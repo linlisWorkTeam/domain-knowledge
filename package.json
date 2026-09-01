@@ -1,0 +1,28 @@
+{
+  "name": "domain-knowledge-agent-framework",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "LangGraph-based multi-agent framework for domain knowledge generation and verification.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "precli": "npm run build --silent",
+    "cli": "node dist/src/cli.js"
+  },
+  "dependencies": {
+    "@langchain/langgraph": "^1.4.13",
+    "@langchain/langgraph-checkpoint-sqlite": "^1.0.4",
+    "@openai/codex-sdk": "^0.152.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.0",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
+  }
+}

@@ -7,7 +7,7 @@
 
 LangGraph 是唯一的顶层编排器，负责节点、边、条件路由、并行 fan-out、循环和 checkpoint。Agent 内部实现通过 `AgentRunner` 接入，可以是 Codex、DeepSeek Harness（DSH）、其他开源 Agent 或自研实现，但不得反向控制或改写顶层工作流。
 
-V1 采用 TypeScript。首个真实后端选择 Codex，原因是当前已有登录额度；框架只复用已有登录状态，不负责登录或账号管理，不在额度或认证失败时静默降级到其他模型。
+V1 采用 TypeScript。云服务器 Demo 可选 Codex，复用已有登录额度；公司环境不允许使用 Codex 或直接调用底层模型 API，只通过公司 CodeAgent CLI 接入。两者都只是 `AgentRunner` 实现，认证失败时显式报错，不静默切换后端。
 
 ## 2. 完整逻辑图
 
@@ -49,12 +49,12 @@ flowchart TD
 | 节点 | 类型 | V1 框架阶段职责 | 允许的占位方式 |
 |---|---|---|---|
 | `OrchestratorAgent` | Agent 节点 | 读取确定性状态并安排下一阶段；V1 使用确定性代码 | 确定性实现 |
-| `DocGenAgent` | Agent 节点 | 生成或修订知识文档，汇总 DocWorker 产物 | `FakeAgentRunner` / Codex |
-| `DocWorkerAgent` | Agent 节点 | 按分块并行生成知识片段 | `FakeAgentRunner`；节点和 Send 路径必须保留 |
-| `TestGenAgent` | Agent 节点 | 从源码与头文件产生候选测试 | `FakeAgentRunner` / Codex |
-| `CodeAgent` | Agent 节点 | 仅依据知识和接口生成实现 | `FakeAgentRunner` / Codex |
-| `CheckAgent` | Agent 节点 | 独立检查代码、diff 和判据，产出检查报告 | `FakeAgentRunner` / Codex |
-| `ReviewAgent` | Agent 节点 | 审查所有有效 Eval 报告与 Check 结论并给出风险、修订建议 | `FakeAgentRunner` / Codex |
+| `DocGenAgent` | Agent 节点 | 生成或修订知识文档，汇总 DocWorker 产物 | Fake / Codex / CodeAgent CLI |
+| `DocWorkerAgent` | Agent 节点 | 按分块并行生成知识片段 | Fake / CodeAgent CLI；节点和 Send 路径必须保留 |
+| `TestGenAgent` | Agent 节点 | 从源码与头文件产生候选测试 | Fake / Codex / CodeAgent CLI |
+| `CodeAgent` | Agent 节点 | 仅依据知识和接口生成实现 | Fake / Codex / CodeAgent CLI |
+| `CheckAgent` | Agent 节点 | 独立检查代码、diff 和判据，产出检查报告 | Fake / Codex / CodeAgent CLI |
+| `ReviewAgent` | Agent 节点 | 审查所有有效 Eval 报告与 Check 结论并给出风险、修订建议 | Fake / Codex / CodeAgent CLI |
 | Oracle 校验 | 确定性组件 | 验证候选测试的 expected output 与真实源码一致 | Fake 或命令实现 |
 | `EvalRunner` | 确定性组件 | 执行可配置的编译、测试和其他评测器 | `FakeEvaluator` / `CommandEvaluator` |
 | `Gate` | 确定性组件 | 根据结构化报告决定 pass、iterate、rollback、stopped | 规则代码，不使用 LLM |
@@ -87,6 +87,10 @@ interface CodexAuthProvider {
   assertAvailable(): Promise<void>;
 }
 
+interface CodeAgentAuthProvider {
+  assertAvailable(): Promise<void>;
+}
+
 interface Evaluator {
   evaluate(input: EvaluationInput): Promise<EvaluationReport>;
 }
@@ -115,6 +119,8 @@ interface ApprovalProvider {
 - `FakeAgentRunner`：覆盖全图 smoke 与故障注入；
 - `CodexAgentRunner`：至少选择一个代表性节点做真实集成；
 - `ExistingLoginAuthProvider`：复用现有 Codex 登录状态；
+- `CompanyCodeAgentCliRunner`：通过 `spawn` + stdin + `stream-json` 调用公司 CLI；
+- `ExistingCodeAgentLoginAuthProvider`：通过 `codeagent auth status --json` 验证 IDAAS 登录；
 - `FakeEvaluator`：稳定地产生 pass、fail、critical regression、infra error；
 - `CommandEvaluator`：执行项目配置提供的命令，不在框架内写死 `g++`；
 - `LocalFileArtifactStore`：写入本地运行目录；
@@ -133,7 +139,7 @@ interface GraphState {
   iteration: number;
   maxIterations: number;        // 默认 5，可配置
   route?: "pass" | "iterate" | "rollback" | "stopped";
-  codexThreadIds: Partial<Record<AgentKind, string>>;
+  agentThreadIds: Partial<Record<AgentKind, string>>;
   artifacts: ArtifactRef[];
   errors: RunError[];
 }
@@ -280,4 +286,3 @@ V1 可以运行在个人本地环境，也可以运行在部门已有的单个�
 5. Artifact 提交、哈希、恢复与损坏检测有效；
 6. 至少一个代表性节点从 Fake 切换到真实 Codex 后不修改图；
 7. 新增或替换 Agent 只影响 Adapter/配置，不要求重写 State、运行时或 Gate。
-
