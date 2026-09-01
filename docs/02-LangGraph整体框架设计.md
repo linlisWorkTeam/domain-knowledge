@@ -115,6 +115,7 @@ interface ApprovalProvider {
 - `FakeAgentRunner`：覆盖全图 smoke 与故障注入；
 - `CompanyCodeAgentCliRunner`：通过 `spawn` + stdin + `stream-json` 调用公司 CLI；
 - `ExistingCodeAgentLoginAuthProvider`：通过 `codeagent auth status --json` 验证 IDAAS 登录；
+- `providers/codex`：独立可选 Provider，通过 `configureRunners` 注入，不进入公司包依赖树；
 - `FakeEvaluator`：稳定地产生 pass、fail、critical regression、infra error；
 - `CommandEvaluator`：执行项目配置提供的命令，不在框架内写死 `g++`；
 - `LocalFileArtifactStore`：写入本地运行目录；

@@ -64,6 +64,28 @@ npm run cli -- run --codeagent-agent doc-gen --codeagent-dangerously-skip-permis
 - Check/Review 节点只启用 `Read,Glob,Grep`，Code 节点才启用 `Bash`；
 - CLI 工具事件只作为辅助证据，Artifact 以可写目录的执行前后文件快照为准。
 
+## 公司与云端依赖隔离
+
+根包就是公司运行时，仅包含 LangGraph、Fake 和 CodeAgent CLI Adapter；根
+`package.json`、`package-lock.json`、`src/` 均不包含 Codex SDK 依赖或静态导入。
+
+```bash
+npm ci
+npm run build
+npm run verify:company
+```
+
+Codex 仅存在于独立的可选包 [`providers/codex`](providers/codex)，只在云服务器 Demo 中单独安装：
+
+```bash
+npm install --prefix providers/codex
+npm --prefix providers/codex test
+codex login
+npm --prefix providers/codex run demo -- run --codex-agent doc-gen
+```
+
+根包的 `files` 白名单不包含 `providers/`，因此生成的公司 npm 发布包也不含 Codex 源码。完整边界和验证方式见 [部署包与 Provider 隔离](docs/06-部署包与Provider隔离.md)。
+
 ## 当前边界
 
 WorkspaceProvider 已建立节点独立工作目录和权限清单，但 V1 尚未接入容器/虚拟机级强制沙箱；各 Agent 的 Prompt、ContextBuilder、分块算法、报告 Schema 和真实质量指标仍是后续工作。框架验收范围见 [docs/03-框架测评与验收.md](docs/03-框架测评与验收.md)。

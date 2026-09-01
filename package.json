@@ -4,14 +4,28 @@
   "private": true,
   "type": "module",
   "description": "LangGraph-based multi-agent framework for domain knowledge generation and verification.",
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "import": "./dist/src/index.js"
+    }
+  },
+  "files": [
+    "dist/src",
+    "README.md"
+  ],
   "engines": {
     "node": ">=20"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "node scripts/build-typescript.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "preverify:company": "npm run build --silent",
+    "verify:company": "node scripts/verify-company-dependencies.mjs",
     "precli": "npm run build --silent",
     "cli": "node dist/src/cli.js"
   },
