@@ -45,6 +45,24 @@ describe("failure handling and adapter seams", () => {
     );
   });
 
+  it("injects an external provider before the graph is compiled", async () => {
+    let calls = 0;
+    const runtime = await createTestRuntime({
+      configureRunners(registry) {
+        registry.register("doc-gen", {
+          async run() {
+            calls += 1;
+            return { finalResponse: "injected", files: [] };
+          },
+        });
+      },
+    });
+    const handle = await runtime.service.startRun({ runId: "provider-injection" });
+
+    expect((await runtime.service.waitForRun(handle.runId)).status).toBe("completed");
+    expect(calls).toBe(1);
+  });
+
   it("materializes different workspace policies for Code and TestGen", async () => {
     const runtime = await createTestRuntime();
     const handle = await runtime.service.startRun({ runId: "workspace-policy" });

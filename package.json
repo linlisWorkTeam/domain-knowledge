@@ -17,8 +17,7 @@
   },
   "dependencies": {
     "@langchain/langgraph": "^1.4.13",
-    "@langchain/langgraph-checkpoint-sqlite": "^1.0.4",
-    "@openai/codex-sdk": "^0.152.0"
+    "@langchain/langgraph-checkpoint-sqlite": "^1.0.4"
   },
   "devDependencies": {
     "@types/node": "^26.4.0",

@@ -10,7 +10,6 @@ function valueAfter(args: string[], flag: string): string | undefined {
 function printHelp(): void {
   console.log(`Usage:
   npm run cli -- run [--workers N] [--max-iterations N]
-                     [--codex-agent KIND]
                      [--codeagent-agent KIND] [--codeagent-cli PATH]
                      [--codeagent-timeout-ms N] [--codeagent-bare]
                      [--codeagent-dangerously-skip-permissions]
@@ -30,16 +29,12 @@ async function main(): Promise<void> {
     return;
   }
 
-  const codexAgent = valueAfter(args, "--codex-agent") as
-    | Exclude<AgentKind, "orchestrator">
-    | undefined;
   const codeAgentAgent = valueAfter(args, "--codeagent-agent") as
     | Exclude<AgentKind, "orchestrator">
     | undefined;
   const codeAgentCliPath = valueAfter(args, "--codeagent-cli");
   const codeAgentTimeout = valueAfter(args, "--codeagent-timeout-ms");
   const runtime = await createRuntime({
-    ...(codexAgent ? { codexAgent } : {}),
     ...(codeAgentAgent ? { codeAgentAgent } : {}),
     ...(codeAgentCliPath ? { codeAgentCliPath } : {}),
     ...(codeAgentTimeout ? { codeAgentTimeoutMs: Number(codeAgentTimeout) } : {}),

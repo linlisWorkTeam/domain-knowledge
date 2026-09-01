@@ -1,8 +1,6 @@
 import type { AgentKind } from "../domain/types.js";
 import { ExistingCodeAgentLoginAuthProvider } from "../agents/codeagent-auth.js";
 import { CompanyCodeAgentCliRunner } from "../agents/codeagent-cli-runner.js";
-import { CodexAgentRunner } from "../agents/codex-runner.js";
-import { ExistingLoginAuthProvider } from "../agents/codex-auth.js";
 import { FakeAgentRunner } from "../agents/fake-runner.js";
 import { MapAgentRunnerRegistry } from "../agents/registry.js";
 import { ScenarioEvaluator } from "../eval/scenario-evaluator.js";
@@ -29,12 +27,14 @@ export interface RuntimeOptions {
   artifactRoot?: string;
   checkpointer?: "sqlite" | "memory";
   sqlitePath?: string;
-  codexAgent?: Exclude<AgentKind, "orchestrator">;
   codeAgentAgent?: Exclude<AgentKind, "orchestrator">;
   codeAgentCliPath?: string;
   codeAgentTimeoutMs?: number;
   codeAgentBare?: boolean;
   codeAgentDangerouslySkipPermissions?: boolean;
+  configureRunners?: (
+    runners: MapAgentRunnerRegistry,
+  ) => void | Promise<void>;
 }
 
 export async function createRuntime(options: RuntimeOptions = {}) {
@@ -43,16 +43,7 @@ export async function createRuntime(options: RuntimeOptions = {}) {
   for (const kind of RUNNER_AGENT_KINDS) {
     runners.register(kind, fakeRunner);
   }
-  if (options.codexAgent) {
-    runners.register(
-      options.codexAgent,
-      new CodexAgentRunner(new ExistingLoginAuthProvider()),
-    );
-  }
   if (options.codeAgentAgent) {
-    if (options.codeAgentAgent === options.codexAgent) {
-      throw new Error(`Agent ${options.codeAgentAgent} cannot use Codex and CodeAgent simultaneously`);
-    }
     const cliPath = options.codeAgentCliPath ?? "codeagent";
     runners.register(
       options.codeAgentAgent,
@@ -69,6 +60,7 @@ export async function createRuntime(options: RuntimeOptions = {}) {
       ),
     );
   }
+  await options.configureRunners?.(runners);
 
   const artifactStore = new LocalFileArtifactStore(options.artifactRoot);
   const workspaceProvider = new LocalWorkspaceProvider(artifactStore.root);

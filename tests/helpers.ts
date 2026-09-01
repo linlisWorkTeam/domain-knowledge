@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach } from "vitest";
 import { createRuntime } from "../src/runtime/composition.js";
+import type { RuntimeOptions } from "../src/runtime/composition.js";
 
 const temporaryRoots: string[] = [];
 
@@ -12,10 +13,11 @@ afterEach(async () => {
   );
 });
 
-export async function createTestRuntime() {
+export async function createTestRuntime(options: RuntimeOptions = {}) {
   const root = await mkdtemp(path.join(os.tmpdir(), "domain-knowledge-test-"));
   temporaryRoots.push(root);
   const runtime = await createRuntime({
+    ...options,
     checkpointer: "memory",
     artifactRoot: path.join(root, "runs"),
   });

@@ -14,10 +14,6 @@ export interface AgentRunnerRegistry {
   get(kind: AgentKind): AgentRunner;
 }
 
-export interface CodexAuthProvider {
-  assertAvailable(): Promise<void>;
-}
-
 export interface CodeAgentAuthProvider {
   assertAvailable(): Promise<void>;
 }

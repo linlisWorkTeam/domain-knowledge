@@ -15,8 +15,8 @@ TypeScript + LangGraph 的多 Agent 框架骨架。当前版本优先验证编�
 - 本地 Artifact、SHA-256 和 completion marker；
 - InMemory/SQLite Checkpointer；
 - Service API 与 CLI；
-- 官方 `@openai/codex-sdk` Adapter，复用现有 Codex 登录，不静默降级。
 - 公司 `CodeAgent CLI` Adapter，通过非交互子进程接入，不依赖底层模型 API。
+- `configureRunners` Provider 注入接缝，核心包不静态导入任何外部 Agent SDK。
 
 ## 快速开始
 
@@ -31,7 +31,7 @@ npm run cli -- run --workers 2
 CLI：
 
 ```text
-run [--workers N] [--max-iterations N] [--codex-agent KIND]
+run [--workers N] [--max-iterations N]
     [--codeagent-agent KIND] [--codeagent-cli PATH]
     [--codeagent-timeout-ms N] [--codeagent-bare]
     [--codeagent-dangerously-skip-permissions]
@@ -40,14 +40,6 @@ status <runId>
 cancel <runId>
 artifacts <runId>
 ```
-
-例如，只把 DocGenAgent 换成真实 Codex，其他节点仍用 Fake：
-
-```bash
-npm run cli -- run --codex-agent doc-gen
-```
-
-Codex 模式使用 `approvalPolicy: never`、`sandboxMode: workspace-write` 和关闭网络访问；认证或额度失败会直接报错。Codex SDK 用法依据 [OpenAI 官方 Codex SDK 文档](https://developers.openai.com/codex/codex-sdk)。
 
 ## 公司 CodeAgent CLI
 

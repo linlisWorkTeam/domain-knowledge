@@ -83,10 +83,6 @@ interface AgentRunnerRegistry {
   get(kind: AgentKind): AgentRunner;
 }
 
-interface CodexAuthProvider {
-  assertAvailable(): Promise<void>;
-}
-
 interface CodeAgentAuthProvider {
   assertAvailable(): Promise<void>;
 }
@@ -117,8 +113,6 @@ interface ApprovalProvider {
 首批实现：
 
 - `FakeAgentRunner`：覆盖全图 smoke 与故障注入；
-- `CodexAgentRunner`：至少选择一个代表性节点做真实集成；
-- `ExistingLoginAuthProvider`：复用现有 Codex 登录状态；
 - `CompanyCodeAgentCliRunner`：通过 `spawn` + stdin + `stream-json` 调用公司 CLI；
 - `ExistingCodeAgentLoginAuthProvider`：通过 `codeagent auth status --json` 验证 IDAAS 登录；
 - `FakeEvaluator`：稳定地产生 pass、fail、critical regression、infra error；
