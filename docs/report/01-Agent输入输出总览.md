@@ -141,7 +141,158 @@ flowchart TD
 - 橙色：确定性组件，不算 Agent。
 - 黄色虚线：尚未确认的边界。
 
-## 2. 公共 Agent 任务契约
+## 2. 分阶段产物流
+
+总图适合检查链路是否完整。汇报单个阶段时，可以直接使用下面三张图。
+
+### 2.1 文档生成
+
+DocWorker 读取分块源码并输出带证据的知识片段，DocGen 是最终知识文档的唯一执笔者。上一版知识和 Review 修订指令也从这里进入下一轮。
+
+```mermaid
+flowchart TD
+    PLAN["TaskPlan / DispatchPlan<br/>分块任务、并发上限、迭代预算"]
+    SRC["源码分块 + 公开头文件<br/>路径、版本、hash"]
+    DEP["模块边界 + 依赖图<br/>文档格式约束"]
+    DW["DocWorkerAgent × N<br/>每个 worker 处理一个分块"]
+    FRAG["知识片段<br/>结构化摘要 + evidence<br/>未解决问题"]
+    PREV["上一版知识文档"]
+    FIX["Review 修订指令<br/>knowledge_path / issue / criterion"]
+    DIRECT["按证据缺口定向补读源码<br/>范围待确认"]
+    DG["DocGenAgent<br/>汇总、消除冲突、修订<br/>唯一执笔者"]
+    DOC["候选知识文档<br/>sources / evidence<br/>合并与冲突报告"]
+    KS["KnowledgeStore 候选区<br/>版本、SHA-256、ledger"]
+
+    PLAN --> DW
+    SRC --> DW
+    DEP --> DW
+    DW --> FRAG
+    FRAG --> DG
+    PREV --> DG
+    FIX --> DG
+    DIRECT -.-> DG
+    DG --> DOC
+    DOC --> KS
+
+    classDef input fill:#e8f5e9,stroke:#388e3c,color:#1b5e20;
+    classDef agent fill:#e1f5fe,stroke:#0288d1,color:#01579b,stroke-width:2px;
+    classDef output fill:#f3e5f5,stroke:#7b1fa2,color:#4a148c;
+    classDef infra fill:#fff3e0,stroke:#f57c00,color:#e65100;
+    classDef pending fill:#fffde7,stroke:#f9a825,color:#5d4037,stroke-dasharray:5 5;
+    class PLAN,SRC,DEP,PREV,FIX input;
+    class DW,DG agent;
+    class FRAG,DOC output;
+    class KS infra;
+    class DIRECT pending;
+```
+
+### 2.2 代码生成与评测
+
+代码生成和测试 Oracle 是两条隔离链路。CodeAgent 看不到真实源码和门禁测试；TestGenAgent 不读取候选知识。两条链路只在 EvalRunner 汇合。
+
+```mermaid
+flowchart TD
+    KS["候选知识文档<br/>KnowledgeStore 候选区"]
+    HEADER["公开接口头文件<br/>目标语言 + 构建约束"]
+    CA["CodeAgent<br/>只读知识和公开接口"]
+    IMPL["实现代码<br/>变更清单 + 假设"]
+
+    SOURCE["真实源码 + 公开头文件<br/>测试框架 + 构建约束"]
+    TG["TestGenAgent<br/>提取行为 Oracle<br/>不读候选知识"]
+    TESTS["候选测试<br/>期望值 + 来源说明"]
+    OV["OracleValidation<br/>在真实源码上运行候选测试"]
+    GATE_TESTS["已验证门禁测试集<br/>期望输出 + 验证证据"]
+
+    RULES["检查判据<br/>diff 范围 + 编码规范"]
+    CK["CheckAgent<br/>新会话、只读检查"]
+    CREP["CheckReport<br/>blocking + findings<br/>文件 / 行号证据"]
+
+    EV["EvalRunner<br/>编译 + 门禁测试 + 客观指标"]
+    EREP["EvaluationReport<br/>pass / fail / critical-regression / infra-error"]
+
+    KS --> CA
+    HEADER --> CA
+    CA --> IMPL
+
+    SOURCE --> TG
+    TG --> TESTS
+    TESTS --> OV
+    SOURCE --> OV
+    OV --> GATE_TESTS
+
+    IMPL --> CK
+    RULES --> CK
+    CK --> CREP
+
+    IMPL --> EV
+    GATE_TESTS --> EV
+    CREP --> EV
+    KS --> EV
+    EV --> EREP
+
+    classDef input fill:#e8f5e9,stroke:#388e3c,color:#1b5e20;
+    classDef agent fill:#e1f5fe,stroke:#0288d1,color:#01579b,stroke-width:2px;
+    classDef output fill:#f3e5f5,stroke:#7b1fa2,color:#4a148c;
+    classDef infra fill:#fff3e0,stroke:#f57c00,color:#e65100;
+    class KS,HEADER,SOURCE,RULES input;
+    class CA,TG,CK agent;
+    class IMPL,TESTS,GATE_TESTS,CREP,EREP output;
+    class OV,EV infra;
+```
+
+### 2.3 Review、门禁与回写
+
+ReviewAgent 负责读取证据、定位问题并给出修订要求。最终路线由确定性 Gate 决定，ReviewAgent 不能直接发布知识。
+
+```mermaid
+flowchart TD
+    EREP["EvaluationReport<br/>结果、日志、失败证据、环境信息"]
+    CREP["CheckReport<br/>blocking + findings<br/>文件 / 行号证据"]
+    KS["候选知识文档<br/>当前版本 + sources / evidence"]
+    HIST["历史最佳版本<br/>Artifact hash"]
+    RS["RunState<br/>iteration + maxIterations"]
+
+    RV["ReviewAgent<br/>只读归因，不改代码"]
+    RREP["ReviewReport<br/>recommendation + findings<br/>knowledge_path / issue / criterion"]
+    G["Gate<br/>确定性规则"]
+
+    PASS["发布<br/>进入 KnowledgeStore 已验证区"]
+    FIX["修订知识<br/>回到 DocGenAgent"]
+    ROLLBACK["回滚<br/>恢复历史最佳版本"]
+    STOP["停止<br/>保留低置信度结果和证据"]
+    FAILED["失败<br/>保留 checkpoint 和错误证据"]
+
+    EREP --> RV
+    CREP --> RV
+    KS --> RV
+    HIST --> RV
+    RV --> RREP
+
+    EREP --> G
+    CREP --> G
+    RREP --> G
+    RS --> G
+    HIST --> G
+
+    G -->|pass| PASS
+    G -->|iterate| FIX
+    G -->|rollback| ROLLBACK
+    G -->|stopped| STOP
+    G -->|failed| FAILED
+
+    classDef input fill:#e8f5e9,stroke:#388e3c,color:#1b5e20;
+    classDef agent fill:#e1f5fe,stroke:#0288d1,color:#01579b,stroke-width:2px;
+    classDef output fill:#f3e5f5,stroke:#7b1fa2,color:#4a148c;
+    classDef infra fill:#fff3e0,stroke:#f57c00,color:#e65100;
+    classDef terminal fill:#eceff1,stroke:#546e7a,color:#263238;
+    class EREP,CREP,KS,HIST,RS input;
+    class RV agent;
+    class RREP output;
+    class G infra;
+    class PASS,FIX,ROLLBACK,STOP,FAILED terminal;
+```
+
+## 3. 公共 Agent 任务契约
 
 下图是所有 Agent 都可共用的外层信封。具体 Prompt 和业务 Schema 可以后续调整，但不应要求改写 LangGraph 顶层图。
 
@@ -169,7 +320,7 @@ flowchart LR
     class FS,AR infra;
 ```
 
-## 3. 每个 Agent 的最小输入输出
+## 4. 每个 Agent 的最小输入输出
 
 | Agent | 最小输入 | 最小输出 | 必须携带的证据 | 禁止项 |
 |---|---|---|---|---|
@@ -181,7 +332,7 @@ flowchart LR
 | CheckAgent | 实现代码、diff、判据清单 | blocking/findings 检查报告 | 文件、行号、触发的判据 | 只读，不直接修改代码，不给最终发布结论 |
 | ReviewAgent | EvaluationReport、CheckReport、候选知识、历史版本 | recommendation、findings、corrections | 失败用例→knowledge_path→修订判据的映射 | 只读，不改代码，不越过确定性 Gate 发布 |
 
-## 4. 当前需要继续确认的问题
+## 5. 当前需要继续确认的问题
 
 1. DocGenAgent 是完全不读源码，还是允许根据证据缺口定向补读；
 2. DocWorker 的分块单位是文件、symbol、模块还是依赖子图；
