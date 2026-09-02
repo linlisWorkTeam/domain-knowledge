@@ -1,8 +1,15 @@
 import { describe, expect, it } from "vitest";
+import { DEFAULT_CODE_AGENT_TIMEOUT_MS } from "../src/agents/codeagent-cli-runner.js";
+import { DEFAULT_GRAPH_NODE_TIMEOUT_MS } from "../src/graph/build-graph.js";
 import { AGENT_GRAPH_NODES, GRAPH_NODES } from "../src/graph/topology.js";
 import { createTestRuntime } from "./helpers.js";
 
 describe("LangGraph topology", () => {
+  it("allows CodeAgent to reach its own timeout before the graph aborts the node", () => {
+    expect(DEFAULT_GRAPH_NODE_TIMEOUT_MS).toBe(600_000);
+    expect(DEFAULT_GRAPH_NODE_TIMEOUT_MS).toBeGreaterThan(DEFAULT_CODE_AGENT_TIMEOUT_MS);
+  });
+
   it("contains every required Agent and deterministic node", async () => {
     const runtime = await createTestRuntime();
     const drawable = await runtime.graph.getGraphAsync();

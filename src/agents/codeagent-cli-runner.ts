@@ -47,6 +47,8 @@ export interface CompanyCodeAgentCliRunnerOptions {
   maxCapturedOutputBytes?: number;
 }
 
+export const DEFAULT_CODE_AGENT_TIMEOUT_MS = 300_000;
+
 interface StreamResult {
   type?: string;
   subtype?: string;
@@ -207,7 +209,7 @@ export class CompanyCodeAgentCliRunner implements AgentRunner {
     this.options = {
       cliPath: options.cliPath ?? "codeagent",
       cliArgsPrefix: options.cliArgsPrefix ?? [],
-      timeoutMs: options.timeoutMs ?? 300_000,
+      timeoutMs: options.timeoutMs ?? DEFAULT_CODE_AGENT_TIMEOUT_MS,
       terminateGraceMs: options.terminateGraceMs ?? 5_000,
       bare: options.bare ?? false,
       dangerouslySkipPermissions: options.dangerouslySkipPermissions ?? false,

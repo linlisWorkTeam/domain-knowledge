@@ -10,6 +10,10 @@ import {
 import { createGraphNodes, type GraphDependencies } from "./nodes.js";
 import { GraphStateAnnotation, type GraphState } from "./state.js";
 
+// Keep the graph-level timeout above the runner timeout so LangGraph does not
+// abort a healthy CodeAgent process before the runner can finish or time out.
+export const DEFAULT_GRAPH_NODE_TIMEOUT_MS = 600_000;
+
 export function buildKnowledgeGraph(
   dependencies: GraphDependencies,
   checkpointer: BaseCheckpointSaver,
@@ -93,7 +97,7 @@ export function buildKnowledgeGraph(
     .addEdge("failed", END)
     .addEdge("stopped", END)
     .setNodeDefaults({
-      timeout: 120_000,
+      timeout: DEFAULT_GRAPH_NODE_TIMEOUT_MS,
       errorHandler: (rawState: unknown, nodeError: NodeError) => {
         const state = rawState as GraphState;
         const occurredAt = new Date().toISOString();
