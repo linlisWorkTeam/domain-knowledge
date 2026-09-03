@@ -1,0 +1,21 @@
+# DeepSeek Harness 作为进程型 AgentProvider 的无密钥配置层。
+# 凭据只从环境变量读取；该文件可以安全提交。
+
+- id: llm-pi-ai
+  config:
+    providers:
+      anthropic:
+        apiKeyEnv: ANTHROPIC_API_KEY
+        baseURL: !!js process.env.ANTHROPIC_BASE_URL
+        models:
+          - id: !!js process.env.WP_DSH_MODEL ?? 'claude-sonnet-4-6'
+            contextWindow: 200000
+            maxTokens: 32768
+        retryPolicy:
+          mode: normal
+          maxRetries: 3
+
+- id: agent-default-model
+  config:
+    provider: anthropic
+    model: !!js process.env.WP_DSH_MODEL ?? 'claude-sonnet-4-6'

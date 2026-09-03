@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wpknowledge.local/schemas/correction/v1",
+  "title": "Correction",
+  "type": "object",
+  "required": ["correctionId", "knowledgePath", "criterion", "evidenceRefs", "risk"],
+  "properties": {
+    "correctionId": {"type": "string", "pattern": "^COR-[0-9]{4,}$"},
+    "knowledgePath": {"type": "string", "minLength": 1},
+    "criterion": {"type": "string", "minLength": 1},
+    "evidenceRefs": {"type": "array", "minItems": 1, "items": {"$ref": "https://wpknowledge.local/schemas/artifact-ref/v1"}},
+    "risk": {"type": "string", "minLength": 1}
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,15 @@
+# 非功能需求
+
+| ID | 优先级 | 可测约束 | 验收场景 |
+|---|---|---|---|
+| NFR-001 | P0 | 安全：默认拒绝；越权、路径穿越、符号链接逃逸和网络访问均失败且记录主体、资源、原因。 | AC-SEC-002 |
+| NFR-002 | P0 | 可恢复：任一持久化节点边界后杀进程，恢复不得丢失已提交 Artifact，也不得重复发布。 | AC-REC-001 |
+| NFR-003 | P0 | 幂等：相同 GenerationKey 和发布键重复提交仅产生一个逻辑结果。 | AC-REC-002 |
+| NFR-004 | P0 | 可审计：所有状态转换、权限拒绝、模型调用、Artifact 血缘和门禁决定可按 runId 导出。 | AC-OBS-001 |
+| NFR-005 | P0 | 可移植：更换模型、Agent runtime、Artifact Store 或编排器只修改对应 Adapter，不修改领域实体。 | AC-ARCH-001 |
+| NFR-006 | P0 | Schema 兼容：事件和命令包含 `schemaVersion`；破坏性变化必须升主版本并提供迁移器。 | AC-SCHEMA-001 |
+| NFR-007 | P0 | 资源治理：每个 Agent/构建/测试具有可配置 wall time、CPU、内存、输出大小和并发上限；超限为结构化失败。 | AC-LANG-002 |
+| NFR-008 | P0 | 可复现：评测报告记录工具链、插件、测试集、模型配置、prompt 与输入 Artifact 的摘要。 | AC-EVAL-003 |
+| NFR-009 | P0 | 隐私：日志不得包含源码正文、密钥或完整 prompt；敏感 Artifact 按边界授权。 | AC-SEC-003 |
+| NFR-010 | P0 | 本地 V1 在 5 个并行 worker 上限内不得因并发产生同路径写冲突；冲突必须在调度前拒绝。 | AC-FLOW-004 |
+| NFR-011 | P0 | 真实源码验收必须记录仓库 URL、本地路径、commit、脏状态、运行时版本、逐条 argv、退出码、截断后的 stdout/stderr 摘要与完整证据 Artifact 摘要；验收不得依赖修改原工作区。 | AC-E2E-001 |

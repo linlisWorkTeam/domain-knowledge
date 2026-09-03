@@ -1,69 +1,45 @@
-# Domain Knowledge 多 Agent 项目文档
+# Knowledge Flywheel 文档中心
 
-> 文档状态：框架搭建阶段  
-> 技术栈：TypeScript + LangGraph  
-> 当前目标：先验证完整编排框架，不提前固化各 Agent 的业务实现细节
+本目录存放 domain-knowledge 的非规范性工程指南。产品行为、权限、状态机和验收条件以 [`../specs/`](../specs/README.md) 为规范性事实源；工程文档负责说明如何理解、运行、修改和维护当前实现。
 
-## 1. 项目目标
+## 按任务查找
 
-本项目使用 LangGraph 搭建一个可替换 Agent 实现、可恢复、可审计的知识生成与验证闭环。当前阶段的交付重点是：
+| 任务 | 文档 | 适合谁 |
+| --- | --- | --- |
+| 第一次安装、初始化和打开 Console；或把完整配置 Prompt 交给 Agent | [GETTING_STARTED.md](GETTING_STARTED.md) | 使用者、Agent、评审者 |
+| 理解治理上层、domain-knowledge/LangGraph 基础设施和知识生命周期 | [ARCHITECTURE.md](ARCHITECTURE.md) | 开发者、架构师 |
+| 搭建开发环境和实现变更 | [DEVELOPMENT.md](DEVELOPMENT.md) | 贡献者、Agent |
+| 只调整某个 Agent 角色，或判断是否必须改核心合同 | [AGENT-CUSTOMIZATION.md](AGENT-CUSTOMIZATION.md) | Agent 定制者、节点开发者、评审者 |
+| 选择测试层级和提交证据 | [TESTING.md](TESTING.md) | 贡献者、评审者 |
+| 确定目录和文件归属 | [REPOSITORY-GUIDE.md](REPOSITORY-GUIDE.md) | 所有贡献者 |
+| 编写中文主文档与英文摘要 | [DOCUMENTATION-I18N.md](DOCUMENTATION-I18N.md) | 所有贡献者、Agent |
+| 摄取、评测、发布、验收和部署 | [OPERATIONS.md](OPERATIONS.md) | 操作员、维护者 |
+| 查看真实 SDK 运行、失败恢复和脱敏证据 | [DeepSeek Harness 治理演示](https://github.com/linlisWorkTeam/wpKnowledge/blob/main/knowledge/3.workpanel/%E8%AF%81%E6%8D%AE/2026-09-02-DeepSeek-Harness%E7%9C%9F%E5%AE%9EAgent%E6%B2%BB%E7%90%86%E6%BC%94%E7%A4%BA.md) | 使用者、评审者、演示者 |
+| 用幻灯片了解架构、流程和 Agent 边界 | [当前 wpKnowledge 知识飞轮方案](https://github.com/linlisWorkTeam/wpKnowledge/blob/main/knowledge/2.wiki/%E8%AE%BE%E8%AE%A1/%E5%BD%93%E5%89%8DwpKnowledge%E7%9F%A5%E8%AF%86%E9%A3%9E%E8%BD%AE%E6%96%B9%E6%A1%88.pptx) | 使用者、开发者、汇报者 |
+| 从旧 Runner 迁移 | [MIGRATION.md](MIGRATION.md) | 旧版本使用者 |
+| 了解跨仓库拆分 | [REPOSITORY-MIGRATION.md](REPOSITORY-MIGRATION.md) | 维护者、评审者 |
+| 本地预览或发布项目官网 | [site/README.md](../site/README.md) | 维护者 |
 
-1. 完整图拓扑能够运行；
-2. 路由、并行、循环、检查点和失败恢复行为正确；
-3. Agent 可以先使用 Fake 实现，之后通过统一 Adapter 替换成 Codex、DSH 或自研 Agent；
-4. 替换 Agent 时不改 LangGraph 顶层工作流；
-5. 所有产物都可追踪、可校验、可恢复。
+## 按角色阅读
 
-当前阶段不以“生成的知识或代码质量达到生产标准”为验收目标。Agent 的 Prompt、上下文协议、分块策略、输出 Schema 等仍允许后续调整。
+- **使用者**：快速上手 → 用户用例 → 运维手册的 Dashboard/API 部分。
+- **贡献者**：根目录贡献指南 → 开发指南 → 测试策略 → 对应 Spec。
+- **架构评审者**：Spec 总入口 → 架构说明 → ADR → 追踪矩阵。
+- **操作员**：安全策略 → 运维手册 → 数据边界 Spec。
 
-## 2. 不可破坏的框架约束
+相关入口：
 
-以下 7 类 Agent 节点必须全部保留在图、状态、日志和测试中，未经明确确认不得删除、合并、绕过或改名后隐藏：
+- [仓库首页](../README.md)
+- [贡献指南](../CONTRIBUTING.md)
+- [安全策略](../SECURITY.md)
+- [组件首页](../README.md)
+- [Spec 总入口](../specs/README.md)
 
-1. `OrchestratorAgent`
-2. `DocGenAgent`
-3. `DocWorkerAgent`
-4. `TestGenAgent`
-5. `CodeAgent`
-6. `CheckAgent`
-7. `ReviewAgent`
+## 文档维护规则
 
-同样必须保留的非 Agent 环节包括：候选知识写入、测试 Oracle 校验、`EvalRunner`、确定性 `Gate`、知识发布。`Sandbox`、`Protection`、`ArtifactStore`、`WorkspaceProvider` 和 `Checkpointer` 是平台服务，不应伪装成 Agent。
-
-即使某节点尚无真实实现，也只能使用 `FakeAgentRunner` 占位，不能从工作流中移除。`DocWorkerAgent × N` 默认可以配置为 `workerCount = 0`，但必须存在至少一个 smoke 场景实际走 `Send` fan-out 和汇聚路径。
-
-## 3. 文档索引
-
-| 文档 | 用途 | 状态 |
-|---|---|---|
-| [01-多agent调研.md](01-多agent调研.md) | 原始调研、角色划分和研究依据；从 `knowledge/2.wiki` 完整保留 | 调研基线 |
-| [02-LangGraph整体框架设计.md](02-LangGraph整体框架设计.md) | 当前已确认的整体架构、边界、状态、接口、权限和恢复设计 | 实现依据 |
-| [03-框架测评与验收.md](03-框架测评与验收.md) | 回答“框架怎么测、怎么证明有效” | 验收依据 |
-| [04-知识回写与治理.md](04-知识回写与治理.md) | 从旧知识治理文档提炼的回写、版本和发布规则 | 领域规则 |
-| [05-决策记录与待定项.md](05-决策记录与待定项.md) | 区分已确认事项和暂未确认的 Agent 细节 | 变更入口 |
-| [06-部署包与Provider隔离.md](06-部署包与Provider隔离.md) | 公司 CodeAgent 与云端 Codex 的依赖、锁文件和发布包隔离 | 部署基线 |
-| [report/README.md](report/README.md) | 阶段汇报用的流程图、输入输出图和结论摘要 | 汇报材料 |
-
-为保持完整迁移的 `01` 中历史链接可用，目录还保留了 `02-编排模式调研.md`、`03-开源编排框架.md`、`04-开源仓库案例.md` 三个兼容入口；它们只指向已经合并后的现行文档，不再复制旧的重复正文。
-
-## 4. 文档优先级
-
-当文档内容发生冲突时，按以下顺序处理：
-
-1. 用户最新明确确认的决策；
-2. `02-LangGraph整体框架设计.md` 与 `03-框架测评与验收.md`；
-3. `05-决策记录与待定项.md`；
-4. `01-多agent调研.md` 中的历史调研结论。
-
-`01` 被完整保留，因此其中可能包含探索期方案、旧链接或待验证观点。它是研究依据，不自动覆盖后续已确认的项目决策。
-
-## 5. 迁移说明
-
-本目录已吸收 `knowledge/2.wiki/多agent选型` 中长期有用的内容：
-
-- `01-多agent调研.md` 原样保留；
-- 原 `02`、`03`、`04` 中仍适用的选型与架构内容，按当前确认结果合并进新 `02`；
-- 原 `05` 的知识治理规则，整理进新 `04`；
-- 新增独立的框架测评与验收文档，避免将框架正确性与 Agent 产出质量混为一谈。
-
-迁移完成后，旧 `knowledge/2.wiki` 已从当前 `domain-knowledge` 工作区移除，不会进入本仓库提交；长期维护入口统一为本 `docs/` 目录。
+1. 文档只描述当前可证明行为；路线或假设必须明确标记。
+2. 行为变化先更新 Spec，再同步本目录的操作说明。
+3. 命令必须从仓库根目录可执行，并注明额外前提。
+4. 相对链接必须通过 `component-layout` 契约测试。
+5. 不在仓库根目录创建第二个 `docs/`；组件相关文档全部留在本目录。
+6. 解释性文字以中文为主；关键入口按 [I18n 约定](DOCUMENTATION-I18N.md)提供 English summary。

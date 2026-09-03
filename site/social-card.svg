@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">WORKPANEL · KNOWLEDGE FLYWHEEL</title>
+  <desc id="desc">可验证的知识飞轮</desc>
+  <defs>
+    <radialGradient id="bg" cx="0" cy="0" r="1" gradientTransform="translate(864 80) rotate(132) scale(760 650)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#173548"/>
+      <stop offset=".55" stop-color="#0B1119"/>
+      <stop offset="1" stop-color="#080B10"/>
+    </radialGradient>
+    <linearGradient id="accent" x1="163" y1="100" x2="995" y2="550" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#88DFFF"/>
+      <stop offset="1" stop-color="#65E5B9"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <g opacity=".16" stroke="#6FCFF5">
+    <path d="M0 114h1200M0 226h1200M0 338h1200M0 450h1200M0 562h1200"/>
+    <path d="M102 0v630M214 0v630M326 0v630M438 0v630M550 0v630M662 0v630M774 0v630M886 0v630M998 0v630M1110 0v630"/>
+  </g>
+  <g transform="translate(86 80)">
+    <rect width="72" height="72" rx="21" fill="#101722" stroke="#314156" stroke-width="2"/>
+    <path d="M36 12 60 36 36 60 12 36 36 12Z" fill="none" stroke="url(#accent)" stroke-width="4"/>
+    <path d="m36 23 13 13-13 13-13-13 13-13Z" fill="#72DCC1" fill-opacity=".16" stroke="url(#accent)" stroke-width="2"/>
+    <circle cx="36" cy="36" r="5" fill="url(#accent)"/>
+  </g>
+  <text x="180" y="125" fill="#F1F5F9" font-family="Inter,Arial,sans-serif" font-size="38" font-weight="700">WORKPANEL · KNOWLEDGE FLYWHEEL</text>
+  <text x="181" y="151" fill="#72D4FA" font-family="Microsoft YaHei,Arial,sans-serif" font-size="14" font-weight="700" letter-spacing="5">知识飞轮</text>
+  <text x="88" y="285" fill="#F3F7FA" font-family="Inter,Arial,sans-serif" font-size="68" font-weight="700">这次踩过的坑，</text>
+  <text x="88" y="372" fill="url(#accent)" font-family="Inter,Arial,sans-serif" font-size="68" font-weight="700">下次别再踩。</text>
+  <text x="91" y="434" fill="#9BAABC" font-family="Microsoft YaHei,Arial,sans-serif" font-size="25">规范驱动 · 证据优先 · 确定性门禁</text>
+  <g transform="translate(89 500)">
+    <rect width="183" height="48" rx="24" fill="#112B2A" stroke="#2D765F"/>
+    <circle cx="26" cy="24" r="5" fill="#72E7B7"/>
+    <text x="44" y="31" fill="#8CE9C5" font-family="Microsoft YaHei,Arial,sans-serif" font-size="19" font-weight="700">已验证</text>
+  </g>
+  <g transform="translate(830 190)" fill="none" stroke="url(#accent)">
+    <circle cx="135" cy="125" r="164" opacity=".12"/>
+    <circle cx="135" cy="125" r="118" opacity=".24"/>
+    <path d="M135 31 229 125 135 219 41 125 135 31Z" stroke-width="3"/>
+    <path d="m135 72 53 53-53 53-53-53 53-53Z" stroke-width="2"/>
+    <circle cx="135" cy="125" r="12" fill="#72DCC1" stroke="none"/>
+  </g>
+</svg>

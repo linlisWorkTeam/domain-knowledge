@@ -1,0 +1,6 @@
+# 公网演示覆盖层。Connection token 保护首页和 API；生产环境仍应增加 TLS 反向代理。
+
+- id: webserver
+  config:
+    host: 0.0.0.0
+    port: !!js Number(process.env.WP_DSH_WEB_PORT ?? 3080)

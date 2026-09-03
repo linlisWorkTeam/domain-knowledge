@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <meta name="theme-color" content="#090c11">
+  <meta name="description" content="知识飞轮会把工程经验先当候选，跑过独立评测、留下完整证据后，再决定它能不能进入正式知识库。">
+  <meta name="robots" content="index, follow">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="zh_CN">
+  <meta property="og:title" content="WORKPANEL · KNOWLEDGE FLYWHEEL">
+  <meta property="og:description" content="文档写得像答案还不够。让知识跑一次，再决定要不要相信它。">
+  <meta property="og:url" content="https://linlisworkteam.github.io/domain-knowledge/">
+  <meta property="og:image" content="https://linlisworkteam.github.io/domain-knowledge/social-card.svg">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>WORKPANEL · KNOWLEDGE FLYWHEEL</title>
+  <link rel="canonical" href="https://linlisworkteam.github.io/domain-knowledge/">
+  <link rel="icon" href="./mark.svg?v=20260903-1" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css?v=20260903-1">
+</head>
+<body>
+  <a class="skip-link" href="#main-content">跳到主要内容</a>
+
+  <header class="site-header" data-header>
+    <div class="nav-shell">
+      <a class="brand" href="#top" aria-label="知识飞轮首页">
+        <img src="./mark.svg?v=20260903-1" width="38" height="38" alt="">
+        <span>
+          <strong>知识飞轮</strong>
+          <small>可验证的工程知识</small>
+        </span>
+      </a>
+
+      <nav class="desktop-nav" aria-label="主要导航">
+        <a href="#why">为什么</a>
+        <a href="#flywheel">飞轮流程</a>
+        <a href="#use-cases">使用场景</a>
+        <a href="#evidence-demo">真实演示</a>
+        <a href="#architecture">架构</a>
+        <a href="#quickstart">开始使用</a>
+      </nav>
+
+      <div class="header-actions">
+        <button class="theme-button" type="button" data-theme-toggle aria-label="切换明暗主题">
+          <span class="theme-sun" aria-hidden="true">☼</span>
+          <span class="theme-moon" aria-hidden="true">◐</span>
+        </button>
+        <a class="header-github" href="https://github.com/linlisWorkTeam/domain-knowledge">源码仓库 <span aria-hidden="true">↗</span></a>
+        <button class="menu-button" type="button" data-menu-toggle aria-expanded="false" aria-controls="mobile-menu">
+          <span></span><span></span>
+          <span class="sr-only">打开导航</span>
+        </button>
+      </div>
+    </div>
+
+    <nav id="mobile-menu" class="mobile-nav" data-mobile-menu aria-label="移动端导航" hidden>
+      <a href="#why">为什么</a>
+      <a href="#flywheel">飞轮流程</a>
+      <a href="#use-cases">使用场景</a>
+      <a href="#evidence-demo">真实演示</a>
+      <a href="#architecture">架构</a>
+      <a href="#quickstart">开始使用</a>
+      <a href="https://github.com/linlisWorkTeam/domain-knowledge">源码仓库 ↗</a>
+    </nav>
+  </header>
+
+  <main id="main-content">
+    <section id="top" class="hero section-shell">
+      <div class="hero-copy reveal">
+        <div class="status-line">
+          <span class="pulse-dot" aria-hidden="true"></span>
+          关键能力实现验收
+        </div>
+        <h1>这次踩过的坑，<br><em>下次别再踩。</em></h1>
+        <p class="hero-lead">知识飞轮会先把工程经验当作候选知识，不急着宣布它是正确答案。智能体根据候选知识生成实现，独立评测器负责找错。只有测试结果和证据都经得起核对，这份知识才会进入正式知识库。</p>
+        <div class="hero-actions">
+          <a class="button primary" href="#quickstart">五分钟开始 <span aria-hidden="true">→</span></a>
+          <a class="button secondary" href="https://github.com/linlisWorkTeam/domain-knowledge">查看源码 <span aria-hidden="true">↗</span></a>
+        </div>
+        <ul class="principle-row" aria-label="产品原则">
+          <li><span>01</span> 规范驱动</li>
+          <li><span>02</span> 证据优先</li>
+          <li><span>03</span> 本地优先</li>
+          <li><span>04</span> 默认拒绝</li>
+        </ul>
+      </div>
+
+      <div class="hero-visual reveal" aria-label="一次知识飞轮运行的证据链示意">
+        <div class="orbit orbit-one" aria-hidden="true"></div>
+        <div class="orbit orbit-two" aria-hidden="true"></div>
+        <div class="run-window">
+          <div class="window-bar">
+            <div class="window-dots" aria-hidden="true"><i></i><i></i><i></i></div>
+            <span>运行 / 示例项目</span>
+            <span class="live-label"><i></i> 实时证据</span>
+          </div>
+          <div class="run-body">
+            <div class="run-heading">
+              <div>
+                <span class="mono-label">实时运行 5503b6bc… · 第 1 轮</span>
+                <strong>知识验证</strong>
+              </div>
+              <span class="badge pass">通过</span>
+            </div>
+            <ol class="run-track">
+              <li class="done"><i>✓</i><span>摄取</span></li>
+              <li class="done"><i>✓</i><span>生成</span></li>
+              <li class="done"><i>✓</i><span>评测</span></li>
+              <li class="done"><i>✓</i><span>复核</span></li>
+              <li class="active"><i>◇</i><span>发布</span></li>
+            </ol>
+            <div class="evidence-stack">
+              <div class="evidence-row">
+                <span class="evidence-icon cyan">⌁</span>
+                <div><small>固定来源</small><b>提交 3b2e607 · 归档快照</b></div>
+                <code>已锁定</code>
+              </div>
+              <div class="evidence-row">
+                <span class="evidence-icon green">✓</span>
+                <div><small>独立评测</small><b>1 / 1 项行为检查通过</b></div>
+                <code>1.000</code>
+              </div>
+              <div class="evidence-row">
+                <span class="evidence-icon violet">⌘</span>
+                <div><small>发布回执</small><b>工件完整性已核验</b></div>
+                <code>原子提交</code>
+              </div>
+            </div>
+            <div class="trust-footer">
+              <span><i class="health good"></i> 知识登记簿</span>
+              <span><i class="health good"></i> 内容寻址存储</span>
+              <span><i class="health good"></i> 评测器</span>
+              <span class="receipt">sha256:b189…9551</span>
+            </div>
+          </div>
+        </div>
+        <div class="floating-note note-top"><span>门禁判定</span><strong>确定性</strong></div>
+        <div class="floating-note note-bottom"><span>故障重放</span><strong>幂等</strong></div>
+      </div>
+    </section>
+
+    <section class="trust-band" aria-label="核心保障">
+      <div class="section-shell trust-grid">
+        <div><strong>不可变</strong><span>内容寻址工件库</span></div>
+        <div><strong>可追踪</strong><span>运行 → 事件 → 证据</span></div>
+        <div><strong>可恢复</strong><span>检查点与重放</span></div>
+        <div><strong>可审计</strong><span>原子发布</span></div>
+      </div>
+    </section>
+
+    <section id="why" class="section section-shell">
+      <div class="section-intro reveal">
+        <p class="eyebrow">为什么需要知识飞轮</p>
+        <h2>写得像答案，<br>不代表真的能用。</h2>
+        <p>知识飞轮不只保存结论。它还记下结论怎么被验证、失败后改了哪里，以及最后是谁按规则放行。</p>
+      </div>
+
+      <div class="comparison-grid">
+        <article class="comparison-card candidate-card reveal">
+          <div class="card-topline"><span>未经行为验证</span><span class="badge candidate">候选</span></div>
+          <h3>看起来像答案</h3>
+          <p>有结构、有来源、质量门禁通过，但还没有独立执行证据。它可以进入评测，不能直接进入正式查询结果。</p>
+          <ul>
+            <li><i>—</i> 文档质量 ≠ 行为正确</li>
+            <li><i>—</i> 智能体自评分 ≠ 独立证据</li>
+            <li><i>—</i> 单次成功 ≠ 稳定可复用</li>
+          </ul>
+        </article>
+
+        <div class="gate-column reveal" aria-hidden="true">
+          <span>质量检查</span>
+          <div class="gate-line"><i></i><b>门禁</b><i></i></div>
+          <span>行为验证</span>
+        </div>
+
+        <article class="comparison-card verified-card reveal">
+          <div class="card-topline"><span>证据完整且可重放</span><span class="badge pass">已验证</span></div>
+          <h3>经得起下一次使用</h3>
+          <p>绑定固定来源、完整测试报告、工具链指纹和不可变工件，再由确定性门禁与原子事务完成发布。</p>
+          <ul>
+            <li><i>✓</i> 独立评测器产生证据</li>
+            <li><i>✓</i> 失败后生成结构化纠正意见</li>
+            <li><i>✓</i> 发布可追踪且幂等</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section id="flywheel" class="section flywheel-section">
+      <div class="section-shell">
+        <div class="section-intro centered reveal">
+          <p class="eyebrow">飞轮流程</p>
+          <h2>测试失败后，<br>飞轮才真正开始工作。</h2>
+          <p>点开每个阶段，看看智能体、编排服务和确定性基础设施各自负责什么。</p>
+        </div>
+
+        <div class="flywheel-lab reveal">
+          <div class="stage-selector" role="tablist" aria-label="知识飞轮阶段">
+            <button class="stage-button active" type="button" role="tab" aria-selected="true" data-stage="ingest">
+              <span>01</span><b>摄取候选</b><small>保存来源</small>
+            </button>
+            <button class="stage-button" type="button" role="tab" aria-selected="false" data-stage="generate">
+              <span>02</span><b>生成实现</b><small>隔离生成</small>
+            </button>
+            <button class="stage-button" type="button" role="tab" aria-selected="false" data-stage="evaluate">
+              <span>03</span><b>独立评测</b><small>执行验证</small>
+            </button>
+            <button class="stage-button" type="button" role="tab" aria-selected="false" data-stage="correct">
+              <span>04</span><b>归因迭代</b><small>纠正知识</small>
+            </button>
+            <button class="stage-button" type="button" role="tab" aria-selected="false" data-stage="publish">
+              <span>05</span><b>门禁发布</b><small>原子提交</small>
+            </button>
+          </div>
+
+          <div class="stage-detail" data-stage-detail role="tabpanel" aria-live="polite">
+            <div>
+              <p class="mono-label" data-stage-kicker>输入 · 来源记录</p>
+              <h3 data-stage-title>先保存来源，再讨论答案</h3>
+              <p data-stage-description>文档、固定提交或项目经验进入内容寻址存储，系统创建候选版本，并保留来源、版本与完整性信息。</p>
+            </div>
+            <dl class="stage-facts">
+              <div><dt>主要参与者</dt><dd data-stage-actor>工程师 · 知识登记簿 · 内容寻址存储</dd></div>
+              <div><dt>不可绕过</dt><dd data-stage-guard>来源记录与内容摘要</dd></div>
+              <div><dt>输出</dt><dd data-stage-output>候选知识版本</dd></div>
+            </dl>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="use-cases" class="section section-shell">
+      <div class="section-heading reveal">
+        <div>
+          <p class="eyebrow">使用场景</p>
+          <h2>谁在什么时候使用它？</h2>
+        </div>
+        <a class="text-link" href="https://github.com/linlisWorkTeam/domain-knowledge/blob/main/specs/05-workflows/user-use-cases.md">查看完整用例与时序图 <span aria-hidden="true">↗</span></a>
+      </div>
+
+      <div class="use-case-grid">
+        <article class="use-card reveal">
+          <span class="use-number">场景 / 001</span>
+          <div class="use-icon cyan" aria-hidden="true">⌕</div>
+          <h3>消费已验证知识</h3>
+          <p>工程师按关键词查询，只获得已经发布并验证的版本，再沿来源和证据链判断它是否适用于当前任务。</p>
+          <div class="use-flow"><span>查询</span><i>→</i><span>核对证据</span><i>→</i><span>反馈</span></div>
+        </article>
+
+        <article class="use-card featured reveal">
+          <span class="use-number">场景 / 003</span>
+          <div class="use-icon violet" aria-hidden="true">↻</div>
+          <h3>让智能体从失败中学习</h3>
+          <p>质量门禁会把结构和验证弱项交还文档生成智能体；行为失败时，复核智能体会生成纠正意见。两条路径都会由编排服务自动进入下一轮。</p>
+          <div class="use-flow"><span>失败</span><i>→</i><span>归因</span><i>→</i><span>重试</span></div>
+        </article>
+
+        <article class="use-card reveal">
+          <span class="use-number">场景 / 004</span>
+          <div class="use-icon green" aria-hidden="true">✓</div>
+          <h3>审计真实源码发布</h3>
+          <p>发布验收者核对固定提交、执行命令、工具版本、测试结果、门禁判定和发布回执。</p>
+          <div class="use-flow"><span>固定提交</span><i>→</i><span>评测</span><i>→</i><span>回执</span></div>
+        </article>
+      </div>
+    </section>
+
+    <section id="evidence-demo" class="section section-shell">
+      <div class="section-heading reveal">
+        <div>
+          <p class="eyebrow">真实运行证据</p>
+          <h2>三次真实运行，留下三类证据。</h2>
+        </div>
+        <a class="text-link" href="https://github.com/linlisWorkTeam/wpKnowledge/blob/main/knowledge/3.workpanel/%E8%AF%81%E6%8D%AE/2026-09-02-DeepSeek-Harness%E7%9C%9F%E5%AE%9EAgent%E6%B2%BB%E7%90%86%E6%BC%94%E7%A4%BA.md">阅读完整运行记录 <span aria-hidden="true">↗</span></a>
+      </div>
+
+      <div class="use-case-grid">
+        <article class="use-card reveal">
+          <span class="use-number">演示 / 甲</span>
+          <div class="use-icon cyan" aria-hidden="true">↗</div>
+          <h3>两轮质量反馈</h3>
+          <p>无界面兼容样例先被质量门禁拒绝，弱项随后交回文档生成智能体；第二轮通过 295/295 项检查并发布。</p>
+          <div class="use-flow"><span>继续迭代</span><i>→</i><span>通过</span></div>
+        </article>
+
+        <article class="use-card featured reveal">
+          <span class="use-number">演示 / 乙</span>
+          <div class="use-icon violet" aria-hidden="true">×</div>
+          <h3>越界就停</h3>
+          <p>官方开发工具包隔离样例发现代码生成角色额外输出了测试文件。路径白名单拒绝继续，31/31 个工件得到保留，发布次数为 0。</p>
+          <div class="use-flow"><span>拒绝</span><i>→</i><span>审计</span></div>
+        </article>
+
+        <article class="use-card reveal">
+          <span class="use-number">演示 / 丙</span>
+          <div class="use-icon green" aria-hidden="true">✓</div>
+          <h3>官方开发工具包闭环</h3>
+          <p>文档生成智能体首次返回无法解析的内容后，在同一次运行中恢复，最终完成验证并通过门禁；14 个节点、46 个事件、12/12 个工件完整。</p>
+          <div class="use-flow"><span>恢复</span><i>→</i><span>已验证</span></div>
+        </article>
+      </div>
+
+      <div class="quick-links reveal">
+        <a href="https://github.com/linlisWorkTeam/wpKnowledge/blob/main/knowledge/2.wiki/%E8%AE%BE%E8%AE%A1/%E5%BD%93%E5%89%8DwpKnowledge%E7%9F%A5%E8%AF%86%E9%A3%9E%E8%BD%AE%E6%96%B9%E6%A1%88.pptx">下载方案演示文稿 ↗</a>
+        <a href="https://github.com/linlisWorkTeam/wpKnowledge/tree/main/knowledge/3.workpanel/%E8%AF%81%E6%8D%AE/%E6%BC%94%E7%A4%BA%E7%B4%A0%E6%9D%90">查看脱敏报告与截图 ↗</a>
+        <a href="https://github.com/linlisWorkTeam/wpKnowledge/tree/main/knowledge">浏览知识仓库 ↗</a>
+      </div>
+    </section>
+
+    <section id="architecture" class="section architecture-section">
+      <div class="section-shell architecture-grid">
+        <div class="section-intro reveal">
+          <p class="eyebrow">技术架构</p>
+          <h2>一个核心，<br>多种入口。</h2>
+          <p>命令行、服务接口、网页控制台和外部适配器都调用同一个应用核心。内嵌的工作流基础设施负责节点、并行、循环和恢复；知识飞轮仍是知识、评测与发布状态的唯一业务依据。</p>
+          <a class="text-link" href="https://github.com/linlisWorkTeam/domain-knowledge/blob/main/docs/ARCHITECTURE.md">阅读架构说明 <span aria-hidden="true">↗</span></a>
+        </div>
+
+        <div class="architecture-map reveal" aria-label="六边形架构依赖方向">
+          <div class="arch-layer entry-layer">
+            <span>交互入口</span>
+            <div><b>命令行</b><b>服务接口</b><b>网页</b><b>外部适配器</b></div>
+          </div>
+          <i class="arch-arrow" aria-hidden="true">↓</i>
+          <div class="arch-layer application-layer">
+            <span>应用层</span>
+            <strong>知识用例 · 治理流程 · 端口契约</strong>
+          </div>
+          <i class="arch-arrow" aria-hidden="true">↓</i>
+          <div class="arch-layer application-layer">
+            <span>基础设施层</span>
+            <strong>工作流 · 智能体节点 · 持久化</strong>
+          </div>
+          <i class="arch-arrow" aria-hidden="true">↓</i>
+          <div class="arch-layer domain-layer">
+            <span>领域核心</span>
+            <strong>知识 · 运行 · 门禁 · 发布</strong>
+          </div>
+          <div class="adapter-row">
+            <div><span>适配器</span><b>本地知识登记簿</b></div>
+            <div><span>适配器</span><b>内容寻址工件库</b></div>
+            <div><span>适配器</span><b>项目评测器</b></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section boundary-section section-shell">
+      <div class="boundary-box reveal">
+        <div>
+          <p class="eyebrow warning">信任边界</p>
+          <h2>有些事，<br>它现在还做不到。</h2>
+        </div>
+        <div class="boundary-list">
+          <p><span>01</span>固定项目验收只面向受信源码，不是用来运行敌对代码的系统沙箱。</p>
+          <p><span>02</span>确定性夹具只能证明编排正确；一次真实运行也不能证明模型长期稳定。</p>
+          <p><span>03</span>网页控制台默认只读，普通智能体没有自行发布权限。</p>
+          <p><span>04</span>发布门禁只接受完整、匹配且可以校验的独立证据。</p>
+          <p><span>05</span>智能体只能追加提示词；职责、输入输出、拓扑与工具权限不可替换。</p>
+          <p><span>06</span>代码生成角色由当前智能体提供方执行，并通过文件白名单和系统级隔离避开参考源码；这并不等于具备敌对代码沙箱。</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="quickstart" class="section quickstart-section">
+      <div class="section-shell">
+        <div class="section-intro reveal">
+          <p class="eyebrow">开始使用</p>
+          <h2>自己动手，或者交给智能体。</h2>
+          <p>两条路径做的是同一件事：装好依赖、跑完门禁、初始化本地知识登记簿，然后以只读模式打开控制台。</p>
+        </div>
+
+        <div class="onboarding reveal">
+          <div class="onboarding-tabs" role="tablist" aria-label="快速入门方式">
+            <button class="active" type="button" role="tab" aria-selected="true" data-onboarding-tab="human">我来运行</button>
+            <button type="button" role="tab" aria-selected="false" data-onboarding-tab="agent" tabindex="-1">交给智能体</button>
+          </div>
+
+          <div class="onboarding-panel" data-onboarding-panel="human" role="tabpanel">
+            <div class="onboarding-copy">
+              <p class="mono-label">人工运行</p>
+              <h3>看着每一步跑完</h3>
+              <p>需要版本管理工具、24 或更高版本的运行时和包管理器。命令结束后，在浏览器打开本地控制台；新环境还没有已验证知识时，查询为空是正常的。</p>
+              <div class="quick-links">
+                <a href="https://github.com/linlisWorkTeam/domain-knowledge/blob/main/docs/GETTING_STARTED.md">完整快速上手 ↗</a>
+                <a href="https://github.com/linlisWorkTeam/domain-knowledge/blob/main/CONTRIBUTING.md">贡献指南 ↗</a>
+              </div>
+            </div>
+            <div class="terminal">
+              <div class="terminal-head">
+                <span><i></i><i></i><i></i></span>
+                <b>命令行 · 知识飞轮</b>
+                <button type="button" data-copy-target="#user-quickstart-command" data-copy-label="启动命令已复制" aria-label="复制快速启动命令">复制</button>
+              </div>
+              <pre><code id="user-quickstart-command">git clone https://github.com/linlisWorkTeam/domain-knowledge.git
+cd domain-knowledge
+npm ci
+npm run typecheck
+npm run validate:specs
+npm test
+npm run knowledge -- init
+npm run knowledge:serve</code></pre>
+              <div class="terminal-result"><span>→</span> 打开 <b>http://127.0.0.1:4174</b></div>
+            </div>
+          </div>
+
+          <div class="onboarding-panel" data-onboarding-panel="agent" role="tabpanel" hidden>
+            <div class="onboarding-copy">
+              <p class="mono-label">智能体运行</p>
+              <h3>复制任务说明，让智能体接手</h3>
+              <p>这段任务说明会要求智能体保护现有改动、执行真实门禁、用独立运行目录启动服务，并把失败如实告诉你。</p>
+              <div class="quick-links">
+                <a href="https://github.com/linlisWorkTeam/domain-knowledge/blob/main/docs/GETTING_STARTED.md#路径-b交给-agent-配置和启动">阅读任务说明 ↗</a>
+                <a href="https://github.com/linlisWorkTeam/domain-knowledge/blob/main/docs/AGENT-CUSTOMIZATION.md">定制单个智能体角色 ↗</a>
+                <a href="https://github.com/linlisWorkTeam/domain-knowledge/blob/main/specs/README.md">规范总入口 ↗</a>
+              </div>
+            </div>
+            <div class="terminal agent-terminal">
+              <div class="terminal-head">
+                <span><i></i><i></i><i></i></span>
+                <b>智能体任务 · 配置知识飞轮</b>
+                <button type="button" data-copy-target="#agent-setup-prompt" data-copy-label="智能体任务说明已复制" aria-label="复制智能体任务说明">复制任务说明</button>
+              </div>
+              <pre><code id="agent-setup-prompt">请从 0 到 1 配置并启动知识飞轮。你需要实际执行命令、处理可安全修复的问题，并在最后给出可核对的结果。
+
+仓库：https://github.com/linlisWorkTeam/domain-knowledge
+
+执行要求：
+1. 如果当前目录已经是 domain-knowledge，先检查 git status，保留所有未提交改动；否则克隆仓库并进入目录。不要覆盖用户文件。
+2. 阅读 README.md、CONTRIBUTING.md、docs/GETTING_STARTED.md 和 specs/README.md。
+3. 检查 Git、Node.js 和 npm。Node.js 必须是 24 或更高版本；版本不满足时，使用机器已有的版本管理器升级，并说明改了什么。
+4. 执行 npm ci、npm run typecheck、npm run validate:specs、npm test。任何门禁失败都要先定位原因；不得跳过测试、降低阈值或伪造通过结果。
+5. 使用独立运行目录初始化：
+   WP_FLYWHEEL_HOME=.workpanel npm run knowledge -- init
+   WP_FLYWHEEL_HOME=.workpanel npm run knowledge -- status
+6. 以只读模式启动控制台：
+   WP_FLYWHEEL_HOME=.workpanel npm run knowledge:serve
+   检查 http://127.0.0.1:4174/health，并确认首页可访问。
+7. 除非我明确要求公网访问，否则只监听 127.0.0.1。不要设置 WP_KNOWLEDGE_WRITE_TOKEN，不要把令牌、数据库、内容寻址存储或 .workpanel 提交到版本库。
+8. 不得手工把候选状态改成已验证，不得调用已经退休的评分、评测或摄取命令，也不得把确定性夹具写成真实模型质量证明。
+9. 最后报告：实际 Node/npm 版本、运行过的检查及结果、服务 PID、访问地址、运行目录、git status，以及仍未解决的问题。若服务无法启动，保留完整错误摘要并给出下一步。</code></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="cta-section section-shell reveal">
+      <div class="cta-copy">
+        <p class="eyebrow">留下经得起复验的知识</p>
+        <h2>把这次调试留下来，<br>别让下个人重来一遍。</h2>
+      </div>
+      <div class="cta-actions">
+        <a class="button primary" href="https://github.com/linlisWorkTeam/domain-knowledge">查看项目源码 <span aria-hidden="true">↗</span></a>
+        <a class="button secondary" href="https://github.com/linlisWorkTeam/domain-knowledge/blob/main/README.md">阅读项目文档</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="section-shell footer-grid">
+      <div class="footer-brand">
+        <img src="./mark.svg?v=20260903-1" width="34" height="34" alt="">
+        <div><strong>知识飞轮</strong><small>经得起复验的工程知识</small></div>
+      </div>
+      <div class="footer-links">
+        <a href="https://github.com/linlisWorkTeam/domain-knowledge">源码仓库</a>
+        <a href="https://github.com/linlisWorkTeam/domain-knowledge/blob/main/CONTRIBUTING.md">贡献指南</a>
+        <a href="https://github.com/linlisWorkTeam/domain-knowledge/blob/main/SECURITY.md">安全说明</a>
+        <a href="https://github.com/linlisWorkTeam/domain-knowledge/blob/main/LICENSE">开源许可</a>
+      </div>
+      <p>© <span data-year>2026</span> linlisWorkTeam · 开源许可 · 这个站点只有静态内容，不连接本地知识登记簿。</p>
+    </div>
+  </footer>
+
+  <div class="copy-toast" data-toast role="status" aria-live="polite" hidden>命令已复制</div>
+  <script src="./app.js?v=20260903-1" defer></script>
+</body>
+</html>

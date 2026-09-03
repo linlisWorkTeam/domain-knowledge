@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "releaseId": "migration-2026-09-03-4e7695d",
+  "assetVersion": "20260903-1",
+  "contentDigest": "sha256:ea7496a4821268400f290a190b3ad4fac2cec8c1d103b692a3c0a96d449e5c4b",
+  "contentCommit": "4e7695d31bb0cf40460b6d48b25ca49325261336",
+  "sourceRepository": "linlisWorkTeam/wpKnowledge",
+  "evidenceRunId": "5503b6bc-0350-4b53-98cc-6fbf3a13aaa9",
+  "siteRoot": "site"
+}

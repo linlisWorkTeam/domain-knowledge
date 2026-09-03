@@ -1,0 +1,27 @@
+# OpenCode Go 的 DeepSeek 路由。密钥通过 OPENCODE_GO_API_KEY 注入。
+
+- id: llm-pi-ai
+  config:
+    providers:
+      opencode-go:
+        displayName: OpenCode Go
+        apiKeyEnv: OPENCODE_GO_API_KEY
+        api: openai-completions
+        baseURL: https://opencode.ai/zen/go/v1
+        headers:
+          User-Agent: domain-knowledge/0.1 (+https://github.com/linlisWorkTeam/domain-knowledge)
+        compat:
+          thinkingFormat: deepseek
+        models:
+          - id: !!js process.env.WP_DSH_MODEL ?? 'deepseek-v4-flash'
+            name: !!js process.env.WP_DSH_MODEL ?? 'deepseek-v4-flash'
+            contextWindow: 262144
+            maxTokens: 32768
+        retryPolicy:
+          mode: normal
+          maxRetries: 3
+
+- id: agent-default-model
+  config:
+    provider: opencode-go
+    model: !!js process.env.WP_DSH_MODEL ?? 'deepseek-v4-flash'

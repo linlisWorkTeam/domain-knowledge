@@ -1,0 +1,208 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wpknowledge.local/schemas/agent-result/v1",
+  "title": "AgentResult",
+  "type": "object",
+  "required": ["schemaVersion", "commandId", "runId", "agentType", "status", "outputRefs", "payload"],
+  "properties": {
+    "schemaVersion": {"const": "1.0"},
+    "commandId": {"type": "string", "minLength": 1},
+    "runId": {"type": "string", "minLength": 1},
+    "agentType": {"enum": ["orchestrator", "doc-gen", "doc-worker", "test-gen", "code", "check", "review"]},
+    "status": {"enum": ["SUCCEEDED", "FAILED"]},
+    "outputRefs": {
+      "type": "array",
+      "items": {"$ref": "https://wpknowledge.local/schemas/artifact-ref/v1"}
+    },
+    "payload": {"type": "object"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"status": {"const": "FAILED"}}, "required": ["status"]},
+      "then": {"properties": {"payload": {"$ref": "#/$defs/errorPayload"}}},
+      "else": {
+        "oneOf": [
+          {
+            "properties": {
+              "agentType": {"const": "orchestrator"},
+              "payload": {"$ref": "#/$defs/planPayload"}
+            }
+          },
+          {
+            "properties": {
+              "agentType": {"const": "doc-gen"},
+              "payload": {"$ref": "#/$defs/knowledgeCandidatePayload"}
+            }
+          },
+          {
+            "properties": {
+              "agentType": {"const": "doc-worker"},
+              "payload": {"$ref": "#/$defs/knowledgeChunkPayload"}
+            }
+          },
+          {
+            "properties": {
+              "agentType": {"const": "test-gen"},
+              "payload": {"$ref": "#/$defs/testCandidatesPayload"}
+            }
+          },
+          {
+            "properties": {
+              "agentType": {"const": "code"},
+              "payload": {"$ref": "#/$defs/codeArtifactPayload"}
+            }
+          },
+          {
+            "properties": {
+              "agentType": {"const": "check"},
+              "payload": {"$ref": "#/$defs/findingsPayload"}
+            }
+          },
+          {
+            "properties": {
+              "agentType": {"const": "review"},
+              "payload": {"$ref": "#/$defs/attributionPayload"}
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "$defs": {
+    "artifactRef": {"$ref": "https://wpknowledge.local/schemas/artifact-ref/v1"},
+    "artifactRefArray": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/artifactRef"}
+    },
+    "riskArray": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1}
+    },
+    "planPayload": {
+      "type": "object",
+      "required": ["resultKind", "nodes"],
+      "properties": {
+        "resultKind": {"const": "plan"},
+        "nodes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["nodeId", "agentType", "dependsOn", "generationKey", "inputSchema", "outputSchema", "resourceClaims", "artifactExpectations"],
+            "properties": {
+              "nodeId": {"type": "string", "minLength": 1},
+              "agentType": {"enum": ["doc-gen", "doc-worker", "test-gen", "code", "check", "review"]},
+              "dependsOn": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+              "generationKey": {"type": "string", "minLength": 16},
+              "inputSchema": {"type": "string", "format": "uri"},
+              "outputSchema": {"type": "string", "format": "uri"},
+              "resourceClaims": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+              "artifactExpectations": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}}
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "knowledgeCandidatePayload": {
+      "type": "object",
+      "required": ["resultKind", "bodyRef", "provenance", "changedPaths"],
+      "properties": {
+        "resultKind": {"const": "knowledgeCandidate"},
+        "bodyRef": {"$ref": "#/$defs/artifactRef"},
+        "provenance": {"$ref": "#/$defs/artifactRefArray"},
+        "changedPaths": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "unresolvedRisks": {"$ref": "#/$defs/riskArray"}
+      },
+      "additionalProperties": false
+    },
+    "knowledgeChunkPayload": {
+      "type": "object",
+      "required": ["resultKind", "chunkRef", "provenance"],
+      "properties": {
+        "resultKind": {"const": "knowledgeChunk"},
+        "chunkRef": {"$ref": "#/$defs/artifactRef"},
+        "provenance": {"$ref": "#/$defs/artifactRefArray"},
+        "dependencyRefs": {"$ref": "#/$defs/artifactRefArray"},
+        "unresolvedRisks": {"$ref": "#/$defs/riskArray"}
+      },
+      "additionalProperties": false
+    },
+    "testCandidatesPayload": {
+      "type": "object",
+      "required": ["resultKind", "candidateSetRef", "caseManifestRef", "oracleClaims"],
+      "properties": {
+        "resultKind": {"const": "testCandidates"},
+        "candidateSetRef": {"$ref": "#/$defs/artifactRef"},
+        "caseManifestRef": {"$ref": "#/$defs/artifactRef"},
+        "oracleClaims": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}
+      },
+      "additionalProperties": false
+    },
+    "codeArtifactPayload": {
+      "type": "object",
+      "required": ["resultKind", "codeRef"],
+      "properties": {
+        "resultKind": {"const": "codeArtifact"},
+        "codeRef": {"$ref": "#/$defs/artifactRef"},
+        "buildManifestRef": {"$ref": "#/$defs/artifactRef"}
+      },
+      "additionalProperties": false
+    },
+    "findingsPayload": {
+      "type": "object",
+      "required": ["resultKind", "findings"],
+      "properties": {
+        "resultKind": {"const": "findings"},
+        "findings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["findingId", "severity", "criterionId", "evidenceLocation", "message"],
+            "properties": {
+              "findingId": {"type": "string", "minLength": 1},
+              "severity": {"enum": ["BLOCKER", "HIGH", "MEDIUM", "LOW", "INFO"]},
+              "criterionId": {"type": "string", "minLength": 1},
+              "evidenceLocation": {"type": "string", "minLength": 1},
+              "message": {"type": "string", "minLength": 1}
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "attributionPayload": {
+      "type": "object",
+      "required": ["resultKind", "corrections", "unresolvedRisks"],
+      "properties": {
+        "resultKind": {"const": "attribution"},
+        "corrections": {
+          "type": "array",
+          "items": {"$ref": "https://wpknowledge.local/schemas/correction/v1"}
+        },
+        "unresolvedRisks": {"$ref": "#/$defs/riskArray"}
+      },
+      "anyOf": [
+        {"properties": {"corrections": {"type": "array", "minItems": 1}}},
+        {"properties": {"unresolvedRisks": {"type": "array", "minItems": 1}}}
+      ],
+      "additionalProperties": false
+    },
+    "errorPayload": {
+      "type": "object",
+      "required": ["resultKind", "errorCode", "message", "retryable"],
+      "properties": {
+        "resultKind": {"const": "error"},
+        "errorCode": {"type": "string", "minLength": 1},
+        "message": {"type": "string", "minLength": 1},
+        "retryable": {"type": "boolean"},
+        "evidenceRefs": {"$ref": "#/$defs/artifactRefArray"}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

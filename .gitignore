@@ -1,5 +1,18 @@
+# Python and local browser/test artifacts
+**/__pycache__/
+*.py[cod]
+.playwright-cli/
+
+# Atomic-write leftovers
+knowledge/**/*.tmp
+knowledge/**/*.write-*
+
+# Knowledge flywheel local runtime
+.workpanel/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
 node_modules/
-dist/
-coverage/
-.agent-runs/
-*.log
+
+# Local operator configuration and secrets
+.env.local

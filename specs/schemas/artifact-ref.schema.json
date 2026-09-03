@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wpknowledge.local/schemas/artifact-ref/v1",
+  "title": "ArtifactRef",
+  "type": "object",
+  "required": ["artifactId", "mediaType", "sha256", "size"],
+  "properties": {
+    "artifactId": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "mediaType": {"type": "string", "minLength": 1},
+    "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "size": {"type": "integer", "minimum": 0}
+  },
+  "additionalProperties": false
+}

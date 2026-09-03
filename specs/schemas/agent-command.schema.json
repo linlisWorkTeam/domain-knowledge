@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wpknowledge.local/schemas/agent-command/v1",
+  "title": "AgentCommand",
+  "type": "object",
+  "required": ["schemaVersion", "commandId", "runId", "agentType", "generationKey", "payload"],
+  "properties": {
+    "schemaVersion": {"const": "1.0"},
+    "commandId": {"type": "string", "minLength": 1},
+    "runId": {"type": "string", "minLength": 1},
+    "agentType": {"enum": ["orchestrator", "doc-gen", "doc-worker", "test-gen", "code", "check", "review"]},
+    "generationKey": {"type": "string", "minLength": 16},
+    "payload": {"type": "object"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"agentType": {"const": "orchestrator"}}, "required": ["agentType"]},
+      "then": {"properties": {"payload": {"$ref": "#/$defs/orchestratorPayload"}}}
+    },
+    {
+      "if": {"properties": {"agentType": {"const": "doc-gen"}}, "required": ["agentType"]},
+      "then": {"properties": {"payload": {"$ref": "#/$defs/docgenPayload"}}}
+    },
+    {
+      "if": {"properties": {"agentType": {"const": "doc-worker"}}, "required": ["agentType"]},
+      "then": {"properties": {"payload": {"$ref": "#/$defs/docworkerPayload"}}}
+    },
+    {
+      "if": {"properties": {"agentType": {"const": "test-gen"}}, "required": ["agentType"]},
+      "then": {"properties": {"payload": {"$ref": "#/$defs/testgenPayload"}}}
+    },
+    {
+      "if": {"properties": {"agentType": {"const": "code"}}, "required": ["agentType"]},
+      "then": {"properties": {"payload": {"$ref": "#/$defs/codegenPayload"}}}
+    },
+    {
+      "if": {"properties": {"agentType": {"const": "check"}}, "required": ["agentType"]},
+      "then": {"properties": {"payload": {"$ref": "#/$defs/checkPayload"}}}
+    },
+    {
+      "if": {"properties": {"agentType": {"const": "review"}}, "required": ["agentType"]},
+      "then": {"properties": {"payload": {"$ref": "#/$defs/reviewPayload"}}}
+    }
+  ],
+  "$defs": {
+    "artifactRef": {"$ref": "https://wpknowledge.local/schemas/artifact-ref/v1"},
+    "artifactRefArray": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/artifactRef"}
+    },
+    "orchestratorPayload": {
+      "type": "object",
+      "required": ["policyRef", "moduleRefs"],
+      "properties": {
+        "policyRef": {"$ref": "#/$defs/artifactRef"},
+        "moduleRefs": {"$ref": "#/$defs/artifactRefArray"},
+        "latestReportRef": {"$ref": "#/$defs/artifactRef"}
+      },
+      "additionalProperties": false
+    },
+    "docgenPayload": {
+      "type": "object",
+      "required": ["moduleId", "sourceRefs", "publicInterfaceRefs"],
+      "properties": {
+        "moduleId": {"type": "string", "minLength": 1},
+        "sourceRefs": {"$ref": "#/$defs/artifactRefArray"},
+        "publicInterfaceRefs": {"$ref": "#/$defs/artifactRefArray"},
+        "baseKnowledgeRef": {"$ref": "#/$defs/artifactRef"},
+        "corrections": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "https://wpknowledge.local/schemas/correction/v1"}
+        }
+      },
+      "additionalProperties": false
+    },
+    "docworkerPayload": {
+      "type": "object",
+      "required": ["moduleId", "sourceRefs", "publicInterfaceRefs"],
+      "properties": {
+        "moduleId": {"type": "string", "minLength": 1},
+        "sourceRefs": {"$ref": "#/$defs/artifactRefArray"},
+        "publicInterfaceRefs": {"$ref": "#/$defs/artifactRefArray"},
+        "dependencyRefs": {"$ref": "#/$defs/artifactRefArray"}
+      },
+      "additionalProperties": false
+    },
+    "testgenPayload": {
+      "type": "object",
+      "required": ["moduleId", "sourceSnapshotRef", "publicInterfaceRefs", "languageId", "testPolicyRef"],
+      "properties": {
+        "moduleId": {"type": "string", "minLength": 1},
+        "sourceSnapshotRef": {"$ref": "#/$defs/artifactRef"},
+        "publicInterfaceRefs": {"$ref": "#/$defs/artifactRefArray"},
+        "languageId": {"type": "string", "pattern": "^[a-z][a-z0-9+.-]*$"},
+        "testPolicyRef": {"$ref": "#/$defs/artifactRef"}
+      },
+      "additionalProperties": false
+    },
+    "codegenPayload": {
+      "type": "object",
+      "required": ["knowledgeRef", "publicInterfaceRefs", "languageId", "buildContractRef"],
+      "properties": {
+        "knowledgeRef": {"$ref": "#/$defs/artifactRef"},
+        "publicInterfaceRefs": {"$ref": "#/$defs/artifactRefArray"},
+        "languageId": {"type": "string", "pattern": "^[a-z][a-z0-9+.-]*$"},
+        "buildContractRef": {"$ref": "#/$defs/artifactRef"}
+      },
+      "additionalProperties": false
+    },
+    "checkPayload": {
+      "type": "object",
+      "required": ["diffRef", "criteriaRef", "publicInterfaceRefs"],
+      "properties": {
+        "diffRef": {"$ref": "#/$defs/artifactRef"},
+        "criteriaRef": {"$ref": "#/$defs/artifactRef"},
+        "publicInterfaceRefs": {"$ref": "#/$defs/artifactRefArray"}
+      },
+      "additionalProperties": false
+    },
+    "reviewPayload": {
+      "type": "object",
+      "required": ["knowledgeRef", "evaluationReportRef", "criteriaRef"],
+      "properties": {
+        "knowledgeRef": {"$ref": "#/$defs/artifactRef"},
+        "evaluationReportRef": {"$ref": "#/$defs/artifactRef"},
+        "criteriaRef": {"$ref": "#/$defs/artifactRef"},
+        "previousCorrectionRefs": {"$ref": "#/$defs/artifactRefArray"}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
