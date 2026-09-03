@@ -311,6 +311,77 @@ export class KnowledgeFlywheelService {
     return this.runProjections.getRunSnapshot(runId, this.listKnowledgeVersions());
   }
 
+  listActionItems(filters?: Record<string, string>): Record<string, unknown>[] {
+    assertInvariant(this.runProjections !== undefined, 'run projection reader is not configured');
+    return this.runProjections.listActionItems(filters);
+  }
+
+  getActionItem(actionItemId: string): Record<string, unknown> | null {
+    assertInvariant(this.runProjections !== undefined, 'run projection reader is not configured');
+    return this.runProjections.getActionItem(actionItemId);
+  }
+
+  getRunProgress(runId: string): Record<string, unknown> | null {
+    assertInvariant(this.runProjections !== undefined, 'run projection reader is not configured');
+    return this.runProjections.getRunProgress(runId);
+  }
+
+  listActivities(filters?: Record<string, string>): Record<string, unknown>[] {
+    assertInvariant(this.runProjections !== undefined, 'run projection reader is not configured');
+    return this.runProjections.listActivities(filters);
+  }
+
+  applyActionItemAction(input: {
+    actionItemId: string;
+    action: 'ACKNOWLEDGE' | 'RESOLVE' | 'RETRY' | 'REGENERATE';
+    expectedRevision: number;
+    reason: string;
+    feedback?: string;
+    commandRunId?: string;
+    actor?: string;
+  }): Record<string, unknown> {
+    assertInvariant(input.reason.trim().length > 0, 'ARGUMENT_REQUIRED: reason');
+    assertInvariant(Number.isSafeInteger(input.expectedRevision) && input.expectedRevision > 0,
+      'ARGUMENT_INVALID: expectedRevision must be a positive integer');
+    return this.repository.applyActionItemAction({
+      ...input,
+      reason: input.reason.trim(),
+      feedback: input.feedback?.trim(),
+      auditId: `aia_${randomUUID()}`,
+      occurredAt: this.clock(),
+      actor: input.actor ?? 'local-admin',
+    });
+  }
+
+  observeComponentUnavailable(component: string, reasonCode: string, runIds: string[]): void {
+    assertInvariant(component.trim().length > 0, 'ARGUMENT_REQUIRED: component');
+    assertInvariant(reasonCode.trim().length > 0, 'ARGUMENT_REQUIRED: reasonCode');
+    const now = this.clock();
+    for (const runId of [...new Set(runIds)]) {
+      const run = this.requireRun(runId);
+      if (['VERIFIED', 'LOW_CONFIDENCE', 'FAILED', 'CANCELLED'].includes(run.state)) continue;
+      const duplicate = this.listActionItems({ runId, type: 'COMPONENT_UNAVAILABLE' }).some((item) => (
+        item.status !== 'RESOLVED' && item.reasonCode === reasonCode
+      ));
+      if (duplicate) continue;
+      this.repository.recordOperationalEvent(createEvent(runId, 'ComponentStatusChanged', {
+        component, status: 'UNAVAILABLE', reasonCode,
+      }, now));
+    }
+  }
+
+  getCommandReceipt(scope: string, idempotencyKey: string): {
+    fingerprint: string; status: number; value: unknown;
+  } | null {
+    return this.repository.getCommandReceipt(scope, idempotencyKey);
+  }
+
+  saveCommandReceipt(input: {
+    scope: string; idempotencyKey: string; fingerprint: string; status: number; value: unknown;
+  }): void {
+    this.repository.saveCommandReceipt({ ...input, createdAt: this.clock() });
+  }
+
   recordFeedback(versionId: string, action: string, rating: number | null, note = ''): void {
     this.requireVersion(versionId);
     assertInvariant(['hit', 'rate', 'correct'].includes(action), 'unsupported feedback action');

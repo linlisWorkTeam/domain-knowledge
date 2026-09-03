@@ -44,6 +44,8 @@
 | KF-SYS-038 | P1 | 系统必须提供持久化 Source Registry，管理来源身份、固定版本、同步状态、漂移、刷新任务、访问边界及其与知识的关联。 | AC-API-007 |
 | KF-SYS-039 | P1 | Console 必须为选定 Run 提供只读 Agent 工作流执行图，使用 Knowledge Registry 中的固定拓扑、WorkflowNodeProjection、Run snapshot 与事件展示节点状态、轮次、尝试和时间；不得读取 graph checkpoint、修改拓扑或人工推进节点。 | AC-API-008 |
 | KF-SYS-040 | P1 | Agent Settings 必须能够读取 Provider 可用性、认证状态、模型标识和受控错误摘要，但不得返回凭据或允许修改固定 Agent 契约。 | AC-API-009 |
+| KF-SYS-041 | P1 | 本地管理员必须能通过服务端安全配置、脱敏读取并无副作用验证模型 API URL 与 API Key；启用后新批次默认使用 Pi Agent 工具，完整凭据不得进入浏览器持久化、URL、日志或运行快照。 | AC-API-010 |
+| KF-SYS-042 | P1 | 系统必须按批次、节点、Provider 和模型记录排队与执行耗时、调用与重试、Token、估算成本、自动修订收敛和人工治理处理数据，并提供 P50/P95 聚合；指标不得包含凭据、Prompt、模型正文或未脱敏上游错误。 | AC-OBS-004 |
 
 ## P0-B Spike（P0-A 后独立开展）
 

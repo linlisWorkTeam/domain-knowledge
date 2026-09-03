@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wpknowledge.local/schemas/run-progress/v1",
+  "title": "Run Progress",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["runId", "mode", "completedUnits", "totalUnits", "ratio", "currentStage", "iteration", "retrying", "sampledAt"],
+  "properties": {
+    "runId": { "type": "string", "minLength": 1 },
+    "mode": { "enum": ["DETERMINATE", "INDETERMINATE"] },
+    "completedUnits": { "type": ["integer", "null"], "minimum": 0 },
+    "totalUnits": { "type": ["integer", "null"], "minimum": 1 },
+    "ratio": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+    "currentStage": { "type": "string", "minLength": 1 },
+    "iteration": { "type": "integer", "minimum": 0 },
+    "retrying": { "type": "boolean" },
+    "sampledAt": { "type": "string", "format": "date-time" }
+  }
+}

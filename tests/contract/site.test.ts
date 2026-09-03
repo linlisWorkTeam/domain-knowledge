@@ -169,6 +169,18 @@ test('UI prototype navigation and frontend spec reflect the reviewed delivery bo
   assert.match(httpApiSpec, /第一阶段操作中心只能从 `FAILED`、`LOW_CONFIDENCE`/);
   assert.match(frontendSpec, /生产导航唯一有效版本为“操作中心、飞轮批次、知识、工作流图、评测、来源、Agent 设置”/);
   assert.match(frontendSpec, /结论：`Accepted`。本次用户确认当前版本为最终 UI\/UX/);
+  for (const contract of [
+    'DEV-006A',
+    'DEV-006B',
+    'DEV-006C',
+    'OPEN → ACKNOWLEDGED → RESOLVED',
+    'mode=INDETERMINATE',
+    '409 CURSOR_EXPIRED',
+    'Idempotency-Key',
+    'expectedRevision',
+  ]) {
+    assert.ok(httpApiSpec.includes(contract), `DEV-006 API contract misses ${contract}`);
+  }
 });
 
 test('site and Console expose the embedded workflow boundary and prompt-only Agent customization', () => {

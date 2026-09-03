@@ -96,12 +96,85 @@ function page<T>(values: T[], url: URL): { items: T[]; nextCursor: string | null
   };
 }
 
+function decodeOpaqueCursor(raw: string): string {
+  try {
+    const value = Buffer.from(raw, 'base64url').toString('utf8');
+    if (!value) throw new Error();
+    return value;
+  } catch {
+    throw new Error('ARGUMENT_INVALID: cursor is invalid');
+  }
+}
+
+function keysetPage<T>(values: T[], url: URL, keyOf: (value: T) => string): {
+  items: T[]; nextCursor: string | null; sampledAt: string;
+} {
+  const rawCursor = url.searchParams.get('cursor');
+  const cursor = rawCursor ? decodeOpaqueCursor(rawCursor) : null;
+  const eligible = cursor === null ? values : values.filter((value) => keyOf(value) < cursor);
+  const limit = parseLimit(url);
+  const items = eligible.slice(0, limit);
+  return {
+    items,
+    nextCursor: eligible.length > items.length && items.length
+      ? Buffer.from(keyOf(items.at(-1) as T)).toString('base64url')
+      : null,
+    sampledAt: new Date().toISOString(),
+  };
+}
+
 function authorized(request: IncomingMessage, token: string | undefined): boolean {
   if (!token) return false;
   const supplied = request.headers.authorization?.replace(/^Bearer\s+/i, '') ?? '';
   const left = Buffer.from(supplied);
   const right = Buffer.from(token);
   return left.byteLength === right.byteLength && timingSafeEqual(left, right);
+}
+
+function sseCursor(request: IncomingMessage, url: URL): number {
+  const header = request.headers['last-event-id'];
+  const headerValue = Array.isArray(header) ? header[0] : header;
+  const queryValue = url.searchParams.get('after');
+  if (headerValue && queryValue && headerValue !== queryValue) {
+    throw new Error('INVALID_EVENT_CURSOR: Last-Event-ID and after differ');
+  }
+  const raw = headerValue || queryValue || '0';
+  const value = Number(raw);
+  if (!Number.isSafeInteger(value) || value < 0) throw new Error('INVALID_EVENT_CURSOR: cursor must be a non-negative integer');
+  return value;
+}
+
+function decodeActivityCursor(raw: string): number {
+  if (!raw) return 0;
+  if (!raw.startsWith('act_')) throw new Error('INVALID_EVENT_CURSOR: activity cursor is invalid');
+  const value = Number(Buffer.from(raw.slice(4), 'base64url').toString('utf8'));
+  if (!Number.isSafeInteger(value) || value < 0) throw new Error('INVALID_EVENT_CURSOR: activity cursor is invalid');
+  return value;
+}
+
+function activitySseCursor(request: IncomingMessage, url: URL): number {
+  const header = request.headers['last-event-id'];
+  const headerValue = Array.isArray(header) ? header[0] : header;
+  const queryValue = url.searchParams.get('after');
+  if (headerValue && queryValue && headerValue !== queryValue) {
+    throw new Error('INVALID_EVENT_CURSOR: Last-Event-ID and after differ');
+  }
+  return decodeActivityCursor(headerValue || queryValue || '');
+}
+
+function openSse(response: ServerResponse): void {
+  response.writeHead(200, {
+    'content-type': 'text/event-stream; charset=utf-8',
+    'cache-control': 'no-store',
+    connection: 'keep-alive',
+    'x-accel-buffering': 'no',
+    'x-content-type-options': 'nosniff',
+  });
+  response.write(`event: ready\ndata: ${JSON.stringify({ connectedAt: new Date().toISOString() })}\n\n`);
+}
+
+function writeSse(response: ServerResponse, id: number | string, event: string, value: unknown): void {
+  response.write(`id: ${id}\nevent: ${event}\ndata: ${JSON.stringify(value)}\n\n`);
 }
 
 async function body(request: IncomingMessage): Promise<Record<string, unknown>> {
@@ -126,11 +199,16 @@ async function body(request: IncomingMessage): Promise<Record<string, unknown>> 
 export function mapHttpError(error: unknown, id = 'req_unknown'): { status: number; body: ApiErrorBody } {
   const message = error instanceof Error ? error.message : String(error);
   const code = message.split(':', 1)[0] || 'INTERNAL_ERROR';
+  if (code === 'INVALID_EVENT_CURSOR') return { status: 400, body: errorBody(code, message, id) };
   if (code === 'PAYLOAD_TOO_LARGE') return { status: 413, body: errorBody(code, 'Request payload is too large.', id) };
   if (code === 'METHOD_NOT_ALLOWED') return { status: 405, body: errorBody(code, 'Method not allowed.', id) };
   if (code.endsWith('_NOT_FOUND')) return { status: 404, body: errorBody(code, 'Resource not found.', id) };
   if (/(?:_ALREADY_RUNNING|_TERMINAL|_CONFLICT)$/.test(code)) {
     return { status: 409, body: errorBody(code, message, id) };
+  }
+  if (code === 'ACTION_ITEM_RESOLVED') return { status: 409, body: errorBody(code, message, id) };
+  if (code === 'ACTION_NOT_ALLOWED' || code === 'RUN_NOT_RETRYABLE') {
+    return { status: 422, body: errorBody(code, message, id) };
   }
   if (/(?:_INVALID|_DENIED|_REQUIRED|_UNSUPPORTED)$/.test(code)) {
     return { status: 422, body: errorBody(code, message, id) };
@@ -142,6 +220,8 @@ export function createKnowledgeServer(input: {
   repositoryRoot?: string;
   runtimeDir?: string;
   writeToken?: string;
+  componentChecks?: Partial<Record<'registry' | 'artifactStore' | 'workflow' | 'provider' | 'evaluator', () => Promise<void> | void>>;
+  componentCheckTimeoutMs?: number;
 } = {}) {
   const composition = createComposition(input);
   const writeToken = input.writeToken ?? process.env.WP_KNOWLEDGE_WRITE_TOKEN;
@@ -196,6 +276,123 @@ export function createKnowledgeServer(input: {
         });
         return;
       }
+      if (request.method === 'GET' && url.pathname === '/api/v1/system/components') {
+        const sampledAt = new Date().toISOString();
+        const componentNames = ['registry', 'artifactStore', 'workflow', 'provider', 'evaluator'] as const;
+        const defaults: Record<typeof componentNames[number], () => Promise<void> | void> = {
+          registry: () => { composition.apps.flywheel.status(); },
+          artifactStore: () => {}, workflow: () => {}, provider: () => {}, evaluator: () => {},
+        };
+        const timeoutMs = input.componentCheckTimeoutMs ?? 250;
+        const components = await Promise.all(componentNames.map(async (component) => {
+          const check = input.componentChecks?.[component] ?? defaults[component];
+          let timeout: NodeJS.Timeout | undefined;
+          try {
+            await Promise.race([
+              Promise.resolve().then(check),
+              new Promise<never>((_, reject) => {
+                timeout = setTimeout(() => reject(new Error('COMPONENT_CHECK_TIMEOUT')), timeoutMs);
+              }),
+            ]);
+            const degraded = component === 'provider' && composition.agentProviderMode === 'fixture';
+            return {
+              component, status: degraded ? 'DEGRADED' : 'AVAILABLE',
+              reasonCode: degraded ? 'FIXTURE_PROVIDER' : 'READY',
+              message: degraded ? '当前使用确定性验收 Provider' : '组件可用',
+              checkedAt: sampledAt, lastSucceededAt: sampledAt,
+            };
+          } catch (error) {
+            const timedOut = error instanceof Error && error.message === 'COMPONENT_CHECK_TIMEOUT';
+            return {
+              component, status: timedOut ? 'UNKNOWN' : 'UNAVAILABLE',
+              reasonCode: timedOut ? 'COMPONENT_CHECK_TIMEOUT' : 'COMPONENT_CHECK_FAILED',
+              message: timedOut ? '组件检查超时' : '组件当前不可用',
+              checkedAt: sampledAt, lastSucceededAt: null,
+            };
+          } finally {
+            if (timeout) clearTimeout(timeout);
+          }
+        }));
+        send(response, 200, {
+          items: components,
+          overall: components.some((component) => component.status === 'UNAVAILABLE')
+            ? 'UNAVAILABLE'
+            : components.some((component) => component.status === 'UNKNOWN') ? 'UNKNOWN'
+              : components.some((component) => component.status === 'DEGRADED') ? 'DEGRADED' : 'AVAILABLE',
+          sampledAt,
+        });
+        return;
+      }
+      if (request.method === 'GET' && url.pathname === '/api/v1/action-items') {
+        const filters = Object.fromEntries(
+          ['status', 'severity', 'type', 'runId']
+            .map((key) => [key, url.searchParams.get(key)])
+            .filter((entry): entry is [string, string] => entry[1] !== null && entry[1] !== ''),
+        );
+        const items = composition.apps.flywheel.listActionItems(filters).map((item) => (
+          authorized(request, writeToken) ? item : { ...item, allowedActions: [] }
+        ));
+        send(response, 200, keysetPage(
+          items,
+          url,
+          (item) => `${String(item.updatedAt)}\0${String(item.actionItemId)}`,
+        ));
+        return;
+      }
+      if (request.method === 'GET' && url.pathname === '/api/v1/activity/stream') {
+        let cursor = activitySseCursor(request, url);
+        openSse(response);
+        const flush = () => {
+          const pending = composition.apps.flywheel.listActivities()
+            .map((item) => ({ item, position: decodeActivityCursor(String(item.cursor)) }))
+            .filter((entry) => entry.position > cursor)
+            .sort((left, right) => left.position - right.position);
+          for (const entry of pending) {
+            cursor = entry.position;
+            writeSse(response, String(entry.item.cursor), 'activity', entry.item);
+          }
+        };
+        flush();
+        const polling = setInterval(flush, 250);
+        const heartbeat = setInterval(() => response.write(': heartbeat\n\n'), 15_000);
+        const lifetime = setTimeout(() => {
+          response.write(`event: reconnect\ndata: ${JSON.stringify({ after: `act_${Buffer.from(String(cursor)).toString('base64url')}` })}\n\n`);
+          response.end();
+        }, 30 * 60_000);
+        polling.unref();
+        heartbeat.unref();
+        lifetime.unref();
+        response.once('close', () => {
+          clearInterval(polling);
+          clearInterval(heartbeat);
+          clearTimeout(lifetime);
+        });
+        return;
+      }
+      if (request.method === 'GET' && url.pathname.startsWith('/api/v1/action-items/')) {
+        const actionItemId = decodeURIComponent(url.pathname.slice('/api/v1/action-items/'.length));
+        if (!actionItemId || actionItemId.includes('/')) {
+          send(response, 404, errorBody('NOT_FOUND', 'Resource not found.', currentRequestId));
+          return;
+        }
+        const item = composition.apps.flywheel.getActionItem(actionItemId);
+        const visible = item && !authorized(request, writeToken) ? { ...item, allowedActions: [] } : item;
+        send(response, visible ? 200 : 404, visible ?? errorBody('NOT_FOUND', 'Resource not found.', currentRequestId));
+        return;
+      }
+      if (request.method === 'GET' && url.pathname === '/api/v1/activity') {
+        const filters = Object.fromEntries(
+          ['type', 'runId', 'severity', 'occurredAfter']
+            .map((key) => [key, url.searchParams.get(key)])
+            .filter((entry): entry is [string, string] => entry[1] !== null && entry[1] !== ''),
+        );
+        send(response, 200, keysetPage(
+          composition.apps.flywheel.listActivities(filters),
+          url,
+          (item) => String(decodeActivityCursor(String(item.cursor))).padStart(20, '0'),
+        ));
+        return;
+      }
       if (request.method === 'GET' && url.pathname === '/api/v1/runs') {
         const states = (url.searchParams.get('status') ?? '').split(',').filter(Boolean);
         const runs = composition.apps.flywheel.listRunSummaries(states.length ? states : undefined)
@@ -228,12 +425,45 @@ export function createKnowledgeServer(input: {
           send(response, 200, { runId, events });
           return;
         }
+        if (child === 'event-stream') {
+          let cursor = sseCursor(request, url);
+          openSse(response);
+          const flush = () => {
+            const current = composition.apps.flywheel.getRunSnapshot(runId);
+            const pending = ((current?.events ?? []) as { eventSeq: number; event: unknown }[])
+              .filter((record) => record.eventSeq > cursor);
+            for (const record of pending) {
+              cursor = record.eventSeq;
+              writeSse(response, cursor, 'run-event', record.event);
+            }
+          };
+          flush();
+          const polling = setInterval(flush, 250);
+          const heartbeat = setInterval(() => response.write(': heartbeat\n\n'), 15_000);
+          const lifetime = setTimeout(() => {
+            response.write(`event: reconnect\ndata: ${JSON.stringify({ after: cursor })}\n\n`);
+            response.end();
+          }, 30 * 60_000);
+          polling.unref();
+          heartbeat.unref();
+          lifetime.unref();
+          response.once('close', () => {
+            clearInterval(polling);
+            clearInterval(heartbeat);
+            clearTimeout(lifetime);
+          });
+          return;
+        }
         if (child === 'workflow-nodes') {
           send(response, 200, { runId, nodes: snapshot.workflowNodes ?? [] });
           return;
         }
         if (child === 'workflow-status') {
           send(response, 200, await composition.apps.orchestrator.status(runId));
+          return;
+        }
+        if (child === 'progress') {
+          send(response, 200, composition.apps.flywheel.getRunProgress(runId));
           return;
         }
         if (child === 'report') {
@@ -283,7 +513,14 @@ export function createKnowledgeServer(input: {
         || /^\/api\/v1\/runs\/[^/]+\/(?:resume|cancel)$/.test(url.pathname)
         || /^\/api\/v1\/knowledge\/[^/]+\/feedback$/.test(url.pathname)
         || /^\/api\/v1\/agents\/[^/]+\/prompt$/.test(url.pathname);
-      if ((request.method === 'POST' || request.method === 'PUT') && isMutationRoute) {
+      const actionItemCommand = url.pathname.match(
+        /^\/api\/v1\/action-items\/([^/]+)\/actions\/(acknowledge|resolve|retry)$/,
+      );
+      const regenerationCommand = url.pathname.match(
+        /^\/api\/v1\/action-items\/([^/]+)\/regenerate$/,
+      );
+      const isControlMutation = actionItemCommand !== null || regenerationCommand !== null;
+      if ((request.method === 'POST' || request.method === 'PUT') && (isMutationRoute || isControlMutation)) {
         if (!writeToken) {
           send(response, 503, errorBody('WRITE_API_DISABLED', 'Set WP_KNOWLEDGE_WRITE_TOKEN to enable mutations.', currentRequestId, true));
           return;
@@ -293,6 +530,87 @@ export function createKnowledgeServer(input: {
           return;
         }
         const payload = await body(request);
+        if (actionItemCommand || regenerationCommand) {
+          if (request.method !== 'POST') throw new Error('METHOD_NOT_ALLOWED');
+          const key = request.headers['idempotency-key'];
+          if (typeof key !== 'string' || !key.trim()) throw new Error('IDEMPOTENCY_KEY_REQUIRED: Idempotency-Key');
+          const normalizedKey = key.trim();
+          const actionItemId = decodeURIComponent((actionItemCommand ?? regenerationCommand)?.[1] ?? '');
+          const action = regenerationCommand
+            ? 'REGENERATE'
+            : String(actionItemCommand?.[2]).toUpperCase() as 'ACKNOWLEDGE' | 'RESOLVE' | 'RETRY';
+          const fingerprint = JSON.stringify({ actionItemId, action, payload });
+          const previous = idempotencyResults.get(normalizedKey)
+            ?? composition.apps.flywheel.getCommandReceipt('action-item', normalizedKey);
+          if (previous && previous.fingerprint !== fingerprint) throw new Error('IDEMPOTENCY_CONFLICT: key reused with different command');
+          if (previous) {
+            send(response, previous.status, previous.value);
+            return;
+          }
+          const expectedRevision = Number(payload.expectedRevision);
+          const reason = typeof payload.reason === 'string' ? payload.reason : '';
+          const item = composition.apps.flywheel.getActionItem(actionItemId);
+          if (!item) throw new Error(`ACTION_ITEM_NOT_FOUND: ${actionItemId}`);
+          if (Number(item.revision) !== expectedRevision) throw new Error('REVISION_CONFLICT: action item changed');
+          if (!Array.isArray(item.allowedActions) || !item.allowedActions.includes(action)) {
+            throw new Error(`ACTION_NOT_ALLOWED: ${action}`);
+          }
+          let commandRunId: string | undefined;
+          let status = 200;
+          if (action === 'RETRY') {
+            commandRunId = String(item.runId ?? '');
+            if (!commandRunId) throw new Error('RUN_NOT_RETRYABLE: action item has no run');
+            let workflowStatus;
+            try {
+              workflowStatus = await composition.apps.orchestrator.status(commandRunId);
+            } catch {
+              throw new Error(`RUN_NOT_RETRYABLE: ${commandRunId}`);
+            }
+            if (workflowStatus.executionStatus !== 'FAILED') {
+              throw new Error(`RUN_NOT_RETRYABLE: ${commandRunId}`);
+            }
+            await composition.apps.orchestrator.resume(commandRunId);
+            status = 202;
+          } else if (action === 'REGENERATE') {
+            const parentRunId = String(item.runId ?? '');
+            const feedback = typeof payload.feedback === 'string' ? payload.feedback.trim() : '';
+            if (!parentRunId) throw new Error('ACTION_NOT_ALLOWED: action item has no parent run');
+            if (!feedback) throw new Error('ARGUMENT_REQUIRED: feedback');
+            const parent = composition.apps.flywheel.getRunSnapshot(parentRunId);
+            if (!parent) throw new Error(`RUN_NOT_FOUND: ${parentRunId}`);
+            const scenario = loadOhMyWorkPanelScenario(composition.repositoryRoot);
+            const parentModuleId = String((parent.run as Record<string, unknown>).moduleId ?? '');
+            if (parentModuleId !== scenario.moduleId) {
+              throw new Error('ACTION_NOT_ALLOWED: regeneration profile is unavailable for this module');
+            }
+            const handle = await composition.apps.orchestrator.start(scenario, {
+              policyId: composition.config.publicationGate.policyId,
+              minimumStability: composition.config.publicationGate.minimumStability,
+              requireAllTests: composition.config.publicationGate.requireAllTests,
+              maxIterations: composition.config.publicationGate.maxIterations,
+              workerCount: 1,
+              governanceTrigger: {
+                parentRunId,
+                causedByActionItemId: actionItemId,
+                reason,
+                feedback,
+              },
+            });
+            commandRunId = handle.runId;
+            status = 202;
+          }
+          const value = composition.apps.flywheel.applyActionItemAction({
+            actionItemId, action, expectedRevision, reason,
+            feedback: action === 'REGENERATE' ? String(payload.feedback ?? '') : undefined,
+            commandRunId,
+          });
+          composition.apps.flywheel.saveCommandReceipt({
+            scope: 'action-item', idempotencyKey: normalizedKey, fingerprint, status, value,
+          });
+          idempotencyResults.set(normalizedKey, { fingerprint, status, value });
+          send(response, status, value);
+          return;
+        }
         if (url.pathname.startsWith('/api/v1/agents/') && url.pathname.endsWith('/prompt')) {
           if (request.method !== 'PUT') throw new Error('METHOD_NOT_ALLOWED: Agent prompt updates require PUT');
           const encodedAgentId = url.pathname.slice('/api/v1/agents/'.length, -'/prompt'.length);

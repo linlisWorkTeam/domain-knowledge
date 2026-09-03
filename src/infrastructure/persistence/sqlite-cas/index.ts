@@ -251,6 +251,63 @@ export class SQLiteFlywheelRepository implements FlywheelRepository {
       CREATE INDEX IF NOT EXISTS workflow_nodes_run_updated
         ON workflow_node_projections(run_id, updated_at, node_id);
 
+      CREATE TABLE IF NOT EXISTS action_items (
+        action_item_id TEXT PRIMARY KEY,
+        type TEXT NOT NULL,
+        severity TEXT NOT NULL,
+        status TEXT NOT NULL,
+        subject_kind TEXT NOT NULL,
+        subject_id TEXT NOT NULL,
+        run_id TEXT,
+        reason_code TEXT NOT NULL,
+        summary TEXT NOT NULL,
+        source_event_id TEXT NOT NULL UNIQUE,
+        fingerprint TEXT NOT NULL,
+        allowed_actions_json TEXT NOT NULL,
+        revision INTEGER NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        resolved_at TEXT,
+        resolution_json TEXT,
+        previous_occurrence_id TEXT
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS action_items_active_fingerprint
+        ON action_items(fingerprint) WHERE status <> 'RESOLVED';
+      CREATE INDEX IF NOT EXISTS action_items_updated
+        ON action_items(updated_at DESC, action_item_id DESC);
+      CREATE TABLE IF NOT EXISTS action_item_sources (
+        action_item_id TEXT NOT NULL,
+        event_id TEXT NOT NULL UNIQUE,
+        observed_at TEXT NOT NULL,
+        PRIMARY KEY(action_item_id, event_id),
+        FOREIGN KEY(action_item_id) REFERENCES action_items(action_item_id)
+      );
+      CREATE TABLE IF NOT EXISTS action_item_history (
+        audit_id TEXT PRIMARY KEY,
+        action_item_id TEXT NOT NULL,
+        action TEXT NOT NULL,
+        reason TEXT NOT NULL,
+        feedback TEXT,
+        command_run_id TEXT,
+        from_status TEXT NOT NULL,
+        to_status TEXT NOT NULL,
+        revision INTEGER NOT NULL,
+        occurred_at TEXT NOT NULL,
+        actor TEXT NOT NULL,
+        FOREIGN KEY(action_item_id) REFERENCES action_items(action_item_id)
+      );
+      CREATE INDEX IF NOT EXISTS action_item_history_item
+        ON action_item_history(action_item_id, occurred_at, audit_id);
+      CREATE TABLE IF NOT EXISTS command_receipts (
+        scope TEXT NOT NULL,
+        idempotency_key TEXT NOT NULL,
+        fingerprint TEXT NOT NULL,
+        status INTEGER NOT NULL,
+        response_json TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY(scope, idempotency_key)
+      );
+
       INSERT OR IGNORE INTO schema_migrations(version, applied_at)
       VALUES (1, datetime('now'));
     `);
@@ -258,13 +315,128 @@ export class SQLiteFlywheelRepository implements FlywheelRepository {
     if (!eventColumns.some((column) => String(column.name) === 'event_seq')) {
       this.database.exec('ALTER TABLE events ADD COLUMN event_seq INTEGER');
     }
+    const actionItemColumns = this.database.prepare('PRAGMA table_info(action_items)').all() as Record<string, unknown>[];
+    if (!actionItemColumns.some((column) => String(column.name) === 'previous_occurrence_id')) {
+      this.database.exec('ALTER TABLE action_items ADD COLUMN previous_occurrence_id TEXT');
+    }
+    const historyColumns = this.database.prepare('PRAGMA table_info(action_item_history)').all() as Record<string, unknown>[];
+    if (!historyColumns.some((column) => String(column.name) === 'actor')) {
+      this.database.exec("ALTER TABLE action_item_history ADD COLUMN actor TEXT NOT NULL DEFAULT 'local-admin'");
+    }
     this.database.exec(`
       UPDATE events SET event_seq = rowid WHERE event_seq IS NULL;
       CREATE UNIQUE INDEX IF NOT EXISTS events_run_seq ON events(run_id, event_seq);
       INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (2, datetime('now'));
       INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (3, datetime('now'));
       INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (4, datetime('now'));
+      INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (5, datetime('now'));
     `);
+  }
+
+  applyActionItemAction(input: {
+    actionItemId: string;
+    action: 'ACKNOWLEDGE' | 'RESOLVE' | 'RETRY' | 'REGENERATE';
+    expectedRevision: number;
+    reason: string;
+    feedback?: string;
+    commandRunId?: string;
+    auditId: string;
+    occurredAt: string;
+    actor: string;
+  }): Record<string, unknown> {
+    return this.transaction(() => {
+      const row = this.database.prepare('SELECT * FROM action_items WHERE action_item_id = ?')
+        .get(input.actionItemId) as Record<string, unknown> | undefined;
+      if (!row) throw new Error(`ACTION_ITEM_NOT_FOUND: ${input.actionItemId}`);
+      const status = String(row.status);
+      const revision = Number(row.revision);
+      if (revision !== input.expectedRevision) throw new Error('REVISION_CONFLICT: action item changed');
+      if (status === 'RESOLVED') throw new Error('ACTION_ITEM_RESOLVED: action item is already resolved');
+      const allowed = parse<string[]>(row.allowed_actions_json);
+      if (!allowed.includes(input.action)) throw new Error(`ACTION_NOT_ALLOWED: ${input.action}`);
+      if (input.action === 'ACKNOWLEDGE' && status !== 'OPEN') {
+        throw new Error('ACTION_NOT_ALLOWED: acknowledge requires OPEN');
+      }
+      if ((input.action === 'RETRY' || input.action === 'REGENERATE') && !input.commandRunId) {
+        throw new Error('ARGUMENT_REQUIRED: commandRunId');
+      }
+      const nextStatus = input.action === 'ACKNOWLEDGE'
+        ? 'ACKNOWLEDGED'
+        : input.action === 'RESOLVE' ? 'RESOLVED' : status;
+      const nextRevision = revision + 1;
+      const resolution = input.action === 'RESOLVE'
+        ? json({ reason: input.reason, auditId: input.auditId })
+        : row.resolution_json === null ? null : String(row.resolution_json);
+      const resolvedAt = nextStatus === 'RESOLVED'
+        ? input.occurredAt
+        : row.resolved_at === null ? null : String(row.resolved_at);
+      const result = this.database.prepare(`
+        UPDATE action_items SET status = ?, revision = ?, updated_at = ?,
+          resolved_at = ?, resolution_json = ?
+        WHERE action_item_id = ? AND revision = ?
+      `).run(
+        nextStatus, nextRevision, input.occurredAt,
+        resolvedAt,
+        resolution, input.actionItemId, revision,
+      );
+      if (Number(result.changes) !== 1) throw new Error('REVISION_CONFLICT: action item changed');
+      this.database.prepare(`
+        INSERT INTO action_item_history(
+          audit_id, action_item_id, action, reason, feedback, command_run_id,
+          from_status, to_status, revision, occurred_at, actor
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        input.auditId, input.actionItemId, input.action, input.reason,
+        input.feedback ?? null, input.commandRunId ?? null, status, nextStatus,
+        nextRevision, input.occurredAt, input.actor,
+      );
+      return {
+        actionItemId: input.actionItemId,
+        resourceId: input.actionItemId,
+        eventId: input.auditId,
+        action: input.action,
+        status: nextStatus,
+        revision: nextRevision,
+        commandRunId: input.commandRunId ?? null,
+        occurredAt: input.occurredAt,
+        acceptedAt: input.occurredAt,
+      };
+    });
+  }
+
+  getCommandReceipt(scope: string, idempotencyKey: string): {
+    fingerprint: string; status: number; value: unknown;
+  } | null {
+    const row = this.database.prepare(`
+      SELECT fingerprint, status, response_json FROM command_receipts
+      WHERE scope = ? AND idempotency_key = ?
+    `).get(scope, idempotencyKey) as Record<string, unknown> | undefined;
+    return row ? {
+      fingerprint: String(row.fingerprint),
+      status: Number(row.status),
+      value: parse<unknown>(row.response_json),
+    } : null;
+  }
+
+  saveCommandReceipt(input: {
+    scope: string; idempotencyKey: string; fingerprint: string; status: number;
+    value: unknown; createdAt: string;
+  }): void {
+    try {
+      this.database.prepare(`
+        INSERT INTO command_receipts(
+          scope, idempotency_key, fingerprint, status, response_json, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?)
+      `).run(
+        input.scope, input.idempotencyKey, input.fingerprint, input.status,
+        json(input.value), input.createdAt,
+      );
+    } catch (error) {
+      const existing = this.getCommandReceipt(input.scope, input.idempotencyKey);
+      if (!existing || existing.fingerprint !== input.fingerprint) {
+        throw new Error('IDEMPOTENCY_CONFLICT: key reused with different command', { cause: error });
+      }
+    }
   }
 
   private transaction<T>(operation: () => T): T {
@@ -280,10 +452,71 @@ export class SQLiteFlywheelRepository implements FlywheelRepository {
   }
 
   private insertEvent(event: DomainEvent): void {
-    this.database.prepare(`
+    const result = this.database.prepare(`
       INSERT OR IGNORE INTO events(event_id, run_id, event_type, event_seq, occurred_at, event_json)
       VALUES (?, ?, ?, COALESCE((SELECT MAX(event_seq) + 1 FROM events WHERE run_id = ?), 1), ?, ?)
     `).run(event.eventId, event.runId, event.eventType, event.runId, event.occurredAt, json(event));
+    if (Number(result.changes) === 1) this.projectActionItem(event);
+  }
+
+  private projectActionItem(event: DomainEvent): void {
+    let type: string | null = null;
+    let severity = 'HIGH';
+    let reasonCode = '';
+    let summary = '';
+    let allowedActions: string[] = [];
+    if (event.eventType === 'RunStateChanged' && event.payload.to === 'FAILED') {
+      type = 'RUN_FAILED';
+      reasonCode = String(event.payload.reasonCode ?? 'RUN_FAILED');
+      summary = '批次执行失败';
+      allowedActions = ['ACKNOWLEDGE', 'RESOLVE', 'RETRY'];
+    } else if (event.eventType === 'RunStateChanged' && event.payload.to === 'LOW_CONFIDENCE') {
+      type = 'LOW_CONFIDENCE';
+      severity = 'MEDIUM';
+      reasonCode = String(event.payload.reasonCode ?? 'LOW_CONFIDENCE');
+      summary = '批次可信度不足，需要人工判断';
+      allowedActions = ['ACKNOWLEDGE', 'RESOLVE', 'REGENERATE'];
+    } else if (event.eventType === 'GateDecided' && event.payload.outcome === 'STOPPED') {
+      type = 'GATE_STOPPED';
+      const reasons = Array.isArray(event.payload.reasonCodes) ? event.payload.reasonCodes.map(String) : [];
+      reasonCode = reasons[0] ?? 'GATE_STOPPED';
+      summary = '确定性门禁停止了本批次';
+      allowedActions = ['ACKNOWLEDGE', 'RESOLVE', 'REGENERATE'];
+    } else if (event.eventType === 'ComponentStatusChanged' && event.payload.status === 'UNAVAILABLE') {
+      type = 'COMPONENT_UNAVAILABLE';
+      reasonCode = String(event.payload.reasonCode ?? 'COMPONENT_UNAVAILABLE');
+      summary = `${String(event.payload.component ?? '必需组件')}不可用，影响活动批次`;
+      allowedActions = ['ACKNOWLEDGE', 'RESOLVE', 'RETRY'];
+    }
+    if (!type) return;
+    const fingerprint = `sha256:${sha256(`${type}\0RUN\0${event.runId}\0${reasonCode}`)}`;
+    const actionItemId = `ai_${sha256(`${fingerprint}\0${event.eventId}`).slice(0, 24)}`;
+    const previous = this.database.prepare(`
+      SELECT action_item_id FROM action_items
+      WHERE fingerprint = ? AND status = 'RESOLVED'
+      ORDER BY resolved_at DESC, action_item_id DESC LIMIT 1
+    `).get(fingerprint) as Record<string, unknown> | undefined;
+    this.database.prepare(`
+      INSERT INTO action_items(
+        action_item_id, type, severity, status, subject_kind, subject_id, run_id,
+        reason_code, summary, source_event_id, fingerprint, allowed_actions_json,
+        revision, created_at, updated_at, resolved_at, resolution_json, previous_occurrence_id
+      ) VALUES (?, ?, ?, 'OPEN', 'RUN', ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, NULL, NULL, ?)
+      ON CONFLICT DO NOTHING
+    `).run(
+      actionItemId, type, severity, event.runId, event.runId, reasonCode, summary,
+      event.eventId, fingerprint, json(allowedActions), event.occurredAt, event.occurredAt,
+      previous ? String(previous.action_item_id) : null,
+    );
+    const active = this.database.prepare(`
+      SELECT action_item_id FROM action_items WHERE fingerprint = ? AND status <> 'RESOLVED'
+    `).get(fingerprint) as Record<string, unknown> | undefined;
+    if (active) {
+      this.database.prepare(`
+        INSERT OR IGNORE INTO action_item_sources(action_item_id, event_id, observed_at)
+        VALUES (?, ?, ?)
+      `).run(String(active.action_item_id), event.eventId, event.occurredAt);
+    }
   }
 
   saveRun(run: FlywheelRun, event: DomainEvent): void {
@@ -640,6 +873,10 @@ export class SQLiteFlywheelRepository implements FlywheelRepository {
       );
       this.insertEvent(event);
     });
+  }
+
+  recordOperationalEvent(event: DomainEvent): void {
+    this.transaction(() => this.insertEvent(event));
   }
 
   listWorkflowNodeProjections(runId: string): WorkflowNodeProjection[] {

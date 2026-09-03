@@ -38,10 +38,24 @@ export class RegistryRunConfigurationService implements RunConfigurationManager 
     this.clock = input.clock ?? (() => new Date().toISOString());
   }
 
-  async capture(runId: string): Promise<RunConfigurationSnapshot> {
+  async capture(runId: string, governanceTrigger?: {
+    parentRunId: string;
+    causedByActionItemId: string;
+    reason: string;
+    feedback: string;
+  }): Promise<RunConfigurationSnapshot> {
     assertInvariant(this.repository.getRun(runId) !== null, `run not found: ${runId}`);
     const existing = this.repository.getRunConfiguration(runId);
     if (existing) return existing;
+    const feedback = governanceTrigger?.feedback.trim() ?? '';
+    if (governanceTrigger) {
+      assertInvariant(feedback.length > 0, 'ARGUMENT_REQUIRED: feedback');
+      assertInvariant(this.repository.getRun(governanceTrigger.parentRunId) !== null,
+        `parent run not found: ${governanceTrigger.parentRunId}`);
+    }
+    const feedbackRef = governanceTrigger
+      ? await this.artifacts.put(Buffer.from(feedback, 'utf8'), 'text/plain; charset=utf-8')
+      : null;
     const configured = new Map(
       this.repository.listAgentPromptConfigurations().map((value) => [value.agentId, value]),
     );
@@ -49,7 +63,10 @@ export class RegistryRunConfigurationService implements RunConfigurationManager 
     for (const definition of this.definitions) {
       const configuration = configured.get(definition.agentId);
       const promptAddon = configuration?.promptAddon ?? '';
-      const effectivePrompt = `${definition.basePrompt}${promptAddon ? `\n\nOperator prompt add-on:\n${promptAddon}` : ''}`;
+      const governanceAddon = governanceTrigger && ['doc-gen', 'review'].includes(definition.agentId)
+        ? `\n\nGovernance correction feedback:\n${feedback}`
+        : '';
+      const effectivePrompt = `${definition.basePrompt}${promptAddon ? `\n\nOperator prompt add-on:\n${promptAddon}` : ''}${governanceAddon}`;
       const effectivePromptRef = await this.artifacts.put(
         Buffer.from(effectivePrompt, 'utf8'),
         'text/plain; charset=utf-8',
@@ -71,6 +88,12 @@ export class RegistryRunConfigurationService implements RunConfigurationManager 
       provider: structuredClone(this.provider),
       contracts: structuredClone(this.contracts),
       agents,
+      governanceTrigger: governanceTrigger && feedbackRef ? {
+        parentRunId: governanceTrigger.parentRunId,
+        causedByActionItemId: governanceTrigger.causedByActionItemId,
+        reasonSha256: sha256(governanceTrigger.reason.trim()),
+        feedbackRef,
+      } : null,
       capturedAt,
     };
     return this.repository.saveRunConfiguration(snapshot, createEvent(
@@ -80,6 +103,7 @@ export class RegistryRunConfigurationService implements RunConfigurationManager 
         provider: snapshot.provider,
         contracts: snapshot.contracts,
         agentRevisions: Object.fromEntries(snapshot.agents.map((agent) => [agent.agentId, agent.promptRevision])),
+        governanceTrigger: snapshot.governanceTrigger ?? null,
       },
       capturedAt,
     ));

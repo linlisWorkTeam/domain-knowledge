@@ -66,7 +66,32 @@ export interface FlywheelRepository {
   saveRunConfiguration(snapshot: RunConfigurationSnapshot, event: DomainEvent): RunConfigurationSnapshot;
   getRunConfiguration(runId: string): RunConfigurationSnapshot | null;
   recordWorkflowNodeProjection(projection: WorkflowNodeProjection, event: DomainEvent): void;
+  recordOperationalEvent(event: DomainEvent): void;
   listWorkflowNodeProjections(runId: string): WorkflowNodeProjection[];
+  applyActionItemAction(input: {
+    actionItemId: string;
+    action: 'ACKNOWLEDGE' | 'RESOLVE' | 'RETRY' | 'REGENERATE';
+    expectedRevision: number;
+    reason: string;
+    feedback?: string;
+    commandRunId?: string;
+    auditId: string;
+    occurredAt: string;
+    actor: string;
+  }): Record<string, unknown>;
+  getCommandReceipt(scope: string, idempotencyKey: string): {
+    fingerprint: string;
+    status: number;
+    value: unknown;
+  } | null;
+  saveCommandReceipt(input: {
+    scope: string;
+    idempotencyKey: string;
+    fingerprint: string;
+    status: number;
+    value: unknown;
+    createdAt: string;
+  }): void;
   status(): Record<string, unknown>;
 }
 
@@ -100,6 +125,10 @@ export interface QualityPolicy {
 export interface RunProjectionReader {
   listRunSummaries(states?: string[]): Record<string, unknown>[];
   getRunSnapshot(runId: string, versions: KnowledgeVersion[]): Record<string, unknown> | null;
+  listActionItems(filters?: Record<string, string>): Record<string, unknown>[];
+  getActionItem(actionItemId: string): Record<string, unknown> | null;
+  getRunProgress(runId: string): Record<string, unknown> | null;
+  listActivities(filters?: Record<string, string>): Record<string, unknown>[];
 }
 
 export interface DemoReportBuilder {
@@ -383,11 +412,22 @@ export interface RunConfigurationSnapshot {
     resultSchemaSha256: string;
   };
   agents: AgentRunConfiguration[];
+  governanceTrigger?: {
+    parentRunId: string;
+    causedByActionItemId: string;
+    reasonSha256: string;
+    feedbackRef: ArtifactRef;
+  } | null;
   capturedAt: string;
 }
 
 export interface RunConfigurationManager {
-  capture(runId: string): Promise<RunConfigurationSnapshot>;
+  capture(runId: string, governanceTrigger?: {
+    parentRunId: string;
+    causedByActionItemId: string;
+    reason: string;
+    feedback: string;
+  }): Promise<RunConfigurationSnapshot>;
   get(runId: string): RunConfigurationSnapshot | null;
   assertCompatible(runId: string): Promise<RunConfigurationSnapshot>;
   resolvePrompt(runId: string, agentId: AgentId): Promise<string>;

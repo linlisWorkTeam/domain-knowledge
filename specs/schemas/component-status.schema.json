@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wpknowledge.local/schemas/component-status/v1",
+  "title": "Component Status",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["component", "status", "reasonCode", "message", "checkedAt", "lastSucceededAt"],
+  "properties": {
+    "component": { "enum": ["registry", "artifactStore", "workflow", "provider", "evaluator"] },
+    "status": { "enum": ["AVAILABLE", "DEGRADED", "UNAVAILABLE", "UNKNOWN"] },
+    "reasonCode": { "type": "string", "minLength": 1 },
+    "message": { "type": "string", "minLength": 1 },
+    "checkedAt": { "type": "string", "format": "date-time" },
+    "lastSucceededAt": { "type": ["string", "null"], "format": "date-time" }
+  }
+}

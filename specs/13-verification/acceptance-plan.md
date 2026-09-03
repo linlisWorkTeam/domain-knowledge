@@ -40,14 +40,16 @@
 | AC-E2E-002 | Given 固定 ohMyWorkPanel 场景，When 内嵌 LangGraph 执行全部 Agent、一次失败迭代和真实项目评测，Then 同一 runId 下保留七类节点投影、两版知识 lineage、PASS decision 和唯一 publication receipt。 |
 | AC-E2E-003 | Given 配置好的 DeepSeek Harness AgentProvider 与固定 ohMyWorkPanel commit，When 运行自动治理并从 Agent 输出错误恢复，Then 七类 live Agent 输出均经过 Schema 校验、调用摘要脱敏、质量反馈自动迭代，最终行为证据与发布仍由 Knowledge Gate 决定。 |
 | AC-API-001 | Given Preview API 迁移变更，When 扫描 Server、Console、DSH Adapter、测试和文档并执行契约测试，Then 只存在规范资源路径，旧 HTTP 路由返回 404，内部 transition/evaluate/publish 不可通过 HTTP 调用。 |
-| AC-API-002 | Given 来自 Run、Evaluation、Source 或安全事件的相同问题，When 重放事件并处理 Action Item，Then 开放事项按 fingerprint 去重，合法动作追加审计，重复 Command 幂等，既有 GateDecision 和 publication 字节不变。 |
-| AC-API-003 | Given 固定与不可预知两种 Run plan，When 查询进度、重试并中断后续传事件，Then 固定计划返回可重建 completed/total，不可预知计划不返回虚假百分比或 ETA，重试语义合法且 SSE 不重不漏。 |
-| AC-API-004 | Given 组件故障、无健康样本和跨 Run 事件，When 查询组件、Activity 和 Knowledge Health，Then 状态含采样时间与 reason code，健康指标含分子/分母/窗口/规则版本，无样本返回 unavailable。 |
+| AC-API-002 | Given 相同 `type + subject + reasonCode` 的失败事实被重复投影，When 创建并处理待处理事项，Then 同时只有一个非 RESOLVED 事项、重放不重复创建；ACKNOWLEDGE/RESOLVE 严格遵循 revision 和幂等键，RETRY 只恢复可恢复 checkpoint，REGENERATE 创建带 parentRunId 的新批次，既有 GateDecision 和 publication 字节不变。 |
+| AC-API-003 | Given 固定七节点、增加迭代和不可证明工作单元三种批次，When 查询进度并从已持久化 event_seq 中断后续传，Then completed/total 可由 snapshot 重建、重试 attempt 不扩大 total、迭代先扩展 total、不可证明计划返回 INDETERMINATE 且无 ETA；SSE 游标之后的持久化事件按序完整到达，过期游标要求重读 snapshot。 |
+| AC-API-004 | Given 组件正常、降级、不可用、检查超时和跨批次事件，When 查询组件与活动列表并连接活动 SSE，Then 每项包含稳定状态、reasonCode 与采样时间，UNKNOWN 不显示为健康；活动 ID 可确定性重建、全局 cursor 可续传，响应不包含凭据、Prompt、Session、路径或上游原始错误。Knowledge Health 继续留在 B3，不属于 DEV-006。 |
 | AC-API-005 | Given 多版知识及其 Run、Correction、Evaluation 和 publication，When 查询 lineage 与 diff，Then 双向链接完整、Diff 范围可验证且能反向定位对应运行和证据。 |
 | AC-API-006 | Given 跨 Run Evaluation 和规则修订，When 查询报告、下载授权证据并更新规则，Then 原报告不可变、秘密不泄露、过期 revision 冲突、新 revision 只影响后续评测且全程可审计。 |
 | AC-API-007 | Given 扫描候选、合法来源和越界/漂移来源，When 创建、修改和刷新 Source，Then 只有通过访问校验的候选被持久化，revision 固定，越界默认拒绝，状态和关联统计可复验。 |
 | AC-API-008 | Given 一个含并行、迭代和失败 attempt 的 Run，When 打开 Graph 并选择节点，Then 固定七 Agent 的节点与依赖边稳定，状态、iteration、attempt、时间、ArtifactRef 和错误摘要来自 Registry 投影；刷新和 SSE 续传后状态一致，且页面不能读取 checkpoint、修改拓扑或人工推进节点。 |
 | AC-API-009 | Given Provider 可用、未认证、过期和故障状态，When 打开 Agent 设置，Then 返回稳定状态、模型、检查时间和受控原因，不返回凭据、会话或提示词，也不能修改固定 Agent 契约。 |
+| AC-API-010 | Given 本地管理员提交合法、非法、不可达和受限网络地址的 API URL 与可选 API Key，When 保存、读取和验证 Provider 配置，Then 只有通过地址与权限校验的配置被服务端加密或受限持有，读取只返回脱敏状态，验证无生成副作用；启用后新批次冻结 Pi Agent 非秘密身份但不冻结完整 Key。 |
+| AC-OBS-004 | Given 真实与 fixture 批次、重试、自动修订和人工治理事项，When 查询 24 小时与 7/30 天观测窗口，Then 返回有样本量的节点/批次 P50/P95、Token、估算成本、首次修订通过率、三轮收敛率、人工介入比例、平均处理时间和短期复发率；无样本返回空值，任何响应不含 Prompt、正文、凭据、Session 或上游原始错误。 |
 
 ## P1 内容质量验收
 

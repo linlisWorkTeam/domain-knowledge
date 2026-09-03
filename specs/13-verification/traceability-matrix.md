@@ -36,24 +36,26 @@
 | KF-SYS-030 | AC-ARCH-003 | Implemented | `docs/REPOSITORY-MIGRATION.md` + `specs/adr/ADR-009-repository-split.md` | `tests/contract/component-layout.test.ts` |
 | KF-SYS-031 | AC-ARCH-004 | Implemented | `src/domain/services` + `src/application/apps` + `src/interfaces/ui-api` + `src/infrastructure/persistence/redis` | `tests/contract/architecture.test.ts` + `tests/unit/ddd-domain-services.test.ts` + `tests/integration/redis-runtime-state.test.ts` |
 | KF-SYS-032 | AC-API-001 | Implemented | `src/interfaces/runner/server.ts` + `src/interfaces/dsh/index.ts` + `web/app.js` | `tests/integration/server.test.ts` + `tests/integration/dsh-adapter.test.ts` + `tests/e2e/console.spec.ts` |
-| KF-SYS-033 | AC-API-002 | Planned | — | — |
-| KF-SYS-034 | AC-API-003 | Planned | — | — |
-| KF-SYS-035 | AC-API-004 | Planned | — | — |
+| KF-SYS-033 | AC-API-002 | Partial | `src/application/services/index.ts` + `src/infrastructure/persistence/sqlite-cas/index.ts` + `src/interfaces/runner/console-read-model.ts` + `src/interfaces/runner/server.ts` + `web/app.js` | `tests/integration/server.test.ts` + `tests/e2e/console.spec.ts` |
+| KF-SYS-034 | AC-API-003 | Implemented | `src/interfaces/runner/console-read-model.ts` + `src/interfaces/runner/server.ts` + `web/app.js` | `tests/integration/server.test.ts` + `tests/e2e/console.spec.ts` |
+| KF-SYS-035 | AC-API-004 | Partial | `src/interfaces/runner/console-read-model.ts` + `src/interfaces/runner/server.ts` | `tests/integration/server.test.ts` |
 | KF-SYS-036 | AC-API-005 | Planned | — | — |
 | KF-SYS-037 | AC-API-006 | Planned | — | — |
 | KF-SYS-038 | AC-API-007 | Planned | — | — |
 | KF-SYS-039 | AC-API-008 | Implemented | `src/application/services/workflow-control.ts` + `src/interfaces/runner/console-read-model.ts` + `web/app.js` | `tests/integration/server.test.ts` + `tests/acceptance/automated-langgraph-flow.test.ts` + `tests/e2e/console.spec.ts` |
 | KF-SYS-040 | AC-API-009 | Planned | — | — |
+| KF-SYS-041 | AC-API-010 | Planned | — | — |
+| KF-SYS-042 | AC-OBS-004 | Planned | — | — |
 | KF-UI-001 | AC-UI-001 | Implemented | `web/app.js` + `src/interfaces/runner/server.ts` | `tests/contract/site.test.ts` + `tests/integration/server.test.ts` |
 | KF-UI-002 | AC-UI-002 | Implemented | `web/app.js` + `src/interfaces/runner/console-read-model.ts` | `tests/contract/site.test.ts` + `tests/integration/server.test.ts` |
 | KF-UI-003 | AC-UI-003 | Implemented | `src/application/services/automated-project-workflow.ts` + `web/app.js` | `tests/acceptance/automated-langgraph-flow.test.ts` + `tests/contract/site.test.ts` |
 | KF-UI-004 | AC-UI-004 | Implemented | `web/app.js` | `tests/contract/site.test.ts` |
 | KF-UI-005 | AC-UI-005 | Partial | `web/app.js` + `src/interfaces/runner/console-read-model.ts` | `tests/contract/site.test.ts` + `tests/integration/server.test.ts` |
-| KF-UI-006 | AC-UI-006 | Partial | `web/app.js` | `tests/contract/site.test.ts` |
+| KF-UI-006 | AC-UI-006 | Implemented | `web/app.js` + `src/infrastructure/persistence/sqlite-cas/index.ts` | `tests/integration/server.test.ts` + `tests/e2e/console.spec.ts` |
 | KF-UI-007 | AC-UI-007 | Implemented | `web/app.js` + `src/interfaces/runner/server.ts` | `tests/contract/site.test.ts` + `tests/integration/server.test.ts` |
 | KF-UI-008 | AC-UI-008 | Partial | `web/app.js` + `src/interfaces/runner/server.ts` | `tests/contract/site.test.ts` + `tests/integration/server.test.ts` |
 | KF-UI-009 | AC-UI-009 | Planned | — | — |
-| KF-UI-010 | AC-UI-010 | Partial | `web/app.js` + `src/interfaces/runner/server.ts` | `tests/contract/site.test.ts` + `tests/integration/server.test.ts` |
+| KF-UI-010 | AC-UI-010 | Implemented | `web/app.js` + `src/interfaces/runner/server.ts` | `tests/integration/server.test.ts` + `tests/e2e/console.spec.ts` |
 | KF-UI-011 | AC-UI-011 | Implemented | `web/app.js` + `src/application/apps/knowledge-search-app.ts` | `tests/contract/site.test.ts` + `tests/integration/server.test.ts` |
 | KF-UI-012 | AC-UI-012 | Implemented | `web/index.html` + `web/styles.css` + `web/app.js` | `tests/contract/site.test.ts` + `tests/e2e/console.spec.ts` |
 | KF-UI-013 | AC-UI-013 | Implemented | `web/app.js` + `web/styles.css` + `site/app.js` | `tests/contract/site.test.ts` |
