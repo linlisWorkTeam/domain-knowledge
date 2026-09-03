@@ -95,6 +95,112 @@ export class ConsoleReadModel {
     };
   }
 
+  listActionItems(filters: Record<string, string> = {}): Record<string, unknown>[] {
+    const rows = this.database.prepare(`
+      SELECT * FROM action_items ORDER BY updated_at DESC, action_item_id DESC
+    `).all() as Record<string, unknown>[];
+    return rows.map((row) => this.actionItemFromRow(row)).filter((item) => (
+      (!filters.status || item.status === filters.status)
+      && (!filters.severity || item.severity === filters.severity)
+      && (!filters.type || item.type === filters.type)
+      && (!filters.runId || item.runId === filters.runId)
+    ));
+  }
+
+  getActionItem(actionItemId: string): Record<string, unknown> | null {
+    const row = this.database.prepare('SELECT * FROM action_items WHERE action_item_id = ?')
+      .get(actionItemId) as Record<string, unknown> | undefined;
+    if (!row) return null;
+    const sources = this.database.prepare(`
+      SELECT event_id, observed_at FROM action_item_sources
+      WHERE action_item_id = ? ORDER BY observed_at, event_id
+    `).all(actionItemId) as Record<string, unknown>[];
+    return {
+      ...this.actionItemFromRow(row),
+      observedSources: sources.map((source) => ({
+        eventId: String(source.event_id), observedAt: String(source.observed_at),
+      })),
+      history: [],
+    };
+  }
+
+  getRunProgress(runId: string): Record<string, unknown> | null {
+    const run = this.database.prepare('SELECT * FROM runs WHERE run_id = ?').get(runId) as Record<string, unknown> | undefined;
+    if (!run) return null;
+    const rows = this.database.prepare(`
+      SELECT node_id, iteration, status, attempt, updated_at FROM workflow_node_projections
+      WHERE run_id = ? ORDER BY iteration, node_id, attempt DESC, updated_at DESC
+    `).all(runId) as Record<string, unknown>[];
+    const latest = new Map<string, Record<string, unknown>>();
+    for (const row of rows) {
+      const key = `${row.iteration}:${row.node_id}`;
+      if (!latest.has(key)) latest.set(key, row);
+    }
+    const units = [...latest.values()];
+    const determinate = units.length > 0;
+    const completed = units.filter((row) => row.status === 'COMPLETED').length;
+    const active = units.find((row) => row.status === 'RUNNING');
+    return {
+      runId,
+      mode: determinate ? 'DETERMINATE' : 'INDETERMINATE',
+      completedUnits: determinate ? completed : null,
+      totalUnits: determinate ? units.length : null,
+      ratio: determinate ? completed / units.length : null,
+      currentStage: active ? String(active.node_id) : String(run.state),
+      iteration: Number(run.iteration),
+      retrying: units.some((row) => Number(row.attempt) > 1 && row.status === 'RUNNING'),
+      sampledAt: new Date().toISOString(),
+    };
+  }
+
+  listActivities(filters: Record<string, string> = {}): Record<string, unknown>[] {
+    const rows = this.database.prepare(`
+      SELECT rowid AS activity_cursor, event_id, run_id, event_type, occurred_at, event_json
+      FROM events ORDER BY rowid DESC
+    `).all() as Record<string, unknown>[];
+    return rows.map((row) => {
+      const event = parse<DomainEvent>(row.event_json);
+      return {
+        activityId: `activity_${event.eventId}`,
+        cursor: Number(row.activity_cursor),
+        type: event.eventType,
+        occurredAt: event.occurredAt,
+        runId: event.runId,
+        subject: { kind: event.runId.startsWith('catalog:') ? 'KNOWLEDGE' : 'RUN', id: event.runId },
+        summary: event.eventType,
+        severity: event.eventType === 'NodeFailed' ? 'HIGH' : 'INFO',
+        eventId: event.eventId,
+        links: event.runId.startsWith('catalog:') ? [] : [{ rel: 'run', href: `/api/v1/runs/${encodeURIComponent(event.runId)}` }],
+      };
+    }).filter((item) => (
+      (!filters.type || item.type === filters.type)
+      && (!filters.runId || item.runId === filters.runId)
+      && (!filters.severity || item.severity === filters.severity)
+      && (!filters.occurredAfter || String(item.occurredAt) > filters.occurredAfter)
+    ));
+  }
+
+  private actionItemFromRow(row: Record<string, unknown>): Record<string, unknown> {
+    return {
+      actionItemId: String(row.action_item_id),
+      type: String(row.type),
+      severity: String(row.severity),
+      status: String(row.status),
+      subject: { kind: String(row.subject_kind), id: String(row.subject_id) },
+      runId: row.run_id === null ? null : String(row.run_id),
+      reasonCode: String(row.reason_code),
+      summary: String(row.summary),
+      sourceEventId: String(row.source_event_id),
+      fingerprint: String(row.fingerprint),
+      allowedActions: parse<string[]>(row.allowed_actions_json),
+      revision: Number(row.revision),
+      createdAt: String(row.created_at),
+      updatedAt: String(row.updated_at),
+      resolvedAt: row.resolved_at === null ? null : String(row.resolved_at),
+      resolution: row.resolution_json === null ? null : parse<unknown>(row.resolution_json),
+    };
+  }
+
   private listPublications(runId: string): Record<string, unknown>[] {
     return this.database.prepare(`
       SELECT publication.publication_key, publication.module_id, publication.version_id,

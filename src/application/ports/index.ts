@@ -100,6 +100,10 @@ export interface QualityPolicy {
 export interface RunProjectionReader {
   listRunSummaries(states?: string[]): Record<string, unknown>[];
   getRunSnapshot(runId: string, versions: KnowledgeVersion[]): Record<string, unknown> | null;
+  listActionItems(filters?: Record<string, string>): Record<string, unknown>[];
+  getActionItem(actionItemId: string): Record<string, unknown> | null;
+  getRunProgress(runId: string): Record<string, unknown> | null;
+  listActivities(filters?: Record<string, string>): Record<string, unknown>[];
 }
 
 export interface DemoReportBuilder {

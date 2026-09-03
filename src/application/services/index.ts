@@ -311,6 +311,26 @@ export class KnowledgeFlywheelService {
     return this.runProjections.getRunSnapshot(runId, this.listKnowledgeVersions());
   }
 
+  listActionItems(filters?: Record<string, string>): Record<string, unknown>[] {
+    assertInvariant(this.runProjections !== undefined, 'run projection reader is not configured');
+    return this.runProjections.listActionItems(filters);
+  }
+
+  getActionItem(actionItemId: string): Record<string, unknown> | null {
+    assertInvariant(this.runProjections !== undefined, 'run projection reader is not configured');
+    return this.runProjections.getActionItem(actionItemId);
+  }
+
+  getRunProgress(runId: string): Record<string, unknown> | null {
+    assertInvariant(this.runProjections !== undefined, 'run projection reader is not configured');
+    return this.runProjections.getRunProgress(runId);
+  }
+
+  listActivities(filters?: Record<string, string>): Record<string, unknown>[] {
+    assertInvariant(this.runProjections !== undefined, 'run projection reader is not configured');
+    return this.runProjections.listActivities(filters);
+  }
+
   recordFeedback(versionId: string, action: string, rating: number | null, note = ''): void {
     this.requireVersion(versionId);
     assertInvariant(['hit', 'rate', 'correct'].includes(action), 'unsupported feedback action');

@@ -173,6 +173,68 @@ test('HTTP adapter rejects missing credentials and accepts authenticated candida
       `${base}/api/v1/runs/${encodeURIComponent(runId)}/events?after=invalid`,
     );
     assert.equal(invalidEventCursor.status, 422);
+
+    const components = await (await fetch(`${base}/api/v1/system/components`)).json();
+    assert.equal(components.items.length, 5);
+    assert.equal(components.overall, 'DEGRADED');
+    assert.deepEqual(components.items.map((item: { component: string }) => item.component), [
+      'registry', 'artifactStore', 'workflow', 'provider', 'evaluator',
+    ]);
+    assert.doesNotMatch(JSON.stringify(components), /test-secret/);
+
+    const initialProgress = await (await fetch(
+      `${base}/api/v1/runs/${encodeURIComponent(runId)}/progress`,
+    )).json();
+    assert.equal(initialProgress.mode, 'INDETERMINATE');
+    assert.equal(initialProgress.ratio, null);
+    assert.equal(Object.hasOwn(initialProgress, 'eta'), false);
+
+    instance.composition.workflowObserver.record({
+      runId, nodeId: 'orchestrator', agentId: 'orchestrator', status: 'COMPLETED',
+      iteration: 0, attempt: 1, detail: 'planned', error: null,
+      startedAt: created.createdAt, completedAt: created.updatedAt, updatedAt: created.updatedAt,
+    });
+    instance.composition.workflowObserver.record({
+      runId, nodeId: 'doc_gen', agentId: 'doc-gen', status: 'RUNNING',
+      iteration: 0, attempt: 1, detail: 'generating', error: null,
+      startedAt: created.createdAt, completedAt: null, updatedAt: created.updatedAt,
+    });
+    const measuredProgress = await (await fetch(
+      `${base}/api/v1/runs/${encodeURIComponent(runId)}/progress`,
+    )).json();
+    assert.equal(measuredProgress.mode, 'DETERMINATE');
+    assert.equal(measuredProgress.completedUnits, 1);
+    assert.equal(measuredProgress.totalUnits, 2);
+    assert.equal(measuredProgress.ratio, 0.5);
+    assert.equal(measuredProgress.currentStage, 'doc_gen');
+
+    instance.composition.service.transition(runId, 'FAILED');
+    const actionItems = await (await fetch(`${base}/api/v1/action-items?status=OPEN`)).json();
+    assert.equal(actionItems.items.length, 1);
+    assert.equal(actionItems.items[0].type, 'RUN_FAILED');
+    assert.equal(actionItems.items[0].runId, runId);
+    assert.deepEqual(actionItems.items[0].allowedActions, ['ACKNOWLEDGE', 'RETRY']);
+    const actionDetail = await (await fetch(
+      `${base}/api/v1/action-items/${encodeURIComponent(actionItems.items[0].actionItemId)}`,
+    )).json();
+    assert.equal(actionDetail.fingerprint, actionItems.items[0].fingerprint);
+    assert.equal(actionDetail.observedSources.length, 1);
+    assert.deepEqual(actionDetail.history, []);
+
+    const activities = await (await fetch(`${base}/api/v1/activity?runId=${encodeURIComponent(runId)}`)).json();
+    assert.ok(activities.items.length >= 2);
+    assert.ok(activities.items.every((item: { runId: string }) => item.runId === runId));
+    assert.ok(activities.items.every((item: { cursor: number }) => Number.isSafeInteger(item.cursor)));
+    const firstActivityPage = await (await fetch(
+      `${base}/api/v1/activity?runId=${encodeURIComponent(runId)}&limit=1`,
+    )).json();
+    assert.equal(firstActivityPage.items.length, 1);
+    assert.ok(firstActivityPage.nextCursor);
+    const secondActivityPage = await (await fetch(
+      `${base}/api/v1/activity?runId=${encodeURIComponent(runId)}&limit=1&cursor=${encodeURIComponent(firstActivityPage.nextCursor)}`,
+    )).json();
+    assert.equal(secondActivityPage.items.length, 1);
+    assert.notEqual(secondActivityPage.items[0].activityId, firstActivityPage.items[0].activityId);
     for (const legacyPath of [
       '/api/v1/status', '/api/v1/capabilities', '/api/v1/query', '/api/v1/scan',
       '/api/v1/ingest', '/api/v1/feedback', '/api/v1/run-commands/start',

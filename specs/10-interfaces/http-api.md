@@ -50,7 +50,7 @@
 | `GET /health` | Available | 进程存活探针；不返回业务健康分。 |
 | `GET /api/v1/system/status` | Available | 返回 Registry、CAS、Provider、Evaluator 的真实状态与采样时间；已由旧 `/api/v1/status` 迁移。 |
 | `GET /api/v1/system/capabilities` | Available | 返回读写开关、认证方式、Provider 类型和隔离能力；已由旧 `/api/v1/capabilities` 迁移。 |
-| `GET /api/v1/system/components` | Planned | 返回分组件健康、reason code、最后成功时间和受控诊断摘要。 |
+| `GET /api/v1/system/components` | Available | 返回分组件健康、reason code、最后成功时间和受控诊断摘要。 |
 
 ## 3. 飞轮批次、操作中心与活动流
 
@@ -65,18 +65,18 @@
 | `GET /api/v1/runs/:runId/report` | Available | 下载脱敏审计报告；已由旧 `demo-report` 路径迁移。 |
 | `POST /api/v1/runs/:runId/resume` | Available | 从同一 checkpoint 恢复。 |
 | `POST /api/v1/runs/:runId/cancel` | Available | 取消运行并传播终止信号。 |
-| `GET /api/v1/runs/:runId/progress` | Planned | 返回可证明的 completed/total 单元、当前阶段和采样时间；无可靠模型时不得提供 ETA。 |
+| `GET /api/v1/runs/:runId/progress` | Available | 返回可证明的 completed/total 单元、当前阶段和采样时间；无可靠模型时返回 `INDETERMINATE`，不提供 ETA。 |
 | `POST /api/v1/runs/:runId/retry` | Planned | 按治理决议创建新 Run 或执行规范允许的失败节点重试。 |
 | `GET /api/v1/runs/:runId/event-stream` | Planned | SSE 推送，支持 `Last-Event-ID`/`event_seq` 续传和自动重连。 |
-| `GET /api/v1/action-items` | Planned | 持久化治理事项列表；支持 severity、type、status、runId、分页。 |
-| `GET /api/v1/action-items/:actionItemId` | Planned | 返回原因、证据、允许动作、actor 权限和审计历史。 |
+| `GET /api/v1/action-items` | Available | 持久化治理事项列表；支持 severity、type、status、runId、分页。 |
+| `GET /api/v1/action-items/:actionItemId` | Available | 返回原因、重复观察来源、允许动作和审计历史；DEV-006B 前历史仅含系统投影。 |
 | `POST /api/v1/action-items/:actionItemId/actions/:action` | Planned | 执行白名单治理动作，如 acknowledge、resolve、retry；不得直接篡改 Gate 或 publication。 |
 | `POST /api/v1/action-items/:actionItemId/regenerate` | Planned | 以修订输入创建新 Run，保留来源 Action Item、原 Run 和 reason。 |
-| `GET /api/v1/activity` | Planned | 跨 Run 审计活动列表，支持 type、runId、actor、时间和分页过滤。 |
+| `GET /api/v1/activity` | Available | 跨 Run 审计活动列表，支持 type、runId、severity、时间和分页过滤。 |
 | `GET /api/v1/activity/stream` | Planned | 跨 Run SSE 活动流，支持断线续传。 |
 | `GET /api/v1/knowledge/health` | Planned | 返回有明确口径和样本范围的 freshness、coverage、quality 聚合，不得输出模型臆测分数。 |
 
-第一阶段操作中心只能从 `FAILED`、`LOW_CONFIDENCE` 和最新 GateDecision=`STOPPED` 派生批次级只读事项，并明确标记为 `Partial`；独立生命周期、处理状态、重新生成和跨批次活动流必须等待上述接口。
+DEV-006A 已把 `FAILED`、`LOW_CONFIDENCE` 和最新 GateDecision=`STOPPED` 投影为持久化批次级事项，并提供进度、组件健康和跨批次活动列表；事项处理、重新生成和 SSE 仍保持 Planned，前台在 DEV-006A 接线完成前继续显示 Partial。
 
 ### 3.1 DEV-006 最小交付边界
 

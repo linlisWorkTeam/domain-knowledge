@@ -96,6 +96,33 @@ function page<T>(values: T[], url: URL): { items: T[]; nextCursor: string | null
   };
 }
 
+function decodeOpaqueCursor(raw: string): string {
+  try {
+    const value = Buffer.from(raw, 'base64url').toString('utf8');
+    if (!value) throw new Error();
+    return value;
+  } catch {
+    throw new Error('ARGUMENT_INVALID: cursor is invalid');
+  }
+}
+
+function keysetPage<T>(values: T[], url: URL, keyOf: (value: T) => string): {
+  items: T[]; nextCursor: string | null; sampledAt: string;
+} {
+  const rawCursor = url.searchParams.get('cursor');
+  const cursor = rawCursor ? decodeOpaqueCursor(rawCursor) : null;
+  const eligible = cursor === null ? values : values.filter((value) => keyOf(value) < cursor);
+  const limit = parseLimit(url);
+  const items = eligible.slice(0, limit);
+  return {
+    items,
+    nextCursor: eligible.length > items.length && items.length
+      ? Buffer.from(keyOf(items.at(-1) as T)).toString('base64url')
+      : null,
+    sampledAt: new Date().toISOString(),
+  };
+}
+
 function authorized(request: IncomingMessage, token: string | undefined): boolean {
   if (!token) return false;
   const supplied = request.headers.authorization?.replace(/^Bearer\s+/i, '') ?? '';
@@ -196,6 +223,69 @@ export function createKnowledgeServer(input: {
         });
         return;
       }
+      if (request.method === 'GET' && url.pathname === '/api/v1/system/components') {
+        const sampledAt = new Date().toISOString();
+        const components = [
+          { component: 'registry', status: 'AVAILABLE', reasonCode: 'READY' },
+          { component: 'artifactStore', status: 'AVAILABLE', reasonCode: 'READY' },
+          { component: 'workflow', status: 'AVAILABLE', reasonCode: 'READY' },
+          {
+            component: 'provider',
+            status: composition.agentProviderMode === 'fixture' ? 'DEGRADED' : 'AVAILABLE',
+            reasonCode: composition.agentProviderMode === 'fixture' ? 'FIXTURE_PROVIDER' : 'READY',
+          },
+          { component: 'evaluator', status: 'AVAILABLE', reasonCode: 'READY' },
+        ].map((component) => ({
+          ...component,
+          message: component.reasonCode === 'FIXTURE_PROVIDER' ? '当前使用确定性验收 Provider' : '组件可用',
+          checkedAt: sampledAt,
+          lastSucceededAt: component.status === 'AVAILABLE' ? sampledAt : null,
+        }));
+        send(response, 200, {
+          items: components,
+          overall: components.some((component) => component.status === 'UNAVAILABLE')
+            ? 'UNAVAILABLE'
+            : components.some((component) => component.status === 'DEGRADED') ? 'DEGRADED' : 'AVAILABLE',
+          sampledAt,
+        });
+        return;
+      }
+      if (request.method === 'GET' && url.pathname === '/api/v1/action-items') {
+        const filters = Object.fromEntries(
+          ['status', 'severity', 'type', 'runId']
+            .map((key) => [key, url.searchParams.get(key)])
+            .filter((entry): entry is [string, string] => entry[1] !== null && entry[1] !== ''),
+        );
+        send(response, 200, keysetPage(
+          composition.apps.flywheel.listActionItems(filters),
+          url,
+          (item) => `${String(item.updatedAt)}\0${String(item.actionItemId)}`,
+        ));
+        return;
+      }
+      if (request.method === 'GET' && url.pathname.startsWith('/api/v1/action-items/')) {
+        const actionItemId = decodeURIComponent(url.pathname.slice('/api/v1/action-items/'.length));
+        if (!actionItemId || actionItemId.includes('/')) {
+          send(response, 404, errorBody('NOT_FOUND', 'Resource not found.', currentRequestId));
+          return;
+        }
+        const item = composition.apps.flywheel.getActionItem(actionItemId);
+        send(response, item ? 200 : 404, item ?? errorBody('NOT_FOUND', 'Resource not found.', currentRequestId));
+        return;
+      }
+      if (request.method === 'GET' && url.pathname === '/api/v1/activity') {
+        const filters = Object.fromEntries(
+          ['type', 'runId', 'severity', 'occurredAfter']
+            .map((key) => [key, url.searchParams.get(key)])
+            .filter((entry): entry is [string, string] => entry[1] !== null && entry[1] !== ''),
+        );
+        send(response, 200, keysetPage(
+          composition.apps.flywheel.listActivities(filters),
+          url,
+          (item) => String(Number(item.cursor)).padStart(20, '0'),
+        ));
+        return;
+      }
       if (request.method === 'GET' && url.pathname === '/api/v1/runs') {
         const states = (url.searchParams.get('status') ?? '').split(',').filter(Boolean);
         const runs = composition.apps.flywheel.listRunSummaries(states.length ? states : undefined)
@@ -234,6 +324,10 @@ export function createKnowledgeServer(input: {
         }
         if (child === 'workflow-status') {
           send(response, 200, await composition.apps.orchestrator.status(runId));
+          return;
+        }
+        if (child === 'progress') {
+          send(response, 200, composition.apps.flywheel.getRunProgress(runId));
           return;
         }
         if (child === 'report') {

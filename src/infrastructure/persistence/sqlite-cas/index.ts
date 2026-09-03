@@ -251,6 +251,37 @@ export class SQLiteFlywheelRepository implements FlywheelRepository {
       CREATE INDEX IF NOT EXISTS workflow_nodes_run_updated
         ON workflow_node_projections(run_id, updated_at, node_id);
 
+      CREATE TABLE IF NOT EXISTS action_items (
+        action_item_id TEXT PRIMARY KEY,
+        type TEXT NOT NULL,
+        severity TEXT NOT NULL,
+        status TEXT NOT NULL,
+        subject_kind TEXT NOT NULL,
+        subject_id TEXT NOT NULL,
+        run_id TEXT,
+        reason_code TEXT NOT NULL,
+        summary TEXT NOT NULL,
+        source_event_id TEXT NOT NULL UNIQUE,
+        fingerprint TEXT NOT NULL,
+        allowed_actions_json TEXT NOT NULL,
+        revision INTEGER NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        resolved_at TEXT,
+        resolution_json TEXT
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS action_items_active_fingerprint
+        ON action_items(fingerprint) WHERE status <> 'RESOLVED';
+      CREATE INDEX IF NOT EXISTS action_items_updated
+        ON action_items(updated_at DESC, action_item_id DESC);
+      CREATE TABLE IF NOT EXISTS action_item_sources (
+        action_item_id TEXT NOT NULL,
+        event_id TEXT NOT NULL UNIQUE,
+        observed_at TEXT NOT NULL,
+        PRIMARY KEY(action_item_id, event_id),
+        FOREIGN KEY(action_item_id) REFERENCES action_items(action_item_id)
+      );
+
       INSERT OR IGNORE INTO schema_migrations(version, applied_at)
       VALUES (1, datetime('now'));
     `);
@@ -264,6 +295,7 @@ export class SQLiteFlywheelRepository implements FlywheelRepository {
       INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (2, datetime('now'));
       INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (3, datetime('now'));
       INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (4, datetime('now'));
+      INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (5, datetime('now'));
     `);
   }
 
@@ -280,10 +312,60 @@ export class SQLiteFlywheelRepository implements FlywheelRepository {
   }
 
   private insertEvent(event: DomainEvent): void {
-    this.database.prepare(`
+    const result = this.database.prepare(`
       INSERT OR IGNORE INTO events(event_id, run_id, event_type, event_seq, occurred_at, event_json)
       VALUES (?, ?, ?, COALESCE((SELECT MAX(event_seq) + 1 FROM events WHERE run_id = ?), 1), ?, ?)
     `).run(event.eventId, event.runId, event.eventType, event.runId, event.occurredAt, json(event));
+    if (Number(result.changes) === 1) this.projectActionItem(event);
+  }
+
+  private projectActionItem(event: DomainEvent): void {
+    let type: string | null = null;
+    let severity = 'HIGH';
+    let reasonCode = '';
+    let summary = '';
+    let allowedActions: string[] = [];
+    if (event.eventType === 'RunStateChanged' && event.payload.to === 'FAILED') {
+      type = 'RUN_FAILED';
+      reasonCode = String(event.payload.reasonCode ?? 'RUN_FAILED');
+      summary = '批次执行失败';
+      allowedActions = ['ACKNOWLEDGE', 'RETRY'];
+    } else if (event.eventType === 'RunStateChanged' && event.payload.to === 'LOW_CONFIDENCE') {
+      type = 'LOW_CONFIDENCE';
+      severity = 'MEDIUM';
+      reasonCode = String(event.payload.reasonCode ?? 'LOW_CONFIDENCE');
+      summary = '批次可信度不足，需要人工判断';
+      allowedActions = ['ACKNOWLEDGE', 'REGENERATE'];
+    } else if (event.eventType === 'GateDecided' && event.payload.outcome === 'STOPPED') {
+      type = 'GATE_STOPPED';
+      const reasons = Array.isArray(event.payload.reasonCodes) ? event.payload.reasonCodes.map(String) : [];
+      reasonCode = reasons[0] ?? 'GATE_STOPPED';
+      summary = '确定性门禁停止了本批次';
+      allowedActions = ['ACKNOWLEDGE', 'REGENERATE'];
+    }
+    if (!type) return;
+    const fingerprint = `sha256:${sha256(`${type}\0RUN\0${event.runId}\0${reasonCode}`)}`;
+    const actionItemId = `ai_${sha256(`${fingerprint}\0${event.eventId}`).slice(0, 24)}`;
+    this.database.prepare(`
+      INSERT INTO action_items(
+        action_item_id, type, severity, status, subject_kind, subject_id, run_id,
+        reason_code, summary, source_event_id, fingerprint, allowed_actions_json,
+        revision, created_at, updated_at, resolved_at, resolution_json
+      ) VALUES (?, ?, ?, 'OPEN', 'RUN', ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, NULL, NULL)
+      ON CONFLICT DO NOTHING
+    `).run(
+      actionItemId, type, severity, event.runId, event.runId, reasonCode, summary,
+      event.eventId, fingerprint, json(allowedActions), event.occurredAt, event.occurredAt,
+    );
+    const active = this.database.prepare(`
+      SELECT action_item_id FROM action_items WHERE fingerprint = ? AND status <> 'RESOLVED'
+    `).get(fingerprint) as Record<string, unknown> | undefined;
+    if (active) {
+      this.database.prepare(`
+        INSERT OR IGNORE INTO action_item_sources(action_item_id, event_id, observed_at)
+        VALUES (?, ?, ?)
+      `).run(String(active.action_item_id), event.eventId, event.occurredAt);
+    }
   }
 
   saveRun(run: FlywheelRun, event: DomainEvent): void {

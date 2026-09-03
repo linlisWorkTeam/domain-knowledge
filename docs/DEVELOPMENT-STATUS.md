@@ -47,7 +47,7 @@ This file is the single entry point for project-level development status, curren
 - DeepSeek Harness live Adapter 已存在；公司 CodeAgent CLI 尚未接入。
 - 真实 Agent 质量、公司环境容量、长期稳定性和敌对代码执行安全尚未形成验收结论。
 
-需求级统计以追踪矩阵当前内容为准：`Implemented 43 / Partial 15 / Planned 14`。
+需求级统计以追踪矩阵当前内容为准：`Implemented 43 / Partial 18 / Planned 11`。
 
 ## 里程碑与工作项
 
@@ -105,6 +105,8 @@ This file is the single entry point for project-level development status, curren
 - 前台操作中心与飞轮批次只读接线，保留明确的写操作 Disabled 状态。
 
 完成标准：对应 API Schema、持久化迁移、Application 读用例、HTTP 集成测试和前台 Empty/Partial/Error 状态全部通过；随后进入 DEV-006B 人工检查，确认事项类型、严重级别、允许动作和进度口径后才开放写命令。
+
+当前进展：后台只读基础已实现，包括 action_items 持久化与来源去重、批次进度、五类组件健康、跨批次活动列表和 HTTP 集成测试；前台接线、专用响应 Schema 与人工检查尚未完成，因此 DEV-006A 仍为 In Progress。
 
 ## 后续开发任务：DEV-009 CompanyCodeAgentCliAdapter
 

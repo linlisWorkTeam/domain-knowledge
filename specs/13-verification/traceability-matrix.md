@@ -36,9 +36,9 @@
 | KF-SYS-030 | AC-ARCH-003 | Implemented | `docs/REPOSITORY-MIGRATION.md` + `specs/adr/ADR-009-repository-split.md` | `tests/contract/component-layout.test.ts` |
 | KF-SYS-031 | AC-ARCH-004 | Implemented | `src/domain/services` + `src/application/apps` + `src/interfaces/ui-api` + `src/infrastructure/persistence/redis` | `tests/contract/architecture.test.ts` + `tests/unit/ddd-domain-services.test.ts` + `tests/integration/redis-runtime-state.test.ts` |
 | KF-SYS-032 | AC-API-001 | Implemented | `src/interfaces/runner/server.ts` + `src/interfaces/dsh/index.ts` + `web/app.js` | `tests/integration/server.test.ts` + `tests/integration/dsh-adapter.test.ts` + `tests/e2e/console.spec.ts` |
-| KF-SYS-033 | AC-API-002 | Planned | — | — |
-| KF-SYS-034 | AC-API-003 | Planned | — | — |
-| KF-SYS-035 | AC-API-004 | Planned | — | — |
+| KF-SYS-033 | AC-API-002 | Partial | `src/infrastructure/persistence/sqlite-cas/index.ts` + `src/interfaces/runner/console-read-model.ts` + `src/interfaces/runner/server.ts` | `tests/integration/server.test.ts` |
+| KF-SYS-034 | AC-API-003 | Partial | `src/interfaces/runner/console-read-model.ts` + `src/interfaces/runner/server.ts` | `tests/integration/server.test.ts` |
+| KF-SYS-035 | AC-API-004 | Partial | `src/interfaces/runner/console-read-model.ts` + `src/interfaces/runner/server.ts` | `tests/integration/server.test.ts` |
 | KF-SYS-036 | AC-API-005 | Planned | — | — |
 | KF-SYS-037 | AC-API-006 | Planned | — | — |
 | KF-SYS-038 | AC-API-007 | Planned | — | — |
