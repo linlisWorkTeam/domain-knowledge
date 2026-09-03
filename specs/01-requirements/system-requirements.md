@@ -35,6 +35,15 @@
 | KF-SYS-029 | P0 | 本地服务必须提供可提交的写入令牌配置样例、默认忽略的本地配置文件和页面内配置说明；未配置时继续默认拒绝写入，但必须告诉用户如何启用并重启服务。 | AC-SEC-004 |
 | KF-SYS-030 | P0 | 运行代码、Spec、测试和前台必须只在 domain-knowledge 演进；wpKnowledge 只能保存知识正文、研究、设计、证据与索引，不得保留可运行副本。 | AC-ARCH-003 |
 | KF-SYS-031 | P0 | UI/API 必须只通过 Orchestrator、Flywheel、EvalRunner、KnowledgeSearch 和 KnowledgeDiscovery Application App 进入系统；领域规则由 Flywheel、EvalRunner 和 Association Domain Service 持有，LangGraph、数据库与 Redis 实现只能位于 Infrastructure。 | AC-ARCH-004 |
+| KF-SYS-032 | P1 | Preview HTTP API 必须按 system、runs、knowledge、evaluations、sources、graph、agents 资源分组；迁移必须原子更新 Server、Console、DSH Adapter、测试和文档，首个 Release 前不得保留旧路由别名。 | AC-API-001 |
+| KF-SYS-033 | P1 | 系统必须提供持久化 Action Item 治理能力，能够从运行、评测、来源和安全事实确定性地产生、去重、处理和审计事项；治理动作不得改写既有 GateDecision 或 publication。 | AC-API-002 |
+| KF-SYS-034 | P1 | Run 必须提供可证明的进度、合法重试和可断线续传的实时事件；无法从固定工作单元计算时不得输出百分比或 ETA。 | AC-API-003 |
+| KF-SYS-035 | P1 | 系统必须提供分组件健康、跨 Run Activity 和有明确数据口径的 Knowledge Health；模型自评或无样本范围的聚合不得成为产品指标。 | AC-API-004 |
+| KF-SYS-036 | P1 | KnowledgeVersion 必须可查询版本血缘、结构化 Diff 和带 provenance 的关系，且能反向定位 Run、Correction、Evaluation 与 publication。 | AC-API-005 |
+| KF-SYS-037 | P1 | 系统必须提供跨 Run Evaluation 读模型、证据查询和版本化 Evaluation Rule 管理；规则修改必须校验权限并保留不可变审计历史。 | AC-API-006 |
+| KF-SYS-038 | P1 | 系统必须提供持久化 Source Registry，管理来源身份、固定版本、同步状态、漂移、刷新任务、访问边界及其与知识的关联。 | AC-API-007 |
+| KF-SYS-039 | P1 | Knowledge Graph 必须从已持久化 Knowledge Relation 构建受限读模型，返回稳定节点、typed edge、provenance、截断信息和生成时间，不得从静态前台图反写领域事实。 | AC-API-008 |
+| KF-SYS-040 | P1 | Agent Settings 必须能够读取 Provider 可用性、认证状态、模型标识和受控错误摘要，但不得返回凭据或允许修改固定 Agent 契约。 | AC-API-009 |
 
 ## P0-B Spike（P0-A 后独立开展）
 

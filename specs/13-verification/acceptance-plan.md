@@ -39,6 +39,15 @@
 | AC-E2E-001 | Given 固定 commit 且基线门禁通过的 ohMyWorkPanel 源码，When 在仓库外隔离副本运行两轮知识驱动再生成，Then 首轮真实测试失败并形成带证据 Correction，第二轮 fresh 生成通过前端全测、生产构建与 Rust 全测，最终只发布第二版且 run 审计包含全部节点、评测与发布证据。 |
 | AC-E2E-002 | Given 固定 ohMyWorkPanel 场景，When 内嵌 LangGraph 执行全部 Agent、一次失败迭代和真实项目评测，Then 同一 runId 下保留七类节点投影、两版知识 lineage、PASS decision 和唯一 publication receipt。 |
 | AC-E2E-003 | Given 配置好的 DeepSeek Harness AgentProvider 与固定 ohMyWorkPanel commit，When 运行自动治理并从 Agent 输出错误恢复，Then 七类 live Agent 输出均经过 Schema 校验、调用摘要脱敏、质量反馈自动迭代，最终行为证据与发布仍由 Knowledge Gate 决定。 |
+| AC-API-001 | Given Preview API 迁移变更，When 扫描 Server、Console、DSH Adapter、测试和文档并执行契约测试，Then 只存在规范资源路径，旧 HTTP 路由返回 404，内部 transition/evaluate/publish 不可通过 HTTP 调用。 |
+| AC-API-002 | Given 来自 Run、Evaluation、Source 或安全事件的相同问题，When 重放事件并处理 Action Item，Then 开放事项按 fingerprint 去重，合法动作追加审计，重复 Command 幂等，既有 GateDecision 和 publication 字节不变。 |
+| AC-API-003 | Given 固定与不可预知两种 Run plan，When 查询进度、重试并中断后续传事件，Then 固定计划返回可重建 completed/total，不可预知计划不返回虚假百分比或 ETA，重试语义合法且 SSE 不重不漏。 |
+| AC-API-004 | Given 组件故障、无健康样本和跨 Run 事件，When 查询组件、Activity 和 Knowledge Health，Then 状态含采样时间与 reason code，健康指标含分子/分母/窗口/规则版本，无样本返回 unavailable。 |
+| AC-API-005 | Given 多版知识及其 Run、Correction、Evaluation、publication 和关系证据，When 查询 lineage、diff 与 relations，Then 双向链接完整、Diff 范围可验证、每条关系可追溯且没有 Agent 自评分。 |
+| AC-API-006 | Given 跨 Run Evaluation 和规则修订，When 查询报告、下载授权证据并更新规则，Then 原报告不可变、秘密不泄露、过期 revision 冲突、新 revision 只影响后续评测且全程可审计。 |
+| AC-API-007 | Given 扫描候选、合法来源和越界/漂移来源，When 创建、修改和刷新 Source，Then 只有通过访问校验的候选被持久化，revision 固定，越界默认拒绝，状态和关联统计可复验。 |
+| AC-API-008 | Given 带 provenance 的 KnowledgeRelation，When 以 depth 和 limit 查询 Graph，Then 节点与 typed edge 稳定、每条边有证据、响应说明截断与生成时间，重建投影不改变领域事实。 |
+| AC-API-009 | Given Provider 可用、未认证、过期和故障状态，When 打开 Agent Settings，Then 返回稳定状态、模型、检查时间和受控原因，不返回凭据/Session/Prompt，也不能修改固定 Agent 契约。 |
 
 ## P1 内容质量验收
 

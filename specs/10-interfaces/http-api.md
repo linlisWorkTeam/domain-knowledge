@@ -16,6 +16,33 @@
 - 所有 Command 必须接受 `Idempotency-Key`，返回关联资源 ID 和审计事件 ID；危险动作还必须记录 actor 与 reason。
 - 前台不得把静态原型或浏览器派生值表达成服务端事实。接口状态只使用：`Available`、`Available / Rename`、`Available / Redefine`、`Available / Extend`、`Partial`、`Planned`。
 
+### 1.1 通用响应契约
+
+列表响应统一为 `{ items, nextCursor, sampledAt }`。`nextCursor=null` 表示结束；cursor 是不透明值，客户端不得解析。默认 `limit=50`，最大 `limit=200`。同一 cursor 链必须使用同一过滤条件和排序，资源变更时允许弱一致但不得重复返回同一 ID。
+
+错误响应统一为：
+
+```json
+{
+  "error": {
+    "code": "STABLE_DOMAIN_CODE",
+    "message": "面向用户的受控说明",
+    "requestId": "req_...",
+    "retryable": false,
+    "details": {}
+  }
+}
+```
+
+`details` 不得包含凭据、Prompt、源码正文、任意文件路径或未脱敏输出。并发版本冲突返回 `409`，无效输入返回 `422`，限流返回 `429`。SSE 的 `id` 必须等于可持久化续传位置，事件 payload 使用同一版本化事件信封。
+
+### 1.2 Command 与版本控制
+
+- `POST` Command 使用 `Idempotency-Key`；同一 key 与同一规范化请求返回同一结果，不同请求返回 `409 IDEMPOTENCY_CONFLICT`。
+- `PATCH` 和规则类修改必须提交当前 revision；过期 revision 返回 `409 REVISION_CONFLICT`。
+- 成功写响应至少包含 `{ resourceId, eventId, revision, acceptedAt }`；异步任务另外返回 `runId` 或 `jobId`。
+- 时间使用 UTC RFC 3339，ID 在资源生命周期内稳定；所有枚举只允许追加或通过 API 大版本调整。
+
 ## 2. 系统与能力
 
 | 方法与路径 | 状态 | 用途与最小响应 |
@@ -132,3 +159,14 @@
 | Evaluations | 从 Run snapshot 查看与聚合 | 全局列表标记 Partial | 独立列表/详情/证据/规则 API |
 | Sources | 扫描候选只读查看 | Registry 控件禁用 | 来源 CRUD、刷新和统计 |
 | Agent Settings | Agent 定义和 promptAddon 事实 | Provider 健康标记未接入 | Provider status；其余固定契约不得开放编辑 |
+
+## 11. 最终目标实施顺序
+
+| 阶段 | 后台能力 | 完成出口 |
+|---|---|---|
+| B1 API 基线 | 11 个旧接口的资源化迁移；分页、错误、认证、幂等、revision 通用契约 | 旧 HTTP 路由全部删除，Server、Console、DSH Adapter、测试和文档只引用新路径。 |
+| B2 核心控制面 | Action Item；Run progress/retry/SSE；组件健康、Activity、Knowledge Health | Action Center 和 Flywheel Runs 不依赖模拟或浏览器私有状态即可完成查看、治理、重试和断线恢复。 |
+| B3 内容与质量面 | Knowledge lineage/diff/relations；Evaluation 读模型与规则；Source Registry | Knowledge、Evaluations、Sources 的列表、详情、筛选、证据和允许动作全部来自服务端事实。 |
+| B4 图谱与运营面 | Graph 投影；Provider status；指标口径和大数据查询加固 | Graph 使用可追溯真实关系，Agent Settings 显示真实 Provider 状态，全部列表通过分页和权限验收。 |
+
+B1–B4 共包含 11 个现有接口迁移/扩展和 27 个 Planned HTTP 接口。阶段可以拆分 PR，但不得在某阶段完成前把对应页面状态从 Preview/Partial/Disabled 提升为 Available。
