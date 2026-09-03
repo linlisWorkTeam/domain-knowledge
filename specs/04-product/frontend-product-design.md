@@ -1,6 +1,6 @@
 # 知识飞轮前台产品设计
 
-**状态：Accepted；B1 已就绪、F2 因 HCP-1=Rework required 正在视觉返工｜版本：0.5.3｜日期：2026-09-03**
+**状态：Accepted；B1 已就绪、F2 因 HCP-1=Rework required 正在视觉返工｜版本：0.5.4｜日期：2026-09-03**
 
 本文定义 domain-knowledge 知识飞轮控制台的用户体验、信息架构、交互边界、接口需求和验收标准。领域状态、门禁、安全和发布语义以同仓库的[规范总入口](../README.md)为准；前台不得创造第二套状态或发布权威。
 
@@ -516,6 +516,7 @@ Console 使用 `14px` 全局基准；正文和操作文字通常不小于 `11px`
 | AC-UI-018 | Given 服务端未配置写入令牌，When 用户点击治理模式或打开设置页，Then 页面引导其从 `.env.example` 创建 `.env.local`、设置 `WP_KNOWLEDGE_WRITE_TOKEN` 并重启服务；令牌不会被写入网址或本地存储。 |
 | AC-UI-019 | Given 服务端只提供当前已实现 API，When 用户访问新版控制台全部页面或任一 API 失败，Then 页面保留原型规定的信息结构，但只显示服务端事实、规范允许的派生值或明确的 `—`/Empty/Partial/Disabled 状态，不显示模拟 Knowledge Health、ETA、Graph、Action Item、Activity、Workspace 或用户身份数据。 |
 | AC-UI-020 | Given Chromium 视口固定为 `1363 × 936`，When 打开浅色 Action Center，Then Header 高度为 `103px`、标题顶部位于 `40–45px`、操作区垂直居中、全局字号为 `14px`，并通过已提交基准图的像素回归。 |
+| AC-UI-021 | Given 用户在七个一级页面之间导航，When 页面完成渲染，Then Topbar 是唯一的页面级标题来源，内容区不得重复同名标题或增加无功能含义的眉标题、副标题和说明卡。 |
 
 ## 13. 实施阶段
 
@@ -531,6 +532,7 @@ Console 使用 `14px` 全局基准；正文和操作文字通常不小于 `11px`
 - 生产导航收敛为 Action Center、Flywheel Runs、Knowledge、Graph、Evaluations、Sources、Agent Settings 七个页面。
 - 七页必须完成最终布局、深浅主题、响应式、键盘路径以及 Loading/Empty/Error/Partial/Disabled 状态；未接 API 不得以演示数据或假成功代替。
 - Graph 必须基于选定 Run 的固定 Agent 定义、WorkflowNodeProjection、workflow status 和事件实现真实轮询版，并允许查看节点 attempt、时间、ArtifactRef 与受控错误摘要。
+- Graph 采用 LangGraph Studio 的有向工作流表达范式：连接线、箭头、当前路径和节点执行状态必须在同一画布直接映射；不得退化为无连线的卡片网格。Studio 是面向 Agent Server 的调试 IDE，本产品不以 iframe 嵌入，也不开放其线程 fork、状态编辑或提示词调试权限。
 - Knowledge 只承诺查询、详情与反馈 Preview；Lineage/Diff 保留禁用入口，Add curated knowledge 不进入本阶段。
 
 ### HCP-1：F2 与 B1 人工检查点

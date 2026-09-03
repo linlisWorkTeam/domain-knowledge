@@ -88,8 +88,10 @@ F2 可访问环境和 B1 API 迁移 diff 都已准备后、B2/B3 前台接线开
 - 七个最终页面均可导航，桌面、移动端、深色和浅色主路径可验收；
 - Action Center 的治理入口、Runs 的业务/执行状态、Knowledge Preview、Evaluations/Sources 的 Partial 边界和 Agent Settings 的可编辑范围表达正确；
 - Graph 展示选定 Run 的真实固定 Agent 拓扑与节点投影，不是 Knowledge Graph，不读取 checkpoint，也没有编辑拓扑或人工推进节点的控件；
+- Graph 的七个 Agent 节点必须以七条有向边连接，完成、运行、失败和未开始状态具备一致图例；当前路径由 WorkflowNodeProjection 映射，不嵌入 LangGraph Studio 或引入第二套运行事实源；
 - 每个动态区域都能指出服务端 API、公开派生规则或明确未接状态，任何失败路径都不回退到演示数据；
 - 以 `1363 × 936` Chromium 固定视口核对 Action Center 基准截图；自动门禁必须同时断言 `103px` Header、标题 `y=40–45px`、操作区垂直居中、`14px` 全局字号以及关键原型组件仍存在；
+- 七个一级页面各自只能出现一个与导航同名的页面标题，统一由 Topbar 提供；内容区只保留指标、工具栏和有业务含义的分区标题，不得重复 Page Intro 或装饰性说明卡；
 - B1 新旧路由映射、删除范围以及 Console/DSH Adapter/测试同步修改边界获得确认。
 
 验收记录必须包含结论 `Accepted`、`Accepted with follow-ups` 或 `Rework required`，以及临时环境地址、桌面/移动端与双主题证据、数据来源/禁用能力清单、Graph 来源说明和自动化结果。只有前两种结论允许开始 B2/B3 前台接线；follow-up 不得改变已冻结的信息架构或 API 契约。

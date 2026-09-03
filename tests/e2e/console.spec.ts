@@ -47,8 +47,11 @@ test('Graph is a read-only Run Agent workflow backed by canonical node APIs', as
   await page.getByRole('button', { name: /^Graph$/ }).click();
   await expect(page.getByRole('heading', { name: 'Graph', level: 1 })).toBeVisible();
   await expect(page.getByLabel('只读 Agent 工作流图')).toBeVisible();
-  await expect(page.getByText('只读拓扑')).toBeVisible();
-  await expect(page.getByText(/B2 event-stream/)).toBeVisible();
+  await expect(page.getByText(/只读 · 10 秒刷新 · PARTIAL/)).toBeVisible();
+  await expect(page.locator('.graph-node')).toHaveCount(7);
+  await expect(page.locator('.graph-edge')).toHaveCount(7);
+  await expect(page.locator('.graph-status-legend')).toContainText('运行中');
+  await expect(page.locator('.graph-status-legend')).toContainText('已完成');
   expect(requests.some((path) => /\/api\/v1\/runs\/[^/]+\/workflow-nodes$/.test(path))).toBe(true);
   expect(requests.some((path) => /\/api\/v1\/runs\/[^/]+\/workflow-status$/.test(path))).toBe(true);
   expect(requests.some((path) => /\/api\/v1\/runs\/[^/]+\/events$/.test(path))).toBe(true);
@@ -74,7 +77,11 @@ test('seven-page Console uses server facts and canonical Sources API', async ({ 
   await expect(page.getByText(/项需要确认/)).toBeVisible();
 
   const labels = ['Action Center', 'Flywheel Runs', 'Knowledge', 'Graph', 'Evaluations', 'Sources', 'Agent Settings'];
-  for (const label of labels) await expect(page.getByRole('button', { name: new RegExp(label) }).first()).toBeVisible();
+  for (const label of labels) {
+    await expect(page.getByRole('button', { name: new RegExp(label) }).first()).toBeVisible();
+    if (label !== 'Action Center') await page.getByRole('button', { name: new RegExp(`^${label}$`) }).click();
+    await expect(page.getByRole('heading', { name: label, exact: true })).toHaveCount(1);
+  }
 
   await page.getByRole('button', { name: /^Sources$/ }).click();
   await expect(page.getByRole('heading', { name: '当前来源候选' })).toBeVisible();

@@ -524,12 +524,6 @@ small, .sidebar-foot small, .topbar .subtitle, .section-heading p:not(.eyebrow),
 }
 
 /* Reference-site page primitives, mapped to canonical API data. */
-.reference-page-intro { height: 137px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
-.reference-page-intro small { color: var(--accent); font: 8px ui-monospace, monospace; letter-spacing: .15em; }
-.reference-page-intro h2 { margin: 8px 0 5px; font-size: 25px; }
-.reference-page-intro p { margin: 0; color: var(--muted); font-size: 10px; }
-.reference-page-intro > button, .reference-page-intro > .status-pill { min-height: 38px; padding: 0 14px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); color: var(--text); font: 8px ui-monospace, monospace; }
-.reference-page-intro > button:disabled { opacity: .52; cursor: not-allowed; }
 .new { min-height: 38px; padding: 0 15px; border: 0; border-radius: 7px; background: var(--accent); color: #06110d; font: 600 8px ui-monospace, monospace; }
 .reference-metrics { margin: 20px 0 14px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
 .reference-metrics article, .reference-run-history, .reference-run-detail, .reference-domains, .reference-docs, .reference-graph-shell, .reference-knowledge-tools, .reference-start-form { border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
@@ -593,8 +587,37 @@ small, .sidebar-foot small, .topbar .subtitle, .section-heading p:not(.eyebrow),
 .reference-graph-tools label { display: flex; align-items: center; }
 .reference-graph-tools select { width: min(430px, 55vw); }
 .reference-graph-shell { min-height: 590px; position: relative; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1fr) 285px; }
-.reference-graph-canvas { min-height: 590px; padding: 40px; background-image: radial-gradient(var(--border) .8px, transparent .8px); background-size: 18px 18px; }
-.reference-graph-canvas .workflow-graph { align-content: center; min-height: 500px; }
+.reference-graph-canvas { min-height: 590px; position: relative; padding: 22px 30px 58px; background-image: radial-gradient(var(--border) .8px, transparent .8px); background-size: 18px 18px; }
+.reference-graph-canvas .workflow-graph { position: relative; display: block; min-height: 510px; padding: 0; }
+.graph-connections { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.graph-edge { stroke: var(--border); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.graph-edge.running { stroke: var(--accent); stroke-width: 2.5; stroke-dasharray: 7 5; animation: graph-flow .8s linear infinite; }
+.graph-edge.complete { stroke: color-mix(in srgb, var(--success) 70%, var(--border)); }
+#graph-arrow-idle path { fill: var(--border); }
+#graph-arrow-running path { fill: var(--accent); }
+#graph-arrow-complete path { fill: var(--success); }
+.reference-graph-canvas .graph-node { position: absolute; left: var(--node-left); top: var(--node-top); width: 20%; min-width: 126px; min-height: 76px; transform: translateX(-50%); display: grid; grid-template-columns: 25px 1fr; grid-template-rows: auto auto; align-content: center; justify-items: start; column-gap: 9px; row-gap: 3px; padding: 11px 12px; border-radius: 8px; background: var(--surface); box-shadow: 0 4px 14px color-mix(in srgb, #000 8%, transparent); }
+.reference-graph-canvas .graph-node:hover, .reference-graph-canvas .graph-node:focus-visible { transform: translateX(-50%) translateY(-2px); }
+.reference-graph-canvas .graph-node-icon { grid-row: 1 / 3; align-self: center; width: 23px; height: 23px; font-size: 10px; }
+.reference-graph-canvas .graph-node b { align-self: end; font-size: 10px; }
+.reference-graph-canvas .graph-node small { align-self: start; font: 7px ui-monospace, monospace; }
+.reference-graph-canvas .graph-node.complete { border-color: color-mix(in srgb, var(--success) 60%, var(--border)); }
+.reference-graph-canvas .graph-node.running { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent), 0 4px 18px color-mix(in srgb, var(--accent) 12%, transparent); }
+.reference-graph-canvas .graph-node.failed { border-color: var(--danger); }
+.reference-graph-canvas .node-orchestrator { left: 50%; top: 4%; }
+.reference-graph-canvas .node-doc-worker { left: 15%; top: 30%; }
+.reference-graph-canvas .node-test-gen { left: 85%; top: 30%; }
+.reference-graph-canvas .node-doc-gen { left: 15%; top: 60%; }
+.reference-graph-canvas .node-code { left: 40%; top: 60%; }
+.reference-graph-canvas .node-check { left: 65%; top: 60%; }
+.reference-graph-canvas .node-review { left: 65%; top: 86%; }
+.graph-status-legend { position: absolute; left: 22px; right: 22px; bottom: 16px; display: flex; gap: 16px; color: var(--faint); font: 7px ui-monospace, monospace; }
+.graph-status-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.graph-status-legend i { width: 6px; height: 6px; border-radius: 50%; background: var(--border); }
+.graph-status-legend i.running { background: var(--accent); box-shadow: 0 0 7px var(--accent); }
+.graph-status-legend i.complete { background: var(--success); }
+.graph-status-legend i.failed { background: var(--danger); }
+@keyframes graph-flow { to { stroke-dashoffset: -12; } }
 .reference-node-detail { padding: 20px; border-left: 1px solid var(--border); }
 .reference-node-detail header { display: flex; justify-content: space-between; }
 .reference-node-detail header em { padding: 4px 5px; border: 1px solid var(--governance-border); border-radius: 3px; background: var(--governance-bg); color: var(--governance); font: 6px ui-monospace, monospace; font-style: normal; }
@@ -614,8 +637,6 @@ small, .sidebar-foot small, .topbar .subtitle, .section-heading p:not(.eyebrow),
   .reference-graph-shell { grid-template-columns: 1fr; }
 }
 @media (max-width: 680px) {
-  .reference-page-intro { height: 112px; }
-  .reference-page-intro p { display: none; }
   .reference-metrics { grid-template-columns: repeat(2, 1fr); }
   .reference-run-item { grid-template-columns: 20px 1fr 55px; }
   .reference-run-item em, .reference-run-item > span:nth-of-type(2), .reference-run-item strong { display: none; }
@@ -625,6 +646,8 @@ small, .sidebar-foot small, .topbar .subtitle, .section-heading p:not(.eyebrow),
   .reference-graph-tools { align-items: stretch; flex-direction: column; height: auto; gap: 8px; padding-block: 10px; }
   .reference-graph-tools select { width: 100%; }
   .reference-graph-canvas { padding: 14px; }
+  .reference-graph-canvas .workflow-graph { min-width: 640px; }
+  .reference-graph-canvas { overflow-x: auto; }
 }
 
 @media (prefers-reduced-motion: reduce) {

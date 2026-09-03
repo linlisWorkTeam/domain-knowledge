@@ -263,7 +263,6 @@ function renderRuns() {
   const latest = state.runs[0]
   const rows = state.runs.map((run, index) => referenceRunRow(run, index === 0)).join('')
   content.innerHTML = `
-    <section class="reference-page-intro"><div><small>EXECUTION</small><h2>Flywheel Runs</h2><p>查看每次运行从发现、生成到评测与发布的真实过程。</p></div><button class="new" data-open-operator type="button">＋ New run</button></section>
     <section class="reference-metrics"><article><small>RUNNING</small><b class="mint">${active.length}</b><p>来自 Registry 当前状态</p></article><article><small>VERIFIED</small><b>${verified.length}</b><p>${state.runs.length} 次运行</p></article><article><small>NEEDS ATTENTION</small><b>${state.runs.filter(needsAttention).length}</b><p>失败、低置信或 STOPPED</p></article><article><small>KNOWLEDGE VERSIONS</small><b>${state.runs.reduce((sum, run) => sum + (run.knowledgeVersionIds?.length ?? 0), 0)}</b><p>由 Run 事实汇总</p></article></section>
     <div class="reference-runs-grid"><section class="reference-run-history"><header><h3>Run history</h3><button class="on" data-run-filter="">全部</button><button data-run-filter="active">运行中</button><button data-run-filter="attention">需处理</button></header><div id="runs-list">${rows || emptyState('没有运行记录', '当前 Registry 中还没有运行记录。')}</div></section>
     <aside class="reference-run-detail">${latest ? `<header><small>LATEST RUN</small><b>${escapeHtml(shortId(latest.runId, 18))}</b></header><div class="orbit-mini"><span>${escapeHtml(displayLabel(latest.state))}<small>RUN STATE</small></span></div><p class="done">✓ <b>运行事实</b><small>${escapeHtml(latest.moduleId)}</small></p><p class="doing">⌁ <b>Agent Graph</b><small>查看真实节点投影</small></p><p>3 <b>Evaluations</b><small>${escapeHtml(latest.latestDecision?.outcome ? displayLabel(latest.latestDecision.outcome) : '等待门禁')}</small></p><button class="wide" data-run-id="${escapeHtml(latest.runId)}">Open run details →</button>` : emptyState('暂无运行', '创建 Run 后在这里查看。')}</aside></div>
@@ -354,7 +353,6 @@ function renderKnowledge(items = state.knowledge) {
   }
   const modules = [...new Set(items.map((item) => item.moduleId))].slice(0, 6)
   content.innerHTML = `
-    <section class="reference-page-intro"><div><small>KNOWLEDGE BASE</small><h2>Knowledge</h2><p>浏览带有来源、质量状态和发布依据的知识版本。</p></div><button disabled>＋ Add curated knowledge</button></section>
     <section class="reference-knowledge-tools"><label>⌕　<input id="knowledge-search" type="search" placeholder="搜索概念、模块或正文…"></label><kbd>⌘ K</kbd><select id="knowledge-status" aria-label="知识状态"><option value="VERIFIED">已验证</option><option value="CANDIDATE">候选</option><option value="LOW_CONFIDENCE">低置信</option><option value="SUPERSEDED">已替代</option><option value="">全部状态</option></select></section>
     <div class="reference-knowledge-grid"><aside class="reference-domains"><header><h3>Domains</h3><span id="knowledge-count">${items.length}</span></header><button class="active">全部知识 <b>${items.length}</b></button>${modules.map((moduleId) => `<button>${escapeHtml(moduleId)} <b>${items.filter((item) => item.moduleId === moduleId).length}</b></button>`).join('')}</aside><section class="reference-docs"><header><span>KNOWLEDGE</span><span>SOURCE</span><span>STATUS</span><span>UPDATED</span></header><div id="knowledge-list">${knowledgeCards(items)}</div></section></div>`
 }
@@ -404,16 +402,36 @@ function renderGovernance() {
     </section>`
 }
 
-const GRAPH_EDGES = [['orchestrator', 'doc-gen'], ['orchestrator', 'test-gen'], ['orchestrator', 'code'], ['doc-gen', 'doc-worker'], ['doc-worker', 'check'], ['test-gen', 'check'], ['code', 'check'], ['check', 'review']]
+const GRAPH_EDGES = [['orchestrator', 'doc-worker'], ['orchestrator', 'test-gen'], ['doc-worker', 'doc-gen'], ['doc-gen', 'code'], ['test-gen', 'check'], ['code', 'check'], ['check', 'review']]
+const GRAPH_POINTS = {
+  orchestrator: [450, 45], 'doc-worker': [135, 185], 'test-gen': [765, 185],
+  'doc-gen': [135, 350], code: [360, 350], check: [585, 350], review: [585, 495],
+}
 
 function graphNodeState(agentId, nodes) {
   const aliases = new Set([agentId, agentId.replaceAll('-', '_')])
   return nodes.filter((node) => aliases.has(node.agentId) || aliases.has(node.nodeId)).at(-1) ?? null
 }
 
+function graphStatus(status) {
+  if (['COMMITTED', 'COMPLETED'].includes(status)) return 'complete'
+  if (status === 'RUNNING') return 'running'
+  if (status === 'FAILED') return 'failed'
+  return 'idle'
+}
+
+function graphEdge(from, to, nodeStates) {
+  const [x1, y1] = GRAPH_POINTS[from]
+  const [x2, y2] = GRAPH_POINTS[to]
+  const fromState = graphStatus(nodeStates.get(from)?.status)
+  const toState = graphStatus(nodeStates.get(to)?.status)
+  const edgeState = toState === 'running' ? 'running' : (fromState === 'complete' && toState === 'complete' ? 'complete' : 'idle')
+  return `<line class="graph-edge ${edgeState}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" marker-end="url(#graph-arrow-${edgeState})"></line>`
+}
+
 function renderGraph() {
   const selected = state.graphRunId || state.runs[0]?.runId || ''
-  content.innerHTML = `<section class="reference-page-intro"><div><small>AGENT WORKFLOW</small><h2>Graph</h2><p>查看选定 Run 的 Agent 执行拓扑、节点状态和事件。</p></div><span class="status-pill">只读拓扑</span></section><section class="reference-graph-tools"><label>选择 Run　<select id="graph-run-select"><option value="">请选择 Run</option>${state.runs.map((run) => `<option value="${escapeHtml(run.runId)}" ${run.runId === selected ? 'selected' : ''}>${escapeHtml(run.moduleId)} · ${escapeHtml(shortId(run.runId))}</option>`).join('')}</select></label><span>每 10 秒轮询 · B2 event-stream PARTIAL</span></section><section id="graph-stage" class="reference-graph-shell">${selected ? '<div class="loading-state"><span class="spinner"></span>正在读取 Agent 节点事实…</div>' : emptyState('选择一个 Run', 'Graph 只展示服务端已记录的 Agent 工作状态。')}</section>`
+  content.innerHTML = `<section class="reference-graph-tools"><label>选择 Run　<select id="graph-run-select"><option value="">请选择 Run</option>${state.runs.map((run) => `<option value="${escapeHtml(run.runId)}" ${run.runId === selected ? 'selected' : ''}>${escapeHtml(run.moduleId)} · ${escapeHtml(shortId(run.runId))}</option>`).join('')}</select></label><span>只读 · 10 秒刷新 · PARTIAL</span></section><section id="graph-stage" class="reference-graph-shell">${selected ? '<div class="loading-state"><span class="spinner"></span>正在读取 Agent 节点事实…</div>' : emptyState('选择一个 Run', '这里只展示服务端记录的 Agent 工作状态。')}</section>`
   if (selected) loadGraph(selected).catch((error) => { const stage = document.querySelector('#graph-stage'); if (stage) stage.innerHTML = errorState('无法读取工作流图', error) })
 }
 
@@ -431,7 +449,10 @@ async function loadGraph(runId) {
   const stage = document.querySelector('#graph-stage')
   if (!stage || state.page !== 'graph' || state.graphRunId !== runId) return
   const definitions = state.agents.length ? state.agents : Object.keys(AGENT_LABELS).map((agentId) => ({ agentId }))
-  stage.innerHTML = `<div class="reference-graph-canvas"><div class="workflow-graph" aria-label="只读 Agent 工作流图">${definitions.map((agent) => { const node = graphNodeState(agent.agentId, nodes); const status = node?.status ?? 'PENDING'; return `<button class="graph-node ${escapeHtml(status.toLowerCase())}" data-graph-agent="${escapeHtml(agent.agentId)}"><span class="graph-node-icon" aria-hidden="true">${['COMMITTED', 'COMPLETED'].includes(status) ? '✓' : status === 'FAILED' ? '!' : status === 'RUNNING' ? '●' : '○'}</span><b>${escapeHtml(AGENT_LABELS[agent.agentId] ?? agent.name ?? agent.agentId)}</b>${badge(status)}<small>${node ? `第 ${(node.iteration ?? 0) + 1} 轮 · attempt ${node.attempt ?? (node.retryCount ?? 0) + 1}` : '尚无执行记录'}</small></button>` }).join('')}</div></div><aside class="reference-node-detail"><header><em>RUN AGENTS</em><b>${nodes.length}</b></header><h3>${escapeHtml(snapshot.run?.moduleId ?? runId)}</h3><p>业务状态 ${escapeHtml(displayLabel(snapshot.run?.state))} · 工作流 ${escapeHtml(displayLabel(workflowStatus.status ?? workflowStatus.workflowStatus ?? 'PENDING'))}</p><small>FIXED EDGES</small>${GRAPH_EDGES.slice(0, 5).map(([from, to]) => `<div><span>${escapeHtml(from)}</span><b>→ ${escapeHtml(to)}</b></div>`).join('')}<button class="wide" data-page-link="evaluations">查看评测证据 →</button></aside>`
+  const nodeStates = new Map(definitions.map((agent) => [agent.agentId, graphNodeState(agent.agentId, nodes)]))
+  const statusCounts = { complete: 0, running: 0, failed: 0, idle: 0 }
+  for (const node of nodeStates.values()) statusCounts[graphStatus(node?.status)] += 1
+  stage.innerHTML = `<div class="reference-graph-canvas"><div class="workflow-graph" aria-label="只读 Agent 工作流图"><svg class="graph-connections" viewBox="0 0 900 540" preserveAspectRatio="none" aria-hidden="true"><defs><marker id="graph-arrow-idle" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z"></path></marker><marker id="graph-arrow-running" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z"></path></marker><marker id="graph-arrow-complete" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z"></path></marker></defs>${GRAPH_EDGES.map(([from, to]) => graphEdge(from, to, nodeStates)).join('')}</svg>${definitions.map((agent) => { const node = nodeStates.get(agent.agentId); const status = node?.status ?? 'PENDING'; return `<button class="graph-node node-${escapeHtml(agent.agentId)} ${graphStatus(status)}" data-graph-agent="${escapeHtml(agent.agentId)}"><span class="graph-node-icon" aria-hidden="true">${['COMMITTED', 'COMPLETED'].includes(status) ? '✓' : status === 'FAILED' ? '!' : status === 'RUNNING' ? '●' : '○'}</span><b>${escapeHtml(AGENT_LABELS[agent.agentId] ?? agent.name ?? agent.agentId)}</b><small>${escapeHtml(displayLabel(status))}${node ? ` · 第 ${(node.iteration ?? 0) + 1} 轮 · #${node.attempt ?? (node.retryCount ?? 0) + 1}` : ''}</small></button>` }).join('')}</div><div class="graph-status-legend"><span><i class="running"></i>运行中 ${statusCounts.running}</span><span><i class="complete"></i>已完成 ${statusCounts.complete}</span><span><i class="failed"></i>失败 ${statusCounts.failed}</span><span><i></i>未开始 ${statusCounts.idle}</span></div></div><aside class="reference-node-detail"><header><em>RUN STATUS</em><b>${nodes.length}</b></header><h3>${escapeHtml(snapshot.run?.moduleId ?? runId)}</h3><p>业务状态 ${escapeHtml(displayLabel(snapshot.run?.state))}<br>工作流 ${escapeHtml(displayLabel(workflowStatus.status ?? workflowStatus.workflowStatus ?? 'PENDING'))}</p><small>EXECUTION</small><div><span>运行中</span><b>${statusCounts.running}</b></div><div><span>已完成</span><b>${statusCounts.complete}</b></div><div><span>失败</span><b>${statusCounts.failed}</b></div><div><span>未开始</span><b>${statusCounts.idle}</b></div><button class="wide" data-page-link="evaluations">查看评测证据 →</button></aside>`
 }
 
 function openGraphNode(agentId, returnFocus) {
@@ -453,7 +474,6 @@ async function renderEvidence() {
   const records = snapshots.flatMap((snapshot) => (snapshot?.evaluations ?? []).map((record) => ({ ...record, run: snapshot.run }))).reverse()
   content.innerHTML = `
     ${failed ? partialNotice(`${failed} 个 Run 快照读取失败，以下为其余 Run 的持久化证据。`) : ''}
-    <section class="reference-page-intro"><div><small>QUALITY</small><h2>Evaluations</h2><p>核对评测报告、门禁判定和不可变执行证据。</p></div><button disabled>Evaluation rules · Disabled</button></section>
     <section class="reference-metrics"><article><small>EVALUATIONS</small><b class="mint">${records.length}</b><p>来自 Run snapshot</p></article><article><small>RUNS READ</small><b>${snapshots.length - failed}</b><p>${failed} 个读取失败</p></article><article><small>RULE MANAGEMENT</small><b>—</b><p>等待 B3 API</p></article><article><small>DATA MODE</small><b>PARTIAL</b><p>跨 Run 聚合预览</p></article></section>
     <section class="panel">
       <div class="section-heading"><div><p class="eyebrow">不可变证据</p><h2>评测与门禁</h2><p>这里只展示服务端持久化的执行事实，不采用智能体自评分。</p></div><span class="counter">${records.length}</span></div>
@@ -472,7 +492,6 @@ async function renderDiscovery(force = false) {
     if (!state.discovery || force) state.discovery = await request('/api/v1/sources/scan')
     const { candidates = [], total = candidates.length, truncated = false } = state.discovery
     content.innerHTML = `
-      <section class="reference-page-intro"><div><small>INPUTS</small><h2>Sources</h2><p>查看服务端已配置边界内扫描到的真实来源候选。</p></div><button class="new" data-refresh-discovery type="button">↻ Scan sources</button></section>
       <section class="reference-metrics"><article><small>CANDIDATES</small><b class="mint">${candidates.length}</b><p>本次只读扫描</p></article><article><small>DISCOVERED</small><b>${total}</b><p>服务端返回总数</p></article><article><small>TRUNCATED</small><b>${truncated ? 'YES' : 'NO'}</b><p>受查询上限约束</p></article><article><small>REGISTRY</small><b>DISABLED</b><p>等待 B3 API</p></article></section>
       <section class="panel discovery-panel">
         <div class="section-heading"><div><p class="eyebrow">只读来源扫描</p><h2>当前来源候选</h2><p>候选来自服务端已配置目录；这里不是持久化来源注册表。</p></div><button class="secondary-button" data-refresh-discovery type="button">重新扫描</button></div>
@@ -522,7 +541,6 @@ function renderAgents() {
   }
   const canEdit = Boolean(state.operatorMode && state.capabilities?.writeEnabled)
   content.innerHTML = `
-    <section class="reference-page-intro"><div><small>AGENT CONFIGURATION</small><h2>Agent Settings</h2><p>查看固定 Agent 契约并在授权后编辑追加提示词。</p></div>${badge(canEdit ? 'VERIFIED' : 'CANDIDATE', canEdit ? '可编辑提示词' : '只读查看')}</section>
     <section class="reference-metrics"><article><small>AGENTS</small><b class="mint">${state.agents.length}</b><p>固定角色定义</p></article><article><small>EDIT MODE</small><b>${canEdit ? 'ON' : 'OFF'}</b><p>需要治理令牌</p></article><article><small>TOPOLOGY</small><b>FIXED</b><p>不可从前台修改</p></article><article><small>PROVIDER STATUS</small><b>—</b><p>等待 B4 API</p></article></section>
     <section class="agent-boundary panel">
       <div><p class="eyebrow">固定契约，可控扩展</p><h2>智能体可以调整表达，不能改变职责</h2><p>拓扑、职责、输入输出、工具权限和基础提示词由代码固定。这里保存的内容只会作为追加提示词，用于后续节点执行。</p></div>
@@ -565,7 +583,6 @@ async function navigate(page) {
   if (page === 'sources') await renderDiscovery()
   if (page === 'agent-settings') {
     renderAgents()
-    content.insertAdjacentHTML('afterbegin', '<section class="panel settings-summary"><p class="eyebrow">PROVIDER STATUS · PLANNED</p><h2>Agent 运行边界</h2><p>Agent 固定契约来自服务端；Provider 健康接口尚未接入，不展示推测状态。</p></section>')
   }
   closeNavigation()
   content.focus({ preventScroll: true })
