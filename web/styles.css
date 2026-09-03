@@ -401,6 +401,22 @@ dialog label { display: grid; gap: 7px; color: #bbc6d3; font-size: .7rem; }
 .nav-backdrop { position: fixed; z-index: 4; inset: 0; border: 0; background: rgba(0, 0, 0, .55); }
 .partial-notice { margin-bottom: 13px; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--warning) 45%, transparent); border-radius: 9px; background: color-mix(in srgb, var(--warning) 9%, var(--surface)); display: flex; gap: 9px; align-items: baseline; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .partial-notice b { flex: 0 0 auto; color: var(--warning); }
+.settings-summary { margin-bottom: 13px; }
+.settings-summary p:last-child { color: var(--muted); }
+.graph-actions label { display: flex; align-items: center; gap: 9px; color: var(--muted); font-size: 12px; }
+.graph-actions select { min-width: min(430px, 68vw); }
+.graph-stage { min-height: 520px; }
+.workflow-graph { position: relative; display: grid; grid-template-columns: repeat(4, minmax(150px, 1fr)); gap: 24px 34px; padding: 30px 8px; }
+.graph-node { position: relative; z-index: 1; min-height: 132px; display: grid; justify-items: start; align-content: center; gap: 7px; padding: 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); color: var(--text); text-align: left; cursor: pointer; }
+.graph-node:hover, .graph-node:focus-visible { border-color: var(--accent); transform: translateY(-2px); }
+.graph-node.running { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent); }
+.graph-node.failed { border-color: var(--danger); }
+.graph-node.completed, .graph-node.committed { border-color: color-mix(in srgb, var(--success) 55%, var(--border)); }
+.graph-node-icon { width: 27px; height: 27px; display: grid; place-items: center; border-radius: 50%; background: color-mix(in srgb, var(--accent) 14%, var(--surface)); color: var(--accent-text); font-weight: 800; }
+.graph-node small { color: var(--faint); }
+.graph-legend { display: flex; flex-wrap: wrap; gap: 6px; padding: 12px; border-top: 1px solid var(--border-soft); color: var(--faint); font-size: 11px; }
+.graph-legend code { padding: 4px 6px; border-radius: 5px; background: var(--surface-2); color: var(--muted); }
+.graph-events { margin-top: 18px; }
 .error-state > span { color: var(--danger); }
 .candidate-list { display: grid; gap: 9px; }
 .candidate-card { padding: 14px; border: 1px solid var(--border-soft); border-radius: 10px; background: var(--surface-2); }
@@ -435,6 +451,7 @@ small, .sidebar-foot small, .topbar .subtitle, .section-heading p:not(.eyebrow),
   :root { --sidebar: 220px; }
   .dashboard-grid, .run-workspace-grid, .run-workspace-grid.lower, .knowledge-layout { grid-template-columns: 1fr; }
   .evidence-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .workflow-graph { grid-template-columns: repeat(2, minmax(150px, 1fr)); }
 }
 
 @media (max-width: 767px) {
@@ -473,6 +490,9 @@ small, .sidebar-foot small, .topbar .subtitle, .section-heading p:not(.eyebrow),
   .candidate-card > div { align-items: flex-start; flex-direction: column; gap: 5px; }
   .candidate-card dl { grid-template-columns: 1fr; }
   .drawer { width: 100vw; }
+  .workflow-graph { grid-template-columns: 1fr; padding: 12px 0; }
+  .graph-actions label { align-items: stretch; flex-direction: column; }
+  .graph-actions select { min-width: 0; width: 100%; }
 }
 
 @media (prefers-reduced-motion: reduce) {

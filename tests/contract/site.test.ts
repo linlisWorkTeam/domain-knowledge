@@ -179,7 +179,7 @@ test('site and Console expose the embedded workflow boundary and prompt-only Age
   assert.match(html, /id="evidence-demo"/);
   assert.match(html, /官方开发工具包闭环/);
   assert.match(html, /AGENT-CUSTOMIZATION\.md/);
-  assert.match(consoleHtml, /data-page="agents"/);
+  assert.match(consoleHtml, /data-page="agent-settings"/);
   assert.match(consoleScript, /\/api\/v1\/agents/);
   assert.match(consoleScript, /promptAddon/);
   assert.match(consoleScript, /workflowNodes/);
@@ -247,21 +247,24 @@ test('project site and Console implement separate light and dark themes', () => 
   assertReadablePalette(consoleLight, ['text', 'muted', 'faint', 'accent-text', 'success', 'warning', 'governance', 'danger'], 'Console light');
 });
 
-test('production Console implements the F1 navigation and truthful data boundary', () => {
+test('production Console implements the F2 seven-page navigation and truthful data boundary', () => {
   const consoleHtml = readFileSync('web/index.html', 'utf8');
   const consoleCss = readFileSync('web/styles.css', 'utf8');
   const consoleScript = readFileSync('web/app.js', 'utf8');
 
-  for (const label of ['操作中心', '运行', '知识', '治理', '证据', '智能体', '发现', '设置']) {
+  for (const label of ['Action Center', 'Flywheel Runs', 'Knowledge', 'Graph', 'Evaluations', 'Sources', 'Agent Settings']) {
     assert.ok(consoleHtml.includes(`>${label}<`) || consoleHtml.includes(`${label} <`), `Console navigation misses ${label}`);
   }
-  assert.match(consoleScript, /request\('\/api\/v1\/scan'\)/);
-  assert.match(consoleScript, /\/api\/v1\/query\?q=/);
+  assert.match(consoleScript, /request\('\/api\/v1\/sources\/scan'\)/);
+  assert.match(consoleScript, /\/api\/v1\/knowledge\?q=/);
+  assert.match(consoleScript, /\/workflow-nodes/);
+  assert.match(consoleScript, /\/workflow-status/);
+  assert.match(consoleScript, /\/events\?after=0/);
   assert.match(consoleScript, /Promise\.allSettled/);
   assert.match(consoleScript, /const ATTENTION = new Set\(\['LOW_CONFIDENCE', 'FAILED'\]\)/);
   assert.match(consoleScript, /latestDecision\?\.outcome === 'STOPPED'/);
   assert.doesNotMatch(consoleScript, /\/api\/v1\/(?:transition|evaluate|publish)/);
-  assert.doesNotMatch(`${consoleHtml}\n${consoleScript}`, /Knowledge Health|Action Item|Workspace owner|预计完成|\bETA\b|87\s*\/\s*100/);
+  assert.doesNotMatch(`${consoleHtml}\n${consoleScript}`, /Workspace owner|87\s*\/\s*100/);
   assert.doesNotMatch(consoleHtml, /fonts\.googleapis|fonts\.gstatic|unpkg|jsdelivr/i);
   assert.match(consoleHtml, /role="dialog" aria-modal="true" aria-labelledby="drawer-title"/);
   assert.match(consoleScript, /drawerReturnFocus/);

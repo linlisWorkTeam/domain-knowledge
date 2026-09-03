@@ -24,8 +24,8 @@ test.beforeAll(async () => {
     authorization: 'Bearer ui-e2e-token',
     'content-type': 'application/json',
   };
-  const candidate = await fetch(`${baseUrl}/api/v1/ingest`, {
-    method: 'POST', headers, body: JSON.stringify({
+  const candidate = await fetch(`${baseUrl}/api/v1/knowledge/candidates`, {
+    method: 'POST', headers: { ...headers, 'idempotency-key': 'console-e2e-candidate' }, body: JSON.stringify({
       moduleId: 'browser-contract',
       title: '浏览器验收知识',
       description: '用于验证控制台真实查询与详情交互。',
@@ -34,16 +34,28 @@ test.beforeAll(async () => {
     }),
   });
   assert.equal(candidate.status, 201);
-  const run = await fetch(`${baseUrl}/api/v1/runs`, {
-    method: 'POST', headers, body: JSON.stringify({ moduleId: 'browser-contract', policyId: 'local-v1' }),
-  });
-  const { runId } = await run.json() as { runId: string };
-  for (const state of ['PLANNED', 'GENERATING', 'EVALUATING', 'FAILED']) {
-    const response = await fetch(`${baseUrl}/api/v1/transition`, {
-      method: 'POST', headers, body: JSON.stringify({ runId, state }),
-    });
-    assert.equal(response.status, 200);
+  const { runId } = instance.composition.apps.flywheel.createRun('browser-contract', 'local-v1');
+  for (const nextState of ['PLANNED', 'GENERATING', 'EVALUATING', 'FAILED'] as const) {
+    instance.composition.apps.flywheel.transition(runId, nextState);
   }
+});
+
+test('Graph is a read-only Run Agent workflow backed by canonical node APIs', async ({ page }) => {
+  const requests: string[] = [];
+  page.on('request', (request) => requests.push(new URL(request.url()).pathname));
+  await page.goto(baseUrl);
+  await page.getByRole('button', { name: /^Graph$/ }).click();
+  await expect(page.getByRole('heading', { name: 'Graph', level: 1 })).toBeVisible();
+  await expect(page.getByLabel('只读 Agent 工作流图')).toBeVisible();
+  await expect(page.getByText('只读拓扑')).toBeVisible();
+  await expect(page.getByText(/B2 event-stream/)).toBeVisible();
+  expect(requests.some((path) => /\/api\/v1\/runs\/[^/]+\/workflow-nodes$/.test(path))).toBe(true);
+  expect(requests.some((path) => /\/api\/v1\/runs\/[^/]+\/workflow-status$/.test(path))).toBe(true);
+  expect(requests.some((path) => /\/api\/v1\/runs\/[^/]+\/events$/.test(path))).toBe(true);
+  await page.locator('[data-graph-agent]').first().click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await page.getByRole('button', { name: '关闭详情' }).click();
+  await expect(page.locator('[data-graph-agent]').first()).toBeFocused();
 });
 
 test.afterAll(async () => {
@@ -52,21 +64,21 @@ test.afterAll(async () => {
   rmSync(runtimeDir, { recursive: true, force: true });
 });
 
-test('eight-page Console uses server facts and the implemented discovery API', async ({ page }) => {
+test('seven-page Console uses server facts and canonical Sources API', async ({ page }) => {
   const requests: string[] = [];
   page.on('request', (request) => requests.push(request.url()));
   await page.goto(baseUrl);
 
-  await expect(page.getByRole('heading', { name: '操作中心', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Action Center', level: 1 })).toBeVisible();
   await expect(page.getByText('browser-contract').first()).toBeVisible();
   await expect(page.getByText('需要人工查看')).toBeVisible();
 
-  const labels = ['操作中心', '运行', '知识', '治理', '证据', '智能体', '发现', '设置'];
+  const labels = ['Action Center', 'Flywheel Runs', 'Knowledge', 'Graph', 'Evaluations', 'Sources', 'Agent Settings'];
   for (const label of labels) await expect(page.getByRole('button', { name: new RegExp(label) }).first()).toBeVisible();
 
-  await page.getByRole('button', { name: /^发现$/ }).click();
+  await page.getByRole('button', { name: /^Sources$/ }).click();
   await expect(page.getByRole('heading', { name: '当前来源候选' })).toBeVisible();
-  expect(requests.some((url) => url.endsWith('/api/v1/scan'))).toBe(true);
+  expect(requests.some((url) => url.endsWith('/api/v1/sources/scan'))).toBe(true);
   expect(requests.every((url) => url.startsWith(baseUrl))).toBe(true);
   await expect(page.getByText(/Knowledge Health|Action Item|预计完成|ETA|Workspace owner/)).toHaveCount(0);
 });
@@ -92,7 +104,7 @@ test('knowledge search and detail drawer are keyboard operable and restore focus
 });
 
 test('partial API failures remain explicit without replacing persisted facts', async ({ page }) => {
-  await page.route('**/api/v1/status', (route) => route.fulfill({
+  await page.route('**/api/v1/system/status', (route) => route.fulfill({
     status: 503,
     contentType: 'application/json',
     body: JSON.stringify({ error: 'STATUS_UNAVAILABLE', message: '状态服务暂不可用' }),
@@ -108,9 +120,9 @@ test('mobile navigation, theme persistence and 200 percent zoom preserve core pa
   await page.goto(baseUrl);
   const navToggle = page.getByRole('button', { name: '打开主导航' });
   await navToggle.click();
-  await expect(page.getByRole('button', { name: /^运行$/ })).toBeVisible();
-  await page.getByRole('button', { name: /^运行$/ }).click();
-  await expect(page.getByRole('heading', { name: '运行', level: 1 })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Flywheel Runs$/ })).toBeVisible();
+  await page.getByRole('button', { name: /^Flywheel Runs$/ }).click();
+  await expect(page.getByRole('heading', { name: 'Flywheel Runs', level: 1 })).toBeVisible();
   await expect(page.getByText('第 1 轮').first()).toBeVisible();
 
   const themeButton = page.locator('#theme-button');
@@ -125,7 +137,7 @@ test('mobile navigation, theme persistence and 200 percent zoom preserve core pa
   const session = await context.newCDPSession(page);
   await session.send('Emulation.setPageScaleFactor', { pageScaleFactor: 2 });
   await page.getByRole('button', { name: '打开主导航' }).click();
-  await page.getByRole('button', { name: /^运行$/ }).click();
-  await expect(page.getByRole('heading', { name: '运行', level: 1 })).toBeVisible();
+  await page.getByRole('button', { name: /^Flywheel Runs$/ }).click();
+  await expect(page.getByRole('heading', { name: 'Flywheel Runs', level: 1 })).toBeVisible();
   await expect(page.getByText('browser-contract').first()).toBeVisible();
 });

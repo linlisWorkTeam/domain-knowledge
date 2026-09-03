@@ -46,14 +46,13 @@ try {
 applyTheme(initialTheme)
 
 const PAGE_META = {
-  overview: ['操作中心', '查看运行事实、知识发布状态，以及需要人工处理的问题。'],
-  runs: ['运行', '沿着节点、评测和事件记录，查看每次运行的完整过程。'],
-  knowledge: ['知识', '检索候选知识和已验证知识，核对来源、版本与发布依据。'],
-  governance: ['治理', '集中处理已停止、低置信或基础设施失败的运行。正常迭代会自动继续。'],
-  evidence: ['证据', '核对评测报告、门禁判定、工具链和不可变证据。'],
-  agents: ['智能体', '查看每个智能体的固定职责，并为后续运行补充提示词。'],
-  discovery: ['发现', '查看服务端当前扫描到、尚未进入知识登记簿的来源候选。'],
-  settings: ['设置', '查看本地运行能力、安全边界和治理写入配置。'],
+  overview: ['Action Center', '集中查看需要处理的运行、系统事实和最近活动。'],
+  runs: ['Flywheel Runs', '沿着节点、评测和事件记录，查看每次运行的完整过程。'],
+  knowledge: ['Knowledge', '检索候选知识和已验证知识，核对来源、版本与发布依据。'],
+  graph: ['Graph', '查看选定 Run 的只读 Agent 工作流、节点状态与执行事件。'],
+  evaluations: ['Evaluations', '核对跨 Run 的评测、门禁判定、工具链和不可变证据。'],
+  sources: ['Sources', '查看服务端实际扫描到的来源候选；来源注册管理尚未接入。'],
+  'agent-settings': ['Agent Settings', '查看固定 Agent 契约、追加提示词和系统能力边界。'],
 }
 
 const UI_LABELS = {
@@ -99,6 +98,16 @@ const state = {
   discovery: null,
   resourceErrors: {},
   loadedAt: null,
+  graphRunId: null,
+  graphSnapshot: null,
+  graphPoll: null,
+}
+
+function collection(payload, legacyKey) {
+  if (Array.isArray(payload?.items)) return payload.items
+  if (Array.isArray(payload?.[legacyKey])) return payload[legacyKey]
+  if (Array.isArray(payload?.hits)) return payload.hits
+  return []
 }
 
 function needsAttention(run) {
@@ -114,12 +123,13 @@ const json = (value) => escapeHtml(JSON.stringify(value, null, 2))
 async function request(path, options = {}) {
   const headers = { ...(options.headers ?? {}) }
   if (options.body) headers['content-type'] = 'application/json'
+  if (options.method === 'POST' && !headers['Idempotency-Key']) headers['Idempotency-Key'] = crypto.randomUUID()
   if (state.token) headers.authorization = `Bearer ${state.token}`
   const response = await fetch(path, { ...options, headers })
   let payload = null
   try { payload = await response.json() } catch { payload = null }
   if (!response.ok) {
-    const error = new Error(payload?.message || payload?.error || `${response.status} ${path}`)
+    const error = new Error(payload?.error?.message || payload?.message || (typeof payload?.error === 'string' ? payload.error : '') || `${response.status} ${path}`)
     error.status = response.status
     throw error
   }
@@ -206,7 +216,7 @@ function renderOverview() {
     </section>
     <div class="dashboard-grid">
       <section class="panel attention-panel">
-        <div class="section-heading"><div><p class="eyebrow">需要处理</p><h2>待人工确认</h2></div><button class="text-button" data-page-link="governance">查看全部</button></div>
+        <div class="section-heading"><div><p class="eyebrow">需要处理 · PARTIAL</p><h2>待人工确认</h2><p>当前由失败、低置信与 STOPPED Run 真实派生；独立 Action Item 生命周期将在 B2 接入。</p></div></div>
         <div class="stack-list">${attention.length ? attention.slice(0, 4).map((run) => runRow(run, true)).join('') : emptyState('目前没有待处理事项', '正常运行会由工作流服务自动推进。')}</div>
       </section>
       <section class="panel trust-panel">
@@ -220,7 +230,7 @@ function renderOverview() {
       </section>
     </div>
     <section class="panel recent-panel">
-        <div class="section-heading"><div><p class="eyebrow">最近活动</p><h2>最近运行</h2></div><button class="text-button" data-page-link="runs">查看全部</button></div>
+        <div class="section-heading"><div><p class="eyebrow">最近活动 · PARTIAL</p><h2>最近运行</h2><p>跨 Run Activity API 尚未接入，这里仅展示真实 Run 事实。</p></div><button class="text-button" data-page-link="runs">查看全部</button></div>
       <div class="run-list">${recent.length ? recent.map((run) => runRow(run)).join('') : emptyState('还没有运行记录', '可以通过命令行或受信项目验收创建运行；通用启动接口完成后，这里也会开放启动入口。')}</div>
     </section>`
 }
@@ -274,7 +284,7 @@ function renderRunWorkspace(snapshot) {
       <button class="back-button" data-run-back>← 返回运行列表</button>
       <div class="run-title-row">
         <div><p class="eyebrow">${escapeHtml(shortId(run.runId, 28))}</p><h2>${escapeHtml(run.moduleId)}</h2><p class="subtitle">策略 ${escapeHtml(run.policyId)} · 更新于 ${escapeHtml(formatDate(run.updatedAt))}</p></div>
-        <div class="run-title-actions">${badge(run.state)}<a class="secondary-button" href="/api/v1/runs/${encodeURIComponent(run.runId)}/demo-report" download>导出演示报告</a><button class="secondary-button" data-refresh-run="${escapeHtml(run.runId)}">刷新</button></div>
+        <div class="run-title-actions">${badge(run.state)}<a class="secondary-button" href="/api/v1/runs/${encodeURIComponent(run.runId)}/report" download>导出报告</a><button class="secondary-button" data-refresh-run="${escapeHtml(run.runId)}">刷新</button></div>
       </div>
       <ol class="run-stepper">${steps}</ol>
       ${['ITERATING', 'ROLLING_BACK', 'LOW_CONFIDENCE', 'FAILED', 'CANCELLED'].includes(run.state) ? `<div class="state-callout ${run.state.toLowerCase().replaceAll('_', '-')}"><b>当前状态：${escapeHtml(displayLabel(run.state))}</b><span>第 ${escapeHtml(run.iteration + 1)} 轮 · 详情以事件与门禁证据为准</span></div>` : ''}
@@ -407,6 +417,43 @@ function renderGovernance() {
     </section>`
 }
 
+const GRAPH_EDGES = [['orchestrator', 'doc-gen'], ['orchestrator', 'test-gen'], ['orchestrator', 'code'], ['doc-gen', 'doc-worker'], ['doc-worker', 'check'], ['test-gen', 'check'], ['code', 'check'], ['check', 'review']]
+
+function graphNodeState(agentId, nodes) {
+  const aliases = new Set([agentId, agentId.replaceAll('-', '_')])
+  return nodes.filter((node) => aliases.has(node.agentId) || aliases.has(node.nodeId)).at(-1) ?? null
+}
+
+function renderGraph() {
+  const selected = state.graphRunId || state.runs[0]?.runId || ''
+  content.innerHTML = `<section class="page-actions graph-actions"><label>选择 Run<select id="graph-run-select"><option value="">请选择 Run</option>${state.runs.map((run) => `<option value="${escapeHtml(run.runId)}" ${run.runId === selected ? 'selected' : ''}>${escapeHtml(run.moduleId)} · ${escapeHtml(shortId(run.runId))}</option>`).join('')}</select></label><span class="status-pill">只读拓扑</span></section>${partialNotice('当前每 10 秒读取节点、工作流状态与事件；B2 event-stream 完成后升级为实时连接。')}<section id="graph-stage" class="panel graph-stage">${selected ? '<div class="loading-state"><span class="spinner"></span>正在读取 Agent 节点事实…</div>' : emptyState('选择一个 Run', 'Graph 只展示服务端已记录的 Agent 工作状态。')}</section>`
+  if (selected) loadGraph(selected).catch((error) => { const stage = document.querySelector('#graph-stage'); if (stage) stage.innerHTML = errorState('无法读取工作流图', error) })
+}
+
+async function loadGraph(runId) {
+  state.graphRunId = runId
+  const encoded = encodeURIComponent(runId)
+  const [snapshot, nodePayload, workflowStatus, eventPayload] = await Promise.all([
+    request(`/api/v1/runs/${encoded}`), request(`/api/v1/runs/${encoded}/workflow-nodes`),
+    request(`/api/v1/runs/${encoded}/workflow-status`), request(`/api/v1/runs/${encoded}/events?after=0`),
+  ])
+  const nodes = collection(nodePayload, 'nodes').length ? collection(nodePayload, 'nodes') : (snapshot.workflowNodes ?? [])
+  const events = collection(eventPayload, 'events').length ? collection(eventPayload, 'events') : (snapshot.events ?? [])
+  state.graphSnapshot = { snapshot, nodes, events, workflowStatus }
+  const stage = document.querySelector('#graph-stage')
+  if (!stage || state.page !== 'graph' || state.graphRunId !== runId) return
+  const definitions = state.agents.length ? state.agents : Object.keys(AGENT_LABELS).map((agentId) => ({ agentId }))
+  stage.innerHTML = `<div class="section-heading"><div><p class="eyebrow">AGENT WORKFLOW · ${escapeHtml(displayLabel(workflowStatus.status ?? workflowStatus.workflowStatus ?? 'PENDING'))}</p><h2>${escapeHtml(snapshot.run?.moduleId ?? runId)}</h2><p>业务状态 ${escapeHtml(displayLabel(snapshot.run?.state))} · 第 ${escapeHtml((snapshot.run?.iteration ?? 0) + 1)} 轮</p></div><span class="counter">${nodes.length} 条节点记录</span></div><div class="workflow-graph" aria-label="只读 Agent 工作流图">${definitions.map((agent) => { const node = graphNodeState(agent.agentId, nodes); const status = node?.status ?? 'PENDING'; return `<button class="graph-node ${escapeHtml(status.toLowerCase())}" data-graph-agent="${escapeHtml(agent.agentId)}"><span class="graph-node-icon" aria-hidden="true">${['COMMITTED', 'COMPLETED'].includes(status) ? '✓' : status === 'FAILED' ? '!' : status === 'RUNNING' ? '●' : '○'}</span><b>${escapeHtml(AGENT_LABELS[agent.agentId] ?? agent.name ?? agent.agentId)}</b>${badge(status)}<small>${node ? `第 ${(node.iteration ?? 0) + 1} 轮 · attempt ${node.attempt ?? (node.retryCount ?? 0) + 1}` : '尚无执行记录'}</small></button>` }).join('')}</div><div class="graph-legend"><span>固定依赖：</span>${GRAPH_EDGES.map(([from, to]) => `<code>${escapeHtml(from)} → ${escapeHtml(to)}</code>`).join('')}</div><section class="graph-events"><h3>最近节点事件</h3>${events.length ? `<ol class="timeline">${events.slice(-6).reverse().map((record) => { const event = record.event ?? record; return `<li><span class="timeline-seq">${escapeHtml(record.eventSeq ?? event.eventSeq ?? '·')}</span><div><b>${escapeHtml(EVENT_LABELS[event.eventType] ?? event.eventType)}</b><small>${escapeHtml(formatDate(event.occurredAt))}</small></div></li>` }).join('')}</ol>` : emptyState('尚无节点事件', 'Graph 不会生成或模拟工作状态。')}</section>`
+}
+
+function openGraphNode(agentId, returnFocus) {
+  const { nodes = [], events = [] } = state.graphSnapshot ?? {}
+  const node = graphNodeState(agentId, nodes)
+  drawerTitle.textContent = AGENT_LABELS[agentId] ?? agentId
+  drawerContent.innerHTML = `${node ? `<div class="drawer-badges">${badge(node.status)}</div><dl class="fact-grid"><div><dt>节点</dt><dd>${escapeHtml(node.nodeId)}</dd></div><div><dt>Agent</dt><dd>${escapeHtml(node.agentId ?? agentId)}</dd></div><div><dt>轮次</dt><dd>${escapeHtml((node.iteration ?? 0) + 1)}</dd></div><div><dt>Attempt</dt><dd>${escapeHtml(node.attempt ?? (node.retryCount ?? 0) + 1)}</dd></div></dl><section class="drawer-section"><h3>受控执行事实</h3><pre class="json-view">${json(node)}</pre></section>` : partialNotice('这个 Agent 在当前 Run 中尚无服务端节点记录。')}<section class="drawer-section"><h3>相关事件</h3><pre class="json-view">${json(events.filter((record) => JSON.stringify(record).includes(agentId)).slice(-10))}</pre></section>`
+  openDrawer(returnFocus)
+}
+
 async function renderEvidence() {
   if (state.resourceErrors.runs) {
     content.innerHTML = errorState('无法读取证据索引', state.resourceErrors.runs, '<button class="primary-button" data-reload type="button">重新连接</button>')
@@ -432,7 +479,7 @@ async function renderEvidence() {
 async function renderDiscovery(force = false) {
   content.innerHTML = '<div class="loading-state"><span class="spinner" aria-hidden="true"></span>正在扫描已配置来源…</div>'
   try {
-    if (!state.discovery || force) state.discovery = await request('/api/v1/scan')
+    if (!state.discovery || force) state.discovery = await request('/api/v1/sources/scan')
     const { candidates = [], total = candidates.length, truncated = false } = state.discovery
     content.innerHTML = `
       <section class="panel discovery-panel">
@@ -514,11 +561,18 @@ async function navigate(page) {
   if (page === 'overview') renderOverview()
   if (page === 'runs') renderRuns()
   if (page === 'knowledge') renderKnowledge()
-  if (page === 'governance') renderGovernance()
-  if (page === 'evidence') await renderEvidence()
-  if (page === 'agents') renderAgents()
-  if (page === 'discovery') await renderDiscovery()
-  if (page === 'settings') renderSettings()
+  clearInterval(state.graphPoll)
+  state.graphPoll = null
+  if (page === 'graph') {
+    renderGraph()
+    state.graphPoll = setInterval(() => state.page === 'graph' && state.graphRunId && loadGraph(state.graphRunId).catch(() => {}), 10_000)
+  }
+  if (page === 'evaluations') await renderEvidence()
+  if (page === 'sources') await renderDiscovery()
+  if (page === 'agent-settings') {
+    renderAgents()
+    content.insertAdjacentHTML('afterbegin', '<section class="panel settings-summary"><p class="eyebrow">PROVIDER STATUS · PLANNED</p><h2>Agent 运行边界</h2><p>Agent 固定契约来自服务端；Provider 健康接口尚未接入，不展示推测状态。</p></section>')
+  }
   closeNavigation()
   content.focus({ preventScroll: true })
 }
@@ -557,10 +611,10 @@ function closeDrawer() {
   drawer.classList.remove('open')
   drawer.setAttribute('aria-hidden', 'true')
   drawerBackdrop.hidden = true
+  const returnTarget = document.contains(drawerReturnFocus) ? drawerReturnFocus : (drawerReturnKey ? document.querySelector(drawerReturnKey) : null)
+  if (returnTarget instanceof HTMLElement) returnTarget.focus()
   setTimeout(() => {
     if (!drawer.classList.contains('open')) drawer.hidden = true
-    const returnTarget = document.contains(drawerReturnFocus) ? drawerReturnFocus : (drawerReturnKey ? document.querySelector(drawerReturnKey) : null)
-    if (returnTarget instanceof HTMLElement) returnTarget.focus()
     drawerReturnFocus = null
     drawerReturnKey = null
   }, 180)
@@ -608,10 +662,9 @@ async function submitFeedback(form) {
   const data = new FormData(form)
   const action = String(data.get('action') || 'hit')
   const ratingValue = String(data.get('rating') || '').trim()
-  await request('/api/v1/feedback', {
+  await request(`/api/v1/knowledge/${encodeURIComponent(form.dataset.version)}/feedback`, {
     method: 'POST',
     body: JSON.stringify({
-      versionId: form.dataset.version,
       action,
       rating: action === 'rate' && ratingValue ? Number(ratingValue) : null,
       note: String(data.get('note') || ''),
@@ -632,7 +685,7 @@ async function saveAgentPrompt(form) {
     method: 'PUT',
     body: JSON.stringify({ promptAddon: String(data.get('promptAddon') || '') }),
   })
-  state.agents = (await request('/api/v1/agents')).agents
+  state.agents = collection(await request('/api/v1/agents'), 'agents')
   renderAgents()
   showToast(`${agentId} 的追加提示词已保存，只影响后续执行。`, 'success')
 }
@@ -643,7 +696,7 @@ async function startWorkflow(form) {
     return
   }
   const data = new FormData(form)
-  const handle = await request('/api/v1/run-commands/start', {
+  const handle = await request('/api/v1/runs', {
     method: 'POST',
     body: JSON.stringify({
       profile: 'ohmyworkpanel',
@@ -651,9 +704,10 @@ async function startWorkflow(form) {
       workerCount: Number(data.get('workerCount') || 1),
     }),
   })
-  state.runs = (await request('/api/v1/runs')).runs
-  showToast(`自动运行 ${shortId(handle.runId, 16)} 已启动。`, 'success')
-  await openRun(handle.runId)
+  state.runs = collection(await request('/api/v1/runs'), 'runs')
+  const runId = handle.runId ?? handle.resourceId
+  showToast(`自动运行 ${shortId(runId, 16)} 已启动。`, 'success')
+  await openRun(runId)
 }
 
 nav.addEventListener('click', (event) => {
@@ -673,6 +727,8 @@ content.addEventListener('click', (event) => {
   if (knowledgeButton) openKnowledge(knowledgeButton.dataset.versionId, knowledgeButton).catch(showFatal)
   const evidenceButton = event.target.closest('[data-evidence]')
   if (evidenceButton) openEvidence(evidenceButton.dataset.evidence, evidenceButton)
+  const graphNode = event.target.closest('[data-graph-agent]')
+  if (graphNode) openGraphNode(graphNode.dataset.graphAgent, graphNode)
   const unavailable = event.target.closest('[data-unavailable]')
   if (unavailable) showUnavailable()
   if (event.target.closest('[data-reload]')) location.reload()
@@ -692,9 +748,9 @@ content.addEventListener('input', (event) => {
     try {
       const status = document.querySelector('#knowledge-status')?.value ?? ''
       const result = query
-        ? await request(`/api/v1/query?q=${encodeURIComponent(query)}&status=${encodeURIComponent(status)}`)
+        ? await request(`/api/v1/knowledge?q=${encodeURIComponent(query)}&status=${encodeURIComponent(status)}`)
         : await request(`/api/v1/knowledge?status=${encodeURIComponent(status)}`)
-      const items = result.hits ?? result.knowledge ?? []
+      const items = collection(result, 'knowledge')
       document.querySelector('#knowledge-list').innerHTML = knowledgeCards(items)
       document.querySelector('#knowledge-count').textContent = items.length
     } catch (error) {
@@ -705,11 +761,23 @@ content.addEventListener('input', (event) => {
 })
 
 content.addEventListener('change', async (event) => {
+  if (event.target.id === 'graph-run-select') {
+    const runId = event.target.value
+    state.graphRunId = runId
+    const stage = document.querySelector('#graph-stage')
+    if (!runId) {
+      if (stage) stage.innerHTML = emptyState('选择一个 Run', 'Graph 只展示服务端已记录的 Agent 工作状态。')
+      return
+    }
+    if (stage) stage.innerHTML = '<div class="loading-state"><span class="spinner"></span>正在读取 Agent 节点事实…</div>'
+    await loadGraph(runId)
+  }
   if (event.target.id === 'knowledge-status') {
     const selected = event.target.value
     const result = await request(`/api/v1/knowledge?status=${encodeURIComponent(selected)}`)
-    document.querySelector('#knowledge-list').innerHTML = knowledgeCards(result.knowledge)
-    document.querySelector('#knowledge-count').textContent = result.knowledge.length
+    const items = collection(result, 'knowledge')
+    document.querySelector('#knowledge-list').innerHTML = knowledgeCards(items)
+    document.querySelector('#knowledge-count').textContent = items.length
   }
   const filter = event.target.closest('[data-run-filter]')
   if (filter) filterRuns(filter.dataset.runFilter)
@@ -832,7 +900,7 @@ function updateMode() {
     modePill.className = `status-pill ${state.capabilities?.writeEnabled ? '' : 'disabled'}`
     operatorButton.textContent = '治理模式'
   }
-  if (state.page === 'agents') renderAgents()
+  if (state.page === 'agent-settings') renderAgents()
   if (state.page === 'runs') renderRuns()
 }
 
@@ -845,7 +913,7 @@ function showFatal(error) {
 async function boot() {
   const keys = ['status', 'capabilities', 'runs', 'knowledge', 'agents']
   const results = await Promise.allSettled([
-    request('/api/v1/status'), request('/api/v1/capabilities'), request('/api/v1/runs'), request('/api/v1/knowledge'), request('/api/v1/agents'),
+    request('/api/v1/system/status'), request('/api/v1/system/capabilities'), request('/api/v1/runs'), request('/api/v1/knowledge'), request('/api/v1/agents'),
   ])
   results.forEach((result, index) => {
     if (result.status === 'rejected') state.resourceErrors[keys[index]] = result.reason
@@ -853,9 +921,9 @@ async function boot() {
   if (results.every((result) => result.status === 'rejected')) throw results[0].reason
   state.status = results[0].status === 'fulfilled' ? results[0].value : null
   state.capabilities = results[1].status === 'fulfilled' ? results[1].value : null
-  state.runs = results[2].status === 'fulfilled' ? results[2].value.runs : []
-  state.knowledge = results[3].status === 'fulfilled' ? results[3].value.knowledge : []
-  state.agents = results[4].status === 'fulfilled' ? results[4].value.agents : []
+  state.runs = results[2].status === 'fulfilled' ? collection(results[2].value, 'runs') : []
+  state.knowledge = results[3].status === 'fulfilled' ? collection(results[3].value, 'knowledge') : []
+  state.agents = results[4].status === 'fulfilled' ? collection(results[4].value, 'agents') : []
   state.loadedAt = new Date().toISOString()
   const partial = Object.keys(state.resourceErrors).length > 0
   registryIndicator.className = `health-dot ${partial ? 'pending' : 'healthy'}`
