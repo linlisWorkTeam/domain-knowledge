@@ -41,4 +41,4 @@ P0-A Spec 已 Accepted；这只表示需求、契约和验收基线可进入实�
 
 需求级状态仍以[追踪矩阵](13-verification/traceability-matrix.md)为准。Application App、Domain Service、固定七 Agent、LangGraph 与持久化的约束分别由 ADR-006、ADR-010、ADR-011 和对应验收场景定义，不因进度文档调整而改变。
 
-前台交付 F1–F5 与系统实施 Phase 1–4 是两条独立编号轴。B1 已完成实现与自动门禁；F2 首轮 HCP-1=`Rework required`，视觉返工通过复验前不得进入 B2/B3 前台接线。原型中的模拟 Health、ETA、Activity、Action Item、Workspace 与用户身份不构成产品能力；Graph 只允许展示 Registry 中的真实 Agent 节点投影，新增后端或领域语义必须另行通过 Spec 对齐。
+前台交付 F1–F5 与系统实施 Phase 1–4 是两条独立编号轴。B1 已完成实现与自动门禁；F2 已由用户按当前版本验收，HCP-1=`Accepted`，最终七页信息架构与 UI/UX 已冻结。F1 八入口结构只作为历史记录，不再具有设计效力。原型中的模拟 Health、ETA、Activity、Action Item、Workspace 与用户身份不构成产品能力；Graph 只允许展示注册中的真实 Agent 节点投影，新增后端或领域语义必须另行通过 Spec 对齐。

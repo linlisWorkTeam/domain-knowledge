@@ -63,6 +63,7 @@
 | KF-UI-017 | AC-UI-017 | Implemented | `web/index.html` + `web/app.js` + `site/index.html` + `site/app.js` | `tests/contract/site.test.ts` |
 | KF-UI-018 | AC-UI-018 | Implemented | `.env.example` + `web/app.js` | `tests/contract/site.test.ts` + `tests/integration/server.test.ts` |
 | KF-UI-019 | AC-UI-019 | Implemented | `web/index.html` + `web/styles.css` + `web/app.js` | `tests/contract/site.test.ts` + `tests/e2e/console.spec.ts` |
+| KF-UI-021 | AC-UI-024 | Planned | — | — |
 | NFR-001 | AC-SEC-002 | Partial | `src/interfaces/runner/server.ts` | `tests/integration/server.test.ts` |
 | NFR-002 | AC-REC-001 | Partial | `src/application/services/index.ts` + `src/infrastructure/persistence/sqlite-cas/index.ts` | `tests/integration/sqlite-cas.test.ts` |
 | NFR-003 | AC-REC-002 | Implemented | `src/application/services/index.ts` + `src/infrastructure/persistence/sqlite-cas/index.ts` | `tests/integration/sqlite-cas.test.ts` + `tests/acceptance/publication-flow.test.ts` |

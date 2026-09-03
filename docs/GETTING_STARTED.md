@@ -101,7 +101,7 @@ npm run knowledge -- query --q "workpanel"
 npm run knowledge:serve
 ```
 
-浏览器打开 <http://127.0.0.1:4174>。Console 提供 Overview、Runs、Knowledge、Governance、Evidence、Agents 和 Settings 视图，默认只读。Agents 页面会列出七个固定角色的职责、输入输出、工具权限和基础提示词；Run 详情会显示从 LangGraph 投影而来的节点状态，而不是直接读取 checkpoint 数据库。
+浏览器打开 <http://127.0.0.1:4174>。Console 提供“操作中心、飞轮批次、知识、工作流图、评测、来源、Agent 设置”七个页面，默认只读。Agent 设置页面会列出七个固定角色的职责、输入输出、工具权限和基础提示词；批次详情与工作流图显示从 LangGraph 投影而来的节点状态，而不是直接读取 checkpoint 数据库。
 
 若仅在受信本机测试 feedback 写入：
 

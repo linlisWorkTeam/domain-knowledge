@@ -1,6 +1,6 @@
 # Preview HTTP API 规范
 
-**状态：Accepted；B1 已实现、HCP-1 待验收｜版本：0.2.1｜日期：2026-09-03**
+**状态：Accepted；B1 已实现、HCP-1 已验收｜版本：0.2.2｜日期：2026-09-03**
 
 本文是 Knowledge Console HTTP API 的唯一规范性入口，统一定义资源分组、页面能力、当前实现映射和待补接口。领域行为、状态机与发布门禁仍以对应领域和工作流规范为准；HTTP 路由不得创造第二套业务语义。
 
@@ -52,7 +52,7 @@
 | `GET /api/v1/system/capabilities` | Available | 返回读写开关、认证方式、Provider 类型和隔离能力；已由旧 `/api/v1/capabilities` 迁移。 |
 | `GET /api/v1/system/components` | Planned | 返回分组件健康、reason code、最后成功时间和受控诊断摘要。 |
 
-## 3. Runs、Action Center 与 Activity
+## 3. 飞轮批次、操作中心与活动流
 
 | 方法与路径 | 状态 | 用途与最小响应 |
 |---|---|---|
@@ -76,7 +76,7 @@
 | `GET /api/v1/activity/stream` | Planned | 跨 Run SSE 活动流，支持断线续传。 |
 | `GET /api/v1/knowledge/health` | Planned | 返回有明确口径和样本范围的 freshness、coverage、quality 聚合，不得输出模型臆测分数。 |
 
-第一阶段 Action Center 只能从 `FAILED`、`LOW_CONFIDENCE` 和最新 GateDecision=`STOPPED` 派生 Run 级只读事项，并明确标记为 `Partial`；独立生命周期、处理状态、Regenerate 和跨 Run Activity 必须等待上述接口。
+第一阶段操作中心只能从 `FAILED`、`LOW_CONFIDENCE` 和最新 GateDecision=`STOPPED` 派生批次级只读事项，并明确标记为 `Partial`；独立生命周期、处理状态、重新生成和跨批次活动流必须等待上述接口。
 
 ## 4. Knowledge
 
@@ -91,7 +91,7 @@
 
 第一阶段 Knowledge 是真实列表、检索与详情组成的 Preview；Add curated knowledge 暂不进入前台范围。
 
-## 5. Evaluations
+## 5. 评测
 
 | 方法与路径 | 状态 | 用途与最小响应 |
 |---|---|---|
@@ -102,9 +102,9 @@
 | `GET /api/v1/evaluation-rules` | Planned | 只读返回规则、版本、适用范围和启用状态。 |
 | `PATCH /api/v1/evaluation-rules/:ruleId` | Planned | 管理员更新允许变更的规则配置，保留版本和审计记录。 |
 
-第一阶段 Evaluations 只能聚合现有 Run snapshot，并持续显示 `Partial`；全局筛选、规则管理和完整证据浏览不可宣称可用。
+第一阶段评测页只能聚合现有批次 snapshot，并持续显示 `Partial`；全局筛选、规则管理和完整证据浏览不可宣称可用。
 
-## 6. Sources
+## 6. 来源
 
 | 方法与路径 | 状态 | 用途与最小响应 |
 |---|---|---|
@@ -115,11 +115,11 @@
 | `PATCH /api/v1/sources/:sourceId` | Planned | 修改白名单字段并记录审计；不得回传秘密正文。 |
 | `POST /api/v1/sources/:sourceId/refresh` | Planned | 发起幂等扫描/同步任务并返回关联 runId 或 jobId。 |
 
-第一阶段 Sources 仅提供真实只读扫描候选；持久化管理、启停、刷新和来源统计均以禁用状态展示。
+第一阶段来源页仅提供真实只读扫描候选；持久化管理、启停、刷新和来源统计均以禁用状态展示。
 
 ## 7. Graph
 
-Graph 页面是选定 Run 的只读 Agent 工作流执行图，不是 Knowledge Graph，也不是可编辑工作流画布。它不新增专用 Graph API，而是组合以下现有事实：
+工作流图页面是所选批次的只读 Agent 工作流执行图，不是 Knowledge Graph，也不是可编辑工作流画布。它不新增专用 Graph API，而是组合以下现有事实：
 
 | 数据来源 | 状态 | Graph 用途 |
 |---|---|---|
@@ -132,15 +132,18 @@ Graph 页面是选定 Run 的只读 Agent 工作流执行图，不是 Knowledge 
 
 第一阶段 Graph 必须使用真实节点投影实现轮询版；点击节点可查看受控 ArtifactRef、错误摘要与事件。固定拓扑来自服务端 Agent 定义，前台不得拖拽修改边、直接读取 checkpoint 或提供人工推进状态的动作。
 
-## 8. Agent Settings
+## 8. Agent 设置
 
 | 方法与路径 | 状态 | 用途与最小响应 |
 |---|---|---|
 | `GET /api/v1/agents` | Available | 返回固定 Agent 定义、职责、只读契约和当前 `promptAddon`。 |
 | `PUT /api/v1/agents/:agentId/prompt` | Available | 仅更新 `promptAddon`；拒绝职责、Schema、权限、节点边和 Provider 类名。 |
 | `GET /api/v1/agents/providers/status` | Planned | 返回 Provider 认证/可用状态、模型标识和受控错误摘要，不返回凭据。 |
+| `GET /api/v1/provider-settings` | Planned | 返回 Pi Agent Provider 类型、脱敏 API URL、API Key 是否已配置及验证状态，不返回完整凭据。 |
+| `PUT /api/v1/provider-settings` | Planned | 管理员保存 API URL 与可选 API Key，要求鉴权、幂等、地址安全校验和审计。 |
+| `POST /api/v1/provider-settings/verify` | Planned | 使用服务端持有凭据执行无副作用连接验证并返回分类结果。 |
 
-第一阶段 Agent Settings 可以真实展示 Agent；若产品暂不开放写入，则隐藏或禁用提示词编辑。拓扑、工具权限、Schema 与 Provider 切换不提供假保存。
+第一阶段 Agent 设置可以真实展示 Agent；若产品暂不开放写入，则隐藏或禁用提示词编辑。拓扑、工具权限、Schema 与 Provider 切换不提供假保存。
 
 ## 9. Preview 破坏性迁移清单
 
@@ -157,23 +160,23 @@ Graph 页面是选定 Run 的只读 Agent 工作流执行图，不是 Knowledge 
 
 | 页面 | 第一阶段可真实使用 | 可预览但不完整 | 仍需后台 API |
 |---|---|---|---|
-| Action Center | Run 指标、最近 Run、运行级异常投影 | 健康分项可展示已有事实 | Action Item 生命周期、Regenerate、Activity、Knowledge Health |
-| Flywheel Runs | 列表、启动固定 profile、详情、节点、事件、取消、恢复、报告 | 进度仅展示可证明阶段 | 百分比进度、retry、SSE、通用启动参数 |
-| Knowledge | 列表、简单查询、详情、反馈 | 血缘和 Diff 入口禁用 | lineage、diff；不含 Add curated knowledge |
-| Graph | 选择 Run、真实固定拓扑、节点状态与轮询事件 | Progress 和实时连接状态在 B2 前为 Partial | 复用 Run progress 与 event-stream，不新增 Graph API |
-| Evaluations | 从 Run snapshot 查看与聚合 | 全局列表标记 Partial | 独立列表/详情/证据/规则 API |
-| Sources | 扫描候选只读查看 | Registry 控件禁用 | 来源 CRUD、刷新和统计 |
-| Agent Settings | Agent 定义和 promptAddon 事实 | Provider 健康标记未接入 | Provider status；其余固定契约不得开放编辑 |
+| 操作中心 | 批次指标、最近批次、批次级异常投影 | 健康分项可展示已有事实 | 待处理事项生命周期、重新生成、活动流、知识健康度 |
+| 飞轮批次 | 列表、启动固定 profile、详情、节点、事件、取消、恢复、报告 | 进度仅展示可证明阶段 | 百分比进度、重试、SSE、通用启动参数 |
+| 知识 | 列表、简单查询、详情、反馈 | 血缘和差异入口禁用 | 血缘、差异；不含人工添加精选知识 |
+| 工作流图 | 选择批次、真实固定拓扑、节点状态与轮询事件 | 进度和实时连接状态在 B2 前为 Partial | 复用批次进度与 event-stream，不新增 Graph API |
+| 评测 | 从批次 snapshot 查看与聚合 | 全局列表标记 Partial | 独立列表/详情/证据/规则 API |
+| 来源 | 扫描候选只读查看 | 注册控件禁用 | 来源 CRUD、刷新和统计 |
+| Agent 设置 | Agent 定义和 promptAddon 事实 | Provider 健康与配置标记未接入 | Provider 状态、API URL/Key 安全配置与验证；固定 Agent 契约不得开放编辑 |
 
 ## 11. 最终目标实施顺序
 
 | 阶段 | 后台能力 | 完成出口 |
 |---|---|---|
 | B1 API 基线 | 11 个旧接口的资源化迁移；分页、错误、认证、幂等、revision 通用契约 | 旧 HTTP 路由全部删除，Server、Console、DSH Adapter、测试和文档只引用新路径。 |
-| B2 核心控制面 | Action Item；Run progress/retry/SSE；组件健康与 Activity；Graph 实时更新 | Action Center、Flywheel Runs 和 Agent 工作流执行图不依赖模拟或浏览器私有状态即可完成查看、治理、重试和断线恢复。 |
+| B2 核心控制面 | 待处理事项；批次进度/重试/SSE；组件健康与活动流；工作流图实时更新 | 操作中心、飞轮批次和 Agent 工作流执行图不依赖模拟或浏览器私有状态即可完成查看、治理、重试和断线恢复。 |
 | B3 内容与质量面 | Knowledge lineage/diff；Evaluation 读模型与规则；Source Registry；Knowledge Health | Knowledge、Evaluations、Sources 的列表、详情、筛选、证据和允许动作全部来自服务端事实，健康指标具备完整输入和计算口径。 |
-| B4 运营面 | Provider status；指标口径、SSE 容量和大数据查询加固 | Agent Settings 显示真实 Provider 状态，全部列表与实时连接通过容量、恢复、分页和权限验收。 |
+| B4 运营面 | Provider status 与 Pi Agent API 配置；项目空间；指标口径、SSE 容量和大数据查询加固 | Agent Settings 显示真实 Provider 状态并安全配置默认 Pi Agent，全部列表与实时连接通过容量、恢复、分页和权限验收。 |
 
-B1–B4 共包含 11 个现有接口迁移/扩展和 24 个唯一 Planned HTTP 接口；Graph 表重复引用 Run event-stream，不重复计数。阶段可以拆分 PR，但不得在某阶段完成前把对应页面状态从 Preview/Partial/Disabled 提升为 Available。
+B1–B4 的接口范围以本文件各表为准；Graph 重复引用批次 event-stream，不重复视为 Graph 专用接口。阶段可以拆分 PR，但不得在某阶段完成前把对应页面状态从 Preview/Partial/Disabled 提升为 Available。
 
-B1 与 F2 可以并行，但进入 B2/B3 前必须通过前台产品设计定义的 HCP-1。HCP-1 冻结页面信息架构、Graph 语义和 API 边界；不替代本规范的自动化迁移验收门。
+HCP-1 已于 2026-09-03 获得 `Accepted`，当前七页信息架构、Graph 语义和 API 边界已经冻结；后续 B2/B3 接线不得恢复历史八入口结构。HCP-1 不替代本规范的自动化迁移验收门。

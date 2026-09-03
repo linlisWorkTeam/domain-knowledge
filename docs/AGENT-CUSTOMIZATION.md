@@ -144,13 +144,13 @@ curl -X PUT http://127.0.0.1:4174/api/v1/agents/doc-gen/prompt \
 
 ### 4. 用 Console 保存
 
-打开 `http://127.0.0.1:4174`，进入 `Agents`：
+打开 `http://127.0.0.1:4174`，进入“Agent 设置”：
 
 1. 展开固定基础提示词，确认角色职责和现有输入输出；
 2. 点击“写入凭据”，只在当前页面内存中填写写 token；
 3. 在目标角色的“追加提示词”中填写内容；
 4. 保存后确认 revision 增加；
-5. 启动新的治理 Run，在节点输出、EvaluationReport 和 Gate 中核对效果。
+5. 启动新的治理批次，在节点输出、EvaluationReport 和 Gate 中核对效果。
 
 ## 验证一次定制
 

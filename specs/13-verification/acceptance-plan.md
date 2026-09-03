@@ -47,7 +47,7 @@
 | AC-API-006 | Given 跨 Run Evaluation 和规则修订，When 查询报告、下载授权证据并更新规则，Then 原报告不可变、秘密不泄露、过期 revision 冲突、新 revision 只影响后续评测且全程可审计。 |
 | AC-API-007 | Given 扫描候选、合法来源和越界/漂移来源，When 创建、修改和刷新 Source，Then 只有通过访问校验的候选被持久化，revision 固定，越界默认拒绝，状态和关联统计可复验。 |
 | AC-API-008 | Given 一个含并行、迭代和失败 attempt 的 Run，When 打开 Graph 并选择节点，Then 固定七 Agent 的节点与依赖边稳定，状态、iteration、attempt、时间、ArtifactRef 和错误摘要来自 Registry 投影；刷新和 SSE 续传后状态一致，且页面不能读取 checkpoint、修改拓扑或人工推进节点。 |
-| AC-API-009 | Given Provider 可用、未认证、过期和故障状态，When 打开 Agent Settings，Then 返回稳定状态、模型、检查时间和受控原因，不返回凭据/Session/Prompt，也不能修改固定 Agent 契约。 |
+| AC-API-009 | Given Provider 可用、未认证、过期和故障状态，When 打开 Agent 设置，Then 返回稳定状态、模型、检查时间和受控原因，不返回凭据、会话或提示词，也不能修改固定 Agent 契约。 |
 
 ## P1 内容质量验收
 
@@ -58,12 +58,12 @@
 | AC-DOC-003 | Given 仓库中已跟踪的 Markdown 和关键入口文档，When 执行文档契约测试，Then 每份文档都有中文说明，关键入口包含相邻的结构化 English summary，代码标识符和协议值仍可与源码直接互查。 |
 | AC-DOC-004 | Given 官网和控制台，When 检查静态文案、状态标签和运行时投影，Then 除品牌、项目名、`Agent`、API/协议缩写、代码字段、枚举原值和技术标识符外，用户看到的栏目、状态与说明均为自然中文；`Registry` 显示为“注册”，名词 `Run` 显示为“批次”。 |
 
-## 前台交付 F1 验收门
+## 最终前台验收门
 
-UI 验收场景的规范正文以[前台产品设计的 AC-UI-001 至 AC-UI-019](../04-product/frontend-product-design.md#121-验收场景)为准，本节只定义本阶段发布门，避免复制场景后产生漂移。
+UI 验收场景的规范正文以[前台产品设计的 AC-UI 场景](../04-product/frontend-product-design.md#121-验收场景)为准，本节只定义发布门，避免复制场景后产生漂移。当前 F2 七页 UI/UX 的 HCP-1 结论为 `Accepted`，F1 八入口结构已经失效。
 
 - 操作中心指标和治理条目必须来自 `/api/v1/status`、`/api/v1/runs` 及其最新 GateDecision；不得出现原型演示值。
-- Run 工作台必须区分 FlywheelRun 业务状态和 WorkflowNodeProjection 执行状态，Evaluation 和 Gate 数据从 Run snapshot 读取。
+- 批次工作台必须区分 FlywheelRun 业务状态和 WorkflowNodeProjection 执行状态，Evaluation 和 Gate 数据从批次 snapshot 读取。
 - Knowledge 查询、详情、状态、quality、provenance 和 feedback 使用现有 API；`CANDIDATE` 不得显示为已发布。
 - 无 token、错误 token、有效 token 和写 API 未配置必须呈现不同状态，治理 token 只能驻留页面内存。
 - 深浅主题、键盘导航、Drawer 焦点、Escape 关闭、焦点恢复、200% 缩放和移动端核心读取路径必须通过浏览器契约验证。
@@ -83,14 +83,16 @@ UI 验收场景的规范正文以[前台产品设计的 AC-UI-001 至 AC-UI-019]
 
 ## HCP-1 最终页面与 API 边界人工检查门
 
+当前结论：`Accepted`（2026-09-03）。用户确认以当前实现作为最终 UI/UX；以下条目继续作为后续变更的回归门，而非待处理的视觉返工清单。
+
 F2 可访问环境和 B1 API 迁移 diff 都已准备后、B2/B3 前台接线开始前，产品用户必须完成一次人工检查：
 
 - 七个最终页面均可导航，桌面、移动端、深色和浅色主路径可验收；
-- Action Center 的治理入口、Runs 的业务/执行状态、Knowledge Preview、Evaluations/Sources 的 Partial 边界和 Agent Settings 的可编辑范围表达正确；
-- Graph 展示选定 Run 的真实固定 Agent 拓扑与节点投影，不是 Knowledge Graph，不读取 checkpoint，也没有编辑拓扑或人工推进节点的控件；
+- 操作中心的治理入口、飞轮批次的业务/执行状态、知识预览、评测/来源的 Partial 边界和 Agent 设置的可编辑范围表达正确；
+- 工作流图展示所选批次的真实固定 Agent 拓扑与节点投影，不是 Knowledge Graph，不读取 checkpoint，也没有编辑拓扑或人工推进节点的控件；
 - Graph 的七个 Agent 节点必须以七条有向边连接，完成、运行、失败和未开始状态具备一致图例；当前路径由 WorkflowNodeProjection 映射，不嵌入 LangGraph Studio 或引入第二套运行事实源；
 - 每个动态区域都能指出服务端 API、公开派生规则或明确未接状态，任何失败路径都不回退到演示数据；
-- 以 `1363 × 936` Chromium 固定视口核对 Action Center 基准截图；自动门禁必须同时断言 `103px` Header、标题 `y=40–45px`、操作区垂直居中、`14px` 全局字号以及关键原型组件仍存在；
+- 以 `1363 × 936` Chromium 固定视口核对操作中心基准截图；自动门禁必须同时断言 `103px` 顶栏、标题 `y=40–45px`、操作区垂直居中、`14px` 全局字号以及关键原型组件仍存在；
 - 七个一级页面各自只能出现一个与导航同名的页面标题，统一由 Topbar 提供；内容区只保留指标、工具栏和有业务含义的分区标题，不得重复 Page Intro 或装饰性说明卡；
 - 用户可见术语遵循统一中文规则：`Agent` 保留原词，`Registry` 显示为“注册”，`Run` 作动词显示为“运行”、作名词显示为“批次”；其他英文只允许出现在品牌、API/协议缩写、代码字段、枚举原值和技术标识符中；
 - B1 新旧路由映射、删除范围以及 Console/DSH Adapter/测试同步修改边界获得确认。
