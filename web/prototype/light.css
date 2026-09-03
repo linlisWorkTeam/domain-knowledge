@@ -1,0 +1,21 @@
+[data-theme=light] body{background:#f3f5f7;color:#17201e}
+[data-theme=light] .sidebar,[data-theme=light] .drawer{background:#fff}
+[data-theme=light] .project,[data-theme=light] .search,[data-theme=light] .theme-toggle,[data-theme=light] .overview article,[data-theme=light] .queue,[data-theme=light] .rail article,[data-theme=light] .metrics article,[data-theme=light] .run-history,[data-theme=light] .run-detail,[data-theme=light] .domains,[data-theme=light] .docs,[data-theme=light] .graph-shell,[data-theme=light] .knowledge-tools{background:#fff;border-color:#dce2e5;color:#17201e}
+[data-theme=light] .project em,[data-theme=light] .sidebar footer>em{background:#e8eeee;color:#42504d}
+[data-theme=light] nav a{color:#64716e}[data-theme=light] nav a:hover{background:#f3f7f6;color:#17201e}[data-theme=light] nav a.active{background:linear-gradient(90deg,#dff5ed,transparent);color:#087557}
+[data-theme=light] nav a>b{background:#fff0f2;color:#ca354a;border-color:#f4cbd1}
+[data-theme=light] .summary>div>i{border-color:#f1bcc4;background:#fff7f8}
+[data-theme=light] .health>div i{color:#0b9d72}[data-theme=light] .health footer b{color:#263330}
+[data-theme=light] .filters button{color:#697672}[data-theme=light] .filters button.on,[data-theme=light] .run-history .on,[data-theme=light] .graph-tools .on{background:#edf3f1;border-color:#d3dfdc;color:#17201e}
+[data-theme=light] .issue{color:#17201e}[data-theme=light] .issue:hover,[data-theme=light] .issue.active,[data-theme=light] .run-item.selected,[data-theme=light] .domains a.active{background:#f2f7f5}
+[data-theme=light] .issue span small,[data-theme=light] .labels,[data-theme=light] .run>p,[data-theme=light] .run section span small,[data-theme=light] .pulse span small{color:#697672}
+[data-theme=light] .eval{background:#edf5ff;color:#276cb6;border-color:#cbdff5}[data-theme=light] .failed{background:#fff0f2;color:#c9374a;border-color:#f3c8ce}[data-theme=light] .conflict{background:#fff3eb;color:#bd5b29;border-color:#f1d2bf}[data-theme=light] .stale{background:#fff9e9;color:#926b08;border-color:#eadcae}
+[data-theme=light] .progress{background:#e5ece9}[data-theme=light] .run section div>i{background:#fff;border-color:#cfd9d6;color:#66736f}
+[data-theme=light] .finding{background:#fff5f7;border-color:#efc8ce}[data-theme=light] .finding p{color:#46524f}[data-theme=light] .finding small{background:#fde9ec;color:#a53c4a}
+[data-theme=light] .code,[data-theme=light] .knowledge{background:#f8faf9;border-color:#dce2e5}[data-theme=light] .code pre,[data-theme=light] .knowledge p{color:#3d4a47}[data-theme=light] .code mark{background:#e5f5ef;color:#27483e}
+[data-theme=light] .code header b{background:#dff3ec;color:#087557}[data-theme=light] .knowledge header b,[data-theme=light] .doc span:first-child em{background:#eeeafb;color:#6550a8}[data-theme=light] .doc span:first-child em.curated{background:#dff3ec;color:#087557}
+[data-theme=light] .drawer>footer{background:#fbfcfc}[data-theme=light] .drawer>footer button{background:#fff;color:#52605d;border-color:#d4ddda}[data-theme=light] .drawer>footer .primary{background:#0b9d72;color:#fff;border-color:#0b9d72}
+[data-theme=light] .new{background:#0b9d72!important;color:#fff!important}[data-theme=light] .wide{background:#f3f7f6;color:#263330;border-color:#d7e0dd}
+[data-theme=light] .orbit-mini{background:#f3faf7;box-shadow:inset 0 0 28px #0b9d7218}
+[data-theme=light] .canvas{background-color:#fbfcfc}[data-theme=light] .nodes .core{fill:#e0f5ed;stroke:#0b9d72}[data-theme=light] .nodes .group{fill:#f0edfb;stroke:#765fc0}[data-theme=light] .nodes .leaf{fill:#fff;stroke:#397dcc}[data-theme=light] .links path{stroke:#cfd9d6}[data-theme=light] .svg-labels text{fill:#24312e}
+[data-theme=light] .node-detail{background:#fff}[data-theme=light] .node-detail em{background:#eeeafb;color:#6550a8}

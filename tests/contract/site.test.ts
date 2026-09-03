@@ -149,6 +149,24 @@ test('public surfaces use consistent Chinese copy and keep only the approved Eng
   assert.match(consoleScript, /服务端尚未配置写入令牌。请到“设置”查看配置方法。/);
 });
 
+test('UI prototype navigation and frontend spec reflect the reviewed delivery boundary', () => {
+  const prototypeHtml = readFileSync('web/prototype/index.html', 'utf8');
+  const prototypeScript = readFileSync('web/prototype/app.js', 'utf8');
+  const frontendSpec = readFileSync('specs/04-product/frontend-product-design.md', 'utf8');
+
+  for (const label of ['工作区', '操作中心', '飞轮运行', '知识', '图谱', '质量', '评测', '来源']) {
+    assert.ok(prototypeHtml.includes(`>${label}<`), `prototype navigation misses Chinese label: ${label}`);
+  }
+  assert.doesNotMatch(prototypeHtml, /<p>WORKSPACE<\/p>|<p>QUALITY<\/p>|<span>Action center<\/span>|<span>Flywheel runs<\/span>|<small>Workspace owner<\/small>/);
+  assert.doesNotMatch(prototypeHtml, /fonts\.googleapis|fonts\.gstatic/);
+  assert.match(prototypeScript, /titles=\['操作中心','飞轮运行','知识','图谱探索'\]/);
+  assert.match(frontendSpec, /### 前台交付 F1：/);
+  assert.match(frontendSpec, /### 系统实施 Phase 1：/);
+  assert.match(frontendSpec, /\| `GET \/api\/v1\/status` \| Implemented \|/);
+  assert.match(frontendSpec, /\| `GET \/api\/v1\/knowledge\/:versionId\/lineage` \| Planned \|/);
+  assert.match(frontendSpec, /\| 从 `GET \/api\/v1\/runs` 派生治理队列 \| Partial \|/);
+});
+
 test('site and Console expose the embedded workflow boundary and prompt-only Agent customization', () => {
   const consoleHtml = readFileSync('web/index.html', 'utf8');
   const consoleScript = readFileSync('web/app.js', 'utf8');
@@ -197,7 +215,6 @@ test('project site and Console implement separate light and dark themes', () => 
     surface: ['#10151d', '#ffffff'],
     text: ['#eef2f7', '#17212b'],
     muted: ['#9aa8ba', '#586b7d'],
-    accent: ['#71d4ff', '#07769f'],
     success: ['#76efbd', '#087c58'],
     warning: ['#ffd27d', '#92610f'],
     danger: ['#ff7d8e', '#b62f48'],
@@ -213,10 +230,42 @@ test('project site and Console implement separate light and dark themes', () => 
     assert.ok(frontendSpec.toLowerCase().includes(dark), `Spec misses dark ${name} token ${dark}`);
     assert.ok(frontendSpec.toLowerCase().includes(light), `Spec misses light ${name} token ${light}`);
   }
+  assert.equal(siteDark.cyan, '#71d4ff', 'site keeps its reviewed cyan accent');
+  assert.equal(siteLight.cyan, '#07769f', 'site keeps its reviewed cyan accent');
+  assert.equal(consoleDark.accent, '#55e6b5', 'Console uses the F1 green accent');
+  assert.equal(consoleLight.accent, '#0b9d72', 'Console uses the F1 green accent');
+  assert.equal(consoleDark['accent-text'], '#55e6b5');
+  assert.equal(consoleLight['accent-text'], '#087c58');
+  for (const token of ['#71d4ff', '#07769f', '#55e6b5', '#0b9d72']) {
+    assert.ok(frontendSpec.toLowerCase().includes(token), `Spec misses reviewed accent ${token}`);
+  }
   assertReadablePalette(siteDark, ['text', 'muted', 'faint', 'cyan', 'green', 'amber', 'violet', 'danger'], 'site dark');
   assertReadablePalette(siteLight, ['text', 'muted', 'faint', 'cyan', 'green', 'amber', 'violet', 'danger'], 'site light');
-  assertReadablePalette(consoleDark, ['text', 'muted', 'faint', 'accent', 'success', 'warning', 'governance', 'danger'], 'Console dark');
-  assertReadablePalette(consoleLight, ['text', 'muted', 'faint', 'accent', 'success', 'warning', 'governance', 'danger'], 'Console light');
+  assertReadablePalette(consoleDark, ['text', 'muted', 'faint', 'accent-text', 'success', 'warning', 'governance', 'danger'], 'Console dark');
+  assertReadablePalette(consoleLight, ['text', 'muted', 'faint', 'accent-text', 'success', 'warning', 'governance', 'danger'], 'Console light');
+});
+
+test('production Console implements the F1 navigation and truthful data boundary', () => {
+  const consoleHtml = readFileSync('web/index.html', 'utf8');
+  const consoleCss = readFileSync('web/styles.css', 'utf8');
+  const consoleScript = readFileSync('web/app.js', 'utf8');
+
+  for (const label of ['操作中心', '运行', '知识', '治理', '证据', '智能体', '发现', '设置']) {
+    assert.ok(consoleHtml.includes(`>${label}<`) || consoleHtml.includes(`${label} <`), `Console navigation misses ${label}`);
+  }
+  assert.match(consoleScript, /request\('\/api\/v1\/scan'\)/);
+  assert.match(consoleScript, /\/api\/v1\/query\?q=/);
+  assert.match(consoleScript, /Promise\.allSettled/);
+  assert.match(consoleScript, /const ATTENTION = new Set\(\['LOW_CONFIDENCE', 'FAILED'\]\)/);
+  assert.match(consoleScript, /latestDecision\?\.outcome === 'STOPPED'/);
+  assert.doesNotMatch(consoleScript, /\/api\/v1\/(?:transition|evaluate|publish)/);
+  assert.doesNotMatch(`${consoleHtml}\n${consoleScript}`, /Knowledge Health|Action Item|Workspace owner|预计完成|\bETA\b|87\s*\/\s*100/);
+  assert.doesNotMatch(consoleHtml, /fonts\.googleapis|fonts\.gstatic|unpkg|jsdelivr/i);
+  assert.match(consoleHtml, /role="dialog" aria-modal="true" aria-labelledby="drawer-title"/);
+  assert.match(consoleScript, /drawerReturnFocus/);
+  assert.match(consoleScript, /event\.key === 'Tab'.*drawer\.classList\.contains\('open'\)/s);
+  assert.match(consoleCss, /@media \(max-width: 767px\)/);
+  assert.match(consoleCss, /\.sidebar\.open \{ transform: translateX\(0\); \}/);
 });
 
 test('write-token setup is discoverable while local secrets remain ignored', () => {

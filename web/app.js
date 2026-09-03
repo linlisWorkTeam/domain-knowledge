@@ -19,6 +19,12 @@ const drawerContent = document.querySelector('#drawer-content')
 const drawerClose = document.querySelector('#drawer-close')
 const drawerBackdrop = document.querySelector('#drawer-backdrop')
 const toast = document.querySelector('#toast')
+const sidebar = document.querySelector('#sidebar')
+const navToggle = document.querySelector('#nav-toggle')
+const navBackdrop = document.querySelector('#nav-backdrop')
+const globalSearchButton = document.querySelector('#global-search-button')
+let drawerReturnFocus = null
+let drawerReturnKey = null
 
 function applyTheme(theme, persist = false) {
   const normalized = theme === 'light' ? 'light' : 'dark'
@@ -40,12 +46,13 @@ try {
 applyTheme(initialTheme)
 
 const PAGE_META = {
-  overview: ['运行概览', '查看运行状态、知识发布进度，以及需要人工处理的问题。'],
+  overview: ['操作中心', '查看运行事实、知识发布状态，以及需要人工处理的问题。'],
   runs: ['运行', '沿着节点、评测和事件记录，查看每次运行的完整过程。'],
   knowledge: ['知识', '检索候选知识和已验证知识，核对来源、版本与发布依据。'],
   governance: ['治理', '集中处理已停止、低置信或基础设施失败的运行。正常迭代会自动继续。'],
   evidence: ['证据', '核对评测报告、门禁判定、工具链和不可变证据。'],
   agents: ['智能体', '查看每个智能体的固定职责，并为后续运行补充提示词。'],
+  discovery: ['发现', '查看服务端当前扫描到、尚未进入知识登记簿的来源候选。'],
   settings: ['设置', '查看本地运行能力、安全边界和治理写入配置。'],
 }
 
@@ -89,6 +96,9 @@ const state = {
   token: '',
   operatorMode: false,
   selectedRun: null,
+  discovery: null,
+  resourceErrors: {},
+  loadedAt: null,
 }
 
 function needsAttention(run) {
@@ -149,6 +159,14 @@ function emptyState(titleText, body, action = '') {
   return `<div class="empty-state"><span aria-hidden="true">◇</span><h3>${escapeHtml(titleText)}</h3><p>${escapeHtml(body)}</p>${action}</div>`
 }
 
+function errorState(titleText, error, action = '') {
+  return `<div class="empty-state error-state" role="alert"><span aria-hidden="true">!</span><h3>${escapeHtml(titleText)}</h3><p>${escapeHtml(error?.message || '请求失败，请稍后重试。')}</p>${action}</div>`
+}
+
+function partialNotice(message) {
+  return `<div class="partial-notice" role="status"><b>部分数据暂不可用</b><span>${escapeHtml(message)}</span></div>`
+}
+
 function metric(label, value, hint, tone = '') {
   return `<article class="metric ${tone}"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong><small>${escapeHtml(hint)}</small></article>`
 }
@@ -174,13 +192,17 @@ function renderOverview() {
   const active = state.runs.filter((run) => !TERMINAL.has(run.state))
   const attention = state.runs.filter(needsAttention)
   const status = state.status ?? {}
+  const verified = state.status ? status.verified : (state.resourceErrors.knowledge ? '不可用' : state.knowledge.filter((item) => item.status === 'VERIFIED').length)
+  const candidates = state.status ? status.candidates : (state.resourceErrors.knowledge ? '不可用' : state.knowledge.filter((item) => item.status === 'CANDIDATE').length)
   const recent = state.runs.slice(0, 6)
+  const notices = ['status', 'runs', 'capabilities'].filter((key) => state.resourceErrors[key])
   content.innerHTML = `
+    ${notices.length ? partialNotice(`${notices.join('、')} 获取失败；其余区域仍展示已读取的服务端事实。`) : ''}
     <section class="metrics-grid" aria-label="关键指标">
-      ${metric('全部运行', status.runs ?? state.runs.length, `${active.length} 个正在运行`)}
-      ${metric('已验证知识', status.verified ?? 0, `${status.publications ?? 0} 条发布记录`, 'success')}
-      ${metric('候选知识', status.candidates ?? 0, `${status.qualityRejected ?? 0} 条未通过质量检查`, 'candidate')}
-      ${metric('需要治理', attention.length, attention.length ? '需要人工查看' : '当前没有阻塞', attention.length ? 'danger' : '')}
+      ${metric('全部运行', state.resourceErrors.runs ? '不可用' : (status.runs ?? state.runs.length), state.resourceErrors.runs ? '运行列表读取失败' : `${active.length} 个正在运行`)}
+      ${metric('已验证知识', verified, state.status ? `${status.publications ?? 0} 条发布记录` : (state.resourceErrors.knowledge ? '知识目录读取失败' : '根据已读取知识列表统计'), 'success')}
+      ${metric('候选知识', candidates, state.status ? `${status.qualityRejected ?? 0} 条未通过质量检查` : (state.resourceErrors.knowledge ? '知识目录读取失败' : '根据已读取知识列表统计'), 'candidate')}
+      ${metric('需要治理', state.resourceErrors.runs ? '不可用' : attention.length, state.resourceErrors.runs ? '运行列表读取失败' : (attention.length ? '需要人工查看' : '当前没有阻塞'), attention.length ? 'danger' : '')}
     </section>
     <div class="dashboard-grid">
       <section class="panel attention-panel">
@@ -190,11 +212,10 @@ function renderOverview() {
       <section class="panel trust-panel">
         <div class="section-heading"><div><p class="eyebrow">信任边界</p><h2>能力边界</h2></div></div>
         <ul class="capability-list">
-          <li><span>知识登记簿与工件库</span>${badge('VERIFIED', '可用')}</li>
-          <li><span>自动工作流</span>${badge('LOW_CONFIDENCE', state.capabilities?.automatedWorkflow ? '已启用' : '尚未接入')}</li>
-          <li><span>受信项目评测</span>${badge('VERIFIED', '可用')}</li>
-          <li><span>智能体源码隔离</span>${badge(state.capabilities?.agentSourceIsolation === 'bubblewrap' ? 'VERIFIED' : 'LOW_CONFIDENCE', state.capabilities?.agentSourceIsolation === 'bubblewrap' ? '已启用' : '未证明')}</li>
-          <li><span>敌对代码执行隔离</span>${badge('FAILED', '未实现')}</li>
+          <li><span>知识登记簿连接</span>${badge(state.resourceErrors.status ? 'FAILED' : 'VERIFIED', state.resourceErrors.status ? '读取失败' : '已连接')}</li>
+          <li><span>自动工作流</span>${state.capabilities ? badge(state.capabilities.automatedWorkflow ? 'VERIFIED' : 'LOW_CONFIDENCE', state.capabilities.automatedWorkflow ? '已启用' : '尚未接入') : badge('FAILED', '读取失败')}</li>
+          <li><span>智能体源码隔离</span>${state.capabilities ? badge(state.capabilities.agentSourceIsolation === 'bubblewrap' ? 'VERIFIED' : 'LOW_CONFIDENCE', state.capabilities.agentSourceIsolation === 'bubblewrap' ? '已启用' : '未证明') : badge('FAILED', '读取失败')}</li>
+          <li><span>敌对代码执行隔离</span>${state.capabilities ? badge(state.capabilities.hostileCodeIsolation ? 'VERIFIED' : 'FAILED', state.capabilities.hostileCodeIsolation ? '已启用' : '未实现') : badge('FAILED', '读取失败')}</li>
         </ul>
       </section>
     </div>
@@ -205,6 +226,10 @@ function renderOverview() {
 }
 
 function renderRuns() {
+  if (state.resourceErrors.runs) {
+    content.innerHTML = errorState('无法读取运行列表', state.resourceErrors.runs, '<button class="primary-button" data-reload type="button">重新连接</button>')
+    return
+  }
   if (state.selectedRun) {
     renderRunWorkspace(state.selectedRun)
     return
@@ -307,6 +332,10 @@ function evaluationCard(record) {
 }
 
 function renderKnowledge(items = state.knowledge) {
+  if (state.resourceErrors.knowledge) {
+    content.innerHTML = errorState('无法读取知识目录', state.resourceErrors.knowledge, '<button class="primary-button" data-reload type="button">重新连接</button>')
+    return
+  }
   content.innerHTML = `
     <section class="knowledge-toolbar panel-flat">
       <label class="search-field"><span aria-hidden="true">⌕</span><input id="knowledge-search" type="search" placeholder="检索知识、模块、标签或正文"></label>
@@ -337,7 +366,7 @@ function knowledgeCards(items) {
   </button>`).join('') : emptyState('没有知识版本', '当前筛选条件下没有可以展示的知识。')
 }
 
-async function openKnowledge(versionId) {
+async function openKnowledge(versionId, returnFocus) {
   const item = await request(`/api/v1/knowledge/${encodeURIComponent(versionId)}`)
   drawerTitle.textContent = item.title || item.moduleId
   drawerContent.innerHTML = `
@@ -358,10 +387,14 @@ async function openKnowledge(versionId) {
         <div class="feedback-inputs"><input name="rating" type="number" min="0" max="5" placeholder="0–5"><input name="note" placeholder="补充说明"><button class="primary-button">提交</button></div>
       </form>
     </section>`
-  openDrawer()
+  openDrawer(returnFocus)
 }
 
 function renderGovernance() {
+  if (state.resourceErrors.runs) {
+    content.innerHTML = errorState('无法生成治理队列', state.resourceErrors.runs, '<button class="primary-button" data-reload type="button">重新连接</button>')
+    return
+  }
   const items = state.runs.filter(needsAttention)
   content.innerHTML = `
     <section class="governance-intro panel"><div><p class="eyebrow">人工治理</p><h2>只处理真正需要判断的异常</h2><p>继续迭代、回滚和通过等正常分支由工作流服务自动推进。治理队列不提供“强制验证”或篡改门禁判定的入口。</p></div><strong>${items.length}</strong></section>
@@ -375,10 +408,16 @@ function renderGovernance() {
 }
 
 async function renderEvidence() {
+  if (state.resourceErrors.runs) {
+    content.innerHTML = errorState('无法读取证据索引', state.resourceErrors.runs, '<button class="primary-button" data-reload type="button">重新连接</button>')
+    return
+  }
   content.innerHTML = '<div class="loading-state"><span class="spinner"></span>正在汇总评测证据…</div>'
   const snapshots = await Promise.all(state.runs.slice(0, 20).map((run) => request(`/api/v1/runs/${encodeURIComponent(run.runId)}`).catch(() => null)))
+  const failed = snapshots.filter((snapshot) => !snapshot).length
   const records = snapshots.flatMap((snapshot) => (snapshot?.evaluations ?? []).map((record) => ({ ...record, run: snapshot.run }))).reverse()
   content.innerHTML = `
+    ${failed ? partialNotice(`${failed} 个 Run 快照读取失败，以下为其余 Run 的持久化证据。`) : ''}
     <section class="panel">
       <div class="section-heading"><div><p class="eyebrow">不可变证据</p><h2>评测与门禁</h2><p>这里只展示服务端持久化的执行事实，不采用智能体自评分。</p></div><span class="counter">${records.length}</span></div>
       <div class="evidence-grid">${records.length ? records.map((record) => `<article class="evidence-card">
@@ -390,26 +429,47 @@ async function renderEvidence() {
     </section>`
 }
 
+async function renderDiscovery(force = false) {
+  content.innerHTML = '<div class="loading-state"><span class="spinner" aria-hidden="true"></span>正在扫描已配置来源…</div>'
+  try {
+    if (!state.discovery || force) state.discovery = await request('/api/v1/scan')
+    const { candidates = [], total = candidates.length, truncated = false } = state.discovery
+    content.innerHTML = `
+      <section class="panel discovery-panel">
+        <div class="section-heading"><div><p class="eyebrow">只读来源扫描</p><h2>当前来源候选</h2><p>候选来自服务端已配置目录；这里不是持久化来源注册表。</p></div><button class="secondary-button" data-refresh-discovery type="button">重新扫描</button></div>
+        ${truncated ? partialNotice(`结果已达到服务端上限，当前展示 ${candidates.length} 条，共发现 ${total} 条。`) : ''}
+        <div class="candidate-list">${candidates.length ? candidates.map((candidate) => `<article class="candidate-card">
+          <div><b>${escapeHtml(candidate.path)}</b><small>${escapeHtml(formatDate(candidate.modifiedAt))}</small></div>
+          <dl><div><dt>大小</dt><dd>${escapeHtml(candidate.size)} 字节</dd></div><div><dt>内容摘要</dt><dd><code>${escapeHtml(candidate.sha256)}</code></dd></div></dl>
+        </article>`).join('') : emptyState('没有来源候选', '服务端当前没有扫描到尚未登记的知识来源。')}</div>
+      </section>`
+  } catch (error) {
+    content.innerHTML = errorState('无法读取来源候选', error, '<button class="primary-button" data-refresh-discovery type="button">重新扫描</button>')
+  }
+}
+
 function renderSettings() {
   const capabilities = state.capabilities ?? {}
   const status = state.status ?? {}
   content.innerHTML = `
     <div class="settings-grid">
       <section class="panel"><p class="eyebrow">本地运行</p><h2>运行状态</h2><dl class="settings-list">
-        <div><dt>知识登记簿</dt><dd>${badge('VERIFIED', '运行正常')}</dd></div>
-        <div><dt>知识版本</dt><dd>${escapeHtml(status.knowledgeTotal ?? 0)}</dd></div>
-        <div><dt>运行次数</dt><dd>${escapeHtml(status.runs ?? 0)}</dd></div>
-        <div><dt>发布记录</dt><dd>${escapeHtml(status.publications ?? 0)}</dd></div>
+        <div><dt>知识登记簿</dt><dd>${badge(state.resourceErrors.status ? 'FAILED' : 'VERIFIED', state.resourceErrors.status ? '读取失败' : '已连接')}</dd></div>
+        <div><dt>知识版本</dt><dd>${escapeHtml(status.knowledgeTotal ?? '不可用')}</dd></div>
+        <div><dt>运行次数</dt><dd>${escapeHtml(status.runs ?? '不可用')}</dd></div>
+        <div><dt>发布记录</dt><dd>${escapeHtml(status.publications ?? '不可用')}</dd></div>
       </dl></section>
       <section class="panel"><p class="eyebrow">安全边界</p><h2>能力范围</h2><dl class="settings-list">
-        <div><dt>接口写入</dt><dd>${badge(capabilities.writeEnabled ? 'VERIFIED' : 'CANDIDATE', capabilities.writeEnabled ? '已启用令牌' : '已关闭')}</dd></div>
+        <div><dt>接口写入</dt><dd>${state.capabilities ? badge(capabilities.writeEnabled ? 'VERIFIED' : 'CANDIDATE', capabilities.writeEnabled ? '已启用令牌' : '已关闭') : badge('FAILED', '读取失败')}</dd></div>
         <div><dt>项目评测</dt><dd>${badge('CANDIDATE', '仅限受信源码')}</dd></div>
-        <div><dt>敌对代码隔离</dt><dd>${badge('FAILED', '暂不可用')}</dd></div>
-        <div><dt>自动工作流</dt><dd>${badge('LOW_CONFIDENCE', capabilities.automatedWorkflow ? '可用' : '规划中')}</dd></div>
-        <div><dt>智能体通信</dt><dd>${badge(capabilities.agentPromptTransport === 'sdk-stdio-json-rpc' ? 'VERIFIED' : 'CANDIDATE', capabilities.agentPromptTransport === 'sdk-stdio-json-rpc' ? '已连接' : '未确认')}</dd></div>
-        <div><dt>智能体源码隔离</dt><dd>${badge(capabilities.agentSourceIsolation === 'bubblewrap' ? 'VERIFIED' : 'LOW_CONFIDENCE', capabilities.agentSourceIsolation === 'bubblewrap' ? '已启用' : '未证明')}</dd></div>
+        <div><dt>敌对代码隔离</dt><dd>${state.capabilities ? badge(capabilities.hostileCodeIsolation ? 'VERIFIED' : 'FAILED', capabilities.hostileCodeIsolation ? '已启用' : '暂不可用') : badge('FAILED', '读取失败')}</dd></div>
+        <div><dt>自动工作流</dt><dd>${state.capabilities ? badge(capabilities.automatedWorkflow ? 'VERIFIED' : 'LOW_CONFIDENCE', capabilities.automatedWorkflow ? '可用' : '规划中') : badge('FAILED', '读取失败')}</dd></div>
+        <div><dt>智能体通信</dt><dd>${state.capabilities ? badge(capabilities.agentPromptTransport === 'sdk-stdio-json-rpc' ? 'VERIFIED' : 'CANDIDATE', capabilities.agentPromptTransport === 'sdk-stdio-json-rpc' ? '已连接' : '未确认') : badge('FAILED', '读取失败')}</dd></div>
+        <div><dt>智能体源码隔离</dt><dd>${state.capabilities ? badge(capabilities.agentSourceIsolation === 'bubblewrap' ? 'VERIFIED' : 'LOW_CONFIDENCE', capabilities.agentSourceIsolation === 'bubblewrap' ? '已启用' : '未证明') : badge('FAILED', '读取失败')}</dd></div>
       </dl></section>
-      <section class="panel full-span"><p class="eyebrow">治理写入</p><h2>配置服务端令牌</h2>${capabilities.writeEnabled
+      <section class="panel full-span"><p class="eyebrow">治理写入</p><h2>配置服务端令牌</h2>${!state.capabilities
+        ? '<div class="notice"><b>能力状态暂不可用。</b><p>重新连接并成功读取能力接口之前，控制台不会开放任何写操作。</p></div>'
+        : capabilities.writeEnabled
         ? '<div class="notice"><b>服务端写入已经启用。</b><p>点击右上角“治理模式”，输入与本地配置文件相同的令牌，即可执行受保护的写操作。</p></div>'
         : '<div class="notice"><b>当前没有配置写入令牌，因此服务端保持只读。</b><p>复制仓库根目录的 <code>.env.example</code> 为 <code>.env.local</code>，把占位值换成随机长令牌，然后重启服务。</p><pre>WP_KNOWLEDGE_WRITE_TOKEN=请替换为随机长令牌\nWP_FLYWHEEL_HOME=.workpanel</pre><p>配置文件不会提交到版本库。启动命令会自动读取它。</p></div>'}</section>
       <section class="panel full-span"><p class="eyebrow">当前能力</p><h2>尚未开放通用启动接口</h2><div class="notice"><b>运行工作台目前以观察和固定场景验收为主。</b><p>固定源码验收已经支持两轮自动编排；通用工作流命令接口尚未完成，所以页面不会用直接改状态的方式伪装自动化。</p></div></section>
@@ -417,6 +477,10 @@ function renderSettings() {
 }
 
 function renderAgents() {
+  if (state.resourceErrors.agents) {
+    content.innerHTML = errorState('无法读取智能体目录', state.resourceErrors.agents, '<button class="primary-button" data-reload type="button">重新连接</button>')
+    return
+  }
   const canEdit = Boolean(state.operatorMode && state.capabilities?.writeEnabled)
   content.innerHTML = `
     <section class="agent-boundary panel">
@@ -453,7 +517,9 @@ async function navigate(page) {
   if (page === 'governance') renderGovernance()
   if (page === 'evidence') await renderEvidence()
   if (page === 'agents') renderAgents()
+  if (page === 'discovery') await renderDiscovery()
   if (page === 'settings') renderSettings()
+  closeNavigation()
   content.focus({ preventScroll: true })
 }
 
@@ -465,16 +531,20 @@ async function openRun(runId) {
   renderRunWorkspace(state.selectedRun)
 }
 
-function openEvidence(encoded) {
+function openEvidence(encoded, returnFocus) {
   const record = JSON.parse(encoded)
   drawerTitle.textContent = '评测证据'
   drawerContent.innerHTML = `<div class="drawer-badges">${badge(record.decision.outcome)}</div>
     <section class="drawer-section"><h3>评测报告</h3><pre class="json-view">${json(record.report)}</pre></section>
     <section class="drawer-section"><h3>门禁判定</h3><pre class="json-view">${json(record.decision)}</pre></section>`
-  openDrawer()
+  openDrawer(returnFocus)
 }
 
-function openDrawer() {
+function openDrawer(returnFocus = document.activeElement) {
+  drawerReturnFocus = returnFocus
+  drawerReturnKey = returnFocus?.dataset?.versionId
+    ? `[data-version-id="${CSS.escape(returnFocus.dataset.versionId)}"]`
+    : null
   drawer.hidden = false
   drawer.setAttribute('aria-hidden', 'false')
   drawerBackdrop.hidden = false
@@ -483,10 +553,35 @@ function openDrawer() {
 }
 
 function closeDrawer() {
+  if (drawer.hidden && !drawer.classList.contains('open')) return
   drawer.classList.remove('open')
   drawer.setAttribute('aria-hidden', 'true')
   drawerBackdrop.hidden = true
-  setTimeout(() => { if (!drawer.classList.contains('open')) drawer.hidden = true }, 180)
+  setTimeout(() => {
+    if (!drawer.classList.contains('open')) drawer.hidden = true
+    const returnTarget = document.contains(drawerReturnFocus) ? drawerReturnFocus : (drawerReturnKey ? document.querySelector(drawerReturnKey) : null)
+    if (returnTarget instanceof HTMLElement) returnTarget.focus()
+    drawerReturnFocus = null
+    drawerReturnKey = null
+  }, 180)
+}
+
+function openNavigation() {
+  sidebar.classList.add('open')
+  sidebar.setAttribute('aria-hidden', 'false')
+  navBackdrop.hidden = false
+  navToggle.setAttribute('aria-expanded', 'true')
+  navToggle.setAttribute('aria-label', '关闭主导航')
+  nav.querySelector('[data-page].active')?.focus()
+}
+
+function closeNavigation() {
+  sidebar.classList.remove('open')
+  navBackdrop.hidden = true
+  navToggle.setAttribute('aria-expanded', 'false')
+  navToggle.setAttribute('aria-label', '打开主导航')
+  if (matchMedia('(max-width: 767px)').matches) sidebar.setAttribute('aria-hidden', 'true')
+  else sidebar.setAttribute('aria-hidden', 'false')
 }
 
 function showToast(message, tone = '') {
@@ -575,12 +670,13 @@ content.addEventListener('click', (event) => {
   const refresh = event.target.closest('[data-refresh-run]')
   if (refresh) openRun(refresh.dataset.refreshRun).catch(showFatal)
   const knowledgeButton = event.target.closest('[data-version-id]')
-  if (knowledgeButton) openKnowledge(knowledgeButton.dataset.versionId).catch(showFatal)
+  if (knowledgeButton) openKnowledge(knowledgeButton.dataset.versionId, knowledgeButton).catch(showFatal)
   const evidenceButton = event.target.closest('[data-evidence]')
-  if (evidenceButton) openEvidence(evidenceButton.dataset.evidence)
+  if (evidenceButton) openEvidence(evidenceButton.dataset.evidence, evidenceButton)
   const unavailable = event.target.closest('[data-unavailable]')
   if (unavailable) showUnavailable()
   if (event.target.closest('[data-reload]')) location.reload()
+  if (event.target.closest('[data-refresh-discovery]')) renderDiscovery(true)
   const copy = event.target.closest('[data-copy]')
   if (copy) {
     if (navigator.clipboard?.writeText) navigator.clipboard.writeText(copy.dataset.copy).then(() => showToast('已复制摘要。')).catch(() => showToast('复制失败。', 'warning'))
@@ -590,10 +686,22 @@ content.addEventListener('click', (event) => {
 
 content.addEventListener('input', (event) => {
   if (event.target.id !== 'knowledge-search') return
-  const query = event.target.value.trim().toLowerCase()
-  const filtered = state.knowledge.filter((item) => [item.title, item.moduleId, item.description, ...(item.tags ?? [])].join(' ').toLowerCase().includes(query))
-  document.querySelector('#knowledge-list').innerHTML = knowledgeCards(filtered)
-  document.querySelector('#knowledge-count').textContent = filtered.length
+  clearTimeout(state.searchTimer)
+  state.searchTimer = setTimeout(async () => {
+    const query = event.target.value.trim()
+    try {
+      const status = document.querySelector('#knowledge-status')?.value ?? ''
+      const result = query
+        ? await request(`/api/v1/query?q=${encodeURIComponent(query)}&status=${encodeURIComponent(status)}`)
+        : await request(`/api/v1/knowledge?status=${encodeURIComponent(status)}`)
+      const items = result.hits ?? result.knowledge ?? []
+      document.querySelector('#knowledge-list').innerHTML = knowledgeCards(items)
+      document.querySelector('#knowledge-count').textContent = items.length
+    } catch (error) {
+      document.querySelector('#knowledge-list').innerHTML = errorState('检索失败', error)
+      document.querySelector('#knowledge-count').textContent = '—'
+    }
+  }, 250)
 })
 
 content.addEventListener('change', async (event) => {
@@ -655,6 +763,10 @@ function filterRuns(filter) {
 }
 
 operatorButton.addEventListener('click', () => {
+  if (!state.capabilities) {
+    showToast('能力状态读取失败，请重新连接后再试。', 'warning')
+    return
+  }
   if (!state.capabilities?.writeEnabled) {
     showToast('服务端尚未配置写入令牌。请到“设置”查看配置方法。', 'warning')
     return
@@ -672,6 +784,12 @@ operatorButton.addEventListener('click', () => {
 themeButton.addEventListener('click', () => {
   applyTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light', true)
 })
+navToggle.addEventListener('click', () => sidebar.classList.contains('open') ? closeNavigation() : openNavigation())
+navBackdrop.addEventListener('click', () => { closeNavigation(); navToggle.focus() })
+globalSearchButton.addEventListener('click', async () => {
+  await navigate('knowledge')
+  document.querySelector('#knowledge-search')?.focus()
+})
 
 operatorForm.addEventListener('submit', (event) => {
   event.preventDefault()
@@ -687,7 +805,22 @@ operatorCancel.addEventListener('click', () => operatorDialog.close())
 
 drawerClose.addEventListener('click', closeDrawer)
 drawerBackdrop.addEventListener('click', closeDrawer)
-document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && drawer.classList.contains('open')) closeDrawer() })
+document.addEventListener('keydown', (event) => {
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+    event.preventDefault()
+    globalSearchButton.click()
+  }
+  if (event.key === 'Escape' && drawer.classList.contains('open')) closeDrawer()
+  else if (event.key === 'Escape' && sidebar.classList.contains('open')) { closeNavigation(); navToggle.focus() }
+  if (event.key === 'Tab' && drawer.classList.contains('open')) {
+    const focusable = [...drawer.querySelectorAll('button, a[href], input, select, textarea, [tabindex]:not([tabindex="-1"])')].filter((item) => !item.disabled && !item.hidden)
+    if (!focusable.length) return
+    const first = focusable[0]
+    const last = focusable.at(-1)
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus() }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
+  }
+})
 
 function updateMode() {
   if (state.operatorMode) {
@@ -695,7 +828,7 @@ function updateMode() {
     modePill.className = 'status-pill operator'
     operatorButton.textContent = '退出治理'
   } else {
-    modePill.textContent = state.capabilities?.writeEnabled ? '只读模式' : '写入关闭'
+    modePill.textContent = !state.capabilities ? '能力未知' : (state.capabilities.writeEnabled ? '只读模式' : '写入关闭')
     modePill.className = `status-pill ${state.capabilities?.writeEnabled ? '' : 'disabled'}`
     operatorButton.textContent = '治理模式'
   }
@@ -710,20 +843,29 @@ function showFatal(error) {
 }
 
 async function boot() {
-  const [statusPayload, capabilityPayload, runPayload, knowledgePayload, agentPayload] = await Promise.all([
+  const keys = ['status', 'capabilities', 'runs', 'knowledge', 'agents']
+  const results = await Promise.allSettled([
     request('/api/v1/status'), request('/api/v1/capabilities'), request('/api/v1/runs'), request('/api/v1/knowledge'), request('/api/v1/agents'),
   ])
-  state.status = statusPayload
-  state.capabilities = capabilityPayload
-  state.runs = runPayload.runs
-  state.knowledge = knowledgePayload.knowledge
-  state.agents = agentPayload.agents
-  registryIndicator.className = 'health-dot healthy'
-  registryLabel.textContent = '运行正常'
+  results.forEach((result, index) => {
+    if (result.status === 'rejected') state.resourceErrors[keys[index]] = result.reason
+  })
+  if (results.every((result) => result.status === 'rejected')) throw results[0].reason
+  state.status = results[0].status === 'fulfilled' ? results[0].value : null
+  state.capabilities = results[1].status === 'fulfilled' ? results[1].value : null
+  state.runs = results[2].status === 'fulfilled' ? results[2].value.runs : []
+  state.knowledge = results[3].status === 'fulfilled' ? results[3].value.knowledge : []
+  state.agents = results[4].status === 'fulfilled' ? results[4].value.agents : []
+  state.loadedAt = new Date().toISOString()
+  const partial = Object.keys(state.resourceErrors).length > 0
+  registryIndicator.className = `health-dot ${partial ? 'pending' : 'healthy'}`
+  registryLabel.textContent = partial ? '部分数据可用' : '服务已连接'
   governanceCount.textContent = state.runs.filter(needsAttention).length || ''
-  runtimeFooter.innerHTML = `<span><i class="health-dot healthy"></i>知识登记簿</span><span><i class="health-dot healthy"></i>内容寻址存储</span><span><i class="health-dot healthy"></i>工作流基础设施</span><span>${escapeHtml(state.runs.length)} 次运行 · ${escapeHtml(state.knowledge.length)} 个知识版本</span>`
+  runtimeFooter.innerHTML = `<span><i class="health-dot healthy"></i>控制台 API 已连接</span><span>读取于 ${escapeHtml(formatDate(state.loadedAt))}</span><span>${escapeHtml(state.runs.length)} 次运行 · ${escapeHtml(state.knowledge.length)} 个知识版本</span>`
   updateMode()
+  setPageMeta('overview')
   renderOverview()
+  closeNavigation()
 }
 
 boot().catch(showFatal)

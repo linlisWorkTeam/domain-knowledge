@@ -183,19 +183,43 @@ function validateMarkdown(): number {
       invariant(statSafe(resolve(dirname(path), decodedTarget)), `Broken link in ${path.slice(specRoot.length + 1)}: ${match[1]}`);
     }
   }
-  const requirements: string[] = [];
-  const pattern = /^\| ((?:KF-SYS|NFR)-\d+) \| P0 \|/gm;
-  for (const name of ['system-requirements.md', 'non-functional-requirements.md']) {
-    const text = readFileSync(join(specRoot, '01-requirements', name), 'utf8');
-    requirements.push(...[...text.matchAll(pattern)].map((match) => match[1]));
+  const requirementSources = [
+    join(specRoot, '01-requirements', 'system-requirements.md'),
+    join(specRoot, '01-requirements', 'non-functional-requirements.md'),
+    join(specRoot, '04-product', 'frontend-product-design.md'),
+  ];
+  const requirementPattern = /^\| ((?:KF-SYS|KF-UI|NFR)-\d+) \| (P[01]) \| [^|\n]+ \| (AC-[A-Z0-9-]+) \|$/gm;
+  const requirements = requirementSources.flatMap((path) => {
+    const text = readFileSync(path, 'utf8');
+    return [...text.matchAll(requirementPattern)].map((match) => ({
+      id: match[1], priority: match[2], acceptance: match[3],
+    }));
+  });
+  const requirementIds = requirements.map(({ id }) => id);
+  invariant(requirementIds.length === new Set(requirementIds).size, 'Requirement IDs must be unique');
+
+  const acceptanceSources = [
+    join(specRoot, '04-product', 'frontend-product-design.md'),
+    join(specRoot, '13-verification', 'acceptance-plan.md'),
+  ];
+  const acceptancePattern = /^\| (AC-[A-Z0-9-]+) \| Given/gm;
+  const acceptanceIds = acceptanceSources.flatMap((path) => {
+    const text = readFileSync(path, 'utf8');
+    return [...text.matchAll(acceptancePattern)].map((match) => match[1]);
+  });
+  invariant(acceptanceIds.length === new Set(acceptanceIds).size, 'Acceptance criterion IDs must be unique');
+  const acceptanceSet = new Set(acceptanceIds);
+  for (const { id, acceptance } of requirements) {
+    invariant(acceptanceSet.has(acceptance), `${id} references undefined acceptance criterion ${acceptance}`);
   }
+
   const trace = readFileSync(join(specRoot, '13-verification', 'traceability-matrix.md'), 'utf8');
   validateTraceabilityMatrix(trace, resolve(specRoot, '..'));
-  for (const requirement of requirements) {
-    const count = trace.split('\n').filter((line) => line.startsWith(`| ${requirement} |`)).length;
-    invariant(count === 1, `${requirement} must appear exactly once in traceability matrix; got ${count}`);
+  for (const { id, priority } of requirements.filter(({ id, priority }) => priority === 'P0' || id.startsWith('KF-UI-'))) {
+    const count = trace.split('\n').filter((line) => line.startsWith(`| ${id} |`)).length;
+    invariant(count === 1, `${id} must appear exactly once in traceability matrix; got ${count}`);
   }
-  return requirements.length;
+  return requirements.filter(({ priority }) => priority === 'P0').length;
 }
 
 function statSafe(path: string): boolean {

@@ -11,6 +11,7 @@
     "knowledge:serve": "node --env-file-if-exists=.env.local src/interfaces/ui-api/index.ts",
     "site:serve": "node site/dev-server.mjs",
     "site:check": "node --test tests/contract/site.test.ts",
+    "test:ui": "playwright test",
     "acceptance:ohmyworkpanel": "node --env-file-if-exists=.env.local src/interfaces/runner/project-acceptance.ts",
     "test": "node --test --test-concurrency=1",
     "test:architecture": "node --test tests/contract/architecture.test.ts",
@@ -31,6 +32,7 @@
     "yaml": "2.9.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.55.0",
     "@types/node": "24.13.3",
     "typescript": "7.0.2"
   }

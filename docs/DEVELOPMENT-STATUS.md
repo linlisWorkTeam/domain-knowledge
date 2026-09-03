@@ -1,6 +1,6 @@
 # 开发状态
 
-**当前阶段：P0-B 实现验证｜更新时间：2026-09-03｜下一任务：DEV-005 CompanyCodeAgentCliAdapter**
+**当前阶段：后端 P0-B 实现验证、前台 F1 已实现｜更新时间：2026-09-03｜下一任务：DEV-005 CompanyCodeAgentCliAdapter**
 
 本文件是 domain-knowledge 的**唯一开发进度入口**，用于记录当前阶段、已完成里程碑、正在进行或下一项工作、后续队列和最近验证结果。产品行为仍以 [`../specs/`](../specs/README.md) 为规范性事实源；需求级的 `Implemented / Partial / Planned` 状态仍只在[追踪矩阵](../specs/13-verification/traceability-matrix.md)维护。
 
@@ -42,10 +42,11 @@ This file is the single entry point for project-level development status, curren
 - DDD 分层已经对齐，UI/API 通过 Application App 进入系统，LangGraph、Provider 和持久化实现留在 Infrastructure。
 - 固定七 Agent 拓扑、并行、迭代、取消、Checkpoint、运行契约和配置快照已经通过自动化验证。
 - deterministic fixture 可以完成失败、修订、重新生成、评测和发布闭环。
+- 前台 F1 已基于现有 API 完成八入口中文 Console、绿色双主题、响应式、可访问性和真实数据状态；没有新增或修改后端 API。
 - DeepSeek Harness live Adapter 已存在；公司 CodeAgent CLI 尚未接入。
 - 真实 Agent 质量、公司环境容量、长期稳定性和敌对代码执行安全尚未形成验收结论。
 
-需求级统计以追踪矩阵当前内容为准：`Implemented 26 / Partial 11 / Planned 5`。
+需求级统计以追踪矩阵当前内容为准：`Implemented 41 / Partial 15 / Planned 6`。
 
 ## 里程碑与工作项
 
@@ -55,6 +56,7 @@ This file is the single entry point for project-level development status, curren
 | DEV-002 | DDD Application/Domain/Infrastructure 边界对齐 | Done | `tests/contract/architecture.test.ts` |
 | DEV-003 | 固定七 Agent LangGraph 编排、Checkpoint 与确定性闭环 | Done | `tests/integration/langgraph-infrastructure.test.ts`、`tests/acceptance/automated-langgraph-flow.test.ts` |
 | DEV-004 | AgentCommand/AgentResult、Run 配置冻结与框架机械能力测评 | Done | [框架阶段性测评](report/框架阶段性测评.md)，结果 `6/6 ACCEPTED` |
+| DEV-UI-001 | 前台 F1 Knowledge Console | Done | `tests/contract/site.test.ts`、`tests/e2e/console.spec.ts`；只复用现有 API |
 | DEV-005 | 公司 CodeAgent CLI Adapter 与契约验证 | Ready / Next | 尚未实现；见下方完成标准 |
 | DEV-006 | 公司 CodeAgent 七角色真实闭环与效果基线 | Planned | 依赖 DEV-005 |
 | DEV-007 | TestGen 候选测试的通用 Oracle 验证与门禁链路 | Planned | 对应 `KF-SYS-004` |
@@ -93,5 +95,6 @@ This file is the single entry point for project-level development status, curren
 | 日期 | 基线 | 结果 |
 | --- | --- | --- |
 | 2026-09-03 | Agent 运行契约与框架测评合入后的 `main` | TypeScript 通过；Spec：7 schemas、7 commands、8 results、38 P0；测试 112/112；框架测评 6/6 `ACCEPTED` |
+| 2026-09-03 | 前台 F1 Knowledge Console 合入前基线 | TypeScript 通过；Spec：7 schemas、7 commands、8 results、51 P0；测试 114/114；框架测评 6/6 `ACCEPTED`；Chromium E2E 4/4 |
 
 该结果只证明框架机械能力，不代表公司 CodeAgent 效果或生产可用性。
