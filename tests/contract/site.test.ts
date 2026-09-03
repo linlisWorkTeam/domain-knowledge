@@ -149,6 +149,24 @@ test('public surfaces use consistent Chinese copy and keep only the approved Eng
   assert.match(consoleScript, /服务端尚未配置写入令牌。请到“设置”查看配置方法。/);
 });
 
+test('UI prototype navigation and frontend spec reflect the reviewed delivery boundary', () => {
+  const prototypeHtml = readFileSync('web/prototype/index.html', 'utf8');
+  const prototypeScript = readFileSync('web/prototype/app.js', 'utf8');
+  const frontendSpec = readFileSync('specs/04-product/frontend-product-design.md', 'utf8');
+
+  for (const label of ['工作区', '操作中心', '飞轮运行', '知识', '图谱', '质量', '评测', '来源']) {
+    assert.ok(prototypeHtml.includes(`>${label}<`), `prototype navigation misses Chinese label: ${label}`);
+  }
+  assert.doesNotMatch(prototypeHtml, /<p>WORKSPACE<\/p>|<p>QUALITY<\/p>|<span>Action center<\/span>|<span>Flywheel runs<\/span>|<small>Workspace owner<\/small>/);
+  assert.doesNotMatch(prototypeHtml, /fonts\.googleapis|fonts\.gstatic/);
+  assert.match(prototypeScript, /titles=\['操作中心','飞轮运行','知识','图谱探索'\]/);
+  assert.match(frontendSpec, /### 前台交付 F1：/);
+  assert.match(frontendSpec, /### 系统实施 Phase 1：/);
+  assert.match(frontendSpec, /\| `GET \/api\/v1\/status` \| Implemented \|/);
+  assert.match(frontendSpec, /\| `GET \/api\/v1\/knowledge\/:versionId\/lineage` \| Planned \|/);
+  assert.match(frontendSpec, /\| 从 `GET \/api\/v1\/runs` 派生治理队列 \| Partial \|/);
+});
+
 test('site and Console expose the embedded workflow boundary and prompt-only Agent customization', () => {
   const consoleHtml = readFileSync('web/index.html', 'utf8');
   const consoleScript = readFileSync('web/app.js', 'utf8');

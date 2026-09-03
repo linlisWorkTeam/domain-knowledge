@@ -387,7 +387,7 @@ sequenceDiagram
 
 所有写入口最终必须经过同一 Application Service、Registry 和 CAS。入口差异不得改变 `CANDIDATE → EvaluationReport → GateDecision → VERIFIED` 的权威链。
 
-## UI Refresh Stage 1 入口映射
+## 前台交付 F1 入口映射
 
 - UC-KF-001 通过“知识”页面完成 `VERIFIED` 查询、详情、provenance 与 feedback；“添加知识”调用 ingest 时必须描述为创建候选，不得描述为人工发布或直接策展为 `VERIFIED`。
 - UC-KF-003 通过“操作中心、运行、治理”呈现。操作中心和治理页当前只从 Run 状态与最新 GateDecision 派生 Run 级事项，不承诺独立问题实体、严重级别或关闭生命周期。

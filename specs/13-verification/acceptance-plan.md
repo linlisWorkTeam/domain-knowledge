@@ -49,7 +49,7 @@
 | AC-DOC-003 | Given 仓库中已跟踪的 Markdown 和关键入口文档，When 执行文档契约测试，Then 每份文档都有中文说明，关键入口包含相邻的结构化 English summary，代码标识符和协议值仍可与源码直接互查。 |
 | AC-DOC-004 | Given 官网和控制台，When 检查静态文案、状态标签和运行时投影，Then 除固定标题 `WORKPANEL · KNOWLEDGE FLYWHEEL` 以及代码、命令、项目名和协议标识符外，用户看到的栏目、状态与说明均为自然中文。 |
 
-## UI Refresh Stage 1 验收门
+## 前台交付 F1 验收门
 
 UI 验收场景的规范正文以[前台产品设计的 AC-UI-001 至 AC-UI-019](../04-product/frontend-product-design.md#121-验收场景)为准，本节只定义本阶段发布门，避免复制场景后产生漂移。
 

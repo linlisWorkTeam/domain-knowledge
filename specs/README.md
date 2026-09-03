@@ -1,6 +1,6 @@
 # Knowledge Flywheel 规范集
 
-**状态：Accepted（P0-A）+ P0-B 实现中 + UI Refresh Stage 1 规范冻结｜版本：1.5.0｜基线日期：2026-09-03**
+**状态：Accepted（P0-A）+ P0-B 实现中 + 前台交付 F1 规范冻结｜版本：1.5.1｜基线日期：2026-09-03**
 
 本目录是 domain-knowledge 的唯一规范性事实源。`KF-SYS-*` 与 `KF-UI-*` 使用独立命名空间，避免与历史实现中的需求编号冲突。本文档定义需求、产品、架构、领域、工作流、Agent 契约、评测、安全与验收；实现进度由追踪矩阵明确标记。关键词“必须 / 不得 / 应当 / 可以”分别表示强制、禁止、推荐和可选。
 
@@ -39,4 +39,4 @@ P0-A Spec 已进入实现验证。当前 P0-B 已落地纯领域边界、Artifac
 
 Application App 与 Domain Service 的命名和依赖方向按 ADR-010 收敛；七个既有 LangGraph Agent 节点保持不变。Redis 运行上下文与租约 Adapter 已提供，但当前本地组合根未启用，且它不属于业务事实存储。
 
-UI Refresh Stage 1 只在现有 API 上收敛控制台布局、视觉、响应式和可访问性。PR #2 原型中的模拟 Health、ETA、Graph、Activity、Action Item、Workspace 与用户身份不构成已实现能力；新增后端或领域语义必须另行通过 Spec 对齐。
+前台交付 F1 只在现有 API 上收敛控制台布局、视觉、响应式和可访问性；它与系统实施 Phase 1–4 是两条独立编号轴。PR #2 原型中的模拟 Health、ETA、Graph、Activity、Action Item、Workspace 与用户身份不构成已实现能力；新增后端或领域语义必须另行通过 Spec 对齐。
