@@ -35,6 +35,15 @@
 | KF-SYS-029 | AC-SEC-004 | Implemented | `.env.example` + `package.json` + `web/app.js` | `tests/contract/site.test.ts` + `tests/integration/server.test.ts` |
 | KF-SYS-030 | AC-ARCH-003 | Implemented | `docs/REPOSITORY-MIGRATION.md` + `specs/adr/ADR-009-repository-split.md` | `tests/contract/component-layout.test.ts` |
 | KF-SYS-031 | AC-ARCH-004 | Implemented | `src/domain/services` + `src/application/apps` + `src/interfaces/ui-api` + `src/infrastructure/persistence/redis` | `tests/contract/architecture.test.ts` + `tests/unit/ddd-domain-services.test.ts` + `tests/integration/redis-runtime-state.test.ts` |
+| KF-SYS-032 | AC-API-001 | Planned | — | — |
+| KF-SYS-033 | AC-API-002 | Planned | — | — |
+| KF-SYS-034 | AC-API-003 | Planned | — | — |
+| KF-SYS-035 | AC-API-004 | Planned | — | — |
+| KF-SYS-036 | AC-API-005 | Planned | — | — |
+| KF-SYS-037 | AC-API-006 | Planned | — | — |
+| KF-SYS-038 | AC-API-007 | Planned | — | — |
+| KF-SYS-039 | AC-API-008 | Partial | `src/application/services/workflow-control.ts` + `src/interfaces/runner/console-read-model.ts` + `web/app.js` | `tests/integration/server.test.ts` + `tests/acceptance/automated-langgraph-flow.test.ts` |
+| KF-SYS-040 | AC-API-009 | Planned | — | — |
 | KF-UI-001 | AC-UI-001 | Implemented | `web/app.js` + `src/interfaces/runner/server.ts` | `tests/contract/site.test.ts` + `tests/integration/server.test.ts` |
 | KF-UI-002 | AC-UI-002 | Implemented | `web/app.js` + `src/interfaces/runner/console-read-model.ts` | `tests/contract/site.test.ts` + `tests/integration/server.test.ts` |
 | KF-UI-003 | AC-UI-003 | Implemented | `src/application/services/automated-project-workflow.ts` + `web/app.js` | `tests/acceptance/automated-langgraph-flow.test.ts` + `tests/contract/site.test.ts` |

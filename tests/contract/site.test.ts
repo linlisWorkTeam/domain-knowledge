@@ -153,6 +153,7 @@ test('UI prototype navigation and frontend spec reflect the reviewed delivery bo
   const prototypeHtml = readFileSync('web/prototype/index.html', 'utf8');
   const prototypeScript = readFileSync('web/prototype/app.js', 'utf8');
   const frontendSpec = readFileSync('specs/04-product/frontend-product-design.md', 'utf8');
+  const httpApiSpec = readFileSync('specs/10-interfaces/http-api.md', 'utf8');
 
   for (const label of ['工作区', '操作中心', '飞轮运行', '知识', '图谱', '质量', '评测', '来源']) {
     assert.ok(prototypeHtml.includes(`>${label}<`), `prototype navigation misses Chinese label: ${label}`);
@@ -162,9 +163,10 @@ test('UI prototype navigation and frontend spec reflect the reviewed delivery bo
   assert.match(prototypeScript, /titles=\['操作中心','飞轮运行','知识','图谱探索'\]/);
   assert.match(frontendSpec, /### 前台交付 F1：/);
   assert.match(frontendSpec, /### 系统实施 Phase 1：/);
-  assert.match(frontendSpec, /\| `GET \/api\/v1\/status` \| Implemented \|/);
-  assert.match(frontendSpec, /\| `GET \/api\/v1\/knowledge\/:versionId\/lineage` \| Planned \|/);
-  assert.match(frontendSpec, /\| 从 `GET \/api\/v1\/runs` 派生治理队列 \| Partial \|/);
+  assert.match(frontendSpec, /Preview HTTP API 规范/);
+  assert.match(httpApiSpec, /\| `GET \/api\/v1\/system\/status` \| Available \/ Rename \|/);
+  assert.match(httpApiSpec, /\| `GET \/api\/v1\/knowledge\/:versionId\/lineage` \| Planned \|/);
+  assert.match(httpApiSpec, /第一阶段 Action Center 只能从 `FAILED`、`LOW_CONFIDENCE`/);
 });
 
 test('site and Console expose the embedded workflow boundary and prompt-only Agent customization', () => {

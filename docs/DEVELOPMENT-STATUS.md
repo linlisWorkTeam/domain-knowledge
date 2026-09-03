@@ -43,10 +43,11 @@ This file is the single entry point for project-level development status, curren
 - 固定七 Agent 拓扑、并行、迭代、取消、Checkpoint、运行契约和配置快照已经通过自动化验证。
 - deterministic fixture 可以完成失败、修订、重新生成、评测和发布闭环。
 - 前台 F1 已基于现有 API 完成八入口中文 Console、绿色双主题、响应式、可访问性和真实数据状态；没有新增或修改后端 API。
+- 前台后续页面缺口和 Preview API 破坏性迁移已统一写入 `specs/10-interfaces/http-api.md`；当前仅为 Accepted 目标契约，所有 `Planned` 与新路径均未实现，不改变 DEV-005 的下一任务顺序。
 - DeepSeek Harness live Adapter 已存在；公司 CodeAgent CLI 尚未接入。
 - 真实 Agent 质量、公司环境容量、长期稳定性和敌对代码执行安全尚未形成验收结论。
 
-需求级统计以追踪矩阵当前内容为准：`Implemented 41 / Partial 15 / Planned 6`。
+需求级统计以追踪矩阵当前内容为准：`Implemented 41 / Partial 16 / Planned 14`。
 
 ## 里程碑与工作项
 
@@ -57,11 +58,16 @@ This file is the single entry point for project-level development status, curren
 | DEV-003 | 固定七 Agent LangGraph 编排、Checkpoint 与确定性闭环 | Done | `tests/integration/langgraph-infrastructure.test.ts`、`tests/acceptance/automated-langgraph-flow.test.ts` |
 | DEV-004 | AgentCommand/AgentResult、Run 配置冻结与框架机械能力测评 | Done | [框架阶段性测评](report/框架阶段性测评.md)，结果 `6/6 ACCEPTED` |
 | DEV-UI-001 | 前台 F1 Knowledge Console | Done | `tests/contract/site.test.ts`、`tests/e2e/console.spec.ts`；只复用现有 API |
+| DEV-UI-002 | 前台 F2 最终七页面、真实 Graph 与 HCP-1 | Planned | 与 DEV-010 B1 可并行；B2/B3 前台接线必须等待 HCP-1 通过 |
 | DEV-005 | 公司 CodeAgent CLI Adapter 与契约验证 | Ready / Next | 尚未实现；见下方完成标准 |
 | DEV-006 | 公司 CodeAgent 七角色真实闭环与效果基线 | Planned | 依赖 DEV-005 |
 | DEV-007 | TestGen 候选测试的通用 Oracle 验证与门禁链路 | Planned | 对应 `KF-SYS-004` |
 | DEV-008 | 四点崩溃注入、完整权限拒绝审计与恢复加固 | Planned | 对应 `AC-REC-001`、`AC-SEC-002` |
 | DEV-009 | 生产容量、认证续期、并发与 Redis 启用决策 | Planned | 依赖真实运行数据，不改变 Registry 事实源地位 |
+| DEV-010 | Console B1 Preview API 基线迁移 | Planned | 11 个旧接口资源化迁移，统一分页、错误、认证、幂等和 revision |
+| DEV-011 | Console B2 Action Center 与 Runs 完整控制面 | Planned | Action Item、progress/retry/SSE、组件健康、Activity 与 Graph 实时更新 |
+| DEV-012 | Console B3 Knowledge、Evaluations 与 Sources | Planned | 血缘/Diff、Evaluation 读模型与规则、Source Registry、Knowledge Health |
+| DEV-013 | Console B4 运营面加固 | Planned | Provider status、指标口径、SSE 容量和大数据查询验收 |
 
 状态含义：`Ready / Next` 表示下一项已排序但尚未开始；`In Progress` 表示已有活动开发分支；`Blocked` 必须写明外部依赖；`Done` 必须给出可复验结果。
 

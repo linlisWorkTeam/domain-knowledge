@@ -39,6 +39,15 @@
 | AC-E2E-001 | Given 固定 commit 且基线门禁通过的 ohMyWorkPanel 源码，When 在仓库外隔离副本运行两轮知识驱动再生成，Then 首轮真实测试失败并形成带证据 Correction，第二轮 fresh 生成通过前端全测、生产构建与 Rust 全测，最终只发布第二版且 run 审计包含全部节点、评测与发布证据。 |
 | AC-E2E-002 | Given 固定 ohMyWorkPanel 场景，When 内嵌 LangGraph 执行全部 Agent、一次失败迭代和真实项目评测，Then 同一 runId 下保留七类节点投影、两版知识 lineage、PASS decision 和唯一 publication receipt。 |
 | AC-E2E-003 | Given 配置好的 DeepSeek Harness AgentProvider 与固定 ohMyWorkPanel commit，When 运行自动治理并从 Agent 输出错误恢复，Then 七类 live Agent 输出均经过 Schema 校验、调用摘要脱敏、质量反馈自动迭代，最终行为证据与发布仍由 Knowledge Gate 决定。 |
+| AC-API-001 | Given Preview API 迁移变更，When 扫描 Server、Console、DSH Adapter、测试和文档并执行契约测试，Then 只存在规范资源路径，旧 HTTP 路由返回 404，内部 transition/evaluate/publish 不可通过 HTTP 调用。 |
+| AC-API-002 | Given 来自 Run、Evaluation、Source 或安全事件的相同问题，When 重放事件并处理 Action Item，Then 开放事项按 fingerprint 去重，合法动作追加审计，重复 Command 幂等，既有 GateDecision 和 publication 字节不变。 |
+| AC-API-003 | Given 固定与不可预知两种 Run plan，When 查询进度、重试并中断后续传事件，Then 固定计划返回可重建 completed/total，不可预知计划不返回虚假百分比或 ETA，重试语义合法且 SSE 不重不漏。 |
+| AC-API-004 | Given 组件故障、无健康样本和跨 Run 事件，When 查询组件、Activity 和 Knowledge Health，Then 状态含采样时间与 reason code，健康指标含分子/分母/窗口/规则版本，无样本返回 unavailable。 |
+| AC-API-005 | Given 多版知识及其 Run、Correction、Evaluation 和 publication，When 查询 lineage 与 diff，Then 双向链接完整、Diff 范围可验证且能反向定位对应运行和证据。 |
+| AC-API-006 | Given 跨 Run Evaluation 和规则修订，When 查询报告、下载授权证据并更新规则，Then 原报告不可变、秘密不泄露、过期 revision 冲突、新 revision 只影响后续评测且全程可审计。 |
+| AC-API-007 | Given 扫描候选、合法来源和越界/漂移来源，When 创建、修改和刷新 Source，Then 只有通过访问校验的候选被持久化，revision 固定，越界默认拒绝，状态和关联统计可复验。 |
+| AC-API-008 | Given 一个含并行、迭代和失败 attempt 的 Run，When 打开 Graph 并选择节点，Then 固定七 Agent 的节点与依赖边稳定，状态、iteration、attempt、时间、ArtifactRef 和错误摘要来自 Registry 投影；刷新和 SSE 续传后状态一致，且页面不能读取 checkpoint、修改拓扑或人工推进节点。 |
+| AC-API-009 | Given Provider 可用、未认证、过期和故障状态，When 打开 Agent Settings，Then 返回稳定状态、模型、检查时间和受控原因，不返回凭据/Session/Prompt，也不能修改固定 Agent 契约。 |
 
 ## P1 内容质量验收
 
@@ -61,6 +70,28 @@ UI 验收场景的规范正文以[前台产品设计的 AC-UI-001 至 AC-UI-019]
 - 页面不得加载第三方字体、脚本或样式，不得因视觉改版放宽 Content Security Policy。
 - API 空结果、部分失败和完全失败必须进入 Empty、Partial 或 Error 状态，不得回退到模拟 Health、ETA、Graph、Action Item、Activity、Workspace 或用户身份。
 - 浏览器契约入口为 `npm run test:ui`，使用临时 Registry 和 Chromium 验证上述前台门禁，不复用开发者正在运行的工作目录或服务数据。
+
+## Preview HTTP API 迁移验收门
+
+规范性目标路由和页面缺口以 [Preview HTTP API 规范](../10-interfaces/http-api.md)为准。开始实现任一 `Available / Rename`、`Available / Redefine` 或 `Planned` 接口时，必须同时满足：
+
+- Server、Console、DSH Adapter、契约测试和文档使用同一条规范路径，不保留 Preview 旧路由别名；
+- 简单知识查询收敛到 `GET /api/v1/knowledge?q=...`，不得重新增加 `/knowledge/query` 或根级 `/query`；
+- 公共 HTTP 不暴露 transition、evaluate、publish 等内部 Application App；
+- 列表分页、Command 幂等、认证错误分类、reason code 和审计关联符合通用约束；
+- 未实现能力在前台保持 Static Preview、Partial、Disabled 或 Planned 表达，不得通过假响应通过验收。
+
+## HCP-1 最终页面与 API 边界人工检查门
+
+F2 可访问环境和 B1 API 迁移 diff 都已准备后、B2/B3 前台接线开始前，产品用户必须完成一次人工检查：
+
+- 七个最终页面均可导航，桌面、移动端、深色和浅色主路径可验收；
+- Action Center 的治理入口、Runs 的业务/执行状态、Knowledge Preview、Evaluations/Sources 的 Partial 边界和 Agent Settings 的可编辑范围表达正确；
+- Graph 展示选定 Run 的真实固定 Agent 拓扑与节点投影，不是 Knowledge Graph，不读取 checkpoint，也没有编辑拓扑或人工推进节点的控件；
+- 每个动态区域都能指出服务端 API、公开派生规则或明确未接状态，任何失败路径都不回退到演示数据；
+- B1 新旧路由映射、删除范围以及 Console/DSH Adapter/测试同步修改边界获得确认。
+
+验收记录必须包含结论 `Accepted`、`Accepted with follow-ups` 或 `Rework required`，以及临时环境地址、桌面/移动端与双主题证据、数据来源/禁用能力清单、Graph 来源说明和自动化结果。只有前两种结论允许开始 B2/B3 前台接线；follow-up 不得改变已冻结的信息架构或 API 契约。
 
 ## P0-A Review 清单
 

@@ -11,12 +11,34 @@
 | `EvaluationReport` | reportId, inputRefs, toolchainFingerprint, criticalResults, testSummary, stability | 原始证据不可被 Agent 修改。 |
 | `Correction` | correctionId, knowledgePath, criterion, evidenceRefs[] | 三字段均非空；只能由 Review 输出、DocGen 消费。 |
 | `GateDecision` | decisionId, outcome, reasonCodes[], evidenceRefs[] | outcome 由确定性策略计算。 |
+| `ActionItem` | actionItemId, type, severity, status, fingerprint, subjectRefs[], evidenceRefs[], createdAt | 由服务端事实确定性产生；相同 fingerprint 的开放事项不得重复；处理动作只追加历史。 |
+| `Source` | sourceId, kind, locator, revision, status, accessPolicyRef, lastSyncAt | locator 与凭据分离；revision 可复验；刷新不直接产生 VERIFIED 知识。 |
+| `EvaluationRule` | ruleId, revision, scope, config, enabled | revision 不可变；修改创建新 revision，不覆盖历史评测所引用的版本。 |
+
+`RunProgress`、`SystemComponentHealth`、`ActivityEntry`、`KnowledgeHealthSnapshot`、`EvaluationSummary` 和 `WorkflowGraphProjection` 是从上述聚合、固定 Agent 定义、节点投影、事件与审计记录生成的只读投影，不是新的写侧事实源。
 
 ## 枚举
 
 - RunState：`CREATED, PLANNED, GENERATING, EVALUATING, REVIEWING, ITERATING, ROLLING_BACK, PUBLISHING, VERIFIED, LOW_CONFIDENCE, FAILED, CANCELLED`。
 - GateOutcome：`PASS, ITERATE, ROLLBACK, STOPPED`。
 - KnowledgeStatus：`CANDIDATE, VERIFIED, LOW_CONFIDENCE, SUPERSEDED`。
+- ActionItemStatus：`OPEN, ACKNOWLEDGED, RESOLVED, DISMISSED`。
+- ActionItemSeverity：`LOW, MEDIUM, HIGH, CRITICAL`。
+- SourceStatus：`ACTIVE, DEGRADED, STALE, DISABLED`。
+
+## Console 最终能力的所有权与计算规则
+
+| 能力 | 权威输入 | 规则 |
+|---|---|---|
+| Action Item | Run、GateDecision、EvaluationReport、AccessDenied、Source 状态 | 产生规则由 Domain Service 版本化；resolve/dismiss 不删除原始证据。 |
+| Run progress | 冻结 Run plan、节点投影、attempt | `completedUnits / totalUnits` 只统计启动时可枚举的工作单元；重试增加 attempt，不增加 completedUnits；未知总量返回阶段而非百分比。 |
+| ETA | 同 profile 的历史完成样本 | 样本不足、执行计划变化或重试中返回 `null`；前台不得自行估算。 |
+| Activity | 领域事件与审计事件 | 按 `(occurredAt, eventId)` 稳定排序，依据调用者权限过滤。 |
+| Knowledge Health | KnowledgeVersion、Source、EvaluationReport | 每个指标必须返回 numerator、denominator、窗口、样本时间与规则版本；无分母返回 unavailable，不返回 0。 |
+| Evaluation 列表 | 不可变 EvaluationReport 与 GateDecision | 读模型不得修改原报告；Rule revision 必须可回溯。 |
+| Source health | Source revision、刷新任务和访问结果 | 扫描候选只有持久化并验证访问边界后才成为 Source。 |
+| Agent 工作流执行图 | 固定 Agent 定义、WorkflowNodeProjection、FlywheelRun 与事件 | `WorkflowGraphProjection` 按 runId 组合固定节点/边、运行与工作流状态、iteration、attempt、当前节点、最新 eventSeq 和 sampledAt；不得读取 checkpoint 或成为第二执行状态源。 |
+| Provider status | Provider Adapter 的受控探针 | 只暴露 available/auth state/model/checkedAt/reasonCode，不暴露 token、session 或 Prompt。 |
 
 ## 领域事件
 

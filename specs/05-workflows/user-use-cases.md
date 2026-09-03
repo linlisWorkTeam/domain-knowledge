@@ -393,7 +393,7 @@ sequenceDiagram
 - UC-KF-003 通过“操作中心、运行、治理”呈现。操作中心和治理页当前只从 Run 状态与最新 GateDecision 派生 Run 级事项，不承诺独立问题实体、严重级别或关闭生命周期。
 - UC-KF-006 通过“智能体”和 Run 工作台呈现，固定契约与可编辑的 `promptAddon` 必须分区，WorkflowNodeProjection 与 FlywheelRun 状态必须分开标注。
 - “发现”页面只读取 `GET /api/v1/scan` 的来源候选；它不是持久化来源注册表，也不提供刷新、漂移治理或来源删除语义。
-- 产品 UI 不得调用 `/api/v1/transition`、`/api/v1/evaluate` 或 `/api/v1/publish` 模拟自动工作流。未实现的 Graph、Health、Activity、ETA 和 Action Item 能力必须隐藏或明确标记为尚未接入，不能回退到演示数据。
+- 产品 UI 不得调用 `/api/v1/transition`、`/api/v1/evaluate` 或 `/api/v1/publish` 模拟自动工作流。Graph 必须使用 Registry 中的真实节点投影；未实现的 Health、Activity、ETA 和 Action Item 能力必须隐藏或明确标记为尚未接入，不能回退到演示数据。
 
 ## 当前实现边界
 
