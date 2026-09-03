@@ -81,6 +81,18 @@ UI 验收场景的规范正文以[前台产品设计的 AC-UI-001 至 AC-UI-019]
 - 列表分页、Command 幂等、认证错误分类、reason code 和审计关联符合通用约束；
 - 未实现能力在前台保持 Static Preview、Partial、Disabled 或 Planned 表达，不得通过假响应通过验收。
 
+## HCP-1 最终页面与 API 边界人工检查门
+
+F2 可访问环境和 B1 API 迁移 diff 都已准备后、B2/B3 前台接线开始前，产品用户必须完成一次人工检查：
+
+- 七个最终页面均可导航，桌面、移动端、深色和浅色主路径可验收；
+- Action Center 的治理入口、Runs 的业务/执行状态、Knowledge Preview、Evaluations/Sources 的 Partial 边界和 Agent Settings 的可编辑范围表达正确；
+- Graph 展示选定 Run 的真实固定 Agent 拓扑与节点投影，不是 Knowledge Graph，不读取 checkpoint，也没有编辑拓扑或人工推进节点的控件；
+- 每个动态区域都能指出服务端 API、公开派生规则或明确未接状态，任何失败路径都不回退到演示数据；
+- B1 新旧路由映射、删除范围以及 Console/DSH Adapter/测试同步修改边界获得确认。
+
+验收记录必须包含结论 `Accepted`、`Accepted with follow-ups` 或 `Rework required`，以及临时环境地址、桌面/移动端与双主题证据、数据来源/禁用能力清单、Graph 来源说明和自动化结果。只有前两种结论允许开始 B2/B3 前台接线；follow-up 不得改变已冻结的信息架构或 API 契约。
+
 ## P0-A Review 清单
 
 `AC-SPEC-001` 还检查：accepted 文件无阻塞性占位标记；Schema 通过 Draft 2020-12 元校验且 `$id` 唯一；跨文件 `$ref` 可从同一 registry 解析；每个 Agent 角色的合法/非法 fixture 分别通过/失败；权限矩阵无空单元格；状态全集与转换目标一致；Domain 禁止 SDK/语言类型；全部 P0 有场景。可重复的基础校验入口为 `npm run validate:specs`。P0-A 通过是创建独立 P0-B Spike 的前置条件，不代表 Spike 已通过或生产可用。

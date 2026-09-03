@@ -1,6 +1,6 @@
 # 知识飞轮前台产品设计
 
-**状态：Accepted；前台交付 F1 与固定 ohMyWorkPanel 自动路径已实现｜版本：0.4.4｜日期：2026-09-03**
+**状态：Accepted；前台交付 F1 与固定 ohMyWorkPanel 自动路径已实现｜版本：0.5.0｜日期：2026-09-03**
 
 本文定义 domain-knowledge 知识飞轮控制台的用户体验、信息架构、交互边界、接口需求和验收标准。领域状态、门禁、安全和发布语义以同仓库的[规范总入口](../README.md)为准；前台不得创造第二套状态或发布权威。
 
@@ -524,6 +524,41 @@ sequenceDiagram
 - 优先交付操作中心、运行、知识、治理、证据、智能体、发现和设置；缺失服务端能力不以演示数据替代。
 - 用契约测试验证自然中文、双主题、同源资源、键盘可达、状态真实性和移动端关键路径。
 - 本阶段不得修改 Domain、Application App、HTTP API 或 JSON Schema；若视觉需求触发这些变化，必须先形成独立 Spec 对齐。
+
+### 前台交付 F2：最终七页面与真实 Graph
+
+- 生产导航收敛为 Action Center、Flywheel Runs、Knowledge、Graph、Evaluations、Sources、Agent Settings 七个页面。
+- 七页必须完成最终布局、深浅主题、响应式、键盘路径以及 Loading/Empty/Error/Partial/Disabled 状态；未接 API 不得以演示数据或假成功代替。
+- Graph 必须基于选定 Run 的固定 Agent 定义、WorkflowNodeProjection、workflow status 和事件实现真实轮询版，并允许查看节点 attempt、时间、ArtifactRef 与受控错误摘要。
+- Knowledge 只承诺查询、详情与反馈 Preview；Lineage/Diff 保留禁用入口，Add curated knowledge 不进入本阶段。
+
+### HCP-1：F2 与 B1 人工检查点
+
+F2 可访问验收环境和 B1 API 迁移 diff 就绪后，进入 B2/B3 并行开发前必须由产品用户人工检查。检查范围包括七页信息架构、目标视觉一致性、Graph 的 Agent 工作流语义、真实/派生/未接数据标识、危险动作位置，以及新旧 API 映射。
+
+检查结果只允许：
+
+- `Accepted`：页面结构和 API 边界冻结，可以进入 B2/B3。
+- `Accepted with follow-ups`：仅有不改变结构和契约的小型视觉问题，记录明确任务后继续。
+- `Rework required`：页面分类、Graph 语义、核心操作或数据真实性不成立，阻止 B2/B3 前台接线。
+
+人工检查不替代自动化门禁。提交方必须同时提供公网临时环境、桌面/移动端与双主题证据、逐区域数据来源表、Disabled/Partial 清单、Graph 节点来源说明、B1 路由映射和自动化结果。
+
+### 前台交付 F3：核心控制面接线
+
+- Action Center 接入真实 Action Item、组件健康和 Activity，允许受控 Resolve、Retry 与 Regenerate。
+- Flywheel Runs 接入可信 progress、retry 和 SSE；Graph 从轮询升级为可断线续传的实时节点图。
+- Knowledge Health 等依赖 B3 数据的指标仍保持 Partial，不得为了完成 F3 提前虚构口径。
+
+### 前台交付 F4：内容与质量面接线
+
+- Knowledge 接入 Lineage 与 Diff；Evaluations 接入独立列表、详情、Evidence 和 Rule revision；Sources 接入 Registry、状态和 Refresh。
+- Knowledge、Evaluations 与 Sources 的基础事实稳定后接入 Knowledge Health，并展示分子、分母、窗口、采样时间与规则版本。
+
+### 前台交付 F5：运营与 DFX 完成
+
+- Agent Settings 接入真实 Provider status。
+- 所有列表、实时连接和高风险操作通过容量、恢复、分页、权限、审计和移动端最终验收；此时才可以移除相应 Preview/Partial/Disabled 标识。
 
 ### 系统实施 Phase 1：架构与事实源收敛
 

@@ -170,8 +170,10 @@ Graph 页面是选定 Run 的只读 Agent 工作流执行图，不是 Knowledge 
 | 阶段 | 后台能力 | 完成出口 |
 |---|---|---|
 | B1 API 基线 | 11 个旧接口的资源化迁移；分页、错误、认证、幂等、revision 通用契约 | 旧 HTTP 路由全部删除，Server、Console、DSH Adapter、测试和文档只引用新路径。 |
-| B2 核心控制面 | Action Item；Run progress/retry/SSE；组件健康、Activity、Knowledge Health；Graph 实时更新 | Action Center、Flywheel Runs 和 Agent 工作流执行图不依赖模拟或浏览器私有状态即可完成查看、治理、重试和断线恢复。 |
-| B3 内容与质量面 | Knowledge lineage/diff；Evaluation 读模型与规则；Source Registry | Knowledge、Evaluations、Sources 的列表、详情、筛选、证据和允许动作全部来自服务端事实。 |
+| B2 核心控制面 | Action Item；Run progress/retry/SSE；组件健康与 Activity；Graph 实时更新 | Action Center、Flywheel Runs 和 Agent 工作流执行图不依赖模拟或浏览器私有状态即可完成查看、治理、重试和断线恢复。 |
+| B3 内容与质量面 | Knowledge lineage/diff；Evaluation 读模型与规则；Source Registry；Knowledge Health | Knowledge、Evaluations、Sources 的列表、详情、筛选、证据和允许动作全部来自服务端事实，健康指标具备完整输入和计算口径。 |
 | B4 运营面 | Provider status；指标口径、SSE 容量和大数据查询加固 | Agent Settings 显示真实 Provider 状态，全部列表与实时连接通过容量、恢复、分页和权限验收。 |
 
 B1–B4 共包含 11 个现有接口迁移/扩展和 24 个唯一 Planned HTTP 接口；Graph 表重复引用 Run event-stream，不重复计数。阶段可以拆分 PR，但不得在某阶段完成前把对应页面状态从 Preview/Partial/Disabled 提升为 Available。
+
+B1 与 F2 可以并行，但进入 B2/B3 前必须通过前台产品设计定义的 HCP-1。HCP-1 冻结页面信息架构、Graph 语义和 API 边界；不替代本规范的自动化迁移验收门。
