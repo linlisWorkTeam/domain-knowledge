@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wpknowledge.local/schemas/evaluation-summary/v1",
+  "title": "Evaluation Summary",
+  "type": "object",
+  "required": ["evaluationId", "runId", "moduleId", "versionId", "status", "gate", "reasonCodes", "tests", "stability", "toolchainFingerprint", "ruleRef", "createdAt", "links"],
+  "properties": {
+    "evaluationId": { "type": "string", "minLength": 1 },
+    "runId": { "type": "string", "minLength": 1 },
+    "moduleId": { "type": "string", "minLength": 1 },
+    "versionId": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["PASSED", "FAILED", "ERROR"] },
+    "gate": { "enum": ["PASS", "ITERATE", "STOPPED"] },
+    "reasonCodes": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+    "tests": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["passed", "total", "criticalFailures"],
+      "properties": {
+        "passed": { "type": "integer", "minimum": 0 },
+        "total": { "type": "integer", "minimum": 0 },
+        "criticalFailures": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "stability": { "type": "number", "minimum": 0, "maximum": 1 },
+    "toolchainFingerprint": { "type": "string", "minLength": 1 },
+    "ruleRef": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["ruleId", "revision"],
+          "properties": {
+            "ruleId": { "type": "string", "minLength": 1 },
+            "revision": { "type": "integer", "minimum": 1 }
+          }
+        }
+      ]
+    },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "links": { "type": "object" },
+    "report": { "type": "object" },
+    "decision": { "type": "object" },
+    "immutable": { "type": "boolean" }
+  },
+  "additionalProperties": false
+}

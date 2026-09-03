@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wpknowledge.local/schemas/source/v1",
+  "title": "Registered Source",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["sourceId", "kind", "project", "displayName", "locator", "revision", "observedRevision", "status", "credentialConfigured", "accessPolicyRef", "recordRevision", "lastSyncAt", "lastErrorCode", "drift", "knowledge", "createdAt", "updatedAt"],
+  "properties": {
+    "sourceId": { "type": "string", "pattern": "^src_[a-f0-9]{24}$" },
+    "kind": { "enum": ["FILE", "HTTPS"] },
+    "project": { "type": "string", "minLength": 1 },
+    "displayName": { "type": "string", "minLength": 1 },
+    "locator": { "type": "string", "minLength": 1 },
+    "revision": { "type": "string", "minLength": 1 },
+    "observedRevision": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["ACTIVE", "DEGRADED", "STALE", "DISABLED"] },
+    "credentialConfigured": { "type": "boolean" },
+    "accessPolicyRef": { "type": "string", "minLength": 1 },
+    "recordRevision": { "type": "integer", "minimum": 1 },
+    "lastSyncAt": { "type": ["string", "null"], "format": "date-time" },
+    "lastErrorCode": { "type": ["string", "null"] },
+    "drift": { "type": ["object", "null"] },
+    "knowledge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["total", "verified", "candidate", "lowConfidence", "superseded"],
+      "properties": {
+        "total": { "type": "integer", "minimum": 0 },
+        "verified": { "type": "integer", "minimum": 0 },
+        "candidate": { "type": "integer", "minimum": 0 },
+        "lowConfidence": { "type": "integer", "minimum": 0 },
+        "superseded": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "updatedAt": { "type": "string", "format": "date-time" }
+  }
+}

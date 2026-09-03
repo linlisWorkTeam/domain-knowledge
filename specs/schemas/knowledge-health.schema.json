@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wpknowledge.local/schemas/knowledge-health/v1",
+  "title": "Knowledge Health Snapshot",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["window", "sampledAt", "ruleVersion", "overall", "metrics"],
+  "properties": {
+    "window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "start", "end"],
+      "properties": {
+        "key": { "enum": ["24h", "7d", "30d"] },
+        "start": { "type": "string", "format": "date-time" },
+        "end": { "type": "string", "format": "date-time" }
+      }
+    },
+    "sampledAt": { "type": "string", "format": "date-time" },
+    "ruleVersion": { "const": "knowledge-health-v1" },
+    "overall": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "value", "unit"],
+      "properties": {
+        "status": { "enum": ["available", "unavailable"] },
+        "value": { "type": ["number", "null"], "minimum": 0, "maximum": 100 },
+        "unit": { "const": "score-out-of-100" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "unavailable" } }, "required": ["status"] },
+          "then": { "properties": { "value": { "const": null } } }
+        }
+      ]
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["freshness", "coverage", "quality"],
+      "properties": {
+        "freshness": { "$ref": "#/$defs/metric" },
+        "coverage": { "$ref": "#/$defs/metric" },
+        "quality": { "$ref": "#/$defs/metric" }
+      }
+    }
+  },
+  "$defs": {
+    "metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "value", "numerator", "denominator", "unit", "window", "sampledAt", "ruleVersion"],
+      "properties": {
+        "status": { "enum": ["available", "unavailable"] },
+        "value": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "numerator": { "type": ["integer", "null"], "minimum": 0 },
+        "denominator": { "type": ["integer", "null"], "minimum": 1 },
+        "unit": { "const": "ratio" },
+        "window": { "enum": ["24h", "7d", "30d"] },
+        "sampledAt": { "type": "string", "format": "date-time" },
+        "ruleVersion": { "const": "knowledge-health-v1" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "unavailable" } }, "required": ["status"] },
+          "then": {
+            "properties": {
+              "value": { "const": null },
+              "numerator": { "const": null },
+              "denominator": { "const": null }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "status": { "const": "available" } }, "required": ["status"] },
+          "then": {
+            "properties": {
+              "value": { "type": "number" },
+              "numerator": { "type": "integer" },
+              "denominator": { "type": "integer", "minimum": 1 }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

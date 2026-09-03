@@ -93,6 +93,8 @@ export interface FlywheelRepository {
     createdAt: string;
   }): void;
   status(): Record<string, unknown>;
+  /** Optional versioned policy resolver. Adapters without DEV-008 use the supplied policy unchanged. */
+  resolveEvaluationPolicy?(policy: GatePolicy): GatePolicy;
 }
 
 export interface NodeCheckpoint {

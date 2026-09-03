@@ -10,7 +10,7 @@ import {
 } from '../../../domain/index.ts';
 import type {
   ArtifactRef, DomainEvent, EvaluationReport, FlywheelRun, GateDecision,
-  KnowledgeStatus, KnowledgeVersion,
+  GatePolicy, KnowledgeStatus, KnowledgeVersion,
 } from '../../../domain/index.ts';
 import type {
   AgentId, AgentPromptConfiguration, ArtifactStore, CandidateInput, FlywheelRepository,
@@ -331,6 +331,33 @@ export class SQLiteFlywheelRepository implements FlywheelRepository {
       INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (4, datetime('now'));
       INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (5, datetime('now'));
     `);
+  }
+
+  resolveEvaluationPolicy(policy: GatePolicy): GatePolicy {
+    const table = this.database.prepare(`
+      SELECT 1 AS present FROM sqlite_master WHERE type = 'table' AND name = 'evaluation_rules'
+    `).get() as Record<string, unknown> | undefined;
+    if (!table) return policy;
+    const row = this.database.prepare(`
+      SELECT config_json, enabled FROM evaluation_rules
+      WHERE rule_id = 'publication-gate' ORDER BY revision DESC LIMIT 1
+    `).get() as Record<string, unknown> | undefined;
+    if (!row) return policy;
+    if (Number(row.enabled) !== 1) throw new Error('EVALUATION_RULE_DISABLED: publication-gate');
+    const config = parse<Record<string, unknown>>(row.config_json);
+    // A named custom policy remains authoritative unless a matching managed rule exists.
+    if (config.policyId !== policy.policyId) return policy;
+    const minimumStability = Number(config.minimumStability);
+    const maxIterations = Number(config.maxIterations);
+    assertInvariant(minimumStability >= 0 && minimumStability <= 1, 'evaluation rule minimumStability must be 0..1');
+    assertInvariant(Number.isSafeInteger(maxIterations) && maxIterations >= 0, 'evaluation rule maxIterations must be non-negative');
+    assertInvariant(typeof config.requireAllTests === 'boolean', 'evaluation rule requireAllTests must be boolean');
+    return {
+      policyId: policy.policyId,
+      minimumStability,
+      requireAllTests: config.requireAllTests,
+      maxIterations,
+    };
   }
 
   applyActionItemAction(input: {

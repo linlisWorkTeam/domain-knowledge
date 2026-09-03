@@ -21,3 +21,9 @@ Agent 命令和结果 Schema 已由运行时消费：受信工作流在调用 Pr
 | `run-progress.schema.json` | DEV-006 可证明批次进度 |
 | `activity.schema.json` | DEV-006 跨批次脱敏活动 |
 | `component-status.schema.json` | DEV-006 固定组件健康状态 |
+| `knowledge-lineage.schema.json` | DEV-008 知识版本血缘与反向关系 |
+| `knowledge-diff.schema.json` | DEV-008 结构化 Markdown 差异与范围校验 |
+| `evaluation-summary.schema.json` | DEV-008 跨批次评测读模型 |
+| `evaluation-rule.schema.json` | DEV-008 不可变评测规则 revision |
+| `source.schema.json` | DEV-008 持久化来源注册（不含凭据正文） |
+| `knowledge-health.schema.json` | DEV-008 带口径与样本范围的知识健康度 |

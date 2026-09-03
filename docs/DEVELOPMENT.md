@@ -87,6 +87,7 @@ uiApi / CLI / DSH / Web projection
 | `WP_KNOWLEDGE_HOST` | 覆盖 HTTP 监听地址 |
 | `WP_KNOWLEDGE_PORT` | 覆盖 HTTP 端口 |
 | `WP_KNOWLEDGE_WRITE_TOKEN` | 启用受保护写 API |
+| `WP_SOURCE_ALLOWED_HOSTS` | 允许 Source Registry 访问的 HTTPS host（逗号分隔；默认全部拒绝） |
 
 Redis Adapter 位于 `src/infrastructure/persistence/redis`，对应 `AgentContextStore` 和 `RunningStateStore`。Agent Context 只保存轮次、attempt、ArtifactRef 和路由等可重建状态，单条上限 64 KiB；运行租约使用 ownerId + leaseId 做 fencing。当前本地组合根仍使用 SQLite Checkpoint 和进程内运行表；在 Redis 的地址、认证、TTL、故障语义确定前，不要把它设为业务事实源或绕过 Registry。
 

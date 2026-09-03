@@ -3,7 +3,8 @@ import { readFileSync } from 'node:fs';
 import { delimiter, dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  EvalRunnerApp, FlywheelApp, KnowledgeDiscoveryApp, KnowledgeSearchApp, Orchestrator,
+  ContentGovernanceApp, EvalRunnerApp, FlywheelApp, KnowledgeDiscoveryApp, KnowledgeSearchApp,
+  Orchestrator,
 } from '../../application/apps/index.ts';
 import {
   AGENT_COMMAND_SCHEMA_ID, AGENT_RESULT_SCHEMA_ID, AgentCatalogService,
@@ -21,6 +22,7 @@ import {
 import {
   LocalCasArtifactStore, SQLiteFlywheelRepository,
 } from '../../infrastructure/persistence/sqlite-cas/index.ts';
+import { SQLiteContentGovernance } from '../../infrastructure/persistence/sqlite-content-governance/index.ts';
 import { SourceScanner } from '../../infrastructure/source-scan/index.ts';
 import { LocalAgentWorkspace } from '../../infrastructure/agents/workspace/index.ts';
 import { JsonSchemaAgentContractValidator } from '../../infrastructure/agents/contracts/index.ts';
@@ -110,6 +112,21 @@ export function createComposition(input: {
       service: flywheelApp,
     }),
   });
+  const contentGovernance = new ContentGovernanceApp(new SQLiteContentGovernance({
+    database: repository.database,
+    artifacts,
+    repositoryRoot,
+    configuredRoots: config.acquisition.roots,
+    allowedRemoteHosts: (process.env.WP_SOURCE_ALLOWED_HOSTS ?? '')
+      .split(',').map((host) => host.trim()).filter(Boolean),
+    defaultRule: {
+      policyId: config.publicationGate.policyId,
+      minimumStability: config.publicationGate.minimumStability,
+      requireAllTests: config.publicationGate.requireAllTests,
+      maxIterations: config.publicationGate.maxIterations,
+    },
+    clock: input.clock,
+  }));
   const agents = new AgentCatalogService({
     definitions: DOMAIN_KNOWLEDGE_AGENT_DEFINITIONS,
     repository,
@@ -286,6 +303,7 @@ export function createComposition(input: {
       evalRunner: evalRunnerApp,
       knowledgeSearch: knowledgeSearchApp,
       knowledgeDiscovery: knowledgeDiscoveryApp,
+      contentGovernance,
       orchestrator,
     },
     // Compatibility surface for existing CLI and integrations. New entrypoints use apps.

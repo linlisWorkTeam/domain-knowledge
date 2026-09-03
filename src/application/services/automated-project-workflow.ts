@@ -448,11 +448,38 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
     const documentRef = input.context[contextKey('doc_gen', input.iteration)] as ArtifactRef | undefined;
     if (!documentRef) throw new Error('WORKFLOW_DOC_OUTPUT_MISSING');
     const document = await this.readAgentOutput<DocumentOutput>(documentRef, 'doc-gen', input);
+    const previousReviewRef = input.iteration > 0
+      ? input.context[contextKey('review', input.iteration - 1)] as ArtifactRef | undefined
+      : undefined;
+    let correctionIds: string[] = [];
+    let correctionEvidenceRefs: ArtifactRef[] = [];
+    if (previousReviewRef) {
+      const previousReview = await this.readAgentResult(
+        previousReviewRef,
+        'review',
+        input.runId,
+        this.expectedAgentGenerationKey(input, 'review', input.iteration - 1),
+      );
+      const corrections = previousReview.payload['corrections'];
+      if (Array.isArray(corrections)) {
+        correctionIds = corrections.flatMap((correction) => (
+          correction && typeof correction === 'object'
+            && typeof (correction as Record<string, unknown>).correctionId === 'string'
+            ? [String((correction as Record<string, unknown>).correctionId)]
+            : []
+        ));
+        correctionEvidenceRefs = corrections.flatMap((correction) => {
+          if (!correction || typeof correction !== 'object') return [];
+          const refs = (correction as Record<string, unknown>).evidenceRefs;
+          return Array.isArray(refs) ? refs as ArtifactRef[] : [];
+        });
+      }
+    }
     const checkpoint = await this.flywheel.executeNode({
       runId: input.runId,
       nodeId: input.nodeId,
       generationKey: `${input.runId}:${input.nodeId}:${input.iteration}`,
-      inputRefs: [documentRef],
+      inputRefs: previousReviewRef ? [documentRef, previousReviewRef] : [documentRef],
     }, async () => {
       const candidate = await this.flywheel.ingestCandidate({
         moduleId: scenario.moduleId,
@@ -466,7 +493,14 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
           commit: (input.context.snapshot as ProjectSnapshot).commit,
           pinned: true,
         })),
-        metadata: { workflow: 'embedded-domain-knowledge', iteration: input.iteration },
+        metadata: {
+          workflow: 'embedded-domain-knowledge',
+          iteration: input.iteration,
+          ...(correctionIds.length > 0 ? { correctionIds } : {}),
+          ...(correctionEvidenceRefs.length > 0
+            ? { correctionEvidenceRefs: this.uniqueRefs(correctionEvidenceRefs) }
+            : {}),
+        },
       });
       return [candidate.version.bodyRef];
     });

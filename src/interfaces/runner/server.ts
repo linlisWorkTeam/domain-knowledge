@@ -203,11 +203,16 @@ export function mapHttpError(error: unknown, id = 'req_unknown'): { status: numb
   if (code === 'PAYLOAD_TOO_LARGE') return { status: 413, body: errorBody(code, 'Request payload is too large.', id) };
   if (code === 'METHOD_NOT_ALLOWED') return { status: 405, body: errorBody(code, 'Method not allowed.', id) };
   if (code.endsWith('_NOT_FOUND')) return { status: 404, body: errorBody(code, 'Resource not found.', id) };
+  if (code === 'SOURCE_ACCESS_DENIED') return { status: 403, body: errorBody(code, 'Source access is outside the configured boundary.', id) };
+  if (code === 'SOURCE_ALREADY_EXISTS' || code === 'SOURCE_DELETED') {
+    return { status: 409, body: errorBody(code, message, id) };
+  }
   if (/(?:_ALREADY_RUNNING|_TERMINAL|_CONFLICT)$/.test(code)) {
     return { status: 409, body: errorBody(code, message, id) };
   }
   if (code === 'ACTION_ITEM_RESOLVED') return { status: 409, body: errorBody(code, message, id) };
-  if (code === 'ACTION_NOT_ALLOWED' || code === 'RUN_NOT_RETRYABLE') {
+  if (code === 'ACTION_NOT_ALLOWED' || code === 'RUN_NOT_RETRYABLE'
+    || code === 'SOURCE_DISABLED' || code === 'SOURCE_CREDENTIAL_UNAVAILABLE') {
     return { status: 422, body: errorBody(code, message, id) };
   }
   if (/(?:_INVALID|_DENIED|_REQUIRED|_UNSUPPORTED)$/.test(code)) {
@@ -478,6 +483,30 @@ export function createKnowledgeServer(input: {
         send(response, 200, snapshot);
         return;
       }
+      if (request.method === 'GET' && url.pathname === '/api/v1/knowledge/health') {
+        send(response, 200, composition.apps.contentGovernance.getKnowledgeHealth(
+          url.searchParams.get('window') ?? '30d',
+        ));
+        return;
+      }
+      const knowledgeRelation = url.pathname.match(
+        /^\/api\/v1\/knowledge\/([^/]+)\/(lineage|diff)$/,
+      );
+      if (request.method === 'GET' && knowledgeRelation) {
+        const versionId = decodeURIComponent(knowledgeRelation[1] ?? '');
+        if (knowledgeRelation[2] === 'lineage') {
+          const value = composition.apps.contentGovernance.getKnowledgeLineage(versionId);
+          send(response, value ? 200 : 404,
+            value ?? errorBody('KNOWLEDGE_VERSION_NOT_FOUND', 'Resource not found.', currentRequestId));
+          return;
+        }
+        const against = url.searchParams.get('against');
+        if (!against) throw new Error('ARGUMENT_REQUIRED: against');
+        const value = await composition.apps.contentGovernance.getKnowledgeDiff(versionId, against);
+        send(response, value ? 200 : 404,
+          value ?? errorBody('KNOWLEDGE_VERSION_NOT_FOUND', 'Resource not found.', currentRequestId));
+        return;
+      }
       if (request.method === 'GET' && url.pathname === '/api/v1/knowledge') {
         const statuses = (url.searchParams.get('status') ?? '').split(',').filter(Boolean);
         const q = url.searchParams.get('q') ?? '';
@@ -495,8 +524,80 @@ export function createKnowledgeServer(input: {
         send(response, 200, { agents: composition.apps.orchestrator.listAgents() });
         return;
       }
+      if (request.method === 'GET' && url.pathname === '/api/v1/evaluations') {
+        const filters = Object.fromEntries(
+          ['runId', 'moduleId', 'gate', 'status', 'from', 'to']
+            .map((key) => [key, url.searchParams.get(key)])
+            .filter((entry): entry is [string, string] => entry[1] !== null && entry[1] !== ''),
+        );
+        send(response, 200, keysetPage(
+          composition.apps.contentGovernance.listEvaluations(filters),
+          url,
+          (item) => `${String(item.createdAt)}\0${String(item.evaluationId)}`,
+        ));
+        return;
+      }
+      const evaluationArtifact = url.pathname.match(
+        /^\/api\/v1\/evaluations\/([^/]+)\/artifacts\/([^/]+)$/,
+      );
+      if (request.method === 'GET' && evaluationArtifact) {
+        if (!writeToken) {
+          send(response, 503, errorBody('WRITE_API_DISABLED', 'Set WP_KNOWLEDGE_WRITE_TOKEN to authorize evidence downloads.', currentRequestId, true));
+          return;
+        }
+        if (!authorized(request, writeToken)) {
+          send(response, 401, errorBody('UNAUTHORIZED', 'A valid Bearer token is required.', currentRequestId));
+          return;
+        }
+        const evaluationId = decodeURIComponent(evaluationArtifact[1] ?? '');
+        const artifactId = decodeURIComponent(evaluationArtifact[2] ?? '');
+        const value = await composition.apps.contentGovernance.getEvaluationArtifact(evaluationId, artifactId);
+        if (!value) {
+          send(response, 404, errorBody('EVALUATION_ARTIFACT_NOT_FOUND', 'Resource not found.', currentRequestId));
+          return;
+        }
+        response.setHeader('content-disposition', 'attachment; filename="evaluation-evidence"');
+        send(response, 200, Buffer.from(value.bytes), value.ref.mediaType);
+        return;
+      }
+      const evaluationArtifacts = url.pathname.match(/^\/api\/v1\/evaluations\/([^/]+)\/artifacts$/);
+      if (request.method === 'GET' && evaluationArtifacts) {
+        const evaluationId = decodeURIComponent(evaluationArtifacts[1] ?? '');
+        const value = composition.apps.contentGovernance.listEvaluationArtifacts(
+          evaluationId,
+          authorized(request, writeToken),
+        );
+        send(response, value ? 200 : 404,
+          value ?? errorBody('EVALUATION_NOT_FOUND', 'Resource not found.', currentRequestId));
+        return;
+      }
+      const evaluationDetail = url.pathname.match(/^\/api\/v1\/evaluations\/([^/]+)$/);
+      if (request.method === 'GET' && evaluationDetail) {
+        const evaluationId = decodeURIComponent(evaluationDetail[1] ?? '');
+        const value = composition.apps.contentGovernance.getEvaluation(evaluationId);
+        send(response, value ? 200 : 404,
+          value ?? errorBody('EVALUATION_NOT_FOUND', 'Resource not found.', currentRequestId));
+        return;
+      }
+      if (request.method === 'GET' && url.pathname === '/api/v1/evaluation-rules') {
+        send(response, 200, page(composition.apps.contentGovernance.listEvaluationRules(), url));
+        return;
+      }
+      const evaluationRuleDetail = url.pathname.match(/^\/api\/v1\/evaluation-rules\/([^/]+)$/);
+      if (request.method === 'GET' && evaluationRuleDetail) {
+        const ruleId = decodeURIComponent(evaluationRuleDetail[1] ?? '');
+        const value = composition.apps.contentGovernance.getEvaluationRule(ruleId);
+        send(response, value ? 200 : 404,
+          value ?? errorBody('EVALUATION_RULE_NOT_FOUND', 'Resource not found.', currentRequestId));
+        return;
+      }
       if (request.method === 'GET' && url.pathname.startsWith('/api/v1/knowledge/')) {
-        const versionId = decodeURIComponent(url.pathname.slice('/api/v1/knowledge/'.length));
+        const encodedVersionId = url.pathname.slice('/api/v1/knowledge/'.length);
+        if (!encodedVersionId || encodedVersionId.includes('/')) {
+          send(response, 404, errorBody('NOT_FOUND', 'Resource not found.', currentRequestId));
+          return;
+        }
+        const versionId = decodeURIComponent(encodedVersionId);
         const value = await composition.apps.knowledgeSearch.get(versionId);
         send(response, value ? 200 : 404, value ?? errorBody('NOT_FOUND', 'Resource not found.', currentRequestId));
         return;
@@ -507,6 +608,72 @@ export function createKnowledgeServer(input: {
           composition.config.acquisition.maxCandidates,
         ));
         return;
+      }
+      if (request.method === 'GET' && url.pathname === '/api/v1/sources') {
+        const filters = Object.fromEntries(
+          ['kind', 'type', 'status', 'project']
+            .map((key) => [key, url.searchParams.get(key)])
+            .filter((entry): entry is [string, string] => entry[1] !== null && entry[1] !== ''),
+        );
+        send(response, 200, keysetPage(
+          composition.apps.contentGovernance.listSources(filters),
+          url,
+          (item) => `${String(item.updatedAt)}\0${String(item.sourceId)}`,
+        ));
+        return;
+      }
+      const sourceDetail = url.pathname.match(/^\/api\/v1\/sources\/([^/]+)$/);
+      if (request.method === 'GET' && sourceDetail) {
+        const sourceId = decodeURIComponent(sourceDetail[1] ?? '');
+        const value = composition.apps.contentGovernance.getSource(sourceId);
+        send(response, value ? 200 : 404,
+          value ?? errorBody('SOURCE_NOT_FOUND', 'Resource not found.', currentRequestId));
+        return;
+      }
+      const ruleUpdate = url.pathname.match(/^\/api\/v1\/evaluation-rules\/([^/]+)$/);
+      const sourceUpdate = url.pathname.match(/^\/api\/v1\/sources\/([^/]+)$/);
+      const sourceRefresh = url.pathname.match(/^\/api\/v1\/sources\/([^/]+)\/refresh$/);
+      const isContentMutation = (request.method === 'PATCH' && (ruleUpdate !== null || sourceUpdate !== null))
+        || (request.method === 'POST' && (url.pathname === '/api/v1/sources' || sourceRefresh !== null));
+      if (isContentMutation) {
+        if (!writeToken) {
+          send(response, 503, errorBody('WRITE_API_DISABLED', 'Set WP_KNOWLEDGE_WRITE_TOKEN to enable mutations.', currentRequestId, true));
+          return;
+        }
+        if (!authorized(request, writeToken)) {
+          send(response, 401, errorBody('UNAUTHORIZED', 'A valid Bearer token is required.', currentRequestId));
+          return;
+        }
+        const key = request.headers['idempotency-key'];
+        if (typeof key !== 'string' || !key.trim()) throw new Error('IDEMPOTENCY_KEY_REQUIRED: Idempotency-Key');
+        const payload = await body(request);
+        const command = {
+          idempotencyKey: key.trim(),
+          fingerprint: JSON.stringify({ method: request.method, path: url.pathname, payload }),
+          actor: 'local-admin',
+        };
+        if (request.method === 'PATCH' && ruleUpdate) {
+          send(response, 200, composition.apps.contentGovernance.updateEvaluationRule(
+            decodeURIComponent(ruleUpdate[1] ?? ''), payload, command,
+          ));
+          return;
+        }
+        if (request.method === 'POST' && url.pathname === '/api/v1/sources') {
+          send(response, 201, await composition.apps.contentGovernance.createSource(payload, command));
+          return;
+        }
+        if (request.method === 'POST' && sourceRefresh) {
+          send(response, 202, await composition.apps.contentGovernance.refreshSource(
+            decodeURIComponent(sourceRefresh[1] ?? ''), command,
+          ));
+          return;
+        }
+        if (request.method === 'PATCH' && sourceUpdate) {
+          send(response, 200, await composition.apps.contentGovernance.updateSource(
+            decodeURIComponent(sourceUpdate[1] ?? ''), payload, command,
+          ));
+          return;
+        }
       }
       const isMutationRoute = url.pathname === '/api/v1/runs'
         || url.pathname === '/api/v1/knowledge/candidates'
