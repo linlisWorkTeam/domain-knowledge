@@ -331,6 +331,26 @@ export class KnowledgeFlywheelService {
     return this.runProjections.listActivities(filters);
   }
 
+  applyActionItemAction(input: {
+    actionItemId: string;
+    action: 'ACKNOWLEDGE' | 'RESOLVE' | 'RETRY' | 'REGENERATE';
+    expectedRevision: number;
+    reason: string;
+    feedback?: string;
+    commandRunId?: string;
+  }): Record<string, unknown> {
+    assertInvariant(input.reason.trim().length > 0, 'ARGUMENT_REQUIRED: reason');
+    assertInvariant(Number.isSafeInteger(input.expectedRevision) && input.expectedRevision > 0,
+      'ARGUMENT_INVALID: expectedRevision must be a positive integer');
+    return this.repository.applyActionItemAction({
+      ...input,
+      reason: input.reason.trim(),
+      feedback: input.feedback?.trim(),
+      auditId: `aia_${randomUUID()}`,
+      occurredAt: this.clock(),
+    });
+  }
+
   recordFeedback(versionId: string, action: string, rating: number | null, note = ''): void {
     this.requireVersion(versionId);
     assertInvariant(['hit', 'rate', 'correct'].includes(action), 'unsupported feedback action');

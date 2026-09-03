@@ -67,6 +67,16 @@ export interface FlywheelRepository {
   getRunConfiguration(runId: string): RunConfigurationSnapshot | null;
   recordWorkflowNodeProjection(projection: WorkflowNodeProjection, event: DomainEvent): void;
   listWorkflowNodeProjections(runId: string): WorkflowNodeProjection[];
+  applyActionItemAction(input: {
+    actionItemId: string;
+    action: 'ACKNOWLEDGE' | 'RESOLVE' | 'RETRY' | 'REGENERATE';
+    expectedRevision: number;
+    reason: string;
+    feedback?: string;
+    commandRunId?: string;
+    auditId: string;
+    occurredAt: string;
+  }): Record<string, unknown>;
   status(): Record<string, unknown>;
 }
 

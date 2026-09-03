@@ -115,12 +115,26 @@ export class ConsoleReadModel {
       SELECT event_id, observed_at FROM action_item_sources
       WHERE action_item_id = ? ORDER BY observed_at, event_id
     `).all(actionItemId) as Record<string, unknown>[];
+    const history = this.database.prepare(`
+      SELECT audit_id, action, reason, command_run_id, from_status, to_status,
+        revision, occurred_at FROM action_item_history
+      WHERE action_item_id = ? ORDER BY occurred_at, audit_id
+    `).all(actionItemId) as Record<string, unknown>[];
     return {
       ...this.actionItemFromRow(row),
       observedSources: sources.map((source) => ({
         eventId: String(source.event_id), observedAt: String(source.observed_at),
       })),
-      history: [],
+      history: history.map((entry) => ({
+        auditId: String(entry.audit_id),
+        action: String(entry.action),
+        reason: String(entry.reason),
+        commandRunId: entry.command_run_id === null ? null : String(entry.command_run_id),
+        fromStatus: String(entry.from_status),
+        toStatus: String(entry.to_status),
+        revision: Number(entry.revision),
+        occurredAt: String(entry.occurred_at),
+      })),
     };
   }
 

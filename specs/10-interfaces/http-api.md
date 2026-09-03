@@ -66,17 +66,17 @@
 | `POST /api/v1/runs/:runId/resume` | Available | 从同一 checkpoint 恢复。 |
 | `POST /api/v1/runs/:runId/cancel` | Available | 取消运行并传播终止信号。 |
 | `GET /api/v1/runs/:runId/progress` | Available | 返回可证明的 completed/total 单元、当前阶段和采样时间；无可靠模型时返回 `INDETERMINATE`，不提供 ETA。 |
-| `POST /api/v1/runs/:runId/retry` | Planned | 按治理决议创建新 Run 或执行规范允许的失败节点重试。 |
-| `GET /api/v1/runs/:runId/event-stream` | Planned | SSE 推送，支持 `Last-Event-ID`/`event_seq` 续传和自动重连。 |
+| `POST /api/v1/runs/:runId/retry` | Planned | 按治理决议创建新 Run 或执行规范允许的失败节点重试；DEV-006B 当前只通过事项动作开放受控 retry。 |
+| `GET /api/v1/runs/:runId/event-stream` | Available | SSE 推送，支持 `Last-Event-ID`/`event_seq` 续传和自动重连。 |
 | `GET /api/v1/action-items` | Available | 持久化治理事项列表；支持 severity、type、status、runId、分页。 |
 | `GET /api/v1/action-items/:actionItemId` | Available | 返回原因、重复观察来源、允许动作和审计历史；DEV-006B 前历史仅含系统投影。 |
-| `POST /api/v1/action-items/:actionItemId/actions/:action` | Planned | 执行白名单治理动作，如 acknowledge、resolve、retry；不得直接篡改 Gate 或 publication。 |
+| `POST /api/v1/action-items/:actionItemId/actions/:action` | Partial | 已实现 acknowledge、resolve、retry 的管理员鉴权、revision、进程内幂等与审计；持久化幂等和 regenerate 仍待完成。 |
 | `POST /api/v1/action-items/:actionItemId/regenerate` | Planned | 以修订输入创建新 Run，保留来源 Action Item、原 Run 和 reason。 |
 | `GET /api/v1/activity` | Available | 跨 Run 审计活动列表，支持 type、runId、severity、时间和分页过滤。 |
-| `GET /api/v1/activity/stream` | Planned | 跨 Run SSE 活动流，支持断线续传。 |
+| `GET /api/v1/activity/stream` | Available | 跨 Run SSE 活动流，支持断线续传。 |
 | `GET /api/v1/knowledge/health` | Planned | 返回有明确口径和样本范围的 freshness、coverage、quality 聚合，不得输出模型臆测分数。 |
 
-DEV-006A 已把 `FAILED`、`LOW_CONFIDENCE` 和最新 GateDecision=`STOPPED` 投影为持久化批次级事项，并提供进度、组件健康和跨批次活动列表；事项处理、重新生成和 SSE 仍保持 Planned，前台在 DEV-006A 接线完成前继续显示 Partial。
+DEV-006A 已把 `FAILED`、`LOW_CONFIDENCE` 和最新 GateDecision=`STOPPED` 投影为持久化批次级事项，并提供进度、组件健康和跨批次活动列表。DEV-006B 已实现 acknowledge、resolve 和受控 retry 的首批后台路径；DEV-006C 已提供批次与活动 SSE。持久化命令幂等、regenerate、冻结工作单元进度和前台接线仍为 Partial。
 
 ### 3.1 DEV-006 最小交付边界
 
@@ -89,6 +89,8 @@ DEV-006 只补齐操作中心、飞轮批次和工作流图所需控制面，不
 ### 3.2 待处理事项领域契约
 
 待处理事项是持久化治理实体，不等同于 FlywheelRun、GateDecision 或普通事件。DEV-006 允许以下来源类型：
+
+第一阶段操作中心只能从 `FAILED`、`LOW_CONFIDENCE`、确定性门禁停止和影响活动批次的必需组件不可用事实产生事项；不得从前台占位内容或模型自由文本制造治理事实。
 
 | `type` | 确定性触发事实 | 默认严重级别 |
 |---|---|---|
@@ -111,7 +113,7 @@ DEV-006 只补齐操作中心、飞轮批次和工作流图所需控制面，不
   "summary": "受控、可本地化的说明",
   "sourceEventId": "evt_...",
   "fingerprint": "sha256:...",
-  "allowedActions": ["ACKNOWLEDGE", "RETRY"],
+  "allowedActions": ["ACKNOWLEDGE", "RESOLVE", "RETRY"],
   "revision": 1,
   "createdAt": "2026-09-03T00:00:00Z",
   "updatedAt": "2026-09-03T00:00:00Z",

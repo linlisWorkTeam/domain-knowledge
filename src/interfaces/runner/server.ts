@@ -131,6 +131,34 @@ function authorized(request: IncomingMessage, token: string | undefined): boolea
   return left.byteLength === right.byteLength && timingSafeEqual(left, right);
 }
 
+function sseCursor(request: IncomingMessage, url: URL): number {
+  const header = request.headers['last-event-id'];
+  const headerValue = Array.isArray(header) ? header[0] : header;
+  const queryValue = url.searchParams.get('after');
+  if (headerValue && queryValue && headerValue !== queryValue) {
+    throw new Error('INVALID_EVENT_CURSOR: Last-Event-ID and after differ');
+  }
+  const raw = headerValue || queryValue || '0';
+  const value = Number(raw);
+  if (!Number.isSafeInteger(value) || value < 0) throw new Error('INVALID_EVENT_CURSOR: cursor must be a non-negative integer');
+  return value;
+}
+
+function openSse(response: ServerResponse): void {
+  response.writeHead(200, {
+    'content-type': 'text/event-stream; charset=utf-8',
+    'cache-control': 'no-store',
+    connection: 'keep-alive',
+    'x-accel-buffering': 'no',
+    'x-content-type-options': 'nosniff',
+  });
+  response.write(`event: ready\ndata: ${JSON.stringify({ connectedAt: new Date().toISOString() })}\n\n`);
+}
+
+function writeSse(response: ServerResponse, id: number, event: string, value: unknown): void {
+  response.write(`id: ${id}\nevent: ${event}\ndata: ${JSON.stringify(value)}\n\n`);
+}
+
 async function body(request: IncomingMessage): Promise<Record<string, unknown>> {
   const chunks: Buffer[] = [];
   let size = 0;
@@ -153,11 +181,16 @@ async function body(request: IncomingMessage): Promise<Record<string, unknown>> 
 export function mapHttpError(error: unknown, id = 'req_unknown'): { status: number; body: ApiErrorBody } {
   const message = error instanceof Error ? error.message : String(error);
   const code = message.split(':', 1)[0] || 'INTERNAL_ERROR';
+  if (code === 'INVALID_EVENT_CURSOR') return { status: 400, body: errorBody(code, message, id) };
   if (code === 'PAYLOAD_TOO_LARGE') return { status: 413, body: errorBody(code, 'Request payload is too large.', id) };
   if (code === 'METHOD_NOT_ALLOWED') return { status: 405, body: errorBody(code, 'Method not allowed.', id) };
   if (code.endsWith('_NOT_FOUND')) return { status: 404, body: errorBody(code, 'Resource not found.', id) };
   if (/(?:_ALREADY_RUNNING|_TERMINAL|_CONFLICT)$/.test(code)) {
     return { status: 409, body: errorBody(code, message, id) };
+  }
+  if (code === 'ACTION_ITEM_RESOLVED') return { status: 409, body: errorBody(code, message, id) };
+  if (code === 'ACTION_NOT_ALLOWED' || code === 'RUN_NOT_RETRYABLE') {
+    return { status: 422, body: errorBody(code, message, id) };
   }
   if (/(?:_INVALID|_DENIED|_REQUIRED|_UNSUPPORTED)$/.test(code)) {
     return { status: 422, body: errorBody(code, message, id) };
@@ -263,6 +296,35 @@ export function createKnowledgeServer(input: {
         ));
         return;
       }
+      if (request.method === 'GET' && url.pathname === '/api/v1/activity/stream') {
+        let cursor = sseCursor(request, url);
+        openSse(response);
+        const flush = () => {
+          const pending = composition.apps.flywheel.listActivities()
+            .filter((item) => Number(item.cursor) > cursor)
+            .sort((left, right) => Number(left.cursor) - Number(right.cursor));
+          for (const item of pending) {
+            cursor = Number(item.cursor);
+            writeSse(response, cursor, 'activity', item);
+          }
+        };
+        flush();
+        const polling = setInterval(flush, 250);
+        const heartbeat = setInterval(() => response.write(': heartbeat\n\n'), 15_000);
+        const lifetime = setTimeout(() => {
+          response.write(`event: reconnect\ndata: ${JSON.stringify({ after: cursor })}\n\n`);
+          response.end();
+        }, 30 * 60_000);
+        polling.unref();
+        heartbeat.unref();
+        lifetime.unref();
+        response.once('close', () => {
+          clearInterval(polling);
+          clearInterval(heartbeat);
+          clearTimeout(lifetime);
+        });
+        return;
+      }
       if (request.method === 'GET' && url.pathname.startsWith('/api/v1/action-items/')) {
         const actionItemId = decodeURIComponent(url.pathname.slice('/api/v1/action-items/'.length));
         if (!actionItemId || actionItemId.includes('/')) {
@@ -316,6 +378,35 @@ export function createKnowledgeServer(input: {
           const events = (snapshot.events as { eventSeq: number }[])
             .filter((record) => record.eventSeq > after);
           send(response, 200, { runId, events });
+          return;
+        }
+        if (child === 'event-stream') {
+          let cursor = sseCursor(request, url);
+          openSse(response);
+          const flush = () => {
+            const current = composition.apps.flywheel.getRunSnapshot(runId);
+            const pending = ((current?.events ?? []) as { eventSeq: number; event: unknown }[])
+              .filter((record) => record.eventSeq > cursor);
+            for (const record of pending) {
+              cursor = record.eventSeq;
+              writeSse(response, cursor, 'run-event', record.event);
+            }
+          };
+          flush();
+          const polling = setInterval(flush, 250);
+          const heartbeat = setInterval(() => response.write(': heartbeat\n\n'), 15_000);
+          const lifetime = setTimeout(() => {
+            response.write(`event: reconnect\ndata: ${JSON.stringify({ after: cursor })}\n\n`);
+            response.end();
+          }, 30 * 60_000);
+          polling.unref();
+          heartbeat.unref();
+          lifetime.unref();
+          response.once('close', () => {
+            clearInterval(polling);
+            clearInterval(heartbeat);
+            clearTimeout(lifetime);
+          });
           return;
         }
         if (child === 'workflow-nodes') {
@@ -377,7 +468,11 @@ export function createKnowledgeServer(input: {
         || /^\/api\/v1\/runs\/[^/]+\/(?:resume|cancel)$/.test(url.pathname)
         || /^\/api\/v1\/knowledge\/[^/]+\/feedback$/.test(url.pathname)
         || /^\/api\/v1\/agents\/[^/]+\/prompt$/.test(url.pathname);
-      if ((request.method === 'POST' || request.method === 'PUT') && isMutationRoute) {
+      const actionItemCommand = url.pathname.match(
+        /^\/api\/v1\/action-items\/([^/]+)\/actions\/(acknowledge|resolve|retry)$/,
+      );
+      const isControlMutation = actionItemCommand !== null;
+      if ((request.method === 'POST' || request.method === 'PUT') && (isMutationRoute || isControlMutation)) {
         if (!writeToken) {
           send(response, 503, errorBody('WRITE_API_DISABLED', 'Set WP_KNOWLEDGE_WRITE_TOKEN to enable mutations.', currentRequestId, true));
           return;
@@ -387,6 +482,46 @@ export function createKnowledgeServer(input: {
           return;
         }
         const payload = await body(request);
+        if (actionItemCommand) {
+          if (request.method !== 'POST') throw new Error('METHOD_NOT_ALLOWED');
+          const key = request.headers['idempotency-key'];
+          if (typeof key !== 'string' || !key.trim()) throw new Error('IDEMPOTENCY_KEY_REQUIRED: Idempotency-Key');
+          const actionItemId = decodeURIComponent(actionItemCommand[1] ?? '');
+          const action = String(actionItemCommand[2]).toUpperCase() as 'ACKNOWLEDGE' | 'RESOLVE' | 'RETRY';
+          const fingerprint = JSON.stringify({ actionItemId, action, payload });
+          const previous = idempotencyResults.get(key);
+          if (previous && previous.fingerprint !== fingerprint) throw new Error('IDEMPOTENCY_CONFLICT: key reused with different command');
+          if (previous) {
+            send(response, previous.status, previous.value);
+            return;
+          }
+          const expectedRevision = Number(payload.expectedRevision);
+          const reason = typeof payload.reason === 'string' ? payload.reason : '';
+          const item = composition.apps.flywheel.getActionItem(actionItemId);
+          if (!item) throw new Error(`ACTION_ITEM_NOT_FOUND: ${actionItemId}`);
+          if (Number(item.revision) !== expectedRevision) throw new Error('REVISION_CONFLICT: action item changed');
+          if (!Array.isArray(item.allowedActions) || !item.allowedActions.includes(action)) {
+            throw new Error(`ACTION_NOT_ALLOWED: ${action}`);
+          }
+          let commandRunId: string | undefined;
+          let status = 200;
+          if (action === 'RETRY') {
+            commandRunId = String(item.runId ?? '');
+            if (!commandRunId) throw new Error('RUN_NOT_RETRYABLE: action item has no run');
+            const workflowStatus = await composition.apps.orchestrator.status(commandRunId);
+            if (workflowStatus.executionStatus !== 'FAILED') {
+              throw new Error(`RUN_NOT_RETRYABLE: ${commandRunId}`);
+            }
+            await composition.apps.orchestrator.resume(commandRunId);
+            status = 202;
+          }
+          const value = composition.apps.flywheel.applyActionItemAction({
+            actionItemId, action, expectedRevision, reason, commandRunId,
+          });
+          idempotencyResults.set(key, { fingerprint, status, value });
+          send(response, status, value);
+          return;
+        }
         if (url.pathname.startsWith('/api/v1/agents/') && url.pathname.endsWith('/prompt')) {
           if (request.method !== 'PUT') throw new Error('METHOD_NOT_ALLOWED: Agent prompt updates require PUT');
           const encodedAgentId = url.pathname.slice('/api/v1/agents/'.length, -'/prompt'.length);

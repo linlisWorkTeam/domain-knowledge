@@ -281,6 +281,21 @@ export class SQLiteFlywheelRepository implements FlywheelRepository {
         PRIMARY KEY(action_item_id, event_id),
         FOREIGN KEY(action_item_id) REFERENCES action_items(action_item_id)
       );
+      CREATE TABLE IF NOT EXISTS action_item_history (
+        audit_id TEXT PRIMARY KEY,
+        action_item_id TEXT NOT NULL,
+        action TEXT NOT NULL,
+        reason TEXT NOT NULL,
+        feedback TEXT,
+        command_run_id TEXT,
+        from_status TEXT NOT NULL,
+        to_status TEXT NOT NULL,
+        revision INTEGER NOT NULL,
+        occurred_at TEXT NOT NULL,
+        FOREIGN KEY(action_item_id) REFERENCES action_items(action_item_id)
+      );
+      CREATE INDEX IF NOT EXISTS action_item_history_item
+        ON action_item_history(action_item_id, occurred_at, audit_id);
 
       INSERT OR IGNORE INTO schema_migrations(version, applied_at)
       VALUES (1, datetime('now'));
@@ -297,6 +312,73 @@ export class SQLiteFlywheelRepository implements FlywheelRepository {
       INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (4, datetime('now'));
       INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (5, datetime('now'));
     `);
+  }
+
+  applyActionItemAction(input: {
+    actionItemId: string;
+    action: 'ACKNOWLEDGE' | 'RESOLVE' | 'RETRY' | 'REGENERATE';
+    expectedRevision: number;
+    reason: string;
+    feedback?: string;
+    commandRunId?: string;
+    auditId: string;
+    occurredAt: string;
+  }): Record<string, unknown> {
+    return this.transaction(() => {
+      const row = this.database.prepare('SELECT * FROM action_items WHERE action_item_id = ?')
+        .get(input.actionItemId) as Record<string, unknown> | undefined;
+      if (!row) throw new Error(`ACTION_ITEM_NOT_FOUND: ${input.actionItemId}`);
+      const status = String(row.status);
+      const revision = Number(row.revision);
+      if (revision !== input.expectedRevision) throw new Error('REVISION_CONFLICT: action item changed');
+      if (status === 'RESOLVED') throw new Error('ACTION_ITEM_RESOLVED: action item is already resolved');
+      const allowed = parse<string[]>(row.allowed_actions_json);
+      if (!allowed.includes(input.action)) throw new Error(`ACTION_NOT_ALLOWED: ${input.action}`);
+      if (input.action === 'ACKNOWLEDGE' && status !== 'OPEN') {
+        throw new Error('ACTION_NOT_ALLOWED: acknowledge requires OPEN');
+      }
+      if ((input.action === 'RETRY' || input.action === 'REGENERATE') && !input.commandRunId) {
+        throw new Error('ARGUMENT_REQUIRED: commandRunId');
+      }
+      const nextStatus = input.action === 'ACKNOWLEDGE'
+        ? 'ACKNOWLEDGED'
+        : input.action === 'RESOLVE' ? 'RESOLVED' : status;
+      const nextRevision = revision + 1;
+      const resolution = input.action === 'RESOLVE'
+        ? json({ reason: input.reason, auditId: input.auditId })
+        : row.resolution_json === null ? null : String(row.resolution_json);
+      const resolvedAt = nextStatus === 'RESOLVED'
+        ? input.occurredAt
+        : row.resolved_at === null ? null : String(row.resolved_at);
+      const result = this.database.prepare(`
+        UPDATE action_items SET status = ?, revision = ?, updated_at = ?,
+          resolved_at = ?, resolution_json = ?
+        WHERE action_item_id = ? AND revision = ?
+      `).run(
+        nextStatus, nextRevision, input.occurredAt,
+        resolvedAt,
+        resolution, input.actionItemId, revision,
+      );
+      if (Number(result.changes) !== 1) throw new Error('REVISION_CONFLICT: action item changed');
+      this.database.prepare(`
+        INSERT INTO action_item_history(
+          audit_id, action_item_id, action, reason, feedback, command_run_id,
+          from_status, to_status, revision, occurred_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        input.auditId, input.actionItemId, input.action, input.reason,
+        input.feedback ?? null, input.commandRunId ?? null, status, nextStatus,
+        nextRevision, input.occurredAt,
+      );
+      return {
+        actionItemId: input.actionItemId,
+        action: input.action,
+        status: nextStatus,
+        revision: nextRevision,
+        commandRunId: input.commandRunId ?? null,
+        occurredAt: input.occurredAt,
+      };
+    });
   }
 
   private transaction<T>(operation: () => T): T {
@@ -329,19 +411,19 @@ export class SQLiteFlywheelRepository implements FlywheelRepository {
       type = 'RUN_FAILED';
       reasonCode = String(event.payload.reasonCode ?? 'RUN_FAILED');
       summary = '批次执行失败';
-      allowedActions = ['ACKNOWLEDGE', 'RETRY'];
+      allowedActions = ['ACKNOWLEDGE', 'RESOLVE', 'RETRY'];
     } else if (event.eventType === 'RunStateChanged' && event.payload.to === 'LOW_CONFIDENCE') {
       type = 'LOW_CONFIDENCE';
       severity = 'MEDIUM';
       reasonCode = String(event.payload.reasonCode ?? 'LOW_CONFIDENCE');
       summary = '批次可信度不足，需要人工判断';
-      allowedActions = ['ACKNOWLEDGE', 'REGENERATE'];
+      allowedActions = ['ACKNOWLEDGE', 'RESOLVE', 'REGENERATE'];
     } else if (event.eventType === 'GateDecided' && event.payload.outcome === 'STOPPED') {
       type = 'GATE_STOPPED';
       const reasons = Array.isArray(event.payload.reasonCodes) ? event.payload.reasonCodes.map(String) : [];
       reasonCode = reasons[0] ?? 'GATE_STOPPED';
       summary = '确定性门禁停止了本批次';
-      allowedActions = ['ACKNOWLEDGE', 'REGENERATE'];
+      allowedActions = ['ACKNOWLEDGE', 'RESOLVE', 'REGENERATE'];
     }
     if (!type) return;
     const fingerprint = `sha256:${sha256(`${type}\0RUN\0${event.runId}\0${reasonCode}`)}`;

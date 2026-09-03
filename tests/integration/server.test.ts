@@ -5,6 +5,21 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import { createKnowledgeServer, mapHttpError, resolveServerBinding } from '../../src/interfaces/runner/server.ts';
+
+async function readSse(response: Response, expected: RegExp): Promise<string> {
+  assert.ok(response.body);
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let text = '';
+  for (let index = 0; index < 20 && !expected.test(text); index += 1) {
+    const next = await reader.read();
+    if (next.done) break;
+    text += decoder.decode(next.value, { stream: true });
+  }
+  await reader.cancel();
+  assert.match(text, expected);
+  return text;
+}
 import { GOOD_BODY } from '../helpers/fixture.ts';
 
 test('server binding defaults to config and supports explicit deployment overrides', () => {
@@ -173,6 +188,19 @@ test('HTTP adapter rejects missing credentials and accepts authenticated candida
       `${base}/api/v1/runs/${encodeURIComponent(runId)}/events?after=invalid`,
     );
     assert.equal(invalidEventCursor.status, 422);
+    const mismatchedEventCursor = await fetch(
+      `${base}/api/v1/runs/${encodeURIComponent(runId)}/event-stream?after=1`,
+      { headers: { 'last-event-id': '2' } },
+    );
+    assert.equal(mismatchedEventCursor.status, 400);
+    assert.equal((await mismatchedEventCursor.json()).error.code, 'INVALID_EVENT_CURSOR');
+    const runStream = await fetch(
+      `${base}/api/v1/runs/${encodeURIComponent(runId)}/event-stream?after=0`,
+    );
+    assert.equal(runStream.headers.get('content-type'), 'text/event-stream; charset=utf-8');
+    const runEvents = await readSse(runStream, /event: run-event/);
+    assert.match(runEvents, /event: ready/);
+    assert.match(runEvents, /id: 1/);
 
     const components = await (await fetch(`${base}/api/v1/system/components`)).json();
     assert.equal(components.items.length, 5);
@@ -213,7 +241,7 @@ test('HTTP adapter rejects missing credentials and accepts authenticated candida
     assert.equal(actionItems.items.length, 1);
     assert.equal(actionItems.items[0].type, 'RUN_FAILED');
     assert.equal(actionItems.items[0].runId, runId);
-    assert.deepEqual(actionItems.items[0].allowedActions, ['ACKNOWLEDGE', 'RETRY']);
+    assert.deepEqual(actionItems.items[0].allowedActions, ['ACKNOWLEDGE', 'RESOLVE', 'RETRY']);
     const actionDetail = await (await fetch(
       `${base}/api/v1/action-items/${encodeURIComponent(actionItems.items[0].actionItemId)}`,
     )).json();
@@ -221,10 +249,55 @@ test('HTTP adapter rejects missing credentials and accepts authenticated candida
     assert.equal(actionDetail.observedSources.length, 1);
     assert.deepEqual(actionDetail.history, []);
 
+    const actionBase = `${base}/api/v1/action-items/${encodeURIComponent(actionDetail.actionItemId)}/actions`;
+    const deniedAction = await fetch(`${actionBase}/acknowledge`, {
+      method: 'POST', headers: { 'content-type': 'application/json', 'idempotency-key': 'action-denied' },
+      body: JSON.stringify({ expectedRevision: 1, reason: '开始处理' }),
+    });
+    assert.equal(deniedAction.status, 401);
+    const acknowledge = await fetch(`${actionBase}/acknowledge`, {
+      method: 'POST', headers: { ...authHeaders, 'idempotency-key': 'action-ack-1' },
+      body: JSON.stringify({ expectedRevision: 1, reason: '开始处理' }),
+    });
+    assert.equal(acknowledge.status, 200);
+    const acknowledged = await acknowledge.json();
+    assert.equal(acknowledged.status, 'ACKNOWLEDGED');
+    assert.equal(acknowledged.revision, 2);
+    const replay = await fetch(`${actionBase}/acknowledge`, {
+      method: 'POST', headers: { ...authHeaders, 'idempotency-key': 'action-ack-1' },
+      body: JSON.stringify({ expectedRevision: 1, reason: '开始处理' }),
+    });
+    assert.deepEqual(await replay.json(), acknowledged);
+    const staleResolve = await fetch(`${actionBase}/resolve`, {
+      method: 'POST', headers: { ...authHeaders, 'idempotency-key': 'action-resolve-stale' },
+      body: JSON.stringify({ expectedRevision: 1, reason: '问题已核实' }),
+    });
+    assert.equal(staleResolve.status, 409);
+    assert.equal((await staleResolve.json()).error.code, 'REVISION_CONFLICT');
+    const resolveAction = await fetch(`${actionBase}/resolve`, {
+      method: 'POST', headers: { ...authHeaders, 'idempotency-key': 'action-resolve-1' },
+      body: JSON.stringify({ expectedRevision: 2, reason: '问题已核实并关闭' }),
+    });
+    assert.equal(resolveAction.status, 200);
+    const resolvedDetail = await (await fetch(
+      `${base}/api/v1/action-items/${encodeURIComponent(actionDetail.actionItemId)}`,
+    )).json();
+    assert.equal(resolvedDetail.status, 'RESOLVED');
+    assert.equal(resolvedDetail.revision, 3);
+    assert.equal(resolvedDetail.history.length, 2);
+    assert.deepEqual(resolvedDetail.history.map((entry: { action: string }) => entry.action), [
+      'ACKNOWLEDGE', 'RESOLVE',
+    ]);
+    assert.doesNotMatch(JSON.stringify(resolvedDetail), /test-secret/);
+
     const activities = await (await fetch(`${base}/api/v1/activity?runId=${encodeURIComponent(runId)}`)).json();
     assert.ok(activities.items.length >= 2);
     assert.ok(activities.items.every((item: { runId: string }) => item.runId === runId));
     assert.ok(activities.items.every((item: { cursor: number }) => Number.isSafeInteger(item.cursor)));
+    const activityStream = await fetch(`${base}/api/v1/activity/stream?after=0`);
+    const activityEvents = await readSse(activityStream, /event: activity/);
+    assert.match(activityEvents, /event: ready/);
+    assert.match(activityEvents, /id: [1-9][0-9]*/);
     const firstActivityPage = await (await fetch(
       `${base}/api/v1/activity?runId=${encodeURIComponent(runId)}&limit=1`,
     )).json();
