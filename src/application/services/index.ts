@@ -10,7 +10,8 @@ import {
   EvalRunnerDomainService, FlywheelDomainService,
 } from '../../domain/services/index.ts';
 import type {
-  ArtifactStore, FlywheelRepository, NodeCheckpoint, QualityPolicy,
+  ArtifactStore, EvaluationSubmission, FlywheelRepository, NodeCheckpoint, QualityPolicy,
+  RunProjectionReader,
 } from '../ports/index.ts';
 
 export interface CandidateRequest {
@@ -24,20 +25,7 @@ export interface CandidateRequest {
   metadata?: Record<string, unknown>;
 }
 
-export interface EvaluationInput {
-  runId: string;
-  versionId: string;
-  inputRefs?: ArtifactRef[];
-  evidenceRefs: ArtifactRef[];
-  toolchainFingerprint: string;
-  criticalFailures: number;
-  testsPassed: number;
-  testsTotal: number;
-  stability: number;
-  infrastructureFailure?: boolean;
-  checkBlocking?: boolean;
-  reviewBlocking?: boolean;
-}
+export type EvaluationInput = EvaluationSubmission;
 
 export class KnowledgeFlywheelService {
   readonly artifacts: ArtifactStore;
@@ -45,6 +33,7 @@ export class KnowledgeFlywheelService {
   readonly qualityPolicy: QualityPolicy;
   readonly flywheelDomain: FlywheelDomainService;
   readonly evalRunnerDomain: EvalRunnerDomainService;
+  readonly runProjections?: RunProjectionReader;
   readonly clock: () => string;
 
   constructor(input: {
@@ -53,6 +42,7 @@ export class KnowledgeFlywheelService {
     qualityPolicy: QualityPolicy;
     flywheelDomain?: FlywheelDomainService;
     evalRunnerDomain?: EvalRunnerDomainService;
+    runProjections?: RunProjectionReader;
     clock?: () => string;
   }) {
     this.artifacts = input.artifacts;
@@ -60,6 +50,7 @@ export class KnowledgeFlywheelService {
     this.qualityPolicy = input.qualityPolicy;
     this.flywheelDomain = input.flywheelDomain ?? new FlywheelDomainService();
     this.evalRunnerDomain = input.evalRunnerDomain ?? new EvalRunnerDomainService();
+    this.runProjections = input.runProjections;
     this.clock = input.clock ?? (() => new Date().toISOString());
     this.repository.initialize();
   }
@@ -286,8 +277,38 @@ export class KnowledgeFlywheelService {
     return this.repository.getKnowledgeVersion(versionId);
   }
 
+  getRun(runId: string): FlywheelRun | null {
+    return this.repository.getRun(runId);
+  }
+
+  findKnowledgeVersionByBody(moduleId: string, artifactId: string): KnowledgeVersion | null {
+    return this.repository.findKnowledgeVersionByBody(moduleId, artifactId);
+  }
+
+  evaluateQuality(body: string, input: Parameters<QualityPolicy['evaluate']>[1]): ReturnType<QualityPolicy['evaluate']> {
+    return this.qualityPolicy.evaluate(body, input);
+  }
+
+  putArtifact(bytes: Uint8Array, mediaType: string): Promise<ArtifactRef> {
+    return this.artifacts.put(bytes, mediaType);
+  }
+
+  getArtifact(ref: ArtifactRef): Promise<Uint8Array> {
+    return this.artifacts.get(ref);
+  }
+
   listKnowledgeVersions(statuses?: string[]): KnowledgeVersion[] {
     return this.repository.listKnowledgeVersions(statuses);
+  }
+
+  listRunSummaries(states?: string[]): Record<string, unknown>[] {
+    assertInvariant(this.runProjections !== undefined, 'run projection reader is not configured');
+    return this.runProjections.listRunSummaries(states);
+  }
+
+  getRunSnapshot(runId: string): Record<string, unknown> | null {
+    assertInvariant(this.runProjections !== undefined, 'run projection reader is not configured');
+    return this.runProjections.getRunSnapshot(runId, this.listKnowledgeVersions());
   }
 
   recordFeedback(versionId: string, action: string, rating: number | null, note = ''): void {

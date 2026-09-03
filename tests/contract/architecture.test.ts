@@ -64,3 +64,17 @@ test('DDD application and domain-service boundaries are explicit without changin
   );
   assert.equal(DOMAIN_KNOWLEDGE_AGENT_DEFINITIONS.length, 7);
 });
+
+test('UI API and workflow executor use Application boundaries instead of concrete adapters', () => {
+  const server = readFileSync('src/interfaces/runner/server.ts', 'utf8');
+  assert.doesNotMatch(
+    server,
+    /composition\.(?:repository|artifacts|agents|service|query|scanner|automatedWorkflow)\b/,
+  );
+  assert.doesNotMatch(server, /from ['"]\.\/(?:console-read-model|demo-report)\.ts['"]|await buildDemoReport\(/);
+  assert.match(server, /composition\.apps\.orchestrator/);
+
+  const executor = readFileSync('src/application/services/automated-project-workflow.ts', 'utf8');
+  assert.doesNotMatch(executor, /this\.flywheel\.(?:repository|artifacts|qualityPolicy)\b/);
+  assert.match(executor, /this\.evalRunner\.evaluate/);
+});

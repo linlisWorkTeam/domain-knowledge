@@ -5,6 +5,7 @@ import type {
   AgentId,
   AgentProvider,
   AgentWorkspaceProvider,
+  EvalRunnerUseCase,
   GeneratedProjectFile,
   ProjectEvaluation,
   ProjectEvaluator,
@@ -176,20 +177,23 @@ function routeFor(outcome: GateDecision['outcome']): WorkflowStageResult['route'
 }
 
 export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
-  readonly service: KnowledgeFlywheelService;
+  readonly flywheel: KnowledgeFlywheelService;
+  readonly evalRunner: EvalRunnerUseCase;
   readonly evaluator: ProjectEvaluator;
   readonly assetRoot: string;
   readonly agent?: AgentProvider;
   readonly agentWorkspaces?: AgentWorkspaceProvider;
 
   constructor(input: {
-    service: KnowledgeFlywheelService;
+    flywheel: KnowledgeFlywheelService;
+    evalRunner: EvalRunnerUseCase;
     evaluator: ProjectEvaluator;
     assetRoot: string;
     agent?: AgentProvider;
     agentWorkspaces?: AgentWorkspaceProvider;
   }) {
-    this.service = input.service;
+    this.flywheel = input.flywheel;
+    this.evalRunner = input.evalRunner;
     this.evaluator = input.evaluator;
     this.assetRoot = resolve(input.assetRoot);
     this.agent = input.agent;
@@ -221,12 +225,12 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
     input: WorkflowStageInput,
     scenario: AutomatedProjectScenario,
   ): Promise<WorkflowStageResult> {
-    const current = this.service.repository.getRun(input.runId);
+    const current = this.flywheel.getRun(input.runId);
     if (!current) throw new Error(`WORKFLOW_RUN_NOT_FOUND: ${input.runId}`);
-    if (current.state === 'CREATED') this.service.transition(input.runId, 'PLANNED');
-    const planned = this.service.repository.getRun(input.runId);
+    if (current.state === 'CREATED') this.flywheel.transition(input.runId, 'PLANNED');
+    const planned = this.flywheel.getRun(input.runId);
     if (planned?.state === 'PLANNED' || planned?.state === 'ITERATING' || planned?.state === 'ROLLING_BACK') {
-      this.service.transition(input.runId, 'GENERATING');
+      this.flywheel.transition(input.runId, 'GENERATING');
     }
     let snapshot = input.context.snapshot as ProjectSnapshot | undefined;
     let scenarioRef = input.context.scenarioRef as ArtifactRef | undefined;
@@ -237,7 +241,7 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
         sourcePaths: scenario.sourcePaths,
         publicInterfacePaths: scenario.publicInterfacePaths,
       });
-      scenarioRef = await this.service.artifacts.put(Buffer.from(JSON.stringify({
+      scenarioRef = await this.flywheel.putArtifact(Buffer.from(JSON.stringify({
         ...scenario, repositoryRoot: snapshot.repositoryRoot, expectedCommit: snapshot.commit,
       }, null, 2)), 'application/json');
     }
@@ -315,7 +319,7 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
     agentId: AgentId,
   ): Promise<ArtifactRef> {
     const outputSchema = outputSchemaFor(agentId, scenario);
-    const checkpoint = await this.service.executeNode({
+    const checkpoint = await this.flywheel.executeNode({
       runId: input.runId,
       nodeId: input.workerId ? `${input.nodeId}:${input.workerId}` : input.nodeId,
       generationKey: this.agentGenerationKey(input, agentId),
@@ -324,7 +328,7 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
       const output = await this.runLiveAgent(input, scenario, agentId);
       this.validateAgentOutput(output, outputSchema);
       if (agentId === 'code') assertAllowedGeneratedFiles(output, scenario.allowedGeneratedPaths);
-      return [await this.service.artifacts.put(
+      return [await this.flywheel.putArtifact(
         Buffer.from(JSON.stringify(output, null, 2)), 'application/json',
       )];
     });
@@ -417,13 +421,13 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
     const documentRef = input.context[contextKey('doc_gen', input.iteration)] as ArtifactRef | undefined;
     if (!documentRef) throw new Error('WORKFLOW_DOC_OUTPUT_MISSING');
     const document = await this.readJson<DocumentOutput>(documentRef);
-    const checkpoint = await this.service.executeNode({
+    const checkpoint = await this.flywheel.executeNode({
       runId: input.runId,
       nodeId: input.nodeId,
       generationKey: `${input.runId}:${input.nodeId}:${input.iteration}`,
       inputRefs: [documentRef],
     }, async () => {
-      const candidate = await this.service.ingestCandidate({
+      const candidate = await this.flywheel.ingestCandidate({
         moduleId: scenario.moduleId,
         body: document.body,
         title: document.title,
@@ -441,9 +445,9 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
     });
     const bodyRef = checkpoint.outputRefs[0];
     if (!bodyRef) throw new Error('WORKFLOW_CANDIDATE_CHECKPOINT_EMPTY');
-    const version = this.service.repository.findKnowledgeVersionByBody(scenario.moduleId, bodyRef.artifactId);
+    const version = this.flywheel.findKnowledgeVersionByBody(scenario.moduleId, bodyRef.artifactId);
     if (!version) throw new Error('WORKFLOW_CANDIDATE_VERSION_MISSING');
-    const quality = this.service.qualityPolicy.evaluate(document.body, {
+    const quality = this.flywheel.evaluateQuality(document.body, {
       title: document.title,
       description: document.description,
       provenance: version.provenance,
@@ -474,7 +478,7 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
   ): Promise<WorkflowStageResult> {
     const snapshot = input.context.snapshot as ProjectSnapshot;
     const scenarioRef = input.context.scenarioRef as ArtifactRef;
-    const checkpoint = await this.service.executeNode({
+    const checkpoint = await this.flywheel.executeNode({
       runId: input.runId,
       nodeId: input.nodeId,
       generationKey: `${input.runId}:${input.nodeId}:${input.iteration}`,
@@ -514,7 +518,7 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
     for (const file of code.files) {
       if (!scenario.allowedGeneratedPaths.includes(file.path)) throw new Error(`PROJECT_PATH_DENIED: ${file.path}`);
     }
-    const checkpoint = await this.service.executeNode({
+    const checkpoint = await this.flywheel.executeNode({
       runId: input.runId,
       nodeId: input.nodeId,
       generationKey: `${input.runId}:${input.nodeId}:${input.iteration}`,
@@ -532,8 +536,8 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
     const evidenceRef = checkpoint.outputRefs[0];
     if (!evidenceRef) throw new Error('WORKFLOW_EVALUATION_EVIDENCE_MISSING');
     const evaluation = await this.readJson<ProjectEvaluation>(evidenceRef);
-    const run = this.service.repository.getRun(input.runId);
-    if (run?.state === 'GENERATING') this.service.transition(input.runId, 'EVALUATING');
+    const run = this.flywheel.getRun(input.runId);
+    if (run?.state === 'GENERATING') this.flywheel.transition(input.runId, 'EVALUATING');
     if (evaluation.infrastructureFailure) {
       const decision = await this.recordGateDecision(input, evaluation);
       return {
@@ -554,13 +558,13 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
   private async route(input: WorkflowStageInput): Promise<WorkflowStageResult> {
     const quality = input.context[contextKey('qualityReport', input.iteration)] as QualityReport | undefined;
     if (quality?.outcome === 'REJECTED') {
-      const run = this.service.repository.getRun(input.runId);
+      const run = this.flywheel.getRun(input.runId);
       if (!run) throw new Error(`WORKFLOW_RUN_NOT_FOUND: ${input.runId}`);
       const exhausted = run.iteration >= input.maxIterations;
       if (exhausted && run.state === 'GENERATING') {
-        this.service.transition(input.runId, 'LOW_CONFIDENCE');
+        this.flywheel.transition(input.runId, 'LOW_CONFIDENCE');
       } else if (!exhausted && run.state === 'GENERATING') {
-        this.service.transition(input.runId, 'ITERATING');
+        this.flywheel.transition(input.runId, 'ITERATING');
       }
       return {
         detail: `knowledge quality ${quality.score}; ${exhausted ? 'stopped' : 'iterate'}: ${quality.weakPoints.join('; ')}`,
@@ -574,11 +578,11 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
     const evaluation = await this.readJson<ProjectEvaluation>(evaluationRef);
     const decision = existing ?? await this.recordGateDecision(input, evaluation);
     const route = routeFor(decision.outcome);
-    const run = this.service.repository.getRun(input.runId);
+    const run = this.flywheel.getRun(input.runId);
     if (route === 'ITERATE' && run?.state === 'REVIEWING') {
-      this.service.transition(input.runId, 'ITERATING');
+      this.flywheel.transition(input.runId, 'ITERATING');
     } else if (route === 'STOPPED' && run?.state === 'REVIEWING') {
-      this.service.transition(input.runId, 'LOW_CONFIDENCE');
+      this.flywheel.transition(input.runId, 'LOW_CONFIDENCE');
     }
     return {
       detail: `workflow route ${route}`,
@@ -605,7 +609,7 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
     const check = await this.readJson<CheckOutput>(checkRef);
     const review = reviewRef ? await this.readJson<ReviewOutput>(reviewRef) : null;
     const policy = input.context.gatePolicy as GatePolicy | undefined;
-    const run = this.service.repository.getRun(input.runId);
+    const run = this.flywheel.getRun(input.runId);
     if (!policy || !run) throw new Error('WORKFLOW_GATE_POLICY_MISSING');
     assertInvariant(policy.policyId === run.policyId, 'workflow gate policy does not match run');
     assertInvariant(policy.maxIterations === input.maxIterations, 'workflow iteration policy changed after start');
@@ -613,7 +617,7 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
     if (!evaluationRef) throw new Error('WORKFLOW_EVALUATION_EVIDENCE_MISSING');
     const inputRefs = [scenarioRef, snapshot.manifestRef, bodyRef, codeRef, oracleRef, checkRef];
     if (reviewRef) inputRefs.push(reviewRef);
-    const { decision } = await this.service.recordEvaluation({
+    const { decision } = await this.evalRunner.evaluate({
       runId: input.runId,
       versionId,
       inputRefs,
@@ -634,7 +638,7 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
     const decision = input.context[contextKey('gateDecision', input.iteration)] as GateDecision | undefined;
     const versionId = input.context[contextKey('candidateVersionId', input.iteration)];
     if (!decision || typeof versionId !== 'string') throw new Error('WORKFLOW_PUBLICATION_INPUT_MISSING');
-    const publication = await this.service.publish(input.runId, versionId, decision.decisionId);
+    const publication = await this.flywheel.publish(input.runId, versionId, decision.decisionId);
     return {
       detail: `Knowledge Flywheel publication ${publication.publicationKey}`,
       context: { publication },
@@ -649,12 +653,12 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
   ): Promise<ArtifactRef> {
     this.validateAgentOutput(output, schema);
     const inputRefs = this.agentInputRefs(input, input.agentId as AgentId);
-    const checkpoint = await this.service.executeNode({
+    const checkpoint = await this.flywheel.executeNode({
       runId: input.runId,
       nodeId: input.workerId ? `${input.nodeId}:${input.workerId}` : input.nodeId,
       generationKey: this.agentGenerationKey(input, input.agentId as AgentId),
       inputRefs,
-    }, async () => [await this.service.artifacts.put(
+    }, async () => [await this.flywheel.putArtifact(
       Buffer.from(JSON.stringify(output, null, 2)), 'application/json',
     )]);
     const ref = checkpoint.outputRefs[0];
@@ -714,11 +718,11 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
   }
 
   private async readJson<T>(ref: ArtifactRef): Promise<T> {
-    return JSON.parse(Buffer.from(await this.service.artifacts.get(ref)).toString('utf8')) as T;
+    return JSON.parse(Buffer.from(await this.flywheel.getArtifact(ref)).toString('utf8')) as T;
   }
 
   private async readArtifact(ref: ArtifactRef): Promise<unknown> {
-    const text = Buffer.from(await this.service.artifacts.get(ref)).toString('utf8');
+    const text = Buffer.from(await this.flywheel.getArtifact(ref)).toString('utf8');
     return ref.mediaType.includes('json') ? JSON.parse(text) as unknown : text;
   }
 }
@@ -788,7 +792,7 @@ export class AutomatedProjectWorkflowService {
     // the knowledge-governance layer makes that decision (or an operator cancels it).
     const next = status === 'CANCELLED' ? 'CANCELLED' : null;
     if (!next) return;
-    const run = this.flywheel.repository.getRun(runId);
+    const run = this.flywheel.getRun(runId);
     if (run && !['VERIFIED', 'LOW_CONFIDENCE', 'FAILED', 'CANCELLED'].includes(run.state)) {
       this.flywheel.transition(runId, next);
     }

@@ -6,7 +6,7 @@ import {
   EvalRunnerApp, FlywheelApp, KnowledgeDiscoveryApp, KnowledgeSearchApp, Orchestrator,
 } from '../../application/apps/index.ts';
 import {
-  AgentCatalogService, DeterministicQualityPolicy, OhMyWorkPanelWorkflowExecutor,
+  AgentCatalogService, AutomatedProjectWorkflowService, DeterministicQualityPolicy, OhMyWorkPanelWorkflowExecutor,
   RegistryWorkflowObserver,
 } from '../../application/services/index.ts';
 import type { AutomatedProjectScenario } from '../../application/services/index.ts';
@@ -21,6 +21,8 @@ import {
 } from '../../infrastructure/persistence/sqlite-cas/index.ts';
 import { SourceScanner } from '../../infrastructure/source-scan/index.ts';
 import { LocalAgentWorkspace } from '../../infrastructure/agents/workspace/index.ts';
+import { ConsoleReadModel } from './console-read-model.ts';
+import { buildDemoReport } from './demo-report.ts';
 
 export interface WorkpanelConfig {
   schemaVersion: '1.0';
@@ -87,10 +89,12 @@ export function createComposition(input: {
   const runtimeDir = isAbsolute(configuredRuntime) ? configuredRuntime : join(componentRoot, configuredRuntime);
   const artifacts = new LocalCasArtifactStore(join(runtimeDir, 'cas'));
   const repository = new SQLiteFlywheelRepository(join(runtimeDir, 'registry.sqlite'));
+  const runProjections = new ConsoleReadModel(repository.database);
   const flywheelApp = new FlywheelApp({
     artifacts,
     repository,
     qualityPolicy: new DeterministicQualityPolicy(config.qualityGate.threshold),
+    runProjections,
     clock: input.clock,
   });
   const evalRunnerApp = new EvalRunnerApp(flywheelApp);
@@ -107,9 +111,9 @@ export function createComposition(input: {
   if (!['fixture', 'deepseek-harness', 'deepseek-harness-headless'].includes(agentProviderMode)) {
     throw new Error('CONFIG_INVALID: WP_FLYWHEEL_AGENT_PROVIDER must be fixture, deepseek-harness, or deepseek-harness-headless');
   }
-  let orchestratorPromise: Promise<Orchestrator> | null = null;
-  const orchestrator = () => {
-    orchestratorPromise ??= (async () => {
+  let workflowPromise: Promise<AutomatedProjectWorkflowService> | null = null;
+  const workflow = () => {
+    workflowPromise ??= (async () => {
       const auditDirectory = join(runtimeDir, 'demo');
       const auditPath = join(auditDirectory, 'agent-runs.jsonl');
       const allowedRoots = (process.env.WP_DSH_ALLOWED_ROOTS?.split(delimiter) ?? [repositoryRoot])
@@ -160,7 +164,8 @@ export function createComposition(input: {
           })
           : undefined;
       const executor = new OhMyWorkPanelWorkflowExecutor({
-        service: flywheelApp,
+        flywheel: flywheelApp,
+        evalRunner: evalRunnerApp,
         evaluator: new TrustedProjectEvaluator(artifacts),
         assetRoot: join(componentRoot, 'acceptance', 'ohmyworkpanel'),
         ...(agent ? { agent } : {}),
@@ -176,10 +181,19 @@ export function createComposition(input: {
         checkpoint: { kind: 'sqlite', filename: join(runtimeDir, 'workflow', 'checkpoints.sqlite') },
         clock: input.clock,
       });
-      return new Orchestrator(flywheelApp, infrastructure.engine);
+      return new AutomatedProjectWorkflowService(flywheelApp, infrastructure.engine);
     })();
-    return orchestratorPromise;
+    return workflowPromise;
   };
+  const orchestrator = new Orchestrator({
+    workflow,
+    agents,
+    reports: {
+      build: (runId) => buildDemoReport({
+        runId, runtimeDir, repository, service: flywheelApp, artifacts,
+      }),
+    },
+  });
   return {
     repositoryRoot,
     runtimeDir,
@@ -200,7 +214,7 @@ export function createComposition(input: {
     agents,
     workflowObserver,
     agentProviderMode,
-    automatedWorkflow: orchestrator,
+    automatedWorkflow: workflow,
     close: () => repository.close(),
   };
 }

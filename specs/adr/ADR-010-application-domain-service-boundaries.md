@@ -29,6 +29,8 @@ Domain 固定暴露三个领域服务边界：
 
 Infrastructure 继续承载 LangGraph、Agent Provider 和持久化 Adapter。当前本地基线使用 SQLite Registry、SQLite Checkpointer 与 CAS；Redis 预留为 `AgentContextStore` 和 `RunningStateStore` 的可替换实现。Redis 只能保存可重建上下文和运行租约，不得成为 KnowledgeVersion、GateDecision 或 Publication 的第二事实源。
 
+`AgentContextStore` 只接受轮次、attempt、输入/输出 ArtifactRef 和路由结果，拒绝 Prompt、正文及任意扩展字段，并限制单条记录为 64 KiB。`RunningStateStore` 的释放操作同时校验 ownerId 与唯一 leaseId，避免同一 owner 重新获取租约后的 ABA 误删。
+
 ## 兼容与迁移
 
 历史名称 `KnowledgeFlywheelService`、`KnowledgeQueryService` 和 `AutomatedProjectWorkflowService` 暂时作为兼容别名保留。新入口和组合根必须优先暴露 App 名称，避免一次性破坏 CLI、测试及外部调用方。
