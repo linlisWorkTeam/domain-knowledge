@@ -23,6 +23,10 @@ import {
   DeepSeekHarnessHeadlessAgent, DeepSeekHarnessSdkAgent,
 } from '../../infrastructure/agents/deepseek-harness/index.ts';
 import {
+  CompanyCodeAgentCliAdapter, FileCodeAgentSessionStore,
+  type CompanyCodeAgentAuditRecord,
+} from '../../infrastructure/agents/company-codeagent/index.ts';
+import {
   LocalCasArtifactStore, SQLiteFlywheelRepository,
 } from '../../infrastructure/persistence/sqlite-cas/index.ts';
 import { SQLiteContentGovernance } from '../../infrastructure/persistence/sqlite-content-governance/index.ts';
@@ -195,14 +199,16 @@ export function createComposition(input: {
   });
   const workflowObserver = new RegistryWorkflowObserver(repository, input.clock);
   const agentProviderMode = process.env.WP_FLYWHEEL_AGENT_PROVIDER?.trim() || 'fixture';
-  if (!['fixture', 'deepseek-harness', 'deepseek-harness-headless'].includes(agentProviderMode)) {
-    throw new Error('CONFIG_INVALID: WP_FLYWHEEL_AGENT_PROVIDER must be fixture, deepseek-harness, or deepseek-harness-headless');
+  if (!['fixture', 'deepseek-harness', 'deepseek-harness-headless', 'company-codeagent-cli'].includes(agentProviderMode)) {
+    throw new Error('CONFIG_INVALID: WP_FLYWHEEL_AGENT_PROVIDER must be fixture, deepseek-harness, deepseek-harness-headless, or company-codeagent-cli');
   }
   const sdkProvider = process.env.WP_DSH_PROVIDER?.trim()
     || (process.env.OPENCODE_GO_API_KEY ? 'opencode-go' : 'deepseek-official');
   const providerModel = agentProviderMode === 'fixture'
     ? 'schema-validated-fixture-v1'
-    : process.env.WP_DSH_MODEL?.trim() || 'deepseek-v4-flash';
+    : agentProviderMode === 'company-codeagent-cli'
+      ? process.env.WP_CODEAGENT_MODEL?.trim() || 'company-default'
+      : process.env.WP_DSH_MODEL?.trim() || 'deepseek-v4-flash';
   const processIsolation = process.env.WP_DSH_PROCESS_ISOLATION?.trim() || 'bubblewrap';
   if (processIsolation !== 'none' && processIsolation !== 'bubblewrap') {
     throw new Error('CONFIG_INVALID: WP_DSH_PROCESS_ISOLATION must be none or bubblewrap');
@@ -227,6 +233,15 @@ export function createComposition(input: {
   const headlessArgs = process.env.WP_DSH_ARGS_JSON
     ? JSON.parse(process.env.WP_DSH_ARGS_JSON) as string[]
     : ['--profile', 'headless'];
+  const codeAgentCommand = process.env.WP_CODEAGENT_BIN?.trim() || 'codeagent';
+  const codeAgentRunArgs = process.env.WP_CODEAGENT_RUN_ARGS_JSON
+    ? JSON.parse(process.env.WP_CODEAGENT_RUN_ARGS_JSON) as string[]
+    : ['run'];
+  const codeAgentTimeoutMs = Number(process.env.WP_CODEAGENT_TIMEOUT_MS ?? 600_000);
+  const codeAgentAuthTimeoutMs = Number(process.env.WP_CODEAGENT_AUTH_TIMEOUT_MS ?? 15_000);
+  const codeAgentMaxOutputBytes = Number(process.env.WP_CODEAGENT_MAX_OUTPUT_BYTES ?? 2 * 1024 * 1024);
+  const codeAgentAllowedRoots = (process.env.WP_CODEAGENT_ALLOWED_ROOTS?.split(delimiter) ?? [repositoryRoot])
+    .map((root) => root.trim()).filter(Boolean).map((root) => resolve(root));
   const patchDigests = agentProviderMode === 'deepseek-harness'
     ? sdkPatches.map((path) => ({ path, sha256: sha256(readFileSync(path)) }))
     : [];
@@ -249,13 +264,22 @@ export function createComposition(input: {
           maxOutputBytes,
           allowedWorkspaceRoots: [...allowedRoots, agentWorkspaceRoot],
         }
-      : {
+      : agentProviderMode === 'deepseek-harness-headless' ? {
           mode: agentProviderMode,
           command: headlessCommand,
           args: headlessArgs,
           timeoutMs,
           maxOutputBytes,
           allowedWorkspaceRoots: [...allowedRoots, agentWorkspaceRoot],
+        } : {
+          mode: agentProviderMode,
+          command: codeAgentCommand,
+          runArgs: codeAgentRunArgs,
+          model: providerModel,
+          timeoutMs: codeAgentTimeoutMs,
+          authTimeoutMs: codeAgentAuthTimeoutMs,
+          maxOutputBytes: codeAgentMaxOutputBytes,
+          allowedWorkspaceRoots: [...codeAgentAllowedRoots, agentWorkspaceRoot],
         };
   const schemaRoot = join(componentRoot, 'specs', 'schemas');
   const artifactRefSchemaSha256 = sha256(readFileSync(join(schemaRoot, 'artifact-ref.schema.json')));
@@ -292,17 +316,18 @@ export function createComposition(input: {
     workflowPromise ??= (async () => {
       const auditDirectory = join(runtimeDir, 'demo');
       const auditPath = join(auditDirectory, 'agent-runs.jsonl');
-      const writeAudit = async (record: Parameters<NonNullable<ConstructorParameters<typeof DeepSeekHarnessSdkAgent>[0]['onAudit']>>[0]) => {
+      const writeAudit = async (record: Parameters<NonNullable<ConstructorParameters<typeof DeepSeekHarnessSdkAgent>[0]['onAudit']>>[0] | CompanyCodeAgentAuditRecord) => {
         await mkdir(auditDirectory, { recursive: true });
         await appendFile(auditPath, `${JSON.stringify(record)}\n`, { encoding: 'utf8', mode: 0o600 });
+        const auditMetadata = 'metadata' in record ? record.metadata : { runId: record.runId };
         metrics.recordProviderInvocation({
           invocationId: `pinv_${sha256(JSON.stringify({
             provider: record.provider,
             idempotencyKey: record.idempotencyKey,
             startedAt: record.startedAt,
-            providerAttempt: record.metadata.providerAttempt ?? 0,
+            providerAttempt: auditMetadata.providerAttempt ?? 0,
           })).slice(0, 32)}`,
-          runId: String(record.metadata.runId ?? ''),
+          runId: String(auditMetadata.runId ?? ''),
           agentId: record.role,
           provider: record.provider,
           model: providerModel,
@@ -310,7 +335,7 @@ export function createComposition(input: {
           completedAt: record.completedAt,
           durationMs: record.durationMs,
           status: record.status,
-          retryCount: Number(record.metadata.providerAttempt ?? 1) > 1 ? 1 : 0,
+          retryCount: Number(auditMetadata.providerAttempt ?? 1) > 1 ? 1 : 0,
           inputTokens: null,
           outputTokens: null,
           cacheReadTokens: null,
@@ -346,7 +371,19 @@ export function createComposition(input: {
             allowedWorkspaceRoots: [...allowedRoots, agentWorkspaceRoot],
             onAudit: writeAudit,
           })
-          : undefined;
+          : agentProviderMode === 'company-codeagent-cli'
+            ? new CompanyCodeAgentCliAdapter({
+                command: codeAgentCommand,
+                runArgs: codeAgentRunArgs,
+                model: providerModel,
+                timeoutMs: codeAgentTimeoutMs,
+                authTimeoutMs: codeAgentAuthTimeoutMs,
+                maxOutputBytes: codeAgentMaxOutputBytes,
+                allowedWorkspaceRoots: [...codeAgentAllowedRoots, agentWorkspaceRoot],
+                sessionStore: new FileCodeAgentSessionStore(join(runtimeDir, 'codeagent', 'sessions')),
+                onAudit: writeAudit,
+              })
+            : undefined;
       const executor = new OhMyWorkPanelWorkflowExecutor({
         flywheel: flywheelApp,
         evalRunner: evalRunnerApp,

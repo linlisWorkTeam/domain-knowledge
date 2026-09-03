@@ -27,6 +27,15 @@ const checks = [
     ],
   },
   {
+    id: 'company-codeagent-contract',
+    claim: 'Company CodeAgent CLI preserves role, stdin, session, cancellation, error, and output validation boundaries',
+    args: ['--test', 'tests/integration/company-codeagent-cli.test.ts'],
+    evidence: [
+      'src/infrastructure/agents/company-codeagent/index.ts',
+      'tests/integration/company-codeagent-cli.test.ts',
+    ],
+  },
+  {
     id: 'run-configuration-freeze',
     claim: 'A Run keeps an immutable, secret-free snapshot and rejects recovery with changed provider, prompts, tools or schema digests',
     args: ['--test', 'tests/integration/run-configuration.test.ts'],
@@ -89,7 +98,8 @@ const report = {
   conclusions: {
     frameworkMechanics: passed === results.length ? 'VERIFIED' : 'NOT_VERIFIED',
     agentOutputQuality: 'NOT_EVALUATED',
-    companyCodeAgentIntegration: 'NOT_EVALUATED',
+    companyCodeAgentIntegration: results.find((result) => result.id === 'company-codeagent-contract')?.status === 'PASS'
+      ? 'CONTRACT_VERIFIED_LIVE_NOT_EVALUATED' : 'NOT_VERIFIED',
     productionCapacityAndAvailability: 'NOT_EVALUATED',
     hostileCodeExecutionSecurity: 'NOT_EVALUATED',
   },

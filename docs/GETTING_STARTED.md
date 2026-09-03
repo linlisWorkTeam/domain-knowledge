@@ -127,6 +127,8 @@ npm run knowledge -- workflow-run --repository /path/to/ohMyWorkPanel
 
 需要接入真实 DeepSeek Harness 时，按 [`deploy/deepseek-harness/README.md`](../deploy/deepseek-harness/README.md) 安装 Bubblewrap，配置 `OPENCODE_GO_API_KEY`、Provider 和来源 allowlist，再设置 `WP_FLYWHEEL_AGENT_PROVIDER=deepseek-harness`。Prompt 通过官方 SDK 的 stdin JSON-RPC 发送；每个 Agent 只得到角色允许的工作区。密钥只放进运行时环境，不写配置文件。公开 Web 只是 DSH 自身的临时调试面，知识飞轮 Console 仍由 `knowledge:serve` 提供。
 
+需要接入公司 CodeAgent CLI 时，先在部署账户执行 CLI 登录，再设置 `WP_FLYWHEEL_AGENT_PROVIDER=company-codeagent-cli`。默认命令是 `codeagent`，模型为 `company-default`；其他非秘密参数见 [`.env.example`](../.env.example)。Adapter 会在每次 Agent 调用前运行 `codeagent auth status --json`，Prompt 仅经 stdin 发送，session ID 保存在 `$WP_FLYWHEEL_HOME/codeagent/sessions/` 的 0600 文件中。CLI 必须符合 `.env.example` 记录的参数与 JSONL 输出协议；未登录、凭据过期或恢复参数变化都会失败关闭。协议夹具通过不代表公司环境的真实模型质量或稳定性已经验收。
+
 Run 结束后，可以把完整步骤导成一个脱敏 Demo 报告：
 
 ```bash

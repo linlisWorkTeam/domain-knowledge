@@ -13,7 +13,7 @@ domain-knowledge exposes seven fixed Agent roles. A trusted operator may append 
 
 Console 里看到的 Orchestrator、DocGen、DocWorker、TestGen、`code`、Check 和 Review 是七类固定角色。它们描述“这个节点负责什么”，不是七个分别安装的 Agent 产品。
 
-以 `code` 为例：旧设计常把它叫作 `CodeAgent`，当前前台改称“代码生成角色（Code role）”。真实运行时，它和其他角色一样由当前 `AgentProvider` 执行。本项目当前有 DeepSeek Harness SDK 和 Pi Agent 两条 live 路径；后者由管理员在 Console 配置、验证并启用 OpenAI-compatible Provider。这里仍没有另行接入公司 `CodeAgent CLI`。
+以 `code` 为例：旧设计常把它叫作 `CodeAgent`，当前前台改称“代码生成角色（Code role）”。真实运行时，它和其他角色一样由当前 `AgentProvider` 执行。本项目当前有 DeepSeek Harness SDK、Pi Agent 和公司 CodeAgent CLI 三种 Adapter；Pi 由管理员在 Console 配置，CodeAgent CLI 则由部署环境显式启用。Adapter 接线不等于公司环境的真实效果与容量已经验收。
 
 对应代码：
 
@@ -21,6 +21,7 @@ Console 里看到的 Orchestrator、DocGen、DocWorker、TestGen、`code`、Chec
 - 节点到角色的映射：[`src/infrastructure/workflow/langgraph/graph.ts`](../src/infrastructure/workflow/langgraph/graph.ts)
 - Provider 装配：[`src/interfaces/runner/composition.ts`](../src/interfaces/runner/composition.ts)
 - Pi Agent Adapter：[`src/infrastructure/agents/pi-agent/index.ts`](../src/infrastructure/agents/pi-agent/index.ts)
+- 公司 CodeAgent CLI Adapter：[`src/infrastructure/agents/company-codeagent/index.ts`](../src/infrastructure/agents/company-codeagent/index.ts)
 - 角色工作区和证据装配：[`src/application/services/automated-project-workflow.ts`](../src/application/services/automated-project-workflow.ts)
 
 ## 允许改什么
