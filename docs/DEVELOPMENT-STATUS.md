@@ -1,6 +1,6 @@
 # 开发状态
 
-**当前阶段：后端 P0-B 实现验证、前台 F1 已实现｜更新时间：2026-09-03｜下一任务：DEV-005 CompanyCodeAgentCliAdapter**
+**当前阶段：Console 最终形态优先、后端 P0-B 并行候选｜更新时间：2026-09-03｜下一任务：DEV-005 Console 第一轮 F2 + B1 + HCP-1**
 
 本文件是 domain-knowledge 的**唯一开发进度入口**，用于记录当前阶段、已完成里程碑、正在进行或下一项工作、后续队列和最近验证结果。产品行为仍以 [`../specs/`](../specs/README.md) 为规范性事实源；需求级的 `Implemented / Partial / Planned` 状态仍只在[追踪矩阵](../specs/13-verification/traceability-matrix.md)维护。
 
@@ -43,7 +43,7 @@ This file is the single entry point for project-level development status, curren
 - 固定七 Agent 拓扑、并行、迭代、取消、Checkpoint、运行契约和配置快照已经通过自动化验证。
 - deterministic fixture 可以完成失败、修订、重新生成、评测和发布闭环。
 - 前台 F1 已基于现有 API 完成八入口中文 Console、绿色双主题、响应式、可访问性和真实数据状态；没有新增或修改后端 API。
-- 前台后续页面缺口和 Preview API 破坏性迁移已统一写入 `specs/10-interfaces/http-api.md`；当前仅为 Accepted 目标契约，所有 `Planned` 与新路径均未实现，不改变 DEV-005 的下一任务顺序。
+- 前台后续页面缺口和 Preview API 破坏性迁移已统一写入 `specs/10-interfaces/http-api.md`；当前仅为 Accepted 目标契约，所有 `Planned` 与新路径均未实现。本轮对齐结果已提升为 DEV-005 起始的最高优先队列。
 - DeepSeek Harness live Adapter 已存在；公司 CodeAgent CLI 尚未接入。
 - 真实 Agent 质量、公司环境容量、长期稳定性和敌对代码执行安全尚未形成验收结论。
 
@@ -58,20 +58,41 @@ This file is the single entry point for project-level development status, curren
 | DEV-003 | 固定七 Agent LangGraph 编排、Checkpoint 与确定性闭环 | Done | `tests/integration/langgraph-infrastructure.test.ts`、`tests/acceptance/automated-langgraph-flow.test.ts` |
 | DEV-004 | AgentCommand/AgentResult、Run 配置冻结与框架机械能力测评 | Done | [框架阶段性测评](report/框架阶段性测评.md)，结果 `6/6 ACCEPTED` |
 | DEV-UI-001 | 前台 F1 Knowledge Console | Done | `tests/contract/site.test.ts`、`tests/e2e/console.spec.ts`；只复用现有 API |
-| DEV-UI-002 | 前台 F2 最终七页面、真实 Graph 与 HCP-1 | Planned | 与 DEV-010 B1 可并行；B2/B3 前台接线必须等待 HCP-1 通过 |
-| DEV-005 | 公司 CodeAgent CLI Adapter 与契约验证 | Ready / Next | 尚未实现；见下方完成标准 |
-| DEV-006 | 公司 CodeAgent 七角色真实闭环与效果基线 | Planned | 依赖 DEV-005 |
-| DEV-007 | TestGen 候选测试的通用 Oracle 验证与门禁链路 | Planned | 对应 `KF-SYS-004` |
-| DEV-008 | 四点崩溃注入、完整权限拒绝审计与恢复加固 | Planned | 对应 `AC-REC-001`、`AC-SEC-002` |
-| DEV-009 | 生产容量、认证续期、并发与 Redis 启用决策 | Planned | 依赖真实运行数据，不改变 Registry 事实源地位 |
-| DEV-010 | Console B1 Preview API 基线迁移 | Planned | 11 个旧接口资源化迁移，统一分页、错误、认证、幂等和 revision |
-| DEV-011 | Console B2 Action Center 与 Runs 完整控制面 | Planned | Action Item、progress/retry/SSE、组件健康、Activity 与 Graph 实时更新 |
-| DEV-012 | Console B3 Knowledge、Evaluations 与 Sources | Planned | 血缘/Diff、Evaluation 读模型与规则、Source Registry、Knowledge Health |
-| DEV-013 | Console B4 运营面加固 | Planned | Provider status、指标口径、SSE 容量和大数据查询验收 |
+| DEV-005 | Console 第一轮：F2 最终七页面 + B1 API 基线 + HCP-1 | Ready / Next | 前后台可并行；HCP-1 通过前不得开始 B2/B3 前台接线 |
+| DEV-006 | Console B2 Action Center 与 Runs 完整控制面 | Planned | Action Item、progress/retry/SSE、组件健康、Activity 与 Graph 实时更新；依赖 DEV-005 |
+| DEV-007 | Console B3 Knowledge、Evaluations 与 Sources | Planned | Knowledge 可由独立 Agent 并行；血缘/Diff、Evaluation 读模型与规则、Source Registry、Knowledge Health；依赖 DEV-005 |
+| DEV-008 | Console B4 运营面加固 | Planned | Provider status、指标口径、SSE 容量和大数据查询验收；依赖 DEV-006/007 |
+| DEV-009 | 公司 CodeAgent CLI Adapter 与契约验证 | Planned | 原 DEV-005；Console 优先队列完成后恢复排序 |
+| DEV-010 | 公司 CodeAgent 七角色真实闭环与效果基线 | Planned | 原 DEV-006；依赖 DEV-009 |
+| DEV-011 | TestGen 候选测试的通用 Oracle 验证与门禁链路 | Planned | 原 DEV-007；对应 `KF-SYS-004` |
+| DEV-012 | 四点崩溃注入、完整权限拒绝审计与恢复加固 | Planned | 原 DEV-008；对应 `AC-REC-001`、`AC-SEC-002` |
+| DEV-013 | 生产容量、认证续期、并发与 Redis 启用决策 | Planned | 原 DEV-009；依赖真实运行数据，不改变 Registry 事实源地位 |
 
 状态含义：`Ready / Next` 表示下一项已排序但尚未开始；`In Progress` 表示已有活动开发分支；`Blocked` 必须写明外部依赖；`Done` 必须给出可复验结果。
 
 ## 下一开发任务：DEV-005
+
+目标是在同一轮并行完成 F2 最终七页面视觉结构与 B1 Preview API 基线，并以 HCP-1 冻结页面信息架构、Graph 语义和 API 边界，再进入 B2/B3。
+
+范围：
+
+- 前台完成 Action Center、Flywheel Runs、Knowledge、Graph、Evaluations、Sources、Agent Settings 七页最终布局和全部真实/Partial/Disabled 状态；
+- Graph 使用现有 Run、WorkflowNodeProjection、workflow status 和事件实现真实轮询版，不增加 Graph API；
+- API 完成 11 个旧接口的资源化迁移，并同步 Server、Console、DSH Adapter、测试和文档；
+- 落地统一分页、错误、认证、幂等和 revision 契约，不保留 Preview 旧路由别名；
+- 提供公网验收环境、桌面/移动端与双主题证据、逐区域数据来源表和禁用能力清单；
+- 执行 HCP-1，结论必须为 `Accepted` 或 `Accepted with follow-ups` 才能开始 B2/B3 前台接线。
+
+完成标准：
+
+1. 七个最终页面均可导航，目标视觉、响应式、无障碍和错误/空/部分状态通过自动化检查；
+2. Graph 正确表达选定 Run 的固定 Agent 执行图，节点详情来自 Registry 投影且不能编辑拓扑或推进状态；
+3. 新 API 路径通过 Server、Console 与 DSH Adapter 契约测试，旧公共 HTTP 路径返回 404；
+4. 页面不展示模拟 Health、ETA、Activity、Action Item、Workspace 或用户身份；
+5. `npm run typecheck`、`npm run validate:specs`、`npm test`、`npm run site:check` 和 `npm run test:ui` 全部通过；
+6. HCP-1 证据与人工结论记录在对应 PR，开发状态在同一变更回写。
+
+## 后续开发任务：DEV-009 CompanyCodeAgentCliAdapter
 
 目标是在不改变 Domain/Application、七个 Agent 拓扑、内部 AgentCommand/AgentResult 和现有 HTTP API 的前提下，实现 `CompanyCodeAgentCliAdapter`，作为现有 `AgentProvider` Port 的 Infrastructure 实现。
 
@@ -94,7 +115,7 @@ This file is the single entry point for project-level development status, curren
 5. `npm run typecheck`、`npm run validate:specs`、`npm test` 和 `npm run evaluate:framework` 全部通过；
 6. 追踪矩阵和本文件在同一 PR 回写实际结果。
 
-本任务不修改 `web/`、`site/`、前台产品设计、现有 HTTP 路由或响应。如果发现必须新增 API，只记录需求并输出交给前台/API 负责人的 Prompt，不在后台任务中实现。
+DEV-009 不修改 `web/`、`site/`、前台产品设计、现有 HTTP 路由或响应。如果发现必须新增 API，只记录需求并输出交给前台/API 负责人的 Prompt，不在后台任务中实现。
 
 ## 最近验证基线
 
