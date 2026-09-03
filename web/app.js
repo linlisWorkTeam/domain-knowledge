@@ -92,6 +92,9 @@ const state = {
   runs: [],
   knowledge: [],
   agents: [],
+  actionItems: [],
+  activities: [],
+  components: null,
   token: '',
   operatorMode: false,
   selectedRun: null,
@@ -101,6 +104,9 @@ const state = {
   graphRunId: null,
   graphSnapshot: null,
   graphPoll: null,
+  graphStream: null,
+  activityStream: null,
+  activityPoll: null,
 }
 
 function collection(payload, legacyKey) {
@@ -200,29 +206,30 @@ function setPageMeta(page) {
 
 function renderOverview() {
   const active = state.runs.filter((run) => !TERMINAL.has(run.state))
-  const attention = state.runs.filter(needsAttention)
+  const attention = state.actionItems.filter((item) => item.status !== 'RESOLVED')
   const status = state.status ?? {}
   const verified = state.status ? status.verified : (state.resourceErrors.knowledge ? '不可用' : state.knowledge.filter((item) => item.status === 'VERIFIED').length)
   const candidates = state.status ? status.candidates : (state.resourceErrors.knowledge ? '不可用' : state.knowledge.filter((item) => item.status === 'CANDIDATE').length)
-  const recent = state.runs.slice(0, 6)
-  const notices = ['status', 'runs', 'capabilities'].filter((key) => state.resourceErrors[key])
+  const recent = state.activities.slice(0, 6)
+  const notices = ['status', 'runs', 'capabilities', 'actionItems', 'activities', 'components'].filter((key) => state.resourceErrors[key])
   const latestRun = state.runs[0]
-  const runIssueRows = attention.length ? attention.slice(0, 5).map((run, index) => `
-    <button class="attention-row ${index === 0 ? 'selected' : ''}" data-run-id="${escapeHtml(run.runId)}" type="button">
-      <i class="attention-dot ${run.state === 'FAILED' ? 'danger' : 'warning'}" aria-hidden="true"></i>
-      <span><b>${escapeHtml(run.moduleId)}</b><small>${escapeHtml(shortId(run.runId, 26))} · ${escapeHtml(displayLabel(run.state))}</small></span>
-      ${badge(run.latestDecision?.outcome ?? run.state)}
-      <time>${escapeHtml(formatDate(run.updatedAt))}</time>
-    </button>`).join('') : ''
-  const queueRemainder = `<div class="queue-partial-state"><span aria-hidden="true">◇</span><div><b>${attention.length ? '暂无更多真实待办' : '目前没有待处理事项'}</b><small>待办事项 API 接入后显示独立任务生命周期</small></div><em>${attention.length ? '数据不完整' : '暂无数据'}</em></div>`
-  const pulseRows = recent.slice(0, 3).map((run) => `
-    <button class="pulse-row" data-run-id="${escapeHtml(run.runId)}" type="button"><i class="${needsAttention(run) ? 'warning' : 'success'}"></i><span><b>${escapeHtml(run.moduleId)}</b><small>${escapeHtml(displayLabel(run.state))} · ${escapeHtml(formatDate(run.updatedAt))}</small></span></button>`).join('')
+  const runIssueRows = attention.length ? attention.slice(0, 5).map((item, index) => `
+    <div class="attention-row ${index === 0 ? 'selected' : ''}">
+      <i class="attention-dot ${item.severity === 'HIGH' ? 'danger' : 'warning'}" aria-hidden="true"></i>
+      <button class="attention-subject" data-run-id="${escapeHtml(item.runId)}" type="button"><b>${escapeHtml(item.summary)}</b><small>${escapeHtml(shortId(item.runId, 26))} · ${escapeHtml(item.reasonCode)}</small></button>
+      ${badge(item.status)}
+      <div class="action-buttons">${(item.allowedActions ?? []).map((action) => `<button type="button" data-action-item="${escapeHtml(item.actionItemId)}" data-action="${escapeHtml(action)}" data-revision="${escapeHtml(item.revision)}" ${state.operatorMode ? '' : 'disabled'}>${escapeHtml({ ACKNOWLEDGE: '接手', RESOLVE: '解决', RETRY: '重试', REGENERATE: '重新生成' }[action] ?? action)}</button>`).join('')}</div>
+      <time>${escapeHtml(formatDate(item.updatedAt))}</time>
+    </div>`).join('') : ''
+  const queueRemainder = `<div class="queue-partial-state"><span aria-hidden="true">◇</span><div><b>${attention.length ? '暂无更多待办' : '目前没有待处理事项'}</b><small>${state.resourceErrors.actionItems ? '待处理事项读取失败' : '所有服务端治理事项均已处理'}</small></div><em>${state.resourceErrors.actionItems ? '读取失败' : '暂无数据'}</em></div>`
+  const pulseRows = recent.slice(0, 3).map((activity) => `
+    <button class="pulse-row" ${activity.runId ? `data-run-id="${escapeHtml(activity.runId)}"` : 'disabled'} type="button"><i class="${activity.severity === 'HIGH' ? 'warning' : 'success'}"></i><span><b>${escapeHtml(activity.summary)}</b><small>${escapeHtml(activity.type)} · ${escapeHtml(formatDate(activity.occurredAt))}</small></span></button>`).join('')
   content.innerHTML = `
     ${notices.length ? partialNotice(`${notices.join('、')} 获取失败；其余区域仍展示已读取的服务端事实。`) : ''}
     <section class="overview-summary-grid" aria-label="关键摘要">
       <article class="attention-summary">
         <span class="attention-orb"><i></i></span>
-        <div><p class="eyebrow danger-text">需要处理 · 数据不完整</p><h2>${state.resourceErrors.runs ? '批次状态不可用' : `${attention.length} 项需要确认`}</h2><p>${state.resourceErrors.runs ? '无法读取批次列表' : `来自 ${state.runs.length} 个真实批次的只读投影`}</p></div>
+        <div><p class="eyebrow danger-text">需要处理</p><h2>${state.resourceErrors.actionItems ? '治理事项不可用' : `${attention.length} 项需要确认`}</h2><p>${state.resourceErrors.actionItems ? '无法读取治理事项' : '来自服务端持久化治理队列'}</p></div>
         <footer><i></i><i></i><i></i></footer>
       </article>
       <article class="knowledge-summary">
@@ -234,17 +241,17 @@ function renderOverview() {
     <div class="overview-workspace">
       <section class="attention-queue">
         <header><div><h2>需要处理</h2><small>由失败、低置信与已停止批次派生</small></div><button class="text-button" data-page-link="runs">查看全部 →</button></header>
-        <div class="queue-filters"><button class="active">全部　${attention.length}</button><button>批次失败　${attention.filter((run) => run.state === 'FAILED').length}</button><button>低置信　${attention.filter((run) => run.state === 'LOW_CONFIDENCE').length}</button><span>数据不完整</span></div>
-        <div class="queue-labels"><span>运行</span><span>状态</span><span>更新</span></div>
+        <div class="queue-filters"><button class="active">全部　${attention.length}</button><button>批次失败　${attention.filter((item) => item.type === 'RUN_FAILED').length}</button><button>低置信　${attention.filter((item) => item.type === 'LOW_CONFIDENCE').length}</button><span>${state.operatorMode ? '可执行治理操作' : '进入治理模式后可操作'}</span></div>
+        <div class="queue-labels"><span>事项</span><span>状态与操作</span><span>更新</span></div>
         <div class="queue-body">${runIssueRows}${queueRemainder}</div>
       </section>
       <aside class="overview-rail">
         <article class="current-run-card">
           <header><small><i></i> 飞轮${active.length ? '运行中' : '状态'}</small><button class="text-button" data-page-link="runs">打开批次 ↗</button></header>
           ${latestRun ? `<h3>${escapeHtml(shortId(latestRun.runId, 18))}</h3><p>${escapeHtml(latestRun.moduleId)} · ${escapeHtml(displayLabel(latestRun.state))}</p><div class="run-state-line"><i></i></div><div class="run-state-meta"><b>${escapeHtml(displayLabel(latestRun.state))}</b><span>预计完成时间暂不可用</span></div>` : emptyState('暂无批次', '注册中没有批次记录。')}
-          <ol class="flywheel-stages"><li class="observed"><i>1</i><span>发现<small>批次已登记</small></span></li><li class="observed"><i>2</i><span>生成<small>${latestRun ? escapeHtml(displayLabel(latestRun.state)) : '等待运行'}</small></span></li><li><i>3</i><span>评测<small>进度 API 未接入</small></span></li><li><i>4</i><span>演进<small>发布状态待确认</small></span></li></ol>
+          <ol class="flywheel-stages"><li class="observed"><i>1</i><span>发现<small>批次已登记</small></span></li><li class="observed"><i>2</i><span>生成<small>${latestRun ? escapeHtml(displayLabel(latestRun.state)) : '等待运行'}</small></span></li><li><i>3</i><span>评测<small>${state.latestProgress?.mode === 'DETERMINATE' ? `${state.latestProgress.completedUnits}/${state.latestProgress.totalUnits}` : '等待可证明进度'}</small></span></li><li><i>4</i><span>演进<small>发布状态待确认</small></span></li></ol>
         </article>
-        <article class="recent-pulse"><header><h3>最近动态</h3><span>活动数据不完整</span></header>${pulseRows || '<div class="pulse-empty"><b>暂无真实活动</b><small>工作区活动 API 尚未接入</small></div>'}</article>
+        <article class="recent-pulse"><header><h3>最近动态</h3><span>${state.activityStream ? '实时连接' : '轮询更新'}</span></header>${pulseRows || '<div class="pulse-empty"><b>暂无真实活动</b><small>服务端尚未记录活动</small></div>'}</article>
       </aside>
     </div>`
 }
@@ -274,7 +281,7 @@ function referenceRunRow(run, selected = false) {
 }
 
 function renderRunWorkspace(snapshot) {
-  const { run, events = [], checkpoints = [], workflowNodes = [], evaluations = [], versions = [], latestDecision } = snapshot
+  const { run, events = [], checkpoints = [], workflowNodes = [], evaluations = [], versions = [], latestDecision, progress } = snapshot
   const automationNodes = workflowNodes.length ? workflowNodes : checkpoints
   const primaryStates = ['CREATED', 'PLANNED', 'GENERATING', 'EVALUATING', 'REVIEWING', 'PUBLISHING', 'VERIFIED']
   const currentIndex = primaryStates.indexOf(run.state)
@@ -292,6 +299,7 @@ function renderRunWorkspace(snapshot) {
         <div class="run-title-actions">${badge(run.state)}<a class="secondary-button" href="/api/v1/runs/${encodeURIComponent(run.runId)}/report" download>导出报告</a><button class="secondary-button" data-refresh-run="${escapeHtml(run.runId)}">刷新</button></div>
       </div>
       <ol class="run-stepper">${steps}</ol>
+      ${progress?.mode === 'DETERMINATE' ? `<div class="state-callout"><b>可证明进度：${escapeHtml(progress.completedUnits)} / ${escapeHtml(progress.totalUnits)}</b><span>当前阶段 ${escapeHtml(displayLabel(progress.currentStage))} · 不提供推测性 ETA</span><progress class="progress" value="${escapeHtml(progress.completedUnits)}" max="${escapeHtml(progress.totalUnits)}"></progress></div>` : '<div class="state-callout"><b>进度暂不可确定</b><span>服务端没有完整冻结工作单元，不显示百分比或 ETA。</span></div>'}
       ${['ITERATING', 'ROLLING_BACK', 'LOW_CONFIDENCE', 'FAILED', 'CANCELLED'].includes(run.state) ? `<div class="state-callout ${run.state.toLowerCase().replaceAll('_', '-')}"><b>当前状态：${escapeHtml(displayLabel(run.state))}</b><span>第 ${escapeHtml(run.iteration + 1)} 轮 · 详情以事件与门禁证据为准</span></div>` : ''}
     </section>
     <div class="run-workspace-grid">
@@ -431,7 +439,7 @@ function graphEdge(from, to, nodeStates) {
 
 function renderGraph() {
   const selected = state.graphRunId || state.runs[0]?.runId || ''
-  content.innerHTML = `<section class="reference-graph-tools"><label>选择批次　<select id="graph-run-select"><option value="">请选择批次</option>${state.runs.map((run) => `<option value="${escapeHtml(run.runId)}" ${run.runId === selected ? 'selected' : ''}>${escapeHtml(run.moduleId)} · ${escapeHtml(shortId(run.runId))}</option>`).join('')}</select></label><span>只读 · 每 10 秒刷新 · 数据不完整</span></section><section id="graph-stage" class="reference-graph-shell">${selected ? '<div class="loading-state"><span class="spinner"></span>正在读取 Agent 节点事实…</div>' : emptyState('选择一个批次', '这里只展示服务端记录的 Agent 工作状态。')}</section>`
+  content.innerHTML = `<section class="reference-graph-tools"><label>选择批次　<select id="graph-run-select"><option value="">请选择批次</option>${state.runs.map((run) => `<option value="${escapeHtml(run.runId)}" ${run.runId === selected ? 'selected' : ''}>${escapeHtml(run.moduleId)} · ${escapeHtml(shortId(run.runId))}</option>`).join('')}</select></label><span>只读 · 实时事件；断线后每 10 秒轮询</span></section><section id="graph-stage" class="reference-graph-shell">${selected ? '<div class="loading-state"><span class="spinner"></span>正在读取 Agent 节点事实…</div>' : emptyState('选择一个批次', '这里只展示服务端记录的 Agent 工作状态。')}</section>`
   if (selected) loadGraph(selected).catch((error) => { const stage = document.querySelector('#graph-stage'); if (stage) stage.innerHTML = errorState('无法读取工作流图', error) })
 }
 
@@ -446,6 +454,7 @@ async function loadGraph(runId) {
   const nodes = collection(nodePayload, 'nodes').length ? collection(nodePayload, 'nodes') : (snapshot.workflowNodes ?? [])
   const events = collection(eventPayload, 'events').length ? collection(eventPayload, 'events') : (snapshot.events ?? [])
   state.graphSnapshot = { snapshot, nodes, events, workflowStatus }
+  ensureGraphStream(runId, Math.max(0, ...events.map((record) => Number(record.eventSeq) || 0)))
   const stage = document.querySelector('#graph-stage')
   if (!stage || state.page !== 'graph' || state.graphRunId !== runId) return
   const definitions = state.agents.length ? state.agents : Object.keys(AGENT_LABELS).map((agentId) => ({ agentId }))
@@ -453,6 +462,39 @@ async function loadGraph(runId) {
   const statusCounts = { complete: 0, running: 0, failed: 0, idle: 0 }
   for (const node of nodeStates.values()) statusCounts[graphStatus(node?.status)] += 1
   stage.innerHTML = `<div class="reference-graph-canvas"><div class="workflow-graph" aria-label="只读 Agent 工作流图"><svg class="graph-connections" viewBox="0 0 900 540" preserveAspectRatio="none" aria-hidden="true"><defs><marker id="graph-arrow-idle" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z"></path></marker><marker id="graph-arrow-running" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z"></path></marker><marker id="graph-arrow-complete" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z"></path></marker></defs>${GRAPH_EDGES.map(([from, to]) => graphEdge(from, to, nodeStates)).join('')}</svg>${definitions.map((agent) => { const node = nodeStates.get(agent.agentId); const status = node?.status ?? 'PENDING'; return `<button class="graph-node node-${escapeHtml(agent.agentId)} ${graphStatus(status)}" data-graph-agent="${escapeHtml(agent.agentId)}"><span class="graph-node-icon" aria-hidden="true">${['COMMITTED', 'COMPLETED'].includes(status) ? '✓' : status === 'FAILED' ? '!' : status === 'RUNNING' ? '●' : '○'}</span><b>${escapeHtml(AGENT_LABELS[agent.agentId] ?? agent.name ?? agent.agentId)}</b><small>${escapeHtml(displayLabel(status))}${node ? ` · 第 ${(node.iteration ?? 0) + 1} 轮 · 第 ${node.attempt ?? (node.retryCount ?? 0) + 1} 次尝试` : ''}</small></button>` }).join('')}</div><div class="graph-status-legend"><span><i class="running"></i>运行中 ${statusCounts.running}</span><span><i class="complete"></i>已完成 ${statusCounts.complete}</span><span><i class="failed"></i>失败 ${statusCounts.failed}</span><span><i></i>未开始 ${statusCounts.idle}</span></div></div><aside class="reference-node-detail"><header><em>批次状态</em><b>${nodes.length}</b></header><h3>${escapeHtml(snapshot.run?.moduleId ?? runId)}</h3><p>业务状态 ${escapeHtml(displayLabel(snapshot.run?.state))}<br>工作流 ${escapeHtml(displayLabel(workflowStatus.status ?? workflowStatus.workflowStatus ?? 'PENDING'))}</p><small>执行情况</small><div><span>运行中</span><b>${statusCounts.running}</b></div><div><span>已完成</span><b>${statusCounts.complete}</b></div><div><span>失败</span><b>${statusCounts.failed}</b></div><div><span>未开始</span><b>${statusCounts.idle}</b></div><button class="wide" data-page-link="evaluations">查看评测证据 →</button></aside>`
+}
+
+function ensureGraphStream(runId, after) {
+  if (!('EventSource' in window) || state.graphStream?._runId === runId) return
+  state.graphStream?.close()
+  const stream = new EventSource(`/api/v1/runs/${encodeURIComponent(runId)}/event-stream?after=${after}`)
+  stream._runId = runId
+  stream._cursor = after
+  stream.addEventListener('ready', () => {
+    clearInterval(state.graphPoll)
+    state.graphPoll = null
+  })
+  stream.addEventListener('run-event', (event) => {
+    stream._cursor = Number(event.lastEventId) || stream._cursor
+    if (state.page === 'graph' && state.graphRunId === runId) loadGraph(runId).catch(() => {})
+  })
+  stream.addEventListener('reconnect', (event) => {
+    try { stream._cursor = Number(JSON.parse(event.data).after) || stream._cursor } catch {}
+  })
+  stream.onerror = () => {
+    stream.close()
+    if (state.graphStream === stream) state.graphStream = null
+    clearInterval(state.graphPoll)
+    state.graphPoll = setInterval(() => {
+      if (state.page === 'graph' && state.graphRunId === runId) loadGraph(runId).catch(() => {})
+    }, 10_000)
+    setTimeout(() => {
+      if (state.page === 'graph' && state.graphRunId === runId && !state.graphStream) {
+        ensureGraphStream(runId, stream._cursor)
+      }
+    }, 2_000)
+  }
+  state.graphStream = stream
 }
 
 function openGraphNode(agentId, returnFocus) {
@@ -575,9 +617,12 @@ async function navigate(page) {
   if (page === 'knowledge') renderKnowledge()
   clearInterval(state.graphPoll)
   state.graphPoll = null
+  if (page !== 'graph') {
+    state.graphStream?.close()
+    state.graphStream = null
+  }
   if (page === 'graph') {
     renderGraph()
-    state.graphPoll = setInterval(() => state.page === 'graph' && state.graphRunId && loadGraph(state.graphRunId).catch(() => {}), 10_000)
   }
   if (page === 'evaluations') await renderEvidence()
   if (page === 'sources') await renderDiscovery()
@@ -592,8 +637,46 @@ async function openRun(runId) {
   setPageMeta('runs')
   state.page = 'runs'
   content.innerHTML = '<div class="loading-state"><span class="spinner"></span>正在读取批次快照…</div>'
-  state.selectedRun = await request(`/api/v1/runs/${encodeURIComponent(runId)}`)
+  const encoded = encodeURIComponent(runId)
+  const [snapshot, progress] = await Promise.all([
+    request(`/api/v1/runs/${encoded}`),
+    request(`/api/v1/runs/${encoded}/progress`),
+  ])
+  state.selectedRun = { ...snapshot, progress }
   renderRunWorkspace(state.selectedRun)
+}
+
+async function performActionItem(button) {
+  if (!state.operatorMode || !state.token) {
+    showToast('请先进入治理模式。', 'warning')
+    return
+  }
+  const action = button.dataset.action
+  const actionItemId = button.dataset.actionItem
+  const reason = window.prompt(action === 'RESOLVE' ? '请输入解决依据' : '请输入本次操作依据')?.trim()
+  if (!reason) return
+  let feedback
+  if (action === 'REGENERATE') {
+    feedback = window.prompt('请输入重新生成时必须采用的反馈')?.trim()
+    if (!feedback) return
+  }
+  button.disabled = true
+  try {
+    const suffix = action === 'REGENERATE' ? 'regenerate' : `actions/${action.toLowerCase()}`
+    await request(`/api/v1/action-items/${encodeURIComponent(actionItemId)}/${suffix}`, {
+      method: 'POST',
+      body: JSON.stringify({
+        expectedRevision: Number(button.dataset.revision), reason,
+        ...(feedback ? { feedback } : {}),
+      }),
+    })
+    await refreshControlPlane()
+    renderOverview()
+    showToast('治理操作已提交并记录审计。', 'success')
+  } catch (error) {
+    button.disabled = false
+    showToast(error.message, 'danger')
+  }
 }
 
 function openEvidence(encoded, returnFocus) {
@@ -731,6 +814,8 @@ content.addEventListener('click', (event) => {
   if (pageLink) navigate(pageLink.dataset.pageLink).catch(showFatal)
   const runButton = event.target.closest('[data-run-id]')
   if (runButton) openRun(runButton.dataset.runId).catch(showFatal)
+  const actionButton = event.target.closest('[data-action-item]')
+  if (actionButton) performActionItem(actionButton)
   if (event.target.closest('[data-run-back]')) { state.selectedRun = null; renderRuns() }
   const refresh = event.target.closest('[data-refresh-run]')
   if (refresh) openRun(refresh.dataset.refreshRun).catch(showFatal)
@@ -854,6 +939,7 @@ operatorButton.addEventListener('click', () => {
     state.token = ''
     state.operatorMode = false
     updateMode()
+    refreshControlPlane().then(() => state.page === 'overview' && renderOverview()).catch(() => {})
     showToast('已退出治理模式。')
     return
   }
@@ -878,6 +964,7 @@ operatorForm.addEventListener('submit', (event) => {
   operatorToken.value = ''
   operatorDialog.close()
   updateMode()
+  refreshControlPlane().then(() => state.page === 'overview' && renderOverview()).catch((error) => showToast(error.message, 'danger'))
   showToast('令牌已载入当前页面内存。', 'success')
 })
 operatorCancel.addEventListener('click', () => operatorDialog.close())
@@ -913,6 +1000,7 @@ function updateMode() {
   }
   if (state.page === 'agent-settings') renderAgents()
   if (state.page === 'runs') renderRuns()
+  if (state.page === 'overview') renderOverview()
 }
 
 function showFatal(error) {
@@ -922,9 +1010,10 @@ function showFatal(error) {
 }
 
 async function boot() {
-  const keys = ['status', 'capabilities', 'runs', 'knowledge', 'agents']
+  const keys = ['status', 'capabilities', 'runs', 'knowledge', 'agents', 'actionItems', 'activities', 'components']
   const results = await Promise.allSettled([
     request('/api/v1/system/status'), request('/api/v1/system/capabilities'), request('/api/v1/runs'), request('/api/v1/knowledge'), request('/api/v1/agents'),
+    request('/api/v1/action-items'), request('/api/v1/activity'), request('/api/v1/system/components'),
   ])
   results.forEach((result, index) => {
     if (result.status === 'rejected') state.resourceErrors[keys[index]] = result.reason
@@ -935,16 +1024,91 @@ async function boot() {
   state.runs = results[2].status === 'fulfilled' ? collection(results[2].value, 'runs') : []
   state.knowledge = results[3].status === 'fulfilled' ? collection(results[3].value, 'knowledge') : []
   state.agents = results[4].status === 'fulfilled' ? collection(results[4].value, 'agents') : []
+  state.actionItems = results[5].status === 'fulfilled' ? collection(results[5].value, 'actionItems') : []
+  state.activities = results[6].status === 'fulfilled' ? collection(results[6].value, 'activities') : []
+  state.components = results[7].status === 'fulfilled' ? results[7].value : null
+  if (state.runs[0]) {
+    state.latestProgress = await request(`/api/v1/runs/${encodeURIComponent(state.runs[0].runId)}/progress`).catch(() => null)
+  }
   state.loadedAt = new Date().toISOString()
   const partial = Object.keys(state.resourceErrors).length > 0
   registryIndicator.className = `health-dot ${partial ? 'pending' : 'healthy'}`
   registryLabel.textContent = partial ? '部分数据可用' : '服务已连接'
-  governanceCount.textContent = state.runs.filter(needsAttention).length || ''
+  governanceCount.textContent = state.actionItems.filter((item) => item.status !== 'RESOLVED').length || ''
   runtimeFooter.innerHTML = `<span><i class="health-dot healthy"></i>控制台 API 已连接</span><span>读取于 ${escapeHtml(formatDate(state.loadedAt))}</span><span>${escapeHtml(state.runs.length)} 个批次 · ${escapeHtml(state.knowledge.length)} 个知识版本</span>`
   updateMode()
   setPageMeta('overview')
   renderOverview()
+  connectActivityStream()
   closeNavigation()
+}
+
+async function refreshControlPlane() {
+  const results = await Promise.allSettled([
+    request('/api/v1/runs'), request('/api/v1/action-items'), request('/api/v1/activity'),
+  ])
+  if (results[0].status === 'fulfilled') state.runs = collection(results[0].value, 'runs')
+  if (results[1].status === 'fulfilled') state.actionItems = collection(results[1].value, 'actionItems')
+  if (results[2].status === 'fulfilled') state.activities = collection(results[2].value, 'activities')
+  governanceCount.textContent = state.actionItems.filter((item) => item.status !== 'RESOLVED').length || ''
+  if (state.runs[0]) {
+    state.latestProgress = await request(`/api/v1/runs/${encodeURIComponent(state.runs[0].runId)}/progress`).catch(() => null)
+  }
+}
+
+function connectActivityStream() {
+  if (!('EventSource' in window) || state.activityStream) {
+    if (!('EventSource' in window) && !state.activityPoll) {
+      state.activityPoll = setInterval(() => refreshControlPlane().then(() => state.page === 'overview' && renderOverview()).catch(() => {}), 10_000)
+    }
+    return
+  }
+  const after = state.activities[0]?.cursor ?? ''
+  const stream = new EventSource(`/api/v1/activity/stream?after=${encodeURIComponent(after)}`)
+  stream._cursor = after
+  stream.addEventListener('ready', () => {
+    clearInterval(state.activityPoll)
+    state.activityPoll = null
+  })
+  stream.addEventListener('activity', (event) => {
+    stream._cursor = event.lastEventId || stream._cursor
+    refreshControlPlane().then(() => state.page === 'overview' && renderOverview()).catch(() => {})
+  })
+  stream.addEventListener('reconnect', (event) => {
+    try { stream._cursor = JSON.parse(event.data).after || stream._cursor } catch {}
+  })
+  stream.onerror = () => {
+    stream.close()
+    if (state.activityStream === stream) state.activityStream = null
+    if (!state.activityPoll) {
+      state.activityPoll = setInterval(() => refreshControlPlane().then(() => state.page === 'overview' && renderOverview()).catch(() => {}), 10_000)
+    }
+    setTimeout(() => {
+      if (!state.activityStream) connectActivityStreamFrom(stream._cursor)
+    }, 2_000)
+  }
+  state.activityStream = stream
+}
+
+function connectActivityStreamFrom(after) {
+  if (state.activityStream || !('EventSource' in window)) return
+  const stream = new EventSource(`/api/v1/activity/stream?after=${encodeURIComponent(after || '')}`)
+  stream._cursor = after || ''
+  stream.addEventListener('ready', () => {
+    clearInterval(state.activityPoll)
+    state.activityPoll = null
+  })
+  stream.addEventListener('activity', (event) => {
+    stream._cursor = event.lastEventId || stream._cursor
+    refreshControlPlane().then(() => state.page === 'overview' && renderOverview()).catch(() => {})
+  })
+  stream.onerror = () => {
+    stream.close()
+    if (state.activityStream === stream) state.activityStream = null
+    if (!state.activityPoll) state.activityPoll = setInterval(() => refreshControlPlane().then(() => state.page === 'overview' && renderOverview()).catch(() => {}), 10_000)
+    setTimeout(() => !state.activityStream && connectActivityStreamFrom(stream._cursor), 2_000)
+  }
+  state.activityStream = stream
 }
 
 boot().catch(showFatal)

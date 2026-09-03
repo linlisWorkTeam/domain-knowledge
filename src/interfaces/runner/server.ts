@@ -144,6 +144,24 @@ function sseCursor(request: IncomingMessage, url: URL): number {
   return value;
 }
 
+function decodeActivityCursor(raw: string): number {
+  if (!raw) return 0;
+  if (!raw.startsWith('act_')) throw new Error('INVALID_EVENT_CURSOR: activity cursor is invalid');
+  const value = Number(Buffer.from(raw.slice(4), 'base64url').toString('utf8'));
+  if (!Number.isSafeInteger(value) || value < 0) throw new Error('INVALID_EVENT_CURSOR: activity cursor is invalid');
+  return value;
+}
+
+function activitySseCursor(request: IncomingMessage, url: URL): number {
+  const header = request.headers['last-event-id'];
+  const headerValue = Array.isArray(header) ? header[0] : header;
+  const queryValue = url.searchParams.get('after');
+  if (headerValue && queryValue && headerValue !== queryValue) {
+    throw new Error('INVALID_EVENT_CURSOR: Last-Event-ID and after differ');
+  }
+  return decodeActivityCursor(headerValue || queryValue || '');
+}
+
 function openSse(response: ServerResponse): void {
   response.writeHead(200, {
     'content-type': 'text/event-stream; charset=utf-8',
@@ -155,7 +173,7 @@ function openSse(response: ServerResponse): void {
   response.write(`event: ready\ndata: ${JSON.stringify({ connectedAt: new Date().toISOString() })}\n\n`);
 }
 
-function writeSse(response: ServerResponse, id: number, event: string, value: unknown): void {
+function writeSse(response: ServerResponse, id: number | string, event: string, value: unknown): void {
   response.write(`id: ${id}\nevent: ${event}\ndata: ${JSON.stringify(value)}\n\n`);
 }
 
@@ -202,6 +220,8 @@ export function createKnowledgeServer(input: {
   repositoryRoot?: string;
   runtimeDir?: string;
   writeToken?: string;
+  componentChecks?: Partial<Record<'registry' | 'artifactStore' | 'workflow' | 'provider' | 'evaluator', () => Promise<void> | void>>;
+  componentCheckTimeoutMs?: number;
 } = {}) {
   const composition = createComposition(input);
   const writeToken = input.writeToken ?? process.env.WP_KNOWLEDGE_WRITE_TOKEN;
@@ -258,27 +278,47 @@ export function createKnowledgeServer(input: {
       }
       if (request.method === 'GET' && url.pathname === '/api/v1/system/components') {
         const sampledAt = new Date().toISOString();
-        const components = [
-          { component: 'registry', status: 'AVAILABLE', reasonCode: 'READY' },
-          { component: 'artifactStore', status: 'AVAILABLE', reasonCode: 'READY' },
-          { component: 'workflow', status: 'AVAILABLE', reasonCode: 'READY' },
-          {
-            component: 'provider',
-            status: composition.agentProviderMode === 'fixture' ? 'DEGRADED' : 'AVAILABLE',
-            reasonCode: composition.agentProviderMode === 'fixture' ? 'FIXTURE_PROVIDER' : 'READY',
-          },
-          { component: 'evaluator', status: 'AVAILABLE', reasonCode: 'READY' },
-        ].map((component) => ({
-          ...component,
-          message: component.reasonCode === 'FIXTURE_PROVIDER' ? '当前使用确定性验收 Provider' : '组件可用',
-          checkedAt: sampledAt,
-          lastSucceededAt: component.status === 'AVAILABLE' ? sampledAt : null,
+        const componentNames = ['registry', 'artifactStore', 'workflow', 'provider', 'evaluator'] as const;
+        const defaults: Record<typeof componentNames[number], () => Promise<void> | void> = {
+          registry: () => { composition.apps.flywheel.status(); },
+          artifactStore: () => {}, workflow: () => {}, provider: () => {}, evaluator: () => {},
+        };
+        const timeoutMs = input.componentCheckTimeoutMs ?? 250;
+        const components = await Promise.all(componentNames.map(async (component) => {
+          const check = input.componentChecks?.[component] ?? defaults[component];
+          let timeout: NodeJS.Timeout | undefined;
+          try {
+            await Promise.race([
+              Promise.resolve().then(check),
+              new Promise<never>((_, reject) => {
+                timeout = setTimeout(() => reject(new Error('COMPONENT_CHECK_TIMEOUT')), timeoutMs);
+              }),
+            ]);
+            const degraded = component === 'provider' && composition.agentProviderMode === 'fixture';
+            return {
+              component, status: degraded ? 'DEGRADED' : 'AVAILABLE',
+              reasonCode: degraded ? 'FIXTURE_PROVIDER' : 'READY',
+              message: degraded ? '当前使用确定性验收 Provider' : '组件可用',
+              checkedAt: sampledAt, lastSucceededAt: sampledAt,
+            };
+          } catch (error) {
+            const timedOut = error instanceof Error && error.message === 'COMPONENT_CHECK_TIMEOUT';
+            return {
+              component, status: timedOut ? 'UNKNOWN' : 'UNAVAILABLE',
+              reasonCode: timedOut ? 'COMPONENT_CHECK_TIMEOUT' : 'COMPONENT_CHECK_FAILED',
+              message: timedOut ? '组件检查超时' : '组件当前不可用',
+              checkedAt: sampledAt, lastSucceededAt: null,
+            };
+          } finally {
+            if (timeout) clearTimeout(timeout);
+          }
         }));
         send(response, 200, {
           items: components,
           overall: components.some((component) => component.status === 'UNAVAILABLE')
             ? 'UNAVAILABLE'
-            : components.some((component) => component.status === 'DEGRADED') ? 'DEGRADED' : 'AVAILABLE',
+            : components.some((component) => component.status === 'UNKNOWN') ? 'UNKNOWN'
+              : components.some((component) => component.status === 'DEGRADED') ? 'DEGRADED' : 'AVAILABLE',
           sampledAt,
         });
         return;
@@ -289,30 +329,34 @@ export function createKnowledgeServer(input: {
             .map((key) => [key, url.searchParams.get(key)])
             .filter((entry): entry is [string, string] => entry[1] !== null && entry[1] !== ''),
         );
+        const items = composition.apps.flywheel.listActionItems(filters).map((item) => (
+          authorized(request, writeToken) ? item : { ...item, allowedActions: [] }
+        ));
         send(response, 200, keysetPage(
-          composition.apps.flywheel.listActionItems(filters),
+          items,
           url,
           (item) => `${String(item.updatedAt)}\0${String(item.actionItemId)}`,
         ));
         return;
       }
       if (request.method === 'GET' && url.pathname === '/api/v1/activity/stream') {
-        let cursor = sseCursor(request, url);
+        let cursor = activitySseCursor(request, url);
         openSse(response);
         const flush = () => {
           const pending = composition.apps.flywheel.listActivities()
-            .filter((item) => Number(item.cursor) > cursor)
-            .sort((left, right) => Number(left.cursor) - Number(right.cursor));
-          for (const item of pending) {
-            cursor = Number(item.cursor);
-            writeSse(response, cursor, 'activity', item);
+            .map((item) => ({ item, position: decodeActivityCursor(String(item.cursor)) }))
+            .filter((entry) => entry.position > cursor)
+            .sort((left, right) => left.position - right.position);
+          for (const entry of pending) {
+            cursor = entry.position;
+            writeSse(response, String(entry.item.cursor), 'activity', entry.item);
           }
         };
         flush();
         const polling = setInterval(flush, 250);
         const heartbeat = setInterval(() => response.write(': heartbeat\n\n'), 15_000);
         const lifetime = setTimeout(() => {
-          response.write(`event: reconnect\ndata: ${JSON.stringify({ after: cursor })}\n\n`);
+          response.write(`event: reconnect\ndata: ${JSON.stringify({ after: `act_${Buffer.from(String(cursor)).toString('base64url')}` })}\n\n`);
           response.end();
         }, 30 * 60_000);
         polling.unref();
@@ -332,7 +376,8 @@ export function createKnowledgeServer(input: {
           return;
         }
         const item = composition.apps.flywheel.getActionItem(actionItemId);
-        send(response, item ? 200 : 404, item ?? errorBody('NOT_FOUND', 'Resource not found.', currentRequestId));
+        const visible = item && !authorized(request, writeToken) ? { ...item, allowedActions: [] } : item;
+        send(response, visible ? 200 : 404, visible ?? errorBody('NOT_FOUND', 'Resource not found.', currentRequestId));
         return;
       }
       if (request.method === 'GET' && url.pathname === '/api/v1/activity') {
@@ -344,7 +389,7 @@ export function createKnowledgeServer(input: {
         send(response, 200, keysetPage(
           composition.apps.flywheel.listActivities(filters),
           url,
-          (item) => String(Number(item.cursor)).padStart(20, '0'),
+          (item) => String(decodeActivityCursor(String(item.cursor))).padStart(20, '0'),
         ));
         return;
       }
@@ -471,7 +516,10 @@ export function createKnowledgeServer(input: {
       const actionItemCommand = url.pathname.match(
         /^\/api\/v1\/action-items\/([^/]+)\/actions\/(acknowledge|resolve|retry)$/,
       );
-      const isControlMutation = actionItemCommand !== null;
+      const regenerationCommand = url.pathname.match(
+        /^\/api\/v1\/action-items\/([^/]+)\/regenerate$/,
+      );
+      const isControlMutation = actionItemCommand !== null || regenerationCommand !== null;
       if ((request.method === 'POST' || request.method === 'PUT') && (isMutationRoute || isControlMutation)) {
         if (!writeToken) {
           send(response, 503, errorBody('WRITE_API_DISABLED', 'Set WP_KNOWLEDGE_WRITE_TOKEN to enable mutations.', currentRequestId, true));
@@ -482,14 +530,18 @@ export function createKnowledgeServer(input: {
           return;
         }
         const payload = await body(request);
-        if (actionItemCommand) {
+        if (actionItemCommand || regenerationCommand) {
           if (request.method !== 'POST') throw new Error('METHOD_NOT_ALLOWED');
           const key = request.headers['idempotency-key'];
           if (typeof key !== 'string' || !key.trim()) throw new Error('IDEMPOTENCY_KEY_REQUIRED: Idempotency-Key');
-          const actionItemId = decodeURIComponent(actionItemCommand[1] ?? '');
-          const action = String(actionItemCommand[2]).toUpperCase() as 'ACKNOWLEDGE' | 'RESOLVE' | 'RETRY';
+          const normalizedKey = key.trim();
+          const actionItemId = decodeURIComponent((actionItemCommand ?? regenerationCommand)?.[1] ?? '');
+          const action = regenerationCommand
+            ? 'REGENERATE'
+            : String(actionItemCommand?.[2]).toUpperCase() as 'ACKNOWLEDGE' | 'RESOLVE' | 'RETRY';
           const fingerprint = JSON.stringify({ actionItemId, action, payload });
-          const previous = idempotencyResults.get(key);
+          const previous = idempotencyResults.get(normalizedKey)
+            ?? composition.apps.flywheel.getCommandReceipt('action-item', normalizedKey);
           if (previous && previous.fingerprint !== fingerprint) throw new Error('IDEMPOTENCY_CONFLICT: key reused with different command');
           if (previous) {
             send(response, previous.status, previous.value);
@@ -508,17 +560,54 @@ export function createKnowledgeServer(input: {
           if (action === 'RETRY') {
             commandRunId = String(item.runId ?? '');
             if (!commandRunId) throw new Error('RUN_NOT_RETRYABLE: action item has no run');
-            const workflowStatus = await composition.apps.orchestrator.status(commandRunId);
+            let workflowStatus;
+            try {
+              workflowStatus = await composition.apps.orchestrator.status(commandRunId);
+            } catch {
+              throw new Error(`RUN_NOT_RETRYABLE: ${commandRunId}`);
+            }
             if (workflowStatus.executionStatus !== 'FAILED') {
               throw new Error(`RUN_NOT_RETRYABLE: ${commandRunId}`);
             }
             await composition.apps.orchestrator.resume(commandRunId);
             status = 202;
+          } else if (action === 'REGENERATE') {
+            const parentRunId = String(item.runId ?? '');
+            const feedback = typeof payload.feedback === 'string' ? payload.feedback.trim() : '';
+            if (!parentRunId) throw new Error('ACTION_NOT_ALLOWED: action item has no parent run');
+            if (!feedback) throw new Error('ARGUMENT_REQUIRED: feedback');
+            const parent = composition.apps.flywheel.getRunSnapshot(parentRunId);
+            if (!parent) throw new Error(`RUN_NOT_FOUND: ${parentRunId}`);
+            const scenario = loadOhMyWorkPanelScenario(composition.repositoryRoot);
+            const parentModuleId = String((parent.run as Record<string, unknown>).moduleId ?? '');
+            if (parentModuleId !== scenario.moduleId) {
+              throw new Error('ACTION_NOT_ALLOWED: regeneration profile is unavailable for this module');
+            }
+            const handle = await composition.apps.orchestrator.start(scenario, {
+              policyId: composition.config.publicationGate.policyId,
+              minimumStability: composition.config.publicationGate.minimumStability,
+              requireAllTests: composition.config.publicationGate.requireAllTests,
+              maxIterations: composition.config.publicationGate.maxIterations,
+              workerCount: 1,
+              governanceTrigger: {
+                parentRunId,
+                causedByActionItemId: actionItemId,
+                reason,
+                feedback,
+              },
+            });
+            commandRunId = handle.runId;
+            status = 202;
           }
           const value = composition.apps.flywheel.applyActionItemAction({
-            actionItemId, action, expectedRevision, reason, commandRunId,
+            actionItemId, action, expectedRevision, reason,
+            feedback: action === 'REGENERATE' ? String(payload.feedback ?? '') : undefined,
+            commandRunId,
           });
-          idempotencyResults.set(key, { fingerprint, status, value });
+          composition.apps.flywheel.saveCommandReceipt({
+            scope: 'action-item', idempotencyKey: normalizedKey, fingerprint, status, value,
+          });
+          idempotencyResults.set(normalizedKey, { fingerprint, status, value });
           send(response, status, value);
           return;
         }

@@ -1072,7 +1072,15 @@ export class AutomatedProjectWorkflowService {
 
   async start(
     scenario: AutomatedProjectScenario,
-    input: GatePolicy & { workerCount?: number },
+    input: GatePolicy & {
+      workerCount?: number;
+      governanceTrigger?: {
+        parentRunId: string;
+        causedByActionItemId: string;
+        reason: string;
+        feedback: string;
+      };
+    },
   ): Promise<WorkflowHandle> {
     assertInvariant(input.policyId.trim().length > 0, 'workflow policyId is required');
     assertInvariant(Number.isFinite(input.minimumStability)
@@ -1084,7 +1092,7 @@ export class AutomatedProjectWorkflowService {
     assertInvariant(Number.isSafeInteger(input.workerCount ?? 1) && (input.workerCount ?? 1) >= 0 && (input.workerCount ?? 1) <= 5,
       'workflow workerCount must be an integer from 0 to 5');
     const run = this.flywheel.createRun(scenario.moduleId, input.policyId);
-    const configurationSnapshot = await this.runConfiguration.capture(run.runId);
+    const configurationSnapshot = await this.runConfiguration.capture(run.runId, input.governanceTrigger);
     this.flywheel.transition(run.runId, 'PLANNED');
     return this.workflow.start({
       runId: run.runId,

@@ -17,3 +17,7 @@ Agent 命令和结果 Schema 已由运行时消费：受信工作流在调用 Pr
 | `evaluation-report.schema.json` | 确定性评测报告 |
 | `event.schema.json` | 领域事件信封 |
 | `language-plugin.schema.json` | 插件能力、请求和标准化结果 |
+| `action-item.schema.json` | DEV-006 持久化治理事项 |
+| `run-progress.schema.json` | DEV-006 可证明批次进度 |
+| `activity.schema.json` | DEV-006 跨批次脱敏活动 |
+| `component-status.schema.json` | DEV-006 固定组件健康状态 |

@@ -338,6 +338,7 @@ export class KnowledgeFlywheelService {
     reason: string;
     feedback?: string;
     commandRunId?: string;
+    actor?: string;
   }): Record<string, unknown> {
     assertInvariant(input.reason.trim().length > 0, 'ARGUMENT_REQUIRED: reason');
     assertInvariant(Number.isSafeInteger(input.expectedRevision) && input.expectedRevision > 0,
@@ -348,7 +349,37 @@ export class KnowledgeFlywheelService {
       feedback: input.feedback?.trim(),
       auditId: `aia_${randomUUID()}`,
       occurredAt: this.clock(),
+      actor: input.actor ?? 'local-admin',
     });
+  }
+
+  observeComponentUnavailable(component: string, reasonCode: string, runIds: string[]): void {
+    assertInvariant(component.trim().length > 0, 'ARGUMENT_REQUIRED: component');
+    assertInvariant(reasonCode.trim().length > 0, 'ARGUMENT_REQUIRED: reasonCode');
+    const now = this.clock();
+    for (const runId of [...new Set(runIds)]) {
+      const run = this.requireRun(runId);
+      if (['VERIFIED', 'LOW_CONFIDENCE', 'FAILED', 'CANCELLED'].includes(run.state)) continue;
+      const duplicate = this.listActionItems({ runId, type: 'COMPONENT_UNAVAILABLE' }).some((item) => (
+        item.status !== 'RESOLVED' && item.reasonCode === reasonCode
+      ));
+      if (duplicate) continue;
+      this.repository.recordOperationalEvent(createEvent(runId, 'ComponentStatusChanged', {
+        component, status: 'UNAVAILABLE', reasonCode,
+      }, now));
+    }
+  }
+
+  getCommandReceipt(scope: string, idempotencyKey: string): {
+    fingerprint: string; status: number; value: unknown;
+  } | null {
+    return this.repository.getCommandReceipt(scope, idempotencyKey);
+  }
+
+  saveCommandReceipt(input: {
+    scope: string; idempotencyKey: string; fingerprint: string; status: number; value: unknown;
+  }): void {
+    this.repository.saveCommandReceipt({ ...input, createdAt: this.clock() });
   }
 
   recordFeedback(versionId: string, action: string, rating: number | null, note = ''): void {

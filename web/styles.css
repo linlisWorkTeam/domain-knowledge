@@ -789,7 +789,7 @@ body, :root[data-theme="light"] body { background: var(--bg); }
 .queue-filters button.active { border: 1px solid var(--border); background: var(--surface-3); color: var(--text); }
 .queue-filters span { margin-left: auto; color: var(--warning); font: 7px ui-monospace, monospace; }
 .queue-labels { height: 34px; padding: 0 20px 0 49px; border-bottom: 1px solid var(--border); display: grid; grid-template-columns: 1fr 110px 120px; align-items: center; color: var(--faint); font: 7px ui-monospace, monospace; letter-spacing: .13em; text-transform: uppercase; }
-.attention-row { position: relative; width: 100%; min-height: 72px; padding: 0 15px 0 48px; border: 0; border-bottom: 1px solid var(--border-soft); background: transparent; color: var(--text); display: grid; grid-template-columns: 1fr 110px 120px; align-items: center; text-align: left; cursor: pointer; }
+.attention-row { position: relative; width: 100%; min-height: 72px; padding: 8px 15px 8px 48px; border: 0; border-bottom: 1px solid var(--border-soft); background: transparent; color: var(--text); display: grid; grid-template-columns: minmax(180px, 1fr) 100px minmax(150px, auto) 90px; gap: 8px; align-items: center; text-align: left; }
 .attention-row:hover, .attention-row.selected { background: var(--surface-2); }
 .attention-row.selected::before { content: ''; position: absolute; inset: 0 auto 0 0; width: 2px; background: var(--accent); }
 .attention-dot { position: absolute; left: 21px; width: 8px; height: 8px; border-radius: 50%; background: var(--warning); }
@@ -798,6 +798,10 @@ body, :root[data-theme="light"] body { background: var(--bg); }
 .attention-row > span b { margin-bottom: 6px; font-size: 11px; }
 .attention-row > span small { color: var(--muted); font: 8px ui-monospace, monospace; }
 .attention-row time { color: var(--faint); font-size: 8px; }
+.attention-subject { min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; }
+.action-buttons { display: flex; flex-wrap: wrap; gap: 4px; }
+.action-buttons button { min-height: 26px; padding: 4px 7px; border: 1px solid var(--border); border-radius: 5px; background: var(--surface); color: var(--muted); font-size: 8px; }
+.action-buttons button:not(:disabled):hover { border-color: var(--accent); color: var(--text); }
 .queue-body { min-height: 320px; display: flex; flex-direction: column; }
 .queue-partial-state { min-height: 176px; flex: 1; padding: 26px 21px; display: flex; align-items: center; justify-content: center; gap: 11px; color: var(--faint); text-align: left; line-height: 1.6; }
 .queue-partial-state > span { width: 30px; height: 30px; border: 1px dashed var(--border); border-radius: 50%; display: grid; place-items: center; color: var(--muted); }
@@ -859,6 +863,7 @@ body, :root[data-theme="light"] body { background: var(--bg); }
   .queue-labels { display: none; }
   .attention-row { grid-template-columns: minmax(0, 1fr) auto; padding-left: 42px; }
   .attention-row > .badge { display: none; }
+  .attention-row .action-buttons { grid-column: 1 / -1; }
   .attention-row time { text-align: right; }
 }
 

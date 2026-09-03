@@ -47,7 +47,7 @@ test('工作流图由标准节点 API 支撑并保持只读', async ({ page }) =
   await page.getByRole('button', { name: /^工作流图$/ }).click();
   await expect(page.getByRole('heading', { name: '工作流图', level: 1 })).toBeVisible();
   await expect(page.getByLabel('只读 Agent 工作流图')).toBeVisible();
-  await expect(page.getByText(/只读 · 每 10 秒刷新 · 数据不完整/)).toBeVisible();
+  await expect(page.getByText(/只读 · 实时事件；断线后每 10 秒轮询/)).toBeVisible();
   await expect(page.locator('.graph-node')).toHaveCount(7);
   await expect(page.locator('.graph-edge')).toHaveCount(7);
   await expect(page.locator('.graph-status-legend')).toContainText('运行中');
@@ -89,6 +89,23 @@ test('seven-page Console uses server facts and canonical Sources API', async ({ 
   expect(requests.some((url) => url.endsWith('/api/v1/sources/scan'))).toBe(true);
   expect(requests.every((url) => url.startsWith(baseUrl))).toBe(true);
   await expect(page.getByText(/预计完成|Workspace owner/)).toHaveCount(0);
+});
+
+test('Action Center uses persisted items and submits an audited governance action', async ({ page }) => {
+  await page.goto(baseUrl);
+  await expect(page.getByText('批次执行失败').first()).toBeVisible();
+  await page.getByRole('button', { name: '＋ 新建批次' }).click();
+  await page.getByLabel('治理令牌').fill('ui-e2e-token');
+  await page.getByRole('button', { name: '确认' }).click();
+  page.once('dialog', (dialog) => dialog.accept('浏览器验收接手'));
+  await page.getByRole('button', { name: '接手' }).first().click();
+  await expect(page.getByText('治理操作已提交并记录审计。')).toBeVisible();
+  await expect(page.getByRole('button', { name: '接手' })).toHaveCount(0);
+  const items = await (await fetch(`${baseUrl}/api/v1/action-items?status=ACKNOWLEDGED`)).json();
+  assert.equal(items.items.length, 1);
+  const detail = await (await fetch(`${baseUrl}/api/v1/action-items/${items.items[0].actionItemId}`)).json();
+  assert.equal(detail.history[0].action, 'ACKNOWLEDGE');
+  assert.equal(detail.history[0].reason, '浏览器验收接手');
 });
 
 test('knowledge search and detail drawer are keyboard operable and restore focus', async ({ page }) => {

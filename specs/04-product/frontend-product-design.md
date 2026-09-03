@@ -553,15 +553,19 @@ F2 可访问验收环境和 B1 API 迁移 diff 就绪后，进入 B2/B3 并行�
 - 飞轮批次接入可信进度、重试和 SSE；工作流图从轮询升级为可断线续传的实时节点图。
 - Knowledge Health 等依赖 B3 数据的指标仍保持 Partial，不得为了完成 F3 提前虚构口径。
 
-### 前台交付 F4：内容与质量面接线
+### 前台交付 F4：运营最小可用面接线（DEV-007）
+
+- Agent 设置接入真实 Provider 状态。
+- 设置页接入模型 API 配置 Use Case：支持 API URL、API Key、脱敏状态和连接验证；服务端持有密钥并提供 `GET/PUT /api/v1/provider-settings` 与 `POST /api/v1/provider-settings/verify`。验证成功后以 Pi Agent 工具作为新任务的默认执行方式，失败时不得回退到演示数据或绕过现有安全门禁。
+- 接入生成与治理观测：批次/节点 P50/P95、调用、重试、Token、估算成本、自动修订通过率、三轮收敛率、人工介入比例、平均处理时间和短期复发率必须同时显示样本量；无样本时显示空值。
+
+### 前台交付 F5：内容与质量面接线（DEV-008）
 
 - 知识接入血缘与差异；评测接入独立列表、详情、证据和规则修订；来源接入注册、状态和刷新。
 - 知识、评测与来源的基础事实稳定后接入知识健康度，并展示分子、分母、窗口、采样时间与规则版本。
 
-### 前台交付 F5：运营与 DFX 完成
+### 前台交付 F6：运营 DFX 加固
 
-- Agent 设置接入真实 Provider 状态。
-- 设置页接入模型 API 配置 Use Case：支持 API URL、API Key、脱敏状态和连接验证；服务端持有密钥并提供 `GET/PUT /api/v1/provider-settings` 与 `POST /api/v1/provider-settings/verify`。验证成功后以 Pi Agent 工具作为新任务的默认执行方式，失败时不得回退到演示数据或绕过现有安全门禁。
 - 左上角项目空间升级为可选择控件，接入 `GET /api/v1/workspaces` 与服务端确认的当前空间；各业务查询采用统一的 workspace scope，切换时清理旧空间缓存和在途请求。具体身份、默认空间、URL 持久化与授权模型须在实现前与后台契约一并评审。
 - 所有列表、实时连接和高风险操作通过容量、恢复、分页、权限、审计和移动端最终验收；此时才可以移除相应 Preview/Partial/Disabled 标识。
 
@@ -605,9 +609,9 @@ F2 可访问验收环境和 B1 API 迁移 diff 就绪后，进入 B2/B3 并行�
 | 自动 Run 启动 | Implemented fixed profile：CLI/API/Console 可启动固定 ohMyWorkPanel LangGraph 流程；任意项目的通用来源/策略向导仍在规划 |
 | Agent 目录与定制 | Implemented：七个固定角色可查，只有 `promptAddon` 可在治理模式修改并形成 revision/audit |
 | LangGraph 节点投影 | Implemented：Run 工作台从 Knowledge Registry 显示节点、Agent、轮次、attempt 与状态，不读取 graph checkpoint |
-| 实时事件 | Partial：已提供 `after=event_seq` 增量查询，SSE 和自动重连尚未实现 |
+| 实时事件 | Implemented：批次与活动 SSE 使用持久化 cursor 续传，断线自动重连并退回增量轮询 |
 | Correction / Diff | Partial：固定场景有 Correction 和范围校验，尚无通用查询/UI |
-| Governance | Partial：已从终态 Run 形成只读队列，治理决议 Command API 尚未实现 |
+| Governance | Implemented：服务端持久化事项、revision、跨重启幂等、审计、受控重试和冻结反馈重新生成均已接入操作中心 |
 | Evidence | Implemented MVP：聚合 EvaluationReport、GateDecision、工具链、测试和证据引用摘要 |
 | 真实在线 Agent | Implemented（受限样例）：官方 DSH SDK 已跑通固定 ohMyWorkPanel；通用项目向导和稳定性统计仍待实现 |
 | 敌对代码安全执行 | Planned；安全能力完成前必须 fail closed |
