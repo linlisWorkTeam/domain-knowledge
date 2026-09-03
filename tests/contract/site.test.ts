@@ -164,7 +164,7 @@ test('UI prototype navigation and frontend spec reflect the reviewed delivery bo
   assert.match(frontendSpec, /### 前台交付 F1：/);
   assert.match(frontendSpec, /### 系统实施 Phase 1：/);
   assert.match(frontendSpec, /Preview HTTP API 规范/);
-  assert.match(httpApiSpec, /\| `GET \/api\/v1\/system\/status` \| Available \/ Rename \|/);
+  assert.match(httpApiSpec, /\| `GET \/api\/v1\/system\/status` \| Available \|/);
   assert.match(httpApiSpec, /\| `GET \/api\/v1\/knowledge\/:versionId\/lineage` \| Planned \|/);
   assert.match(httpApiSpec, /第一阶段 Action Center 只能从 `FAILED`、`LOW_CONFIDENCE`/);
 });

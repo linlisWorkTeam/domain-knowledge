@@ -1,6 +1,6 @@
 # Preview HTTP API 规范
 
-**状态：Accepted｜版本：0.2.0｜日期：2026-09-03**
+**状态：Accepted；B1 已实现、HCP-1 待验收｜版本：0.2.1｜日期：2026-09-03**
 
 本文是 Knowledge Console HTTP API 的唯一规范性入口，统一定义资源分组、页面能力、当前实现映射和待补接口。领域行为、状态机与发布门禁仍以对应领域和工作流规范为准；HTTP 路由不得创造第二套业务语义。
 
@@ -48,8 +48,8 @@
 | 方法与路径 | 状态 | 用途与最小响应 |
 |---|---|---|
 | `GET /health` | Available | 进程存活探针；不返回业务健康分。 |
-| `GET /api/v1/system/status` | Available / Rename | 由 `/api/v1/status` 迁移；返回 Registry、CAS、Provider、Evaluator 的真实状态与采样时间。 |
-| `GET /api/v1/system/capabilities` | Available / Rename | 由 `/api/v1/capabilities` 迁移；返回读写开关、认证方式、Provider 类型和隔离能力。 |
+| `GET /api/v1/system/status` | Available | 返回 Registry、CAS、Provider、Evaluator 的真实状态与采样时间；已由旧 `/api/v1/status` 迁移。 |
+| `GET /api/v1/system/capabilities` | Available | 返回读写开关、认证方式、Provider 类型和隔离能力；已由旧 `/api/v1/capabilities` 迁移。 |
 | `GET /api/v1/system/components` | Planned | 返回分组件健康、reason code、最后成功时间和受控诊断摘要。 |
 
 ## 3. Runs、Action Center 与 Activity
@@ -57,14 +57,14 @@
 | 方法与路径 | 状态 | 用途与最小响应 |
 |---|---|---|
 | `GET /api/v1/runs` | Available / Extend | Run 列表；补充 `status`、`moduleId`、`updatedAfter`、分页和稳定排序。 |
-| `POST /api/v1/runs` | Available / Redefine | 创建并启动固定 profile Run；替代只创建记录的旧语义，返回 `runId`、`eventId`。 |
+| `POST /api/v1/runs` | Available | 创建并启动固定 profile Run；返回 `runId`、`eventId`。 |
 | `GET /api/v1/runs/:runId` | Available | Run、版本、评测、Decision、checkpoint、节点、事件和 publication 快照。 |
 | `GET /api/v1/runs/:runId/events?after=<seq>` | Available | 按 `event_seq` 增量读取运行事件。 |
 | `GET /api/v1/runs/:runId/workflow-nodes` | Available | 返回角色、轮次、尝试、执行状态和时间，不暴露 checkpoint 私有数据。 |
 | `GET /api/v1/runs/:runId/workflow-status` | Available | 工作流执行状态，不替代 FlywheelRun 业务状态。 |
-| `GET /api/v1/runs/:runId/report` | Available / Rename | 由 `demo-report` 迁移；下载脱敏审计报告。 |
-| `POST /api/v1/runs/:runId/resume` | Available / Rename | 从同一 checkpoint 恢复。 |
-| `POST /api/v1/runs/:runId/cancel` | Available / Rename | 取消运行并传播终止信号。 |
+| `GET /api/v1/runs/:runId/report` | Available | 下载脱敏审计报告；已由旧 `demo-report` 路径迁移。 |
+| `POST /api/v1/runs/:runId/resume` | Available | 从同一 checkpoint 恢复。 |
+| `POST /api/v1/runs/:runId/cancel` | Available | 取消运行并传播终止信号。 |
 | `GET /api/v1/runs/:runId/progress` | Planned | 返回可证明的 completed/total 单元、当前阶段和采样时间；无可靠模型时不得提供 ETA。 |
 | `POST /api/v1/runs/:runId/retry` | Planned | 按治理决议创建新 Run 或执行规范允许的失败节点重试。 |
 | `GET /api/v1/runs/:runId/event-stream` | Planned | SSE 推送，支持 `Last-Event-ID`/`event_seq` 续传和自动重连。 |
@@ -82,10 +82,10 @@
 
 | 方法与路径 | 状态 | 用途与最小响应 |
 |---|---|---|
-| `GET /api/v1/knowledge` | Available / Extend | 知识目录与简单检索；统一支持 `q`、`status`、`category`、`limit`、`cursor`，取代 `/api/v1/query`。 |
+| `GET /api/v1/knowledge` | Available | 知识目录与简单检索；统一支持 `q`、`status`、`category`、`limit`、`cursor`，已取代 `/api/v1/query`。 |
 | `GET /api/v1/knowledge/:versionId` | Available | 正文、状态、quality 和 provenance 详情。 |
-| `POST /api/v1/knowledge/candidates` | Available / Rename | 由 `/api/v1/ingest` 迁移；只创建候选，不表示发布。 |
-| `POST /api/v1/knowledge/:versionId/feedback` | Available / Rename | 由 `/api/v1/feedback` 迁移；记录 `hit`、`rate` 或 `correct`，不得直接改变发布状态。 |
+| `POST /api/v1/knowledge/candidates` | Available | 创建候选但不表示发布；已由旧 `/api/v1/ingest` 迁移。 |
+| `POST /api/v1/knowledge/:versionId/feedback` | Available | 记录 `hit`、`rate` 或 `correct`，不得直接改变发布状态；已由旧 `/api/v1/feedback` 迁移。 |
 | `GET /api/v1/knowledge/:versionId/lineage` | Planned | 返回父子版本、关联 Run、Correction、Evaluation 和 publication。 |
 | `GET /api/v1/knowledge/:versionId/diff?against=<versionId>` | Planned | 返回结构化 Markdown Diff 和范围校验。 |
 
@@ -108,7 +108,7 @@
 
 | 方法与路径 | 状态 | 用途与最小响应 |
 |---|---|---|
-| `GET /api/v1/sources/scan` | Available / Rename | 由 `/api/v1/scan` 迁移；返回本次发现的来源候选，不等同于 Registry。 |
+| `GET /api/v1/sources/scan` | Available | 返回本次发现的来源候选，不等同于 Registry；已由旧 `/api/v1/scan` 迁移。 |
 | `GET /api/v1/sources` | Planned | 持久化来源列表；支持 type、status、project、分页和最后同步时间。 |
 | `POST /api/v1/sources` | Planned | 创建来源配置，校验路径/URL、访问边界和凭据引用。 |
 | `GET /api/v1/sources/:sourceId` | Planned | 返回来源配置、同步状态、最近错误和关联知识统计。 |
@@ -144,14 +144,14 @@ Graph 页面是选定 Run 的只读 Agent 工作流执行图，不是 Knowledge 
 
 ## 9. Preview 破坏性迁移清单
 
-以下旧 HTTP 路径必须在实现迁移时直接删除，不保留别名：
+以下旧 HTTP 路径已在 B1 迁移中直接删除，不保留别名：
 
 - `/api/v1/status`、`/api/v1/capabilities`；
 - `/api/v1/query`、`/api/v1/scan`、`/api/v1/ingest`、`/api/v1/feedback`；
 - `/api/v1/run-commands/start`、`/api/v1/run-commands/resume`、`/api/v1/run-commands/cancel`；
 - `/api/v1/transition`、`/api/v1/evaluate`、`/api/v1/publish`。
 
-其中 transition、evaluate、publish 继续作为内部 Application App/工作流能力存在，但不再作为公共 HTTP API。迁移提交完成前，本文中的 `Available / Rename` 和 `Available / Redefine` 均不等于新路径已经可调用。
+其中 transition、evaluate、publish 继续作为内部 Application App/工作流能力存在，但不再作为公共 HTTP API。Server、Console、DSH Adapter 与测试均已切换到规范路径，旧公共路径由集成测试验证返回 `404`。
 
 ## 10. 页面交付矩阵
 
