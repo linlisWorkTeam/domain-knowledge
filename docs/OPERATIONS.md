@@ -81,7 +81,7 @@ npm run acceptance:ohmyworkpanel -- `
 
 评测器使用 `git archive`，生成文件只写临时目录；可执行工具限于 `node`、`pnpm` 和 `cargo`。它不经过 shell，会净化继承环境、限制命令时间与输出，并把工具版本、脱敏 argv、退出状态和脱敏输出保存到 CAS。
 
-默认 Agent Provider 重放经过 Schema 校验的 fixture，因此适合验证编排和执行路径。真实 DeepSeek Harness 接法、OpenCode Go patch 和公网调试说明见 [`deploy/deepseek-harness/README.md`](../deploy/deepseek-harness/README.md)。live 模式的 Agent 使用角色白名单工作区、官方 SDK 和 Bubblewrap；后续 ProjectEvaluator 仍只能运行受信源码。一次成功样例不是模型稳定性或敌对代码执行隔离证明。
+默认 Agent Provider 重放经过 Schema 校验的 fixture，因此适合验证编排和执行路径。真实 DeepSeek Harness 接法、OpenCode Go patch 和公网调试说明见 [`deploy/deepseek-harness/README.md`](../deploy/deepseek-harness/README.md)。live 模式的 Agent 使用角色白名单工作区、官方 SDK 和 Bubblewrap；角色工作区直接从 Run 快照绑定的 Git commit 读取文件，不复制可变工作树，DocWorker 只能读取自己的源码分块和共享公开接口。后续 ProjectEvaluator 仍只能运行受信源码。一次成功样例不是模型稳定性或敌对代码执行隔离证明。
 
 ## 内嵌 LangGraph 工作流
 

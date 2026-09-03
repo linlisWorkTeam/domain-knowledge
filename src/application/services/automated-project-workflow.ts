@@ -364,9 +364,12 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
   ): Promise<Record<string, unknown>> {
     if (!this.agent) throw new Error('WORKFLOW_LIVE_AGENT_UNAVAILABLE');
     if (!this.agentWorkspaces) throw new Error('WORKFLOW_AGENT_WORKSPACE_UNAVAILABLE');
-    const sourceReadable = ['doc-worker', 'doc-gen', 'test-gen'].includes(agentId);
-    const readablePaths = sourceReadable
-      ? [...scenario.sourcePaths, ...scenario.publicInterfacePaths]
+    const snapshot = input.context.snapshot as ProjectSnapshot | undefined;
+    if (!snapshot) throw new Error('WORKFLOW_PROJECT_SNAPSHOT_MISSING');
+    const readablePaths = agentId === 'doc-worker'
+      ? [...this.assignedSourcePaths(input, scenario), ...scenario.publicInterfacePaths]
+      : agentId === 'doc-gen' || agentId === 'test-gen'
+        ? [...scenario.sourcePaths, ...scenario.publicInterfacePaths]
       : agentId === 'code' || agentId === 'check' || agentId === 'review'
         ? scenario.publicInterfacePaths
         : [];
@@ -374,6 +377,7 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
       isolationKey: `${input.runId}:${input.nodeId}:${input.iteration}:${input.workerId ?? 'main'}`,
       role: agentId,
       sourceRoot: scenario.repositoryRoot,
+      sourceCommit: snapshot.commit,
       readablePaths,
     });
     const materials = await Promise.all(this.artifactRefsIn(command.payload).map(async (ref) => ({
@@ -702,10 +706,7 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
         publicInterfaceRefs,
       };
       if (agentId === 'doc-worker') {
-        const workerIndex = input.workerIndex ?? 0;
-        const assignedSourcePaths = scenario.sourcePaths.filter((_, index) =>
-          index % Math.max(1, input.workerCount) === workerIndex,
-        );
+        const assignedSourcePaths = this.assignedSourcePaths(input, scenario);
         if (assignedSourcePaths.length > 0) payload.assignedSourcePaths = assignedSourcePaths;
       } else {
         const workerFragmentRefs: ArtifactRef[] = [];
@@ -928,6 +929,16 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
   private scenarioLanguage(scenario: AutomatedProjectScenario): string {
     const tool = scenario.finalCommands[0]?.tool ?? scenario.referenceCommands[0]?.tool ?? 'node';
     return tool === 'cargo' ? 'rust' : 'typescript';
+  }
+
+  private assignedSourcePaths(
+    input: WorkflowStageInput,
+    scenario: AutomatedProjectScenario,
+  ): string[] {
+    const workerIndex = input.workerIndex ?? 0;
+    return scenario.sourcePaths.filter((_, index) =>
+      index % Math.max(1, input.workerCount) === workerIndex,
+    );
   }
 
   private correctionId(value: unknown): string {

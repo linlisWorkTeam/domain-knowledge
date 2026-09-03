@@ -233,6 +233,8 @@ export interface AgentWorkspaceProvider {
     isolationKey: string;
     role: string;
     sourceRoot: string;
+    /** When present, files must be read from this immutable Git commit, not the worktree. */
+    sourceCommit?: string;
     readablePaths: string[];
   }): Promise<AgentWorkspaceView>;
 }

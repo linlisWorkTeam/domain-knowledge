@@ -19,6 +19,8 @@ Provider 返回值首先视为不可信的角色原始输出。工作流负责�
 
 Provider 所见动态上下文必须直接属于 `AgentCommand.payload`，或由其中 ArtifactRef 经过内容摘要校验后物化；不得再附加未版本化的上下文对象。`AgentResult.commandRef` 必须指向原始受信命令，下游同时核对 `runId`、`agentType`、`commandId` 和 `generationKey`，防止跨 Run、跨节点或跨迭代复用合法但不属于本次执行的结果。
 
+Provider 的角色文件视图必须从 Run 快照绑定的 Git commit 读取，不能复制调用时的可变工作树。DocWorker 的源码白名单必须收窄到本 Worker 的 `assignedSourcePaths`；公开接口可以作为所有文档类 Worker 的共享只读输入。
+
 七个角色保持不变：`orchestrator`、`doc-gen`、`doc-worker`、`test-gen`、`code`、`check`、`review`。统一信封不能改变图拓扑、职责、工具权限或确定性 Gate 的发布权。
 
 ### RunConfigurationSnapshot
