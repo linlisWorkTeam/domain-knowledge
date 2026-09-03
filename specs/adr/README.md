@@ -12,3 +12,4 @@
 - [ADR-008：回滚能力显式降级](ADR-008-reserve-rollback-state.md)
 - [ADR-009：运行仓库与知识仓库分离](ADR-009-repository-split.md)
 - [ADR-010：Application App 与 Domain Service 边界](ADR-010-application-domain-service-boundaries.md)
+- [ADR-011：Agent 运行契约与 Run 配置快照](ADR-011-agent-contract-and-run-configuration-snapshot.md)
