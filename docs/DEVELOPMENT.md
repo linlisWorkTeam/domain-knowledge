@@ -50,6 +50,7 @@ uiApi / CLI / DSH / Web projection
 3. 更新追踪矩阵中的实现和测试映射。
 4. 从 Domain/Application 边界实现，再接入 Adapter 和入口。
 5. 增加最窄且足够的测试，最后同步上手或运维文档。
+6. 任务或需求状态发生变化时，在同一 PR 更新[开发状态](DEVELOPMENT-STATUS.md)；需求级状态仍由追踪矩阵维护。
 
 ### 增加 HTTP 或 CLI 能力
 
@@ -102,5 +103,6 @@ Redis Adapter 位于 `src/infrastructure/persistence/redis`，对应 `AgentConte
 - 中文主文与关键 English summary 没有能力口径冲突；
 - Console 与 GitHub Pages 的产品表达（适用时）；
 - PR 中可复现的实际验证结果。
+- [开发状态](DEVELOPMENT-STATUS.md)中的阶段、当前任务、下一任务和验证基线已按实际进度回写。
 
 提交规则和评审标准见根目录[贡献指南](../CONTRIBUTING.md)。

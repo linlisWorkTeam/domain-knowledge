@@ -1,8 +1,8 @@
 # Knowledge Flywheel 规范集
 
-**状态：Accepted（P0-A）+ P0-B 实现中 + 前台交付 F1 已实现｜版本：1.5.2｜基线日期：2026-09-03**
+**规范状态：Accepted｜版本：1.5.2｜基线日期：2026-09-03**
 
-本目录是 domain-knowledge 的唯一规范性事实源。`KF-SYS-*` 与 `KF-UI-*` 使用独立命名空间，避免与历史实现中的需求编号冲突。本文档定义需求、产品、架构、领域、工作流、Agent 契约、评测、安全与验收；实现进度由追踪矩阵明确标记。关键词“必须 / 不得 / 应当 / 可以”分别表示强制、禁止、推荐和可选。
+本目录是 domain-knowledge 的唯一规范性事实源。`KF-SYS-*` 与 `KF-UI-*` 使用独立命名空间，避免与历史实现中的需求编号冲突。本文档定义需求、产品、架构、领域、工作流、Agent 契约、评测、安全与验收；需求级实现状态由追踪矩阵明确标记，项目阶段、当前任务和后续顺序统一从[开发状态](../docs/DEVELOPMENT-STATUS.md)查看。关键词“必须 / 不得 / 应当 / 可以”分别表示强制、禁止、推荐和可选。
 
 <details lang="en">
 <summary>English summary</summary>
@@ -35,8 +35,8 @@ This directory is the normative source for Knowledge Flywheel behavior. Requirem
 
 ## 阶段门
 
-P0-A Spec 已进入实现验证。当前 P0-B 已落地纯领域边界、Artifact CAS、SQLite Registry、幂等业务副作用、确定性 Gate、原子发布、旧 OKF 迁移、产品控制台和 DSH 查询适配器。LangGraph 已按 ADR-006 以内嵌 `domain-knowledge` infrastructure 接入；默认 Provider 仍是 deterministic fixture，live 路径已切换到 DeepSeek Harness 官方 stdio JSON-RPC SDK，并为七个角色建立文件白名单工作区。Linux 上的 Bubblewrap 会让代码生成角色看不到参考源码，Prompt 也不再进入 argv。Headless 样例完成过候选质量 65→98、295/295 独立评测与发布；官方 SDK 样例完成了失败恢复、1/1 确定性评测、唯一发布和 12/12 工件校验。这里的 `code` 是图节点角色，不是独立的 CodeAgent CLI；一次成功样例也不能外推为模型稳定性。敌对代码执行沙箱、完整权限拒绝审计与四点崩溃注入仍待完成。
+P0-A Spec 已 Accepted；这只表示需求、契约和验收基线可进入实现验证，不代表 P0-B 或生产能力已经完成。P0-B 的当前实现范围、验证证据、下一工作项和未测边界统一记录在[开发状态](../docs/DEVELOPMENT-STATUS.md)，本规范入口不再维护一份会随开发变化的平行进度摘要。
 
-Application App 与 Domain Service 的命名和依赖方向按 ADR-010 收敛；七个既有 LangGraph Agent 节点保持不变。Redis 运行上下文与租约 Adapter 已提供，但当前本地组合根未启用，且它不属于业务事实存储。
+需求级状态仍以[追踪矩阵](13-verification/traceability-matrix.md)为准。Application App、Domain Service、固定七 Agent、LangGraph 与持久化的约束分别由 ADR-006、ADR-010、ADR-011 和对应验收场景定义，不因进度文档调整而改变。
 
-前台交付 F1 只在现有 API 上收敛控制台布局、视觉、响应式和可访问性；它与系统实施 Phase 1–4 是两条独立编号轴。PR #2 原型中的模拟 Health、ETA、Graph、Activity、Action Item、Workspace 与用户身份不构成已实现能力；新增后端或领域语义必须另行通过 Spec 对齐。
+前台交付 F1 与系统实施 Phase 1–4 是两条独立编号轴。F1 只允许在现有 API 上收敛控制台布局、视觉、响应式和可访问性；原型中的模拟 Health、ETA、Graph、Activity、Action Item、Workspace 与用户身份不构成产品能力，新增后端或领域语义必须另行通过 Spec 对齐。
