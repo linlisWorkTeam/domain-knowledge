@@ -137,7 +137,8 @@ test('mobile navigation, theme persistence and 200 percent zoom preserve core pa
   const session = await context.newCDPSession(page);
   await session.send('Emulation.setPageScaleFactor', { pageScaleFactor: 2 });
   await page.getByRole('button', { name: '打开主导航' }).click();
-  await page.getByRole('button', { name: /^Flywheel Runs$/ }).click();
+  await page.getByRole('button', { name: /^Flywheel Runs$/ }).focus();
+  await page.keyboard.press('Enter');
   await expect(page.getByRole('heading', { name: 'Flywheel Runs', level: 1 })).toBeVisible();
   await expect(page.getByText('browser-contract').first()).toBeVisible();
 });
