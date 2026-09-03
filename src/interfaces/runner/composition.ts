@@ -129,6 +129,59 @@ export function createComposition(input: {
   if (processIsolation !== 'none' && processIsolation !== 'bubblewrap') {
     throw new Error('CONFIG_INVALID: WP_DSH_PROCESS_ISOLATION must be none or bubblewrap');
   }
+  const profile = process.env.WP_DSH_PROFILE?.trim() || 'sdk';
+  const dshBin = process.env.WP_DSH_BIN?.trim() || 'dsh';
+  const dshHome = process.env.DSH_HOME?.trim() || join(runtimeDir, 'dsh');
+  const bubblewrapCommand = process.env.WP_DSH_BWRAP_COMMAND?.trim() || 'bwrap';
+  const timeoutMs = Number(process.env.WP_DSH_TIMEOUT_MS ?? 600_000);
+  const maxOutputBytes = Number(process.env.WP_DSH_MAX_OUTPUT_BYTES ?? 2 * 1024 * 1024);
+  const maxTokens = Number(process.env.WP_DSH_MAX_TOKENS ?? 32_768);
+  const maxSchemaAttempts = Number(process.env.WP_DSH_MAX_SCHEMA_ATTEMPTS ?? 2);
+  const allowedRoots = (process.env.WP_DSH_ALLOWED_ROOTS?.split(delimiter) ?? [repositoryRoot])
+    .map((root) => root.trim()).filter(Boolean).map((root) => resolve(root));
+  const agentWorkspaceRoot = join(runtimeDir, 'agent-workspaces');
+  const sdkPatches = process.env.WP_DSH_PATCHES_JSON
+    ? JSON.parse(process.env.WP_DSH_PATCHES_JSON) as string[]
+    : sdkProvider === 'opencode-go'
+      ? [join(componentRoot, 'deploy', 'deepseek-harness', 'opencode-go.cordis.yml')]
+      : [];
+  const headlessCommand = process.env.WP_DSH_COMMAND?.trim() || 'dsh';
+  const headlessArgs = process.env.WP_DSH_ARGS_JSON
+    ? JSON.parse(process.env.WP_DSH_ARGS_JSON) as string[]
+    : ['--profile', 'headless'];
+  const patchDigests = agentProviderMode === 'deepseek-harness'
+    ? sdkPatches.map((path) => ({ path, sha256: sha256(readFileSync(path)) }))
+    : [];
+  const providerParameters = agentProviderMode === 'fixture'
+    ? { mode: 'fixture', fixtureVersion: '1' }
+    : agentProviderMode === 'deepseek-harness'
+      ? {
+          mode: agentProviderMode,
+          dshBin,
+          profile,
+          patches: patchDigests,
+          dshHome,
+          provider: sdkProvider,
+          model: providerModel,
+          maxTokens,
+          maxSchemaAttempts,
+          processIsolation,
+          bubblewrapCommand,
+          timeoutMs,
+          maxOutputBytes,
+          allowedWorkspaceRoots: [...allowedRoots, agentWorkspaceRoot],
+        }
+      : {
+          mode: agentProviderMode,
+          command: headlessCommand,
+          args: headlessArgs,
+          timeoutMs,
+          maxOutputBytes,
+          allowedWorkspaceRoots: [...allowedRoots, agentWorkspaceRoot],
+        };
+  const schemaRoot = join(componentRoot, 'specs', 'schemas');
+  const artifactRefSchemaSha256 = sha256(readFileSync(join(schemaRoot, 'artifact-ref.schema.json')));
+  const correctionSchemaSha256 = sha256(readFileSync(join(schemaRoot, 'correction.schema.json')));
   const runConfiguration = new RegistryRunConfigurationService({
     definitions: DOMAIN_KNOWLEDGE_AGENT_DEFINITIONS,
     repository,
@@ -136,25 +189,20 @@ export function createComposition(input: {
     provider: {
       kind: agentProviderMode,
       model: providerModel,
-      parametersSha256: sha256(JSON.stringify({
-        provider: agentProviderMode === 'fixture' ? 'fixture' : sdkProvider,
-        profile: process.env.WP_DSH_PROFILE?.trim() || (agentProviderMode === 'fixture' ? 'fixture' : 'sdk'),
-        maxTokens: Number(process.env.WP_DSH_MAX_TOKENS ?? 32_768),
-        maxSchemaAttempts: Number(process.env.WP_DSH_MAX_SCHEMA_ATTEMPTS ?? 2),
-        processIsolation,
-        timeoutMs: Number(process.env.WP_DSH_TIMEOUT_MS ?? 600_000),
-        maxOutputBytes: Number(process.env.WP_DSH_MAX_OUTPUT_BYTES ?? 2 * 1024 * 1024),
-      })),
+      parametersSha256: sha256(JSON.stringify(providerParameters)),
     },
     contracts: {
       commandSchema: AGENT_COMMAND_SCHEMA_ID,
       resultSchema: AGENT_RESULT_SCHEMA_ID,
-      commandSchemaSha256: sha256(readFileSync(
-        join(componentRoot, 'specs', 'schemas', 'agent-command.schema.json'),
-      )),
-      resultSchemaSha256: sha256(readFileSync(
-        join(componentRoot, 'specs', 'schemas', 'agent-result.schema.json'),
-      )),
+      commandSchemaSha256: sha256(JSON.stringify({
+        command: sha256(readFileSync(join(schemaRoot, 'agent-command.schema.json'))),
+        artifactRef: artifactRefSchemaSha256,
+      })),
+      resultSchemaSha256: sha256(JSON.stringify({
+        result: sha256(readFileSync(join(schemaRoot, 'agent-result.schema.json'))),
+        artifactRef: artifactRefSchemaSha256,
+        correction: correctionSchemaSha256,
+      })),
     },
     clock: input.clock,
   });
@@ -163,43 +211,33 @@ export function createComposition(input: {
     workflowPromise ??= (async () => {
       const auditDirectory = join(runtimeDir, 'demo');
       const auditPath = join(auditDirectory, 'agent-runs.jsonl');
-      const allowedRoots = (process.env.WP_DSH_ALLOWED_ROOTS?.split(delimiter) ?? [repositoryRoot])
-        .map((root) => root.trim()).filter(Boolean).map((root) => resolve(root));
-      const agentWorkspaceRoot = join(runtimeDir, 'agent-workspaces');
       const writeAudit = async (record: Parameters<NonNullable<ConstructorParameters<typeof DeepSeekHarnessSdkAgent>[0]['onAudit']>>[0]) => {
         await mkdir(auditDirectory, { recursive: true });
         await appendFile(auditPath, `${JSON.stringify(record)}\n`, { encoding: 'utf8', mode: 0o600 });
       };
-      const sdkPatches = process.env.WP_DSH_PATCHES_JSON
-        ? JSON.parse(process.env.WP_DSH_PATCHES_JSON) as string[]
-        : sdkProvider === 'opencode-go'
-          ? [join(componentRoot, 'deploy', 'deepseek-harness', 'opencode-go.cordis.yml')]
-          : [];
       const agent = agentProviderMode === 'deepseek-harness'
         ? new DeepSeekHarnessSdkAgent({
-            ...(process.env.WP_DSH_BIN?.trim() ? { dshBin: process.env.WP_DSH_BIN.trim() } : {}),
-            profile: process.env.WP_DSH_PROFILE?.trim() || 'sdk',
+            dshBin,
+            profile,
             patches: sdkPatches,
-            dshHome: process.env.DSH_HOME?.trim() || join(runtimeDir, 'dsh'),
+            dshHome,
             provider: sdkProvider,
             model: providerModel,
-            maxTokens: Number(process.env.WP_DSH_MAX_TOKENS ?? 32_768),
-            maxSchemaAttempts: Number(process.env.WP_DSH_MAX_SCHEMA_ATTEMPTS ?? 2),
+            maxTokens,
+            maxSchemaAttempts,
             processIsolation,
-            bubblewrapCommand: process.env.WP_DSH_BWRAP_COMMAND?.trim() || 'bwrap',
-            timeoutMs: Number(process.env.WP_DSH_TIMEOUT_MS ?? 600_000),
-            maxOutputBytes: Number(process.env.WP_DSH_MAX_OUTPUT_BYTES ?? 2 * 1024 * 1024),
+            bubblewrapCommand,
+            timeoutMs,
+            maxOutputBytes,
             allowedWorkspaceRoots: [...allowedRoots, agentWorkspaceRoot],
             onAudit: writeAudit,
           })
         : agentProviderMode === 'deepseek-harness-headless'
           ? new DeepSeekHarnessHeadlessAgent({
-            command: process.env.WP_DSH_COMMAND?.trim() || 'dsh',
-            args: process.env.WP_DSH_ARGS_JSON
-              ? JSON.parse(process.env.WP_DSH_ARGS_JSON) as string[]
-              : ['--profile', 'headless'],
-            timeoutMs: Number(process.env.WP_DSH_TIMEOUT_MS ?? 600_000),
-            maxOutputBytes: Number(process.env.WP_DSH_MAX_OUTPUT_BYTES ?? 2 * 1024 * 1024),
+            command: headlessCommand,
+            args: headlessArgs,
+            timeoutMs,
+            maxOutputBytes,
             allowedWorkspaceRoots: [...allowedRoots, agentWorkspaceRoot],
             onAudit: writeAudit,
           })
@@ -209,7 +247,7 @@ export function createComposition(input: {
         evalRunner: evalRunnerApp,
         evaluator: new TrustedProjectEvaluator(artifacts),
         assetRoot: join(componentRoot, 'acceptance', 'ohmyworkpanel'),
-        contracts: new JsonSchemaAgentContractValidator(join(componentRoot, 'specs', 'schemas')),
+        contracts: new JsonSchemaAgentContractValidator(schemaRoot),
         ...(agent ? { agent } : {}),
         ...(agent ? { agentWorkspaces: new LocalAgentWorkspace({
           workspaceRoot: agentWorkspaceRoot,
