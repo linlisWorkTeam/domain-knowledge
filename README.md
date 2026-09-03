@@ -25,7 +25,7 @@ SQLite Registry 与 CAS 是运行时事实源，默认写到本仓库 `.workpane
 - Flywheel、EvalRunner、Association Domain Service 与 Agent/工作流/持久化 Adapter 保持单向依赖；
 - 候选知识绑定来源，工件使用 SHA-256 内容寻址；
 - 质量 Gate 与行为发布 Gate 分开，只有完整证据和 `PASS` 能产生 `VERIFIED`；
-- DeepSeek Harness 官方 SDK、可在 Console 配置并验证的 Pi Agent Provider、角色工作区和 Linux Bubblewrap 隔离；
+- DeepSeek Harness 官方 SDK、可在 Console 配置并验证的 Pi Agent Provider、公司 CodeAgent CLI Adapter、角色工作区和 Linux Bubblewrap 隔离；
 - 知识血缘与差异、评测证据与规则、来源注册与漂移、知识健康度和生成/治理观测；
 - CLI、资源化 HTTP API、DSH Adapter、双主题 Console 和项目网站；
 - 固定 ohMyWorkPanel 场景、真实评测与脱敏演示证据。

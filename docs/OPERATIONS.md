@@ -150,6 +150,12 @@ Agent 元数据来自 `GET /api/v1/agents`。浏览器默认只读，操作员 t
 
 `WP_PI_MAX_SCHEMA_ATTEMPTS` 控制空输出或 Schema 不合法输出的总尝试次数，默认 `2`，范围 `1..3`；`WP_PI_MAX_TOKENS` 默认 `32768`，`WP_PI_CONTEXT_WINDOW` 默认 `128000` 且不得小于输出上限。协议、地址、模型与这三个非秘密执行参数全部进入批次摘要，恢复时发生变化会失败关闭；Pi 不复用 DSH 的 Token 配置。每次尝试都创建新会话并记录独立的脱敏调用事实。模型调用重试与工作流节点恢复是两项不同指标。Provider 设置文件与 SQLite 命令回执目前不共享事务：正常重放有幂等回执，但若进程恰好在加密文件提交后、回执写入前崩溃，重放会因 revision 冲突失败；DEV-012 将验证并收口该恢复窗口。
 
+### 公司 CodeAgent CLI
+
+部署账户先完成 CLI 登录，并确认 `codeagent auth status --json` 返回已认证且未过期，再设置 `WP_FLYWHEEL_AGENT_PROVIDER=company-codeagent-cli`。Adapter 不经 shell 启动 CLI，Prompt 只写 stdin；`orchestrator` 不开放工具，文档与测试角色仅开放受控读写/检索工具，`check`/`review` 只读，`code` 虽可编辑和执行命令但仍只能看到工作流为该角色物化的隔离视图。JSON/JSONL 最终结果在进入 AgentResult 前校验角色与 Schema。
+
+session ID 按幂等键保存到 `$WP_FLYWHEEL_HOME/codeagent/sessions/`，目录权限 `0700`、文件权限 `0600`。CLI 路径、基础参数、模型、时限、输出上限和允许根进入 Run 非秘密摘要；恢复时任一项变化都会失败关闭。超时或取消会终止整个进程组。审计只保存 Prompt/Schema 摘要、耗时、状态、错误码、run/session/idempotency 关联 ID，不保存 Prompt、凭据或任意请求 metadata。当前自动化只证明 Adapter 协议，生产登录、模型质量、容量和长期稳定性由 DEV-010 验收。
+
 来源注册的 `FILE` locator 只能位于配置的 acquisition roots；远程 `HTTPS` host 必须列入 `WP_SOURCE_ALLOWED_HOSTS`，凭据仅可使用 `secret://env/<变量名>` 引用。刷新发现内容变更时保留固定 revision 并标记漂移，不会自动把新内容发布为知识。
 
 稳定的本地 API 前缀是 `/api/v1`，进程探针 `/health` 不加版本。

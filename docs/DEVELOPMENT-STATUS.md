@@ -1,6 +1,6 @@
 # 开发状态
 
-**当前阶段：DEV-007 与 DEV-008 已完成，单项目 Preview 闭环可用｜更新时间：2026-09-04｜下一任务：DEV-009 公司 CodeAgent CLI Adapter**
+**当前阶段：DEV-009 Adapter 与契约验证已完成｜更新时间：2026-09-04｜下一任务：DEV-010 公司 CodeAgent 七角色真实闭环与效果基线**
 
 本文件是 domain-knowledge 的**唯一开发进度入口**，用于记录当前阶段、已完成里程碑、正在进行或下一项工作、后续队列和最近验证结果。产品行为仍以 [`../specs/`](../specs/README.md) 为规范性事实源；需求级的 `Implemented / Partial / Planned` 状态仍只在[追踪矩阵](../specs/13-verification/traceability-matrix.md)维护。
 
@@ -44,7 +44,7 @@ This file is the single entry point for project-level development status, curren
 - deterministic fixture 可以完成失败、修订、重新生成、评测和发布闭环。
 - 前台 F2 已完成最终七页面、真实批次 Agent 工作流图、绿色双主题、响应式、可访问性及真实/部分/禁用状态；用户已确认当前版本为最终 UI/UX，HCP-1=`Accepted`。
 - B1–B4 Preview API 与前台接线已经完成；操作中心、批次、工作流图、知识血缘/差异、评测/规则、来源注册、知识健康、Provider 配置和观测指标均使用服务端事实。
-- DeepSeek Harness 与 Pi SDK AgentProvider 已存在；已验证的 Pi 配置会成为新批次默认执行方式，公司 CodeAgent CLI 尚未接入。
+- DeepSeek Harness、Pi SDK 与公司 CodeAgent CLI AgentProvider Adapter 已存在；CodeAgent CLI 已完成协议夹具和组合根接线，公司环境 live Run 与效果基线仍待 DEV-010。
 - 来源漂移与不可用会形成可去重的持久化事项；完整安全事实事项仍等待 DEV-012 的权限拒绝审计。
 - 外部真实模型质量、公司环境容量、长期稳定性、企业 KMS 和敌对代码执行安全尚未形成验收结论。
 
@@ -63,7 +63,7 @@ This file is the single entry point for project-level development status, curren
 | DEV-006 | Console B2 操作中心与飞轮批次完整控制面 | Done | 持久化事项、可证明进度、完整治理命令、组件健康、活动流、SSE、前台实时接线与轮询降级 |
 | DEV-007 | Console B4 运营最小可用面 | Done | Provider 状态、安全 API URL/Key 配置与验证、真实 Pi SDK 执行路径、默认新批次快照和生成/治理观测已接入 |
 | DEV-008 | Console B3 知识、评测与来源 | Done | 血缘/差异、评测读模型/证据/规则、来源注册/漂移/刷新、来源事项和知识健康度已接入 |
-| DEV-009 | 公司 CodeAgent CLI Adapter 与契约验证 | Planned | 原 DEV-005；Console 优先队列完成后恢复排序 |
+| DEV-009 | 公司 CodeAgent CLI Adapter 与契约验证 | Done | 七角色、认证、stdin JSONL、session 恢复、超时/取消/错误分类、角色工具与工作区、脱敏审计、Run 摘要均有自动化验证 |
 | DEV-010 | 公司 CodeAgent 七角色真实闭环与效果基线 | Planned | 原 DEV-006；依赖 DEV-009 |
 | DEV-011 | TestGen 候选测试的通用 Oracle 验证与门禁链路 | Planned | 原 DEV-007；对应 `KF-SYS-004` |
 | DEV-012 | 四点崩溃注入、完整权限拒绝审计与恢复加固 | Planned | 原 DEV-008；对应 `AC-REC-001`、`AC-SEC-002` |
@@ -130,7 +130,7 @@ DEV-007 的目标是形成单项目最小完整可用闭环：管理员能安全
 
 验收边界：本地模拟上游证明的是 Pi SDK、配置、安全和工作流执行路径，不是某个外部模型的质量或稳定性结论；本地加密文件不等同于企业 KMS。项目空间、跨项目隔离和大规模容量加固继续留在 F6，不阻塞单项目 Preview 最小完整可用。
 
-## 后续开发任务：DEV-009 CompanyCodeAgentCliAdapter
+## 已完成开发任务：DEV-009 CompanyCodeAgentCliAdapter
 
 目标是在不改变 Domain/Application、七个 Agent 拓扑、内部 AgentCommand/AgentResult 和现有 HTTP API 的前提下，实现 `CompanyCodeAgentCliAdapter`，作为现有 `AgentProvider` Port 的 Infrastructure 实现。
 
@@ -155,6 +155,8 @@ DEV-007 的目标是形成单项目最小完整可用闭环：管理员能安全
 
 DEV-009 不修改 `web/`、`site/`、前台产品设计、现有 HTTP 路由或响应。如果发现必须新增 API，只记录需求并输出交给前台/API 负责人的 Prompt，不在后台任务中实现。
 
+完成结果：`CompanyCodeAgentCliAdapter` 已作为现有 `AgentProvider` 的 Infrastructure 实现接入组合根。Adapter 每次调用前执行认证预检，以非 shell 子进程、stdin Prompt、固定角色工具白名单和角色工作区执行；支持 JSON/JSONL 最终结果、角色与 Schema 失败关闭、0600 session 持久化、超时、AbortSignal、进程组终止和稳定错误码。CLI 命令、模型、基础参数、时限、输出上限及允许根进入非秘密 Run 配置摘要，变化后恢复失败关闭。七角色和失败矩阵由协议夹具验证；当前环境未安装公司 CLI，因此没有宣称 live 质量、稳定性或容量结论，这些属于 DEV-010。
+
 ## 最近验证基线
 
 | 日期 | 基线 | 结果 |
@@ -164,5 +166,6 @@ DEV-009 不修改 `web/`、`site/`、前台产品设计、现有 HTTP 路由或�
 | 2026-09-03 | DEV-005 F2 + B1 HCP-1 最终基线 | TypeScript 通过；Spec：7 schemas、7 commands、8 results、51 P0；测试 115/115；Chromium E2E 7/7，含七页亮色语义面审计及操作中心 `1363 × 936` 像素基线；HCP-1=`Accepted` |
 | 2026-09-03 | DEV-006 B2 完整控制面 | TypeScript 通过；Spec：11 schemas、7 commands、8 results、51 P0；测试 117/117；Chromium E2E 8/8；框架测评 6/6 `ACCEPTED` |
 | 2026-09-04 | DEV-007 B4 + DEV-008 B3 最终验收 | Node 24.13.0；TypeScript 通过；Spec：17 schemas、7 commands、8 results、51 P0；测试 135/135；Chromium E2E 13/13；站点契约 12/12；框架测评 6/6 `ACCEPTED`；npm audit 0；七页双主题、1363×936、390×844、200% 缩放和 8 帧实机动图通过；结论 `Accepted with follow-ups` |
+| 2026-09-04 | DEV-009 CompanyCodeAgentCliAdapter | Node 24.13.0；TypeScript 与 Spec 通过；公司 CLI 协议夹具覆盖七角色、认证、stdin、JSON/JSONL、session、工作区、超时/取消和错误分类；测试 142/142；框架测评 7/7 `ACCEPTED`；公司环境 live Run 留待 DEV-010 |
 
 该结果只证明框架机械能力，不代表公司 CodeAgent 效果或生产可用性。

@@ -146,6 +146,58 @@ test('provider parameter digest covers headless arguments and SDK patch content'
   }
 });
 
+test('Company CodeAgent snapshot freezes all non-secret CLI execution parameters', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'wp-codeagent-provider-digest-'));
+  const runtimeDir = join(root, 'runtime');
+  const trackedKeys = [
+    'WP_FLYWHEEL_AGENT_PROVIDER', 'WP_CODEAGENT_BIN', 'WP_CODEAGENT_RUN_ARGS_JSON',
+    'WP_CODEAGENT_MODEL', 'WP_CODEAGENT_TIMEOUT_MS', 'WP_CODEAGENT_AUTH_TIMEOUT_MS',
+    'WP_CODEAGENT_MAX_OUTPUT_BYTES', 'WP_CODEAGENT_ALLOWED_ROOTS',
+  ] as const;
+  const previous = new Map(trackedKeys.map((key) => [key, process.env[key]]));
+  const compositions: ReturnType<typeof createComposition>[] = [];
+  const create = () => {
+    const composition = createComposition({ runtimeDir });
+    compositions.push(composition);
+    return composition;
+  };
+  try {
+    process.env.WP_FLYWHEEL_AGENT_PROVIDER = 'company-codeagent-cli';
+    process.env.WP_CODEAGENT_BIN = '/opt/company/bin/codeagent';
+    process.env.WP_CODEAGENT_RUN_ARGS_JSON = '["run","--tenant","knowledge"]';
+    process.env.WP_CODEAGENT_MODEL = 'company-model-a';
+    process.env.WP_CODEAGENT_TIMEOUT_MS = '12345';
+    process.env.WP_CODEAGENT_AUTH_TIMEOUT_MS = '2345';
+    process.env.WP_CODEAGENT_MAX_OUTPUT_BYTES = '456789';
+    process.env.WP_CODEAGENT_ALLOWED_ROOTS = root;
+    const first = create();
+    const run = first.apps.flywheel.createRun('codeagent-runtime-snapshot', 'local-v1');
+    const snapshot = await first.runConfiguration.capture(run.runId);
+    assert.equal(snapshot.provider.kind, 'company-codeagent-cli');
+    assert.equal(snapshot.provider.model, 'company-model-a');
+    assert.match(snapshot.provider.parametersSha256, /^[a-f0-9]{64}$/);
+    first.close();
+
+    const same = create();
+    await same.runConfiguration.assertCompatible(run.runId);
+    same.close();
+
+    process.env.WP_CODEAGENT_MODEL = 'company-model-b';
+    const changed = create();
+    await assert.rejects(changed.runConfiguration.assertCompatible(run.runId), /run provider configuration changed/);
+  } finally {
+    for (const composition of compositions) {
+      try { composition.close(); } catch { /* already closed */ }
+    }
+    for (const key of trackedKeys) {
+      const value = previous.get(key);
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('Pi RunConfigurationSnapshot freezes every non-secret execution parameter', async () => {
   const root = mkdtempSync(join(tmpdir(), 'wp-pi-provider-digest-'));
   const runtimeDir = join(root, 'runtime');

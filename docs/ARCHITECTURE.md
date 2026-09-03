@@ -96,7 +96,7 @@ src/
 
 真实源码验收还定义了 `ProjectEvaluator` Port。本地受信 Adapter 会解析并归档指定 Git commit，在临时目录执行，不改变源码仓库当前 checkout。生成文件只写入临时目录；工具必须在白名单中，且不得经过 shell。完整进程证据最终写入 CAS。
 
-Orchestrator、DocWorker、DocGen、TestGen、Code、Check 和 Review 的输出都会经过角色专属 JSON Schema 校验。默认 Scenario Provider 是确定性测试设施；设置 `WP_FLYWHEEL_AGENT_PROVIDER=deepseek-harness` 后，组合根会通过官方 stdio JSON-RPC SDK 启动短生命周期 DSH runtime。管理员也可以在 Console 保存并验证 Pi Agent 的 OpenAI-compatible Provider；启用后，新批次会冻结非秘密 Provider 摘要并通过 `PiCodingAgentProvider` 执行，恢复时按摘要 fail closed。Prompt 不进入 argv，Code 输出路径仍受场景白名单约束。一次成功 live Run 只能证明接线与样例结果，不能替代外部模型质量、稳定性或容量试验。
+Orchestrator、DocWorker、DocGen、TestGen、Code、Check 和 Review 的输出都会经过角色专属 JSON Schema 校验。默认 Scenario Provider 是确定性测试设施；设置 `WP_FLYWHEEL_AGENT_PROVIDER=deepseek-harness` 后，组合根会通过官方 stdio JSON-RPC SDK 启动短生命周期 DSH runtime。管理员也可以在 Console 保存并验证 Pi Agent 的 OpenAI-compatible Provider；启用后，新批次会冻结非秘密 Provider 摘要并通过 `PiCodingAgentProvider` 执行。部署环境还可显式选择 `company-codeagent-cli`：该 Adapter 先做认证预检，再以 stdin、固定角色工具白名单、角色工作区和 JSONL 协议执行公司 CLI。三种 live 配置恢复时都按非秘密参数摘要 fail closed。Prompt 不进入 argv，Code 输出路径仍受场景白名单约束。一次成功 live Run 只能证明接线与样例结果，不能替代外部模型质量、稳定性或容量试验。
 
 候选正文先过 Quality Gate。结构、验证锚点或可读性不足时，图会跳过本轮 CodeAgent，将 score、signals 和 weak points 放回下一轮 DocGen 上下文。行为评测仍在候选质量合格后执行，两个 Gate 不能合并。
 
@@ -118,9 +118,9 @@ Orchestrator、DocWorker、DocGen、TestGen、Code、Check 和 Review 的输出�
 - `/api/v1` 下的 HTTP GET 操作只读。
 - 只有配置 `WP_KNOWLEDGE_WRITE_TOKEN` 且请求携带 Bearer token 时，HTTP 写接口才会启用。
 - token 只是本地受信操作员边界，不是完整的用户、资源和动作授权矩阵。当前评测接口负责记录并校验提交的证据元数据，不自行编译或执行代码。
-- 查询侧 DSH Adapter 只访问带版本的 HTTP API，不启动 Python 或 shell。Agent 执行侧有两条 live 路径：`DeepSeekHarnessSdkAgent` 通过官方 stdin JSON-RPC SDK 传递 Prompt；`PiCodingAgentProvider` 读取已验证的加密设置，通过 Pi SDK 调用 OpenAI-compatible Provider。两条路径都执行角色 JSON Schema 校验并记录脱敏调用事实；旧 `DeepSeekHarnessHeadlessAgent` 仅作显式迁移兼容。查询 Adapter 与执行 Provider 不是同一职责。
+- 查询侧 DSH Adapter 只访问带版本的 HTTP API，不启动 Python 或 shell。Agent 执行侧有三条 live 路径：`DeepSeekHarnessSdkAgent` 通过官方 stdin JSON-RPC SDK 传递 Prompt；`PiCodingAgentProvider` 读取已验证的加密设置，通过 Pi SDK 调用 OpenAI-compatible Provider；`CompanyCodeAgentCliAdapter` 对公司 CLI 做认证预检，以非 shell 子进程和 stdin 执行，并持久化可恢复 session ID。三条路径都执行角色 JSON Schema 校验并记录脱敏调用事实；旧 `DeepSeekHarnessHeadlessAgent` 仅作显式迁移兼容。查询 Adapter 与执行 Provider 不是同一职责。
 - `LocalAgentWorkspace` 为每个节点复制显式允许的文件，拒绝路径穿越和源码符号链接。Linux live 模式再由 Bubblewrap 只读挂载角色视图、运行依赖和 patch，并给该节点单独挂载可写 DSH_HOME；参考仓库不进入该 mount namespace。
-- Bubblewrap 仍保留模型 API 所需的网络。它证明代码生成角色的模型会话看不到参考源码，不证明生成代码可以安全执行。`CodeAgent` 在旧设计文档里是角色名，不代表当前运行时调用了独立的 CodeAgent CLI。
+- Bubblewrap 仍保留模型 API 所需的网络。它证明代码生成角色的模型会话看不到参考源码，不证明生成代码可以安全执行。`CodeAgent` 在旧设计文档里通常是角色名；只有部署显式选择 `company-codeagent-cli` 时才调用公司 CLI。
 - 受信项目评测器会净化环境、拒绝路径穿越和符号链接目标、限制时间与输出，并终止进程树。这些措施用于避免验收任务误伤宿主机；子进程仍共享宿主机内核，不能用来运行敌对代码。
 - 核心层另外定义了 Sandbox Port。真实 OS 隔离 Adapter 在通过逃逸、网络、文件系统和资源测试前，不受信的 C++ 执行必须 fail closed。
 
