@@ -71,7 +71,7 @@ test('seven-page Console uses server facts and canonical Sources API', async ({ 
 
   await expect(page.getByRole('heading', { name: 'Action Center', level: 1 })).toBeVisible();
   await expect(page.getByText('browser-contract').first()).toBeVisible();
-  await expect(page.getByText('需要人工查看')).toBeVisible();
+  await expect(page.getByText(/项需要确认/)).toBeVisible();
 
   const labels = ['Action Center', 'Flywheel Runs', 'Knowledge', 'Graph', 'Evaluations', 'Sources', 'Agent Settings'];
   for (const label of labels) await expect(page.getByRole('button', { name: new RegExp(label) }).first()).toBeVisible();
