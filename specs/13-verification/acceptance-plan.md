@@ -62,6 +62,16 @@ UI 验收场景的规范正文以[前台产品设计的 AC-UI-001 至 AC-UI-019]
 - API 空结果、部分失败和完全失败必须进入 Empty、Partial 或 Error 状态，不得回退到模拟 Health、ETA、Graph、Action Item、Activity、Workspace 或用户身份。
 - 浏览器契约入口为 `npm run test:ui`，使用临时 Registry 和 Chromium 验证上述前台门禁，不复用开发者正在运行的工作目录或服务数据。
 
+## Preview HTTP API 迁移验收门
+
+规范性目标路由和页面缺口以 [Preview HTTP API 规范](../10-interfaces/http-api.md)为准。开始实现任一 `Available / Rename`、`Available / Redefine` 或 `Planned` 接口时，必须同时满足：
+
+- Server、Console、DSH Adapter、契约测试和文档使用同一条规范路径，不保留 Preview 旧路由别名；
+- 简单知识查询收敛到 `GET /api/v1/knowledge?q=...`，不得重新增加 `/knowledge/query` 或根级 `/query`；
+- 公共 HTTP 不暴露 transition、evaluate、publish 等内部 Application App；
+- 列表分页、Command 幂等、认证错误分类、reason code 和审计关联符合通用约束；
+- 未实现能力在前台保持 Static Preview、Partial、Disabled 或 Planned 表达，不得通过假响应通过验收。
+
 ## P0-A Review 清单
 
 `AC-SPEC-001` 还检查：accepted 文件无阻塞性占位标记；Schema 通过 Draft 2020-12 元校验且 `$id` 唯一；跨文件 `$ref` 可从同一 registry 解析；每个 Agent 角色的合法/非法 fixture 分别通过/失败；权限矩阵无空单元格；状态全集与转换目标一致；Domain 禁止 SDK/语言类型；全部 P0 有场景。可重复的基础校验入口为 `npm run validate:specs`。P0-A 通过是创建独立 P0-B Spike 的前置条件，不代表 Spike 已通过或生产可用。

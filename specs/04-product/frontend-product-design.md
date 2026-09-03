@@ -1,6 +1,6 @@
 # 知识飞轮前台产品设计
 
-**状态：Accepted；前台交付 F1 与固定 ohMyWorkPanel 自动路径已实现｜版本：0.4.2｜日期：2026-09-03**
+**状态：Accepted；前台交付 F1 与固定 ohMyWorkPanel 自动路径已实现｜版本：0.4.3｜日期：2026-09-03**
 
 本文定义 domain-knowledge 知识飞轮控制台的用户体验、信息架构、交互边界、接口需求和验收标准。领域状态、门禁、安全和发布语义以同仓库的[规范总入口](../README.md)为准；前台不得创造第二套状态或发布权威。
 
@@ -458,49 +458,15 @@ sequenceDiagram
 
 ## 11. 前端所需 API
 
-### 11.1 当前可复用
+规范性路由、当前实现映射、破坏性迁移清单和所有页面缺口统一见 [Preview HTTP API 规范](../10-interfaces/http-api.md)，本节不再复制可能漂移的接口表。
 
-| API | 实现状态 | 用途与边界 |
-|---|---|---|
-| `GET /api/v1/status` | Implemented | 操作中心基础指标；前台交付 F1 不扩展为综合健康分。 |
-| `GET /api/v1/capabilities` | Implemented | Provider、Prompt 传输、Agent 源码隔离和敌对代码执行隔离的当前事实；前台不得合并两种隔离。 |
-| `GET /api/v1/knowledge` | Implemented | 知识列表与状态筛选；游标分页与自定义排序未实现。 |
-| `GET /api/v1/knowledge/:versionId` | Implemented | 知识详情、正文与 provenance；血缘和反向链接未实现。 |
-| `GET /api/v1/query` | Implemented | Knowledge 关键词与分类搜索；分页和高亮摘要未实现。 |
-| `GET /api/v1/scan` | Implemented | 发现页的来源候选，不等同于持久化来源管理。 |
-| `POST /api/v1/feedback` | Implemented | 使用反馈；写入是否开放及 Bearer token 规则由 capabilities 和服务端配置决定。 |
-| `POST /api/v1/runs` | Implemented（兼容入口） | 只创建 Run，不启动完整自动工作流，不作为产品主入口。 |
-| `POST /api/v1/transition` | Implemented（运维兼容） | 裸状态转换，不供产品 UI 使用。 |
-| `POST /api/v1/evaluate` | Implemented（受信操作端） | 录入受信报告，不作为普通 UI 流程。 |
-| `POST /api/v1/publish` | Implemented（内部受控） | 由 Workflow/Publisher 调用，不暴露普通发布按钮。 |
+产品层额外约束如下：
 
-### 11.2 运行与观察 API
-
-| API 或数据来源 | 实现状态 | 需求与边界 |
-|---|---|---|
-| `GET /api/v1/runs` | Implemented | Run 摘要和状态过滤；模块过滤、分页与排序未实现。 |
-| `GET /api/v1/runs/:runId` | Implemented | 返回 Run、版本、评测、Decision、checkpoint、workflowNodes、事件和 publication 的 snapshot。 |
-| `GET /api/v1/runs/:runId/events?after=<seq>` | Implemented | 基于 `event_seq` 增量读取；SSE 和浏览器自动重连未实现。 |
-| `GET /api/v1/runs/:runId/workflow-nodes` | Implemented | 节点、角色、轮次、尝试、状态和时间投影，不暴露 checkpoint 私有数据。 |
-| `GET /api/v1/runs/:runId/workflow-status` | Implemented | 工作流执行状态查询，不替代 FlywheelRun 业务状态。 |
-| Run snapshot 的 `evaluations` 与 `latestDecision` | Implemented | 前台交付 F1 的评测与 Gate 事实源；没有独立评测列表 API。 |
-| `GET /api/v1/knowledge/:versionId/lineage` | Planned | 目标是返回父子版本、关联 Run、Correction 和 publication。 |
-| `GET /api/v1/artifacts/:artifactId` | Planned | 目标是按权限返回元数据或受控内容。 |
-| 从 `GET /api/v1/runs` 派生治理队列 | Partial | 可形成 Run 级只读队列；独立 Governance API 和治理决议未实现。 |
-| `GET /api/v1/policies` | Planned | 目标是返回可选择的固化策略及解释。 |
-| `POST /api/v1/run-commands/start` | Implemented（固定 profile） | 支持固定 ohMyWorkPanel；通用来源/策略向导和请求幂等键未实现。 |
-| `POST /api/v1/run-commands/cancel` | Implemented | 已有取消传播和业务状态同步；请求级幂等审计仍需强化。 |
-| `POST /api/v1/run-commands/resume` | Implemented | 按同一 runId/thread_id 从 graph checkpoint 恢复。 |
-| `POST /api/v1/run-commands/retry` | Planned | 目标是按治理决议创建新 Run 或合法重试失败节点。 |
-| `POST /api/v1/governance/:id/resolve` | Planned | 目标是记录受控治理决议，不修改既有 Gate 或 receipt。 |
-| `GET /api/v1/event-stream` | Planned | 目标是 SSE 推送并按 `event_seq` 续传。 |
-| `GET /api/v1/agents` | Implemented | 返回全部固定 Agent 定义和追加提示词；Provider 健康未接入。 |
-| `PUT /api/v1/agents/:agentId/prompt` | Implemented | 只更新 `promptAddon`，需要写 token，并拒绝职责、Schema、权限或拓扑字段。 |
-| `GET /api/v1/runs/:runId/demo-report` | Implemented | 下载脱敏 Demo JSON，不返回 Prompt、Session 或凭据。 |
-
-所有列表接口必须有稳定排序、游标分页和上限；所有 Command 必须包含幂等键并返回关联 `runId/eventId`。
-
-上述分页、独立 Governance、lineage、Artifact、policy、retry 和 SSE 路由是目标契约，不得在第一阶段前台中假定已经实现。精确进度、ETA、Knowledge Health、Knowledge Graph、跨 Run Activity、持久化 Sources 和 Evaluation Rule 管理同样等待后端规范对齐后另行立项。
+- 首个 Release 前允许直接清理旧路由，但 Server、Console、DSH Adapter、测试和文档必须在同一变更中迁移。
+- 第一阶段优先保证 Action Center 与 Flywheel Runs 的真实可用性；Knowledge 提供真实 Preview，不实现 Add curated knowledge。
+- Graph 使用带永久说明的静态预览；Evaluations 与 Sources 独立成页，但不得把现有 Run 聚合或扫描候选冒充完整 Registry。
+- Agent Settings 可以读取真实固定 Agent 定义；任何未接通的编辑控件不得产生假保存成功。
+- Planned API 上线前，相关界面必须隐藏、禁用或明确标记 Preview/Partial，且不得回退到演示数据。
 
 ## 12. 产品需求与验收
 
