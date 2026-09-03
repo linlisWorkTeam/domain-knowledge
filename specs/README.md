@@ -1,6 +1,6 @@
 # Knowledge Flywheel 规范集
 
-**规范状态：Accepted｜版本：1.6.0｜基线日期：2026-09-03**
+**规范状态：Accepted｜版本：1.6.1｜基线日期：2026-09-03**
 
 本目录是 domain-knowledge 的唯一规范性事实源。`KF-SYS-*` 与 `KF-UI-*` 使用独立命名空间，避免与历史实现中的需求编号冲突。本文档定义需求、产品、架构、领域、工作流、Agent 契约、评测、安全与验收；需求级实现状态由追踪矩阵明确标记，项目阶段、当前任务和后续顺序统一从[开发状态](../docs/DEVELOPMENT-STATUS.md)查看。关键词“必须 / 不得 / 应当 / 可以”分别表示强制、禁止、推荐和可选。
 
@@ -41,4 +41,4 @@ P0-A Spec 已 Accepted；这只表示需求、契约和验收基线可进入实�
 
 需求级状态仍以[追踪矩阵](13-verification/traceability-matrix.md)为准。Application App、Domain Service、固定七 Agent、LangGraph 与持久化的约束分别由 ADR-006、ADR-010、ADR-011 和对应验收场景定义，不因进度文档调整而改变。
 
-前台交付 F1 与系统实施 Phase 1–4 是两条独立编号轴。F1 只允许在现有 API 上收敛控制台布局、视觉、响应式和可访问性；原型中的模拟 Health、ETA、Graph、Activity、Action Item、Workspace 与用户身份不构成产品能力，新增后端或领域语义必须另行通过 Spec 对齐。
+前台交付 F1 与系统实施 Phase 1–4 是两条独立编号轴。F1 只允许在现有 API 上收敛控制台布局、视觉、响应式和可访问性；原型中的模拟 Health、ETA、Activity、Action Item、Workspace 与用户身份不构成产品能力。Graph 只允许展示 Registry 中的真实 Agent 节点投影，新增后端或领域语义必须另行通过 Spec 对齐。

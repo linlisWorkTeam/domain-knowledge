@@ -14,9 +14,8 @@
 | `ActionItem` | actionItemId, type, severity, status, fingerprint, subjectRefs[], evidenceRefs[], createdAt | 由服务端事实确定性产生；相同 fingerprint 的开放事项不得重复；处理动作只追加历史。 |
 | `Source` | sourceId, kind, locator, revision, status, accessPolicyRef, lastSyncAt | locator 与凭据分离；revision 可复验；刷新不直接产生 VERIFIED 知识。 |
 | `EvaluationRule` | ruleId, revision, scope, config, enabled | revision 不可变；修改创建新 revision，不覆盖历史评测所引用的版本。 |
-| `KnowledgeRelation` | relationId, fromVersionId, toNodeId, relationType, evidenceRefs[], confidenceBasis | 关系必须可追溯至版本和证据；confidenceBasis 不接受 Agent 自评分。 |
 
-`RunProgress`、`SystemComponentHealth`、`ActivityEntry`、`KnowledgeHealthSnapshot`、`EvaluationSummary` 和 `GraphProjection` 是从上述聚合、事件与审计记录生成的只读投影，不是新的写侧事实源。
+`RunProgress`、`SystemComponentHealth`、`ActivityEntry`、`KnowledgeHealthSnapshot`、`EvaluationSummary` 和 `WorkflowGraphProjection` 是从上述聚合、固定 Agent 定义、节点投影、事件与审计记录生成的只读投影，不是新的写侧事实源。
 
 ## 枚举
 
@@ -38,7 +37,7 @@
 | Knowledge Health | KnowledgeVersion、Source、EvaluationReport | 每个指标必须返回 numerator、denominator、窗口、样本时间与规则版本；无分母返回 unavailable，不返回 0。 |
 | Evaluation 列表 | 不可变 EvaluationReport 与 GateDecision | 读模型不得修改原报告；Rule revision 必须可回溯。 |
 | Source health | Source revision、刷新任务和访问结果 | 扫描候选只有持久化并验证访问边界后才成为 Source。 |
-| Graph | KnowledgeRelation 与 KnowledgeVersion | 图只是可重建投影；边必须含 relationType 与 evidenceRefs，查询必须限制 depth 和节点数。 |
+| Agent 工作流执行图 | 固定 Agent 定义、WorkflowNodeProjection、FlywheelRun 与事件 | `WorkflowGraphProjection` 按 runId 组合固定节点/边、运行与工作流状态、iteration、attempt、当前节点、最新 eventSeq 和 sampledAt；不得读取 checkpoint 或成为第二执行状态源。 |
 | Provider status | Provider Adapter 的受控探针 | 只暴露 available/auth state/model/checkedAt/reasonCode，不暴露 token、session 或 Prompt。 |
 
 ## 领域事件

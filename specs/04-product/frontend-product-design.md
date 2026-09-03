@@ -1,6 +1,6 @@
 # 知识飞轮前台产品设计
 
-**状态：Accepted；前台交付 F1 与固定 ohMyWorkPanel 自动路径已实现｜版本：0.4.3｜日期：2026-09-03**
+**状态：Accepted；前台交付 F1 与固定 ohMyWorkPanel 自动路径已实现｜版本：0.4.4｜日期：2026-09-03**
 
 本文定义 domain-knowledge 知识飞轮控制台的用户体验、信息架构、交互边界、接口需求和验收标准。领域状态、门禁、安全和发布语义以同仓库的[规范总入口](../README.md)为准；前台不得创造第二套状态或发布权威。
 
@@ -149,7 +149,7 @@ Knowledge Flywheel
 
 - 操作中心从 Run 状态与最新 GateDecision 派生运行级待治理事项，不声明独立 Action Item 生命周期。
 - 发现页只展示 `GET /api/v1/scan` 返回的来源候选，不描述为持久化 Source Registry。
-- Knowledge Graph、Knowledge Health、跨 Run Activity、精确进度百分比、ETA、多项目切换和用户身份不在本阶段能力内；对应入口隐藏，或以不带演示值的明确“尚未接入”状态展示。
+- 独立 Graph 页面、Knowledge Health、跨 Run Activity、精确进度百分比、ETA、多项目切换和用户身份不在 F1 范围；Run 工作台已有真实节点投影，后续 Graph 页面必须复用该事实而非展示模拟节点状态。
 - 页面只能展示服务端事实或本节允许的派生值。派生值必须能说明输入字段和计算规则，不得伪装成服务端指标。
 - API 失败、部分响应或空结果分别进入 Error、Partial 或 Empty 状态，不得回退到原型演示数据。
 
@@ -464,7 +464,7 @@ sequenceDiagram
 
 - 首个 Release 前允许直接清理旧路由，但 Server、Console、DSH Adapter、测试和文档必须在同一变更中迁移。
 - 第一阶段优先保证 Action Center 与 Flywheel Runs 的真实可用性；Knowledge 提供真实 Preview，不实现 Add curated knowledge。
-- Graph 使用带永久说明的静态预览；Evaluations 与 Sources 独立成页，但不得把现有 Run 聚合或扫描候选冒充完整 Registry。
+- Graph 使用选定 Run 的真实固定 Agent 拓扑和节点投影，B2 前采用轮询、B2 后接入 SSE；Evaluations 与 Sources 独立成页，但不得把现有 Run 聚合或扫描候选冒充完整 Registry。
 - Agent Settings 可以读取真实固定 Agent 定义；任何未接通的编辑控件不得产生假保存成功。
 - Planned API 上线前，相关界面必须隐藏、禁用或明确标记 Preview/Partial，且不得回退到演示数据。
 

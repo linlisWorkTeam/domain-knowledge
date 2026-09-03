@@ -42,7 +42,7 @@
 | KF-SYS-036 | P1 | KnowledgeVersion 必须可查询版本血缘、结构化 Diff 和带 provenance 的关系，且能反向定位 Run、Correction、Evaluation 与 publication。 | AC-API-005 |
 | KF-SYS-037 | P1 | 系统必须提供跨 Run Evaluation 读模型、证据查询和版本化 Evaluation Rule 管理；规则修改必须校验权限并保留不可变审计历史。 | AC-API-006 |
 | KF-SYS-038 | P1 | 系统必须提供持久化 Source Registry，管理来源身份、固定版本、同步状态、漂移、刷新任务、访问边界及其与知识的关联。 | AC-API-007 |
-| KF-SYS-039 | P1 | Knowledge Graph 必须从已持久化 Knowledge Relation 构建受限读模型，返回稳定节点、typed edge、provenance、截断信息和生成时间，不得从静态前台图反写领域事实。 | AC-API-008 |
+| KF-SYS-039 | P1 | Console 必须为选定 Run 提供只读 Agent 工作流执行图，使用 Knowledge Registry 中的固定拓扑、WorkflowNodeProjection、Run snapshot 与事件展示节点状态、轮次、尝试和时间；不得读取 graph checkpoint、修改拓扑或人工推进节点。 | AC-API-008 |
 | KF-SYS-040 | P1 | Agent Settings 必须能够读取 Provider 可用性、认证状态、模型标识和受控错误摘要，但不得返回凭据或允许修改固定 Agent 契约。 | AC-API-009 |
 
 ## P0-B Spike（P0-A 后独立开展）

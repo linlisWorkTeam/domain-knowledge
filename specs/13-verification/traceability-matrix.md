@@ -42,7 +42,7 @@
 | KF-SYS-036 | AC-API-005 | Planned | — | — |
 | KF-SYS-037 | AC-API-006 | Planned | — | — |
 | KF-SYS-038 | AC-API-007 | Planned | — | — |
-| KF-SYS-039 | AC-API-008 | Planned | — | — |
+| KF-SYS-039 | AC-API-008 | Partial | `src/application/services/workflow-control.ts` + `src/interfaces/runner/console-read-model.ts` + `web/app.js` | `tests/integration/server.test.ts` + `tests/acceptance/automated-langgraph-flow.test.ts` |
 | KF-SYS-040 | AC-API-009 | Planned | — | — |
 | KF-UI-001 | AC-UI-001 | Implemented | `web/app.js` + `src/interfaces/runner/server.ts` | `tests/contract/site.test.ts` + `tests/integration/server.test.ts` |
 | KF-UI-002 | AC-UI-002 | Implemented | `web/app.js` + `src/interfaces/runner/console-read-model.ts` | `tests/contract/site.test.ts` + `tests/integration/server.test.ts` |

@@ -47,7 +47,7 @@ This file is the single entry point for project-level development status, curren
 - DeepSeek Harness live Adapter 已存在；公司 CodeAgent CLI 尚未接入。
 - 真实 Agent 质量、公司环境容量、长期稳定性和敌对代码执行安全尚未形成验收结论。
 
-需求级统计以追踪矩阵当前内容为准：`Implemented 41 / Partial 15 / Planned 15`。
+需求级统计以追踪矩阵当前内容为准：`Implemented 41 / Partial 16 / Planned 14`。
 
 ## 里程碑与工作项
 
@@ -65,8 +65,8 @@ This file is the single entry point for project-level development status, curren
 | DEV-009 | 生产容量、认证续期、并发与 Redis 启用决策 | Planned | 依赖真实运行数据，不改变 Registry 事实源地位 |
 | DEV-010 | Console B1 Preview API 基线迁移 | Planned | 11 个旧接口资源化迁移，统一分页、错误、认证、幂等和 revision |
 | DEV-011 | Console B2 Action Center 与 Runs 完整控制面 | Planned | Action Item、progress/retry/SSE、组件健康、Activity 与 Knowledge Health |
-| DEV-012 | Console B3 Knowledge、Evaluations 与 Sources | Planned | 血缘/Diff/关系、Evaluation 读模型与规则、Source Registry |
-| DEV-013 | Console B4 Graph 与运营面加固 | Planned | 真实 Graph 投影、Provider status、指标和大数据查询验收 |
+| DEV-012 | Console B3 Knowledge、Evaluations 与 Sources | Planned | 血缘/Diff、Evaluation 读模型与规则、Source Registry |
+| DEV-013 | Console B4 运营面加固 | Planned | Provider status、指标口径、SSE 容量和大数据查询验收 |
 
 状态含义：`Ready / Next` 表示下一项已排序但尚未开始；`In Progress` 表示已有活动开发分支；`Blocked` 必须写明外部依赖；`Done` 必须给出可复验结果。
 
