@@ -4,15 +4,18 @@ import { delimiter, dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   ContentGovernanceApp, EvalRunnerApp, FlywheelApp, KnowledgeDiscoveryApp, KnowledgeSearchApp,
-  Orchestrator,
+  OperationalMetricsApp, Orchestrator, ProviderOperationsApp,
 } from '../../application/apps/index.ts';
 import {
   AGENT_COMMAND_SCHEMA_ID, AGENT_RESULT_SCHEMA_ID, AgentCatalogService,
   AutomatedProjectWorkflowService, DeterministicQualityPolicy, OhMyWorkPanelWorkflowExecutor,
   RegistryRunConfigurationService, RegistryWorkflowObserver,
 } from '../../application/services/index.ts';
-import { sha256 } from '../../domain/index.ts';
+import { createEvent, sha256 } from '../../domain/index.ts';
 import type { AutomatedProjectScenario } from '../../application/services/index.ts';
+import type {
+  OperationalMetricsPort, ProviderConnectionProbe, ProviderEndpointPolicy, ProviderSettingsStore,
+} from '../../application/ports/index.ts';
 import { DOMAIN_KNOWLEDGE_AGENT_DEFINITIONS } from '../../infrastructure/workflow/langgraph/index.ts';
 import { createDomainKnowledgeInfrastructure } from '../../infrastructure/workflow/langgraph/index.ts';
 import { TrustedProjectEvaluator } from '../../infrastructure/evaluation/project/index.ts';
@@ -25,7 +28,12 @@ import {
 import { SQLiteContentGovernance } from '../../infrastructure/persistence/sqlite-content-governance/index.ts';
 import { SourceScanner } from '../../infrastructure/source-scan/index.ts';
 import { LocalAgentWorkspace } from '../../infrastructure/agents/workspace/index.ts';
+import {
+  EncryptedFileProviderSettingsStore, OpenAiCompatibleProviderProbe,
+  PiCodingAgentProvider, PublicHttpsEndpointPolicy,
+} from '../../infrastructure/agents/pi-agent/index.ts';
 import { JsonSchemaAgentContractValidator } from '../../infrastructure/agents/contracts/index.ts';
+import { SQLiteOperationalMetrics } from '../../infrastructure/observability/sqlite-operational-metrics.ts';
 import { migrateLegacyOkf } from '../../infrastructure/migration/legacy-okf/index.ts';
 import { ConsoleReadModel } from './console-read-model.ts';
 import { buildDemoReport } from './demo-report.ts';
@@ -88,6 +96,10 @@ export function createComposition(input: {
   repositoryRoot?: string;
   runtimeDir?: string;
   clock?: () => string;
+  providerSettingsStore?: ProviderSettingsStore;
+  providerEndpointPolicy?: ProviderEndpointPolicy;
+  providerProbe?: ProviderConnectionProbe;
+  operationalMetrics?: OperationalMetricsPort;
 } = {}) {
   const repositoryRoot = resolve(input.repositoryRoot ?? defaultRepositoryRoot);
   const config = loadWorkpanelConfig(repositoryRoot);
@@ -127,6 +139,27 @@ export function createComposition(input: {
     },
     clock: input.clock,
   }));
+  const metrics = input.operationalMetrics ?? new SQLiteOperationalMetrics(
+    repository.database,
+    () => new Date(input.clock?.() ?? Date.now()),
+  );
+  const operationalMetricsApp = new OperationalMetricsApp(metrics);
+  const providerEndpointPolicy = input.providerEndpointPolicy ?? new PublicHttpsEndpointPolicy();
+  const providerOperations = new ProviderOperationsApp({
+    store: input.providerSettingsStore ?? new EncryptedFileProviderSettingsStore(
+      join(runtimeDir, 'secrets', 'provider-settings.enc'),
+      join(runtimeDir, 'secrets', 'provider-settings.key'),
+    ),
+    endpointPolicy: providerEndpointPolicy,
+    probe: input.providerProbe ?? new OpenAiCompatibleProviderProbe(),
+    clock: input.clock,
+    audit: (event) => {
+      const domainEvent = createEvent(
+        'provider-settings:pi-agent', event.eventType, event.payload, event.occurredAt,
+      );
+      repository.recordOperationalEvent({ ...domainEvent, eventId: event.eventId });
+    },
+  });
   const agents = new AgentCatalogService({
     definitions: DOMAIN_KNOWLEDGE_AGENT_DEFINITIONS,
     repository,
@@ -199,15 +232,18 @@ export function createComposition(input: {
   const schemaRoot = join(componentRoot, 'specs', 'schemas');
   const artifactRefSchemaSha256 = sha256(readFileSync(join(schemaRoot, 'artifact-ref.schema.json')));
   const correctionSchemaSha256 = sha256(readFileSync(join(schemaRoot, 'correction.schema.json')));
-  const runConfiguration = new RegistryRunConfigurationService({
+  const fallbackRunProvider = {
+    kind: agentProviderMode,
+    model: providerModel,
+    parametersSha256: sha256(JSON.stringify(providerParameters)),
+  };
+  let runConfiguration!: RegistryRunConfigurationService;
+  runConfiguration = new RegistryRunConfigurationService({
     definitions: DOMAIN_KNOWLEDGE_AGENT_DEFINITIONS,
     repository,
     artifacts,
-    provider: {
-      kind: agentProviderMode,
-      model: providerModel,
-      parametersSha256: sha256(JSON.stringify(providerParameters)),
-    },
+    provider: fallbackRunProvider,
+    providerResolver: () => providerOperations.runConfigurationProvider(runConfiguration.provider),
     contracts: {
       commandSchema: AGENT_COMMAND_SCHEMA_ID,
       resultSchema: AGENT_RESULT_SCHEMA_ID,
@@ -231,6 +267,30 @@ export function createComposition(input: {
       const writeAudit = async (record: Parameters<NonNullable<ConstructorParameters<typeof DeepSeekHarnessSdkAgent>[0]['onAudit']>>[0]) => {
         await mkdir(auditDirectory, { recursive: true });
         await appendFile(auditPath, `${JSON.stringify(record)}\n`, { encoding: 'utf8', mode: 0o600 });
+        metrics.recordProviderInvocation({
+          invocationId: `pinv_${sha256(JSON.stringify({
+            provider: record.provider,
+            idempotencyKey: record.idempotencyKey,
+            startedAt: record.startedAt,
+            providerAttempt: record.metadata.providerAttempt ?? 0,
+          })).slice(0, 32)}`,
+          runId: String(record.metadata.runId ?? ''),
+          agentId: record.role,
+          provider: record.provider,
+          model: providerModel,
+          startedAt: record.startedAt,
+          completedAt: record.completedAt,
+          durationMs: record.durationMs,
+          status: record.status,
+          retryCount: Math.max(0, Number(record.metadata.providerAttempt ?? 1) - 1),
+          inputTokens: null,
+          outputTokens: null,
+          cacheReadTokens: null,
+          cacheWriteTokens: null,
+          estimatedCostUsd: null,
+          fixture: false,
+          errorCode: record.errorCode,
+        });
       };
       const agent = agentProviderMode === 'deepseek-harness'
         ? new DeepSeekHarnessSdkAgent({
@@ -266,10 +326,21 @@ export function createComposition(input: {
         assetRoot: join(componentRoot, 'acceptance', 'ohmyworkpanel'),
         contracts: new JsonSchemaAgentContractValidator(schemaRoot),
         ...(agent ? { agent } : {}),
-        ...(agent ? { agentWorkspaces: new LocalAgentWorkspace({
+        agentResolver: (runId) => {
+          const snapshot = runConfiguration.get(runId);
+          if (snapshot?.provider.kind !== 'pi-agent') return undefined;
+          return new PiCodingAgentProvider({
+            settings: providerOperations.requireRuntimeConfiguration(snapshot.provider),
+            agentDir: join(runtimeDir, 'pi-agent'),
+            maxTokens,
+            endpointPolicy: providerEndpointPolicy,
+            onInvocation: (record) => metrics.recordProviderInvocation(record),
+          });
+        },
+        agentWorkspaces: new LocalAgentWorkspace({
           workspaceRoot: agentWorkspaceRoot,
           allowedSourceRoots: allowedRoots,
-        }) } : {}),
+        }),
       });
       const infrastructure = await createDomainKnowledgeInfrastructure({
         executor,
@@ -304,6 +375,8 @@ export function createComposition(input: {
       knowledgeSearch: knowledgeSearchApp,
       knowledgeDiscovery: knowledgeDiscoveryApp,
       contentGovernance,
+      providerOperations,
+      operationalMetrics: operationalMetricsApp,
       orchestrator,
     },
     // Compatibility surface for existing CLI and integrations. New entrypoints use apps.

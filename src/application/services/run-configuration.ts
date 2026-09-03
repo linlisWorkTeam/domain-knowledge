@@ -15,6 +15,7 @@ export class RegistryRunConfigurationService implements RunConfigurationManager 
   readonly repository: FlywheelRepository;
   readonly artifacts: ArtifactStore;
   readonly provider: RunConfigurationSnapshot['provider'];
+  readonly providerResolver?: () => RunConfigurationSnapshot['provider'];
   readonly contracts: RunConfigurationSnapshot['contracts'];
   readonly clock: () => string;
 
@@ -23,6 +24,7 @@ export class RegistryRunConfigurationService implements RunConfigurationManager 
     repository: FlywheelRepository;
     artifacts: ArtifactStore;
     provider: RunConfigurationSnapshot['provider'];
+    providerResolver?: () => RunConfigurationSnapshot['provider'];
     contracts: RunConfigurationSnapshot['contracts'];
     clock?: () => string;
   }) {
@@ -34,6 +36,7 @@ export class RegistryRunConfigurationService implements RunConfigurationManager 
     this.repository = input.repository;
     this.artifacts = input.artifacts;
     this.provider = structuredClone(input.provider);
+    this.providerResolver = input.providerResolver;
     this.contracts = structuredClone(input.contracts);
     this.clock = input.clock ?? (() => new Date().toISOString());
   }
@@ -85,7 +88,7 @@ export class RegistryRunConfigurationService implements RunConfigurationManager 
     const snapshot: RunConfigurationSnapshot = {
       schemaVersion: '1.0',
       runId,
-      provider: structuredClone(this.provider),
+      provider: structuredClone(this.currentProvider()),
       contracts: structuredClone(this.contracts),
       agents,
       governanceTrigger: governanceTrigger && feedbackRef ? {
@@ -116,7 +119,7 @@ export class RegistryRunConfigurationService implements RunConfigurationManager 
   async assertCompatible(runId: string): Promise<RunConfigurationSnapshot> {
     const snapshot = this.repository.getRunConfiguration(runId);
     assertInvariant(snapshot !== null, `run configuration not found: ${runId}`);
-    assertInvariant(JSON.stringify(snapshot.provider) === JSON.stringify(this.provider),
+    assertInvariant(JSON.stringify(snapshot.provider) === JSON.stringify(this.currentProvider()),
       `run provider configuration changed: ${runId}`);
     assertInvariant(JSON.stringify(snapshot.contracts) === JSON.stringify(this.contracts),
       `run schema configuration changed: ${runId}`);
@@ -143,5 +146,11 @@ export class RegistryRunConfigurationService implements RunConfigurationManager 
     const prompt = Buffer.from(await this.artifacts.get(agent.effectivePromptRef)).toString('utf8');
     assertInvariant(sha256(prompt) === agent.effectivePromptSha256, `frozen prompt digest mismatch: ${agentId}`);
     return prompt;
+  }
+
+  private currentProvider(): RunConfigurationSnapshot['provider'] {
+    const provider = this.providerResolver?.() ?? this.provider;
+    assertInvariant(/^[a-f0-9]{64}$/.test(provider.parametersSha256), 'provider parameters digest is invalid');
+    return provider;
   }
 }

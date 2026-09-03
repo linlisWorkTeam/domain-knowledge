@@ -228,6 +228,78 @@ export interface AgentProvider {
   run(request: AgentRequest, signal?: AbortSignal): Promise<Record<string, unknown>>;
 }
 
+export type ProviderVerificationStatus = 'NOT_CONFIGURED' | 'UNVERIFIED' | 'VERIFIED' | 'FAILED';
+
+export interface ProviderSettingsRecord {
+  provider: 'pi-agent';
+  apiUrl: string;
+  apiKey: string | null;
+  model: string | null;
+  enabled: boolean;
+  revision: number;
+  verificationStatus: ProviderVerificationStatus;
+  verificationReasonCode: string;
+  lastVerifiedAt: string | null;
+  verifiedFingerprint: string | null;
+  updatedAt: string;
+}
+
+/** Secret-bearing persistence boundary. Implementations must never expose this record to HTTP directly. */
+export interface ProviderSettingsStore {
+  load(): ProviderSettingsRecord | null;
+  save(record: ProviderSettingsRecord): void;
+}
+
+export interface ProviderEndpoint {
+  url: URL;
+  addresses: readonly string[];
+}
+
+/** Resolves and rejects unsafe destinations before either persistence or a network probe. */
+export interface ProviderEndpointPolicy {
+  validate(apiUrl: string): Promise<ProviderEndpoint>;
+}
+
+export interface ProviderProbeResult {
+  status: 'VERIFIED' | 'FAILED';
+  reasonCode: string;
+  model: string | null;
+}
+
+export interface ProviderConnectionProbe {
+  verify(input: {
+    endpoint: ProviderEndpoint;
+    apiKey: string | null;
+    model: string | null;
+  }): Promise<ProviderProbeResult>;
+}
+
+export interface ProviderInvocationRecord {
+  invocationId: string;
+  runId: string;
+  agentId: string;
+  provider: string;
+  model: string;
+  startedAt: string;
+  completedAt: string;
+  durationMs: number;
+  status: 'SUCCEEDED' | 'FAILED';
+  retryCount: number;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  cacheReadTokens: number | null;
+  cacheWriteTokens: number | null;
+  estimatedCostUsd: number | null;
+  fixture: boolean;
+  errorCode: string | null;
+}
+
+export interface OperationalMetricsPort {
+  recordProviderInvocation(record: ProviderInvocationRecord): void;
+  runs(window: '24h' | '7d' | '30d'): Record<string, unknown>;
+  governance(window: '24h' | '7d' | '30d'): Record<string, unknown>;
+}
+
 export interface AgentCommand {
   schemaVersion: '1.0';
   commandId: string;

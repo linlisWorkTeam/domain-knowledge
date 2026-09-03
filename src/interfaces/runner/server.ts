@@ -2,10 +2,13 @@
 import { createServer as createHttpServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { readFileSync } from 'node:fs';
 import { extname, join, resolve } from 'node:path';
-import { randomUUID, timingSafeEqual } from 'node:crypto';
+import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
 import { createComposition, loadOhMyWorkPanelScenario } from './composition.ts';
+import type {
+  OperationalMetricsPort, ProviderConnectionProbe, ProviderEndpointPolicy, ProviderSettingsStore,
+} from '../../application/ports/index.ts';
 
 export interface ServerBinding {
   host: string;
@@ -196,6 +199,15 @@ async function body(request: IncomingMessage): Promise<Record<string, unknown>> 
   return parsed as Record<string, unknown>;
 }
 
+function payloadFingerprint(value: unknown): string {
+  return createHash('sha256').update(JSON.stringify(value)).digest('hex');
+}
+
+function requireOnlyKeys(payload: Record<string, unknown>, allowed: readonly string[]): void {
+  const unexpected = Object.keys(payload).filter((key) => !allowed.includes(key));
+  if (unexpected.length) throw new Error(`PAYLOAD_INVALID: unexpected fields: ${unexpected.join(', ')}`);
+}
+
 export function mapHttpError(error: unknown, id = 'req_unknown'): { status: number; body: ApiErrorBody } {
   const message = error instanceof Error ? error.message : String(error);
   const code = message.split(':', 1)[0] || 'INTERNAL_ERROR';
@@ -215,6 +227,9 @@ export function mapHttpError(error: unknown, id = 'req_unknown'): { status: numb
     || code === 'SOURCE_DISABLED' || code === 'SOURCE_CREDENTIAL_UNAVAILABLE') {
     return { status: 422, body: errorBody(code, message, id) };
   }
+  if (code === 'PROVIDER_URL_UNREACHABLE') {
+    return { status: 422, body: errorBody(code, message, id, true) };
+  }
   if (/(?:_INVALID|_DENIED|_REQUIRED|_UNSUPPORTED)$/.test(code)) {
     return { status: 422, body: errorBody(code, message, id) };
   }
@@ -224,7 +239,12 @@ export function mapHttpError(error: unknown, id = 'req_unknown'): { status: numb
 export function createKnowledgeServer(input: {
   repositoryRoot?: string;
   runtimeDir?: string;
+  clock?: () => string;
   writeToken?: string;
+  providerSettingsStore?: ProviderSettingsStore;
+  providerEndpointPolicy?: ProviderEndpointPolicy;
+  providerProbe?: ProviderConnectionProbe;
+  operationalMetrics?: OperationalMetricsPort;
   componentChecks?: Partial<Record<'registry' | 'artifactStore' | 'workflow' | 'provider' | 'evaluator', () => Promise<void> | void>>;
   componentCheckTimeoutMs?: number;
 } = {}) {
@@ -257,21 +277,48 @@ export function createKnowledgeServer(input: {
         send(response, 200, composition.apps.flywheel.status());
         return;
       }
+      if (request.method === 'GET' && url.pathname === '/api/v1/agents/providers/status') {
+        send(response, 200, composition.apps.providerOperations.getStatus({
+          provider: composition.agentProviderMode,
+          model: composition.runConfiguration.provider.model,
+        }));
+        return;
+      }
+      if (request.method === 'GET' && url.pathname === '/api/v1/provider-settings') {
+        send(response, 200, composition.apps.providerOperations.getSettings());
+        return;
+      }
+      if (request.method === 'GET' && url.pathname === '/api/v1/metrics/runs') {
+        send(response, 200, composition.apps.operationalMetrics.runs(url.searchParams.get('window') ?? '24h'));
+        return;
+      }
+      if (request.method === 'GET' && url.pathname === '/api/v1/metrics/governance') {
+        send(response, 200, composition.apps.operationalMetrics.governance(url.searchParams.get('window') ?? '24h'));
+        return;
+      }
       if (request.method === 'GET' && url.pathname === '/api/v1/system/capabilities') {
-        const sdkIsolation = composition.agentProviderMode === 'deepseek-harness'
+        const providerStatus = composition.apps.providerOperations.getStatus({
+          provider: composition.agentProviderMode,
+          model: composition.runConfiguration.provider.model,
+        });
+        const activeProvider = providerStatus.enabled === true
+          ? String(providerStatus.provider) : composition.agentProviderMode;
+        const sdkIsolation = activeProvider === 'deepseek-harness'
           && (process.env.WP_DSH_PROCESS_ISOLATION?.trim() || 'bubblewrap') === 'bubblewrap';
         send(response, 200, {
           writeEnabled: Boolean(writeToken),
           automatedWorkflow: true,
           langGraphInfrastructure: true,
-          agentProvider: composition.agentProviderMode,
+          agentProvider: activeProvider,
           agentPromptCustomization: 'promptAddon-only',
-          agentPromptTransport: composition.agentProviderMode === 'deepseek-harness'
+          agentPromptTransport: activeProvider === 'pi-agent'
+            ? 'pi-agent-openai-compatible'
+            : activeProvider === 'deepseek-harness'
             ? 'sdk-stdio-json-rpc'
-            : composition.agentProviderMode === 'deepseek-harness-headless'
+            : activeProvider === 'deepseek-harness-headless'
               ? 'headless-stdin'
               : 'in-process-fixture',
-          agentWorkspaceView: composition.agentProviderMode === 'fixture'
+          agentWorkspaceView: activeProvider === 'fixture'
             ? 'not-applicable'
             : 'role-allowlist',
           agentSourceIsolation: sdkIsolation ? 'bubblewrap' : 'not-proven',
@@ -283,6 +330,10 @@ export function createKnowledgeServer(input: {
       }
       if (request.method === 'GET' && url.pathname === '/api/v1/system/components') {
         const sampledAt = new Date().toISOString();
+        const providerStatus = composition.apps.providerOperations.getStatus({
+          provider: composition.agentProviderMode,
+          model: composition.runConfiguration.provider.model,
+        });
         const componentNames = ['registry', 'artifactStore', 'workflow', 'provider', 'evaluator'] as const;
         const defaults: Record<typeof componentNames[number], () => Promise<void> | void> = {
           registry: () => { composition.apps.flywheel.status(); },
@@ -299,6 +350,19 @@ export function createKnowledgeServer(input: {
                 timeout = setTimeout(() => reject(new Error('COMPONENT_CHECK_TIMEOUT')), timeoutMs);
               }),
             ]);
+            if (component === 'provider' && !input.componentChecks?.provider) {
+              const status = String(providerStatus.availability);
+              return {
+                component,
+                status,
+                reasonCode: String(providerStatus.reasonCode),
+                message: status === 'AVAILABLE' ? 'Provider 可用'
+                  : status === 'UNAVAILABLE' ? 'Provider 当前不可用'
+                    : status === 'UNKNOWN' ? 'Provider 状态未知' : 'Provider 尚未就绪',
+                checkedAt: sampledAt,
+                lastSucceededAt: status === 'AVAILABLE' ? sampledAt : null,
+              };
+            }
             const degraded = component === 'provider' && composition.agentProviderMode === 'fixture';
             return {
               component, status: degraded ? 'DEGRADED' : 'AVAILABLE',
@@ -677,6 +741,8 @@ export function createKnowledgeServer(input: {
       }
       const isMutationRoute = url.pathname === '/api/v1/runs'
         || url.pathname === '/api/v1/knowledge/candidates'
+        || url.pathname === '/api/v1/provider-settings'
+        || url.pathname === '/api/v1/provider-settings/verify'
         || /^\/api\/v1\/runs\/[^/]+\/(?:resume|cancel)$/.test(url.pathname)
         || /^\/api\/v1\/knowledge\/[^/]+\/feedback$/.test(url.pathname)
         || /^\/api\/v1\/agents\/[^/]+\/prompt$/.test(url.pathname);
@@ -697,6 +763,59 @@ export function createKnowledgeServer(input: {
           return;
         }
         const payload = await body(request);
+        if (url.pathname === '/api/v1/provider-settings'
+          || url.pathname === '/api/v1/provider-settings/verify') {
+          if (url.pathname === '/api/v1/provider-settings' && request.method !== 'PUT') {
+            throw new Error('METHOD_NOT_ALLOWED: Provider settings updates require PUT');
+          }
+          if (url.pathname === '/api/v1/provider-settings/verify' && request.method !== 'POST') {
+            throw new Error('METHOD_NOT_ALLOWED: Provider verification requires POST');
+          }
+          requireOnlyKeys(payload, url.pathname.endsWith('/verify')
+            ? ['expectedRevision', 'enable']
+            : ['provider', 'apiUrl', 'apiKey', 'clearApiKey', 'model', 'expectedRevision']);
+          const key = request.headers['idempotency-key'];
+          if (typeof key !== 'string' || !key.trim()) {
+            throw new Error('IDEMPOTENCY_KEY_REQUIRED: Idempotency-Key');
+          }
+          const scope = url.pathname.endsWith('/verify')
+            ? 'provider-settings.verify' : 'provider-settings.put';
+          const normalizedKey = key.trim();
+          if (normalizedKey.length > 256 || /[\0\r\n]/.test(normalizedKey)) {
+            throw new Error('IDEMPOTENCY_KEY_INVALID: Idempotency-Key must contain 1..256 safe characters');
+          }
+          // Store only a digest: PUT may contain the API key and command receipts are durable.
+          const fingerprint = payloadFingerprint({ scope, payload });
+          const memoryKey = `${scope}\0${normalizedKey}`;
+          const previous = idempotencyResults.get(memoryKey)
+            ?? composition.apps.flywheel.getCommandReceipt(scope, normalizedKey);
+          if (previous && previous.fingerprint !== fingerprint) {
+            throw new Error('IDEMPOTENCY_CONFLICT: key reused with different command');
+          }
+          if (previous) {
+            send(response, previous.status, previous.value);
+            return;
+          }
+          const value = scope === 'provider-settings.verify'
+            ? await composition.apps.providerOperations.verify({
+                expectedRevision: payload.expectedRevision,
+                enable: payload.enable,
+              })
+            : await composition.apps.providerOperations.put({
+                provider: payload.provider,
+                apiUrl: payload.apiUrl,
+                apiKey: payload.apiKey,
+                clearApiKey: payload.clearApiKey,
+                model: payload.model,
+                expectedRevision: payload.expectedRevision,
+              });
+          composition.apps.flywheel.saveCommandReceipt({
+            scope, idempotencyKey: normalizedKey, fingerprint, status: 200, value,
+          });
+          idempotencyResults.set(memoryKey, { fingerprint, status: 200, value });
+          send(response, 200, value);
+          return;
+        }
         if (actionItemCommand || regenerationCommand) {
           if (request.method !== 'POST') throw new Error('METHOD_NOT_ALLOWED');
           const key = request.headers['idempotency-key'];

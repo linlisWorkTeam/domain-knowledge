@@ -213,6 +213,7 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
   readonly evaluator: ProjectEvaluator;
   readonly assetRoot: string;
   readonly agent?: AgentProvider;
+  readonly agentResolver?: (runId: string) => AgentProvider | undefined;
   readonly agentWorkspaces?: AgentWorkspaceProvider;
   readonly contracts: AgentContractValidator;
 
@@ -223,6 +224,7 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
     assetRoot: string;
     contracts: AgentContractValidator;
     agent?: AgentProvider;
+    agentResolver?: (runId: string) => AgentProvider | undefined;
     agentWorkspaces?: AgentWorkspaceProvider;
   }) {
     this.flywheel = input.flywheel;
@@ -231,6 +233,7 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
     this.assetRoot = resolve(input.assetRoot);
     this.contracts = input.contracts;
     this.agent = input.agent;
+    this.agentResolver = input.agentResolver;
     this.agentWorkspaces = input.agentWorkspaces;
   }
 
@@ -280,7 +283,7 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
       }, null, 2)), 'application/json');
     }
     const commandInput = { ...input, context: { ...input.context, snapshot, scenarioRef } };
-    const agent = this.agent
+    const agent = this.agentForRun(input.runId)
       ? await this.runLiveAgentCheckpoint(commandInput, scenario, 'orchestrator')
       : await this.commitAgentOutput(commandInput, scenario, 'orchestrator', {
         strategy: 'fixed-knowledge-flywheel-v1',
@@ -298,10 +301,10 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
     scenario: AutomatedProjectScenario,
     agentId: AgentId,
   ): Promise<WorkflowStageResult> {
-    if (this.agent) {
+    if (this.agentForRun(input.runId)) {
       const ref = await this.runLiveAgentCheckpoint(input, scenario, agentId);
       return {
-        detail: `${agentId} produced schema-validated DeepSeek Harness output`,
+        detail: `${agentId} produced schema-validated Provider output`,
         context: { [contextKey(input.nodeId, input.iteration, input.workerId)]: ref },
       };
     }
@@ -362,7 +365,8 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
     agentId: AgentId,
     command: AgentCommand,
   ): Promise<Record<string, unknown>> {
-    if (!this.agent) throw new Error('WORKFLOW_LIVE_AGENT_UNAVAILABLE');
+    const agent = this.agentForRun(input.runId);
+    if (!agent) throw new Error('WORKFLOW_LIVE_AGENT_UNAVAILABLE');
     if (!this.agentWorkspaces) throw new Error('WORKFLOW_AGENT_WORKSPACE_UNAVAILABLE');
     const snapshot = input.context.snapshot as ProjectSnapshot | undefined;
     if (!snapshot) throw new Error('WORKFLOW_PROJECT_SNAPSHOT_MISSING');
@@ -384,7 +388,7 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
       ref,
       content: await this.readArtifact(ref),
     })));
-    return this.agent.run({
+    return agent.run({
       role: agentId,
       prompt: `${input.prompt}\n\n受信 AgentCommand：\n${JSON.stringify(command)}\n\n命令引用工件（已校验内容摘要）：\n${JSON.stringify(materials)}`,
       outputSchema: outputSchemaFor(agentId, scenario),
@@ -1086,6 +1090,10 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
   private async readArtifact(ref: ArtifactRef): Promise<unknown> {
     const text = Buffer.from(await this.flywheel.getArtifact(ref)).toString('utf8');
     return ref.mediaType.includes('json') ? JSON.parse(text) as unknown : text;
+  }
+
+  private agentForRun(runId: string): AgentProvider | undefined {
+    return this.agentResolver?.(runId) ?? this.agent;
   }
 }
 

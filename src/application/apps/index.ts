@@ -5,3 +5,7 @@ export { EvalRunnerApp } from './eval-runner-app.ts';
 export { KnowledgeDiscoveryApp } from './knowledge-discovery-app.ts';
 export { ContentGovernanceApp } from './content-governance-app.ts';
 export type { ContentCommand, ContentGovernancePort } from './content-governance-app.ts';
+export { ProviderOperationsApp } from './provider-operations-app.ts';
+export type { ProviderSettingsView } from './provider-operations-app.ts';
+export { OperationalMetricsApp } from './operational-metrics-app.ts';
+export type { MetricsWindow } from './operational-metrics-app.ts';
