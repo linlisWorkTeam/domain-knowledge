@@ -1,6 +1,6 @@
 # 知识飞轮前台产品设计
 
-**状态：Accepted；前台交付 F1 与固定 ohMyWorkPanel 自动路径已实现｜版本：0.5.0｜日期：2026-09-03**
+**状态：Accepted；F2 最终 UI/UX 与 HCP-1 已冻结｜版本：0.5.8｜日期：2026-09-03**
 
 本文定义 domain-knowledge 知识飞轮控制台的用户体验、信息架构、交互边界、接口需求和验收标准。领域状态、门禁、安全和发布语义以同仓库的[规范总入口](../README.md)为准；前台不得创造第二套状态或发布权威。
 
@@ -44,6 +44,10 @@
 | 平台维护者 | 配置 Provider、Policy、评测器和安全边界，诊断基础设施失败 | 本地管理员 |
 
 ## 3. 产品原则
+
+### 3.0 前台术语
+
+用户可见界面以自然中文为主，品牌名、项目名、`Agent`、API/协议缩写、代码字段、枚举原值和不可翻译的技术标识符除外。`Registry` 统一写作“注册”；`Agent` 不翻译为“智能体”；`Run` 作动作时写作“运行”，作实体名词时写作“批次”。同一组件不得同时使用未经批准的中英文同义标签。
 
 ### 3.1 证据优先
 
@@ -102,11 +106,11 @@ Knowledge Flywheel
 │   ├── 系统健康
 │   ├── 运行指标
 │   ├── 需要处理
-│   └── 最近 Run
-├── 运行
-│   ├── Run 列表
-│   ├── 创建 Run
-│   └── Run 工作台
+│   └── 最近批次
+├── 飞轮批次
+│   ├── 批次列表
+│   ├── 创建批次
+│   └── 批次工作台
 │       ├── 自动化状态图
 │       ├── Agent 节点
 │       ├── 评测与 Gate
@@ -117,39 +121,29 @@ Knowledge Flywheel
 │   ├── 版本详情
 │   ├── 版本血缘与 Diff
 │   └── 使用反馈
-├── 治理
-│   ├── LOW_CONFIDENCE
-│   ├── 基础设施失败
-│   ├── 安全拒绝
-│   └── 待批准动作
-├── 证据
-│   ├── Artifact 检索
-│   ├── EvaluationReport
-│   └── Publication receipt
-├── 智能体
-│   ├── Agent 目录与固定契约
-│   ├── 当前 Provider / 运行健康
-│   └── 追加提示词定制
-├── 发现
-│   └── 当前来源扫描候选
-└── 设置
-    ├── Policy
-    ├── Project / source roots
-    ├── Agent Provider
-    └── EvalRunner / Sandbox 状态
+├── 工作流图
+│   └── 所选批次的 Agent 拓扑、节点状态和详情
+├── 评测
+│   └── EvaluationReport、Gate 与证据
+├── 来源
+│   └── 当前扫描候选；来源注册能力后续接入
+└── Agent 设置
+    ├── Agent 目录与固定契约
+    ├── 当前 Provider / 运行健康
+    └── 追加提示词与后续模型 API 配置
 ```
 
-“智能体”不是工作流画布编辑器。节点名称、职责、依赖、输入输出 Schema、可读写范围和工具权限来自服务端固定定义，只读展示。治理模式下仅可修改 `promptAddon`；前台不得提交任意 Agent 类型、Provider 类名、节点边或 Schema。
+“工作流图”不是工作流画布编辑器。节点名称、职责、依赖、输入输出 Schema、可读写范围和工具权限来自服务端固定定义，只读展示。治理模式下仅可修改 `promptAddon`；前台不得提交任意 Agent 类型、Provider 类名、节点边或 Schema。
 
-### 4.2 前台交付 F1 范围
+### 4.2 最终 UI/UX 裁决
 
-`web/prototype/` 中保存的 PR #2 原型只作为布局、密度、组件层级和绿色强调色的视觉参考。运行时事实、可用动作、状态名称和权限仍以服务端 API 与本规范为准，原型内的演示数据不是产品契约。原型与最终 Console 的左侧导航统一使用自然中文；品牌名、Run、API、类名和协议值等技术标识保持原值。
+`web/prototype/` 中保存的 PR #2 原型是 F2 布局、密度、组件层级、组件语义和绿色强调色的规范性视觉基准，不得以“适配真实产品”为由替换 `Knowledge Health`、四阶段 Flywheel、`Recent Pulse`、`New run` 等信息结构。运行时事实、可用动作、状态名称和权限仍以服务端 API 与本规范为准；缺失 API 时保留原组件位置并显示 `—`、Empty、Partial 或 Disabled，原型演示值不是产品契约。
 
-第一阶段导航固定为“操作中心、运行、知识、治理、证据、智能体、发现、设置”。其中：
+F1 的八入口信息架构已经被 F2 取代，不再是有效产品设计。生产导航唯一有效版本为“操作中心、飞轮批次、知识、工作流图、评测、来源、Agent 设置”。其中：
 
-- 操作中心从 Run 状态与最新 GateDecision 派生运行级待治理事项，不声明独立 Action Item 生命周期。
-- 发现页只展示 `GET /api/v1/scan` 返回的来源候选，不描述为持久化 Source Registry。
-- 独立 Graph 页面、Knowledge Health、跨 Run Activity、精确进度百分比、ETA、多项目切换和用户身份不在 F1 范围；Run 工作台已有真实节点投影，后续 Graph 页面必须复用该事实而非展示模拟节点状态。
+- 操作中心从批次状态与最新 GateDecision 派生批次级待治理事项，不声明独立 Action Item 生命周期。
+- 来源页只展示 `GET /api/v1/sources/scan` 返回的来源候选，不描述为持久化来源注册。
+- 工作流图复用批次工作台的真实节点投影，不是 Knowledge Graph；Knowledge Health、跨批次 Activity、精确进度百分比、ETA、多项目切换和用户身份在相应后续 API 完成前保持 Partial 或 Disabled。
 - 页面只能展示服务端事实或本节允许的派生值。派生值必须能说明输入字段和计算规则，不得伪装成服务端指标。
 - API 失败、部分响应或空结果分别进入 Error、Partial 或 Empty 状态，不得回退到原型演示数据。
 
@@ -160,13 +154,12 @@ Knowledge Flywheel
 │ ◇ Knowledge Flywheel   [环境: Local] [只读/治理模式] [系统健康] [用户]   │
 ├──────────────┬────────────────────────────────────────────────────────────┤
 │ 操作中心     │ 页面标题                                      主要动作    │
-│ 运行         ├────────────────────────────────────────────────────────────┤
+│ 飞轮批次     ├────────────────────────────────────────────────────────────┤
 │ 知识         │                                                            │
-│ 治理 3       │                    页面主内容                              │
-│ 证据         │                                                            │
-│ 智能体       │                                                            │
-│ 发现         │                                                            │
-│ 设置         │                                                            │
+│ 工作流图     │                    页面主内容                              │
+│ 评测         │                                                            │
+│ 来源         │                                                            │
+│ Agent 设置   │                                                            │
 │              │                                                            │
 ├──────────────┴────────────────────────────────────────────────────────────┤
 │ Runtime · Registry · CAS · Provider · Evaluator 状态                     │
@@ -175,7 +168,7 @@ Knowledge Flywheel
 
 全局规则：
 
-- 左侧导航固定，治理队列显示未处理数量。
+- 左侧导航固定，操作中心显示待处理数量。
 - 顶栏持续显示当前运行环境和权限模式，避免用户误以为只读页面可以写入。
 - 第一阶段全局搜索覆盖 Knowledge 关键词；Run ID、moduleId 和 versionId 通过对应列表和详情定位。Artifact 全局检索在专用 API 可用前不作承诺。
 - 系统健康不是单一绿色圆点，而是 Registry、CAS、Provider、Evaluator 的分项状态。
@@ -184,7 +177,7 @@ Knowledge Flywheel
 
 ### 6.1 操作中心
 
-操作中心用于回答三个问题：系统是否正常、飞轮是否在工作、我是否需要介入。第一阶段的待处理条目是 Run 级投影，仅允许从 `FAILED`、`LOW_CONFIDENCE` 或最新 GateDecision=`STOPPED` 的真实数据产生。
+操作中心用于回答三个问题：系统是否正常、飞轮是否在工作、我是否需要介入。第一阶段的待处理条目是批次级投影，仅允许从 `FAILED`、`LOW_CONFIDENCE` 或最新 GateDecision=`STOPPED` 的真实数据产生。
 
 ```text
 ┌─ 今日运行 ─────┬─ VERIFIED ─────┬─ 自动迭代 ────┬─ 待治理 ─────────┐
@@ -198,7 +191,7 @@ Knowledge Flywheel
 │ MED   cpp-parser · INFRA_FAILURE · evaluator unavailable [诊断]  │
 └────────────────────────────────────────────────────────────────────┘
 
-最近 Run
+最近批次
 Module             State          Iteration   Gate       Updated
 mentions           EVALUATING     1/5         —          2m
 connector-routing  VERIFIED       2/5         PASS       1h
@@ -206,7 +199,7 @@ connector-routing  VERIFIED       2/5         PASS       1h
 
 禁止使用虚构的“AI 信心分”。指标必须来自 Registry、EvaluationReport 或事件聚合；Coverage、Freshness、Accuracy、趋势百分比、ETA 和全局活动流在没有专用服务端口径时不得展示数值。
 
-### 6.2 创建 Run
+### 6.2 创建批次
 
 采用三步向导，最终提交的是高层 `StartRunCommand`，不是一组裸状态转换。
 
@@ -214,7 +207,7 @@ connector-routing  VERIFIED       2/5         PASS       1h
 2. **策略**：选择 GatePolicy、最大迭代、评测器和允许的工具。
 3. **确认**：展示可访问路径、命令白名单、预计资源和安全边界。
 
-提交后界面立即进入 Run 工作台；Workflow Service 负责后续状态推进。
+提交后界面立即进入批次工作台；Workflow Service 负责后续状态推进。
 
 必须在确认页突出显示：
 
@@ -223,7 +216,7 @@ connector-routing  VERIFIED       2/5         PASS       1h
 - 当前执行器是否具备 OS 级隔离。
 - Agent Provider 是真实模型还是 deterministic scenario。
 
-### 6.3 Run 工作台
+### 6.3 批次工作台
 
 这是产品的核心页面。
 
@@ -362,7 +355,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     actor Operator as 平台维护者
-    participant UI as Agents 页面
+    participant UI as Agent 设置页面
     participant API as Knowledge Flywheel API
     participant Registry as Agent 配置存储
     participant WF as LangGraph infrastructure
@@ -402,7 +395,7 @@ sequenceDiagram
 
 前台交付 F1 实现合入前，当前 Console 与项目官网继续共享既有交互强调色 `#71D4FF`（深色）和 `#07769F`（浅色），不得仅修改规范造成实现漂移。绿色目标 token 只在新版 Console、契约测试和本规范同步落地后启用；项目官网是否同步换色另行评审。
 
-正文默认不小于 `14px`，辅助说明不小于 `12px`，仅非关键短标签可以使用 `11px`；正文行高不低于 `1.5`。页面在 200% 缩放下必须保持查询、导航、详情与治理状态可用。字体、图标、脚本和样式默认同源提供，不得依赖 Google Fonts 或其他第三方 CDN；既有 Content Security Policy 不得因视觉改版放宽。
+Console 使用 `14px` 全局基准；正文和操作文字通常不小于 `11px`，非关键眉标题、状态与元数据可使用 `8–10px`。中文界面优先使用微软雅黑，跨平台依次回退到苹方、Noto Sans CJK SC 等无衬线字体；不得让普通标题、正文、按钮、标签或图形文字回落到宋体等衬线字体。等宽字体只用于代码、ID、哈希、原始技术值和时间等需要定宽识别的事实，不用于普通中文界面文案。中文取消为英文标签设置的字间距，并以 `1.45–1.6` 行高保证识别度。页面在 200% 缩放下必须保持查询、导航、详情与治理状态可用。字体、图标、脚本和样式默认同源提供，不得依赖 Google Fonts 或其他第三方 CDN；既有 Content Security Policy 不得因视觉改版放宽。
 
 ### 8.2 组件
 
@@ -463,9 +456,9 @@ sequenceDiagram
 产品层额外约束如下：
 
 - 首个 Release 前允许直接清理旧路由，但 Server、Console、DSH Adapter、测试和文档必须在同一变更中迁移。
-- 第一阶段优先保证 Action Center 与 Flywheel Runs 的真实可用性；Knowledge 提供真实 Preview，不实现 Add curated knowledge。
-- Graph 使用选定 Run 的真实固定 Agent 拓扑和节点投影，B2 前采用轮询、B2 后接入 SSE；Evaluations 与 Sources 独立成页，但不得把现有 Run 聚合或扫描候选冒充完整 Registry。
-- Agent Settings 可以读取真实固定 Agent 定义；任何未接通的编辑控件不得产生假保存成功。
+- 第一阶段优先保证“操作中心”与“飞轮批次”的真实可用性；“知识”提供真实预览，不实现人工添加精选知识。
+- “工作流图”使用所选批次的真实固定 Agent 拓扑和节点投影，B2 前采用轮询、B2 后接入 SSE；“评测”与“来源”独立成页，但不得把现有批次聚合或扫描候选冒充完整注册。
+- “Agent 设置”可以读取真实固定 Agent 定义；任何未接通的编辑控件不得产生假保存成功。
 - Planned API 上线前，相关界面必须隐藏、禁用或明确标记 Preview/Partial，且不得回退到演示数据。
 
 ## 12. 产品需求与验收
@@ -485,12 +478,14 @@ sequenceDiagram
 | KF-UI-011 | P1 | 知识消费者可以在不获得发布权限的情况下查询和反馈。 | AC-UI-011 |
 | KF-UI-012 | P1 | 界面必须满足键盘导航、可见焦点、语义标签和非纯颜色状态表达。 | AC-UI-012 |
 | KF-UI-013 | P1 | 项目官网和本地 Console 必须提供深色/浅色主题，首次跟随系统、允许手动切换并独立保存偏好；主题切换不得持久化治理凭据或改变领域状态。 | AC-UI-013 |
-| KF-UI-014 | P0 | Agents 页面必须显示全部 Agent 的固定职责、输入输出、基础提示词和追加提示词；每次 Run 中的 Agent 节点状态在 Run 工作台显示。 | AC-UI-014 |
+| KF-UI-014 | P0 | Agent 设置页面必须显示全部 Agent 的固定职责、输入输出、基础提示词和追加提示词；每个批次中的 Agent 节点状态在批次工作台和工作流图显示。 | AC-UI-014 |
 | KF-UI-015 | P0 | 治理模式只能修改 Agent 的追加提示词；服务端必须拒绝任何拓扑、职责、Schema、Provider 实现或权限替换。 | AC-UI-015 |
 | KF-UI-016 | P0 | Run 工作台必须显示 LangGraph 节点投影，并明确区分执行状态与 FlywheelRun 业务状态。 | AC-UI-016 |
-| KF-UI-017 | P1 | 项目官网和控制台的用户可见文案必须使用自然、统一的中文；除固定标题 `WORKPANEL · KNOWLEDGE FLYWHEEL` 外，不得出现中英文拼接的栏目名、状态名或说明句。代码、命令、项目名、环境变量和协议标识符按原值展示。 | AC-UI-017 |
+| KF-UI-017 | P1 | 项目官网和控制台的用户可见文案必须使用自然、统一的中文；品牌、项目名、`Agent`、API/协议缩写、代码字段、枚举原值和技术标识符可以保持原值，其他栏目名、状态名或说明句不得中英文混用。 | AC-UI-017 |
 | KF-UI-018 | P0 | 写入关闭时，设置页必须提供 `.env.local` 的创建位置、变量示例和重启方式；配置前所有写操作仍默认拒绝，治理令牌只保存在页面内存中。 | AC-UI-018 |
 | KF-UI-019 | P0 | 前台只能展示服务端事实或具有公开计算规则的派生值；缺少领域模型或 API 支持的指标、身份、问题和关系不得以模拟数据呈现。 | AC-UI-019 |
+| KF-UI-020 | P2 | 左上角项目空间必须在后续阶段升级为真实选择器；选择项、当前项目空间和切换后的数据范围均由服务端事实驱动，本阶段不得实现无效下拉框。 | AC-UI-023 |
+| KF-UI-021 | P1 | 设置页后续必须支持本地管理员配置模型 API URL 与 API Key；有效配置启用后，新任务默认使用 Pi Agent 工具执行，且不得削弱既有 Agent 权限、隔离、审计和 Gate。 | AC-UI-024 |
 
 ### 12.1 验收场景
 
@@ -509,30 +504,38 @@ sequenceDiagram
 | AC-UI-011 | Given只读知识消费者，When查询并提交 feedback，Then反馈被记录但知识状态和 GateDecision 不变。 |
 | AC-UI-012 | Given仅键盘和屏幕阅读器，When完成查询并打开 Run Gate，Then焦点顺序、名称、状态和错误均可感知。 |
 | AC-UI-013 | Given 系统主题为浅色、无已保存偏好，When 首次打开官网或 Console，Then 使用浅色 token；When 用户切换深色并刷新，Then 主题保持且页面没有保存治理 token、发出写请求或改变 Run 状态。 |
-| AC-UI-014 | Given 已启动或未启动工作流，When 打开 Agents 页面和 Run 工作台，Then 七类 Agent 均可查阅，固定契约与可编辑提示词分离，节点状态按 runId 展示。 |
+| AC-UI-014 | Given 已启动或未启动工作流，When 打开 Agent 设置页面和批次工作台，Then 七类 Agent 均可查阅，固定契约与可编辑提示词分离，节点状态按 runId 展示。 |
 | AC-UI-015 | Given 有效写 token，When 保存 promptAddon，Then 后续执行使用该值并产生审计；When 请求包含 role、inputs、outputs、tools 或 edges，Then 服务端拒绝。 |
 | AC-UI-016 | Given LangGraph 正在运行，When 打开 Run 工作台，Then 页面从 Knowledge Registry 的节点投影显示 pending/running/completed/failed，不把 graph route 当成知识发布状态。 |
-| AC-UI-017 | Given 用户打开项目官网或控制台，When 阅读栏目、状态、说明和错误提示，Then 除固定标题与原样技术标识符外，页面不出现英文栏目或中英文拼接句，中文表达自然且术语一致。 |
+| AC-UI-017 | Given 用户打开项目官网或控制台，When 阅读栏目、状态、说明和错误提示，Then 除品牌、项目名、`Agent`、API/协议缩写、代码字段、枚举原值和原样技术标识符外，页面不出现英文栏目或未经批准的中英文拼接句；`Registry` 写作“注册”，`Run` 的动作与实体语义分别写作“运行”与“批次”。 |
 | AC-UI-018 | Given 服务端未配置写入令牌，When 用户点击治理模式或打开设置页，Then 页面引导其从 `.env.example` 创建 `.env.local`、设置 `WP_KNOWLEDGE_WRITE_TOKEN` 并重启服务；令牌不会被写入网址或本地存储。 |
-| AC-UI-019 | Given 服务端只提供当前已实现 API，When 用户访问新版控制台全部页面或任一 API 失败，Then 页面只显示服务端事实、规范允许的派生值或明确状态，不显示模拟 Knowledge Health、ETA、Graph、Action Item、Activity、Workspace 或用户身份数据。 |
+| AC-UI-019 | Given 服务端只提供当前已实现 API，When 用户访问新版控制台全部页面或任一 API 失败，Then 页面保留原型规定的信息结构，但只显示服务端事实、规范允许的派生值或明确的 `—`/Empty/Partial/Disabled 状态，不显示模拟 Knowledge Health、ETA、Graph、Action Item、Activity、Workspace 或用户身份数据。 |
+| AC-UI-020 | Given Chromium 视口固定为 `1363 × 936`，When 打开浅色操作中心，Then 顶栏高度为 `103px`、标题顶部位于 `40–45px`、操作区垂直居中、全局字号为 `14px`，并通过已提交基准图的像素回归。 |
+| AC-UI-021 | Given 用户在七个一级页面之间导航，When 页面完成渲染，Then Topbar 是唯一的页面级标题来源，内容区不得重复同名标题或增加无功能含义的眉标题、副标题和说明卡。 |
+| AC-UI-022 | Given 用户打开中文 Console，When 浏览正文、标题、按钮、标签和工作流图，Then 这些界面文字使用以微软雅黑为首选的中文无衬线字体栈；只有代码、ID、哈希、原始技术值和时间允许使用等宽字体，普通中文文案不得回落到宋体。 |
+| AC-UI-023 | Given 服务端提供项目空间列表和当前选择，When 用户从左上角切换项目空间，Then 全部页面按所选项目空间重新查询且不泄露其他空间的数据；URL 或会话可以恢复选择，不可用或无权限的空间给出明确错误并保留原选择。 |
+| AC-UI-024 | Given 本地管理员在设置中提交合法 API URL 和 API Key，When 无副作用连接验证成功并启用配置，Then 新任务默认通过 Pi Agent 工具执行；界面和查询接口只显示脱敏配置状态，完整 Key 不进入 URL、日志、浏览器持久化或运行快照；验证失败时分类提示并失败关闭。 |
 
 ## 13. 实施阶段
 
-### 前台交付 F1：现有 API 上的产品视觉收敛
+### 前台交付 F1：现有 API 上的产品视觉收敛（历史阶段，已被 F2 取代）
 
 - 使用 `web/prototype/` 的布局和视觉层级重构现有 Console，但保留 `web/app.js` 的真实 API、鉴权和状态语义。
-- 优先交付操作中心、运行、知识、治理、证据、智能体、发现和设置；缺失服务端能力不以演示数据替代。
-- 用契约测试验证自然中文、双主题、同源资源、键盘可达、状态真实性和移动端关键路径。
+- F1 曾使用八入口结构；该结构仅保留为演进记录，不得用于新增页面、测试或文档。
+- 用契约测试验证中文排版、双主题、同源资源、键盘可达、状态真实性和移动端关键路径；操作中心另以固定 `1363 × 936` 的 Chromium 截图执行像素回归。
 - 本阶段不得修改 Domain、Application App、HTTP API 或 JSON Schema；若视觉需求触发这些变化，必须先形成独立 Spec 对齐。
 
 ### 前台交付 F2：最终七页面与真实 Graph
 
-- 生产导航收敛为 Action Center、Flywheel Runs、Knowledge、Graph、Evaluations、Sources、Agent Settings 七个页面。
+- 生产导航收敛为“操作中心、飞轮批次、知识、工作流图、评测、来源、Agent 设置”七个页面。
 - 七页必须完成最终布局、深浅主题、响应式、键盘路径以及 Loading/Empty/Error/Partial/Disabled 状态；未接 API 不得以演示数据或假成功代替。
 - Graph 必须基于选定 Run 的固定 Agent 定义、WorkflowNodeProjection、workflow status 和事件实现真实轮询版，并允许查看节点 attempt、时间、ArtifactRef 与受控错误摘要。
+- Graph 采用 LangGraph Studio 的有向工作流表达范式：连接线、箭头、当前路径和节点执行状态必须在同一画布直接映射；不得退化为无连线的卡片网格。Studio 是面向 Agent Server 的调试 IDE，本产品不以 iframe 嵌入，也不开放其线程 fork、状态编辑或提示词调试权限。
 - Knowledge 只承诺查询、详情与反馈 Preview；Lineage/Diff 保留禁用入口，Add curated knowledge 不进入本阶段。
 
 ### HCP-1：F2 与 B1 人工检查点
+
+结论：`Accepted`。本次用户确认当前版本为最终 UI/UX，七页信息架构、视觉语言、Graph 语义和真实数据边界自此冻结；后续功能接线不得恢复 F1 八入口结构或另行重设计页面。
 
 F2 可访问验收环境和 B1 API 迁移 diff 就绪后，进入 B2/B3 并行开发前必须由产品用户人工检查。检查范围包括七页信息架构、目标视觉一致性、Graph 的 Agent 工作流语义、真实/派生/未接数据标识、危险动作位置，以及新旧 API 映射。
 
@@ -546,18 +549,20 @@ F2 可访问验收环境和 B1 API 迁移 diff 就绪后，进入 B2/B3 并行�
 
 ### 前台交付 F3：核心控制面接线
 
-- Action Center 接入真实 Action Item、组件健康和 Activity，允许受控 Resolve、Retry 与 Regenerate。
-- Flywheel Runs 接入可信 progress、retry 和 SSE；Graph 从轮询升级为可断线续传的实时节点图。
+- 操作中心接入真实待处理事项、组件健康和活动流，允许受控处理、重试与重新生成。
+- 飞轮批次接入可信进度、重试和 SSE；工作流图从轮询升级为可断线续传的实时节点图。
 - Knowledge Health 等依赖 B3 数据的指标仍保持 Partial，不得为了完成 F3 提前虚构口径。
 
 ### 前台交付 F4：内容与质量面接线
 
-- Knowledge 接入 Lineage 与 Diff；Evaluations 接入独立列表、详情、Evidence 和 Rule revision；Sources 接入 Registry、状态和 Refresh。
-- Knowledge、Evaluations 与 Sources 的基础事实稳定后接入 Knowledge Health，并展示分子、分母、窗口、采样时间与规则版本。
+- 知识接入血缘与差异；评测接入独立列表、详情、证据和规则修订；来源接入注册、状态和刷新。
+- 知识、评测与来源的基础事实稳定后接入知识健康度，并展示分子、分母、窗口、采样时间与规则版本。
 
 ### 前台交付 F5：运营与 DFX 完成
 
-- Agent Settings 接入真实 Provider status。
+- Agent 设置接入真实 Provider 状态。
+- 设置页接入模型 API 配置 Use Case：支持 API URL、API Key、脱敏状态和连接验证；服务端持有密钥并提供 `GET/PUT /api/v1/provider-settings` 与 `POST /api/v1/provider-settings/verify`。验证成功后以 Pi Agent 工具作为新任务的默认执行方式，失败时不得回退到演示数据或绕过现有安全门禁。
+- 左上角项目空间升级为可选择控件，接入 `GET /api/v1/workspaces` 与服务端确认的当前空间；各业务查询采用统一的 workspace scope，切换时清理旧空间缓存和在途请求。具体身份、默认空间、URL 持久化与授权模型须在实现前与后台契约一并评审。
 - 所有列表、实时连接和高风险操作通过容量、恢复、分页、权限、审计和移动端最终验收；此时才可以移除相应 Preview/Partial/Disabled 标识。
 
 ### 系统实施 Phase 1：架构与事实源收敛
@@ -572,9 +577,9 @@ F2 可访问验收环境和 B1 API 迁移 diff 就绪后，进入 B2/B3 并行�
 - 打通候选知识、首轮失败、Review、增量修订、fresh Code generation、真实 ProjectEvaluator 和 Knowledge Registry 发布事务。
 - 用 GenerationKey 防止 graph checkpoint 边界重放外部副作用。
 
-### 系统实施 Phase 3：Agent Studio 与节点可观察性
+### 系统实施 Phase 3：Agent 设置与节点可观察性
 
-- 新增 Agents 页面、固定 Agent 定义查询和受限 promptAddon 编辑。
+- 新增 Agent 设置页面、固定 Agent 定义查询和受限 promptAddon 编辑。
 - 在 Run 工作台展示 LangGraph 节点执行投影。
 - 增加高层 Start/Resume/Cancel API，不向产品 UI 暴露裸状态转换。
 
@@ -591,12 +596,12 @@ F2 可访问验收环境和 B1 API 迁移 diff 就绪后，进入 B2/B3 并行�
 
 | 能力 | 当前状态 |
 |---|---|
-| 全局 Shell、响应式导航和 Overview | Implemented：桌面侧栏、移动底栏、运行指标和能力边界已接入真实 API |
+| 全局框架、响应式导航和操作中心 | Implemented：桌面侧栏、移动导航、批次指标和能力边界已接入真实 API |
 | GitHub Pages 项目官网 | Implemented：纯静态、双主题、响应式，提供使用者命令和 Agent 配置 Prompt；不连接 Registry；站点源码只在 `site/`，分支/Jekyll 模式由根入口嵌入，切到 GitHub Actions Source 后由工作流直接发布该目录 |
 | 双主题知识目录、状态筛选、知识详情 | Implemented MVP：官网和 Console 支持深色/浅色切换；目录筛选、搜索、详情 Drawer、provenance 和正文使用同一套语义状态色 |
 | Quality / Behavioral Gate 区分 | Implemented MVP：分区展示并解释 `ACCEPTED` 不等于 `VERIFIED`；版本 Diff 仍待实现 |
 | Feedback UI | Implemented：使用仅驻留页面内存的 bearer token，明确反馈不改变发布状态 |
-| Run 列表与工作台 | Implemented MVP：新增 Run 列表、snapshot、顺序事件、checkpoint、评测和 Gate API/UI |
+| 批次列表与工作台 | Implemented MVP：新增批次列表、snapshot、顺序事件、checkpoint、评测和 Gate API/UI |
 | 自动 Run 启动 | Implemented fixed profile：CLI/API/Console 可启动固定 ohMyWorkPanel LangGraph 流程；任意项目的通用来源/策略向导仍在规划 |
 | Agent 目录与定制 | Implemented：七个固定角色可查，只有 `promptAddon` 可在治理模式修改并形成 revision/audit |
 | LangGraph 节点投影 | Implemented：Run 工作台从 Knowledge Registry 显示节点、Agent、轮次、attempt 与状态，不读取 graph checkpoint |
@@ -606,4 +611,5 @@ F2 可访问验收环境和 B1 API 迁移 diff 就绪后，进入 B2/B3 并行�
 | Evidence | Implemented MVP：聚合 EvaluationReport、GateDecision、工具链、测试和证据引用摘要 |
 | 真实在线 Agent | Implemented（受限样例）：官方 DSH SDK 已跑通固定 ohMyWorkPanel；通用项目向导和稳定性统计仍待实现 |
 | 敌对代码安全执行 | Planned；安全能力完成前必须 fail closed |
-| 前台交付 F1 | Implemented：新版 Console 已复用现有 API，提供八个固定入口、绿色双主题、真实来源发现、部分失败状态和浏览器无障碍契约；缺失能力未以演示数据补齐 |
+| 前台交付 F1 | Superseded：八入口结构仅作为历史实现记录，不再指导产品页面 |
+| 前台交付 F2 | Accepted：最终七页、真实 Agent 工作流图、目标站布局与视觉 token、微软雅黑优先字体、双主题和数据真实性边界已冻结 |

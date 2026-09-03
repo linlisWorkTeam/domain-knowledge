@@ -19,18 +19,28 @@ export class KnowledgeApiClient {
     return this.request('GET', path);
   }
 
-  async post(path: string, payload: Record<string, unknown>): Promise<Record<string, unknown>> {
+  async post(
+    path: string,
+    payload: Record<string, unknown>,
+    idempotencyKey?: string,
+  ): Promise<Record<string, unknown>> {
     if (!this.writeToken) throw new Error('DSH_ADAPTER_WRITE_DISABLED: configure writeToken');
-    return this.request('POST', path, payload);
+    return this.request('POST', path, payload, idempotencyKey);
   }
 
-  private async request(method: string, path: string, payload?: Record<string, unknown>): Promise<Record<string, unknown>> {
+  private async request(
+    method: string,
+    path: string,
+    payload?: Record<string, unknown>,
+    idempotencyKey?: string,
+  ): Promise<Record<string, unknown>> {
     const response = await this.fetchImpl(`${this.baseUrl}${path}`, {
       method,
       headers: {
         accept: 'application/json',
         ...(payload ? { 'content-type': 'application/json' } : {}),
         ...(this.writeToken ? { authorization: `Bearer ${this.writeToken}` } : {}),
+        ...(idempotencyKey ? { 'idempotency-key': idempotencyKey } : {}),
       },
       body: payload ? JSON.stringify(payload) : undefined,
       signal: AbortSignal.timeout(180_000),
@@ -48,12 +58,12 @@ export function createDshToolDefinitions(client: KnowledgeApiClient) {
       description: 'Read-only retrieval of behaviorally VERIFIED knowledge. Candidate knowledge is excluded by default.',
       parameters: {
         q: { type: 'string', required: true },
-        top: { type: 'number' },
+        limit: { type: 'number' },
         status: { type: 'string', enum: ['VERIFIED', 'CANDIDATE', 'SUPERSEDED'] },
       },
       execute: (args: Record<string, unknown>) => client.get(
-        `/api/v1/query?q=${encodeURIComponent(String(args.q ?? ''))}` +
-        `&top=${encodeURIComponent(String(args.top ?? 8))}` +
+        `/api/v1/knowledge?q=${encodeURIComponent(String(args.q ?? ''))}` +
+        `&limit=${encodeURIComponent(String(args.limit ?? 8))}` +
         `&status=${encodeURIComponent(String(args.status ?? 'VERIFIED'))}`,
       ),
     },
@@ -61,13 +71,13 @@ export function createDshToolDefinitions(client: KnowledgeApiClient) {
       name: 'wp_knowledge_status',
       description: 'Read the knowledge flywheel registry status.',
       parameters: {},
-      execute: () => client.get('/api/v1/status'),
+      execute: () => client.get('/api/v1/system/status'),
     },
     {
       name: 'wp_knowledge_scan',
       description: 'List changed Markdown sources from server-configured acquisition roots. The scan is read-only and does not schedule an Agent.',
       parameters: {},
-      execute: () => client.get('/api/v1/scan'),
+      execute: () => client.get('/api/v1/sources/scan'),
     },
     {
       name: 'wp_knowledge_ingest_candidate',
@@ -80,8 +90,12 @@ export function createDshToolDefinitions(client: KnowledgeApiClient) {
         category: { type: 'string' },
         tags: { type: 'array', items: { type: 'string' } },
         provenance: { type: 'array', required: true, items: { type: 'object' } },
+        idempotencyKey: { type: 'string', required: true },
       },
-      execute: (args: Record<string, unknown>) => client.post('/api/v1/ingest', args),
+      execute: (args: Record<string, unknown>) => {
+        const { idempotencyKey, ...payload } = args;
+        return client.post('/api/v1/knowledge/candidates', payload, String(idempotencyKey));
+      },
     },
     {
       name: 'wp_knowledge_feedback',
@@ -91,8 +105,16 @@ export function createDshToolDefinitions(client: KnowledgeApiClient) {
         action: { type: 'string', required: true, enum: ['hit', 'rate', 'correct'] },
         rating: { type: 'number' },
         note: { type: 'string' },
+        idempotencyKey: { type: 'string', required: true },
       },
-      execute: (args: Record<string, unknown>) => client.post('/api/v1/feedback', args),
+      execute: (args: Record<string, unknown>) => {
+        const { versionId, idempotencyKey, ...payload } = args;
+        return client.post(
+          `/api/v1/knowledge/${encodeURIComponent(String(versionId))}/feedback`,
+          payload,
+          String(idempotencyKey),
+        );
+      },
     },
   ];
 }

@@ -128,7 +128,7 @@ WP_KNOWLEDGE_HOST=0.0.0.0 WP_KNOWLEDGE_PORT=80 npm run knowledge:serve
 
 随后打开 `http://<server-public-ip>/`。云安全组需要放行所选端口的 TCP 入站流量，建议把来源 CIDR 限制到操作员 IP。不要在明文 HTTP 上暴露写接口；任何非本地监听在启用 `WP_KNOWLEDGE_WRITE_TOKEN` 前都应先配置 TLS 反向代理。
 
-Console 提供概览、Runs、Knowledge、Governance、Evidence、Agents 和 Settings。Run 观察使用以下接口：
+Console 提供“操作中心、飞轮批次、知识、工作流图、评测、来源、Agent 设置”七个页面。批次观察使用以下接口：
 
 - `GET /api/v1/runs`
 - `GET /api/v1/runs/:runId`

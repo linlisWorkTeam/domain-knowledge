@@ -1,6 +1,6 @@
 # 开发状态
 
-**当前阶段：Console 最终形态优先、后端 P0-B 并行候选｜更新时间：2026-09-03｜下一任务：DEV-005 Console 第一轮 F2 + B1 + HCP-1**
+**当前阶段：DEV-005 HCP-1 = Accepted，最终 UI/UX 已冻结｜更新时间：2026-09-03｜下一任务：DEV-006**
 
 本文件是 domain-knowledge 的**唯一开发进度入口**，用于记录当前阶段、已完成里程碑、正在进行或下一项工作、后续队列和最近验证结果。产品行为仍以 [`../specs/`](../specs/README.md) 为规范性事实源；需求级的 `Implemented / Partial / Planned` 状态仍只在[追踪矩阵](../specs/13-verification/traceability-matrix.md)维护。
 
@@ -42,12 +42,12 @@ This file is the single entry point for project-level development status, curren
 - DDD 分层已经对齐，UI/API 通过 Application App 进入系统，LangGraph、Provider 和持久化实现留在 Infrastructure。
 - 固定七 Agent 拓扑、并行、迭代、取消、Checkpoint、运行契约和配置快照已经通过自动化验证。
 - deterministic fixture 可以完成失败、修订、重新生成、评测和发布闭环。
-- 前台 F1 已基于现有 API 完成八入口中文 Console、绿色双主题、响应式、可访问性和真实数据状态；没有新增或修改后端 API。
-- 前台后续页面缺口和 Preview API 破坏性迁移已统一写入 `specs/10-interfaces/http-api.md`；当前仅为 Accepted 目标契约，所有 `Planned` 与新路径均未实现。本轮对齐结果已提升为 DEV-005 起始的最高优先队列。
+- 前台 F2 已完成最终七页面、真实批次 Agent 工作流图、绿色双主题、响应式、可访问性及真实/部分/禁用状态；用户已确认当前版本为最终 UI/UX，HCP-1=`Accepted`。
+- B1 Preview API 破坏性迁移已经同步完成 Server、Console、DSH Adapter、测试和文档；旧公共 HTTP 路径不保留兼容别名，B2–B4 的 `Planned` 能力仍未实现。
 - DeepSeek Harness live Adapter 已存在；公司 CodeAgent CLI 尚未接入。
 - 真实 Agent 质量、公司环境容量、长期稳定性和敌对代码执行安全尚未形成验收结论。
 
-需求级统计以追踪矩阵当前内容为准：`Implemented 41 / Partial 16 / Planned 14`。
+需求级统计以追踪矩阵当前内容为准：`Implemented 43 / Partial 15 / Planned 14`。
 
 ## 里程碑与工作项
 
@@ -58,9 +58,9 @@ This file is the single entry point for project-level development status, curren
 | DEV-003 | 固定七 Agent LangGraph 编排、Checkpoint 与确定性闭环 | Done | `tests/integration/langgraph-infrastructure.test.ts`、`tests/acceptance/automated-langgraph-flow.test.ts` |
 | DEV-004 | AgentCommand/AgentResult、Run 配置冻结与框架机械能力测评 | Done | [框架阶段性测评](report/框架阶段性测评.md)，结果 `6/6 ACCEPTED` |
 | DEV-UI-001 | 前台 F1 Knowledge Console | Done | `tests/contract/site.test.ts`、`tests/e2e/console.spec.ts`；只复用现有 API |
-| DEV-005 | Console 第一轮：F2 最终七页面 + B1 API 基线 + HCP-1 | Ready / Next | 前后台可并行；HCP-1 通过前不得开始 B2/B3 前台接线 |
-| DEV-006 | Console B2 Action Center 与 Runs 完整控制面 | Planned | Action Item、progress/retry/SSE、组件健康、Activity 与 Graph 实时更新；依赖 DEV-005 |
-| DEV-007 | Console B3 Knowledge、Evaluations 与 Sources | Planned | Knowledge 可由独立 Agent 并行；血缘/Diff、Evaluation 读模型与规则、Source Registry、Knowledge Health；依赖 DEV-005 |
+| DEV-005 | Console 第一轮：F2 最终七页面 + B1 API 基线 + HCP-1 | Done | B1 已就绪；当前七页 UI/UX 已冻结，HCP-1=`Accepted` |
+| DEV-006 | Console B2 操作中心与飞轮批次完整控制面 | Planned | 待处理事项、进度/重试/SSE、组件健康、活动流与工作流图实时更新；依赖 DEV-005 |
+| DEV-007 | Console B3 知识、评测与来源 | Planned | 知识可由独立 Agent 并行；血缘/差异、评测读模型与规则、来源注册、知识健康度；依赖 DEV-005 |
 | DEV-008 | Console B4 运营面加固 | Planned | Provider status、指标口径、SSE 容量和大数据查询验收；依赖 DEV-006/007 |
 | DEV-009 | 公司 CodeAgent CLI Adapter 与契约验证 | Planned | 原 DEV-005；Console 优先队列完成后恢复排序 |
 | DEV-010 | 公司 CodeAgent 七角色真实闭环与效果基线 | Planned | 原 DEV-006；依赖 DEV-009 |
@@ -70,13 +70,13 @@ This file is the single entry point for project-level development status, curren
 
 状态含义：`Ready / Next` 表示下一项已排序但尚未开始；`In Progress` 表示已有活动开发分支；`Blocked` 必须写明外部依赖；`Done` 必须给出可复验结果。
 
-## 下一开发任务：DEV-005
+## 已完成开发任务：DEV-005
 
 目标是在同一轮并行完成 F2 最终七页面视觉结构与 B1 Preview API 基线，并以 HCP-1 冻结页面信息架构、Graph 语义和 API 边界，再进入 B2/B3。
 
 范围：
 
-- 前台完成 Action Center、Flywheel Runs、Knowledge、Graph、Evaluations、Sources、Agent Settings 七页最终布局和全部真实/Partial/Disabled 状态；
+- 前台完成“操作中心、飞轮批次、知识、工作流图、评测、来源、Agent 设置”七页最终布局和全部真实/Partial/Disabled 状态；
 - Graph 使用现有 Run、WorkflowNodeProjection、workflow status 和事件实现真实轮询版，不增加 Graph API；
 - API 完成 11 个旧接口的资源化迁移，并同步 Server、Console、DSH Adapter、测试和文档；
 - 落地统一分页、错误、认证、幂等和 revision 契约，不保留 Preview 旧路由别名；
@@ -123,5 +123,6 @@ DEV-009 不修改 `web/`、`site/`、前台产品设计、现有 HTTP 路由或�
 | --- | --- | --- |
 | 2026-09-03 | Agent 运行契约与框架测评合入后的 `main` | TypeScript 通过；Spec：7 schemas、7 commands、8 results、38 P0；测试 112/112；框架测评 6/6 `ACCEPTED` |
 | 2026-09-03 | 前台 F1 Knowledge Console 合入前基线 | TypeScript 通过；Spec：7 schemas、7 commands、8 results、51 P0；测试 114/114；框架测评 6/6 `ACCEPTED`；Chromium E2E 4/4 |
+| 2026-09-03 | DEV-005 F2 + B1 HCP-1 最终基线 | TypeScript 通过；Spec：7 schemas、7 commands、8 results、51 P0；测试 115/115；Chromium E2E 7/7，含七页亮色语义面审计及操作中心 `1363 × 936` 像素基线；HCP-1=`Accepted` |
 
 该结果只证明框架机械能力，不代表公司 CodeAgent 效果或生产可用性。

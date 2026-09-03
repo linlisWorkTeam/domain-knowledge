@@ -2,7 +2,7 @@
 import { createServer as createHttpServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { readFileSync } from 'node:fs';
 import { extname, join, resolve } from 'node:path';
-import { timingSafeEqual } from 'node:crypto';
+import { randomUUID, timingSafeEqual } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
 import { createComposition, loadOhMyWorkPanelScenario } from './composition.ts';
@@ -48,6 +48,54 @@ function send(response: ServerResponse, status: number, body: unknown, contentTy
   response.end(bytes);
 }
 
+interface ApiErrorBody {
+  error: {
+    code: string;
+    message: string;
+    requestId: string;
+    retryable: boolean;
+    details: Record<string, unknown>;
+  };
+}
+
+function requestId(request: IncomingMessage): string {
+  const supplied = request.headers['x-request-id'];
+  return typeof supplied === 'string' && /^[A-Za-z0-9._:-]{1,128}$/.test(supplied)
+    ? supplied
+    : `req_${randomUUID()}`;
+}
+
+function errorBody(code: string, message: string, id: string, retryable = false): ApiErrorBody {
+  return { error: { code, message, requestId: id, retryable, details: {} } };
+}
+
+function parseLimit(url: URL): number {
+  const raw = url.searchParams.get('limit');
+  const limit = raw === null ? 50 : Number(raw);
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 200) throw new Error('ARGUMENT_INVALID: limit must be 1..200');
+  return limit;
+}
+
+function parseCursor(url: URL): number {
+  const raw = url.searchParams.get('cursor');
+  if (raw === null || raw === '') return 0;
+  const decoded = Number(Buffer.from(raw, 'base64url').toString('utf8'));
+  if (!Number.isSafeInteger(decoded) || decoded < 0) throw new Error('ARGUMENT_INVALID: cursor is invalid');
+  return decoded;
+}
+
+function page<T>(values: T[], url: URL): { items: T[]; nextCursor: string | null; sampledAt: string } {
+  const offset = parseCursor(url);
+  const limit = parseLimit(url);
+  const items = values.slice(offset, offset + limit);
+  const nextOffset = offset + items.length;
+  return {
+    items,
+    nextCursor: nextOffset < values.length ? Buffer.from(String(nextOffset)).toString('base64url') : null,
+    sampledAt: new Date().toISOString(),
+  };
+}
+
 function authorized(request: IncomingMessage, token: string | undefined): boolean {
   if (!token) return false;
   const supplied = request.headers.authorization?.replace(/^Bearer\s+/i, '') ?? '';
@@ -75,19 +123,19 @@ async function body(request: IncomingMessage): Promise<Record<string, unknown>> 
   return parsed as Record<string, unknown>;
 }
 
-export function mapHttpError(error: unknown): { status: number; body: { error: string; message?: string } } {
+export function mapHttpError(error: unknown, id = 'req_unknown'): { status: number; body: ApiErrorBody } {
   const message = error instanceof Error ? error.message : String(error);
   const code = message.split(':', 1)[0] || 'INTERNAL_ERROR';
-  if (code === 'PAYLOAD_TOO_LARGE') return { status: 413, body: { error: code } };
-  if (code === 'METHOD_NOT_ALLOWED') return { status: 405, body: { error: code } };
-  if (code.endsWith('_NOT_FOUND')) return { status: 404, body: { error: code } };
+  if (code === 'PAYLOAD_TOO_LARGE') return { status: 413, body: errorBody(code, 'Request payload is too large.', id) };
+  if (code === 'METHOD_NOT_ALLOWED') return { status: 405, body: errorBody(code, 'Method not allowed.', id) };
+  if (code.endsWith('_NOT_FOUND')) return { status: 404, body: errorBody(code, 'Resource not found.', id) };
   if (/(?:_ALREADY_RUNNING|_TERMINAL|_CONFLICT)$/.test(code)) {
-    return { status: 409, body: { error: code, message } };
+    return { status: 409, body: errorBody(code, message, id) };
   }
   if (/(?:_INVALID|_DENIED|_REQUIRED|_UNSUPPORTED)$/.test(code)) {
-    return { status: 400, body: { error: code, message } };
+    return { status: 422, body: errorBody(code, message, id) };
   }
-  return { status: 500, body: { error: 'INTERNAL_ERROR' } };
+  return { status: 500, body: errorBody('INTERNAL_ERROR', 'Internal server error.', id) };
 }
 
 export function createKnowledgeServer(input: {
@@ -97,8 +145,10 @@ export function createKnowledgeServer(input: {
 } = {}) {
   const composition = createComposition(input);
   const writeToken = input.writeToken ?? process.env.WP_KNOWLEDGE_WRITE_TOKEN;
+  const idempotencyResults = new Map<string, { fingerprint: string; status: number; value: unknown }>();
   const server = createHttpServer(async (request, response) => {
     const url = new URL(request.url ?? '/', 'http://127.0.0.1');
+    const currentRequestId = requestId(request);
     try {
       if (request.method === 'GET' && assets.has(url.pathname)) {
         const file = assets.get(url.pathname) as string;
@@ -118,11 +168,11 @@ export function createKnowledgeServer(input: {
         send(response, 200, { ok: true });
         return;
       }
-      if (request.method === 'GET' && url.pathname === '/api/v1/status') {
+      if (request.method === 'GET' && url.pathname === '/api/v1/system/status') {
         send(response, 200, composition.apps.flywheel.status());
         return;
       }
-      if (request.method === 'GET' && url.pathname === '/api/v1/capabilities') {
+      if (request.method === 'GET' && url.pathname === '/api/v1/system/capabilities') {
         const sdkIsolation = composition.agentProviderMode === 'deepseek-harness'
           && (process.env.WP_DSH_PROCESS_ISOLATION?.trim() || 'bubblewrap') === 'bubblewrap';
         send(response, 200, {
@@ -147,8 +197,10 @@ export function createKnowledgeServer(input: {
         return;
       }
       if (request.method === 'GET' && url.pathname === '/api/v1/runs') {
-        const states = (url.searchParams.get('state') ?? '').split(',').filter(Boolean);
-        send(response, 200, { runs: composition.apps.flywheel.listRunSummaries(states.length ? states : undefined) });
+        const states = (url.searchParams.get('status') ?? '').split(',').filter(Boolean);
+        const runs = composition.apps.flywheel.listRunSummaries(states.length ? states : undefined)
+          .sort((left, right) => String(right.updatedAt ?? right.createdAt ?? '').localeCompare(String(left.updatedAt ?? left.createdAt ?? '')));
+        send(response, 200, page(runs, url));
         return;
       }
       if (request.method === 'GET' && url.pathname.startsWith('/api/v1/runs/')) {
@@ -156,19 +208,19 @@ export function createKnowledgeServer(input: {
         const segments = suffix.split('/');
         const [encodedRunId, child] = segments;
         if (segments.length > 2) {
-          send(response, 404, { error: 'NOT_FOUND' });
+          send(response, 404, errorBody('NOT_FOUND', 'Resource not found.', currentRequestId));
           return;
         }
         const runId = decodeURIComponent(encodedRunId ?? '');
         const snapshot = composition.apps.flywheel.getRunSnapshot(runId);
         if (!snapshot) {
-          send(response, 404, { error: 'NOT_FOUND' });
+          send(response, 404, errorBody('NOT_FOUND', 'Resource not found.', currentRequestId));
           return;
         }
         if (child === 'events') {
           const after = Number(url.searchParams.get('after') ?? 0);
           if (!Number.isSafeInteger(after) || after < 0) {
-            send(response, 400, { error: 'ARGUMENT_INVALID', message: 'after must be a non-negative integer' });
+            send(response, 422, errorBody('ARGUMENT_INVALID', 'after must be a non-negative integer', currentRequestId));
             return;
           }
           const events = (snapshot.events as { eventSeq: number }[])
@@ -184,13 +236,13 @@ export function createKnowledgeServer(input: {
           send(response, 200, await composition.apps.orchestrator.status(runId));
           return;
         }
-        if (child === 'demo-report') {
+        if (child === 'report') {
           response.setHeader('content-disposition', 'attachment; filename="wpknowledge-run-demo.json"');
           send(response, 200, await composition.apps.orchestrator.buildDemoReport(runId));
           return;
         }
         if (child) {
-          send(response, 404, { error: 'NOT_FOUND' });
+          send(response, 404, errorBody('NOT_FOUND', 'Resource not found.', currentRequestId));
           return;
         }
         send(response, 200, snapshot);
@@ -198,7 +250,15 @@ export function createKnowledgeServer(input: {
       }
       if (request.method === 'GET' && url.pathname === '/api/v1/knowledge') {
         const statuses = (url.searchParams.get('status') ?? '').split(',').filter(Boolean);
-        send(response, 200, { knowledge: composition.apps.flywheel.listKnowledgeVersions(statuses.length ? statuses : undefined) });
+        const q = url.searchParams.get('q') ?? '';
+        const category = url.searchParams.get('category') ?? undefined;
+        const result = await composition.apps.knowledgeSearch.search({
+          query: q,
+          top: 200,
+          statuses: statuses.length ? statuses : ['CANDIDATE', 'VERIFIED', 'LOW_CONFIDENCE', 'SUPERSEDED'],
+          category,
+        });
+        send(response, 200, { ...page(result.hits, url), query: result.query, total: result.total });
         return;
       }
       if (request.method === 'GET' && url.pathname === '/api/v1/agents') {
@@ -208,38 +268,28 @@ export function createKnowledgeServer(input: {
       if (request.method === 'GET' && url.pathname.startsWith('/api/v1/knowledge/')) {
         const versionId = decodeURIComponent(url.pathname.slice('/api/v1/knowledge/'.length));
         const value = await composition.apps.knowledgeSearch.get(versionId);
-        send(response, value ? 200 : 404, value ?? { error: 'NOT_FOUND' });
+        send(response, value ? 200 : 404, value ?? errorBody('NOT_FOUND', 'Resource not found.', currentRequestId));
         return;
       }
-      if (request.method === 'GET' && url.pathname === '/api/v1/query') {
-        const requestedStatuses = url.searchParams.get('status');
-        const statuses = requestedStatuses === null
-          ? ['VERIFIED']
-          : requestedStatuses
-            ? requestedStatuses.split(',').filter(Boolean)
-            : ['CANDIDATE', 'VERIFIED', 'LOW_CONFIDENCE', 'SUPERSEDED'];
-        send(response, 200, await composition.apps.knowledgeSearch.search({
-          query: url.searchParams.get('q') ?? '',
-          top: Number(url.searchParams.get('top') ?? 8),
-          statuses,
-          category: url.searchParams.get('category') ?? undefined,
-        }));
-        return;
-      }
-      if (request.method === 'GET' && url.pathname === '/api/v1/scan') {
+      if (request.method === 'GET' && url.pathname === '/api/v1/sources/scan') {
         send(response, 200, composition.apps.knowledgeDiscovery.discover(
           composition.config.acquisition.roots,
           composition.config.acquisition.maxCandidates,
         ));
         return;
       }
-      if ((request.method === 'POST' || request.method === 'PUT') && url.pathname.startsWith('/api/v1/')) {
+      const isMutationRoute = url.pathname === '/api/v1/runs'
+        || url.pathname === '/api/v1/knowledge/candidates'
+        || /^\/api\/v1\/runs\/[^/]+\/(?:resume|cancel)$/.test(url.pathname)
+        || /^\/api\/v1\/knowledge\/[^/]+\/feedback$/.test(url.pathname)
+        || /^\/api\/v1\/agents\/[^/]+\/prompt$/.test(url.pathname);
+      if ((request.method === 'POST' || request.method === 'PUT') && isMutationRoute) {
         if (!writeToken) {
-          send(response, 503, { error: 'WRITE_API_DISABLED', message: 'Set WP_KNOWLEDGE_WRITE_TOKEN to enable mutations.' });
+          send(response, 503, errorBody('WRITE_API_DISABLED', 'Set WP_KNOWLEDGE_WRITE_TOKEN to enable mutations.', currentRequestId, true));
           return;
         }
         if (!authorized(request, writeToken)) {
-          send(response, 401, { error: 'UNAUTHORIZED' });
+          send(response, 401, errorBody('UNAUTHORIZED', 'A valid Bearer token is required.', currentRequestId));
           return;
         }
         const payload = await body(request);
@@ -261,12 +311,21 @@ export function createKnowledgeServer(input: {
           return;
         }
         if (request.method !== 'POST') throw new Error('METHOD_NOT_ALLOWED');
-        if (url.pathname === '/api/v1/run-commands/start') {
+        if (url.pathname === '/api/v1/runs') {
           const profile = String(payload.profile ?? 'ohmyworkpanel');
           if (profile !== 'ohmyworkpanel') throw new Error(`WORKFLOW_PROFILE_UNSUPPORTED: ${profile}`);
           const repositoryRoot = String(payload.repositoryRoot ?? '').trim();
           if (!repositoryRoot) throw new Error('ARGUMENT_REQUIRED: repositoryRoot');
-          send(response, 202, await composition.apps.orchestrator.start(
+          const key = request.headers['idempotency-key'];
+          if (typeof key !== 'string' || !key.trim()) throw new Error('IDEMPOTENCY_KEY_REQUIRED: Idempotency-Key');
+          const fingerprint = JSON.stringify(payload);
+          const previous = idempotencyResults.get(key);
+          if (previous && previous.fingerprint !== fingerprint) throw new Error('IDEMPOTENCY_CONFLICT: key reused with different payload');
+          if (previous) {
+            send(response, previous.status, previous.value);
+            return;
+          }
+          const value = await composition.apps.orchestrator.start(
             loadOhMyWorkPanelScenario(repositoryRoot),
             {
               policyId: String(payload.policyId ?? composition.config.publicationGate.policyId),
@@ -279,20 +338,36 @@ export function createKnowledgeServer(input: {
               maxIterations: Number(payload.maxIterations ?? composition.config.publicationGate.maxIterations),
               workerCount: Number(payload.workerCount ?? 1),
             },
-          ));
+          );
+          idempotencyResults.set(key, { fingerprint, status: 202, value });
+          send(response, 202, value);
           return;
         }
-        if (url.pathname === '/api/v1/run-commands/resume') {
-          send(response, 202, await composition.apps.orchestrator.resume(String(payload.runId ?? '')));
-          return;
-        }
-        if (url.pathname === '/api/v1/run-commands/cancel') {
-          const runId = String(payload.runId ?? '');
+        const runCommand = url.pathname.match(/^\/api\/v1\/runs\/([^/]+)\/(resume|cancel)$/);
+        if (runCommand) {
+          const runId = decodeURIComponent(runCommand[1] ?? '');
+          const key = request.headers['idempotency-key'];
+          if (typeof key !== 'string' || !key.trim()) throw new Error('IDEMPOTENCY_KEY_REQUIRED: Idempotency-Key');
+          const fingerprint = JSON.stringify({ runId, command: runCommand[2], payload });
+          const previous = idempotencyResults.get(key);
+          if (previous && previous.fingerprint !== fingerprint) throw new Error('IDEMPOTENCY_CONFLICT: key reused with different command');
+          if (previous) {
+            send(response, previous.status, previous.value);
+            return;
+          }
+          if (runCommand[2] === 'resume') {
+            const value = await composition.apps.orchestrator.resume(runId);
+            idempotencyResults.set(key, { fingerprint, status: 202, value });
+            send(response, 202, value);
+            return;
+          }
           await composition.apps.orchestrator.cancel(runId);
-          send(response, 200, { runId, executionStatus: 'CANCELLED' });
+          const value = { runId, executionStatus: 'CANCELLED' };
+          idempotencyResults.set(key, { fingerprint, status: 200, value });
+          send(response, 200, value);
           return;
         }
-        if (url.pathname === '/api/v1/ingest') {
+        if (url.pathname === '/api/v1/knowledge/candidates') {
           send(response, 201, await composition.apps.flywheel.ingestCandidate({
             moduleId: String(payload.moduleId ?? ''),
             body: String(payload.body ?? ''),
@@ -305,47 +380,20 @@ export function createKnowledgeServer(input: {
           }));
           return;
         }
-        if (url.pathname === '/api/v1/feedback') {
+        const feedback = url.pathname.match(/^\/api\/v1\/knowledge\/([^/]+)\/feedback$/);
+        if (feedback) {
           composition.apps.flywheel.recordFeedback(
-            String(payload.versionId ?? ''), String(payload.action ?? ''),
+            decodeURIComponent(feedback[1] ?? ''), String(payload.action ?? ''),
             payload.rating === null || payload.rating === undefined ? null : Number(payload.rating),
             String(payload.note ?? ''),
           );
           send(response, 200, { ok: true });
           return;
         }
-        if (url.pathname === '/api/v1/runs') {
-          send(response, 201, composition.apps.flywheel.createRun(String(payload.moduleId ?? ''), String(payload.policyId ?? composition.config.publicationGate.policyId)));
-          return;
-        }
-        if (url.pathname === '/api/v1/transition') {
-          send(response, 200, composition.apps.flywheel.transition(String(payload.runId ?? ''), String(payload.state ?? '') as never));
-          return;
-        }
-        if (url.pathname === '/api/v1/evaluate') {
-          send(response, 201, await composition.apps.evalRunner.evaluate({
-            runId: String(payload.runId ?? ''),
-            versionId: String(payload.versionId ?? ''),
-            evidenceRefs: Array.isArray(payload.evidenceRefs) ? payload.evidenceRefs as never[] : [],
-            toolchainFingerprint: String(payload.toolchainFingerprint ?? ''),
-            criticalFailures: Number(payload.criticalFailures ?? 0),
-            testsPassed: Number(payload.testsPassed ?? 0),
-            testsTotal: Number(payload.testsTotal ?? 0),
-            stability: Number(payload.stability ?? 0),
-            infrastructureFailure: Boolean(payload.infrastructureFailure),
-          }, composition.config.publicationGate));
-          return;
-        }
-        if (url.pathname === '/api/v1/publish') {
-          send(response, 201, await composition.apps.flywheel.publish(
-            String(payload.runId ?? ''), String(payload.versionId ?? ''), String(payload.decisionId ?? ''),
-          ));
-          return;
-        }
       }
-      send(response, 404, { error: 'NOT_FOUND' });
+      send(response, 404, errorBody('NOT_FOUND', 'Resource not found.', currentRequestId));
     } catch (error) {
-      const mapped = mapHttpError(error);
+      const mapped = mapHttpError(error, currentRequestId);
       send(response, mapped.status, mapped.body);
     }
   });

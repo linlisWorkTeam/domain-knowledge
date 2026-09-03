@@ -26,16 +26,19 @@ test('server binding defaults to config and supports explicit deployment overrid
 });
 
 test('HTTP errors distinguish client failures without exposing unexpected internals', () => {
-  assert.deepEqual(mapHttpError(new Error('PAYLOAD_INVALID')), {
-    status: 400, body: { error: 'PAYLOAD_INVALID', message: 'PAYLOAD_INVALID' },
+  const invalid = mapHttpError(new Error('PAYLOAD_INVALID'), 'req_test');
+  assert.equal(invalid.status, 422);
+  assert.deepEqual(invalid.body.error, {
+    code: 'PAYLOAD_INVALID', message: 'PAYLOAD_INVALID', requestId: 'req_test', retryable: false, details: {},
   });
   assert.deepEqual(mapHttpError(new Error('WORKFLOW_ALREADY_RUNNING: run-1')), {
     status: 409,
-    body: { error: 'WORKFLOW_ALREADY_RUNNING', message: 'WORKFLOW_ALREADY_RUNNING: run-1' },
+    body: { error: { code: 'WORKFLOW_ALREADY_RUNNING', message: 'WORKFLOW_ALREADY_RUNNING: run-1', requestId: 'req_unknown', retryable: false, details: {} } },
   });
-  assert.deepEqual(mapHttpError(new Error('database path D:\\secret failed')), {
-    status: 500, body: { error: 'INTERNAL_ERROR' },
-  });
+  const internal = mapHttpError(new Error('database path D:\\secret failed'));
+  assert.equal(internal.status, 500);
+  assert.equal(internal.body.error.code, 'INTERNAL_ERROR');
+  assert.doesNotMatch(JSON.stringify(internal.body), /secret/);
 });
 
 test('HTTP adapter rejects missing credentials and accepts authenticated candidates', async () => {
@@ -49,19 +52,19 @@ test('HTTP adapter rejects missing credentials and accepts authenticated candida
   try {
     const health = await fetch(`${base}/health`);
     assert.equal(health.status, 200);
-    assert.equal((await fetch(`${base}/api/v1/status`)).status, 200);
-    const denied = await fetch(`${base}/api/v1/ingest`, {
+    assert.equal((await fetch(`${base}/api/v1/system/status`)).status, 200);
+    const denied = await fetch(`${base}/api/v1/knowledge/candidates`, {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}',
     });
     assert.equal(denied.status, 401);
-    const malformed = await fetch(`${base}/api/v1/ingest`, {
+    const malformed = await fetch(`${base}/api/v1/knowledge/candidates`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: 'Bearer test-secret' },
       body: '{',
     });
-    assert.equal(malformed.status, 400);
-    assert.deepEqual(await malformed.json(), { error: 'PAYLOAD_INVALID', message: 'PAYLOAD_INVALID' });
-    const accepted = await fetch(`${base}/api/v1/ingest`, {
+    assert.equal(malformed.status, 422);
+    assert.equal((await malformed.json()).error.code, 'PAYLOAD_INVALID');
+    const accepted = await fetch(`${base}/api/v1/knowledge/candidates`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: 'Bearer test-secret' },
       body: JSON.stringify({
@@ -73,17 +76,23 @@ test('HTTP adapter rejects missing credentials and accepts authenticated candida
     assert.equal(accepted.status, 201);
     const payload = await accepted.json();
     assert.equal(payload.version.status, 'CANDIDATE');
-    const defaultQuery = await fetch(`${base}/api/v1/query?q=${encodeURIComponent('行为')}`);
-    assert.equal((await defaultQuery.json()).hits.length, 0);
-    const allStatusQuery = await fetch(`${base}/api/v1/query?q=${encodeURIComponent('行为')}&status=`);
+    const defaultQuery = await fetch(`${base}/api/v1/knowledge?q=${encodeURIComponent('行为')}`);
+    const defaultQueryPayload = await defaultQuery.json();
+    assert.equal(defaultQueryPayload.items.length, 1);
+    assert.equal(defaultQueryPayload.items[0].status, 'CANDIDATE');
+    const verifiedQuery = await fetch(`${base}/api/v1/knowledge?q=${encodeURIComponent('行为')}&status=VERIFIED`);
+    assert.equal((await verifiedQuery.json()).items.length, 0);
+    const allStatusQuery = await fetch(`${base}/api/v1/knowledge?q=${encodeURIComponent('行为')}&status=CANDIDATE`);
     const allStatusPayload = await allStatusQuery.json();
-    assert.equal(allStatusPayload.hits.length, 1);
-    assert.equal(allStatusPayload.hits[0].status, 'CANDIDATE');
+    assert.equal(allStatusPayload.items.length, 1);
+    assert.equal(allStatusPayload.items[0].status, 'CANDIDATE');
+    assert.equal(allStatusPayload.nextCursor, null);
+    assert.ok(allStatusPayload.sampledAt);
     const page = await fetch(`${base}/`);
     assert.equal(page.status, 200);
     assert.match(await page.text(), /知识飞轮控制台/);
 
-    const capabilities = await (await fetch(`${base}/api/v1/capabilities`)).json();
+    const capabilities = await (await fetch(`${base}/api/v1/system/capabilities`)).json();
     assert.equal(capabilities.writeEnabled, true);
     assert.equal(capabilities.automatedWorkflow, true);
     assert.equal(capabilities.langGraphInfrastructure, true);
@@ -98,9 +107,6 @@ test('HTTP adapter rejects missing credentials and accepts authenticated candida
     ]);
 
     const authHeaders = { 'content-type': 'application/json', authorization: 'Bearer test-secret' };
-    const post = (path: string, input: Record<string, unknown>) => fetch(`${base}${path}`, {
-      method: 'POST', headers: authHeaders, body: JSON.stringify(input),
-    });
     const configuredAgent = await fetch(`${base}/api/v1/agents/doc-gen/prompt`, {
       method: 'PUT', headers: authHeaders, body: JSON.stringify({ promptAddon: '优先写清适用边界。' }),
     });
@@ -112,77 +118,74 @@ test('HTTP adapter rejects missing credentials and accepts authenticated candida
       method: 'PUT', headers: authHeaders,
       body: JSON.stringify({ promptAddon: 'ok', tools: ['Bash'] }),
     });
-    assert.equal(deniedAgentMutation.status, 400);
+    assert.equal(deniedAgentMutation.status, 422);
     assert.match(JSON.stringify(await deniedAgentMutation.json()), /only promptAddon/);
     const deniedPromptType = await fetch(`${base}/api/v1/agents/doc-gen/prompt`, {
       method: 'PUT', headers: authHeaders,
       body: JSON.stringify({ promptAddon: { text: 'not a string' } }),
     });
-    assert.equal(deniedPromptType.status, 400);
+    assert.equal(deniedPromptType.status, 422);
     assert.match(JSON.stringify(await deniedPromptType.json()), /must be a string/);
-    const createdRun = await post('/api/v1/runs', { moduleId: 'server-card', policyId: 'local-v1' });
-    assert.equal(createdRun.status, 201);
-    const runId = String((await createdRun.json()).runId);
-    for (const state of ['PLANNED', 'GENERATING', 'EVALUATING']) {
-      const transition = await post('/api/v1/transition', { runId, state });
-      assert.equal(transition.status, 200, await transition.text());
-    }
-    const evidenceRef = await instance.composition.artifacts.put(Buffer.from('{"passed":true}'), 'application/json');
-    const evaluated = await post('/api/v1/evaluate', {
-      runId, versionId: payload.version.versionId, evidenceRefs: [evidenceRef],
-      toolchainFingerprint: 'server-test@1', criticalFailures: 0,
-      testsPassed: 1, testsTotal: 1, stability: 1,
+    const feedbackResponse = await fetch(`${base}/api/v1/knowledge/${encodeURIComponent(payload.version.versionId)}/feedback`, {
+      method: 'POST', headers: authHeaders, body: JSON.stringify({ action: 'hit' }),
     });
-    const evaluatedPayload = await evaluated.json();
-    assert.equal(evaluated.status, 201, JSON.stringify(evaluatedPayload));
-    const decision = evaluatedPayload.decision;
-    assert.equal(decision.outcome, 'PASS');
-    assert.equal(instance.composition.repository.getRun(runId)?.state, 'REVIEWING');
-    const published = await post('/api/v1/publish', {
-      runId, versionId: payload.version.versionId, decisionId: decision.decisionId,
+    assert.equal(feedbackResponse.status, 200);
+    const scanResponse = await fetch(`${base}/api/v1/sources/scan`);
+    assert.equal(scanResponse.status, 200);
+    const runWithoutIdempotency = await fetch(`${base}/api/v1/runs`, {
+      method: 'POST', headers: authHeaders, body: JSON.stringify({ repositoryRoot: '/tmp' }),
     });
-    assert.equal(published.status, 201, await published.text());
-    assert.equal(instance.composition.service.getKnowledgeVersion(payload.version.versionId)?.status, 'VERIFIED');
+    assert.equal(runWithoutIdempotency.status, 422);
+    assert.equal((await runWithoutIdempotency.json()).error.code, 'IDEMPOTENCY_KEY_REQUIRED');
+    const created = instance.composition.service.createRun('server-card', 'local-v1');
+    const runId = created.runId;
 
     const runsPayload = await (await fetch(`${base}/api/v1/runs`)).json();
-    assert.equal(runsPayload.runs.length, 1);
-    assert.equal(runsPayload.runs[0].runId, runId);
-    assert.equal(runsPayload.runs[0].state, 'VERIFIED');
-    assert.equal(runsPayload.runs[0].latestDecision.outcome, 'PASS');
-    const verifiedRuns = await (await fetch(`${base}/api/v1/runs?state=VERIFIED`)).json();
-    assert.equal(verifiedRuns.runs.length, 1);
+    assert.equal(runsPayload.items.length, 1);
+    assert.equal(runsPayload.items[0].runId, runId);
+    const plannedRuns = await (await fetch(`${base}/api/v1/runs?status=CREATED`)).json();
+    assert.equal(plannedRuns.items.length, 1);
 
     const snapshotResponse = await fetch(`${base}/api/v1/runs/${encodeURIComponent(runId)}`);
     assert.equal(snapshotResponse.status, 200);
     const snapshot = await snapshotResponse.json();
     assert.equal(snapshot.run.runId, runId);
-    assert.equal(snapshot.evaluations.length, 1);
-    assert.equal(snapshot.evaluations[0].decision.outcome, 'PASS');
-    assert.equal(snapshot.latestDecision.decisionId, decision.decisionId);
-    assert.equal(snapshot.versions[0].status, 'VERIFIED');
-    assert.equal(snapshot.publications.length, 1);
-    assert.equal(snapshot.publications[0].versionId, payload.version.versionId);
-    assert.ok(snapshot.events.length >= 7);
+    assert.equal(snapshot.evaluations.length, 0);
+    assert.equal(snapshot.publications.length, 0);
+    assert.ok(snapshot.events.length >= 1);
     assert.deepEqual(snapshot.events.map((record: { eventSeq: number }) => record.eventSeq),
       snapshot.events.map((_: unknown, index: number) => index + 1));
 
-    const demoResponse = await fetch(`${base}/api/v1/runs/${encodeURIComponent(runId)}/demo-report`);
+    const demoResponse = await fetch(`${base}/api/v1/runs/${encodeURIComponent(runId)}/report`);
     assert.equal(demoResponse.status, 200);
     assert.match(demoResponse.headers.get('content-disposition') ?? '', /attachment/);
     const demoReport = await demoResponse.json();
     assert.equal(demoReport.snapshot.run.runId, runId);
-    assert.equal(demoReport.snapshot.publications.length, 1);
+    assert.equal(demoReport.snapshot.publications.length, 0);
     assert.equal(demoReport.artifactIntegrity.failed.length, 0);
 
     const eventTail = await (await fetch(
-      `${base}/api/v1/runs/${encodeURIComponent(runId)}/events?after=2`,
+      `${base}/api/v1/runs/${encodeURIComponent(runId)}/events?after=0`,
     )).json();
     assert.ok(eventTail.events.length > 0);
-    assert.ok(eventTail.events.every((record: { eventSeq: number }) => record.eventSeq > 2));
+    assert.ok(eventTail.events.every((record: { eventSeq: number }) => record.eventSeq > 0));
     const invalidEventCursor = await fetch(
       `${base}/api/v1/runs/${encodeURIComponent(runId)}/events?after=invalid`,
     );
-    assert.equal(invalidEventCursor.status, 400);
+    assert.equal(invalidEventCursor.status, 422);
+    for (const legacyPath of [
+      '/api/v1/status', '/api/v1/capabilities', '/api/v1/query', '/api/v1/scan',
+      '/api/v1/ingest', '/api/v1/feedback', '/api/v1/run-commands/start',
+      '/api/v1/transition', '/api/v1/evaluate', '/api/v1/publish',
+      `/api/v1/runs/${encodeURIComponent(runId)}/demo-report`,
+    ]) {
+      const legacy = await fetch(`${base}${legacyPath}`);
+      assert.equal(legacy.status, 404, legacyPath);
+    }
+    for (const legacyPath of ['/api/v1/ingest', '/api/v1/feedback', '/api/v1/run-commands/start', '/api/v1/transition', '/api/v1/evaluate', '/api/v1/publish']) {
+      const legacy = await fetch(`${base}${legacyPath}`, { method: 'POST', headers: authHeaders, body: '{}' });
+      assert.equal(legacy.status, 404, legacyPath);
+    }
   } finally {
     instance.server.close();
     await once(instance.server, 'close');
@@ -198,13 +201,13 @@ test('HTTP mutation API is disabled when no write token is configured', async ()
   const address = instance.server.address();
   assert.ok(address && typeof address === 'object');
   try {
-    const capabilities = await (await fetch(`http://127.0.0.1:${address.port}/api/v1/capabilities`)).json();
+    const capabilities = await (await fetch(`http://127.0.0.1:${address.port}/api/v1/system/capabilities`)).json();
     assert.equal(capabilities.writeEnabled, false);
-    const response = await fetch(`http://127.0.0.1:${address.port}/api/v1/ingest`, {
+    const response = await fetch(`http://127.0.0.1:${address.port}/api/v1/knowledge/candidates`, {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}',
     });
     assert.equal(response.status, 503);
-    assert.equal((await response.json()).error, 'WRITE_API_DISABLED');
+    assert.equal((await response.json()).error.code, 'WRITE_API_DISABLED');
   } finally {
     instance.server.close();
     await once(instance.server, 'close');

@@ -1,6 +1,6 @@
 # 用户用例与交互时序
 
-**状态：Accepted｜版本：1.1.0｜基线日期：2026-09-02**
+**状态：Accepted｜版本：1.1.1｜基线日期：2026-09-02**
 
 本文把需求、验收场景和用户入口连接成可执行的交互视图。时序图中的“必须 / 不得”具有规范性；具体能力是否已经落地，以[追踪矩阵](../13-verification/traceability-matrix.md)为准。
 
@@ -16,6 +16,7 @@
 | UC-KF-004 | 发布验收者 | 对固定 commit 完成可复验的真实源码闭环 | KF-SYS-017、NFR-011；AC-E2E-001 |
 | UC-KF-005 | 旧 Runner 调用方 | 保持旧命令可用且不产生第二套事实源 | KF-SYS-016；AC-COMPAT-001 |
 | UC-KF-006 | 受信操作者 | 查阅全部 Agent 和节点状态，并只追加提示词 | KF-SYS-020、KF-SYS-021；AC-OBS-002、AC-AGENT-003 |
+| UC-KF-007 | 本地管理员 | 在设置中配置模型 API 并以 Pi Agent 工具作为默认任务执行方式 | KF-UI-021；AC-UI-024 |
 
 ## 参与者与责任
 
@@ -31,6 +32,28 @@
 | Deterministic Gate | 根据固化策略和证据产生 `PASS / ITERATE / ROLLBACK / STOPPED`。 |
 | Knowledge Publisher | 在一个事务中更新知识、Run、事件和 publication receipt。 |
 | 受信操作者 | 查看固定 Agent 契约和执行状态；只能追加提示词，不能改职责、Schema、拓扑或工具权限。 |
+| 本地管理员 | 配置模型 API URL 和 API Key、验证连通性并启用默认 Pi Agent 工具；不能从界面读回完整密钥。 |
+
+## UC-KF-007：配置模型 API 并启用 Pi Agent
+
+### 前置条件与结果
+
+- 用户已进入治理模式并具有本地管理员权限。
+- “设置”允许填写 API URL 与 API Key，并在保存前或保存后执行一次不产生领域副作用的连接测试。
+- API Key 只能提交给服务端凭据边界，不得写入 URL、日志、浏览器本地存储、运行快照或普通配置查询响应；后续查询只返回“已配置”和脱敏提示。
+- API URL 必须经过协议、主机和重定向策略校验，防止任意内网探测；错误必须区分地址无效、鉴权失败、模型不可用和超时。
+- 有效配置启用后，新任务默认由 Pi Agent 工具执行。Pi Agent 仍受既有 Agent 契约、工具权限、工作区隔离、超时、审计和确定性 Gate 约束，不能获得发布权限或绕过评测。
+- 未配置、验证失败或凭据失效时，真实任务必须明确禁用或失败关闭；不得静默回退到演示 Provider 并伪装成功。
+
+### 计划接口
+
+| 目的 | 接口 | 最小语义 |
+|---|---|---|
+| 读取配置状态 | `GET /api/v1/provider-settings` | 返回 Provider 类型、脱敏 API URL、Key 是否已配置、验证状态和最近验证时间，不返回完整 Key。 |
+| 保存配置 | `PUT /api/v1/provider-settings` | 接收 `provider=pi-agent`、API URL 和可选的新 API Key；需要管理员鉴权、幂等与审计。 |
+| 验证连接 | `POST /api/v1/provider-settings/verify` | 使用服务端持有的待验证或已保存凭据执行无副作用探测，返回分类结果。 |
+
+该用例属于后续交付，本阶段只建立产品与安全契约，不实现页面控件或接口。
 
 ## UC-KF-001：查询已验证知识并反馈
 
@@ -349,7 +372,7 @@ sequenceDiagram
     participant Registry as SQLite Registry
     participant Graph as domain-knowledge / LangGraph
 
-    User->>Console: 打开 Agents 页面
+    User->>Console: 打开 Agent 设置页面
     Console->>API: GET /api/v1/agents
     API->>Catalog: listAgents()
     Catalog->>Registry: 读取 prompt revisions
@@ -387,12 +410,12 @@ sequenceDiagram
 
 所有写入口最终必须经过同一 Application Service、Registry 和 CAS。入口差异不得改变 `CANDIDATE → EvaluationReport → GateDecision → VERIFIED` 的权威链。
 
-## 前台交付 F1 入口映射
+## 最终前台入口映射
 
 - UC-KF-001 通过“知识”页面完成 `VERIFIED` 查询、详情、provenance 与 feedback；“添加知识”调用 ingest 时必须描述为创建候选，不得描述为人工发布或直接策展为 `VERIFIED`。
-- UC-KF-003 通过“操作中心、运行、治理”呈现。操作中心和治理页当前只从 Run 状态与最新 GateDecision 派生 Run 级事项，不承诺独立问题实体、严重级别或关闭生命周期。
-- UC-KF-006 通过“智能体”和 Run 工作台呈现，固定契约与可编辑的 `promptAddon` 必须分区，WorkflowNodeProjection 与 FlywheelRun 状态必须分开标注。
-- “发现”页面只读取 `GET /api/v1/scan` 的来源候选；它不是持久化来源注册表，也不提供刷新、漂移治理或来源删除语义。
+- UC-KF-003 通过“操作中心、飞轮批次、工作流图”呈现。操作中心当前只从批次状态与最新 GateDecision 派生批次级事项，不承诺独立问题实体、严重级别或关闭生命周期。
+- UC-KF-006 通过“Agent 设置”和批次工作台呈现，固定契约与可编辑的 `promptAddon` 必须分区，WorkflowNodeProjection 与 FlywheelRun 状态必须分开标注。
+- “来源”页面只读取 `GET /api/v1/sources/scan` 的来源候选；它不是持久化来源注册，来源刷新、漂移治理和删除语义等待后续接口。
 - 产品 UI 不得调用 `/api/v1/transition`、`/api/v1/evaluate` 或 `/api/v1/publish` 模拟自动工作流。Graph 必须使用 Registry 中的真实节点投影；未实现的 Health、Activity、ETA 和 Action Item 能力必须隐藏或明确标记为尚未接入，不能回退到演示数据。
 
 ## 当前实现边界

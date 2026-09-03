@@ -35,14 +35,14 @@
 | KF-SYS-029 | AC-SEC-004 | Implemented | `.env.example` + `package.json` + `web/app.js` | `tests/contract/site.test.ts` + `tests/integration/server.test.ts` |
 | KF-SYS-030 | AC-ARCH-003 | Implemented | `docs/REPOSITORY-MIGRATION.md` + `specs/adr/ADR-009-repository-split.md` | `tests/contract/component-layout.test.ts` |
 | KF-SYS-031 | AC-ARCH-004 | Implemented | `src/domain/services` + `src/application/apps` + `src/interfaces/ui-api` + `src/infrastructure/persistence/redis` | `tests/contract/architecture.test.ts` + `tests/unit/ddd-domain-services.test.ts` + `tests/integration/redis-runtime-state.test.ts` |
-| KF-SYS-032 | AC-API-001 | Planned | — | — |
+| KF-SYS-032 | AC-API-001 | Implemented | `src/interfaces/runner/server.ts` + `src/interfaces/dsh/index.ts` + `web/app.js` | `tests/integration/server.test.ts` + `tests/integration/dsh-adapter.test.ts` + `tests/e2e/console.spec.ts` |
 | KF-SYS-033 | AC-API-002 | Planned | — | — |
 | KF-SYS-034 | AC-API-003 | Planned | — | — |
 | KF-SYS-035 | AC-API-004 | Planned | — | — |
 | KF-SYS-036 | AC-API-005 | Planned | — | — |
 | KF-SYS-037 | AC-API-006 | Planned | — | — |
 | KF-SYS-038 | AC-API-007 | Planned | — | — |
-| KF-SYS-039 | AC-API-008 | Partial | `src/application/services/workflow-control.ts` + `src/interfaces/runner/console-read-model.ts` + `web/app.js` | `tests/integration/server.test.ts` + `tests/acceptance/automated-langgraph-flow.test.ts` |
+| KF-SYS-039 | AC-API-008 | Implemented | `src/application/services/workflow-control.ts` + `src/interfaces/runner/console-read-model.ts` + `web/app.js` | `tests/integration/server.test.ts` + `tests/acceptance/automated-langgraph-flow.test.ts` + `tests/e2e/console.spec.ts` |
 | KF-SYS-040 | AC-API-009 | Planned | — | — |
 | KF-UI-001 | AC-UI-001 | Implemented | `web/app.js` + `src/interfaces/runner/server.ts` | `tests/contract/site.test.ts` + `tests/integration/server.test.ts` |
 | KF-UI-002 | AC-UI-002 | Implemented | `web/app.js` + `src/interfaces/runner/console-read-model.ts` | `tests/contract/site.test.ts` + `tests/integration/server.test.ts` |
@@ -63,6 +63,7 @@
 | KF-UI-017 | AC-UI-017 | Implemented | `web/index.html` + `web/app.js` + `site/index.html` + `site/app.js` | `tests/contract/site.test.ts` |
 | KF-UI-018 | AC-UI-018 | Implemented | `.env.example` + `web/app.js` | `tests/contract/site.test.ts` + `tests/integration/server.test.ts` |
 | KF-UI-019 | AC-UI-019 | Implemented | `web/index.html` + `web/styles.css` + `web/app.js` | `tests/contract/site.test.ts` + `tests/e2e/console.spec.ts` |
+| KF-UI-021 | AC-UI-024 | Planned | — | — |
 | NFR-001 | AC-SEC-002 | Partial | `src/interfaces/runner/server.ts` | `tests/integration/server.test.ts` |
 | NFR-002 | AC-REC-001 | Partial | `src/application/services/index.ts` + `src/infrastructure/persistence/sqlite-cas/index.ts` | `tests/integration/sqlite-cas.test.ts` |
 | NFR-003 | AC-REC-002 | Implemented | `src/application/services/index.ts` + `src/infrastructure/persistence/sqlite-cas/index.ts` | `tests/integration/sqlite-cas.test.ts` + `tests/acceptance/publication-flow.test.ts` |
