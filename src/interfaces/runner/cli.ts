@@ -2,7 +2,6 @@
 import { readFileSync } from 'node:fs';
 import { isAbsolute, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { migrateLegacyOkf } from '../../infrastructure/migration/legacy-okf/index.ts';
 import type { ArtifactRef, RunState } from '../../domain/index.ts';
 import { createComposition, loadOhMyWorkPanelScenario } from './composition.ts';
 
@@ -85,7 +84,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   const composition = createComposition();
   try {
     if (args.command === 'init') {
-      jsonOutput({ ok: true, runtimeDir: composition.runtimeDir, ...composition.service.status() });
+      jsonOutput({ ok: true, runtimeDir: composition.runtimeDir, ...composition.apps.flywheel.status() });
       return;
     }
     if (args.command === 'ingest') {
@@ -94,7 +93,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
         ? readFileSync(isAbsolute(file) ? file : join(composition.repositoryRoot, file), 'utf8')
         : required(args, 'content');
       const source = required(args, 'source');
-      const result = await composition.service.ingestCandidate({
+      const result = await composition.apps.flywheel.ingestCandidate({
         moduleId: required(args, 'module'),
         body: content,
         title: option(args, 'title'),
@@ -116,11 +115,11 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     if (args.command === 'migrate-legacy') {
       const configured = option(args, 'root', composition.config.legacy.knowledgeDir);
       const legacyRoot = isAbsolute(configured) ? configured : join(composition.repositoryRoot, configured);
-      jsonOutput(await migrateLegacyOkf({ legacyKnowledgeRoot: legacyRoot, service: composition.service }));
+      jsonOutput(await composition.apps.knowledgeDiscovery.migrateLegacy(legacyRoot));
       return;
     }
     if (args.command === 'scan') {
-      jsonOutput(composition.scanner.scan(
+      jsonOutput(composition.apps.knowledgeDiscovery.discover(
         composition.config.acquisition.roots,
         composition.config.acquisition.maxCandidates,
       ));
@@ -128,22 +127,22 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     }
     if (args.command === 'list') {
       const statuses = option(args, 'status').split(',').map((value) => value.trim()).filter(Boolean);
-      jsonOutput({ knowledge: composition.service.listKnowledgeVersions(statuses.length ? statuses : undefined) });
+      jsonOutput({ knowledge: composition.apps.flywheel.listKnowledgeVersions(statuses.length ? statuses : undefined) });
       return;
     }
     if (args.command === 'get') {
       const explicitVersion = option(args, 'version');
       const moduleId = option(args, 'module');
-      const versionId = explicitVersion || (moduleId ? composition.repository.latestKnowledgeVersion(moduleId)?.versionId : '');
+      const versionId = explicitVersion || (moduleId ? composition.apps.knowledgeSearch.latestVersionId(moduleId) : '');
       if (!versionId) throw new Error('ARGUMENT_REQUIRED: --version or an existing --module');
-      const value = await composition.query.get(versionId);
+      const value = await composition.apps.knowledgeSearch.get(versionId);
       if (!value) throw new Error('NOT_FOUND: knowledge version');
       jsonOutput(value);
       return;
     }
     if (args.command === 'query') {
       const statuses = option(args, 'status', 'VERIFIED').split(',').map((value) => value.trim()).filter(Boolean);
-      jsonOutput(await composition.query.search({
+      jsonOutput(await composition.apps.knowledgeSearch.search({
         query: required(args, 'q'),
         top: numberOption(args, 'top', 8),
         statuses,
@@ -154,9 +153,9 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     if (args.command === 'feedback') {
       const explicitVersion = option(args, 'version');
       const moduleId = option(args, 'module');
-      const versionId = explicitVersion || (moduleId ? composition.repository.latestKnowledgeVersion(moduleId)?.versionId : '');
+      const versionId = explicitVersion || (moduleId ? composition.apps.knowledgeSearch.latestVersionId(moduleId) : '');
       if (!versionId) throw new Error('ARGUMENT_REQUIRED: --version or an existing --module');
-      composition.service.recordFeedback(
+      composition.apps.flywheel.recordFeedback(
         versionId,
         required(args, 'action'),
         args.options.has('rating') ? numberOption(args, 'rating', 0) : null,
@@ -166,18 +165,18 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
       return;
     }
     if (args.command === 'create-run') {
-      jsonOutput(composition.service.createRun(required(args, 'module'), option(args, 'policy', composition.config.publicationGate.policyId)));
+      jsonOutput(composition.apps.flywheel.createRun(required(args, 'module'), option(args, 'policy', composition.config.publicationGate.policyId)));
       return;
     }
     if (args.command === 'transition') {
-      jsonOutput(composition.service.transition(required(args, 'run'), required(args, 'state') as RunState));
+      jsonOutput(composition.apps.flywheel.transition(required(args, 'run'), required(args, 'state') as RunState));
       return;
     }
     if (args.command === 'evaluate') {
       const evidenceFile = required(args, 'evidence-file');
       const evidenceBytes = readFileSync(isAbsolute(evidenceFile) ? evidenceFile : join(composition.repositoryRoot, evidenceFile));
-      const evidenceRef = await composition.artifacts.put(evidenceBytes, option(args, 'evidence-media-type', 'application/json'));
-      const result = await composition.service.recordEvaluation({
+      const evidenceRef = await composition.apps.flywheel.putArtifact(evidenceBytes, option(args, 'evidence-media-type', 'application/json'));
+      const result = await composition.apps.evalRunner.evaluate({
         runId: required(args, 'run'),
         versionId: required(args, 'version'),
         evidenceRefs: [evidenceRef],
@@ -192,28 +191,28 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
       return;
     }
     if (args.command === 'publish') {
-      jsonOutput(await composition.service.publish(
+      jsonOutput(await composition.apps.flywheel.publish(
         required(args, 'run'), required(args, 'version'), required(args, 'decision'),
       ));
       return;
     }
     if (args.command === 'status') {
-      jsonOutput({ ...composition.service.status(), runtimeDir: composition.runtimeDir });
+      jsonOutput({ ...composition.apps.flywheel.status(), runtimeDir: composition.runtimeDir });
       return;
     }
     if (args.command === 'agents') {
-      jsonOutput({ agents: composition.agents.list() });
+      jsonOutput({ agents: composition.apps.orchestrator.listAgents() });
       return;
     }
     if (args.command === 'set-agent-prompt') {
-      jsonOutput(composition.agents.updatePromptAddon(
+      jsonOutput(composition.apps.orchestrator.updatePromptAddon(
         required(args, 'agent') as never,
         option(args, 'prompt'),
       ));
       return;
     }
     if (args.command === 'workflow-run') {
-      const workflow = await composition.automatedWorkflow();
+      const workflow = composition.apps.orchestrator;
       const handle = await workflow.start(
         loadOhMyWorkPanelScenario(required(args, 'repository')),
         {
@@ -229,23 +228,18 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
       return;
     }
     if (args.command === 'workflow-resume') {
-      const workflow = await composition.automatedWorkflow();
+      const workflow = composition.apps.orchestrator;
       const handle = await workflow.resume(required(args, 'run'));
       jsonOutput({ event: 'resumed', ...handle });
       jsonOutput(await workflow.wait(handle.runId));
       return;
     }
     if (args.command === 'workflow-status') {
-      jsonOutput(await (await composition.automatedWorkflow()).status(required(args, 'run')));
+      jsonOutput(await composition.apps.orchestrator.status(required(args, 'run')));
       return;
     }
     if (args.command === 'workflow-report') {
-      const { buildDemoReport } = await import('./demo-report.ts');
-      const report = await buildDemoReport({
-        runId: required(args, 'run'), runtimeDir: composition.runtimeDir,
-        repository: composition.repository, service: composition.service,
-        artifacts: composition.artifacts,
-      });
+      const report = await composition.apps.orchestrator.buildDemoReport(required(args, 'run'));
       const outputPath = option(args, 'output');
       if (!outputPath) {
         jsonOutput(report);
@@ -261,7 +255,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     }
     if (args.command === 'workflow-cancel') {
       const runId = required(args, 'run');
-      await (await composition.automatedWorkflow()).cancel(runId);
+      await composition.apps.orchestrator.cancel(runId);
       jsonOutput({ runId, executionStatus: 'CANCELLED' });
       return;
     }

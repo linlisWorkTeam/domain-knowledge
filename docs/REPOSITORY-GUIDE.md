@@ -20,10 +20,10 @@ domain-knowledge/
 
 `src/` 使用四层结构：
 
-- `domain/` 保存实体、状态与确定性业务规则，不依赖数据库或工作流 SDK；
-- `application/` 保存 Port 和用例服务，只依赖领域与 Port；
-- `infrastructure/` 实现 LangGraph、Agent、评测、CAS、SQLite 与来源扫描；
-- `interfaces/` 提供 CLI、HTTP 和 DSH 接口。
+- `domain/` 保存实体、状态与 Flywheel、EvalRunner、Association 领域服务，不依赖数据库或工作流 SDK；
+- `application/apps/` 保存 Orchestrator、Flywheel、EvalRunner、KnowledgeSearch、KnowledgeDiscovery 五个用例入口；`application/ports/` 和 `application/services/` 保存契约与内部协调服务；
+- `infrastructure/` 实现 LangGraph、Agent、评测、CAS、SQLite、Redis 运行状态 Adapter 与来源扫描；
+- `interfaces/ui-api/` 是 UI/HTTP 正式入口，`interfaces/runner/` 和 `interfaces/dsh/` 提供 CLI、兼容入口与 DSH 接口。
 
 旧的 `endlessWpKnowledgeRunner/` 包装目录已经取消。不要恢复根级 `apps/`、`packages/`，也不要把旧 `src/graph` 框架作为第二套实现搬回来；需要追溯时查看迁移前提交 `68b0fde`。
 
@@ -37,11 +37,14 @@ domain-knowledge 的 SQLite Registry 与 CAS 仍是一次运行中的业务事�
 
 | 新内容 | 放置位置 |
 | --- | --- |
-| 领域实体、Gate 或状态规则 | `src/domain/` |
-| 用例编排或 Port | `src/application/services/`、`src/application/ports/` |
+| 领域实体、Domain Service、Gate 或状态规则 | `src/domain/`、`src/domain/services/` |
+| 对外用例入口 | `src/application/apps/` |
+| 用例协调或 Port | `src/application/services/`、`src/application/ports/` |
 | Agent、评测器、持久化或来源扫描 | `src/infrastructure/` |
 | LangGraph 图和 Checkpoint | `src/infrastructure/workflow/langgraph/` |
-| CLI、HTTP 或 DSH 接口 | `src/interfaces/` |
+| Agent Context、Running State 的 Redis Adapter | `src/infrastructure/persistence/redis/` |
+| UI/HTTP API | `src/interfaces/ui-api/` |
+| CLI、兼容 Runner 或 DSH 接口 | `src/interfaces/runner/`、`src/interfaces/dsh/` |
 | 产品或架构契约 | `specs/` |
 | 测试 | `tests/` 对应层级 |
 | 使用和维护说明 | `docs/` |

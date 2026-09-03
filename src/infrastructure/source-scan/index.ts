@@ -3,19 +3,17 @@ import {
 } from 'node:fs';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { artifactIdFor, sha256 } from '../../domain/index.ts';
-import type { FlywheelRepository } from '../../application/ports/index.ts';
+import type {
+  FlywheelRepository, KnowledgeDiscoveryCandidate, KnowledgeDiscoveryPort,
+} from '../../application/ports/index.ts';
 
 const ignoredDirectories = new Set(['.git', '.dsh', '.workpanel', '__pycache__', 'node_modules', 'dist', 'build', 'runtime', 'history']);
 const ignoredFiles = new Set(['README.md', 'index.md', 'log.md']);
 
-export interface SourceCandidate {
-  path: string;
-  sha256: string;
-  size: number;
-  modifiedAt: string;
-}
+/** @deprecated Use KnowledgeDiscoveryCandidate from the application port. */
+export type SourceCandidate = KnowledgeDiscoveryCandidate;
 
-export class SourceScanner {
+export class SourceScanner implements KnowledgeDiscoveryPort {
   readonly repositoryRoot: string;
   readonly repository: FlywheelRepository;
 

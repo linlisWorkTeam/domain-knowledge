@@ -29,6 +29,7 @@
 | AC-ARCH-001 | Given 替代假 Provider/Store/Workflow Adapter，When 跑契约套件，Then Domain/Application 不变且测试通过。 |
 | AC-ARCH-002 | Given 内嵌 domain-knowledge LangGraph runtime，When 扫描依赖并执行图，Then SDK 只存在于 infrastructure，且 Run、知识、评测和发布事实只写 Knowledge Registry。 |
 | AC-ARCH-003 | Given 两个仓库的默认分支，When 检查目录和入口，Then domain-knowledge 拥有唯一运行时、Spec、测试与前台，wpKnowledge 只含知识内容和仓库说明。 |
+| AC-ARCH-004 | Given uiApi、五个 Application App 和三个 Domain Service，When 扫描依赖与组合根，Then UI 只调用 App、App 只依赖 Domain/Port、Domain 不导入 SDK/数据库，七个 Agent 节点保持完整，Redis 边界不成为第二业务事实源。 |
 | AC-OBS-002 | Given 一个自动 Run，When LangGraph 节点开始、完成或失败，Then Console 可按 runId 读取节点、角色、轮次、尝试和时间投影，且不读取 graph checkpoint。 |
 | AC-OBS-003 | Given 一个成功或失败的自动 Run，When 执行 `workflow-report --run`，Then 报告按 runId 导出 Registry 事实、脱敏 Agent 摘要并逐一校验引用的 CAS Artifact，且注入审计文件的 Prompt/凭据字段不会出现在报告中。 |
 | AC-AGENT-003 | Given 七个固定 Agent，When 查看和修改配置，Then 全部契约可查，只有受信操作者能改 `promptAddon`，任何职责、Schema、拓扑、输入输出或工具字段均拒绝。 |

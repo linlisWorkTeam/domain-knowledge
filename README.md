@@ -21,6 +21,8 @@ SQLite Registry 与 CAS 是运行时事实源，默认写到本仓库 `.workpane
 ## 已实现
 
 - 七类 Agent 通过 LangGraph 执行，支持并行、循环、取消和 Checkpoint 恢复；
+- uiApi 统一进入 Orchestrator、Flywheel、EvalRunner、KnowledgeSearch、KnowledgeDiscovery Application App；
+- Flywheel、EvalRunner、Association Domain Service 与 Agent/工作流/持久化 Adapter 保持单向依赖；
 - 候选知识绑定来源，工件使用 SHA-256 内容寻址；
 - 质量 Gate 与行为发布 Gate 分开，只有完整证据和 `PASS` 能产生 `VERIFIED`；
 - DeepSeek Harness 官方 SDK、角色工作区和 Linux Bubblewrap 隔离；
@@ -58,9 +60,10 @@ npm run knowledge -- workflow-run --repository /path/to/ohMyWorkPanel
 domain-knowledge/
 ├── src/
 │   ├── domain/               # 领域模型与确定性规则
-│   ├── application/          # Port 与应用服务
-│   ├── infrastructure/       # LangGraph、Agent、持久化和评测
-│   └── interfaces/           # CLI、HTTP 与 DSH 接口
+│   │   └── services/         # Flywheel、EvalRunner、Association
+│   ├── application/          # Apps、Port 与用例协调服务
+│   ├── infrastructure/       # LangGraph、Agent、DB/Redis Adapter 和评测
+│   └── interfaces/           # uiApi、CLI、Runner 与 DSH 接口
 ├── acceptance/               # 固定项目验收夹具
 ├── docs/                     # 上手、架构、开发和运维说明
 ├── specs/                    # 规范性事实源、ADR 与 Schema

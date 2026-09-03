@@ -6,8 +6,6 @@ import { timingSafeEqual } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
 import { createComposition, loadOhMyWorkPanelScenario } from './composition.ts';
-import { ConsoleReadModel } from './console-read-model.ts';
-import { buildDemoReport } from './demo-report.ts';
 
 export interface ServerBinding {
   host: string;
@@ -98,7 +96,6 @@ export function createKnowledgeServer(input: {
   writeToken?: string;
 } = {}) {
   const composition = createComposition(input);
-  const consoleReadModel = new ConsoleReadModel(composition.repository.database);
   const writeToken = input.writeToken ?? process.env.WP_KNOWLEDGE_WRITE_TOKEN;
   const server = createHttpServer(async (request, response) => {
     const url = new URL(request.url ?? '/', 'http://127.0.0.1');
@@ -122,7 +119,7 @@ export function createKnowledgeServer(input: {
         return;
       }
       if (request.method === 'GET' && url.pathname === '/api/v1/status') {
-        send(response, 200, composition.service.status());
+        send(response, 200, composition.apps.flywheel.status());
         return;
       }
       if (request.method === 'GET' && url.pathname === '/api/v1/capabilities') {
@@ -151,7 +148,7 @@ export function createKnowledgeServer(input: {
       }
       if (request.method === 'GET' && url.pathname === '/api/v1/runs') {
         const states = (url.searchParams.get('state') ?? '').split(',').filter(Boolean);
-        send(response, 200, { runs: consoleReadModel.listRunSummaries(states.length ? states : undefined) });
+        send(response, 200, { runs: composition.apps.flywheel.listRunSummaries(states.length ? states : undefined) });
         return;
       }
       if (request.method === 'GET' && url.pathname.startsWith('/api/v1/runs/')) {
@@ -163,10 +160,7 @@ export function createKnowledgeServer(input: {
           return;
         }
         const runId = decodeURIComponent(encodedRunId ?? '');
-        const snapshot = consoleReadModel.getRunSnapshot(
-          runId,
-          composition.service.listKnowledgeVersions(),
-        );
+        const snapshot = composition.apps.flywheel.getRunSnapshot(runId);
         if (!snapshot) {
           send(response, 404, { error: 'NOT_FOUND' });
           return;
@@ -187,15 +181,12 @@ export function createKnowledgeServer(input: {
           return;
         }
         if (child === 'workflow-status') {
-          send(response, 200, await (await composition.automatedWorkflow()).status(runId));
+          send(response, 200, await composition.apps.orchestrator.status(runId));
           return;
         }
         if (child === 'demo-report') {
           response.setHeader('content-disposition', 'attachment; filename="wpknowledge-run-demo.json"');
-          send(response, 200, await buildDemoReport({
-            runId, runtimeDir: composition.runtimeDir, repository: composition.repository,
-            service: composition.service, artifacts: composition.artifacts,
-          }));
+          send(response, 200, await composition.apps.orchestrator.buildDemoReport(runId));
           return;
         }
         if (child) {
@@ -207,16 +198,16 @@ export function createKnowledgeServer(input: {
       }
       if (request.method === 'GET' && url.pathname === '/api/v1/knowledge') {
         const statuses = (url.searchParams.get('status') ?? '').split(',').filter(Boolean);
-        send(response, 200, { knowledge: composition.service.listKnowledgeVersions(statuses.length ? statuses : undefined) });
+        send(response, 200, { knowledge: composition.apps.flywheel.listKnowledgeVersions(statuses.length ? statuses : undefined) });
         return;
       }
       if (request.method === 'GET' && url.pathname === '/api/v1/agents') {
-        send(response, 200, { agents: composition.agents.list() });
+        send(response, 200, { agents: composition.apps.orchestrator.listAgents() });
         return;
       }
       if (request.method === 'GET' && url.pathname.startsWith('/api/v1/knowledge/')) {
         const versionId = decodeURIComponent(url.pathname.slice('/api/v1/knowledge/'.length));
-        const value = await composition.query.get(versionId);
+        const value = await composition.apps.knowledgeSearch.get(versionId);
         send(response, value ? 200 : 404, value ?? { error: 'NOT_FOUND' });
         return;
       }
@@ -227,7 +218,7 @@ export function createKnowledgeServer(input: {
           : requestedStatuses
             ? requestedStatuses.split(',').filter(Boolean)
             : ['CANDIDATE', 'VERIFIED', 'LOW_CONFIDENCE', 'SUPERSEDED'];
-        send(response, 200, await composition.query.search({
+        send(response, 200, await composition.apps.knowledgeSearch.search({
           query: url.searchParams.get('q') ?? '',
           top: Number(url.searchParams.get('top') ?? 8),
           statuses,
@@ -236,7 +227,7 @@ export function createKnowledgeServer(input: {
         return;
       }
       if (request.method === 'GET' && url.pathname === '/api/v1/scan') {
-        send(response, 200, composition.scanner.scan(
+        send(response, 200, composition.apps.knowledgeDiscovery.discover(
           composition.config.acquisition.roots,
           composition.config.acquisition.maxCandidates,
         ));
@@ -263,7 +254,7 @@ export function createKnowledgeServer(input: {
           if (typeof payload.promptAddon !== 'string') {
             throw new Error('AGENT_CUSTOMIZATION_DENIED: promptAddon must be a string');
           }
-          send(response, 200, composition.agents.updatePromptAddon(
+          send(response, 200, composition.apps.orchestrator.updatePromptAddon(
             agentId as never,
             payload.promptAddon,
           ));
@@ -275,8 +266,7 @@ export function createKnowledgeServer(input: {
           if (profile !== 'ohmyworkpanel') throw new Error(`WORKFLOW_PROFILE_UNSUPPORTED: ${profile}`);
           const repositoryRoot = String(payload.repositoryRoot ?? '').trim();
           if (!repositoryRoot) throw new Error('ARGUMENT_REQUIRED: repositoryRoot');
-          const workflow = await composition.automatedWorkflow();
-          send(response, 202, await workflow.start(
+          send(response, 202, await composition.apps.orchestrator.start(
             loadOhMyWorkPanelScenario(repositoryRoot),
             {
               policyId: String(payload.policyId ?? composition.config.publicationGate.policyId),
@@ -293,17 +283,17 @@ export function createKnowledgeServer(input: {
           return;
         }
         if (url.pathname === '/api/v1/run-commands/resume') {
-          send(response, 202, await (await composition.automatedWorkflow()).resume(String(payload.runId ?? '')));
+          send(response, 202, await composition.apps.orchestrator.resume(String(payload.runId ?? '')));
           return;
         }
         if (url.pathname === '/api/v1/run-commands/cancel') {
           const runId = String(payload.runId ?? '');
-          await (await composition.automatedWorkflow()).cancel(runId);
+          await composition.apps.orchestrator.cancel(runId);
           send(response, 200, { runId, executionStatus: 'CANCELLED' });
           return;
         }
         if (url.pathname === '/api/v1/ingest') {
-          send(response, 201, await composition.service.ingestCandidate({
+          send(response, 201, await composition.apps.flywheel.ingestCandidate({
             moduleId: String(payload.moduleId ?? ''),
             body: String(payload.body ?? ''),
             title: String(payload.title ?? ''),
@@ -316,7 +306,7 @@ export function createKnowledgeServer(input: {
           return;
         }
         if (url.pathname === '/api/v1/feedback') {
-          composition.service.recordFeedback(
+          composition.apps.flywheel.recordFeedback(
             String(payload.versionId ?? ''), String(payload.action ?? ''),
             payload.rating === null || payload.rating === undefined ? null : Number(payload.rating),
             String(payload.note ?? ''),
@@ -325,15 +315,15 @@ export function createKnowledgeServer(input: {
           return;
         }
         if (url.pathname === '/api/v1/runs') {
-          send(response, 201, composition.service.createRun(String(payload.moduleId ?? ''), String(payload.policyId ?? composition.config.publicationGate.policyId)));
+          send(response, 201, composition.apps.flywheel.createRun(String(payload.moduleId ?? ''), String(payload.policyId ?? composition.config.publicationGate.policyId)));
           return;
         }
         if (url.pathname === '/api/v1/transition') {
-          send(response, 200, composition.service.transition(String(payload.runId ?? ''), String(payload.state ?? '') as never));
+          send(response, 200, composition.apps.flywheel.transition(String(payload.runId ?? ''), String(payload.state ?? '') as never));
           return;
         }
         if (url.pathname === '/api/v1/evaluate') {
-          send(response, 201, await composition.service.recordEvaluation({
+          send(response, 201, await composition.apps.evalRunner.evaluate({
             runId: String(payload.runId ?? ''),
             versionId: String(payload.versionId ?? ''),
             evidenceRefs: Array.isArray(payload.evidenceRefs) ? payload.evidenceRefs as never[] : [],
@@ -347,7 +337,7 @@ export function createKnowledgeServer(input: {
           return;
         }
         if (url.pathname === '/api/v1/publish') {
-          send(response, 201, await composition.service.publish(
+          send(response, 201, await composition.apps.flywheel.publish(
             String(payload.runId ?? ''), String(payload.versionId ?? ''), String(payload.decisionId ?? ''),
           ));
           return;

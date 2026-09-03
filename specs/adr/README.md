@@ -11,3 +11,4 @@
 - [ADR-007：按领域驱动设计收敛源码目录](ADR-007-ddd-layered-source-layout.md)
 - [ADR-008：回滚能力显式降级](ADR-008-reserve-rollback-state.md)
 - [ADR-009：运行仓库与知识仓库分离](ADR-009-repository-split.md)
+- [ADR-010：Application App 与 Domain Service 边界](ADR-010-application-domain-service-boundaries.md)

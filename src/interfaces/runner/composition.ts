@@ -3,8 +3,10 @@ import { readFileSync } from 'node:fs';
 import { delimiter, dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  AgentCatalogService, AutomatedProjectWorkflowService, DeterministicQualityPolicy,
-  KnowledgeFlywheelService, KnowledgeQueryService, OhMyWorkPanelWorkflowExecutor,
+  EvalRunnerApp, FlywheelApp, KnowledgeDiscoveryApp, KnowledgeSearchApp, Orchestrator,
+} from '../../application/apps/index.ts';
+import {
+  AgentCatalogService, AutomatedProjectWorkflowService, DeterministicQualityPolicy, OhMyWorkPanelWorkflowExecutor,
   RegistryWorkflowObserver,
 } from '../../application/services/index.ts';
 import type { AutomatedProjectScenario } from '../../application/services/index.ts';
@@ -19,6 +21,9 @@ import {
 } from '../../infrastructure/persistence/sqlite-cas/index.ts';
 import { SourceScanner } from '../../infrastructure/source-scan/index.ts';
 import { LocalAgentWorkspace } from '../../infrastructure/agents/workspace/index.ts';
+import { migrateLegacyOkf } from '../../infrastructure/migration/legacy-okf/index.ts';
+import { ConsoleReadModel } from './console-read-model.ts';
+import { buildDemoReport } from './demo-report.ts';
 
 export interface WorkpanelConfig {
   schemaVersion: '1.0';
@@ -85,14 +90,23 @@ export function createComposition(input: {
   const runtimeDir = isAbsolute(configuredRuntime) ? configuredRuntime : join(componentRoot, configuredRuntime);
   const artifacts = new LocalCasArtifactStore(join(runtimeDir, 'cas'));
   const repository = new SQLiteFlywheelRepository(join(runtimeDir, 'registry.sqlite'));
-  const service = new KnowledgeFlywheelService({
+  const runProjections = new ConsoleReadModel(repository.database);
+  const flywheelApp = new FlywheelApp({
     artifacts,
     repository,
     qualityPolicy: new DeterministicQualityPolicy(config.qualityGate.threshold),
+    runProjections,
     clock: input.clock,
   });
-  const query = new KnowledgeQueryService(artifacts, repository);
+  const evalRunnerApp = new EvalRunnerApp(flywheelApp);
+  const knowledgeSearchApp = new KnowledgeSearchApp(artifacts, repository);
   const scanner = new SourceScanner(repositoryRoot, repository);
+  const knowledgeDiscoveryApp = new KnowledgeDiscoveryApp(scanner, undefined, {
+    migrate: (legacyKnowledgeRoot) => migrateLegacyOkf({
+      legacyKnowledgeRoot,
+      service: flywheelApp,
+    }),
+  });
   const agents = new AgentCatalogService({
     definitions: DOMAIN_KNOWLEDGE_AGENT_DEFINITIONS,
     repository,
@@ -103,9 +117,9 @@ export function createComposition(input: {
   if (!['fixture', 'deepseek-harness', 'deepseek-harness-headless'].includes(agentProviderMode)) {
     throw new Error('CONFIG_INVALID: WP_FLYWHEEL_AGENT_PROVIDER must be fixture, deepseek-harness, or deepseek-harness-headless');
   }
-  let automatedWorkflowPromise: Promise<AutomatedProjectWorkflowService> | null = null;
-  const automatedWorkflow = () => {
-    automatedWorkflowPromise ??= (async () => {
+  let workflowPromise: Promise<AutomatedProjectWorkflowService> | null = null;
+  const workflow = () => {
+    workflowPromise ??= (async () => {
       const auditDirectory = join(runtimeDir, 'demo');
       const auditPath = join(auditDirectory, 'agent-runs.jsonl');
       const allowedRoots = (process.env.WP_DSH_ALLOWED_ROOTS?.split(delimiter) ?? [repositoryRoot])
@@ -156,7 +170,8 @@ export function createComposition(input: {
           })
           : undefined;
       const executor = new OhMyWorkPanelWorkflowExecutor({
-        service,
+        flywheel: flywheelApp,
+        evalRunner: evalRunnerApp,
         evaluator: new TrustedProjectEvaluator(artifacts),
         assetRoot: join(componentRoot, 'acceptance', 'ohmyworkpanel'),
         ...(agent ? { agent } : {}),
@@ -172,23 +187,40 @@ export function createComposition(input: {
         checkpoint: { kind: 'sqlite', filename: join(runtimeDir, 'workflow', 'checkpoints.sqlite') },
         clock: input.clock,
       });
-      return new AutomatedProjectWorkflowService(service, infrastructure.engine);
+      return new AutomatedProjectWorkflowService(flywheelApp, infrastructure.engine);
     })();
-    return automatedWorkflowPromise;
+    return workflowPromise;
   };
+  const orchestrator = new Orchestrator({
+    workflow,
+    agents,
+    reports: {
+      build: (runId) => buildDemoReport({
+        runId, runtimeDir, repository, service: flywheelApp, artifacts,
+      }),
+    },
+  });
   return {
     repositoryRoot,
     runtimeDir,
     config,
     artifacts,
     repository,
-    service,
-    query,
+    apps: {
+      flywheel: flywheelApp,
+      evalRunner: evalRunnerApp,
+      knowledgeSearch: knowledgeSearchApp,
+      knowledgeDiscovery: knowledgeDiscoveryApp,
+      orchestrator,
+    },
+    // Compatibility surface for existing CLI and integrations. New entrypoints use apps.
+    service: flywheelApp,
+    query: knowledgeSearchApp,
     scanner,
     agents,
     workflowObserver,
     agentProviderMode,
-    automatedWorkflow,
+    automatedWorkflow: workflow,
     close: () => repository.close(),
   };
 }

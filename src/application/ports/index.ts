@@ -1,5 +1,5 @@
 import type {
-  ArtifactRef, DomainEvent, EvaluationReport, FlywheelRun, GateDecision,
+  ArtifactRef, DomainEvent, EvaluationReport, FlywheelRun, GateDecision, GatePolicy,
   KnowledgeVersion, ProvenanceRef,
 } from '../../domain/index.ts';
 
@@ -92,6 +92,89 @@ export interface QualityPolicy {
     description: string;
     provenance: ProvenanceRef[];
   }): QualityReport;
+}
+
+/** Read-only projection consumed by Application use cases, implemented by an adapter. */
+export interface RunProjectionReader {
+  listRunSummaries(states?: string[]): Record<string, unknown>[];
+  getRunSnapshot(runId: string, versions: KnowledgeVersion[]): Record<string, unknown> | null;
+}
+
+export interface DemoReportBuilder {
+  build(runId: string): Promise<Record<string, unknown>>;
+}
+
+export interface EvaluationSubmission {
+  runId: string;
+  versionId: string;
+  inputRefs?: ArtifactRef[];
+  evidenceRefs: ArtifactRef[];
+  toolchainFingerprint: string;
+  criticalFailures: number;
+  testsPassed: number;
+  testsTotal: number;
+  stability: number;
+  infrastructureFailure?: boolean;
+  checkBlocking?: boolean;
+  reviewBlocking?: boolean;
+}
+
+export interface EvalRunnerUseCase {
+  evaluate(input: EvaluationSubmission, policy: GatePolicy): Promise<{
+    report: EvaluationReport;
+    decision: GateDecision;
+  }>;
+}
+
+export interface KnowledgeDiscoveryCandidate {
+  path: string;
+  sha256: string;
+  size: number;
+  modifiedAt: string;
+}
+
+export interface KnowledgeDiscoveryPort {
+  scan(configuredRoots: string[], maximum?: number): {
+    candidates: KnowledgeDiscoveryCandidate[];
+    total: number;
+    truncated: boolean;
+  };
+}
+
+export interface LegacyKnowledgeMigrationPort {
+  migrate(legacyKnowledgeRoot: string): Promise<{
+    imported: number;
+    replayed: number;
+    rejected: number;
+    errors: { file: string; error: string }[];
+  }>;
+}
+
+export interface AgentContextSnapshot {
+  iteration: number;
+  attempt: number;
+  inputRefs: ArtifactRef[];
+  outputRefs: ArtifactRef[];
+  route: 'PASS' | 'ITERATE' | 'STOPPED' | 'FAILED' | null;
+}
+
+export interface AgentContextStore {
+  get(runId: string, nodeId: string): Promise<AgentContextSnapshot | null>;
+  set(runId: string, nodeId: string, context: AgentContextSnapshot, ttlMs: number): Promise<void>;
+  delete(runId: string, nodeId: string): Promise<void>;
+}
+
+export interface RunningStateLease {
+  runId: string;
+  ownerId: string;
+  leaseId: string;
+  expiresAt: string;
+}
+
+export interface RunningStateStore {
+  acquire(runId: string, ownerId: string, ttlMs: number): Promise<RunningStateLease | null>;
+  get(runId: string): Promise<RunningStateLease | null>;
+  release(runId: string, ownerId: string, leaseId: string): Promise<boolean>;
 }
 
 export interface AgentRequest {

@@ -1,14 +1,17 @@
 import { randomUUID } from 'node:crypto';
 import {
-  assertArtifactRef, assertInvariant, createEvent, createRun, decideGate,
-  sha256, transitionRun,
+  assertArtifactRef, assertInvariant, createEvent, sha256,
 } from '../../domain/index.ts';
 import type {
   ArtifactRef, EvaluationReport, FlywheelRun, GateDecision, GatePolicy,
   KnowledgeVersion, ProvenanceRef, RunState,
 } from '../../domain/index.ts';
+import {
+  EvalRunnerDomainService, FlywheelDomainService,
+} from '../../domain/services/index.ts';
 import type {
-  ArtifactStore, FlywheelRepository, NodeCheckpoint, QualityPolicy,
+  ArtifactStore, EvaluationSubmission, FlywheelRepository, NodeCheckpoint, QualityPolicy,
+  RunProjectionReader,
 } from '../ports/index.ts';
 
 export interface CandidateRequest {
@@ -22,43 +25,39 @@ export interface CandidateRequest {
   metadata?: Record<string, unknown>;
 }
 
-export interface EvaluationInput {
-  runId: string;
-  versionId: string;
-  inputRefs?: ArtifactRef[];
-  evidenceRefs: ArtifactRef[];
-  toolchainFingerprint: string;
-  criticalFailures: number;
-  testsPassed: number;
-  testsTotal: number;
-  stability: number;
-  infrastructureFailure?: boolean;
-  checkBlocking?: boolean;
-  reviewBlocking?: boolean;
-}
+export type EvaluationInput = EvaluationSubmission;
 
 export class KnowledgeFlywheelService {
   readonly artifacts: ArtifactStore;
   readonly repository: FlywheelRepository;
   readonly qualityPolicy: QualityPolicy;
+  readonly flywheelDomain: FlywheelDomainService;
+  readonly evalRunnerDomain: EvalRunnerDomainService;
+  readonly runProjections?: RunProjectionReader;
   readonly clock: () => string;
 
   constructor(input: {
     artifacts: ArtifactStore;
     repository: FlywheelRepository;
     qualityPolicy: QualityPolicy;
+    flywheelDomain?: FlywheelDomainService;
+    evalRunnerDomain?: EvalRunnerDomainService;
+    runProjections?: RunProjectionReader;
     clock?: () => string;
   }) {
     this.artifacts = input.artifacts;
     this.repository = input.repository;
     this.qualityPolicy = input.qualityPolicy;
+    this.flywheelDomain = input.flywheelDomain ?? new FlywheelDomainService();
+    this.evalRunnerDomain = input.evalRunnerDomain ?? new EvalRunnerDomainService();
+    this.runProjections = input.runProjections;
     this.clock = input.clock ?? (() => new Date().toISOString());
     this.repository.initialize();
   }
 
   createRun(moduleId: string, policyId: string): FlywheelRun {
     const now = this.clock();
-    const run = createRun(moduleId, policyId, now);
+    const run = this.flywheelDomain.createRun(moduleId, policyId, now);
     this.repository.saveRun(run, createEvent(run.runId, 'RunCreated', { moduleId, policyId }, now));
     return run;
   }
@@ -66,7 +65,7 @@ export class KnowledgeFlywheelService {
   transition(runId: string, next: RunState): FlywheelRun {
     const current = this.requireRun(runId);
     const now = this.clock();
-    const updated = transitionRun(current, next, now);
+    const updated = this.flywheelDomain.transition(current, next, now);
     this.repository.updateRun(updated, createEvent(runId, 'RunStateChanged', {
       from: current.state, to: next, iteration: updated.iteration,
     }, now));
@@ -181,8 +180,8 @@ export class KnowledgeFlywheelService {
       reviewBlocking: input.reviewBlocking ?? false,
       createdAt: now,
     };
-    const decision = decideGate(run, report, policy, now);
-    const reviewing = transitionRun(run, 'REVIEWING', now);
+    const decision = this.evalRunnerDomain.decide(run, report, policy, now);
+    const reviewing = this.flywheelDomain.transition(run, 'REVIEWING', now);
     this.repository.saveEvaluationAndDecision(report, decision, reviewing, createEvent(run.runId, 'GateDecided', {
       reportId: report.reportId, decisionId: decision.decisionId,
       versionId: version.versionId, outcome: decision.outcome,
@@ -214,8 +213,10 @@ export class KnowledgeFlywheelService {
     const existing = this.repository.getPublication(publicationKey);
     if (existing) return { ...existing, replayed: true };
     const now = this.clock();
-    const publishing = run.state === 'PUBLISHING' ? run : transitionRun(run, 'PUBLISHING', now);
-    const verified = transitionRun(publishing, 'VERIFIED', now);
+    const publishing = run.state === 'PUBLISHING'
+      ? run
+      : this.flywheelDomain.transition(run, 'PUBLISHING', now);
+    const verified = this.flywheelDomain.transition(publishing, 'VERIFIED', now);
     return this.repository.publish(publicationKey, verified, version, decision, createEvent(runId, 'KnowledgePublished', {
       publicationKey, versionId, decisionId,
     }, now));
@@ -276,8 +277,38 @@ export class KnowledgeFlywheelService {
     return this.repository.getKnowledgeVersion(versionId);
   }
 
+  getRun(runId: string): FlywheelRun | null {
+    return this.repository.getRun(runId);
+  }
+
+  findKnowledgeVersionByBody(moduleId: string, artifactId: string): KnowledgeVersion | null {
+    return this.repository.findKnowledgeVersionByBody(moduleId, artifactId);
+  }
+
+  evaluateQuality(body: string, input: Parameters<QualityPolicy['evaluate']>[1]): ReturnType<QualityPolicy['evaluate']> {
+    return this.qualityPolicy.evaluate(body, input);
+  }
+
+  putArtifact(bytes: Uint8Array, mediaType: string): Promise<ArtifactRef> {
+    return this.artifacts.put(bytes, mediaType);
+  }
+
+  getArtifact(ref: ArtifactRef): Promise<Uint8Array> {
+    return this.artifacts.get(ref);
+  }
+
   listKnowledgeVersions(statuses?: string[]): KnowledgeVersion[] {
     return this.repository.listKnowledgeVersions(statuses);
+  }
+
+  listRunSummaries(states?: string[]): Record<string, unknown>[] {
+    assertInvariant(this.runProjections !== undefined, 'run projection reader is not configured');
+    return this.runProjections.listRunSummaries(states);
+  }
+
+  getRunSnapshot(runId: string): Record<string, unknown> | null {
+    assertInvariant(this.runProjections !== undefined, 'run projection reader is not configured');
+    return this.runProjections.getRunSnapshot(runId, this.listKnowledgeVersions());
   }
 
   recordFeedback(versionId: string, action: string, rating: number | null, note = ''): void {

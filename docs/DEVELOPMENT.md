@@ -15,10 +15,12 @@ npm test
 ## 依赖方向
 
 ```text
-CLI / HTTP / DSH / Web projection
+uiApi / CLI / DSH / Web projection
                  │
                  ▼
-           Application services
+            Application Apps
+  Orchestrator / Flywheel / EvalRunner
+       Search / Discovery
                  │
         ┌────────┴────────┐
         ▼                 ▼
@@ -28,11 +30,13 @@ CLI / HTTP / DSH / Web projection
                     (LangGraph / checkpoints)
 ```
 
-- `src/domain`：领域实体、状态和纯规则；不能导入 Adapter、数据库或工作流 SDK。
-- `src/application/services`：用例编排和 Port；不能直接依赖具体 SQLite、HTTP、模型或编译器。
+- `src/domain`：领域实体、状态和 Flywheel/EvalRunner/Association 纯领域服务；不能导入 Adapter、数据库或工作流 SDK。
+- `src/application/apps`：Orchestrator、Flywheel、EvalRunner、KnowledgeSearch、KnowledgeDiscovery 五个用例入口。
+- `src/application/services`：App 使用的用例协调服务；只能依赖 Domain 和 Port，不能直接依赖具体 SQLite、HTTP、模型或编译器。
 - `src/infrastructure`：实现知识登记簿、内容寻址存储、智能体、外部适配和项目评测等技术边界。
 - `src/infrastructure/workflow/langgraph`：相对独立的 LangGraph 图、运行时和固定 Agent 定义；不能拥有 KnowledgeVersion、评测或发布事务。
-- `src/interfaces/runner`：组合根、CLI、HTTP Server 和 Console read model。
+- `src/interfaces/ui-api`：UI/HTTP 的正式入站入口，只调用 Application App。
+- `src/interfaces/runner`：组合根、CLI、兼容 HTTP Server 和 Console read model。
 - `web`：浏览器界面；不能复制状态机或发布判断。
 
 架构契约由自动化测试保护，详细语义见[架构说明](ARCHITECTURE.md)。
@@ -82,6 +86,8 @@ CLI / HTTP / DSH / Web projection
 | `WP_KNOWLEDGE_HOST` | 覆盖 HTTP 监听地址 |
 | `WP_KNOWLEDGE_PORT` | 覆盖 HTTP 端口 |
 | `WP_KNOWLEDGE_WRITE_TOKEN` | 启用受保护写 API |
+
+Redis Adapter 位于 `src/infrastructure/persistence/redis`，对应 `AgentContextStore` 和 `RunningStateStore`。Agent Context 只保存轮次、attempt、ArtifactRef 和路由等可重建状态，单条上限 64 KiB；运行租约使用 ownerId + leaseId 做 fencing。当前本地组合根仍使用 SQLite Checkpoint 和进程内运行表；在 Redis 的地址、认证、TTL、故障语义确定前，不要把它设为业务事实源或绕过 Registry。
 
 为每个实验使用独立 `WP_FLYWHEEL_HOME`，可以避免开发数据互相污染。配置默认值见 [`../runner.config.json`](../runner.config.json)。需要启用本地写入时，从仓库根目录执行 `copy .env.example .env.local`，将 `WP_KNOWLEDGE_WRITE_TOKEN` 的占位值换成随机长令牌，再重启 `npm run knowledge:serve`。`.env.local` 已被 Git 忽略，不得提交。
 

@@ -53,7 +53,8 @@ test('generated result matches contract', () => assert.equal(calculate(), expect
   try {
     composition.agents.updatePromptAddon('doc-gen', '先写清行为边界。');
     const executor = new OhMyWorkPanelWorkflowExecutor({
-      service: composition.service,
+      flywheel: composition.apps.flywheel,
+      evalRunner: composition.apps.evalRunner,
       evaluator: new TrustedProjectEvaluator(composition.artifacts),
       assetRoot,
     });
