@@ -861,3 +861,88 @@ body, :root[data-theme="light"] body { background: var(--bg); }
   .attention-row > .badge { display: none; }
   .attention-row time { text-align: right; }
 }
+
+/* Chinese-first typography: keep product copy in a UI sans and reserve mono for facts. */
+:root {
+  --font-ui: "Microsoft YaHei", "微软雅黑", "PingFang SC", "Noto Sans CJK SC", "Noto Sans SC", "Segoe UI", Arial, sans-serif;
+  --font-code: "Cascadia Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-family: var(--font-ui);
+}
+
+body,
+button,
+input,
+select,
+textarea,
+svg text {
+  font-family: var(--font-ui);
+}
+
+.new,
+.eyebrow,
+.table-head,
+.badge,
+.status-pill,
+.counter,
+.nav-section,
+.topbar-actions,
+.topbar-actions button,
+.reference-metrics small,
+.reference-metrics p,
+.reference-run-history header button,
+.reference-run-item span small,
+.reference-run-item > small,
+.reference-run-item > span,
+.reference-run-item strong,
+.reference-run-item em,
+.reference-run-detail header,
+.reference-run-detail > p,
+.wide,
+.reference-start-form label,
+.reference-knowledge-tools,
+.reference-docs header,
+.reference-doc-status,
+.reference-docs > header,
+.reference-doc span:first-child em,
+.reference-doc > span,
+.reference-doc strong,
+.reference-graph-tools,
+.reference-graph-node small,
+.reference-graph-legend,
+.reference-graph-canvas .graph-node small,
+.graph-status-legend,
+.reference-graph-detail header,
+.reference-graph-detail small,
+.reference-node-detail header em,
+.reference-node-detail > small,
+.reference-node-detail > div span,
+.project-card small,
+.knowledge-summary header span,
+.knowledge-summary > div small,
+.knowledge-summary > div b,
+.knowledge-summary footer,
+.queue-filters button,
+.queue-filters span,
+.queue-labels,
+.attention-row > span small,
+.queue-partial-state em,
+.current-run-card header small,
+.run-state-meta,
+.flywheel-stages i,
+.flywheel-stages small,
+.recent-pulse header span,
+.pulse-row small {
+  font-family: var(--font-ui);
+}
+
+code,
+pre,
+.json-view,
+.knowledge-body,
+time,
+.reference-run-item span b,
+.reference-doc time,
+.current-run-card h3,
+.current-run-card > p {
+  font-family: var(--font-code);
+}

@@ -276,6 +276,9 @@ test('production Console implements the F2 seven-page navigation and truthful da
   assert.match(consoleScript, /event\.key === 'Tab'.*drawer\.classList\.contains\('open'\)/s);
   assert.match(consoleCss, /@media \(max-width: 767px\)/);
   assert.match(consoleCss, /\.sidebar\.open \{ transform: translateX\(0\); \}/);
+  assert.match(consoleCss, /--font-ui:\s*"Microsoft YaHei",\s*"微软雅黑",\s*"PingFang SC",\s*"Noto Sans CJK SC"/);
+  assert.match(consoleCss, /--font-code:\s*"Cascadia Mono"/);
+  assert.match(consoleCss, /body,\s*button,\s*input,\s*select,\s*textarea,\s*svg text\s*\{\s*font-family:\s*var\(--font-ui\)/s);
 });
 
 test('write-token setup is discoverable while local secrets remain ignored', () => {

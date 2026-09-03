@@ -171,12 +171,19 @@ test('Action Center preserves the reference header baseline and information stru
     const actions = document.querySelector('.topbar-actions')!.getBoundingClientRect();
     return {
       bodyFontSize: getComputedStyle(document.body).fontSize,
+      bodyFontFamily: getComputedStyle(document.body).fontFamily,
+      titleFontFamily: getComputedStyle(document.querySelector('#page-title')!).fontFamily,
+      actionFontFamily: getComputedStyle(document.querySelector('.topbar-actions button')!).fontFamily,
       topbar: { top: topbar.top, height: topbar.height, center: topbar.top + topbar.height / 2 },
       title: { top: title.top, center: title.top + title.height / 2 },
       actions: { top: actions.top, center: actions.top + actions.height / 2 },
     };
   });
   expect(geometry.bodyFontSize).toBe('14px');
+  for (const family of [geometry.bodyFontFamily, geometry.titleFontFamily, geometry.actionFontFamily]) {
+    expect(family).toContain('Microsoft YaHei');
+    expect(family).not.toMatch(/SimSun|宋体/);
+  }
   expect(geometry.topbar.height).toBe(103);
   expect(Math.abs(geometry.actions.center - geometry.topbar.center)).toBeLessThan(2);
   expect(geometry.title.top).toBeGreaterThanOrEqual(40);
