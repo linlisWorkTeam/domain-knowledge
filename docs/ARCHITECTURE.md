@@ -11,37 +11,58 @@ domain-knowledge owns knowledge governance and execution. Its Domain/Application
 
 ## 架构边界
 
-运行时采用六边形依赖方向：
+运行时采用 DDD 与六边形依赖方向：
 
 ```text
-DSH / CLI / HTTP / Web Console
-                 │
-                 ▼
-           Application services
-                 │
-        ┌────────┴────────┐
-        ▼                 ▼
-      Domain            Ports
-        ▲                 ▲
-        │                 │
- SQLite/CAS       LangGraph infrastructure
+uiApi / CLI
+     │
+     ▼
+Application
+├── Orchestrator
+├── FlywheelApp
+├── EvalRunnerApp
+├── KnowledgeSearchApp
+└── KnowledgeDiscoveryApp
+     │
+     ▼
+Domain
+├── FlywheelDomainService
+│   ├── DocGenAgent
+│   ├── TestGenAgent
+│   └── CodeAgent
+├── EvalRunnerDomainService
+│   └── EvaluationAgent（确定性评测能力，不新增图节点）
+└── AssociationDomainService
+    ├── ExternalExtractor
+    └── ReverseMapper
+     │ Ports
+     ▼
+Infrastructure
+├── Agent Runtime / LangGraph
+├── DB：Knowledge / Workflow State / Agent Settings
+└── Redis：Agent Context / Running State（目标 Adapter，当前未启用）
 ```
 
 源码目录按同一依赖方向分层：
 
 ```text
 src/
-├── domain/                 # 领域模型与确定性规则
+├── domain/
+│   └── services/           # Flywheel / EvalRunner / Association 纯领域服务
 ├── application/
+│   ├── apps/               # 五个用例入口
 │   ├── ports/              # 入站和出站端口
 │   └── services/           # 用例编排
 ├── infrastructure/         # 持久化、评测、智能体与工作流实现
-└── interfaces/             # 命令行、服务接口与外部适配入口
+└── interfaces/
+    ├── ui-api/             # UI/HTTP 入站入口
+    ├── runner/             # CLI、组合根与兼容入口
+    └── dsh/                # DSH 查询接口
 ```
 
 交互层和基础设施层可以依赖应用层，应用层可以依赖领域层，反向依赖一律禁止。目录收敛及旧源码根的处置见 [ADR-007](../specs/adr/ADR-007-ddd-layered-source-layout.md)。
 
-`src/domain` 不引入工作流 SDK、数据库、模型 Provider、编译器或特定语言类型。`src/application/services` 只依赖领域层和 Port。`src/infrastructure/workflow/langgraph` 用 LangGraph 实现工作流 Port，并保持独立模块形态。这样，图运行时可以继续演进，知识治理规则仍留在上层。架构契约测试会检查这些边界。
+`src/domain` 不引入工作流 SDK、数据库、模型 Provider、编译器或特定语言类型。`src/application/apps` 与 `src/application/services` 只依赖领域层和 Port。`src/infrastructure/workflow/langgraph` 用 LangGraph 实现工作流 Port，并保持独立模块形态。这样，图运行时可以继续演进，知识治理规则仍留在上层。架构契约测试会检查这些边界。详细决策见 [ADR-010](../specs/adr/ADR-010-application-domain-service-boundaries.md)。
 
 `fw.mjs` 是 CLI 边缘的兼容门面。组件内统一维护产品 Spec、浏览器资源、HTTP Adapter、Console 只读投影、共享核心包、测试和验收 fixture。`src/interfaces/runner/server.ts` 是唯一 HTTP 实现。所有写路径都委派给共享 Application Service，不能另建 Registry、生命周期、评分、工作流或发布权威。
 
