@@ -54,6 +54,12 @@ test('RedisAgentContextStore rejects business payloads and oversized context', a
   const ref = { artifactId: `sha256:${'a'.repeat(64)}`, sha256: 'a'.repeat(64), mediaType: 'text/plain', size: 1 };
   await assert.rejects(
     store.set('run-1', 'doc-gen', {
+      iteration: 0, attempt: 0, inputRefs: [{ ...ref, prompt: 'secret' } as never], outputRefs: [], route: null,
+    }, 5_000),
+    /artifact ref contains forbidden fields/,
+  );
+  await assert.rejects(
+    store.set('run-1', 'doc-gen', {
       iteration: 0, attempt: 0, inputRefs: Array.from({ length: 500 }, () => ref), outputRefs: [], route: null,
     }, 5_000),
     /exceeds 64 KiB/,

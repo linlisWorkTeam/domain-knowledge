@@ -38,6 +38,10 @@ export class KnowledgeQueryService {
     return { ...version, body };
   }
 
+  latestVersionId(moduleId: string): string | null {
+    return this.repository.latestKnowledgeVersion(moduleId)?.versionId ?? null;
+  }
+
   async search(input: {
     query: string;
     top?: number;

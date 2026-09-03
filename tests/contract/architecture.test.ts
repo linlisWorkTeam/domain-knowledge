@@ -74,6 +74,14 @@ test('UI API and workflow executor use Application boundaries instead of concret
   assert.doesNotMatch(server, /from ['"]\.\/(?:console-read-model|demo-report)\.ts['"]|await buildDemoReport\(/);
   assert.match(server, /composition\.apps\.orchestrator/);
 
+  const cli = readFileSync('src/interfaces/runner/cli.ts', 'utf8');
+  assert.doesNotMatch(
+    cli,
+    /composition\.(?:repository|artifacts|agents|service|query|scanner|automatedWorkflow)\b/,
+  );
+  assert.doesNotMatch(cli, /from ['"][^'"]*infrastructure[^'"]*['"]/);
+  assert.match(cli, /composition\.apps\.(?:flywheel|evalRunner|knowledgeSearch|knowledgeDiscovery|orchestrator)/);
+
   const executor = readFileSync('src/application/services/automated-project-workflow.ts', 'utf8');
   assert.doesNotMatch(executor, /this\.flywheel\.(?:repository|artifacts|qualityPolicy)\b/);
   assert.match(executor, /this\.evalRunner\.evaluate/);

@@ -21,6 +21,7 @@ import {
 } from '../../infrastructure/persistence/sqlite-cas/index.ts';
 import { SourceScanner } from '../../infrastructure/source-scan/index.ts';
 import { LocalAgentWorkspace } from '../../infrastructure/agents/workspace/index.ts';
+import { migrateLegacyOkf } from '../../infrastructure/migration/legacy-okf/index.ts';
 import { ConsoleReadModel } from './console-read-model.ts';
 import { buildDemoReport } from './demo-report.ts';
 
@@ -100,7 +101,12 @@ export function createComposition(input: {
   const evalRunnerApp = new EvalRunnerApp(flywheelApp);
   const knowledgeSearchApp = new KnowledgeSearchApp(artifacts, repository);
   const scanner = new SourceScanner(repositoryRoot, repository);
-  const knowledgeDiscoveryApp = new KnowledgeDiscoveryApp(scanner);
+  const knowledgeDiscoveryApp = new KnowledgeDiscoveryApp(scanner, undefined, {
+    migrate: (legacyKnowledgeRoot) => migrateLegacyOkf({
+      legacyKnowledgeRoot,
+      service: flywheelApp,
+    }),
+  });
   const agents = new AgentCatalogService({
     definitions: DOMAIN_KNOWLEDGE_AGENT_DEFINITIONS,
     repository,

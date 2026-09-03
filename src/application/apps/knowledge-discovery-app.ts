@@ -1,4 +1,4 @@
-import type { KnowledgeDiscoveryPort } from '../ports/index.ts';
+import type { KnowledgeDiscoveryPort, LegacyKnowledgeMigrationPort } from '../ports/index.ts';
 import {
   AssociationDomainService,
   type AssociationTarget,
@@ -9,10 +9,16 @@ import {
 export class KnowledgeDiscoveryApp {
   readonly discovery: KnowledgeDiscoveryPort;
   readonly association: AssociationDomainService;
+  readonly legacyMigration?: LegacyKnowledgeMigrationPort;
 
-  constructor(discovery: KnowledgeDiscoveryPort, association = new AssociationDomainService()) {
+  constructor(
+    discovery: KnowledgeDiscoveryPort,
+    association = new AssociationDomainService(),
+    legacyMigration?: LegacyKnowledgeMigrationPort,
+  ) {
     this.discovery = discovery;
     this.association = association;
+    this.legacyMigration = legacyMigration;
   }
 
   discover(configuredRoots: string[], maximum = 50) {
@@ -27,5 +33,10 @@ export class KnowledgeDiscoveryApp {
     reverseMapper: ReverseMapper;
   }) {
     return this.association.associate(input);
+  }
+
+  migrateLegacy(legacyKnowledgeRoot: string) {
+    if (!this.legacyMigration) throw new Error('LEGACY_MIGRATION_UNAVAILABLE');
+    return this.legacyMigration.migrate(legacyKnowledgeRoot);
   }
 }

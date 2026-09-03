@@ -6,6 +6,7 @@ import type {
 
 const MAX_AGENT_CONTEXT_BYTES = 64 * 1024;
 const AGENT_CONTEXT_KEYS = new Set(['iteration', 'attempt', 'inputRefs', 'outputRefs', 'route']);
+const ARTIFACT_REF_KEYS = new Set(['artifactId', 'mediaType', 'sha256', 'size']);
 
 export interface RedisCommandClient {
   get(key: string): Promise<string | null>;
@@ -34,7 +35,15 @@ function assertAgentContext(value: unknown): asserts value is AgentContextSnapsh
   assertInvariant(Number.isSafeInteger(context.iteration) && Number(context.iteration) >= 0, 'redis agent context iteration is invalid');
   assertInvariant(Number.isSafeInteger(context.attempt) && Number(context.attempt) >= 0, 'redis agent context attempt is invalid');
   assertInvariant(Array.isArray(context.inputRefs) && Array.isArray(context.outputRefs), 'redis agent context refs are invalid');
-  for (const ref of [...context.inputRefs, ...context.outputRefs]) assertArtifactRef(ref);
+  for (const ref of [...context.inputRefs, ...context.outputRefs]) {
+    assertInvariant(ref !== null && typeof ref === 'object' && !Array.isArray(ref), 'redis artifact ref must be an object');
+    const keys = Object.keys(ref);
+    assertInvariant(
+      keys.length === ARTIFACT_REF_KEYS.size && keys.every((key) => ARTIFACT_REF_KEYS.has(key)),
+      'redis artifact ref contains forbidden fields',
+    );
+    assertArtifactRef(ref as never);
+  }
   assertInvariant(
     context.route === null || ['PASS', 'ITERATE', 'STOPPED', 'FAILED'].includes(String(context.route)),
     'redis agent context route is invalid',

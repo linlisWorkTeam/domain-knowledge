@@ -141,6 +141,15 @@ export interface KnowledgeDiscoveryPort {
   };
 }
 
+export interface LegacyKnowledgeMigrationPort {
+  migrate(legacyKnowledgeRoot: string): Promise<{
+    imported: number;
+    replayed: number;
+    rejected: number;
+    errors: { file: string; error: string }[];
+  }>;
+}
+
 export interface AgentContextSnapshot {
   iteration: number;
   attempt: number;
