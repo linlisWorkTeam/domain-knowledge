@@ -6,7 +6,7 @@
 
 | ID | 场景 |
 |---|---|
-| AC-SPEC-001 | Given 本规范集，When 执行 spec lint，Then 每个 SYS/NFR P0 ID 在追踪矩阵中恰有一行且实现、测试、场景非空。 |
+| AC-SPEC-001 | Given 本规范集，When 执行 spec lint，Then 每个 SYS/UI/NFR P0 ID 在追踪矩阵中恰有一行且关联验收场景；非 Planned 行的实现和测试路径非空。 |
 | AC-SCHEMA-001 | Given 每类 Agent 的合法/非法 fixture，When Draft 2020-12 校验，Then 合法输入输出通过，未知字段、缺字段和错误版本失败且不调度下游。 |
 | AC-FLOW-001 | Given 一个受支持模块，When 执行 Run，Then 状态按定义顺序完成两条独立生成链并以确定性 Gate 到达终态。 |
 | AC-FLOW-002 | Given 一个可归因失败，When Review 完成，Then Correction 含路径、判据、证据，DocGen 仅改影响范围且 Code fresh 重生成。 |
@@ -48,6 +48,18 @@
 | AC-DOC-002 | Given 一个跨层大规模特性，When 准备合入，Then Console、GitHub Pages、工程文档、Spec、追踪矩阵和自动化验收均已更新或在 PR 中明确说明不适用。 |
 | AC-DOC-003 | Given 仓库中已跟踪的 Markdown 和关键入口文档，When 执行文档契约测试，Then 每份文档都有中文说明，关键入口包含相邻的结构化 English summary，代码标识符和协议值仍可与源码直接互查。 |
 | AC-DOC-004 | Given 官网和控制台，When 检查静态文案、状态标签和运行时投影，Then 除固定标题 `WORKPANEL · KNOWLEDGE FLYWHEEL` 以及代码、命令、项目名和协议标识符外，用户看到的栏目、状态与说明均为自然中文。 |
+
+## UI Refresh Stage 1 验收门
+
+UI 验收场景的规范正文以[前台产品设计的 AC-UI-001 至 AC-UI-019](../04-product/frontend-product-design.md#121-验收场景)为准，本节只定义本阶段发布门，避免复制场景后产生漂移。
+
+- 操作中心指标和治理条目必须来自 `/api/v1/status`、`/api/v1/runs` 及其最新 GateDecision；不得出现原型演示值。
+- Run 工作台必须区分 FlywheelRun 业务状态和 WorkflowNodeProjection 执行状态，Evaluation 和 Gate 数据从 Run snapshot 读取。
+- Knowledge 查询、详情、状态、quality、provenance 和 feedback 使用现有 API；`CANDIDATE` 不得显示为已发布。
+- 无 token、错误 token、有效 token 和写 API 未配置必须呈现不同状态，治理 token 只能驻留页面内存。
+- 深浅主题、键盘导航、Drawer 焦点、Escape 关闭、焦点恢复、200% 缩放和移动端核心读取路径必须通过浏览器契约验证。
+- 页面不得加载第三方字体、脚本或样式，不得因视觉改版放宽 Content Security Policy。
+- API 空结果、部分失败和完全失败必须进入 Empty、Partial 或 Error 状态，不得回退到模拟 Health、ETA、Graph、Action Item、Activity、Workspace 或用户身份。
 
 ## P0-A Review 清单
 

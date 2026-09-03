@@ -386,6 +386,14 @@ sequenceDiagram
 
 所有写入口最终必须经过同一 Application Service、Registry 和 CAS。入口差异不得改变 `CANDIDATE → EvaluationReport → GateDecision → VERIFIED` 的权威链。
 
+## UI Refresh Stage 1 入口映射
+
+- UC-KF-001 通过“知识”页面完成 `VERIFIED` 查询、详情、provenance 与 feedback；“添加知识”调用 ingest 时必须描述为创建候选，不得描述为人工发布或直接策展为 `VERIFIED`。
+- UC-KF-003 通过“操作中心、运行、治理”呈现。操作中心和治理页当前只从 Run 状态与最新 GateDecision 派生 Run 级事项，不承诺独立问题实体、严重级别或关闭生命周期。
+- UC-KF-006 通过“智能体”和 Run 工作台呈现，固定契约与可编辑的 `promptAddon` 必须分区，WorkflowNodeProjection 与 FlywheelRun 状态必须分开标注。
+- “发现”页面只读取 `GET /api/v1/scan` 的来源候选；它不是持久化来源注册表，也不提供刷新、漂移治理或来源删除语义。
+- 产品 UI 不得调用 `/api/v1/transition`、`/api/v1/evaluate` 或 `/api/v1/publish` 模拟自动工作流。未实现的 Graph、Health、Activity、ETA 和 Action Item 能力必须隐藏或明确标记为尚未接入，不能回退到演示数据。
+
 ## 当前实现边界
 
 - UC-KF-001、UC-KF-002 的核心存储、查询、评测录入和发布路径已实现；通用评测的进程执行仍由独立受信评测器负责。

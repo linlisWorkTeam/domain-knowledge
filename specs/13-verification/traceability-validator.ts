@@ -1,7 +1,7 @@
 import { statSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-const REQUIREMENT_ID = /^(?:KF-SYS|NFR)-\d+$/;
+const REQUIREMENT_ID = /^(?:KF-SYS|KF-UI|NFR)-\d+$/;
 const PATH_TOKEN = /`([^`]+)`/g;
 
 function invariant(condition: unknown, message: string): asserts condition {
