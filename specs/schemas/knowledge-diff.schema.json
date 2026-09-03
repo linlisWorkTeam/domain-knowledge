@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wpknowledge.local/schemas/knowledge-diff/v1",
+  "title": "Structured Knowledge Diff",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["against", "target", "hunks", "changedSections", "rangeValidation", "sampledAt"],
+  "properties": {
+    "against": { "type": "object" },
+    "target": { "type": "object" },
+    "hunks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["oldStart", "oldCount", "newStart", "newCount", "lines"],
+        "properties": {
+          "oldStart": { "type": "integer", "minimum": 0 },
+          "oldCount": { "type": "integer", "minimum": 0 },
+          "newStart": { "type": "integer", "minimum": 0 },
+          "newCount": { "type": "integer", "minimum": 0 },
+          "lines": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["type", "oldLine", "newLine", "text"],
+              "properties": {
+                "type": { "enum": ["CONTEXT", "REMOVE", "ADD"] },
+                "oldLine": { "type": ["integer", "null"], "minimum": 1 },
+                "newLine": { "type": ["integer", "null"], "minimum": 1 },
+                "text": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "changedSections": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+    "rangeValidation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "scope", "oldLines", "newLines", "algorithm", "validated"],
+      "properties": {
+        "status": { "const": "PASS" },
+        "scope": { "const": "FULL_DOCUMENT" },
+        "oldLines": { "type": "integer", "minimum": 1 },
+        "newLines": { "type": "integer", "minimum": 1 },
+        "algorithm": { "enum": ["LCS", "BOUNDED_FALLBACK"] },
+        "validated": { "const": true }
+      }
+    },
+    "sampledAt": { "type": "string", "format": "date-time" }
+  }
+}

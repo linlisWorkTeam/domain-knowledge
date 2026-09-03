@@ -45,6 +45,24 @@ test('embedded LangGraph runs every fixed Agent and exposes node projections', a
   assert.ok(projections.some((projection) => projection.nodeId === 'doc_worker:worker-1'));
   assert.ok(projections.some((projection) => projection.nodeId === 'publication' && projection.status === 'COMPLETED'));
   assert.ok(projections.every((projection) => projection.runId === handle.runId));
+  const running = projections.filter((projection) => projection.status === 'RUNNING');
+  assert.ok(running.every((projection) => projection.readyAt !== null));
+  assert.ok(running.every((projection) => (
+    Date.parse(projection.readyAt ?? '') <= Date.parse(projection.startedAt ?? '')
+  )));
+  const firstFanOutReady = new Set(running.filter((projection) => (
+    projection.iteration === 0
+      && (projection.nodeId === 'test_gen' || projection.nodeId.startsWith('doc_worker:'))
+  )).map((projection) => projection.readyAt));
+  assert.equal(firstFanOutReady.size, 1, 'parallel siblings share the recorded scheduler-ready barrier');
+  for (const completed of projections.filter((projection) => projection.status === 'COMPLETED')) {
+    const started = running.find((projection) => (
+      projection.nodeId === completed.nodeId
+      && projection.iteration === completed.iteration
+      && projection.attempt === completed.attempt
+    ));
+    assert.equal(completed.readyAt, started?.readyAt);
+  }
 });
 
 test('embedded LangGraph cancellation wins over an aborted node invocation', async () => {
@@ -103,8 +121,10 @@ test('failed workflow resumes from the latest failed LangGraph checkpoint', asyn
   const calls: string[] = [];
   const projections: WorkflowNodeProjection[] = [];
   let failCodeOnce = true;
+  let clockTick = 0;
   const infrastructure = await createDomainKnowledgeInfrastructure({
     checkpoint: { kind: 'memory' },
+    clock: () => new Date(Date.UTC(2026, 8, 4, 0, 0, clockTick++)).toISOString(),
     prompts: { getPromptAddon: () => '' },
     observer: { record: (projection) => projections.push(structuredClone(projection)) },
     executor: {
@@ -137,6 +157,14 @@ test('failed workflow resumes from the latest failed LangGraph checkpoint', asyn
   assert.equal(calls.filter((node) => node === 'code').length, 2);
   assert.ok(projections.some((projection) => projection.nodeId === 'code' && projection.status === 'FAILED'));
   assert.ok(projections.some((projection) => projection.nodeId === 'code' && projection.status === 'COMPLETED'));
+  const failedCode = projections.find((projection) => (
+    projection.nodeId === 'code' && projection.status === 'FAILED'
+  ));
+  const resumedCode = projections.filter((projection) => (
+    projection.nodeId === 'code' && projection.status === 'RUNNING'
+  )).at(-1);
+  assert.ok(Date.parse(resumedCode?.readyAt ?? '') >= Date.parse(failedCode?.completedAt ?? ''),
+    'resume records a new enqueue time instead of retaining the old predecessor barrier');
 });
 
 test('parallel sibling completion cannot hide a recoverable node failure', async () => {

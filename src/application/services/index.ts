@@ -166,6 +166,7 @@ export class KnowledgeFlywheelService {
       return existing;
     }
     assertInvariant(run.state === 'EVALUATING', 'run must be EVALUATING before recording a behavioral evaluation');
+    const effectivePolicy = this.repository.resolveEvaluationPolicy?.(policy) ?? policy;
     const now = this.clock();
     const report: EvaluationReport = {
       reportId: randomUUID(), runId: run.runId, versionId: version.versionId,
@@ -180,7 +181,7 @@ export class KnowledgeFlywheelService {
       reviewBlocking: input.reviewBlocking ?? false,
       createdAt: now,
     };
-    const decision = this.evalRunnerDomain.decide(run, report, policy, now);
+    const decision = this.evalRunnerDomain.decide(run, report, effectivePolicy, now);
     const reviewing = this.flywheelDomain.transition(run, 'REVIEWING', now);
     this.repository.saveEvaluationAndDecision(report, decision, reviewing, createEvent(run.runId, 'GateDecided', {
       reportId: report.reportId, decisionId: decision.decisionId,

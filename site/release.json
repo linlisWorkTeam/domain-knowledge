@@ -1,10 +1,34 @@
 {
   "schemaVersion": 1,
   "releaseId": "migration-2026-09-03-4e7695d",
-  "assetVersion": "20260903-1",
-  "contentDigest": "sha256:ea7496a4821268400f290a190b3ad4fac2cec8c1d103b692a3c0a96d449e5c4b",
+  "assetVersion": "20260904-4",
+  "contentDigest": "sha256:01beb7e0d2b2eee549acca851219e2cd121817ccfe3b92bf4443c815df8673c6",
   "contentCommit": "4e7695d31bb0cf40460b6d48b25ca49325261336",
   "sourceRepository": "linlisWorkTeam/wpKnowledge",
   "evidenceRunId": "5503b6bc-0350-4b53-98cc-6fbf3a13aaa9",
-  "siteRoot": "site"
+  "siteRoot": "site",
+  "featureRelease": {
+    "releaseId": "dev-007-dev-008-2026-09-04",
+    "implementationRepository": "linlisWorkTeam/domain-knowledge",
+    "implementationBaseCommit": "fd1fb5597534bfb59b80f0a2309cf365008a4b3c",
+    "phases": ["DEV-007", "DEV-008"],
+    "capture": {
+      "script": "scripts/capture-console-demo.mjs",
+      "capturedAt": "2026-09-03T18:17:04.259Z",
+      "provenance": "actual-console-persisted-deterministic-acceptance-seed",
+      "viewport": "1280x800",
+      "output": "960x600",
+      "frames": 8,
+      "evidenceRunId": "96f86f71-2868-424e-bef6-5ba8b507698b",
+      "secretRendered": false,
+      "gif": {
+        "path": "site/console-dev007-dev008.gif",
+        "sha256": "da655beb047538dab017dc60b32edef682a14e6cfeb5abd1ca15871d21c5df00"
+      },
+      "poster": {
+        "path": "site/console-dev007-dev008-poster.webp",
+        "sha256": "94efed5b64b2b8efedb1a8efb0a2aba459b11ef9259a04f64d04cf9e1419db1a"
+      }
+    }
+  }
 }

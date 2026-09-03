@@ -101,7 +101,7 @@ npm run knowledge -- query --q "workpanel"
 npm run knowledge:serve
 ```
 
-浏览器打开 <http://127.0.0.1:4174>。Console 提供“操作中心、飞轮批次、知识、工作流图、评测、来源、Agent 设置”七个页面，默认只读。Agent 设置页面会列出七个固定角色的职责、输入输出、工具权限和基础提示词；批次详情与工作流图显示从 LangGraph 投影而来的节点状态，而不是直接读取 checkpoint 数据库。
+浏览器打开 <http://127.0.0.1:4174>。Console 提供“操作中心、飞轮批次、知识、工作流图、评测、来源、Agent 设置”七个页面，默认只读。Agent 设置页面会列出七个固定角色的职责、输入输出、工具权限和基础提示词，并展示模型服务与运行/治理指标；批次详情与工作流图显示从 LangGraph 投影而来的节点状态，而不是直接读取 checkpoint 数据库。
 
 若仅在受信本机测试 feedback 写入：
 
@@ -111,6 +111,10 @@ WP_KNOWLEDGE_WRITE_TOKEN='<local-secret>' npm run knowledge:serve
 
 不要把 token 提交到仓库，也不要在公网明文 HTTP 上启用写操作。公网只读部署和 TLS 要求见[运维手册](OPERATIONS.md#dashboard-and-api)。
 
+进入治理模式后，可在“Agent 设置”保存公开 HTTPS 的 OpenAI-compatible API 地址、API Key 和模型标识，再点击“验证并启用”。保存会使旧验证失效，只有无副作用的模型列表探测成功后，新批次才默认使用 Pi Agent。页面不会读回完整 Key；服务端把加密配置与本地密钥存放在 `$WP_FLYWHEEL_HOME/secrets/`，文件权限限制为 `0600`。不要备份或提交该目录，也不要把模型地址指向本机、私网或会重定向的目标。
+
+Pi Agent 对空输出或不符合角色 JSON Schema 的输出使用全新会话做有限重试。`WP_PI_MAX_SCHEMA_ATTEMPTS` 表示总尝试次数，默认 `2`，只允许 `1..3`；`WP_PI_MAX_TOKENS` 默认 `32768`，`WP_PI_CONTEXT_WINDOW` 默认 `128000` 且不得小于输出上限。这三个非秘密执行参数连同协议、地址与模型一起进入批次摘要，恢复时任何变化都会失败关闭；每次尝试单独记录脱敏调用事实，不与工作流节点恢复次数混算。
+
 ### 7. 运行固定 ohMyWorkPanel 自动流程
 
 准备一个包含验收场景固定 commit 的 ohMyWorkPanel 本地仓库，然后运行：
@@ -119,7 +123,7 @@ WP_KNOWLEDGE_WRITE_TOKEN='<local-secret>' npm run knowledge:serve
 npm run knowledge -- workflow-run --repository /path/to/ohMyWorkPanel
 ```
 
-命令会创建 `FlywheelRun`，以内嵌 LangGraph 执行全部 Agent 节点，并等待失败迭代、独立评测和发布结束。另一个终端打开 Console，就能按同一 `runId` 查看节点状态。默认 Agent Provider 是可重复的 fixture，适合先确认环境与治理链路。
+命令会创建 `FlywheelRun`，以内嵌 LangGraph 执行全部 Agent 节点，并等待失败迭代、独立评测和发布结束。另一个终端打开 Console，就能按同一 `runId` 查看节点状态。没有启用已验证的 Pi Agent 配置时，默认 Agent Provider 是可重复的 fixture，适合先确认环境与治理链路；启用后只影响新批次，已有批次继续遵循冻结快照。
 
 需要接入真实 DeepSeek Harness 时，按 [`deploy/deepseek-harness/README.md`](../deploy/deepseek-harness/README.md) 安装 Bubblewrap，配置 `OPENCODE_GO_API_KEY`、Provider 和来源 allowlist，再设置 `WP_FLYWHEEL_AGENT_PROVIDER=deepseek-harness`。Prompt 通过官方 SDK 的 stdin JSON-RPC 发送；每个 Agent 只得到角色允许的工作区。密钥只放进运行时环境，不写配置文件。公开 Web 只是 DSH 自身的临时调试面，知识飞轮 Console 仍由 `knowledge:serve` 提供。
 

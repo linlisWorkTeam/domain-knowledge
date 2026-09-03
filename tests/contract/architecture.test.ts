@@ -54,6 +54,7 @@ test('DDD application and domain-service boundaries are explicit without changin
   const apps = readFileSync('src/application/apps/index.ts', 'utf8');
   for (const name of [
     'Orchestrator', 'FlywheelApp', 'EvalRunnerApp', 'KnowledgeSearchApp', 'KnowledgeDiscoveryApp',
+    'ContentGovernanceApp', 'ProviderOperationsApp', 'OperationalMetricsApp',
   ]) assert.match(apps, new RegExp(`\\b${name}\\b`));
 
   const uiApi = readFileSync('src/interfaces/ui-api/index.ts', 'utf8');

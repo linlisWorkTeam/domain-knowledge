@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wpknowledge.local/schemas/knowledge-lineage/v1",
+  "title": "Knowledge Lineage",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["target", "nodes", "edges", "relations", "sampledAt"],
+  "properties": {
+    "target": { "$ref": "#/$defs/version" },
+    "nodes": { "type": "array", "items": { "$ref": "#/$defs/version" } },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type", "fromVersionId", "toVersionId"],
+        "properties": {
+          "type": { "const": "PARENT_OF" },
+          "fromVersionId": { "type": "string", "minLength": 1 },
+          "toVersionId": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "relations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runs", "evaluations", "corrections", "publications", "provenance"],
+      "properties": {
+        "runs": { "type": "array", "items": { "type": "object" } },
+        "evaluations": { "type": "array", "items": { "type": "object" } },
+        "corrections": { "type": "array", "items": { "type": "object" } },
+        "publications": { "type": "array", "items": { "type": "object" } },
+        "provenance": { "type": "array", "items": { "type": "object" } }
+      }
+    },
+    "sampledAt": { "type": "string", "format": "date-time" }
+  },
+  "$defs": {
+    "version": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["versionId", "moduleId", "parentVersionId", "status", "qualityOutcome", "qualityScore", "gateDecisionId", "bodyRef", "createdAt", "href"],
+      "properties": {
+        "versionId": { "type": "string", "minLength": 1 },
+        "moduleId": { "type": "string", "minLength": 1 },
+        "parentVersionId": { "type": ["string", "null"] },
+        "status": { "enum": ["CANDIDATE", "VERIFIED", "LOW_CONFIDENCE", "SUPERSEDED"] },
+        "qualityOutcome": { "enum": ["ACCEPTED", "REJECTED"] },
+        "qualityScore": { "type": "number", "minimum": 0, "maximum": 100 },
+        "gateDecisionId": { "type": ["string", "null"] },
+        "bodyRef": { "$ref": "https://wpknowledge.local/schemas/artifact-ref/v1" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "href": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

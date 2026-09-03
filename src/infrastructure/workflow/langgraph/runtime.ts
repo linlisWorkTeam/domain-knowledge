@@ -45,6 +45,7 @@ export interface DomainKnowledgeInfrastructureOptions {
 }
 
 export async function createDomainKnowledgeInfrastructure(options: DomainKnowledgeInfrastructureOptions) {
+  const clock = options.clock ?? (() => new Date().toISOString());
   const checkpoint = options.checkpoint ?? {
     kind: 'sqlite' as const,
     filename: resolve('.workpanel/workflow/checkpoints.sqlite'),
@@ -56,12 +57,22 @@ export async function createDomainKnowledgeInfrastructure(options: DomainKnowled
       return SqliteSaver.fromConnString(checkpoint.filename);
     })();
   const controllers = new Map<string, AbortController>();
+  const resumeReadyAt = new Map<string, string>();
+  const readyKey = (runId: string, nodeId: string, iteration: number) => (
+    `${runId}\0${nodeId}\0${iteration}`
+  );
   const graph = buildInfrastructureGraph({
     executor: options.executor,
     observer: options.observer,
     prompts: options.prompts,
     signalFor: (runId) => controllers.get(runId)?.signal,
-    clock: options.clock ?? (() => new Date().toISOString()),
+    readyAtFor: (runId, nodeId, iteration, fallback) => {
+      const key = readyKey(runId, nodeId, iteration);
+      const override = resumeReadyAt.get(key);
+      if (override) resumeReadyAt.delete(key);
+      return override ?? fallback;
+    },
+    clock,
   }, checkpointer);
 
   type Graph = typeof graph;
@@ -91,6 +102,7 @@ export async function createDomainKnowledgeInfrastructure(options: DomainKnowled
         maxIterations: command.maxIterations,
         workerCount: command.workerCount,
         context: command.context ?? {},
+        readyAt: clock(),
       }, graphConfig(runId, Math.max(100, command.maxIterations * 30), controller.signal)) as Promise<InfrastructureState>;
       this.track(runId, promise);
       return { runId, executionStatus: 'RUNNING' };
@@ -106,6 +118,10 @@ export async function createDomainKnowledgeInfrastructure(options: DomainKnowled
       let config = graphConfig(runId, recursionLimit, controller.signal);
       if (current.executionStatus === 'FAILED' || (current.route === 'FAILED' && current.error)) {
         const failedCheckpoint = await this.failedCheckpoint(runId);
+        if (!current.currentNode) throw new Error(`WORKFLOW_NOT_RECOVERABLE: ${runId} has no failed node`);
+        // A resumed task is newly eligible when the operator/runtime enqueues
+        // the failed checkpoint branch, not when its old predecessor finished.
+        resumeReadyAt.set(readyKey(runId, current.currentNode, current.iteration), clock());
         config = retryConfig(
           runId,
           failedCheckpoint as Record<string, unknown>,
@@ -161,6 +177,9 @@ export async function createDomainKnowledgeInfrastructure(options: DomainKnowled
       const tracked = promise.finally(() => {
         this.running.delete(runId);
         controllers.delete(runId);
+        for (const key of resumeReadyAt.keys()) {
+          if (key.startsWith(`${runId}\0`)) resumeReadyAt.delete(key);
+        }
       });
       this.running.set(runId, tracked);
     }

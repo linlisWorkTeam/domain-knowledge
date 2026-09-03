@@ -11,6 +11,15 @@ export interface WorkerTask {
 
 const replace = <T>(_left: T, right: T): T => right;
 
+function latestTimestamp(left: string, right: string): string {
+  if (!left) return right;
+  if (!right) return left;
+  const leftTime = Date.parse(left);
+  const rightTime = Date.parse(right);
+  if (!Number.isFinite(leftTime) || !Number.isFinite(rightTime)) return right;
+  return rightTime >= leftTime ? right : left;
+}
+
 export const InfrastructureStateAnnotation = Annotation.Root({
   runId: Annotation<string>({ reducer: replace, default: () => '' }),
   executionStatus: Annotation<InfrastructureExecutionStatus>({ reducer: replace, default: () => 'PENDING' }),
@@ -27,6 +36,8 @@ export const InfrastructureStateAnnotation = Annotation.Root({
   attempts: Annotation<Record<string, number>>({
     reducer: (left, right) => ({ ...left, ...right }), default: () => ({}),
   }),
+  /** Latest predecessor/barrier completion: the next super-step is eligible here. */
+  readyAt: Annotation<string>({ reducer: latestTimestamp, default: () => '' }),
   activeAgent: Annotation<AgentId | null>({ reducer: replace, default: () => null }),
 });
 

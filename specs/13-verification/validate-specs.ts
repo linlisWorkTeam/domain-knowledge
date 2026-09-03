@@ -163,6 +163,112 @@ function validateSupporting(): void {
   const invalid = clone(event) as unknown as Record<string, unknown>;
   delete invalid.causationId;
   expectInvalid('event.schema.json', invalid, 'event causation is required');
+  validate('action-item.schema.json', {
+    actionItemId: `ai_${'a'.repeat(24)}`,
+    type: 'SOURCE_DRIFT',
+    severity: 'MEDIUM',
+    status: 'OPEN',
+    subject: { kind: 'SOURCE', id: `src_${'b'.repeat(24)}` },
+    runId: null,
+    reasonCode: 'SOURCE_REVISION_DRIFT',
+    summary: '来源内容与固定版本不一致，需要人工复核',
+    sourceEventId: `audit_${'c'.repeat(24)}`,
+    fingerprint: `sha256:${'d'.repeat(64)}`,
+    allowedActions: ['ACKNOWLEDGE', 'RESOLVE'],
+    revision: 1,
+    createdAt: '2026-09-04T00:00:00Z',
+    updatedAt: '2026-09-04T00:00:00Z',
+    resolvedAt: null,
+    resolution: null,
+    previousOccurrenceId: null,
+  });
+}
+
+function validateContentGovernance(): void {
+  const ref = artifact('g');
+  const version = {
+    versionId: 'kv-content-1', moduleId: 'content', parentVersionId: null,
+    status: 'VERIFIED', qualityOutcome: 'ACCEPTED', qualityScore: 91,
+    gateDecisionId: 'decision-1', bodyRef: ref, createdAt: '2026-09-04T00:00:00Z',
+    href: '/api/v1/knowledge/kv-content-1',
+  };
+  validate('knowledge-lineage.schema.json', {
+    target: version,
+    nodes: [version],
+    edges: [],
+    relations: { runs: [], evaluations: [], corrections: [], publications: [], provenance: [] },
+    sampledAt: '2026-09-04T00:00:00Z',
+  });
+  validate('knowledge-diff.schema.json', {
+    against: version,
+    target: { ...version, versionId: 'kv-content-2', parentVersionId: 'kv-content-1' },
+    hunks: [{
+      oldStart: 1, oldCount: 1, newStart: 1, newCount: 1,
+      lines: [
+        { type: 'REMOVE', oldLine: 1, newLine: null, text: '# Before' },
+        { type: 'ADD', oldLine: null, newLine: 1, text: '# After' },
+      ],
+    }],
+    changedSections: ['# After'],
+    rangeValidation: {
+      status: 'PASS', scope: 'FULL_DOCUMENT', oldLines: 1, newLines: 1,
+      algorithm: 'LCS', validated: true,
+    },
+    sampledAt: '2026-09-04T00:00:00Z',
+  });
+  validate('evaluation-summary.schema.json', {
+    evaluationId: 'evaluation-1', runId: 'run-1', moduleId: 'content', versionId: 'kv-content-1',
+    status: 'PASSED', gate: 'PASS', reasonCodes: ['ALL_DETERMINISTIC_GATES_PASSED'],
+    tests: { passed: 2, total: 2, criticalFailures: 0 }, stability: 1,
+    toolchainFingerprint: 'node-22', ruleRef: { ruleId: 'publication-gate', revision: 1 },
+    ruleBinding: { status: 'BOUND', reasonCode: 'RULE_REVISION_BOUND' },
+    createdAt: '2026-09-04T00:00:00Z', links: {},
+  });
+  const legacyEvaluation = {
+    evaluationId: 'legacy-evaluation-1', runId: 'legacy-run-1', moduleId: 'content', versionId: 'kv-content-1',
+    status: 'FAILED', gate: 'ITERATE', reasonCodes: ['QUALITY_THRESHOLD_NOT_MET'],
+    tests: { passed: 1, total: 2, criticalFailures: 0 }, stability: 0.5,
+    toolchainFingerprint: 'legacy-toolchain', ruleRef: null,
+    ruleBinding: { status: 'UNBOUND', reasonCode: 'RULE_REVISION_NOT_PROVABLE' },
+    createdAt: '2026-08-01T00:00:00Z', links: {},
+  };
+  validate('evaluation-summary.schema.json', legacyEvaluation);
+  expectInvalid('evaluation-summary.schema.json', {
+    ...legacyEvaluation,
+    ruleBinding: { status: 'BOUND', reasonCode: 'RULE_REVISION_BOUND' },
+  }, 'bound evaluation must identify its immutable rule revision');
+  validate('evaluation-rule.schema.json', {
+    ruleId: 'publication-gate', revision: 1, scope: { kind: 'GLOBAL' },
+    config: { policyId: 'local-v1', minimumStability: 1, requireAllTests: true, maxIterations: 3 },
+    enabled: true, createdAt: '2026-09-04T00:00:00Z', createdBy: 'system',
+    changeReason: 'Initial deterministic publication gate', auditId: 'audit-1',
+  });
+  validate('source.schema.json', {
+    sourceId: `src_${'a'.repeat(24)}`, kind: 'FILE', project: 'default', displayName: 'Source',
+    locator: 'knowledge/inbox/source.md', revision: `sha256:${'b'.repeat(64)}`,
+    observedRevision: `sha256:${'b'.repeat(64)}`, status: 'ACTIVE', credentialConfigured: false,
+    accessPolicyRef: 'configured-acquisition-roots', recordRevision: 1,
+    lastSyncAt: '2026-09-04T00:00:00Z', lastErrorCode: null, drift: null,
+    knowledge: { total: 1, verified: 1, candidate: 0, lowConfidence: 0, superseded: 0 },
+    createdAt: '2026-09-04T00:00:00Z', updatedAt: '2026-09-04T00:00:00Z',
+  });
+  const metric = {
+    status: 'available', value: 1, numerator: 1, denominator: 1, unit: 'ratio',
+    window: '30d', sampledAt: '2026-09-04T00:00:00Z', ruleVersion: 'knowledge-health-v1',
+  };
+  validate('knowledge-health.schema.json', {
+    window: { key: '30d', start: '2026-08-05T00:00:00Z', end: '2026-09-04T00:00:00Z' },
+    sampledAt: '2026-09-04T00:00:00Z', ruleVersion: 'knowledge-health-v1',
+    overall: { status: 'available', value: 100, unit: 'score-out-of-100' },
+    metrics: { freshness: metric, coverage: metric, quality: metric },
+  });
+  const invalidHealth = {
+    window: { key: '30d', start: '2026-08-05T00:00:00Z', end: '2026-09-04T00:00:00Z' },
+    sampledAt: '2026-09-04T00:00:00Z', ruleVersion: 'knowledge-health-v1',
+    overall: { status: 'unavailable', value: 0, unit: 'score-out-of-100' },
+    metrics: { freshness: { ...metric, status: 'unavailable', denominator: null }, coverage: metric, quality: metric },
+  };
+  expectInvalid('knowledge-health.schema.json', invalidHealth, 'unavailable health must not look like zero or one');
 }
 
 function validateMarkdown(): number {
@@ -234,5 +340,6 @@ function statSafe(path: string): boolean {
 const [commands, results] = validateAgentContracts();
 validateEvaluation();
 validateSupporting();
+validateContentGovernance();
 const requirements = validateMarkdown();
 process.stdout.write(`SPEC_VALIDATION_OK schemas=${Object.keys(schemas).length} commands=${commands} results=${results} p0=${requirements}\n`);

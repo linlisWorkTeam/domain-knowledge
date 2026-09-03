@@ -7,7 +7,7 @@
 | NFR-003 | P0 | 幂等：相同 GenerationKey 和发布键重复提交仅产生一个逻辑结果。 | AC-REC-002 |
 | NFR-004 | P0 | 可审计：所有状态转换、权限拒绝、模型调用、Artifact 血缘和门禁决定可按 runId 导出。 | AC-OBS-001 |
 | NFR-005 | P0 | 可移植：更换模型、Agent runtime、Artifact Store 或编排器只修改对应 Adapter，不修改领域实体。 | AC-ARCH-001 |
-| NFR-006 | P0 | Schema 兼容：事件和命令包含 `schemaVersion`；破坏性变化必须升主版本并提供迁移器。 | AC-SCHEMA-001 |
+| NFR-006 | P0 | Schema 兼容：事件和命令包含 `schemaVersion`；首个 Release 前的 Preview 变更可以在同一原子提交中同步修改 v1 Schema、生产者、消费者、fixture、迁移与测试，首个 Release 后的破坏性变化必须升主版本并提供迁移器。 | AC-SCHEMA-001 |
 | NFR-007 | P0 | 资源治理：每个 Agent/构建/测试具有可配置 wall time、CPU、内存、输出大小和并发上限；超限为结构化失败。 | AC-LANG-002 |
 | NFR-008 | P0 | 可复现：评测报告记录工具链、插件、测试集、模型配置、prompt 与输入 Artifact 的摘要。 | AC-EVAL-003 |
 | NFR-009 | P0 | 隐私：日志不得包含源码正文、密钥或完整 prompt；敏感 Artifact 按边界授权。 | AC-SEC-003 |

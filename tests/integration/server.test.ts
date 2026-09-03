@@ -67,7 +67,11 @@ test('HTTP adapter rejects missing credentials and accepts authenticated candida
   try {
     const health = await fetch(`${base}/health`);
     assert.equal(health.status, 200);
-    assert.equal((await fetch(`${base}/api/v1/system/status`)).status, 200);
+    const statusResponse = await fetch(`${base}/api/v1/system/status`);
+    assert.equal(statusResponse.status, 200);
+    const statusPayload = await statusResponse.json();
+    assert.equal(Object.hasOwn(statusPayload, 'database'), false,
+      'the public status response must not expose a local database path');
     const denied = await fetch(`${base}/api/v1/knowledge/candidates`, {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}',
     });
@@ -222,11 +226,13 @@ test('HTTP adapter rejects missing credentials and accepts authenticated candida
     instance.composition.workflowObserver.record({
       runId, nodeId: 'orchestrator', agentId: 'orchestrator', status: 'COMPLETED',
       iteration: 0, attempt: 1, detail: 'planned', error: null,
+      readyAt: created.createdAt,
       startedAt: created.createdAt, completedAt: created.updatedAt, updatedAt: created.updatedAt,
     });
     instance.composition.workflowObserver.record({
       runId, nodeId: 'doc_gen', agentId: 'doc-gen', status: 'RUNNING',
       iteration: 0, attempt: 1, detail: 'generating', error: null,
+      readyAt: created.createdAt,
       startedAt: created.createdAt, completedAt: null, updatedAt: created.updatedAt,
     });
     const measuredProgress = await (await fetch(
@@ -244,6 +250,7 @@ test('HTTP adapter rejects missing credentials and accepts authenticated candida
     instance.composition.workflowObserver.record({
       runId, nodeId: 'orchestrator', agentId: 'orchestrator', status: 'COMPLETED',
       iteration: 0, attempt: 2, detail: 'retried', error: null,
+      readyAt: created.createdAt,
       startedAt: created.createdAt, completedAt: created.updatedAt, updatedAt: created.updatedAt,
     });
     const iteratedProgress = await (await fetch(
@@ -285,7 +292,7 @@ test('HTTP adapter rejects missing credentials and accepts authenticated candida
     assert.equal(acknowledged.revision, 2);
     const replay = await fetch(`${actionBase}/acknowledge`, {
       method: 'POST', headers: { ...authHeaders, 'idempotency-key': 'action-ack-1' },
-      body: JSON.stringify({ expectedRevision: 1, reason: '开始处理' }),
+      body: JSON.stringify({ reason: '开始处理', expectedRevision: 1 }),
     });
     assert.deepEqual(await replay.json(), acknowledged);
     const staleResolve = await fetch(`${actionBase}/resolve`, {
@@ -450,7 +457,7 @@ test('action command receipt survives a server restart', async () => {
           'content-type': 'application/json', authorization: 'Bearer test-secret',
           'idempotency-key': 'restart-safe-action',
         },
-        body: requestBody,
+        body: JSON.stringify({ reason: '已接手排查', expectedRevision: 1 }),
       },
     );
     assert.equal(response.status, 200);
@@ -494,6 +501,54 @@ test('action command receipt survives a server restart', async () => {
   } finally {
     second.server.close();
     await once(second.server, 'close');
+    rmSync(runtimeDir, { recursive: true, force: true });
+  }
+});
+
+test('run command idempotency treats reordered JSON object keys as the same payload', async () => {
+  const runtimeDir = mkdtempSync(join(tmpdir(), 'wp-server-run-fingerprint-'));
+  const instance = createKnowledgeServer({ runtimeDir, writeToken: 'test-secret' });
+  instance.server.listen(0, '127.0.0.1');
+  await once(instance.server, 'listening');
+  const address = instance.server.address();
+  assert.ok(address && typeof address === 'object');
+  const base = `http://127.0.0.1:${address.port}`;
+  const originalStart = instance.composition.apps.orchestrator.start.bind(
+    instance.composition.apps.orchestrator,
+  );
+  let starts = 0;
+  instance.composition.apps.orchestrator.start = async () => {
+    starts += 1;
+    return { runId: 'canonical-run', executionStatus: 'RUNNING' };
+  };
+  const headers = {
+    'content-type': 'application/json', authorization: 'Bearer test-secret',
+    'idempotency-key': 'canonical-run-command',
+  };
+  try {
+    const first = await fetch(`${base}/api/v1/runs`, {
+      method: 'POST', headers,
+      body: JSON.stringify({
+        profile: 'ohmyworkpanel', repositoryRoot: process.cwd(),
+        maxIterations: 2, workerCount: 1,
+      }),
+    });
+    assert.equal(first.status, 202);
+    const firstValue = await first.json();
+    const replay = await fetch(`${base}/api/v1/runs`, {
+      method: 'POST', headers,
+      body: JSON.stringify({
+        workerCount: 1, maxIterations: 2,
+        repositoryRoot: process.cwd(), profile: 'ohmyworkpanel',
+      }),
+    });
+    assert.equal(replay.status, 202);
+    assert.deepEqual(await replay.json(), firstValue);
+    assert.equal(starts, 1);
+  } finally {
+    instance.composition.apps.orchestrator.start = originalStart;
+    instance.server.close();
+    await once(instance.server, 'close');
     rmSync(runtimeDir, { recursive: true, force: true });
   }
 });

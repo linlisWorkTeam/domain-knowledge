@@ -21,12 +21,13 @@ SQLite Registry 与 CAS 是运行时事实源，默认写到本仓库 `.workpane
 ## 已实现
 
 - 七类 Agent 通过 LangGraph 执行，支持并行、循环、取消和 Checkpoint 恢复；
-- uiApi 统一进入 Orchestrator、Flywheel、EvalRunner、KnowledgeSearch、KnowledgeDiscovery Application App；
+- uiApi 统一进入 Orchestrator、Flywheel、EvalRunner、KnowledgeSearch、KnowledgeDiscovery、ContentGovernance、ProviderOperations、OperationalMetrics Application App；
 - Flywheel、EvalRunner、Association Domain Service 与 Agent/工作流/持久化 Adapter 保持单向依赖；
 - 候选知识绑定来源，工件使用 SHA-256 内容寻址；
 - 质量 Gate 与行为发布 Gate 分开，只有完整证据和 `PASS` 能产生 `VERIFIED`；
-- DeepSeek Harness 官方 SDK、角色工作区和 Linux Bubblewrap 隔离；
-- CLI、HTTP API、DSH Adapter、双主题 Console 和项目网站；
+- DeepSeek Harness 官方 SDK、可在 Console 配置并验证的 Pi Agent Provider、角色工作区和 Linux Bubblewrap 隔离；
+- 知识血缘与差异、评测证据与规则、来源注册与漂移、知识健康度和生成/治理观测；
+- CLI、资源化 HTTP API、DSH Adapter、双主题 Console 和项目网站；
 - 固定 ohMyWorkPanel 场景、真实评测与脱敏演示证据。
 
 ## 五分钟启动

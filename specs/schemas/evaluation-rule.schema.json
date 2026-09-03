@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wpknowledge.local/schemas/evaluation-rule/v1",
+  "title": "Evaluation Rule Revision",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["ruleId", "revision", "scope", "config", "enabled", "createdAt", "createdBy", "changeReason", "auditId"],
+  "properties": {
+    "ruleId": { "type": "string", "minLength": 1 },
+    "revision": { "type": "integer", "minimum": 1 },
+    "scope": { "type": "object" },
+    "config": { "type": "object" },
+    "enabled": { "type": "boolean" },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "createdBy": { "type": "string", "minLength": 1 },
+    "changeReason": { "type": "string", "minLength": 1 },
+    "auditId": { "type": "string", "minLength": 1 }
+  }
+}

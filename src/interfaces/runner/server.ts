@@ -2,10 +2,13 @@
 import { createServer as createHttpServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { readFileSync } from 'node:fs';
 import { extname, join, resolve } from 'node:path';
-import { randomUUID, timingSafeEqual } from 'node:crypto';
+import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
 import { createComposition, loadOhMyWorkPanelScenario } from './composition.ts';
+import type {
+  OperationalMetricsPort, ProviderConnectionProbe, ProviderEndpointPolicy, ProviderSettingsStore,
+} from '../../application/ports/index.ts';
 
 export interface ServerBinding {
   host: string;
@@ -196,6 +199,32 @@ async function body(request: IncomingMessage): Promise<Record<string, unknown>> 
   return parsed as Record<string, unknown>;
 }
 
+function canonicalJson(value: unknown): string {
+  if (value === null || typeof value === 'boolean' || typeof value === 'string') {
+    return JSON.stringify(value);
+  }
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) throw new Error('PAYLOAD_INVALID: JSON number must be finite');
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value as Record<string, unknown>).sort().map((key) => (
+      `${JSON.stringify(key)}:${canonicalJson((value as Record<string, unknown>)[key])}`
+    )).join(',')}}`;
+  }
+  throw new Error('PAYLOAD_INVALID: command fingerprint requires JSON data');
+}
+
+function payloadFingerprint(value: unknown): string {
+  return createHash('sha256').update(canonicalJson(value)).digest('hex');
+}
+
+function requireOnlyKeys(payload: Record<string, unknown>, allowed: readonly string[]): void {
+  const unexpected = Object.keys(payload).filter((key) => !allowed.includes(key));
+  if (unexpected.length) throw new Error(`PAYLOAD_INVALID: unexpected fields: ${unexpected.join(', ')}`);
+}
+
 export function mapHttpError(error: unknown, id = 'req_unknown'): { status: number; body: ApiErrorBody } {
   const message = error instanceof Error ? error.message : String(error);
   const code = message.split(':', 1)[0] || 'INTERNAL_ERROR';
@@ -203,12 +232,20 @@ export function mapHttpError(error: unknown, id = 'req_unknown'): { status: numb
   if (code === 'PAYLOAD_TOO_LARGE') return { status: 413, body: errorBody(code, 'Request payload is too large.', id) };
   if (code === 'METHOD_NOT_ALLOWED') return { status: 405, body: errorBody(code, 'Method not allowed.', id) };
   if (code.endsWith('_NOT_FOUND')) return { status: 404, body: errorBody(code, 'Resource not found.', id) };
+  if (code === 'SOURCE_ACCESS_DENIED') return { status: 403, body: errorBody(code, 'Source access is outside the configured boundary.', id) };
+  if (code === 'SOURCE_ALREADY_EXISTS' || code === 'SOURCE_DELETED') {
+    return { status: 409, body: errorBody(code, message, id) };
+  }
   if (/(?:_ALREADY_RUNNING|_TERMINAL|_CONFLICT)$/.test(code)) {
     return { status: 409, body: errorBody(code, message, id) };
   }
   if (code === 'ACTION_ITEM_RESOLVED') return { status: 409, body: errorBody(code, message, id) };
-  if (code === 'ACTION_NOT_ALLOWED' || code === 'RUN_NOT_RETRYABLE') {
+  if (code === 'ACTION_NOT_ALLOWED' || code === 'RUN_NOT_RETRYABLE'
+    || code === 'SOURCE_DISABLED' || code === 'SOURCE_CREDENTIAL_UNAVAILABLE') {
     return { status: 422, body: errorBody(code, message, id) };
+  }
+  if (code === 'PROVIDER_URL_UNREACHABLE') {
+    return { status: 422, body: errorBody(code, message, id, true) };
   }
   if (/(?:_INVALID|_DENIED|_REQUIRED|_UNSUPPORTED)$/.test(code)) {
     return { status: 422, body: errorBody(code, message, id) };
@@ -219,7 +256,14 @@ export function mapHttpError(error: unknown, id = 'req_unknown'): { status: numb
 export function createKnowledgeServer(input: {
   repositoryRoot?: string;
   runtimeDir?: string;
+  clock?: () => string;
   writeToken?: string;
+  providerSettingsStore?: ProviderSettingsStore;
+  providerEndpointPolicy?: ProviderEndpointPolicy;
+  sourceEndpointPolicy?: ProviderEndpointPolicy;
+  allowedSourceHosts?: string[];
+  providerProbe?: ProviderConnectionProbe;
+  operationalMetrics?: OperationalMetricsPort;
   componentChecks?: Partial<Record<'registry' | 'artifactStore' | 'workflow' | 'provider' | 'evaluator', () => Promise<void> | void>>;
   componentCheckTimeoutMs?: number;
 } = {}) {
@@ -249,24 +293,53 @@ export function createKnowledgeServer(input: {
         return;
       }
       if (request.method === 'GET' && url.pathname === '/api/v1/system/status') {
-        send(response, 200, composition.apps.flywheel.status());
+        const status = composition.apps.flywheel.status();
+        delete status.database;
+        send(response, 200, status);
+        return;
+      }
+      if (request.method === 'GET' && url.pathname === '/api/v1/agents/providers/status') {
+        send(response, 200, composition.apps.providerOperations.getStatus({
+          provider: composition.agentProviderMode,
+          model: composition.runConfiguration.provider.model,
+        }));
+        return;
+      }
+      if (request.method === 'GET' && url.pathname === '/api/v1/provider-settings') {
+        send(response, 200, composition.apps.providerOperations.getSettings());
+        return;
+      }
+      if (request.method === 'GET' && url.pathname === '/api/v1/metrics/runs') {
+        send(response, 200, composition.apps.operationalMetrics.runs(url.searchParams.get('window') ?? '24h'));
+        return;
+      }
+      if (request.method === 'GET' && url.pathname === '/api/v1/metrics/governance') {
+        send(response, 200, composition.apps.operationalMetrics.governance(url.searchParams.get('window') ?? '24h'));
         return;
       }
       if (request.method === 'GET' && url.pathname === '/api/v1/system/capabilities') {
-        const sdkIsolation = composition.agentProviderMode === 'deepseek-harness'
+        const providerStatus = composition.apps.providerOperations.getStatus({
+          provider: composition.agentProviderMode,
+          model: composition.runConfiguration.provider.model,
+        });
+        const activeProvider = providerStatus.enabled === true
+          ? String(providerStatus.provider) : composition.agentProviderMode;
+        const sdkIsolation = activeProvider === 'deepseek-harness'
           && (process.env.WP_DSH_PROCESS_ISOLATION?.trim() || 'bubblewrap') === 'bubblewrap';
         send(response, 200, {
           writeEnabled: Boolean(writeToken),
           automatedWorkflow: true,
           langGraphInfrastructure: true,
-          agentProvider: composition.agentProviderMode,
+          agentProvider: activeProvider,
           agentPromptCustomization: 'promptAddon-only',
-          agentPromptTransport: composition.agentProviderMode === 'deepseek-harness'
+          agentPromptTransport: activeProvider === 'pi-agent'
+            ? 'pi-agent-openai-compatible'
+            : activeProvider === 'deepseek-harness'
             ? 'sdk-stdio-json-rpc'
-            : composition.agentProviderMode === 'deepseek-harness-headless'
+            : activeProvider === 'deepseek-harness-headless'
               ? 'headless-stdin'
               : 'in-process-fixture',
-          agentWorkspaceView: composition.agentProviderMode === 'fixture'
+          agentWorkspaceView: activeProvider === 'fixture'
             ? 'not-applicable'
             : 'role-allowlist',
           agentSourceIsolation: sdkIsolation ? 'bubblewrap' : 'not-proven',
@@ -278,6 +351,10 @@ export function createKnowledgeServer(input: {
       }
       if (request.method === 'GET' && url.pathname === '/api/v1/system/components') {
         const sampledAt = new Date().toISOString();
+        const providerStatus = composition.apps.providerOperations.getStatus({
+          provider: composition.agentProviderMode,
+          model: composition.runConfiguration.provider.model,
+        });
         const componentNames = ['registry', 'artifactStore', 'workflow', 'provider', 'evaluator'] as const;
         const defaults: Record<typeof componentNames[number], () => Promise<void> | void> = {
           registry: () => { composition.apps.flywheel.status(); },
@@ -294,6 +371,19 @@ export function createKnowledgeServer(input: {
                 timeout = setTimeout(() => reject(new Error('COMPONENT_CHECK_TIMEOUT')), timeoutMs);
               }),
             ]);
+            if (component === 'provider' && !input.componentChecks?.provider) {
+              const status = String(providerStatus.availability);
+              return {
+                component,
+                status,
+                reasonCode: String(providerStatus.reasonCode),
+                message: status === 'AVAILABLE' ? 'Provider 可用'
+                  : status === 'UNAVAILABLE' ? 'Provider 当前不可用'
+                    : status === 'UNKNOWN' ? 'Provider 状态未知' : 'Provider 尚未就绪',
+                checkedAt: sampledAt,
+                lastSucceededAt: status === 'AVAILABLE' ? sampledAt : null,
+              };
+            }
             const degraded = component === 'provider' && composition.agentProviderMode === 'fixture';
             return {
               component, status: degraded ? 'DEGRADED' : 'AVAILABLE',
@@ -478,6 +568,30 @@ export function createKnowledgeServer(input: {
         send(response, 200, snapshot);
         return;
       }
+      if (request.method === 'GET' && url.pathname === '/api/v1/knowledge/health') {
+        send(response, 200, composition.apps.contentGovernance.getKnowledgeHealth(
+          url.searchParams.get('window') ?? '30d',
+        ));
+        return;
+      }
+      const knowledgeRelation = url.pathname.match(
+        /^\/api\/v1\/knowledge\/([^/]+)\/(lineage|diff)$/,
+      );
+      if (request.method === 'GET' && knowledgeRelation) {
+        const versionId = decodeURIComponent(knowledgeRelation[1] ?? '');
+        if (knowledgeRelation[2] === 'lineage') {
+          const value = composition.apps.contentGovernance.getKnowledgeLineage(versionId);
+          send(response, value ? 200 : 404,
+            value ?? errorBody('KNOWLEDGE_VERSION_NOT_FOUND', 'Resource not found.', currentRequestId));
+          return;
+        }
+        const against = url.searchParams.get('against');
+        if (!against) throw new Error('ARGUMENT_REQUIRED: against');
+        const value = await composition.apps.contentGovernance.getKnowledgeDiff(versionId, against);
+        send(response, value ? 200 : 404,
+          value ?? errorBody('KNOWLEDGE_VERSION_NOT_FOUND', 'Resource not found.', currentRequestId));
+        return;
+      }
       if (request.method === 'GET' && url.pathname === '/api/v1/knowledge') {
         const statuses = (url.searchParams.get('status') ?? '').split(',').filter(Boolean);
         const q = url.searchParams.get('q') ?? '';
@@ -495,8 +609,80 @@ export function createKnowledgeServer(input: {
         send(response, 200, { agents: composition.apps.orchestrator.listAgents() });
         return;
       }
+      if (request.method === 'GET' && url.pathname === '/api/v1/evaluations') {
+        const filters = Object.fromEntries(
+          ['runId', 'moduleId', 'gate', 'status', 'from', 'to']
+            .map((key) => [key, url.searchParams.get(key)])
+            .filter((entry): entry is [string, string] => entry[1] !== null && entry[1] !== ''),
+        );
+        send(response, 200, keysetPage(
+          composition.apps.contentGovernance.listEvaluations(filters),
+          url,
+          (item) => `${String(item.createdAt)}\0${String(item.evaluationId)}`,
+        ));
+        return;
+      }
+      const evaluationArtifact = url.pathname.match(
+        /^\/api\/v1\/evaluations\/([^/]+)\/artifacts\/([^/]+)$/,
+      );
+      if (request.method === 'GET' && evaluationArtifact) {
+        if (!writeToken) {
+          send(response, 503, errorBody('WRITE_API_DISABLED', 'Set WP_KNOWLEDGE_WRITE_TOKEN to authorize evidence downloads.', currentRequestId, true));
+          return;
+        }
+        if (!authorized(request, writeToken)) {
+          send(response, 401, errorBody('UNAUTHORIZED', 'A valid Bearer token is required.', currentRequestId));
+          return;
+        }
+        const evaluationId = decodeURIComponent(evaluationArtifact[1] ?? '');
+        const artifactId = decodeURIComponent(evaluationArtifact[2] ?? '');
+        const value = await composition.apps.contentGovernance.getEvaluationArtifact(evaluationId, artifactId);
+        if (!value) {
+          send(response, 404, errorBody('EVALUATION_ARTIFACT_NOT_FOUND', 'Resource not found.', currentRequestId));
+          return;
+        }
+        response.setHeader('content-disposition', 'attachment; filename="evaluation-evidence"');
+        send(response, 200, Buffer.from(value.bytes), value.ref.mediaType);
+        return;
+      }
+      const evaluationArtifacts = url.pathname.match(/^\/api\/v1\/evaluations\/([^/]+)\/artifacts$/);
+      if (request.method === 'GET' && evaluationArtifacts) {
+        const evaluationId = decodeURIComponent(evaluationArtifacts[1] ?? '');
+        const value = composition.apps.contentGovernance.listEvaluationArtifacts(
+          evaluationId,
+          authorized(request, writeToken),
+        );
+        send(response, value ? 200 : 404,
+          value ?? errorBody('EVALUATION_NOT_FOUND', 'Resource not found.', currentRequestId));
+        return;
+      }
+      const evaluationDetail = url.pathname.match(/^\/api\/v1\/evaluations\/([^/]+)$/);
+      if (request.method === 'GET' && evaluationDetail) {
+        const evaluationId = decodeURIComponent(evaluationDetail[1] ?? '');
+        const value = composition.apps.contentGovernance.getEvaluation(evaluationId);
+        send(response, value ? 200 : 404,
+          value ?? errorBody('EVALUATION_NOT_FOUND', 'Resource not found.', currentRequestId));
+        return;
+      }
+      if (request.method === 'GET' && url.pathname === '/api/v1/evaluation-rules') {
+        send(response, 200, page(composition.apps.contentGovernance.listEvaluationRules(), url));
+        return;
+      }
+      const evaluationRuleDetail = url.pathname.match(/^\/api\/v1\/evaluation-rules\/([^/]+)$/);
+      if (request.method === 'GET' && evaluationRuleDetail) {
+        const ruleId = decodeURIComponent(evaluationRuleDetail[1] ?? '');
+        const value = composition.apps.contentGovernance.getEvaluationRule(ruleId);
+        send(response, value ? 200 : 404,
+          value ?? errorBody('EVALUATION_RULE_NOT_FOUND', 'Resource not found.', currentRequestId));
+        return;
+      }
       if (request.method === 'GET' && url.pathname.startsWith('/api/v1/knowledge/')) {
-        const versionId = decodeURIComponent(url.pathname.slice('/api/v1/knowledge/'.length));
+        const encodedVersionId = url.pathname.slice('/api/v1/knowledge/'.length);
+        if (!encodedVersionId || encodedVersionId.includes('/')) {
+          send(response, 404, errorBody('NOT_FOUND', 'Resource not found.', currentRequestId));
+          return;
+        }
+        const versionId = decodeURIComponent(encodedVersionId);
         const value = await composition.apps.knowledgeSearch.get(versionId);
         send(response, value ? 200 : 404, value ?? errorBody('NOT_FOUND', 'Resource not found.', currentRequestId));
         return;
@@ -508,8 +694,76 @@ export function createKnowledgeServer(input: {
         ));
         return;
       }
+      if (request.method === 'GET' && url.pathname === '/api/v1/sources') {
+        const filters = Object.fromEntries(
+          ['kind', 'type', 'status', 'project']
+            .map((key) => [key, url.searchParams.get(key)])
+            .filter((entry): entry is [string, string] => entry[1] !== null && entry[1] !== ''),
+        );
+        send(response, 200, keysetPage(
+          composition.apps.contentGovernance.listSources(filters),
+          url,
+          (item) => `${String(item.updatedAt)}\0${String(item.sourceId)}`,
+        ));
+        return;
+      }
+      const sourceDetail = url.pathname.match(/^\/api\/v1\/sources\/([^/]+)$/);
+      if (request.method === 'GET' && sourceDetail) {
+        const sourceId = decodeURIComponent(sourceDetail[1] ?? '');
+        const value = composition.apps.contentGovernance.getSource(sourceId);
+        send(response, value ? 200 : 404,
+          value ?? errorBody('SOURCE_NOT_FOUND', 'Resource not found.', currentRequestId));
+        return;
+      }
+      const ruleUpdate = url.pathname.match(/^\/api\/v1\/evaluation-rules\/([^/]+)$/);
+      const sourceUpdate = url.pathname.match(/^\/api\/v1\/sources\/([^/]+)$/);
+      const sourceRefresh = url.pathname.match(/^\/api\/v1\/sources\/([^/]+)\/refresh$/);
+      const isContentMutation = (request.method === 'PATCH' && (ruleUpdate !== null || sourceUpdate !== null))
+        || (request.method === 'POST' && (url.pathname === '/api/v1/sources' || sourceRefresh !== null));
+      if (isContentMutation) {
+        if (!writeToken) {
+          send(response, 503, errorBody('WRITE_API_DISABLED', 'Set WP_KNOWLEDGE_WRITE_TOKEN to enable mutations.', currentRequestId, true));
+          return;
+        }
+        if (!authorized(request, writeToken)) {
+          send(response, 401, errorBody('UNAUTHORIZED', 'A valid Bearer token is required.', currentRequestId));
+          return;
+        }
+        const key = request.headers['idempotency-key'];
+        if (typeof key !== 'string' || !key.trim()) throw new Error('IDEMPOTENCY_KEY_REQUIRED: Idempotency-Key');
+        const payload = await body(request);
+        const command = {
+          idempotencyKey: key.trim(),
+          fingerprint: payloadFingerprint({ method: request.method, path: url.pathname, payload }),
+          actor: 'local-admin',
+        };
+        if (request.method === 'PATCH' && ruleUpdate) {
+          send(response, 200, composition.apps.contentGovernance.updateEvaluationRule(
+            decodeURIComponent(ruleUpdate[1] ?? ''), payload, command,
+          ));
+          return;
+        }
+        if (request.method === 'POST' && url.pathname === '/api/v1/sources') {
+          send(response, 201, await composition.apps.contentGovernance.createSource(payload, command));
+          return;
+        }
+        if (request.method === 'POST' && sourceRefresh) {
+          send(response, 202, await composition.apps.contentGovernance.refreshSource(
+            decodeURIComponent(sourceRefresh[1] ?? ''), command,
+          ));
+          return;
+        }
+        if (request.method === 'PATCH' && sourceUpdate) {
+          send(response, 200, await composition.apps.contentGovernance.updateSource(
+            decodeURIComponent(sourceUpdate[1] ?? ''), payload, command,
+          ));
+          return;
+        }
+      }
       const isMutationRoute = url.pathname === '/api/v1/runs'
         || url.pathname === '/api/v1/knowledge/candidates'
+        || url.pathname === '/api/v1/provider-settings'
+        || url.pathname === '/api/v1/provider-settings/verify'
         || /^\/api\/v1\/runs\/[^/]+\/(?:resume|cancel)$/.test(url.pathname)
         || /^\/api\/v1\/knowledge\/[^/]+\/feedback$/.test(url.pathname)
         || /^\/api\/v1\/agents\/[^/]+\/prompt$/.test(url.pathname);
@@ -530,6 +784,59 @@ export function createKnowledgeServer(input: {
           return;
         }
         const payload = await body(request);
+        if (url.pathname === '/api/v1/provider-settings'
+          || url.pathname === '/api/v1/provider-settings/verify') {
+          if (url.pathname === '/api/v1/provider-settings' && request.method !== 'PUT') {
+            throw new Error('METHOD_NOT_ALLOWED: Provider settings updates require PUT');
+          }
+          if (url.pathname === '/api/v1/provider-settings/verify' && request.method !== 'POST') {
+            throw new Error('METHOD_NOT_ALLOWED: Provider verification requires POST');
+          }
+          requireOnlyKeys(payload, url.pathname.endsWith('/verify')
+            ? ['expectedRevision', 'enable']
+            : ['provider', 'apiUrl', 'apiKey', 'clearApiKey', 'model', 'expectedRevision']);
+          const key = request.headers['idempotency-key'];
+          if (typeof key !== 'string' || !key.trim()) {
+            throw new Error('IDEMPOTENCY_KEY_REQUIRED: Idempotency-Key');
+          }
+          const scope = url.pathname.endsWith('/verify')
+            ? 'provider-settings.verify' : 'provider-settings.put';
+          const normalizedKey = key.trim();
+          if (normalizedKey.length > 256 || /[\0\r\n]/.test(normalizedKey)) {
+            throw new Error('IDEMPOTENCY_KEY_INVALID: Idempotency-Key must contain 1..256 safe characters');
+          }
+          // Store only a digest: PUT may contain the API key and command receipts are durable.
+          const fingerprint = payloadFingerprint({ scope, payload });
+          const memoryKey = `${scope}\0${normalizedKey}`;
+          const previous = idempotencyResults.get(memoryKey)
+            ?? composition.apps.flywheel.getCommandReceipt(scope, normalizedKey);
+          if (previous && previous.fingerprint !== fingerprint) {
+            throw new Error('IDEMPOTENCY_CONFLICT: key reused with different command');
+          }
+          if (previous) {
+            send(response, previous.status, previous.value);
+            return;
+          }
+          const value = scope === 'provider-settings.verify'
+            ? await composition.apps.providerOperations.verify({
+                expectedRevision: payload.expectedRevision,
+                enable: payload.enable,
+              })
+            : await composition.apps.providerOperations.put({
+                provider: payload.provider,
+                apiUrl: payload.apiUrl,
+                apiKey: payload.apiKey,
+                clearApiKey: payload.clearApiKey,
+                model: payload.model,
+                expectedRevision: payload.expectedRevision,
+              });
+          composition.apps.flywheel.saveCommandReceipt({
+            scope, idempotencyKey: normalizedKey, fingerprint, status: 200, value,
+          });
+          idempotencyResults.set(memoryKey, { fingerprint, status: 200, value });
+          send(response, 200, value);
+          return;
+        }
         if (actionItemCommand || regenerationCommand) {
           if (request.method !== 'POST') throw new Error('METHOD_NOT_ALLOWED');
           const key = request.headers['idempotency-key'];
@@ -539,7 +846,7 @@ export function createKnowledgeServer(input: {
           const action = regenerationCommand
             ? 'REGENERATE'
             : String(actionItemCommand?.[2]).toUpperCase() as 'ACKNOWLEDGE' | 'RESOLVE' | 'RETRY';
-          const fingerprint = JSON.stringify({ actionItemId, action, payload });
+          const fingerprint = payloadFingerprint({ actionItemId, action, payload });
           const previous = idempotencyResults.get(normalizedKey)
             ?? composition.apps.flywheel.getCommandReceipt('action-item', normalizedKey);
           if (previous && previous.fingerprint !== fingerprint) throw new Error('IDEMPOTENCY_CONFLICT: key reused with different command');
@@ -636,7 +943,7 @@ export function createKnowledgeServer(input: {
           if (!repositoryRoot) throw new Error('ARGUMENT_REQUIRED: repositoryRoot');
           const key = request.headers['idempotency-key'];
           if (typeof key !== 'string' || !key.trim()) throw new Error('IDEMPOTENCY_KEY_REQUIRED: Idempotency-Key');
-          const fingerprint = JSON.stringify(payload);
+          const fingerprint = payloadFingerprint(payload);
           const previous = idempotencyResults.get(key);
           if (previous && previous.fingerprint !== fingerprint) throw new Error('IDEMPOTENCY_CONFLICT: key reused with different payload');
           if (previous) {
@@ -666,7 +973,7 @@ export function createKnowledgeServer(input: {
           const runId = decodeURIComponent(runCommand[1] ?? '');
           const key = request.headers['idempotency-key'];
           if (typeof key !== 'string' || !key.trim()) throw new Error('IDEMPOTENCY_KEY_REQUIRED: Idempotency-Key');
-          const fingerprint = JSON.stringify({ runId, command: runCommand[2], payload });
+          const fingerprint = payloadFingerprint({ runId, command: runCommand[2], payload });
           const previous = idempotencyResults.get(key);
           if (previous && previous.fingerprint !== fingerprint) throw new Error('IDEMPOTENCY_CONFLICT: key reused with different command');
           if (previous) {

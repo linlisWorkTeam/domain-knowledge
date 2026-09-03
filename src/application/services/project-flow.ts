@@ -350,7 +350,12 @@ export async function runRealSourceFlow(input: {
     description: finalDocument.output.description,
     category: 'real-source-acceptance', tags: ['ohmyworkpanel', 'e2e'],
     provenance: input.scenario.sourcePaths.map((path) => ({ path, commit: snapshot.commit, pinned: true })),
-    metadata: { scenario: input.scenario.name, iteration: 1, correctionId: review.output.correction.correctionId },
+    metadata: {
+      scenario: input.scenario.name,
+      iteration: 1,
+      correctionId: review.output.correction.correctionId,
+      correctionEvidenceRefs: [correctionRef],
+    },
   });
   if (finalCandidate.quality.outcome !== 'ACCEPTED') throw new Error('FINAL_KNOWLEDGE_QUALITY_REJECTED');
   if (finalCandidate.version.parentVersionId !== firstCandidate.version.versionId) {

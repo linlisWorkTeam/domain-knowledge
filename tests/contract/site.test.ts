@@ -19,7 +19,24 @@ const release = JSON.parse(readFileSync(`${siteRoot}/release.json`, 'utf8')) as 
   sourceRepository: string;
   evidenceRunId: string;
   siteRoot: string;
+  featureRelease: {
+    releaseId: string;
+    phases: string[];
+    capture: {
+      script: string;
+      provenance: string;
+      frames: number;
+      evidenceRunId: string;
+      secretRendered: boolean;
+      gif: { path: string; sha256: string };
+      poster: { path: string; sha256: string };
+    };
+  };
 };
+
+function sha256(path: string): string {
+  return createHash('sha256').update(readFileSync(path)).digest('hex');
+}
 
 function themeTokens(source: string, selector: string): Record<string, string> {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -64,13 +81,21 @@ function assertReadablePalette(
 test('GitHub Pages site is self-contained and project-path safe', () => {
   for (const path of [
     'index.html', 'styles.css', 'app.js', 'mark.svg', 'social-card.svg', '.nojekyll', 'README.md',
-    'release.json',
+    'release.json', 'console-dev007-dev008.gif', 'console-dev007-dev008-poster.webp',
   ]) {
     assert.equal(existsSync(`${siteRoot}/${path}`), true, `missing site asset: ${path}`);
   }
   assert.doesNotMatch(html, /(?:src|href)="\/(?!\/)/, 'local assets must not assume a domain root');
   assert.doesNotMatch(html, /(?:unpkg|jsdelivr|fonts\.googleapis|googletagmanager)/i);
+  assert.doesNotMatch(html, /(?:src|srcset)="https?:\/\//i, 'rendered assets must remain local');
+  assert.doesNotMatch(css, /(?:@import|url\(\s*["']?https?:\/\/)/i, 'styles must not fetch external assets');
   assert.match(html, /connect-src 'none'/);
+  assert.match(html, /img-src 'self' data:/);
+  assert.match(html, /href="#release"/);
+  assert.match(html, /id="release"/);
+  assert.match(html, /确定性验收种子/);
+  assert.match(html, /不代表外部生产表现/);
+  assert.match(html, /<source media="\(prefers-reduced-motion: reduce\)" srcset="\.\/console-dev007-dev008-poster\.webp\?v=/);
 
   const ids = new Set([...html.matchAll(/\sid="([^"]+)"/g)].map((match) => match[1]));
   for (const match of html.matchAll(/href="#([^"]+)"/g)) {
@@ -104,6 +129,38 @@ test('public release marker binds the site assets to their migration source and 
     digest.update(asset).update('\0').update(readFileSync(`${siteRoot}/${asset}`)).update('\0');
   }
   assert.equal(release.contentDigest, `sha256:${digest.digest('hex')}`);
+
+  assert.equal(release.featureRelease.releaseId, 'dev-007-dev-008-2026-09-04');
+  assert.deepEqual(release.featureRelease.phases, ['DEV-007', 'DEV-008']);
+  const capture = release.featureRelease.capture;
+  assert.equal(capture.script, 'scripts/capture-console-demo.mjs');
+  assert.equal(capture.provenance, 'actual-console-persisted-deterministic-acceptance-seed');
+  assert.ok(capture.frames >= 6);
+  assert.match(capture.evidenceRunId, /^[a-f0-9-]{36}$/);
+  assert.equal(capture.secretRendered, false);
+  for (const asset of [capture.gif, capture.poster]) {
+    assert.match(asset.path, /^site\/[a-z0-9-]+\.(?:gif|webp)$/);
+    assert.equal(existsSync(asset.path), true, `missing captured asset: ${asset.path}`);
+    assert.equal(asset.sha256, sha256(asset.path), `capture digest mismatch: ${asset.path}`);
+    assert.ok(html.includes(`./${asset.path.slice('site/'.length)}?v=${release.assetVersion}`));
+  }
+  assert.match(readFileSync(capture.gif.path).subarray(0, 6).toString('ascii'), /^GIF8[79]a$/);
+  const posterHeader = readFileSync(capture.poster.path).subarray(0, 12);
+  assert.equal(posterHeader.subarray(0, 4).toString('ascii'), 'RIFF');
+  assert.equal(posterHeader.subarray(8, 12).toString('ascii'), 'WEBP');
+
+  const developmentServer = readFileSync(`${siteRoot}/dev-server.mjs`, 'utf8');
+  assert.match(developmentServer, /\['\.gif', 'image\/gif'\]/);
+  assert.match(developmentServer, /\['\.webp', 'image\/webp'\]/);
+
+  const captureScript = readFileSync(capture.script, 'utf8');
+  assert.match(captureScript, /new SQLiteOperationalMetrics/);
+  assert.match(captureScript, /composition\.workflowObserver\.record/);
+  assert.match(captureScript, /actions\/acknowledge/);
+  assert.match(captureScript, /actions\/resolve/);
+  assert.match(captureScript, /estimatedCostUsd: null/);
+  assert.doesNotMatch(captureScript, /const operationalMetrics\s*=/,
+    'capture must aggregate persisted facts instead of injecting metric responses');
 });
 
 test('project site exposes human and Agent onboarding without weakening trust gates', () => {
@@ -140,13 +197,14 @@ test('public surfaces use consistent Chinese copy and approved technical identif
   assert.match(html, /<html lang="zh-CN">/);
   assert.match(consoleHtml, /<html lang="zh-CN">/);
   assert.match(html, /<meta property="og:locale" content="zh_CN">/);
-  assert.match(consoleHtml, />工作台 · 知识飞轮</);
+  assert.match(consoleHtml, /<h1 id="page-title">操作中心<\/h1>/);
+  assert.doesNotMatch(consoleHtml, /id="page-(?:eyebrow|description)"/);
   assert.doesNotMatch(html, /English summary|WHY WPKNOWLEDGE|THE FLYWHEEL|USE CASES|LIVE EVIDENCE|GET STARTED|BUILD KNOWLEDGE THAT HOLDS/);
   assert.doesNotMatch(consoleScript, /LANGGRAPH EXECUTION PROJECTION|LATEST GATE|EVENT SEQUENCE|IMMUTABLE EVIDENCE|HUMAN IN THE LOOP|PRODUCTIZATION/);
   assert.doesNotMatch(css, /content:\s*["']EVIDENCE["']/);
   assert.doesNotMatch(socialCard, /Evidence-driven|Spec-driven|Evidence-first|Deterministic Gate|>VERIFIED</);
   assert.match(html, /规范驱动/);
-  assert.match(consoleScript, /服务端尚未配置写入令牌。请到“设置”查看配置方法。/);
+  assert.match(consoleScript, /服务端尚未配置写入令牌。请到“Agent 设置”查看配置方法。/);
 });
 
 test('UI prototype navigation and frontend spec reflect the reviewed delivery boundary', () => {
@@ -165,8 +223,8 @@ test('UI prototype navigation and frontend spec reflect the reviewed delivery bo
   assert.match(frontendSpec, /### 系统实施 Phase 1：/);
   assert.match(frontendSpec, /Preview HTTP API 规范/);
   assert.match(httpApiSpec, /\| `GET \/api\/v1\/system\/status` \| Available \|/);
-  assert.match(httpApiSpec, /\| `GET \/api\/v1\/knowledge\/:versionId\/lineage` \| Planned \|/);
-  assert.match(httpApiSpec, /第一阶段操作中心只能从 `FAILED`、`LOW_CONFIDENCE`/);
+  assert.match(httpApiSpec, /\| `GET \/api\/v1\/knowledge\/:versionId\/lineage` \| Available \|/);
+  assert.match(httpApiSpec, /操作中心只能从 `FAILED`、`LOW_CONFIDENCE`/);
   assert.match(frontendSpec, /生产导航唯一有效版本为“操作中心、飞轮批次、知识、工作流图、评测、来源、Agent 设置”/);
   assert.match(frontendSpec, /结论：`Accepted`。本次用户确认当前版本为最终 UI\/UX/);
   for (const contract of [
@@ -196,6 +254,7 @@ test('site and Console expose the embedded workflow boundary and prompt-only Age
   assert.match(consoleHtml, /data-page="agent-settings"/);
   assert.match(consoleScript, /\/api\/v1\/agents/);
   assert.match(consoleScript, /promptAddon/);
+  assert.match(consoleScript, /Agent 可以调整表达，不能改变职责/);
   assert.match(consoleScript, /workflowNodes/);
   assert.match(frontendSpec, /KF-UI-014/);
   assert.match(frontendSpec, /KF-UI-015/);
@@ -261,7 +320,7 @@ test('project site and Console implement separate light and dark themes', () => 
   assertReadablePalette(consoleLight, ['text', 'muted', 'faint', 'accent-text', 'success', 'warning', 'governance', 'danger'], 'Console light');
 });
 
-test('production Console implements the F2 seven-page navigation and truthful data boundary', () => {
+test('production Console implements the seven-page navigation and truthful F2-F5 data boundary', () => {
   const consoleHtml = readFileSync('web/index.html', 'utf8');
   const consoleCss = readFileSync('web/styles.css', 'utf8');
   const consoleScript = readFileSync('web/app.js', 'utf8');
@@ -269,12 +328,29 @@ test('production Console implements the F2 seven-page navigation and truthful da
   for (const label of ['操作中心', '飞轮批次', '知识', '工作流图', '评测', '来源', 'Agent 设置']) {
     assert.ok(consoleHtml.includes(`>${label}<`) || consoleHtml.includes(`${label} <`), `Console navigation misses ${label}`);
   }
-  assert.match(consoleScript, /request\('\/api\/v1\/sources\/scan'\)/);
-  assert.match(consoleScript, /\/api\/v1\/knowledge\?q=/);
+  assert.match(consoleScript, /request\(`\/api\/v1\/sources\?\$\{sourceQuery\}`\)/);
+  assert.match(consoleScript, /force \? request\('\/api\/v1\/sources\/scan'\) : Promise\.resolve\(state\.discovery\)/);
+  assert.match(consoleScript, /if \(page === 'sources'\) await renderDiscovery\(\)/);
+  assert.doesNotMatch(consoleScript, /if \(page === 'sources'\) await renderDiscovery\(true\)/);
+  assert.match(consoleScript, /const params = new URLSearchParams\(\)/);
+  assert.match(consoleScript, /params\.set\('q', state\.knowledgeQuery\)/);
+  assert.match(consoleScript, /params\.set\('status', state\.knowledgeStatus\)/);
+  assert.match(consoleScript, /\/api\/v1\/knowledge\/\$\{encoded\}\/lineage/);
+  assert.match(consoleScript, /\/diff\?against=/);
+  assert.match(consoleScript, /\/api\/v1\/evaluations\?/);
+  assert.match(consoleScript, /\/api\/v1\/evaluation-rules/);
+  assert.match(consoleScript, /\/api\/v1\/provider-settings\/verify/);
+  assert.match(consoleScript, /\/api\/v1\/metrics\/runs\?window=/);
+  assert.match(consoleScript, /\/api\/v1\/metrics\/governance\?window=/);
+  assert.match(consoleScript, /\/api\/v1\/knowledge\/health/);
   assert.match(consoleScript, /\/workflow-nodes/);
   assert.match(consoleScript, /\/workflow-status/);
   assert.match(consoleScript, /\/events\?after=0/);
   assert.match(consoleScript, /Promise\.allSettled/);
+  assert.match(consoleScript, /JSON\.parse\(String\(data\.get\('scope'\) \|\| '\{\}'\)\)/);
+  assert.match(consoleScript, /适用范围必须是有效的 JSON 对象/);
+  assert.match(consoleScript, /排队耗时 P50 \/ P95/);
+  assert.match(consoleScript, /查看指标口径/);
   assert.match(consoleScript, /const ATTENTION = new Set\(\['LOW_CONFIDENCE', 'FAILED'\]\)/);
   assert.match(consoleScript, /latestDecision\?\.outcome === 'STOPPED'/);
   assert.doesNotMatch(consoleScript, /\/api\/v1\/(?:transition|evaluate|publish)/);
@@ -284,7 +360,7 @@ test('production Console implements the F2 seven-page navigation and truthful da
     assert.match(`${consoleHtml}\n${consoleScript}`, new RegExp(`class="[^"]*${visualHook}`), `Console misses reference-layout hook ${visualHook}`);
     assert.match(consoleCss, new RegExp(`\\.${visualHook}`), `Console misses reference-layout styling ${visualHook}`);
   }
-  assert.match(consoleScript, /预计完成时间暂不可用/);
+  assert.match(consoleScript, /暂不提供预计完成时间/);
   assert.match(consoleHtml, /role="dialog" aria-modal="true" aria-labelledby="drawer-title"/);
   assert.match(consoleScript, /drawerReturnFocus/);
   assert.match(consoleScript, /event\.key === 'Tab'.*drawer\.classList\.contains\('open'\)/s);

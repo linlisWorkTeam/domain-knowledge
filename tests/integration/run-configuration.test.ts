@@ -145,3 +145,89 @@ test('provider parameter digest covers headless arguments and SDK patch content'
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test('Pi RunConfigurationSnapshot freezes every non-secret execution parameter', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'wp-pi-provider-digest-'));
+  const runtimeDir = join(root, 'runtime');
+  const trackedKeys = [
+    'WP_PI_MAX_TOKENS', 'WP_PI_MAX_SCHEMA_ATTEMPTS', 'WP_PI_CONTEXT_WINDOW',
+    'WP_DSH_MAX_TOKENS',
+  ] as const;
+  const previous = new Map(trackedKeys.map((key) => [key, process.env[key]]));
+  const compositions: ReturnType<typeof createComposition>[] = [];
+  const create = () => {
+    const composition = createComposition({
+      runtimeDir,
+      clock: () => '2026-09-04T00:00:00.000Z',
+      providerEndpointPolicy: {
+        validate: async (raw) => ({
+          url: new URL(raw.endsWith('/') ? raw : `${raw}/`), addresses: ['1.1.1.1'],
+        }),
+      },
+      providerProbe: {
+        verify: async ({ model }) => ({ status: 'VERIFIED', reasonCode: 'READY', model }),
+      },
+    });
+    compositions.push(composition);
+    return composition;
+  };
+  try {
+    process.env.WP_PI_MAX_TOKENS = '4096';
+    process.env.WP_PI_MAX_SCHEMA_ATTEMPTS = '2';
+    process.env.WP_PI_CONTEXT_WINDOW = '16384';
+    process.env.WP_DSH_MAX_TOKENS = '1111';
+    const first = create();
+    await first.apps.providerOperations.put({
+      provider: 'pi-agent', apiUrl: 'https://provider.example/v1', apiKey: 'snapshot-secret',
+      model: 'model-a', expectedRevision: 0,
+    });
+    await first.apps.providerOperations.verify({ expectedRevision: 1 });
+    const run = first.apps.flywheel.createRun('pi-runtime-snapshot', 'local-v1');
+    const snapshot = await first.runConfiguration.capture(run.runId);
+    assert.equal(snapshot.provider.kind, 'pi-agent');
+    const runtime = first.apps.providerOperations.requireRuntimeConfiguration(snapshot.provider);
+    assert.deepEqual({
+      api: runtime.api,
+      maxTokens: runtime.maxTokens,
+      maxSchemaAttempts: runtime.maxSchemaAttempts,
+      contextWindow: runtime.contextWindow,
+    }, {
+      api: 'openai-completions', maxTokens: 4096, maxSchemaAttempts: 2, contextWindow: 16384,
+    });
+    assert.doesNotMatch(JSON.stringify(snapshot), /snapshot-secret/);
+    first.close();
+
+    // DSH settings no longer affect the Pi execution digest.
+    process.env.WP_DSH_MAX_TOKENS = '2222';
+    const dshChanged = create();
+    await dshChanged.runConfiguration.assertCompatible(run.runId);
+    dshChanged.close();
+
+    process.env.WP_PI_MAX_TOKENS = '4097';
+    const tokenChanged = create();
+    await assert.rejects(
+      tokenChanged.runConfiguration.assertCompatible(run.runId),
+      /run provider configuration changed/,
+    );
+    tokenChanged.close();
+
+    process.env.WP_PI_MAX_TOKENS = '4096';
+    process.env.WP_PI_MAX_SCHEMA_ATTEMPTS = '3';
+    const attemptsChanged = create();
+    await assert.rejects(
+      attemptsChanged.runConfiguration.assertCompatible(run.runId),
+      /run provider configuration changed/,
+    );
+    attemptsChanged.close();
+  } finally {
+    for (const composition of compositions) {
+      try { composition.close(); } catch { /* already closed */ }
+    }
+    for (const key of trackedKeys) {
+      const value = previous.get(key);
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+    rmSync(root, { recursive: true, force: true });
+  }
+});

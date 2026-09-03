@@ -213,6 +213,7 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
   readonly evaluator: ProjectEvaluator;
   readonly assetRoot: string;
   readonly agent?: AgentProvider;
+  readonly agentResolver?: (runId: string) => AgentProvider | undefined;
   readonly agentWorkspaces?: AgentWorkspaceProvider;
   readonly contracts: AgentContractValidator;
 
@@ -223,6 +224,7 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
     assetRoot: string;
     contracts: AgentContractValidator;
     agent?: AgentProvider;
+    agentResolver?: (runId: string) => AgentProvider | undefined;
     agentWorkspaces?: AgentWorkspaceProvider;
   }) {
     this.flywheel = input.flywheel;
@@ -231,6 +233,7 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
     this.assetRoot = resolve(input.assetRoot);
     this.contracts = input.contracts;
     this.agent = input.agent;
+    this.agentResolver = input.agentResolver;
     this.agentWorkspaces = input.agentWorkspaces;
   }
 
@@ -280,7 +283,7 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
       }, null, 2)), 'application/json');
     }
     const commandInput = { ...input, context: { ...input.context, snapshot, scenarioRef } };
-    const agent = this.agent
+    const agent = this.agentForRun(input.runId)
       ? await this.runLiveAgentCheckpoint(commandInput, scenario, 'orchestrator')
       : await this.commitAgentOutput(commandInput, scenario, 'orchestrator', {
         strategy: 'fixed-knowledge-flywheel-v1',
@@ -298,10 +301,10 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
     scenario: AutomatedProjectScenario,
     agentId: AgentId,
   ): Promise<WorkflowStageResult> {
-    if (this.agent) {
+    if (this.agentForRun(input.runId)) {
       const ref = await this.runLiveAgentCheckpoint(input, scenario, agentId);
       return {
-        detail: `${agentId} produced schema-validated DeepSeek Harness output`,
+        detail: `${agentId} produced schema-validated Provider output`,
         context: { [contextKey(input.nodeId, input.iteration, input.workerId)]: ref },
       };
     }
@@ -362,7 +365,8 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
     agentId: AgentId,
     command: AgentCommand,
   ): Promise<Record<string, unknown>> {
-    if (!this.agent) throw new Error('WORKFLOW_LIVE_AGENT_UNAVAILABLE');
+    const agent = this.agentForRun(input.runId);
+    if (!agent) throw new Error('WORKFLOW_LIVE_AGENT_UNAVAILABLE');
     if (!this.agentWorkspaces) throw new Error('WORKFLOW_AGENT_WORKSPACE_UNAVAILABLE');
     const snapshot = input.context.snapshot as ProjectSnapshot | undefined;
     if (!snapshot) throw new Error('WORKFLOW_PROJECT_SNAPSHOT_MISSING');
@@ -384,7 +388,7 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
       ref,
       content: await this.readArtifact(ref),
     })));
-    return this.agent.run({
+    return agent.run({
       role: agentId,
       prompt: `${input.prompt}\n\n受信 AgentCommand：\n${JSON.stringify(command)}\n\n命令引用工件（已校验内容摘要）：\n${JSON.stringify(materials)}`,
       outputSchema: outputSchemaFor(agentId, scenario),
@@ -448,11 +452,38 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
     const documentRef = input.context[contextKey('doc_gen', input.iteration)] as ArtifactRef | undefined;
     if (!documentRef) throw new Error('WORKFLOW_DOC_OUTPUT_MISSING');
     const document = await this.readAgentOutput<DocumentOutput>(documentRef, 'doc-gen', input);
+    const previousReviewRef = input.iteration > 0
+      ? input.context[contextKey('review', input.iteration - 1)] as ArtifactRef | undefined
+      : undefined;
+    let correctionIds: string[] = [];
+    let correctionEvidenceRefs: ArtifactRef[] = [];
+    if (previousReviewRef) {
+      const previousReview = await this.readAgentResult(
+        previousReviewRef,
+        'review',
+        input.runId,
+        this.expectedAgentGenerationKey(input, 'review', input.iteration - 1),
+      );
+      const corrections = previousReview.payload['corrections'];
+      if (Array.isArray(corrections)) {
+        correctionIds = corrections.flatMap((correction) => (
+          correction && typeof correction === 'object'
+            && typeof (correction as Record<string, unknown>).correctionId === 'string'
+            ? [String((correction as Record<string, unknown>).correctionId)]
+            : []
+        ));
+        correctionEvidenceRefs = corrections.flatMap((correction) => {
+          if (!correction || typeof correction !== 'object') return [];
+          const refs = (correction as Record<string, unknown>).evidenceRefs;
+          return Array.isArray(refs) ? refs as ArtifactRef[] : [];
+        });
+      }
+    }
     const checkpoint = await this.flywheel.executeNode({
       runId: input.runId,
       nodeId: input.nodeId,
       generationKey: `${input.runId}:${input.nodeId}:${input.iteration}`,
-      inputRefs: [documentRef],
+      inputRefs: previousReviewRef ? [documentRef, previousReviewRef] : [documentRef],
     }, async () => {
       const candidate = await this.flywheel.ingestCandidate({
         moduleId: scenario.moduleId,
@@ -466,7 +497,14 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
           commit: (input.context.snapshot as ProjectSnapshot).commit,
           pinned: true,
         })),
-        metadata: { workflow: 'embedded-domain-knowledge', iteration: input.iteration },
+        metadata: {
+          workflow: 'embedded-domain-knowledge',
+          iteration: input.iteration,
+          ...(correctionIds.length > 0 ? { correctionIds } : {}),
+          ...(correctionEvidenceRefs.length > 0
+            ? { correctionEvidenceRefs: this.uniqueRefs(correctionEvidenceRefs) }
+            : {}),
+        },
       });
       return [candidate.version.bodyRef];
     });
@@ -1052,6 +1090,10 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
   private async readArtifact(ref: ArtifactRef): Promise<unknown> {
     const text = Buffer.from(await this.flywheel.getArtifact(ref)).toString('utf8');
     return ref.mediaType.includes('json') ? JSON.parse(text) as unknown : text;
+  }
+
+  private agentForRun(runId: string): AgentProvider | undefined {
+    return this.agentResolver?.(runId) ?? this.agent;
   }
 }
 
