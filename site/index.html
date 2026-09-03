@@ -17,8 +17,8 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'none'; base-uri 'none'; form-action 'none'">
   <title>WORKPANEL · KNOWLEDGE FLYWHEEL</title>
   <link rel="canonical" href="https://linlisworkteam.github.io/domain-knowledge/">
-  <link rel="icon" href="./mark.svg?v=20260903-1" type="image/svg+xml">
-  <link rel="stylesheet" href="./styles.css?v=20260903-1">
+  <link rel="icon" href="./mark.svg?v=20260904-2" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css?v=20260904-2">
 </head>
 <body>
   <a class="skip-link" href="#main-content">跳到主要内容</a>
@@ -26,7 +26,7 @@
   <header class="site-header" data-header>
     <div class="nav-shell">
       <a class="brand" href="#top" aria-label="知识飞轮首页">
-        <img src="./mark.svg?v=20260903-1" width="38" height="38" alt="">
+        <img src="./mark.svg?v=20260904-2" width="38" height="38" alt="">
         <span>
           <strong>知识飞轮</strong>
           <small>可验证的工程知识</small>
@@ -34,6 +34,7 @@
       </a>
 
       <nav class="desktop-nav" aria-label="主要导航">
+        <a href="#release">本次更新</a>
         <a href="#why">为什么</a>
         <a href="#flywheel">飞轮流程</a>
         <a href="#use-cases">使用场景</a>
@@ -56,6 +57,7 @@
     </div>
 
     <nav id="mobile-menu" class="mobile-nav" data-mobile-menu aria-label="移动端导航" hidden>
+      <a href="#release">本次更新</a>
       <a href="#why">为什么</a>
       <a href="#flywheel">飞轮流程</a>
       <a href="#use-cases">使用场景</a>
@@ -147,6 +149,70 @@
         <div><strong>可追踪</strong><span>运行 → 事件 → 证据</span></div>
         <div><strong>可恢复</strong><span>检查点与重放</span></div>
         <div><strong>可审计</strong><span>原子发布</span></div>
+      </div>
+    </section>
+
+    <section id="release" class="section release-section">
+      <div class="section-shell">
+        <div class="release-heading reveal">
+          <div>
+            <p class="eyebrow">本次更新 · DEV-007 / DEV-008</p>
+            <h2>控制台开始真正<br>接管知识治理。</h2>
+          </div>
+          <p>从配置 Agent，到核对知识血缘、评测证据和来源漂移，关键路径已经接入真实服务接口。动图使用确定性验收种子验证完整数据链路，界面中的分数、状态和计量均由持久化事实聚合，不代表外部生产表现。</p>
+        </div>
+
+        <div class="release-showcase reveal">
+          <figure class="console-demo">
+            <div class="console-demo-bar" aria-hidden="true">
+              <span><i></i><i></i><i></i></span>
+              <b>知识飞轮控制台 · 真实接口演示</b>
+              <em>确定性验收种子</em>
+            </div>
+            <picture>
+              <source media="(prefers-reduced-motion: reduce)" srcset="./console-dev007-dev008-poster.webp?v=20260904-2" type="image/webp">
+              <img src="./console-dev007-dev008.gif?v=20260904-2" width="960" height="600" loading="lazy" decoding="async" alt="知识飞轮控制台依次展示操作中心、知识血缘与差异、评测、来源、Agent 设置和明暗主题">
+            </picture>
+            <figcaption>
+              <span><i></i> 从实际运行的 Console 录制</span>
+              <span>真实服务接口 · 确定性验收种子 · 不含密钥</span>
+            </figcaption>
+          </figure>
+
+          <ol class="demo-sequence" aria-label="演示内容顺序">
+            <li><span>01</span><b>操作中心</b><small>健康度与待办事实</small></li>
+            <li><span>02</span><b>知识证据链</b><small>血缘、差异与反向导航</small></li>
+            <li><span>03</span><b>评测与来源</b><small>不可变报告、规则、漂移</small></li>
+            <li><span>04</span><b>Agent 设置</b><small>连接验证、计量、治理效果</small></li>
+          </ol>
+        </div>
+
+        <div class="release-capabilities">
+          <article class="release-card reveal">
+            <span>Agent 执行</span>
+            <h3>先验证，再成为新批次默认方式</h3>
+            <p>在本地保存 API 地址、API Key 和模型，连接验证成功后才启用 Pi Agent。密钥加密落盘，不回填到浏览器，也不会写入审计事件。</p>
+            <ul><li>地址策略默认拒绝私网与重定向</li><li>每个批次固定执行配置快照</li></ul>
+          </article>
+          <article class="release-card reveal">
+            <span>知识证据链</span>
+            <h3>从知识结论一路返回产生它的证据</h3>
+            <p>知识健康度、版本血缘和差异已经成为可查询事实。可以从版本进入关联批次、评测报告、纠正记录和发布凭据。</p>
+            <ul><li>总分与分项口径由服务端计算</li><li>差异范围经过修订约束校验</li></ul>
+          </article>
+          <article class="release-card reveal">
+            <span>治理资源</span>
+            <h3>评测和来源都有独立生命周期</h3>
+            <p>评测报告、证据工件与规则修订可以复核；来源可以登记、筛选、刷新、识别漂移和停用，历史记录不会被直接删除。</p>
+            <ul><li>规则新修订只影响后续评测</li><li>来源刷新保留审计与幂等结果</li></ul>
+          </article>
+          <article class="release-card reveal">
+            <span>运行与效果</span>
+            <h3>速度、成本和治理效果放在一起看</h3>
+            <p>运行观测给出批次、节点和排队耗时，以及调用、Token、成本与重试；治理效果继续跟踪收敛、人工介入和短期复发。</p>
+            <ul><li>所有统计同时显示样本量与窗口</li><li>无样本时明确显示为空，不推测结果</li></ul>
+          </article>
+        </div>
       </div>
     </section>
 
@@ -462,7 +528,7 @@ npm run knowledge:serve</code></pre>
   <footer class="site-footer">
     <div class="section-shell footer-grid">
       <div class="footer-brand">
-        <img src="./mark.svg?v=20260903-1" width="34" height="34" alt="">
+        <img src="./mark.svg?v=20260904-2" width="34" height="34" alt="">
         <div><strong>知识飞轮</strong><small>经得起复验的工程知识</small></div>
       </div>
       <div class="footer-links">
@@ -476,6 +542,6 @@ npm run knowledge:serve</code></pre>
   </footer>
 
   <div class="copy-toast" data-toast role="status" aria-live="polite" hidden>命令已复制</div>
-  <script src="./app.js?v=20260903-1" defer></script>
+  <script src="./app.js?v=20260904-2" defer></script>
 </body>
 </html>

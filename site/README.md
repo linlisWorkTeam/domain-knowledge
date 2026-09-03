@@ -14,14 +14,30 @@ npm run site:serve
 
 ## 文件
 
-- `index.html`：语义结构、项目内容和使用入口；
+- `index.html`：语义结构、项目内容、版本更新和使用入口；
 - `styles.css`：深色/浅色主题、响应式布局和动效；
 - `app.js`：主题、导航、飞轮阶段、快速入门页签和复制；
 - `mark.svg`、`social-card.svg`：站点图标和分享卡片；
+- `console-dev007-dev008.gif`：由真实 Console 与持久化接口数据录制的 DEV-007/008 操作动图；
+- `console-dev007-dev008-poster.webp`：为减少动态效果的访问者提供的静态替代图；
 - `release.json`：当前公开内容的发布标识、内容提交和演示证据 Run，供部署验收读取；
 - `dev-server.mjs`：无依赖的本地静态服务器。
 
 页面使用相对资源路径，可以部署在 GitHub Pages 的 `/domain-knowledge/` 项目子路径下。没有 CDN、第三方字体、统计脚本或后端请求。
+
+## 重录 Console 动图
+
+在仓库根目录运行：
+
+```bash
+node scripts/capture-console-demo.mjs
+```
+
+脚本会启动真实的 `createKnowledgeServer`，在临时目录中通过正式 API 写入知识版本、评测证据、来源漂移和已验证的 Pi Agent 配置，并通过正式工作流观察器、治理命令和 SQLite 观测组件写入确定性验收事实，再用 Chromium 依次截取操作中心、知识血缘与差异、评测、来源、Agent 设置、治理指标和浅色主题。输出会覆盖 GIF 与静态替代图，临时数据库和来源目录在结束时删除。
+
+这些记录只用于复验数据链路，不代表外部生产表现。调用耗时、Token 和重试来自持久化验收事实；未配置可信模型定价时，估算成本保持显示为 `—`。
+
+演示使用专用假密钥。录制前会检查所有密码输入框与可见文字，发现密钥值就直接失败；生成的公开资产不包含密钥。该脚本需要项目依赖已经安装，并需要 Playwright Chromium 可用。
 
 ## 发布
 

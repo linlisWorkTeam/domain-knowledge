@@ -11,10 +11,12 @@ if (!Number.isInteger(parsedPort) || parsedPort < 1 || parsedPort > 65535) {
 
 const mediaTypes = new Map([
   ['.css', 'text/css; charset=utf-8'],
+  ['.gif', 'image/gif'],
   ['.html', 'text/html; charset=utf-8'],
   ['.js', 'text/javascript; charset=utf-8'],
   ['.md', 'text/markdown; charset=utf-8'],
   ['.svg', 'image/svg+xml'],
+  ['.webp', 'image/webp'],
 ]);
 
 const server = createServer((request, response) => {
