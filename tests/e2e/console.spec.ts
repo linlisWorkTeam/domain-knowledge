@@ -115,6 +115,37 @@ test('partial API failures remain explicit without replacing persisted facts', a
   await expect(page.getByText('状态服务暂不可用')).toHaveCount(0);
 });
 
+test('light theme applies semantic surfaces across all seven pages and drawers', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('wp-knowledge-theme', 'light'));
+  await page.goto(baseUrl);
+  const forbiddenDarkSurfaces = new Set([
+    'rgb(16, 43, 37)', 'rgb(43, 37, 24)', 'rgb(36, 29, 52)',
+    'rgb(46, 25, 32)', 'rgb(28, 34, 43)', 'rgb(16, 38, 51)',
+    'rgb(36, 32, 54)', 'rgb(23, 48, 41)', 'rgb(8, 12, 17)',
+  ]);
+  const assertNoDarkSurfaces = async (pageName: string) => {
+    const offenders = await page.locator('body *').evaluateAll((elements, forbidden) => elements
+      .filter((element) => {
+        const rect = element.getBoundingClientRect();
+        return rect.width > 8 && rect.height > 8 && getComputedStyle(element).visibility !== 'hidden';
+      })
+      .map((element) => ({ element, background: getComputedStyle(element).backgroundColor }))
+      .filter(({ background }) => forbidden.includes(background))
+      .map(({ element, background }) => `${element.tagName}.${element.className}: ${background}`), [...forbiddenDarkSurfaces]);
+    expect(offenders, `${pageName} contains dark-only surfaces in light theme`).toEqual([]);
+  };
+
+  for (const label of ['Action Center', 'Flywheel Runs', 'Knowledge', 'Graph', 'Evaluations', 'Sources', 'Agent Settings']) {
+    if (label !== 'Action Center') await page.getByRole('button', { name: new RegExp(`^${label}$`) }).click();
+    await assertNoDarkSurfaces(label);
+  }
+  await page.getByRole('button', { name: /^Knowledge$/ }).click();
+  await page.getByRole('combobox', { name: '知识状态' }).selectOption('');
+  await page.getByRole('button', { name: /浏览器验收知识/ }).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await assertNoDarkSurfaces('Knowledge drawer');
+});
+
 test('mobile navigation, theme persistence and 200 percent zoom preserve core paths', async ({ page, context }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(baseUrl);
