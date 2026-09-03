@@ -7,6 +7,8 @@
 
 The DSH adapter only translates `wp_knowledge_*` tool calls to the versioned HTTP API. It has no shell access and no publication authority. Read tools work without a write token; mutation tools fail closed when the token is missing.
 
+它只调用 Preview 规范中的资源化路径：知识查询使用 `GET /api/v1/knowledge`，系统状态使用 `GET /api/v1/system/status`，来源扫描使用 `GET /api/v1/sources/scan`，候选摄取与反馈位于 `/api/v1/knowledge/*`。写工具要求调用方提供稳定的 `idempotencyKey`，Adapter 将其转换为 `Idempotency-Key` 请求头且不会写入请求正文。
+
 </details>
 
 配置：
