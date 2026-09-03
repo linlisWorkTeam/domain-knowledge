@@ -363,7 +363,8 @@ sequenceDiagram
 
     Operator->>Console: 启动固定 ohMyWorkPanel Run
     Console->>API: POST /api/v1/run-commands/start
-    API->>Graph: start(runId, fixed scenario)
+    API->>Registry: 保存 RunConfigurationSnapshot + Prompt ArtifactRef
+    API->>Graph: start(runId, fixed scenario + frozen configuration)
     loop 每个节点变化
         Graph->>Registry: WorkflowNodeProjection(runId, node, status, attempt)
         Console->>API: GET /api/v1/runs/:id

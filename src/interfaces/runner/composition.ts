@@ -6,9 +6,11 @@ import {
   EvalRunnerApp, FlywheelApp, KnowledgeDiscoveryApp, KnowledgeSearchApp, Orchestrator,
 } from '../../application/apps/index.ts';
 import {
-  AgentCatalogService, AutomatedProjectWorkflowService, DeterministicQualityPolicy, OhMyWorkPanelWorkflowExecutor,
-  RegistryWorkflowObserver,
+  AGENT_COMMAND_SCHEMA_ID, AGENT_RESULT_SCHEMA_ID, AgentCatalogService,
+  AutomatedProjectWorkflowService, DeterministicQualityPolicy, OhMyWorkPanelWorkflowExecutor,
+  RegistryRunConfigurationService, RegistryWorkflowObserver,
 } from '../../application/services/index.ts';
+import { sha256 } from '../../domain/index.ts';
 import type { AutomatedProjectScenario } from '../../application/services/index.ts';
 import { DOMAIN_KNOWLEDGE_AGENT_DEFINITIONS } from '../../infrastructure/workflow/langgraph/index.ts';
 import { createDomainKnowledgeInfrastructure } from '../../infrastructure/workflow/langgraph/index.ts';
@@ -21,6 +23,7 @@ import {
 } from '../../infrastructure/persistence/sqlite-cas/index.ts';
 import { SourceScanner } from '../../infrastructure/source-scan/index.ts';
 import { LocalAgentWorkspace } from '../../infrastructure/agents/workspace/index.ts';
+import { JsonSchemaAgentContractValidator } from '../../infrastructure/agents/contracts/index.ts';
 import { migrateLegacyOkf } from '../../infrastructure/migration/legacy-okf/index.ts';
 import { ConsoleReadModel } from './console-read-model.ts';
 import { buildDemoReport } from './demo-report.ts';
@@ -117,54 +120,124 @@ export function createComposition(input: {
   if (!['fixture', 'deepseek-harness', 'deepseek-harness-headless'].includes(agentProviderMode)) {
     throw new Error('CONFIG_INVALID: WP_FLYWHEEL_AGENT_PROVIDER must be fixture, deepseek-harness, or deepseek-harness-headless');
   }
+  const sdkProvider = process.env.WP_DSH_PROVIDER?.trim()
+    || (process.env.OPENCODE_GO_API_KEY ? 'opencode-go' : 'deepseek-official');
+  const providerModel = agentProviderMode === 'fixture'
+    ? 'schema-validated-fixture-v1'
+    : process.env.WP_DSH_MODEL?.trim() || 'deepseek-v4-flash';
+  const processIsolation = process.env.WP_DSH_PROCESS_ISOLATION?.trim() || 'bubblewrap';
+  if (processIsolation !== 'none' && processIsolation !== 'bubblewrap') {
+    throw new Error('CONFIG_INVALID: WP_DSH_PROCESS_ISOLATION must be none or bubblewrap');
+  }
+  const profile = process.env.WP_DSH_PROFILE?.trim() || 'sdk';
+  const dshBin = process.env.WP_DSH_BIN?.trim() || 'dsh';
+  const dshHome = process.env.DSH_HOME?.trim() || join(runtimeDir, 'dsh');
+  const bubblewrapCommand = process.env.WP_DSH_BWRAP_COMMAND?.trim() || 'bwrap';
+  const timeoutMs = Number(process.env.WP_DSH_TIMEOUT_MS ?? 600_000);
+  const maxOutputBytes = Number(process.env.WP_DSH_MAX_OUTPUT_BYTES ?? 2 * 1024 * 1024);
+  const maxTokens = Number(process.env.WP_DSH_MAX_TOKENS ?? 32_768);
+  const maxSchemaAttempts = Number(process.env.WP_DSH_MAX_SCHEMA_ATTEMPTS ?? 2);
+  const allowedRoots = (process.env.WP_DSH_ALLOWED_ROOTS?.split(delimiter) ?? [repositoryRoot])
+    .map((root) => root.trim()).filter(Boolean).map((root) => resolve(root));
+  const agentWorkspaceRoot = join(runtimeDir, 'agent-workspaces');
+  const sdkPatches = process.env.WP_DSH_PATCHES_JSON
+    ? JSON.parse(process.env.WP_DSH_PATCHES_JSON) as string[]
+    : sdkProvider === 'opencode-go'
+      ? [join(componentRoot, 'deploy', 'deepseek-harness', 'opencode-go.cordis.yml')]
+      : [];
+  const headlessCommand = process.env.WP_DSH_COMMAND?.trim() || 'dsh';
+  const headlessArgs = process.env.WP_DSH_ARGS_JSON
+    ? JSON.parse(process.env.WP_DSH_ARGS_JSON) as string[]
+    : ['--profile', 'headless'];
+  const patchDigests = agentProviderMode === 'deepseek-harness'
+    ? sdkPatches.map((path) => ({ path, sha256: sha256(readFileSync(path)) }))
+    : [];
+  const providerParameters = agentProviderMode === 'fixture'
+    ? { mode: 'fixture', fixtureVersion: '1' }
+    : agentProviderMode === 'deepseek-harness'
+      ? {
+          mode: agentProviderMode,
+          dshBin,
+          profile,
+          patches: patchDigests,
+          dshHome,
+          provider: sdkProvider,
+          model: providerModel,
+          maxTokens,
+          maxSchemaAttempts,
+          processIsolation,
+          bubblewrapCommand,
+          timeoutMs,
+          maxOutputBytes,
+          allowedWorkspaceRoots: [...allowedRoots, agentWorkspaceRoot],
+        }
+      : {
+          mode: agentProviderMode,
+          command: headlessCommand,
+          args: headlessArgs,
+          timeoutMs,
+          maxOutputBytes,
+          allowedWorkspaceRoots: [...allowedRoots, agentWorkspaceRoot],
+        };
+  const schemaRoot = join(componentRoot, 'specs', 'schemas');
+  const artifactRefSchemaSha256 = sha256(readFileSync(join(schemaRoot, 'artifact-ref.schema.json')));
+  const correctionSchemaSha256 = sha256(readFileSync(join(schemaRoot, 'correction.schema.json')));
+  const runConfiguration = new RegistryRunConfigurationService({
+    definitions: DOMAIN_KNOWLEDGE_AGENT_DEFINITIONS,
+    repository,
+    artifacts,
+    provider: {
+      kind: agentProviderMode,
+      model: providerModel,
+      parametersSha256: sha256(JSON.stringify(providerParameters)),
+    },
+    contracts: {
+      commandSchema: AGENT_COMMAND_SCHEMA_ID,
+      resultSchema: AGENT_RESULT_SCHEMA_ID,
+      commandSchemaSha256: sha256(JSON.stringify({
+        command: sha256(readFileSync(join(schemaRoot, 'agent-command.schema.json'))),
+        artifactRef: artifactRefSchemaSha256,
+      })),
+      resultSchemaSha256: sha256(JSON.stringify({
+        result: sha256(readFileSync(join(schemaRoot, 'agent-result.schema.json'))),
+        artifactRef: artifactRefSchemaSha256,
+        correction: correctionSchemaSha256,
+      })),
+    },
+    clock: input.clock,
+  });
   let workflowPromise: Promise<AutomatedProjectWorkflowService> | null = null;
   const workflow = () => {
     workflowPromise ??= (async () => {
       const auditDirectory = join(runtimeDir, 'demo');
       const auditPath = join(auditDirectory, 'agent-runs.jsonl');
-      const allowedRoots = (process.env.WP_DSH_ALLOWED_ROOTS?.split(delimiter) ?? [repositoryRoot])
-        .map((root) => root.trim()).filter(Boolean).map((root) => resolve(root));
-      const agentWorkspaceRoot = join(runtimeDir, 'agent-workspaces');
       const writeAudit = async (record: Parameters<NonNullable<ConstructorParameters<typeof DeepSeekHarnessSdkAgent>[0]['onAudit']>>[0]) => {
         await mkdir(auditDirectory, { recursive: true });
         await appendFile(auditPath, `${JSON.stringify(record)}\n`, { encoding: 'utf8', mode: 0o600 });
       };
-      const sdkProvider = process.env.WP_DSH_PROVIDER?.trim()
-        || (process.env.OPENCODE_GO_API_KEY ? 'opencode-go' : 'deepseek-official');
-      const sdkPatches = process.env.WP_DSH_PATCHES_JSON
-        ? JSON.parse(process.env.WP_DSH_PATCHES_JSON) as string[]
-        : sdkProvider === 'opencode-go'
-          ? [join(componentRoot, 'deploy', 'deepseek-harness', 'opencode-go.cordis.yml')]
-          : [];
-      const processIsolation = process.env.WP_DSH_PROCESS_ISOLATION?.trim() || 'bubblewrap';
-      if (processIsolation !== 'none' && processIsolation !== 'bubblewrap') {
-        throw new Error('CONFIG_INVALID: WP_DSH_PROCESS_ISOLATION must be none or bubblewrap');
-      }
       const agent = agentProviderMode === 'deepseek-harness'
         ? new DeepSeekHarnessSdkAgent({
-            ...(process.env.WP_DSH_BIN?.trim() ? { dshBin: process.env.WP_DSH_BIN.trim() } : {}),
-            profile: process.env.WP_DSH_PROFILE?.trim() || 'sdk',
+            dshBin,
+            profile,
             patches: sdkPatches,
-            dshHome: process.env.DSH_HOME?.trim() || join(runtimeDir, 'dsh'),
+            dshHome,
             provider: sdkProvider,
-            model: process.env.WP_DSH_MODEL?.trim() || 'deepseek-v4-flash',
-            maxTokens: Number(process.env.WP_DSH_MAX_TOKENS ?? 32_768),
-            maxSchemaAttempts: Number(process.env.WP_DSH_MAX_SCHEMA_ATTEMPTS ?? 2),
+            model: providerModel,
+            maxTokens,
+            maxSchemaAttempts,
             processIsolation,
-            bubblewrapCommand: process.env.WP_DSH_BWRAP_COMMAND?.trim() || 'bwrap',
-            timeoutMs: Number(process.env.WP_DSH_TIMEOUT_MS ?? 600_000),
-            maxOutputBytes: Number(process.env.WP_DSH_MAX_OUTPUT_BYTES ?? 2 * 1024 * 1024),
+            bubblewrapCommand,
+            timeoutMs,
+            maxOutputBytes,
             allowedWorkspaceRoots: [...allowedRoots, agentWorkspaceRoot],
             onAudit: writeAudit,
           })
         : agentProviderMode === 'deepseek-harness-headless'
           ? new DeepSeekHarnessHeadlessAgent({
-            command: process.env.WP_DSH_COMMAND?.trim() || 'dsh',
-            args: process.env.WP_DSH_ARGS_JSON
-              ? JSON.parse(process.env.WP_DSH_ARGS_JSON) as string[]
-              : ['--profile', 'headless'],
-            timeoutMs: Number(process.env.WP_DSH_TIMEOUT_MS ?? 600_000),
-            maxOutputBytes: Number(process.env.WP_DSH_MAX_OUTPUT_BYTES ?? 2 * 1024 * 1024),
+            command: headlessCommand,
+            args: headlessArgs,
+            timeoutMs,
+            maxOutputBytes,
             allowedWorkspaceRoots: [...allowedRoots, agentWorkspaceRoot],
             onAudit: writeAudit,
           })
@@ -174,6 +247,7 @@ export function createComposition(input: {
         evalRunner: evalRunnerApp,
         evaluator: new TrustedProjectEvaluator(artifacts),
         assetRoot: join(componentRoot, 'acceptance', 'ohmyworkpanel'),
+        contracts: new JsonSchemaAgentContractValidator(schemaRoot),
         ...(agent ? { agent } : {}),
         ...(agent ? { agentWorkspaces: new LocalAgentWorkspace({
           workspaceRoot: agentWorkspaceRoot,
@@ -183,17 +257,18 @@ export function createComposition(input: {
       const infrastructure = await createDomainKnowledgeInfrastructure({
         executor,
         observer: workflowObserver,
-        prompts: { getPromptAddon: (agentId) => agents.getPromptAddon(agentId) },
+        prompts: runConfiguration,
         checkpoint: { kind: 'sqlite', filename: join(runtimeDir, 'workflow', 'checkpoints.sqlite') },
         clock: input.clock,
       });
-      return new AutomatedProjectWorkflowService(flywheelApp, infrastructure.engine);
+      return new AutomatedProjectWorkflowService(flywheelApp, infrastructure.engine, runConfiguration);
     })();
     return workflowPromise;
   };
   const orchestrator = new Orchestrator({
     workflow,
     agents,
+    runConfiguration,
     reports: {
       build: (runId) => buildDemoReport({
         runId, runtimeDir, repository, service: flywheelApp, artifacts,
@@ -219,6 +294,7 @@ export function createComposition(input: {
     scanner,
     agents,
     workflowObserver,
+    runConfiguration,
     agentProviderMode,
     automatedWorkflow: workflow,
     close: () => repository.close(),

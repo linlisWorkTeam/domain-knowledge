@@ -7,7 +7,7 @@
 | ID | 场景 |
 |---|---|
 | AC-SPEC-001 | Given 本规范集，When 执行 spec lint，Then 每个 SYS/UI/NFR P0 ID 在追踪矩阵中恰有一行且关联验收场景；非 Planned 行的实现和测试路径非空。 |
-| AC-SCHEMA-001 | Given 每类 Agent 的合法/非法 fixture，When Draft 2020-12 校验，Then 合法输入输出通过，未知字段、缺字段和错误版本失败且不调度下游。 |
+| AC-SCHEMA-001 | Given 七类 Agent 的合法/非法 fixture 和已冻结的 Run 配置，When 运行真实节点契约边界，Then 合法 AgentCommand/AgentResult 通过，未知字段、缺字段、错误版本和角色错配在 Provider 或下游执行前失败；同一 Run 始终使用启动时的配置快照。 |
 | AC-FLOW-001 | Given 一个受支持模块，When 执行 Run，Then 状态按定义顺序完成两条独立生成链并以确定性 Gate 到达终态。 |
 | AC-FLOW-002 | Given 一个可归因失败，When Review 完成，Then Correction 含路径、判据、证据，DocGen 仅改影响范围且 Code fresh 重生成。 |
 | AC-FLOW-003 | Given critical regression 或预算耗尽，When Gate 决策，Then 分别回滚 historical best 或产生 LOW_CONFIDENCE 治理包。 |

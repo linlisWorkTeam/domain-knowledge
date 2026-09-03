@@ -68,7 +68,7 @@ function command(agentType: AgentId, payload: Record<string, unknown>) {
 
 function result(agentType: AgentId, payload: Record<string, unknown>, outputRefs: unknown[] = []) {
   return {
-    schemaVersion: '1.0', commandId: `cmd-${agentType}`, runId: 'run-1', agentType,
+    schemaVersion: '1.0', commandId: `cmd-${agentType}`, commandRef: artifact('c'), runId: 'run-1', agentType,
     status: 'SUCCEEDED', outputRefs, payload,
   };
 }

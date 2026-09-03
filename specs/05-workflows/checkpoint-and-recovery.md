@@ -3,6 +3,7 @@
 ## 两层 checkpoint
 
 - LangGraph Checkpointer 保存 `GraphState`，用于恢复当前节点、并行 worker、轮次、尝试和路由上下文。
+- Run 启动时持久化不可变 `RunConfigurationSnapshot`；恢复只能继续使用其中冻结的 prompt revision、Provider/模型摘要、工具权限和 Schema URI，不能重新读取最新 Agent 配置。
 - Knowledge Registry 保存 `FlywheelRun`、GenerationKey、Artifact、Event、EvaluationReport 与 Publication，负责业务事实、幂等副作用和审计。
 
 两层使用同一个 `runId/thread_id`。前台只能读取 Registry 中的 `WorkflowNodeProjection`，不得读取或解释 LangGraph checkpoint 表。恢复执行不等于重放业务事实：节点即使被再次调用，仍必须经过 GenerationKey 和 publication key 去重。

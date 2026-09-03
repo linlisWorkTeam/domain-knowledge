@@ -11,6 +11,7 @@
 | 搭建开发环境和实现变更 | [DEVELOPMENT.md](DEVELOPMENT.md) | 贡献者、Agent |
 | 只调整某个 Agent 角色，或判断是否必须改核心合同 | [AGENT-CUSTOMIZATION.md](AGENT-CUSTOMIZATION.md) | Agent 定制者、节点开发者、评审者 |
 | 选择测试层级和提交证据 | [TESTING.md](TESTING.md) | 贡献者、评审者 |
+| 汇报当前 LangGraph 框架机制与未测边界 | [框架阶段性测评](report/框架阶段性测评.md) | 汇报者、架构评审者 |
 | 确定目录和文件归属 | [REPOSITORY-GUIDE.md](REPOSITORY-GUIDE.md) | 所有贡献者 |
 | 编写中文主文档与英文摘要 | [DOCUMENTATION-I18N.md](DOCUMENTATION-I18N.md) | 所有贡献者、Agent |
 | 摄取、评测、发布、验收和部署 | [OPERATIONS.md](OPERATIONS.md) | 操作员、维护者 |
