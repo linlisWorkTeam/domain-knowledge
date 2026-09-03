@@ -1,12 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import {
-  assertArtifactRef, assertInvariant, createEvent, createRun, decideGate,
-  sha256, transitionRun,
+  assertArtifactRef, assertInvariant, createEvent, sha256,
 } from '../../domain/index.ts';
 import type {
   ArtifactRef, EvaluationReport, FlywheelRun, GateDecision, GatePolicy,
   KnowledgeVersion, ProvenanceRef, RunState,
 } from '../../domain/index.ts';
+import {
+  EvalRunnerDomainService, FlywheelDomainService,
+} from '../../domain/services/index.ts';
 import type {
   ArtifactStore, FlywheelRepository, NodeCheckpoint, QualityPolicy,
 } from '../ports/index.ts';
@@ -41,24 +43,30 @@ export class KnowledgeFlywheelService {
   readonly artifacts: ArtifactStore;
   readonly repository: FlywheelRepository;
   readonly qualityPolicy: QualityPolicy;
+  readonly flywheelDomain: FlywheelDomainService;
+  readonly evalRunnerDomain: EvalRunnerDomainService;
   readonly clock: () => string;
 
   constructor(input: {
     artifacts: ArtifactStore;
     repository: FlywheelRepository;
     qualityPolicy: QualityPolicy;
+    flywheelDomain?: FlywheelDomainService;
+    evalRunnerDomain?: EvalRunnerDomainService;
     clock?: () => string;
   }) {
     this.artifacts = input.artifacts;
     this.repository = input.repository;
     this.qualityPolicy = input.qualityPolicy;
+    this.flywheelDomain = input.flywheelDomain ?? new FlywheelDomainService();
+    this.evalRunnerDomain = input.evalRunnerDomain ?? new EvalRunnerDomainService();
     this.clock = input.clock ?? (() => new Date().toISOString());
     this.repository.initialize();
   }
 
   createRun(moduleId: string, policyId: string): FlywheelRun {
     const now = this.clock();
-    const run = createRun(moduleId, policyId, now);
+    const run = this.flywheelDomain.createRun(moduleId, policyId, now);
     this.repository.saveRun(run, createEvent(run.runId, 'RunCreated', { moduleId, policyId }, now));
     return run;
   }
@@ -66,7 +74,7 @@ export class KnowledgeFlywheelService {
   transition(runId: string, next: RunState): FlywheelRun {
     const current = this.requireRun(runId);
     const now = this.clock();
-    const updated = transitionRun(current, next, now);
+    const updated = this.flywheelDomain.transition(current, next, now);
     this.repository.updateRun(updated, createEvent(runId, 'RunStateChanged', {
       from: current.state, to: next, iteration: updated.iteration,
     }, now));
@@ -181,8 +189,8 @@ export class KnowledgeFlywheelService {
       reviewBlocking: input.reviewBlocking ?? false,
       createdAt: now,
     };
-    const decision = decideGate(run, report, policy, now);
-    const reviewing = transitionRun(run, 'REVIEWING', now);
+    const decision = this.evalRunnerDomain.decide(run, report, policy, now);
+    const reviewing = this.flywheelDomain.transition(run, 'REVIEWING', now);
     this.repository.saveEvaluationAndDecision(report, decision, reviewing, createEvent(run.runId, 'GateDecided', {
       reportId: report.reportId, decisionId: decision.decisionId,
       versionId: version.versionId, outcome: decision.outcome,
@@ -214,8 +222,10 @@ export class KnowledgeFlywheelService {
     const existing = this.repository.getPublication(publicationKey);
     if (existing) return { ...existing, replayed: true };
     const now = this.clock();
-    const publishing = run.state === 'PUBLISHING' ? run : transitionRun(run, 'PUBLISHING', now);
-    const verified = transitionRun(publishing, 'VERIFIED', now);
+    const publishing = run.state === 'PUBLISHING'
+      ? run
+      : this.flywheelDomain.transition(run, 'PUBLISHING', now);
+    const verified = this.flywheelDomain.transition(publishing, 'VERIFIED', now);
     return this.repository.publish(publicationKey, verified, version, decision, createEvent(runId, 'KnowledgePublished', {
       publicationKey, versionId, decisionId,
     }, now));

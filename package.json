@@ -8,7 +8,7 @@
   },
   "scripts": {
     "knowledge": "node --env-file-if-exists=.env.local src/interfaces/runner/cli.ts",
-    "knowledge:serve": "node --env-file-if-exists=.env.local src/interfaces/runner/server.ts",
+    "knowledge:serve": "node --env-file-if-exists=.env.local src/interfaces/ui-api/index.ts",
     "site:serve": "node site/dev-server.mjs",
     "site:check": "node --test tests/contract/site.test.ts",
     "acceptance:ohmyworkpanel": "node --env-file-if-exists=.env.local src/interfaces/runner/project-acceptance.ts",

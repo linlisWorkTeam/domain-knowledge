@@ -94,6 +94,39 @@ export interface QualityPolicy {
   }): QualityReport;
 }
 
+export interface KnowledgeDiscoveryCandidate {
+  path: string;
+  sha256: string;
+  size: number;
+  modifiedAt: string;
+}
+
+export interface KnowledgeDiscoveryPort {
+  scan(configuredRoots: string[], maximum?: number): {
+    candidates: KnowledgeDiscoveryCandidate[];
+    total: number;
+    truncated: boolean;
+  };
+}
+
+export interface AgentContextStore {
+  get(runId: string, nodeId: string): Promise<Record<string, unknown> | null>;
+  set(runId: string, nodeId: string, context: Record<string, unknown>, ttlMs: number): Promise<void>;
+  delete(runId: string, nodeId: string): Promise<void>;
+}
+
+export interface RunningStateLease {
+  runId: string;
+  ownerId: string;
+  expiresAt: string;
+}
+
+export interface RunningStateStore {
+  acquire(runId: string, ownerId: string, ttlMs: number): Promise<RunningStateLease | null>;
+  get(runId: string): Promise<RunningStateLease | null>;
+  release(runId: string, ownerId: string): Promise<boolean>;
+}
+
 export interface AgentRequest {
   role: string;
   prompt: string;
