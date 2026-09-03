@@ -123,6 +123,6 @@ DEV-009 不修改 `web/`、`site/`、前台产品设计、现有 HTTP 路由或�
 | --- | --- | --- |
 | 2026-09-03 | Agent 运行契约与框架测评合入后的 `main` | TypeScript 通过；Spec：7 schemas、7 commands、8 results、38 P0；测试 112/112；框架测评 6/6 `ACCEPTED` |
 | 2026-09-03 | 前台 F1 Knowledge Console 合入前基线 | TypeScript 通过；Spec：7 schemas、7 commands、8 results、51 P0；测试 114/114；框架测评 6/6 `ACCEPTED`；Chromium E2E 4/4 |
-| 2026-09-03 | DEV-005 F2 + B1 HCP-1 首轮候选 | TypeScript 通过；Spec：7 schemas、7 commands、8 results、51 P0；测试 115/115；迁移后 Server 定向测试 4/4；干净 clone Chromium E2E 5/5；HCP-1=`Rework required`，原因是布局与目标视觉差距 |
+| 2026-09-03 | DEV-005 F2 + B1 HCP-1 返工候选 | TypeScript 通过；Spec：7 schemas、7 commands、8 results、51 P0；测试 115/115；干净 clone Chromium E2E 6/6，含七页与 Drawer 亮色语义面审计；HCP-1 仍为 `Rework required`，等待复验 |
 
 该结果只证明框架机械能力，不代表公司 CodeAgent 效果或生产可用性。
