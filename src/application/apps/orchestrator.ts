@@ -57,7 +57,4 @@ export class Orchestrator {
     return this.reports.build(runId);
   }
 
-  getRunConfiguration(runId: string) {
-    return this.runConfiguration.get(runId);
-  }
 }

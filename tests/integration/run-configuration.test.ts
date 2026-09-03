@@ -32,7 +32,7 @@ test('RunConfigurationSnapshot freezes all Agent prompts and safe runtime identi
     assert.doesNotMatch(resolved, /later instruction/);
 
     assert.deepEqual(await composition.runConfiguration.capture(run.runId), snapshot);
-    assert.deepEqual(composition.apps.orchestrator.getRunConfiguration(run.runId), snapshot);
+    assert.deepEqual(composition.runConfiguration.get(run.runId), snapshot);
     assert.deepEqual(composition.repository.listEvents(run.runId).map(({ eventType }) => eventType), [
       'RunCreated', 'RunConfigurationCaptured',
     ]);
