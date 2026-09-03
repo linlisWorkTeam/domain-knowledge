@@ -80,7 +80,7 @@ test('seven-page Console uses server facts and canonical Sources API', async ({ 
   await expect(page.getByRole('heading', { name: '当前来源候选' })).toBeVisible();
   expect(requests.some((url) => url.endsWith('/api/v1/sources/scan'))).toBe(true);
   expect(requests.every((url) => url.startsWith(baseUrl))).toBe(true);
-  await expect(page.getByText(/Knowledge Health|Action Item|预计完成|ETA|Workspace owner/)).toHaveCount(0);
+  await expect(page.getByText(/预计完成|Workspace owner/)).toHaveCount(0);
 });
 
 test('knowledge search and detail drawer are keyboard operable and restore focus', async ({ page }) => {
@@ -144,6 +144,44 @@ test('light theme applies semantic surfaces across all seven pages and drawers',
   await page.getByRole('button', { name: /浏览器验收知识/ }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
   await assertNoDarkSurfaces('Knowledge drawer');
+});
+
+test('Action Center preserves the reference header baseline and information structure at 1363 by 936', async ({ page }) => {
+  await page.setViewportSize({ width: 1363, height: 936 });
+  await page.addInitScript(() => localStorage.setItem('wp-knowledge-theme', 'light'));
+  await page.goto(baseUrl);
+  await expect(page.getByRole('heading', { name: 'Action Center', level: 1 })).toBeVisible();
+  await expect(page.getByText('KNOWLEDGE HEALTH')).toBeVisible();
+  await expect(page.getByText('Recent Pulse')).toBeVisible();
+  for (const [index, stage] of ['Discover', 'Generate', 'Evaluate', 'Evolve'].entries()) {
+    await expect(page.locator('.flywheel-stages > li > span').nth(index)).toContainText(stage);
+  }
+
+  const geometry = await page.evaluate(() => {
+    const topbar = document.querySelector('.topbar')!.getBoundingClientRect();
+    const title = document.querySelector('#page-title')!.getBoundingClientRect();
+    const actions = document.querySelector('.topbar-actions')!.getBoundingClientRect();
+    return {
+      bodyFontSize: getComputedStyle(document.body).fontSize,
+      topbar: { top: topbar.top, height: topbar.height, center: topbar.top + topbar.height / 2 },
+      title: { top: title.top, center: title.top + title.height / 2 },
+      actions: { top: actions.top, center: actions.top + actions.height / 2 },
+    };
+  });
+  expect(geometry.bodyFontSize).toBe('14px');
+  expect(geometry.topbar.height).toBe(103);
+  expect(Math.abs(geometry.actions.center - geometry.topbar.center)).toBeLessThan(2);
+  expect(geometry.title.top).toBeGreaterThanOrEqual(40);
+  expect(geometry.title.top).toBeLessThanOrEqual(45);
+  expect(geometry.actions.top).toBeGreaterThan(20);
+
+  await expect(page).toHaveScreenshot('action-center-1363x936-light.png', {
+    animations: 'disabled',
+    caret: 'hide',
+    mask: [page.locator('time'), page.locator('#runtime-footer')],
+    maskColor: '#dfe3e5',
+    maxDiffPixelRatio: 0.01,
+  });
 });
 
 test('mobile navigation, theme persistence and 200 percent zoom preserve core paths', async ({ page, context }) => {

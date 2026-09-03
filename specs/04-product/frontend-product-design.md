@@ -1,6 +1,6 @@
 # 知识飞轮前台产品设计
 
-**状态：Accepted；B1 已就绪、F2 因 HCP-1=Rework required 正在视觉返工｜版本：0.5.2｜日期：2026-09-03**
+**状态：Accepted；B1 已就绪、F2 因 HCP-1=Rework required 正在视觉返工｜版本：0.5.3｜日期：2026-09-03**
 
 本文定义 domain-knowledge 知识飞轮控制台的用户体验、信息架构、交互边界、接口需求和验收标准。领域状态、门禁、安全和发布语义以同仓库的[规范总入口](../README.md)为准；前台不得创造第二套状态或发布权威。
 
@@ -143,7 +143,7 @@ Knowledge Flywheel
 
 ### 4.2 前台交付 F1 范围
 
-`web/prototype/` 中保存的 PR #2 原型只作为布局、密度、组件层级和绿色强调色的视觉参考。运行时事实、可用动作、状态名称和权限仍以服务端 API 与本规范为准，原型内的演示数据不是产品契约。原型与最终 Console 的左侧导航统一使用自然中文；品牌名、Run、API、类名和协议值等技术标识保持原值。
+`web/prototype/` 中保存的 PR #2 原型是 F2 布局、密度、组件层级、组件语义和绿色强调色的规范性视觉基准，不得以“适配真实产品”为由替换 `Knowledge Health`、四阶段 Flywheel、`Recent Pulse`、`New run` 等信息结构。运行时事实、可用动作、状态名称和权限仍以服务端 API 与本规范为准；缺失 API 时保留原组件位置并显示 `—`、Empty、Partial 或 Disabled，原型演示值不是产品契约。
 
 第一阶段导航固定为“操作中心、运行、知识、治理、证据、智能体、发现、设置”。其中：
 
@@ -402,7 +402,7 @@ sequenceDiagram
 
 前台交付 F1 实现合入前，当前 Console 与项目官网继续共享既有交互强调色 `#71D4FF`（深色）和 `#07769F`（浅色），不得仅修改规范造成实现漂移。绿色目标 token 只在新版 Console、契约测试和本规范同步落地后启用；项目官网是否同步换色另行评审。
 
-正文默认不小于 `14px`，辅助说明不小于 `12px`，仅非关键短标签可以使用 `11px`；正文行高不低于 `1.5`。页面在 200% 缩放下必须保持查询、导航、详情与治理状态可用。字体、图标、脚本和样式默认同源提供，不得依赖 Google Fonts 或其他第三方 CDN；既有 Content Security Policy 不得因视觉改版放宽。
+Console 使用 `14px` 全局基准；正文和操作文字通常不小于 `11px`，非关键 Mono 眉标题、状态与元数据可使用 `8–10px`。中文使用独立的无衬线 fallback，取消为英文标签设置的字间距，并以 `1.45–1.6` 行高保证识别度。页面在 200% 缩放下必须保持查询、导航、详情与治理状态可用。字体、图标、脚本和样式默认同源提供，不得依赖 Google Fonts 或其他第三方 CDN；既有 Content Security Policy 不得因视觉改版放宽。
 
 ### 8.2 组件
 
@@ -514,7 +514,8 @@ sequenceDiagram
 | AC-UI-016 | Given LangGraph 正在运行，When 打开 Run 工作台，Then 页面从 Knowledge Registry 的节点投影显示 pending/running/completed/failed，不把 graph route 当成知识发布状态。 |
 | AC-UI-017 | Given 用户打开项目官网或控制台，When 阅读栏目、状态、说明和错误提示，Then 除固定标题与原样技术标识符外，页面不出现英文栏目或中英文拼接句，中文表达自然且术语一致。 |
 | AC-UI-018 | Given 服务端未配置写入令牌，When 用户点击治理模式或打开设置页，Then 页面引导其从 `.env.example` 创建 `.env.local`、设置 `WP_KNOWLEDGE_WRITE_TOKEN` 并重启服务；令牌不会被写入网址或本地存储。 |
-| AC-UI-019 | Given 服务端只提供当前已实现 API，When 用户访问新版控制台全部页面或任一 API 失败，Then 页面只显示服务端事实、规范允许的派生值或明确状态，不显示模拟 Knowledge Health、ETA、Graph、Action Item、Activity、Workspace 或用户身份数据。 |
+| AC-UI-019 | Given 服务端只提供当前已实现 API，When 用户访问新版控制台全部页面或任一 API 失败，Then 页面保留原型规定的信息结构，但只显示服务端事实、规范允许的派生值或明确的 `—`/Empty/Partial/Disabled 状态，不显示模拟 Knowledge Health、ETA、Graph、Action Item、Activity、Workspace 或用户身份数据。 |
+| AC-UI-020 | Given Chromium 视口固定为 `1363 × 936`，When 打开浅色 Action Center，Then Header 高度为 `103px`、标题顶部位于 `40–45px`、操作区垂直居中、全局字号为 `14px`，并通过已提交基准图的像素回归。 |
 
 ## 13. 实施阶段
 
@@ -522,7 +523,7 @@ sequenceDiagram
 
 - 使用 `web/prototype/` 的布局和视觉层级重构现有 Console，但保留 `web/app.js` 的真实 API、鉴权和状态语义。
 - 优先交付操作中心、运行、知识、治理、证据、智能体、发现和设置；缺失服务端能力不以演示数据替代。
-- 用契约测试验证自然中文、双主题、同源资源、键盘可达、状态真实性和移动端关键路径。
+- 用契约测试验证中文排版、双主题、同源资源、键盘可达、状态真实性和移动端关键路径；Action Center 另以固定 `1363 × 936` 的 Chromium 截图执行像素回归。
 - 本阶段不得修改 Domain、Application App、HTTP API 或 JSON Schema；若视觉需求触发这些变化，必须先形成独立 Spec 对齐。
 
 ### 前台交付 F2：最终七页面与真实 Graph

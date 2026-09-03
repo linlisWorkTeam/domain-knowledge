@@ -42,7 +42,7 @@ This file is the single entry point for project-level development status, curren
 - DDD 分层已经对齐，UI/API 通过 Application App 进入系统，LangGraph、Provider 和持久化实现留在 Infrastructure。
 - 固定七 Agent 拓扑、并行、迭代、取消、Checkpoint、运行契约和配置快照已经通过自动化验证。
 - deterministic fixture 可以完成失败、修订、重新生成、评测和发布闭环。
-- 前台 F2 已完成最终七页面、真实 Run Agent Graph、绿色双主题、响应式、可访问性及真实/Partial/Disabled 状态；首轮自动门禁通过，但 HCP-1 因目标布局与视觉差距判定 `Rework required`，正在按指定参考站返工。
+- 前台 F2 已完成最终七页面、真实 Run Agent Graph、绿色双主题、响应式、可访问性及真实/Partial/Disabled 状态；已修正 103px Header 基线、14px 密度并恢复原型信息结构，加入 `1363 × 936` 像素回归，HCP-1 仍为 `Rework required` 等待人工复验。
 - B1 Preview API 破坏性迁移已经同步完成 Server、Console、DSH Adapter、测试和文档；旧公共 HTTP 路径不保留兼容别名，B2–B4 的 `Planned` 能力仍未实现。
 - DeepSeek Harness live Adapter 已存在；公司 CodeAgent CLI 尚未接入。
 - 真实 Agent 质量、公司环境容量、长期稳定性和敌对代码执行安全尚未形成验收结论。
@@ -123,6 +123,6 @@ DEV-009 不修改 `web/`、`site/`、前台产品设计、现有 HTTP 路由或�
 | --- | --- | --- |
 | 2026-09-03 | Agent 运行契约与框架测评合入后的 `main` | TypeScript 通过；Spec：7 schemas、7 commands、8 results、38 P0；测试 112/112；框架测评 6/6 `ACCEPTED` |
 | 2026-09-03 | 前台 F1 Knowledge Console 合入前基线 | TypeScript 通过；Spec：7 schemas、7 commands、8 results、51 P0；测试 114/114；框架测评 6/6 `ACCEPTED`；Chromium E2E 4/4 |
-| 2026-09-03 | DEV-005 F2 + B1 HCP-1 返工候选 | TypeScript 通过；Spec：7 schemas、7 commands、8 results、51 P0；测试 115/115；干净 clone Chromium E2E 6/6，含七页与 Drawer 亮色语义面审计；HCP-1 仍为 `Rework required`，等待复验 |
+| 2026-09-03 | DEV-005 F2 + B1 HCP-1 第二轮返工候选 | TypeScript 通过；Spec：7 schemas、7 commands、8 results、51 P0；测试 115/115；Chromium E2E 7/7，含七页亮色语义面审计及 Action Center `1363 × 936` 像素基线；HCP-1 仍为 `Rework required`，等待复验 |
 
 该结果只证明框架机械能力，不代表公司 CodeAgent 效果或生产可用性。

@@ -213,7 +213,8 @@ function renderOverview() {
       <span><b>${escapeHtml(run.moduleId)}</b><small>${escapeHtml(shortId(run.runId, 26))} · ${escapeHtml(displayLabel(run.state))}</small></span>
       ${badge(run.latestDecision?.outcome ?? run.state)}
       <time>${escapeHtml(formatDate(run.updatedAt))}</time>
-    </button>`).join('') : emptyState('目前没有待处理事项', '正常运行会由工作流服务自动推进。')
+    </button>`).join('') : ''
+  const queueRemainder = `<div class="queue-partial-state"><span aria-hidden="true">◇</span><div><b>${attention.length ? '暂无更多真实待办' : '目前没有待处理事项'}</b><small>Action Item API 接入后显示独立任务生命周期</small></div><em>${attention.length ? 'PARTIAL' : 'EMPTY'}</em></div>`
   const pulseRows = recent.slice(0, 3).map((run) => `
     <button class="pulse-row" data-run-id="${escapeHtml(run.runId)}" type="button"><i class="${needsAttention(run) ? 'warning' : 'success'}"></i><span><b>${escapeHtml(run.moduleId)}</b><small>${escapeHtml(displayLabel(run.state))} · ${escapeHtml(formatDate(run.updatedAt))}</small></span></button>`).join('')
   content.innerHTML = `
@@ -225,9 +226,9 @@ function renderOverview() {
         <footer><i></i><i></i><i></i></footer>
       </article>
       <article class="knowledge-summary">
-        <header><p class="eyebrow">KNOWLEDGE REGISTRY</p><span>${state.resourceErrors.knowledge ? 'PARTIAL' : 'LIVE'}</span></header>
-        <div><strong>${escapeHtml(verified)}</strong><small>VERIFIED</small><b>${escapeHtml(candidates)} 候选</b></div>
-        <footer><span>发布记录 <b>${escapeHtml(status.publications ?? '—')}</b></span><span>质量未通过 <b>${escapeHtml(status.qualityRejected ?? '—')}</b></span></footer>
+        <header><p class="eyebrow">KNOWLEDGE HEALTH</p><span>PARTIAL</span></header>
+        <div><strong>—</strong><small>/ 100</small><b>口径未接入</b></div>
+        <footer><span>Coverage <b>—</b></span><span>Freshness <b>—</b></span><span>Accuracy <b>—</b></span></footer>
       </article>
     </section>
     <div class="overview-workspace">
@@ -235,15 +236,15 @@ function renderOverview() {
         <header><div><h2>需要处理</h2><small>由失败、低置信与 STOPPED Run 派生</small></div><button class="text-button" data-page-link="runs">查看全部 →</button></header>
         <div class="queue-filters"><button class="active">全部　${attention.length}</button><button>运行失败　${attention.filter((run) => run.state === 'FAILED').length}</button><button>低置信　${attention.filter((run) => run.state === 'LOW_CONFIDENCE').length}</button><span>PARTIAL</span></div>
         <div class="queue-labels"><span>运行</span><span>状态</span><span>更新</span></div>
-        <div>${runIssueRows}</div>
+        <div class="queue-body">${runIssueRows}${queueRemainder}</div>
       </section>
       <aside class="overview-rail">
         <article class="current-run-card">
           <header><small><i></i> FLYWHEEL ${active.length ? 'RUNNING' : 'STATUS'}</small><button class="text-button" data-page-link="runs">打开运行 ↗</button></header>
-          ${latestRun ? `<h3>${escapeHtml(shortId(latestRun.runId, 18))}</h3><p>${escapeHtml(latestRun.moduleId)} · ${escapeHtml(displayLabel(latestRun.state))}</p><div class="run-state-line"><i></i></div><div class="run-state-meta"><b>${escapeHtml(displayLabel(latestRun.state))}</b><span>不提供模拟 ETA</span></div>` : emptyState('暂无运行', 'Registry 中没有 Run 记录。')}
-          <ul class="fact-steps"><li><i>1</i><span>运行事实<small>${state.runs.length} 条 Run</small></span></li><li><i>2</i><span>工作流节点<small>进入 Graph 查看</small></span></li><li><i>3</i><span>门禁证据<small>进入 Evaluations 查看</small></span></li></ul>
+          ${latestRun ? `<h3>${escapeHtml(shortId(latestRun.runId, 18))}</h3><p>${escapeHtml(latestRun.moduleId)} · ${escapeHtml(displayLabel(latestRun.state))}</p><div class="run-state-line"><i></i></div><div class="run-state-meta"><b>${escapeHtml(displayLabel(latestRun.state))}</b><span>不提供模拟 ETA · PROGRESS PARTIAL</span></div>` : emptyState('暂无运行', 'Registry 中没有 Run 记录。')}
+          <ol class="flywheel-stages"><li class="observed"><i>1</i><span>Discover<small>Run 已登记</small></span></li><li class="observed"><i>2</i><span>Generate<small>${latestRun ? escapeHtml(displayLabel(latestRun.state)) : '等待运行'}</small></span></li><li><i>3</i><span>Evaluate<small>进度 API 未接入</small></span></li><li><i>4</i><span>Evolve<small>发布状态待确认</small></span></li></ol>
         </article>
-        <article class="recent-pulse"><header><h3>最近运行</h3><span>ACTIVITY PARTIAL</span></header>${pulseRows || '<p class="muted">暂无运行事实</p>'}</article>
+        <article class="recent-pulse"><header><h3>Recent Pulse</h3><span>ACTIVITY PARTIAL</span></header>${pulseRows || '<div class="pulse-empty"><b>暂无真实活动</b><small>Workspace Activity API 尚未接入</small></div>'}</article>
       </aside>
     </div>`
 }
@@ -891,7 +892,7 @@ function updateMode() {
   } else {
     modePill.textContent = !state.capabilities ? '能力未知' : (state.capabilities.writeEnabled ? '只读模式' : '写入关闭')
     modePill.className = `status-pill ${state.capabilities?.writeEnabled ? '' : 'disabled'}`
-    operatorButton.textContent = '治理模式'
+    operatorButton.textContent = '＋ New run'
   }
   if (state.page === 'agent-settings') renderAgents()
   if (state.page === 'runs') renderRuns()
