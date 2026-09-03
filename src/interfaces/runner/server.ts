@@ -293,7 +293,9 @@ export function createKnowledgeServer(input: {
         return;
       }
       if (request.method === 'GET' && url.pathname === '/api/v1/system/status') {
-        send(response, 200, composition.apps.flywheel.status());
+        const status = composition.apps.flywheel.status();
+        delete status.database;
+        send(response, 200, status);
         return;
       }
       if (request.method === 'GET' && url.pathname === '/api/v1/agents/providers/status') {

@@ -16,6 +16,9 @@ function createApp(store: Store, clock: () => string) {
     endpointPolicy: {
       validate: async (raw) => ({ url: new URL(raw.endsWith('/') ? raw : `${raw}/`), addresses: ['1.1.1.1'] }),
     },
+    executionParameters: {
+      api: 'openai-completions', maxTokens: 32_768, maxSchemaAttempts: 2, contextWindow: 128_000,
+    },
     probe: {
       verify: async ({ model }) => ({ status: 'VERIFIED', reasonCode: 'READY', model: model ?? 'model-a' }),
     },

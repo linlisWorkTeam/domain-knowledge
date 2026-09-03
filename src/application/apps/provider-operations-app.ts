@@ -3,6 +3,8 @@ import { assertInvariant, sha256 } from '../../domain/index.ts';
 import type {
   ProviderConnectionProbe,
   ProviderEndpointPolicy,
+  PiAgentExecutionParameters,
+  PiAgentRuntimeConfiguration,
   ProviderSettingsRecord,
   ProviderSettingsStore,
   RunConfigurationSnapshot,
@@ -45,13 +47,20 @@ function settingsFingerprint(record: Pick<ProviderSettingsRecord, 'provider' | '
   }));
 }
 
-function runtimeDigest(record: ProviderSettingsRecord): string {
+function runtimeDigest(
+  record: ProviderSettingsRecord,
+  execution: PiAgentExecutionParameters,
+): string {
   // Credentials and the mutable settings revision are intentionally excluded. A
   // rotated, reverified key may resume a Run; endpoint/model changes may not.
   return sha256(JSON.stringify({
     provider: record.provider,
     apiUrl: record.apiUrl,
     model: record.model,
+    api: execution.api,
+    maxTokens: execution.maxTokens,
+    maxSchemaAttempts: execution.maxSchemaAttempts,
+    contextWindow: execution.contextWindow,
   }));
 }
 
@@ -62,12 +71,14 @@ export class ProviderOperationsApp {
   readonly clock: () => string;
   readonly audit: (event: ProviderAuditEvent) => void;
   readonly verificationMaxAgeMs: number;
+  readonly executionParameters: PiAgentExecutionParameters;
   private mutationTail: Promise<void> = Promise.resolve();
 
   constructor(input: {
     store: ProviderSettingsStore;
     endpointPolicy: ProviderEndpointPolicy;
     probe: ProviderConnectionProbe;
+    executionParameters: PiAgentExecutionParameters;
     clock?: () => string;
     audit?: (event: ProviderAuditEvent) => void;
     verificationMaxAgeMs?: number;
@@ -75,6 +86,19 @@ export class ProviderOperationsApp {
     this.store = input.store;
     this.endpointPolicy = input.endpointPolicy;
     this.probe = input.probe;
+    assertInvariant(input.executionParameters.api === 'openai-completions',
+      'PI_AGENT_API_INVALID: only openai-completions is supported');
+    assertInvariant(Number.isSafeInteger(input.executionParameters.maxTokens)
+      && input.executionParameters.maxTokens > 0,
+    'PI_AGENT_MAX_TOKENS_INVALID: maxTokens must be a positive integer');
+    assertInvariant(Number.isSafeInteger(input.executionParameters.maxSchemaAttempts)
+      && input.executionParameters.maxSchemaAttempts >= 1
+      && input.executionParameters.maxSchemaAttempts <= 3,
+    'PI_AGENT_MAX_SCHEMA_ATTEMPTS_INVALID: maxSchemaAttempts must be 1..3');
+    assertInvariant(Number.isSafeInteger(input.executionParameters.contextWindow)
+      && input.executionParameters.contextWindow >= input.executionParameters.maxTokens,
+    'PI_AGENT_CONTEXT_WINDOW_INVALID: contextWindow must be at least maxTokens');
+    this.executionParameters = structuredClone(input.executionParameters);
     this.clock = input.clock ?? (() => new Date().toISOString());
     this.audit = input.audit ?? (() => undefined);
     this.verificationMaxAgeMs = input.verificationMaxAgeMs ?? 24 * 60 * 60_000;
@@ -288,19 +312,24 @@ export class ProviderOperationsApp {
     return {
       kind: 'pi-agent',
       model: current.model as string,
-      parametersSha256: runtimeDigest(current),
+      parametersSha256: runtimeDigest(current, this.executionParameters),
     };
   }
 
-  requireRuntimeConfiguration(expected: RunConfigurationSnapshot['provider']): ProviderSettingsRecord {
+  requireRuntimeConfiguration(
+    expected: RunConfigurationSnapshot['provider'],
+  ): PiAgentRuntimeConfiguration {
     const current = this.store.load();
     assertInvariant(current !== null && this.isEnabledAndVerified(current),
       'PI_AGENT_CONFIGURATION_UNAVAILABLE: verified Provider settings are required');
     assertInvariant(expected.kind === 'pi-agent'
       && expected.model === current.model
-      && expected.parametersSha256 === runtimeDigest(current),
+      && expected.parametersSha256 === runtimeDigest(current, this.executionParameters),
     'PI_AGENT_CONFIGURATION_CHANGED: Provider settings no longer match the Run snapshot');
-    return structuredClone(current);
+    return {
+      settings: structuredClone(current),
+      ...structuredClone(this.executionParameters),
+    };
   }
 
   private isEnabledAndVerified(record: ProviderSettingsRecord): boolean {

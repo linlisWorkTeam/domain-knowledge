@@ -244,6 +244,17 @@ export interface ProviderSettingsRecord {
   updatedAt: string;
 }
 
+export interface PiAgentExecutionParameters {
+  api: 'openai-completions';
+  maxTokens: number;
+  maxSchemaAttempts: number;
+  contextWindow: number;
+}
+
+export interface PiAgentRuntimeConfiguration extends PiAgentExecutionParameters {
+  settings: ProviderSettingsRecord;
+}
+
 /** Secret-bearing persistence boundary. Implementations must never expose this record to HTTP directly. */
 export interface ProviderSettingsStore {
   load(): ProviderSettingsRecord | null;

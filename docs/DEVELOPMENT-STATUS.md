@@ -115,8 +115,8 @@ DEV-007 的目标是形成单项目最小完整可用闭环：管理员能安全
 
 - Provider 可用性、认证状态、模型与受控错误查询；
 - API URL/API Key 的管理员配置、脱敏读取、地址安全校验、无副作用验证、启用和审计；
-- 启用后新批次默认选择 Pi Agent，运行快照只冻结非秘密身份与参数摘要；
-- 采集批次/节点排队与执行耗时、调用、重试、Token 和估算成本；
+- 启用后新批次默认选择 Pi Agent，运行快照冻结协议、地址、模型、Token/上下文上限和 Schema 尝试上限的非秘密摘要；
+- 采集批次/节点排队与执行耗时、调用、重试、Token 和可空估算成本；聚合契约已实现，当前内置 Adapter 没有可信定价源，成本保持为空；
 - 聚合 P50/P95、首次自动修订通过率、三轮收敛率、人工介入比例、平均处理时间和短期复发率；
 - fixture 与无样本数据明确标识，不把演示速度或空分母表达为真实效果。
 
@@ -163,6 +163,6 @@ DEV-009 不修改 `web/`、`site/`、前台产品设计、现有 HTTP 路由或�
 | 2026-09-03 | 前台 F1 Knowledge Console 合入前基线 | TypeScript 通过；Spec：7 schemas、7 commands、8 results、51 P0；测试 114/114；框架测评 6/6 `ACCEPTED`；Chromium E2E 4/4 |
 | 2026-09-03 | DEV-005 F2 + B1 HCP-1 最终基线 | TypeScript 通过；Spec：7 schemas、7 commands、8 results、51 P0；测试 115/115；Chromium E2E 7/7，含七页亮色语义面审计及操作中心 `1363 × 936` 像素基线；HCP-1=`Accepted` |
 | 2026-09-03 | DEV-006 B2 完整控制面 | TypeScript 通过；Spec：11 schemas、7 commands、8 results、51 P0；测试 117/117；Chromium E2E 8/8；框架测评 6/6 `ACCEPTED` |
-| 2026-09-04 | DEV-007 B4 + DEV-008 B3 最终验收 | Node 24.13.0；TypeScript 通过；Spec：17 schemas、7 commands、8 results、51 P0；测试 133/133；Chromium E2E 13/13；站点契约 12/12；框架测评 6/6 `ACCEPTED`；npm audit 0；七页双主题、1363×936、390×844、200% 缩放和 8 帧实机动图通过；结论 `Accepted with follow-ups` |
+| 2026-09-04 | DEV-007 B4 + DEV-008 B3 最终验收 | Node 24.13.0；TypeScript 通过；Spec：17 schemas、7 commands、8 results、51 P0；测试 135/135；Chromium E2E 13/13；站点契约 12/12；框架测评 6/6 `ACCEPTED`；npm audit 0；七页双主题、1363×936、390×844、200% 缩放和 8 帧实机动图通过；结论 `Accepted with follow-ups` |
 
 该结果只证明框架机械能力，不代表公司 CodeAgent 效果或生产可用性。

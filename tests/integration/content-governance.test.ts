@@ -5,6 +5,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import test from 'node:test';
+import { MockAgent } from 'undici';
+import { sha256 } from '../../src/domain/index.ts';
+import {
+  LocalCasArtifactStore, SQLiteFlywheelRepository,
+} from '../../src/infrastructure/persistence/sqlite-cas/index.ts';
+import { SQLiteContentGovernance } from '../../src/infrastructure/persistence/sqlite-content-governance/index.ts';
 import { PublicHttpsEndpointPolicy } from '../../src/infrastructure/security/public-https.ts';
 import { createKnowledgeServer } from '../../src/interfaces/runner/server.ts';
 import { GOOD_BODY } from '../helpers/fixture.ts';
@@ -21,6 +27,86 @@ async function close(instance: ReturnType<typeof createKnowledgeServer>): Promis
   instance.server.close();
   await once(instance.server, 'close');
 }
+
+test('HTTPS Sources hash approved content, reject redirects, and use the one approved DNS resolution', async () => {
+  const projectRoot = mkdtempSync(join(tmpdir(), 'wp-https-source-'));
+  const repository = new SQLiteFlywheelRepository(join(projectRoot, 'registry.sqlite'));
+  repository.initialize();
+  const approvedAddresses = ['1.1.1.1', '2606:4700:4700::1111'] as const;
+  const resolvedHosts: string[] = [];
+  const dispatched: { url: string; addresses: readonly string[]; maxResponseSize: number }[] = [];
+  const body = Buffer.from('# Approved source\n\nPinned transport fixture.\n');
+  const governance = new SQLiteContentGovernance({
+    database: repository.database,
+    artifacts: new LocalCasArtifactStore(join(projectRoot, 'cas')),
+    repositoryRoot: projectRoot,
+    configuredRoots: [],
+    allowedRemoteHosts: ['public.source.example'],
+    remoteEndpointPolicy: new PublicHttpsEndpointPolicy(async (hostname) => {
+      resolvedHosts.push(hostname);
+      return approvedAddresses;
+    }),
+    sourceHttpsDispatcherFactory: (endpoint, maxResponseSize) => {
+      dispatched.push({
+        url: endpoint.url.toString(), addresses: endpoint.addresses, maxResponseSize,
+      });
+      const agent = new MockAgent();
+      agent.disableNetConnect();
+      const pool = agent.get(endpoint.url.origin);
+      if (endpoint.url.pathname === '/approved.md') {
+        pool.intercept({ method: 'GET', path: '/approved.md' }).reply(200, body, {
+          headers: {
+            'content-length': String(body.byteLength),
+            'last-modified': 'Fri, 04 Sep 2026 00:00:00 GMT',
+          },
+        });
+      } else {
+        pool.intercept({ method: 'GET', path: '/redirect.md' }).reply(302, '', {
+          headers: { location: 'https://unapproved.example/private' },
+        });
+      }
+      return agent;
+    },
+    defaultRule: {
+      policyId: 'local-v1', minimumStability: 0.8, requireAllTests: true, maxIterations: 3,
+    },
+    clock: () => '2026-09-04T00:00:00.000Z',
+  });
+  governance.initialize();
+  try {
+    const created = await governance.createSource({
+      kind: 'HTTPS', locator: 'https://public.source.example/approved.md',
+      displayName: 'Approved remote source', project: 'default',
+    }, {
+      idempotencyKey: 'https-source-approved-1', fingerprint: 'approved', actor: 'acceptance',
+    });
+    const source = created.source as Record<string, unknown>;
+    assert.equal(source.status, 'ACTIVE');
+    assert.equal(source.locator, 'https://public.source.example/approved.md');
+    assert.equal(source.revision, `sha256:${sha256(body)}`);
+    assert.equal(source.observedRevision, `sha256:${sha256(body)}`);
+    assert.equal(source.lastSyncAt, '2026-09-04T00:00:00.000Z');
+
+    await assert.rejects(governance.createSource({
+      kind: 'HTTPS', locator: 'https://public.source.example/redirect.md',
+      displayName: 'Redirecting remote source', project: 'default',
+    }, {
+      idempotencyKey: 'https-source-redirect-1', fingerprint: 'redirect', actor: 'acceptance',
+    }), /SOURCE_ACCESS_DENIED: HTTPS source redirects are forbidden/);
+
+    assert.deepEqual(resolvedHosts, ['public.source.example', 'public.source.example']);
+    assert.deepEqual(dispatched.map((entry) => entry.url), [
+      'https://public.source.example/approved.md',
+      'https://public.source.example/redirect.md',
+    ]);
+    for (const entry of dispatched) assert.deepEqual(entry.addresses, approvedAddresses);
+    assert.ok(dispatched.every((entry) => entry.maxResponseSize === 10 * 1024 * 1024));
+    assert.equal(governance.listSources().length, 1);
+  } finally {
+    repository.close();
+    rmSync(projectRoot, { recursive: true, force: true });
+  }
+});
 
 test('DEV-008 content governance APIs preserve lineage, evidence, rules, sources, and health inputs', async () => {
   const projectRoot = mkdtempSync(join(tmpdir(), 'wp-content-project-'));

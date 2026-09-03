@@ -145,6 +145,13 @@ const AGENT_LABELS = {
   'test-gen': '测试生成 Agent', code: '代码生成 Agent', check: '检查 Agent', review: '复核 Agent',
 }
 
+const PROVIDER_LABELS = {
+  fixture: '本地验收模拟器',
+  'pi-agent': 'Pi Agent',
+  'deepseek-harness': 'DeepSeek Harness',
+  'deepseek-harness-headless': 'DeepSeek Harness 无界面模式',
+}
+
 const METRIC_DEFINITION_LABELS = {
   runDurationMs: '终态批次的最后更新时间减去创建时间',
   nodeDurationMs: '节点单次执行的完成时间减去开始时间',
@@ -1001,6 +1008,9 @@ function renderAgents() {
   const governance = state.governanceMetrics
   const runSamples = Number(runs?.cohort?.runCount ?? 0)
   const providerLabel = provider?.availability ? displayLabel(provider.availability) : '读取中'
+  const executionProvider = (provider?.enabled ? provider.provider : state.capabilities?.agentProvider)
+    ?? provider?.provider
+  const executionProviderLabel = PROVIDER_LABELS[executionProvider] ?? executionProvider ?? '未读取'
   const operationErrorKeys = ['providerStatus', 'providerSettings', 'runMetrics', 'governanceMetrics'].filter((key) => state.resourceErrors[key])
   const operationErrorLabels = operationErrorKeys.map((key) => RESOURCE_LABELS[key]).join('、')
   content.innerHTML = `
@@ -1009,7 +1019,7 @@ function renderAgents() {
     <div class="provider-layout">
       <section class="panel provider-card"><div class="section-heading"><h2>模型服务配置</h2>${provider?.availability ? badge(provider.availability) : badge('UNKNOWN')}</div>
         ${state.capabilities?.writeEnabled ? '' : '<div class="notice"><b>服务端写入尚未启用。</b><p>复制仓库根目录的 <code>.env.example</code> 为 <code>.env.local</code>，设置 <code>WP_KNOWLEDGE_WRITE_TOKEN=请替换为随机长令牌</code>，然后重启服务。配置文件不会提交到版本库。</p></div>'}
-        <dl class="settings-list"><div><dt>执行方式</dt><dd>Pi Agent</dd></div><div><dt>认证状态</dt><dd>${escapeHtml(displayLabel(provider?.authentication ?? 'UNKNOWN'))}</dd></div><div><dt>接口地址</dt><dd>${escapeHtml(settings?.apiUrlMasked ?? '未配置')}</dd></div><div><dt>模型</dt><dd>${escapeHtml(settings?.model ?? provider?.model ?? '未配置')}</dd></div><div><dt>最近验证</dt><dd>${escapeHtml(formatDate(settings?.verification?.checkedAt))}</dd></div></dl>
+        <dl class="settings-list"><div><dt>当前执行方式</dt><dd>${escapeHtml(executionProviderLabel)}</dd></div><div><dt>认证状态</dt><dd>${escapeHtml(displayLabel(provider?.authentication ?? 'UNKNOWN'))}</dd></div><div><dt>接口地址</dt><dd>${escapeHtml(settings?.apiUrlMasked ?? '未配置')}</dd></div><div><dt>模型</dt><dd>${escapeHtml(settings?.model ?? provider?.model ?? '未配置')}</dd></div><div><dt>最近验证</dt><dd>${escapeHtml(formatDate(settings?.verification?.checkedAt))}</dd></div></dl>
         <form id="provider-settings-form" data-revision="${escapeHtml(settings?.revision ?? 0)}"><label>API 地址<input name="apiUrl" type="url" required placeholder="${escapeHtml(settings?.apiUrlMasked ? `重新输入完整地址；当前 ${settings.apiUrlMasked}` : 'https://模型服务地址/v1')}" ${canEdit ? '' : 'disabled'}></label><label>API Key<input name="apiKey" type="password" autocomplete="new-password" placeholder="${settings?.apiKeyConfigured ? '留空表示保留现有密钥' : '输入服务密钥'}" ${canEdit ? '' : 'disabled'}></label><label>模型<input name="model" value="${escapeHtml(settings?.model ?? '')}" placeholder="模型标识" ${canEdit ? '' : 'disabled'}></label><label class="inline-check"><input name="clearApiKey" type="checkbox" ${canEdit ? '' : 'disabled'}> 清除已保存的 API Key</label><button class="secondary-button" type="submit" ${canEdit ? '' : 'disabled'}>保存待验证配置</button></form>
         <button class="primary-button verify-provider" data-verify-provider type="button" ${canEdit && settings?.revision > 0 ? '' : 'disabled'}>验证并启用</button>
         <p class="form-note">保存会使旧验证失效；只有无副作用验证成功后，新批次才会默认使用这项配置。</p>

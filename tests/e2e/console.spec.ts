@@ -318,6 +318,7 @@ test('Provider 配置与验证通过真实 API fail closed，且密钥不回填�
   await enterGovernance(page);
   await navigateTo(page, 'Agent 设置');
   await expect(page.getByRole('heading', { name: 'Agent 可以调整表达，不能改变职责' })).toBeVisible();
+  await expect(page.locator('.settings-list')).toContainText('本地验收模拟器');
 
   const form = page.locator('#provider-settings-form');
   await form.getByLabel('API 地址').fill('https://denied.example.test/v1');
@@ -383,6 +384,7 @@ test('Provider 配置与验证通过真实 API fail closed，且密钥不回填�
   assert.equal(successfulPayload.status, 'VERIFIED');
   assert.equal(successfulPayload.enabled, true);
   await expect(page.locator('#toast')).toHaveText('连接验证成功，新批次将默认使用 Pi Agent。');
+  await expect(page.locator('.settings-list')).toContainText('Pi Agent');
   await expect(page.locator('.reference-metrics').getByText('已作为新批次默认方式')).toBeVisible();
 
   const storedSettingsText = await (await fetch(`${baseUrl}/api/v1/provider-settings`)).text();

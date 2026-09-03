@@ -24,7 +24,7 @@
 
 ## 失败分类
 
-`TRANSIENT` 可按策略退避重试；`AGENT_OUTPUT_INVALID` 和无法解析的 JSON 允许 Provider 在同一节点内有限重试，默认最多两次、部署上限三次。每次 Provider 尝试必须使用新模型 Session 并单独审计；业务 GenerationKey 不变。尝试耗尽后，LangGraph 节点才进入 `FAILED`，可由 `workflow-resume` 从 task checkpoint 恢复。`POLICY_DENIED`、`INTEGRITY_FAILURE`、路径拒绝和 `UNSUPPORTED_CAPABILITY` 不重试；`RESOURCE_EXHAUSTED` 是否重试由已固化策略决定。Registry Observer 按 `runId + nodeId + iteration` 计算持久化 attempt，进程重启后的重试不能覆盖上一次失败投影。
+`TRANSIENT` 可按策略退避重试；`AGENT_OUTPUT_INVALID` 和无法解析的 JSON 允许 Provider 在同一节点内有限尝试，总尝试次数默认二次（一次初始调用加至多一次重试）、部署上限三次。每次 Provider 尝试必须使用新模型 Session 并单独审计；业务 GenerationKey 不变。尝试耗尽后，LangGraph 节点才进入 `FAILED`，可由 `workflow-resume` 从 task checkpoint 恢复。`POLICY_DENIED`、`INTEGRITY_FAILURE`、路径拒绝和 `UNSUPPORTED_CAPABILITY` 不重试；`RESOURCE_EXHAUSTED` 是否重试由已固化策略决定。Registry Observer 按 `runId + nodeId + iteration` 计算持久化 attempt，进程重启后的重试不能覆盖上一次失败投影。
 
 ## 崩溃注入点
 

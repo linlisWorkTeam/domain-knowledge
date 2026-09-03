@@ -48,7 +48,7 @@
 | 方法与路径 | 状态 | 用途与最小响应 |
 |---|---|---|
 | `GET /health` | Available | 进程存活探针；不返回业务健康分。 |
-| `GET /api/v1/system/status` | Available | 返回 Registry、CAS、Provider、Evaluator 的真实状态与采样时间；已由旧 `/api/v1/status` 迁移。 |
+| `GET /api/v1/system/status` | Available | 返回 Registry 业务汇总：知识各状态、反馈、批次与 publication 计数；已由旧 `/api/v1/status` 迁移。分组件健康与采样时间只由 `/api/v1/system/components` 返回。 |
 | `GET /api/v1/system/capabilities` | Available | 返回读写开关、认证方式、Provider 类型和隔离能力；已由旧 `/api/v1/capabilities` 迁移。 |
 | `GET /api/v1/system/components` | Available | 返回分组件健康、reason code、最后成功时间和受控诊断摘要。 |
 
@@ -207,7 +207,7 @@ DEV-006 只补齐操作中心、飞轮批次和工作流图所需控制面，不
 
 | 方法与路径 | 状态 | 用途与最小响应 |
 |---|---|---|
-| `GET /api/v1/knowledge` | Available | 知识目录与简单检索；统一支持 `q`、`status`、`category`、`limit`、`cursor`，已取代 `/api/v1/query`。 |
+| `GET /api/v1/knowledge` | Available | 治理知识目录与简单检索；统一支持 `q`、`status`、`category`、`limit`、`cursor`，未给 `status` 时返回 `CANDIDATE,VERIFIED,LOW_CONFIDENCE,SUPERSEDED`。面向知识消费者的调用必须显式使用 `status=VERIFIED`；该路由已取代 `/api/v1/query`。 |
 | `GET /api/v1/knowledge/:versionId` | Available | 正文、状态、quality 和 provenance 详情。 |
 | `POST /api/v1/knowledge/candidates` | Available | 创建候选但不表示发布；已由旧 `/api/v1/ingest` 迁移。 |
 | `POST /api/v1/knowledge/:versionId/feedback` | Available | 记录 `hit`、`rate` 或 `correct`，不得直接改变发布状态；已由旧 `/api/v1/feedback` 迁移。 |
@@ -269,7 +269,7 @@ Graph 使用真实节点投影与 SSE；断线时退回增量轮询。点击节�
 | `GET /api/v1/provider-settings` | Available | 返回 Pi Agent 类型、脱敏 API URL、API Key 是否已配置、revision 与验证状态，不返回完整凭据。 |
 | `PUT /api/v1/provider-settings` | Available | 管理员保存 API URL、模型与可选 API Key，要求鉴权、revision、幂等、地址安全校验和脱敏审计；保存后默认未启用。 |
 | `POST /api/v1/provider-settings/verify` | Available | 使用服务端持有凭据执行无生成副作用的模型列表探测；成功后按请求启用，失败则保持关闭。 |
-| `GET /api/v1/metrics/runs?window=24h|7d|30d` | Available | 返回批次、节点与排队耗时 P50/P95、调用、`providerCalls.retries`、`workflowNodeRetries`、Token、估算成本、Provider/节点分组和样本量。 |
+| `GET /api/v1/metrics/runs?window=24h|7d|30d` | Available | 返回批次、节点与排队耗时 P50/P95、调用、`providerCalls.retries`、`workflowNodeRetries`、Token、可空估算成本、Provider/节点分组和样本量；当前内置 Adapter 没有可信定价源，因此成本保持 `null`。 |
 | `GET /api/v1/metrics/governance?window=24h|7d|30d` | Available | 返回首次自动修订通过率、三轮收敛率、人工介入比例、平均处理时间与七日复发率。 |
 
 Agent 设置同时展示固定 Agent 契约、Provider 配置/验证和运营指标。完整 API Key 仅在保存请求中从页面内存发送；服务端使用权限为 `0600` 的 AES-256-GCM 本地密钥文件持有，读接口、审计、运行快照和指标均不得包含秘密。API URL 必须是公开 `HTTPS`，保存和验证前均重新解析 DNS 并拒绝本机、私网、混合解析、用户信息、查询、fragment 与重定向。验证成功的配置有效期为 24 小时；只有已启用且验证有效的配置才使后续新批次冻结 `pi-agent`、模型和非秘密参数摘要。已经冻结为 Pi 的批次在到期、配置变化、不可用或恢复摘要不匹配时拒绝执行，不得退回 fixture；没有有效 Pi 配置时，新批次使用 `GET /api/v1/system/capabilities` 明确返回的部署 fallback，默认 fixture 仅代表本地验收。空输出或 Schema 不合法输出由全新 Pi 会话做 `1..3` 次有界总尝试，每次单独审计。Provider 设置文件与 SQLite 命令回执暂不共享崩溃原子性：加密文件已经提交但回执尚未提交时，进程重启后的重放会返回 revision 冲突；该恢复边界属于 DEV-012，不得宣称 crash-exactly-once。

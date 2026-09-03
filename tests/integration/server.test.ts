@@ -67,7 +67,11 @@ test('HTTP adapter rejects missing credentials and accepts authenticated candida
   try {
     const health = await fetch(`${base}/health`);
     assert.equal(health.status, 200);
-    assert.equal((await fetch(`${base}/api/v1/system/status`)).status, 200);
+    const statusResponse = await fetch(`${base}/api/v1/system/status`);
+    assert.equal(statusResponse.status, 200);
+    const statusPayload = await statusResponse.json();
+    assert.equal(Object.hasOwn(statusPayload, 'database'), false,
+      'the public status response must not expose a local database path');
     const denied = await fetch(`${base}/api/v1/knowledge/candidates`, {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}',
     });

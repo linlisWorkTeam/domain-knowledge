@@ -401,7 +401,7 @@ sequenceDiagram
 | 接口 | 适用用户 | 能力边界 |
 |---|---|---|
 | CLI | 本地知识治理者 | 支持完整候选、Run、评测报告录入和发布操作。 |
-| Dashboard / HTTP GET | 知识消费者 | 只读；默认查询 `VERIFIED`。 |
+| Console / HTTP GET | 本地治理者与知识消费者 | 只读治理目录默认包含全部知识状态；知识消费者与 DSH Adapter 必须显式提交 `status=VERIFIED`。 |
 | HTTP POST | 受信本地治理者 | 未配置写 token 时返回 `503`；Bearer token 无效时返回 `401`。 |
 | DSH Adapter | Agent 消费者 | 查询、状态、扫描、候选录入和反馈；不能发布。 |
 | Legacy facade | 旧自动化 | 只映射保留命令；不能恢复旧评分或发布语义。 |
@@ -412,7 +412,7 @@ sequenceDiagram
 
 ## 最终前台入口映射
 
-- UC-KF-001 通过“知识”页面完成 `VERIFIED` 查询、详情、provenance 与 feedback；“添加知识”调用 ingest 时必须描述为创建候选，不得描述为人工发布或直接策展为 `VERIFIED`。
+- UC-KF-001 通过“知识”页面筛选 `VERIFIED` 后完成查询、详情、provenance 与 feedback；面向消费者的 DSH 查询固定显式传入 `status=VERIFIED`。“添加知识”调用 ingest 时必须描述为创建候选，不得描述为人工发布或直接策展为 `VERIFIED`。
 - UC-KF-003 通过“操作中心、飞轮批次、工作流图”呈现。操作中心读取持久化事项、严重级别、允许动作和审计历史；运行、Gate、组件和来源事实按确定性规则投影，安全事实仍随后续完整权限审计补齐。
 - UC-KF-006 通过“Agent 设置”和批次工作台呈现，固定契约与可编辑的 `promptAddon` 必须分区，WorkflowNodeProjection 与 FlywheelRun 状态必须分开标注。
 - “来源”页面默认读取持久化来源注册，并支持创建、启停、更新和刷新；`GET /api/v1/sources/scan` 只有在用户明确扫描时作为候选辅助视图，不得覆盖注册事实。Preview 不提供删除语义。

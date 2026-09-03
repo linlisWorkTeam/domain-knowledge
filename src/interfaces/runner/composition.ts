@@ -30,7 +30,8 @@ import { SourceScanner } from '../../infrastructure/source-scan/index.ts';
 import { LocalAgentWorkspace } from '../../infrastructure/agents/workspace/index.ts';
 import {
   EncryptedFileProviderSettingsStore, OpenAiCompatibleProviderProbe,
-  PiCodingAgentProvider, PublicHttpsEndpointPolicy,
+  PI_AGENT_DEFAULT_CONTEXT_WINDOW, PI_AGENT_DEFAULT_MAX_SCHEMA_ATTEMPTS,
+  PI_AGENT_DEFAULT_MAX_TOKENS, PiCodingAgentProvider, PublicHttpsEndpointPolicy,
 } from '../../infrastructure/agents/pi-agent/index.ts';
 import { JsonSchemaAgentContractValidator } from '../../infrastructure/agents/contracts/index.ts';
 import { SQLiteOperationalMetrics } from '../../infrastructure/observability/sqlite-operational-metrics.ts';
@@ -148,6 +149,29 @@ export function createComposition(input: {
   );
   const operationalMetricsApp = new OperationalMetricsApp(metrics);
   const providerEndpointPolicy = input.providerEndpointPolicy ?? new PublicHttpsEndpointPolicy();
+  const piMaxTokens = Number(process.env.WP_PI_MAX_TOKENS ?? PI_AGENT_DEFAULT_MAX_TOKENS);
+  const piMaxSchemaAttempts = Number(
+    process.env.WP_PI_MAX_SCHEMA_ATTEMPTS ?? PI_AGENT_DEFAULT_MAX_SCHEMA_ATTEMPTS,
+  );
+  const piContextWindow = Number(
+    process.env.WP_PI_CONTEXT_WINDOW ?? PI_AGENT_DEFAULT_CONTEXT_WINDOW,
+  );
+  if (!Number.isSafeInteger(piMaxTokens) || piMaxTokens < 1) {
+    throw new Error('CONFIG_INVALID: WP_PI_MAX_TOKENS must be a positive integer');
+  }
+  if (!Number.isSafeInteger(piMaxSchemaAttempts)
+    || piMaxSchemaAttempts < 1 || piMaxSchemaAttempts > 3) {
+    throw new Error('CONFIG_INVALID: WP_PI_MAX_SCHEMA_ATTEMPTS must be 1..3');
+  }
+  if (!Number.isSafeInteger(piContextWindow) || piContextWindow < piMaxTokens) {
+    throw new Error('CONFIG_INVALID: WP_PI_CONTEXT_WINDOW must be an integer at least WP_PI_MAX_TOKENS');
+  }
+  const piExecutionParameters = {
+    api: 'openai-completions' as const,
+    maxTokens: piMaxTokens,
+    maxSchemaAttempts: piMaxSchemaAttempts,
+    contextWindow: piContextWindow,
+  };
   const providerOperations = new ProviderOperationsApp({
     store: input.providerSettingsStore ?? new EncryptedFileProviderSettingsStore(
       join(runtimeDir, 'secrets', 'provider-settings.enc'),
@@ -155,6 +179,7 @@ export function createComposition(input: {
     ),
     endpointPolicy: providerEndpointPolicy,
     probe: input.providerProbe ?? new OpenAiCompatibleProviderProbe(),
+    executionParameters: piExecutionParameters,
     clock: input.clock,
     audit: (event) => {
       const domainEvent = createEvent(
@@ -190,7 +215,6 @@ export function createComposition(input: {
   const maxOutputBytes = Number(process.env.WP_DSH_MAX_OUTPUT_BYTES ?? 2 * 1024 * 1024);
   const maxTokens = Number(process.env.WP_DSH_MAX_TOKENS ?? 32_768);
   const maxSchemaAttempts = Number(process.env.WP_DSH_MAX_SCHEMA_ATTEMPTS ?? 2);
-  const piMaxSchemaAttempts = Number(process.env.WP_PI_MAX_SCHEMA_ATTEMPTS ?? 2);
   const allowedRoots = (process.env.WP_DSH_ALLOWED_ROOTS?.split(delimiter) ?? [repositoryRoot])
     .map((root) => root.trim()).filter(Boolean).map((root) => resolve(root));
   const agentWorkspaceRoot = join(runtimeDir, 'agent-workspaces');
@@ -334,10 +358,8 @@ export function createComposition(input: {
           const snapshot = runConfiguration.get(runId);
           if (snapshot?.provider.kind !== 'pi-agent') return undefined;
           return new PiCodingAgentProvider({
-            settings: providerOperations.requireRuntimeConfiguration(snapshot.provider),
+            ...providerOperations.requireRuntimeConfiguration(snapshot.provider),
             agentDir: join(runtimeDir, 'pi-agent'),
-            maxTokens,
-            maxSchemaAttempts: piMaxSchemaAttempts,
             endpointPolicy: providerEndpointPolicy,
             onInvocation: (record) => metrics.recordProviderInvocation(record),
           });

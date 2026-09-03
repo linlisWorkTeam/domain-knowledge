@@ -113,7 +113,7 @@ WP_KNOWLEDGE_WRITE_TOKEN='<local-secret>' npm run knowledge:serve
 
 进入治理模式后，可在“Agent 设置”保存公开 HTTPS 的 OpenAI-compatible API 地址、API Key 和模型标识，再点击“验证并启用”。保存会使旧验证失效，只有无副作用的模型列表探测成功后，新批次才默认使用 Pi Agent。页面不会读回完整 Key；服务端把加密配置与本地密钥存放在 `$WP_FLYWHEEL_HOME/secrets/`，文件权限限制为 `0600`。不要备份或提交该目录，也不要把模型地址指向本机、私网或会重定向的目标。
 
-Pi Agent 对空输出或不符合角色 JSON Schema 的输出使用全新会话做有限重试。`WP_PI_MAX_SCHEMA_ATTEMPTS` 表示总尝试次数，默认 `2`，只允许 `1..3`；每次尝试单独记录脱敏调用事实，不与工作流节点恢复次数混算。
+Pi Agent 对空输出或不符合角色 JSON Schema 的输出使用全新会话做有限重试。`WP_PI_MAX_SCHEMA_ATTEMPTS` 表示总尝试次数，默认 `2`，只允许 `1..3`；`WP_PI_MAX_TOKENS` 默认 `32768`，`WP_PI_CONTEXT_WINDOW` 默认 `128000` 且不得小于输出上限。这三个非秘密执行参数连同协议、地址与模型一起进入批次摘要，恢复时任何变化都会失败关闭；每次尝试单独记录脱敏调用事实，不与工作流节点恢复次数混算。
 
 ### 7. 运行固定 ohMyWorkPanel 自动流程
 

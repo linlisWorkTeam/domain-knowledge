@@ -13,6 +13,7 @@ import { fetch as undiciFetch } from 'undici';
 import type {
   AgentProvider,
   AgentRequest,
+  PiAgentExecutionParameters,
   ProviderEndpoint,
   ProviderEndpointPolicy,
   ProviderInvocationRecord,
@@ -34,6 +35,7 @@ const Ajv2020 = Ajv2020Import as unknown as new (options: Record<string, unknown
 interface PiAgentProviderOptions {
   settings: ProviderSettingsRecord;
   agentDir: string;
+  api?: PiAgentExecutionParameters['api'];
   maxTokens?: number;
   maxSchemaAttempts?: number;
   contextWindow?: number;
@@ -41,6 +43,10 @@ interface PiAgentProviderOptions {
   endpointPolicy?: ProviderEndpointPolicy;
   onInvocation?: (record: ProviderInvocationRecord) => void | Promise<void>;
 }
+
+export const PI_AGENT_DEFAULT_MAX_TOKENS = 32_768;
+export const PI_AGENT_DEFAULT_MAX_SCHEMA_ATTEMPTS = 2;
+export const PI_AGENT_DEFAULT_CONTEXT_WINDOW = 128_000;
 
 function pinnedProviderTransport(endpoint: ProviderEndpoint): {
   fetch: typeof globalThis.fetch;
@@ -159,6 +165,7 @@ export class PiCodingAgentProvider implements AgentProvider {
   readonly maxTokens: number;
   readonly maxSchemaAttempts: number;
   readonly contextWindow: number;
+  readonly api: PiAgentExecutionParameters['api'];
   readonly clock: () => Date;
   readonly endpointPolicy: ProviderEndpointPolicy;
   readonly onInvocation?: PiAgentProviderOptions['onInvocation'];
@@ -169,13 +176,21 @@ export class PiCodingAgentProvider implements AgentProvider {
     this.settings = structuredClone(options.settings);
     this.model = options.settings.model;
     this.agentDir = options.agentDir;
-    this.maxTokens = options.maxTokens ?? 32_768;
-    this.maxSchemaAttempts = options.maxSchemaAttempts ?? 2;
+    this.api = options.api ?? 'openai-completions';
+    if (this.api !== 'openai-completions') throw new Error('PI_AGENT_API_INVALID');
+    this.maxTokens = options.maxTokens ?? PI_AGENT_DEFAULT_MAX_TOKENS;
+    if (!Number.isSafeInteger(this.maxTokens) || this.maxTokens < 1) {
+      throw new Error('PI_AGENT_MAX_TOKENS_INVALID');
+    }
+    this.maxSchemaAttempts = options.maxSchemaAttempts ?? PI_AGENT_DEFAULT_MAX_SCHEMA_ATTEMPTS;
     if (!Number.isSafeInteger(this.maxSchemaAttempts)
       || this.maxSchemaAttempts < 1 || this.maxSchemaAttempts > 3) {
       throw new Error('PI_AGENT_MAX_SCHEMA_ATTEMPTS_INVALID');
     }
-    this.contextWindow = options.contextWindow ?? 128_000;
+    this.contextWindow = options.contextWindow ?? PI_AGENT_DEFAULT_CONTEXT_WINDOW;
+    if (!Number.isSafeInteger(this.contextWindow) || this.contextWindow < this.maxTokens) {
+      throw new Error('PI_AGENT_CONTEXT_WINDOW_INVALID');
+    }
     this.clock = options.clock ?? (() => new Date());
     this.endpointPolicy = options.endpointPolicy ?? new PublicHttpsEndpointPolicy();
     this.onInvocation = options.onInvocation;
@@ -216,7 +231,7 @@ export class PiCodingAgentProvider implements AgentProvider {
       runtime.registerProvider(providerId, {
         name: 'Domain Knowledge Pi Provider',
         baseUrl: this.settings.apiUrl,
-        api: 'openai-completions',
+        api: this.api,
         streamSimple: (
           model: Model<Api>, context: Context, options?: SimpleStreamOptions,
         ) => streamOpenAiCompatible(model as Model<'openai-completions'>, context, {
@@ -227,7 +242,7 @@ export class PiCodingAgentProvider implements AgentProvider {
         models: [{
           id: this.model,
           name: this.model,
-          api: 'openai-completions',
+          api: this.api,
           baseUrl: this.settings.apiUrl,
           reasoning: false,
           input: ['text'],

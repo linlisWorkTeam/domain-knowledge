@@ -4,7 +4,7 @@ import {
 import { randomUUID } from 'node:crypto';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
-import { fetch as undiciFetch } from 'undici';
+import { fetch as undiciFetch, type Dispatcher } from 'undici';
 import type {
   ContentCommand, ContentGovernancePort,
 } from '../../../application/apps/content-governance-app.ts';
@@ -29,6 +29,11 @@ interface SourceAccess {
   size: number;
   modifiedAt: string | null;
 }
+
+type SourceHttpsDispatcherFactory = (
+  endpoint: { url: URL; addresses: readonly string[] },
+  maxResponseSize: number,
+) => Dispatcher;
 
 interface SourceRow {
   source_id: string;
@@ -123,6 +128,7 @@ export class SQLiteContentGovernance implements ContentGovernancePort {
   private readonly configuredRoots: string[];
   private readonly allowedRemoteHosts: Set<string>;
   private readonly remoteEndpointPolicy: ProviderEndpointPolicy;
+  private readonly sourceHttpsDispatcherFactory: SourceHttpsDispatcherFactory;
   private readonly defaultRule: Record<string, unknown>;
   private readonly clock: () => string;
 
@@ -133,6 +139,7 @@ export class SQLiteContentGovernance implements ContentGovernancePort {
     configuredRoots: string[];
     allowedRemoteHosts?: string[];
     remoteEndpointPolicy?: ProviderEndpointPolicy;
+    sourceHttpsDispatcherFactory?: SourceHttpsDispatcherFactory;
     defaultRule: Record<string, unknown>;
     clock?: () => string;
   }) {
@@ -144,6 +151,8 @@ export class SQLiteContentGovernance implements ContentGovernancePort {
     ));
     this.allowedRemoteHosts = new Set((input.allowedRemoteHosts ?? []).map((host) => host.toLowerCase()));
     this.remoteEndpointPolicy = input.remoteEndpointPolicy ?? new PublicHttpsEndpointPolicy();
+    this.sourceHttpsDispatcherFactory = input.sourceHttpsDispatcherFactory
+      ?? createPinnedHttpsDispatcher;
     this.defaultRule = structuredClone(input.defaultRule);
     this.clock = input.clock ?? (() => new Date().toISOString());
   }
@@ -1133,7 +1142,10 @@ export class SQLiteContentGovernance implements ContentGovernancePort {
       }
       throw new Error('SOURCE_ACCESS_DENIED: HTTPS source resolves to a restricted target');
     }
-    const dispatcher = createPinnedHttpsDispatcher({ url: locator, addresses }, 10 * 1024 * 1024);
+    const dispatcher = this.sourceHttpsDispatcherFactory(
+      { url: locator, addresses },
+      10 * 1024 * 1024,
+    );
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 5_000);
     timeout.unref();
