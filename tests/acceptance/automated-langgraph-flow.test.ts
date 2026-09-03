@@ -9,6 +9,7 @@ import {
   type AutomatedProjectScenario,
 } from '../../src/application/services/index.ts';
 import { TrustedProjectEvaluator } from '../../src/infrastructure/evaluation/project/index.ts';
+import { JsonSchemaAgentContractValidator } from '../../src/infrastructure/agents/contracts/index.ts';
 import { createDomainKnowledgeInfrastructure } from '../../src/infrastructure/workflow/langgraph/index.ts';
 import { createComposition } from '../../src/interfaces/runner/composition.ts';
 import { GOOD_BODY } from '../helpers/fixture.ts';
@@ -57,6 +58,7 @@ test('generated result matches contract', () => assert.equal(calculate(), expect
       evalRunner: composition.apps.evalRunner,
       evaluator: new TrustedProjectEvaluator(composition.artifacts),
       assetRoot,
+      contracts: new JsonSchemaAgentContractValidator(join(process.cwd(), 'specs', 'schemas')),
     });
     const infrastructure = await createDomainKnowledgeInfrastructure({
       executor,
@@ -110,6 +112,26 @@ test('generated result matches contract', () => assert.equal(calculate(), expect
     ]);
     assert.equal(projections.some((projection) => projection.nodeId === 'publication' && projection.status === 'COMPLETED'), true);
     assert.equal(composition.repository.listEvents(handle.runId).at(-1)?.eventType, 'WorkflowNodeStateChanged');
+    const resultCheckpoints = [
+      [`${handle.runId}:orchestrator:1:main:contract-v5`, 'orchestrator'],
+      [`${handle.runId}:doc_worker:worker-1:stable-source:contract-v5`, 'doc-worker'],
+      [`${handle.runId}:doc_gen:1:main:contract-v5`, 'doc-gen'],
+      [`${handle.runId}:test_gen:stable-source:contract-v5`, 'test-gen'],
+      [`${handle.runId}:code:1:main:contract-v5`, 'code'],
+      [`${handle.runId}:check:1:main:contract-v5`, 'check'],
+      [`${handle.runId}:review:1:main:contract-v5`, 'review'],
+    ] as const;
+    for (const [generationKey, agentType] of resultCheckpoints) {
+      const resultRef = composition.repository.getCheckpoint(generationKey)?.outputRefs[0];
+      assert.ok(resultRef, `AgentResult missing: ${generationKey}`);
+      const envelope = JSON.parse(Buffer.from(
+        await composition.artifacts.get(resultRef),
+      ).toString('utf8')) as Record<string, unknown>;
+      assert.equal(envelope.schemaVersion, '1.0');
+      assert.equal(envelope.runId, handle.runId);
+      assert.equal(envelope.agentType, agentType);
+      assert.equal(envelope.status, 'SUCCEEDED');
+    }
     const versions = composition.service.listKnowledgeVersions();
     const moduleVersions = versions.filter((version) => version.moduleId === scenario.moduleId);
     assert.equal(moduleVersions.length, 2);
@@ -124,12 +146,12 @@ test('generated result matches contract', () => assert.equal(calculate(), expect
     assert.equal(finalGate?.report.checkBlocking, false);
     assert.equal(finalGate?.report.reviewBlocking, false);
     const finalInputIds = new Set(finalGate?.report.inputRefs.map((ref) => ref.artifactId));
-    for (const generationKey of [
-      `${handle.runId}:oracle_validation:1`,
-      `${handle.runId}:check:1:main:contract-v4`,
-      `${handle.runId}:review:1:main:contract-v4`,
-    ]) {
-      const outputRef = composition.repository.getCheckpoint(generationKey)?.outputRefs[0];
+    for (const [generationKey, outputIndex] of [
+      [`${handle.runId}:oracle_validation:1`, 0],
+      [`${handle.runId}:check:1:main:contract-v5`, 0],
+      [`${handle.runId}:review:1:main:contract-v5`, 0],
+    ] as const) {
+      const outputRef = composition.repository.getCheckpoint(generationKey)?.outputRefs[outputIndex];
       assert.ok(outputRef, `checkpoint output missing: ${generationKey}`);
       assert.equal(finalInputIds.has(outputRef.artifactId), true, `gate input missing: ${generationKey}`);
     }

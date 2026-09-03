@@ -22,6 +22,7 @@ import {
 } from '../../infrastructure/persistence/sqlite-cas/index.ts';
 import { SourceScanner } from '../../infrastructure/source-scan/index.ts';
 import { LocalAgentWorkspace } from '../../infrastructure/agents/workspace/index.ts';
+import { JsonSchemaAgentContractValidator } from '../../infrastructure/agents/contracts/index.ts';
 import { migrateLegacyOkf } from '../../infrastructure/migration/legacy-okf/index.ts';
 import { ConsoleReadModel } from './console-read-model.ts';
 import { buildDemoReport } from './demo-report.ts';
@@ -197,6 +198,7 @@ export function createComposition(input: {
         evalRunner: evalRunnerApp,
         evaluator: new TrustedProjectEvaluator(artifacts),
         assetRoot: join(componentRoot, 'acceptance', 'ohmyworkpanel'),
+        contracts: new JsonSchemaAgentContractValidator(join(componentRoot, 'specs', 'schemas')),
         ...(agent ? { agent } : {}),
         ...(agent ? { agentWorkspaces: new LocalAgentWorkspace({
           workspaceRoot: agentWorkspaceRoot,

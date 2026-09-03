@@ -42,9 +42,10 @@ ReviewAgent 只审查已经形成的正常评测报告。认证失败、超时�
 4. 基础设施失败不会调用 ReviewAgent；正常评测仍经过 ReviewAgent。
 5. 原有七个 Agent 和 LangGraph 边保持不变。
 
+当前实现证据：运行配置冻结由 `tests/integration/run-configuration.test.ts` 验证；七类运行时结果信封、命令先验校验及原拓扑覆盖由 `tests/integration/agent-contracts.test.ts` 和 `tests/acceptance/automated-langgraph-flow.test.ts` 验证。真实模型输出质量不属于本 ADR 的完成条件。
+
 ## 后果
 
 - Adapter 可以更换为公司 CodeAgent CLI，而不改变 Domain/Application 或节点契约。
 - Checkpoint 恢复能够重用同一配置与 Schema 版本，评测报告具备可复验配置摘要。
 - 新增 Schema 规范化和 CAS 写入步骤，但大对象不会膨胀 GraphState。
-
