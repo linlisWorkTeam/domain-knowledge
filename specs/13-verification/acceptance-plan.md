@@ -60,6 +60,7 @@ UI 验收场景的规范正文以[前台产品设计的 AC-UI-001 至 AC-UI-019]
 - 深浅主题、键盘导航、Drawer 焦点、Escape 关闭、焦点恢复、200% 缩放和移动端核心读取路径必须通过浏览器契约验证。
 - 页面不得加载第三方字体、脚本或样式，不得因视觉改版放宽 Content Security Policy。
 - API 空结果、部分失败和完全失败必须进入 Empty、Partial 或 Error 状态，不得回退到模拟 Health、ETA、Graph、Action Item、Activity、Workspace 或用户身份。
+- 浏览器契约入口为 `npm run test:ui`，使用临时 Registry 和 Chromium 验证上述前台门禁，不复用开发者正在运行的工作目录或服务数据。
 
 ## P0-A Review 清单
 

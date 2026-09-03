@@ -1,25 +1,26 @@
-# Knowledge Console UI/UX Prototype
+# 知识控制台 UI/UX 原型
 
-This directory preserves the approved first-pass UI/UX design for the domain-knowledge product console.
+本目录保存 domain-knowledge 产品控制台第一轮 UI/UX 视觉原型，用于评审信息层级、布局和交互风格，不是生产前台。
 
-## Included views
+## 包含页面
 
-- Action Center: severity-ranked work queue, knowledge health, active flywheel run, and issue diagnosis drawer.
-- Flywheel Runs: run metrics, execution history, and stage-level progress.
-- Knowledge: domain navigation, generated/curated provenance, freshness, and health states.
-- Graph Explorer: concept, source-symbol, and knowledge relationships with node details.
-- Light and dark themes with system preference detection and persisted user choice.
-- Responsive desktop and compact layouts.
+- 操作中心：用于探索工作队列、概览指标、活动运行和问题详情抽屉的视觉组织。
+- 飞轮运行：运行指标、执行历史和阶段进度的原型表达。
+- 知识：领域导航、来源、新鲜度和状态的原型表达。
+- 图谱探索：概念、源码符号和知识关系及节点详情的原型表达。
+- 深色与浅色主题，以及桌面和紧凑布局的响应式方案。
 
-## Preview
+上述页面包含尚未实现的演示能力和静态数据，只能作为视觉参考。生产控制台是否展示某项信息，以已接受的 Spec 和真实 API 能力为准。
 
-Serve this directory through any static HTTP server. For example:
+## 本地预览
+
+可以使用任意静态 HTTP 服务预览，例如：
 
 ```bash
 cd web/prototype
 python3 -m http.server 4173
 ```
 
-Then open `http://localhost:4173`.
+然后打开 `http://localhost:4173`。
 
-The prototype uses static demonstration data. It intentionally does not replace the current `web/` implementation or connect to production APIs. Product behavior and backend integration should be handled in follow-up work after design review.
+原型不会替换 `web/` 中的生产实现，也不会连接真实 API。产品行为、权限边界和后端集成必须在设计评审后按照对应 Spec 实施。

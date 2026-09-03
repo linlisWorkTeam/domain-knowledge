@@ -2,6 +2,8 @@
 **/__pycache__/
 *.py[cod]
 .playwright-cli/
+playwright-report/
+test-results/
 
 # Atomic-write leftovers
 knowledge/**/*.tmp

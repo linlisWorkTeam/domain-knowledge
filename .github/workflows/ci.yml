@@ -32,6 +32,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install browser for Console tests
+        run: npx playwright install --with-deps chromium
+
       - name: Type-check
         run: npm run typecheck
 
@@ -40,3 +43,6 @@ jobs:
 
       - name: Run test suite
         run: npm test
+
+      - name: Run Console browser tests
+        run: npm run test:ui

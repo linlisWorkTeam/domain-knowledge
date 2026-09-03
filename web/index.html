@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="dark">
+  <meta name="color-scheme" content="dark light">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
   <title>知识飞轮控制台</title>
   <link rel="stylesheet" href="/styles.css">
@@ -11,18 +11,19 @@
 <body>
   <a class="skip-link" href="#page-content">跳到主要内容</a>
   <div class="app-shell">
-    <aside class="sidebar" aria-label="主导航">
+    <aside id="sidebar" class="sidebar" aria-label="主导航" aria-hidden="false">
       <div class="brand">
         <span class="brand-mark" aria-hidden="true">◇</span>
         <div><strong>知识飞轮</strong><small>本地控制台</small></div>
       </div>
       <nav id="primary-nav">
-        <button class="nav-item active" data-page="overview"><span aria-hidden="true">⌂</span>概览</button>
+        <button class="nav-item active" data-page="overview"><span aria-hidden="true">⌂</span>操作中心</button>
         <button class="nav-item" data-page="runs"><span aria-hidden="true">◎</span>运行</button>
         <button class="nav-item" data-page="knowledge"><span aria-hidden="true">▤</span>知识</button>
         <button class="nav-item" data-page="governance"><span aria-hidden="true">△</span>治理 <em id="governance-count"></em></button>
         <button class="nav-item" data-page="evidence"><span aria-hidden="true">◫</span>证据</button>
         <button class="nav-item" data-page="agents"><span aria-hidden="true">✦</span>智能体</button>
+        <button class="nav-item" data-page="discovery"><span aria-hidden="true">⌕</span>发现</button>
         <button class="nav-item" data-page="settings"><span aria-hidden="true">⚙</span>设置</button>
       </nav>
       <div class="sidebar-foot">
@@ -33,12 +34,14 @@
 
     <main class="main-area">
       <header class="topbar">
+        <button id="nav-toggle" class="icon-button nav-toggle" type="button" aria-label="打开主导航" aria-controls="sidebar" aria-expanded="false">☰</button>
         <div>
           <p id="page-eyebrow" class="eyebrow">WORKPANEL · KNOWLEDGE FLYWHEEL</p>
-          <h1 id="page-title">运行概览</h1>
-          <p id="page-description" class="subtitle">查看运行状态、知识发布进度，以及需要人工处理的问题。</p>
+          <h1 id="page-title">操作中心</h1>
+          <p id="page-description" class="subtitle">查看运行事实、知识发布状态，以及需要人工处理的问题。</p>
         </div>
         <div class="topbar-actions">
+          <button id="global-search-button" class="secondary-button" type="button" aria-label="搜索知识">⌕ 搜索</button>
           <button id="theme-button" class="secondary-button theme-button" type="button" aria-label="切换到浅色主题">☼ 浅色</button>
           <span id="mode-pill" class="status-pill">只读模式</span>
           <button id="operator-button" class="secondary-button" type="button">治理模式</button>
@@ -51,7 +54,9 @@
     </main>
   </div>
 
-  <aside id="detail-drawer" class="drawer" aria-label="详情" aria-hidden="true">
+  <button id="nav-backdrop" class="nav-backdrop" type="button" aria-label="关闭主导航" hidden></button>
+
+  <aside id="detail-drawer" class="drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title" aria-hidden="true" hidden>
     <div class="drawer-header">
       <div><p class="eyebrow">详细信息</p><h2 id="drawer-title">详情</h2></div>
       <button id="drawer-close" class="icon-button" type="button" aria-label="关闭详情">×</button>

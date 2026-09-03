@@ -46,14 +46,14 @@
 | KF-UI-009 | AC-UI-009 | Planned | — | — |
 | KF-UI-010 | AC-UI-010 | Partial | `web/app.js` + `src/interfaces/runner/server.ts` | `tests/contract/site.test.ts` + `tests/integration/server.test.ts` |
 | KF-UI-011 | AC-UI-011 | Implemented | `web/app.js` + `src/application/apps/knowledge-search-app.ts` | `tests/contract/site.test.ts` + `tests/integration/server.test.ts` |
-| KF-UI-012 | AC-UI-012 | Partial | `web/index.html` + `web/styles.css` + `web/app.js` | `tests/contract/site.test.ts` |
+| KF-UI-012 | AC-UI-012 | Implemented | `web/index.html` + `web/styles.css` + `web/app.js` | `tests/contract/site.test.ts` + `tests/e2e/console.spec.ts` |
 | KF-UI-013 | AC-UI-013 | Implemented | `web/app.js` + `web/styles.css` + `site/app.js` | `tests/contract/site.test.ts` |
 | KF-UI-014 | AC-UI-014 | Implemented | `web/app.js` + `src/infrastructure/workflow/langgraph/agent-definitions.ts` | `tests/contract/site.test.ts` + `tests/integration/server.test.ts` |
 | KF-UI-015 | AC-UI-015 | Implemented | `web/app.js` + `src/interfaces/runner/server.ts` | `tests/contract/site.test.ts` + `tests/integration/server.test.ts` |
 | KF-UI-016 | AC-UI-016 | Implemented | `web/app.js` + `src/interfaces/runner/console-read-model.ts` | `tests/contract/site.test.ts` + `tests/acceptance/automated-langgraph-flow.test.ts` |
 | KF-UI-017 | AC-UI-017 | Implemented | `web/index.html` + `web/app.js` + `site/index.html` + `site/app.js` | `tests/contract/site.test.ts` |
 | KF-UI-018 | AC-UI-018 | Implemented | `.env.example` + `web/app.js` | `tests/contract/site.test.ts` + `tests/integration/server.test.ts` |
-| KF-UI-019 | AC-UI-019 | Planned | — | — |
+| KF-UI-019 | AC-UI-019 | Implemented | `web/index.html` + `web/styles.css` + `web/app.js` | `tests/contract/site.test.ts` + `tests/e2e/console.spec.ts` |
 | NFR-001 | AC-SEC-002 | Partial | `src/interfaces/runner/server.ts` | `tests/integration/server.test.ts` |
 | NFR-002 | AC-REC-001 | Partial | `src/application/services/index.ts` + `src/infrastructure/persistence/sqlite-cas/index.ts` | `tests/integration/sqlite-cas.test.ts` |
 | NFR-003 | AC-REC-002 | Implemented | `src/application/services/index.ts` + `src/infrastructure/persistence/sqlite-cas/index.ts` | `tests/integration/sqlite-cas.test.ts` + `tests/acceptance/publication-flow.test.ts` |
@@ -65,6 +65,6 @@
 | NFR-009 | AC-SEC-003 | Partial | `src/infrastructure/agents/deepseek-harness` + `src/interfaces/runner/demo-report.ts` | `tests/integration/deepseek-harness-agent.test.ts` + `tests/integration/demo-report.test.ts` |
 | NFR-010 | AC-FLOW-004 | Planned | — | — |
 | NFR-011 | AC-E2E-001 | Implemented | `src/application/services/project-flow.ts` + `src/infrastructure/persistence/sqlite-cas/index.ts` | `tests/acceptance/real-source-flow.test.ts` |
-| NFR-012 | AC-UI-012 | Partial | `web/index.html` + `web/styles.css` + `web/app.js` | `tests/contract/site.test.ts` |
+| NFR-012 | AC-UI-012 | Implemented | `web/index.html` + `web/styles.css` + `web/app.js` | `tests/contract/site.test.ts` + `tests/e2e/console.spec.ts` |
 
 `SPK-001` 的官方 SDK 接缝、stdin JSON-RPC、超时关闭和 Bubblewrap 角色工作区已有自动化验证；端到端 SDK Run `5503b6bc-0350-4b53-98cc-6fbf3a13aaa9` 已归档，`KF-SYS-025` 的接线验收完成。`SPK-002` 的 LangGraph 选型结果已由 ADR-006 和自动化测试固化；失败 task checkpoint 恢复已有自动化用例，四个崩溃注入点仍是恢复加固项。单次 live Run 不能替代稳定性试验，Agent 源码隔离也不能证明敌对代码执行安全。

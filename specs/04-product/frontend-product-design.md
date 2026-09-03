@@ -1,6 +1,6 @@
 # 知识飞轮前台产品设计
 
-**状态：Accepted；前台交付 F1 规范已冻结，固定 ohMyWorkPanel 自动路径已实现｜版本：0.4.1｜日期：2026-09-03**
+**状态：Accepted；前台交付 F1 与固定 ohMyWorkPanel 自动路径已实现｜版本：0.4.2｜日期：2026-09-03**
 
 本文定义 domain-knowledge 知识飞轮控制台的用户体验、信息架构、交互边界、接口需求和验收标准。领域状态、门禁、安全和发布语义以同仓库的[规范总入口](../README.md)为准；前台不得创造第二套状态或发布权威。
 
@@ -605,4 +605,4 @@ sequenceDiagram
 | Evidence | Implemented MVP：聚合 EvaluationReport、GateDecision、工具链、测试和证据引用摘要 |
 | 真实在线 Agent | Implemented（受限样例）：官方 DSH SDK 已跑通固定 ohMyWorkPanel；通用项目向导和稳定性统计仍待实现 |
 | 敌对代码安全执行 | Planned；安全能力完成前必须 fail closed |
-| 前台交付 F1 | Spec accepted：视觉原型只作样式参考；实现必须复用现有 API，缺失能力不得以演示数据补齐 |
+| 前台交付 F1 | Implemented：新版 Console 已复用现有 API，提供八个固定入口、绿色双主题、真实来源发现、部分失败状态和浏览器无障碍契约；缺失能力未以演示数据补齐 |
