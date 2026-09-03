@@ -17,6 +17,8 @@
 
 Provider 返回值首先视为不可信的角色原始输出。工作流负责执行角色专属校验、把正文或代码等大对象写入 CAS，再规范化为 `AgentResult`。只有通过统一 `AgentResult` Schema 的结果可以成为节点输出并被下游消费。Provider 不生成或猜测 ArtifactRef。
 
+Provider 所见动态上下文必须直接属于 `AgentCommand.payload`，或由其中 ArtifactRef 经过内容摘要校验后物化；不得再附加未版本化的上下文对象。`AgentResult.commandRef` 必须指向原始受信命令，下游同时核对 `runId`、`agentType`、`commandId` 和 `generationKey`，防止跨 Run、跨节点或跨迭代复用合法但不属于本次执行的结果。
+
 七个角色保持不变：`orchestrator`、`doc-gen`、`doc-worker`、`test-gen`、`code`、`check`、`review`。统一信封不能改变图拓扑、职责、工具权限或确定性 Gate 的发布权。
 
 ### RunConfigurationSnapshot

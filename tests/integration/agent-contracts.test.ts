@@ -2,12 +2,12 @@ import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import test from 'node:test';
 import type {
-  AgentCommand, AgentContractValidator, AgentProvider, ProjectSnapshot,
+  AgentCommand, AgentContractValidator, AgentProvider, AgentResult, ProjectSnapshot,
 } from '../../src/application/ports/index.ts';
 import type { ArtifactRef } from '../../src/domain/index.ts';
 import type { KnowledgeFlywheelService } from '../../src/application/services/index.ts';
 import {
-  OhMyWorkPanelWorkflowExecutor, type AutomatedProjectScenario,
+  assertAgentResultBinding, OhMyWorkPanelWorkflowExecutor, type AutomatedProjectScenario,
 } from '../../src/application/services/automated-project-workflow.ts';
 import { JsonSchemaAgentContractValidator } from '../../src/infrastructure/agents/contracts/index.ts';
 
@@ -80,4 +80,28 @@ test('command validation runs before checkpoint dispatch and provider invocation
   }), /AGENT_COMMAND_INVALID/);
   assert.equal(checkpointClaims, 0);
   assert.equal(providerRuns, 0);
+});
+
+test('AgentResult binding rejects cross-Run and wrong-command reuse', () => {
+  const command: AgentCommand = {
+    schemaVersion: '1.0', commandId: 'command-1', runId: 'run-1',
+    agentType: 'code', generationKey: 'run-1:code:0:main:contract-v5',
+    payload: {
+      knowledgeRef: artifactRef, publicInterfaceRefs: [artifactRef], languageId: 'typescript',
+      buildContractRef: artifactRef, allowedGeneratedPaths: ['src/out.ts'],
+    },
+  };
+  const result: AgentResult = {
+    schemaVersion: '1.0', commandId: command.commandId, commandRef: artifactRef,
+    runId: command.runId, agentType: command.agentType, status: 'SUCCEEDED',
+    outputRefs: [artifactRef], payload: { resultKind: 'codeArtifact', codeRef: artifactRef },
+  };
+  const expected = { runId: 'run-1', agentId: 'code' as const, generationKey: command.generationKey };
+  assert.doesNotThrow(() => assertAgentResultBinding(result, command, expected));
+  assert.throws(() => assertAgentResultBinding({ ...result, runId: 'run-2' }, command, expected),
+    /AGENT_RESULT_ROLE_MISMATCH/);
+  assert.throws(() => assertAgentResultBinding(result, { ...command, commandId: 'command-2' }, expected),
+    /AGENT_RESULT_COMMAND_MISMATCH/);
+  assert.throws(() => assertAgentResultBinding(result, { ...command, generationKey: 'wrong-generation-key' }, expected),
+    /AGENT_RESULT_COMMAND_MISMATCH/);
 });

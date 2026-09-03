@@ -209,6 +209,7 @@ export interface AgentCommand {
 export interface AgentResult {
   schemaVersion: '1.0';
   commandId: string;
+  commandRef: ArtifactRef;
   runId: string;
   agentType: AgentId;
   status: 'SUCCEEDED' | 'FAILED';

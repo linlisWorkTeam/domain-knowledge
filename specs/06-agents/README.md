@@ -11,7 +11,7 @@
 
 统一信封、角色枚举和封闭的角色 payload 由 `agent-command.schema.json` 与 `agent-result.schema.json` 定义，Correction 另由 `correction.schema.json` 约束。成功结果的 `resultKind` 必须与 `agentType` 匹配，失败结果统一为 `error` payload；未知字段一律拒绝。所有输入 Artifact 在调用前授权，所有输出先 Schema 校验再提交。Agent 不能直接改变 Run 状态、发布知识或授予权限。
 
-运行时采用两阶段校验：调用前先校验由受信工作流构造的 `AgentCommand`；Provider 的角色原始输出仍视为不可信，经过角色校验并将大对象提交 CAS 后，再规范化和校验 `AgentResult`。下游只消费规范化结果。具体配置冻结规则见 [ADR-011](../adr/ADR-011-agent-contract-and-run-configuration-snapshot.md)。
+运行时采用两阶段校验：调用前先校验由受信工作流构造的 `AgentCommand`；传给 Provider 的动态上下文必须是命令内字段，或由命令中 ArtifactRef 完整性校验后物化的内容，不允许附加未绑定旁路输入。Provider 的角色原始输出仍视为不可信，经过角色校验并将大对象提交 CAS 后，再规范化和校验 `AgentResult`。下游只消费规范化结果，并沿 `commandRef` 核对 Run、角色、命令和 GenerationKey。具体配置冻结规则见 [ADR-011](../adr/ADR-011-agent-contract-and-run-configuration-snapshot.md)。
 
 ## 固定节点与有限定制
 

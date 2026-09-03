@@ -27,7 +27,6 @@ import {
 } from '../../domain/index.ts';
 import type { KnowledgeFlywheelService } from './index.ts';
 import type { RealSourceScenario } from './project-flow.ts';
-import { KNOWLEDGE_WRITING_GUIDE } from './knowledge-writing-guide.ts';
 
 const Ajv2020 = Ajv2020Import as unknown as new (options: Record<string, unknown>) => {
   compile(schema: Record<string, unknown>): {
@@ -99,6 +98,16 @@ const AGENT_OUTPUT_SCHEMAS: Record<AgentId, Record<string, unknown>> = {
       },
     },
   },
+};
+
+const NODE_BY_AGENT: Record<AgentId, string> = {
+  orchestrator: 'orchestrator',
+  'doc-worker': 'doc_worker',
+  'doc-gen': 'doc_gen',
+  'test-gen': 'test_gen',
+  code: 'code',
+  check: 'check',
+  review: 'review',
 };
 
 interface AutomatedAssets {
@@ -178,6 +187,24 @@ function contextKey(nodeId: string, iteration: number, workerId?: string): strin
 
 function routeFor(outcome: GateDecision['outcome']): WorkflowStageResult['route'] {
   return outcome;
+}
+
+export function assertAgentResultBinding(
+  result: AgentResult,
+  command: AgentCommand,
+  expected: { runId: string; agentId: AgentId; generationKey: string },
+): void {
+  if (result.status !== 'SUCCEEDED'
+    || result.runId !== expected.runId
+    || result.agentType !== expected.agentId) {
+    throw new Error(`AGENT_RESULT_ROLE_MISMATCH: expected ${expected.agentId}`);
+  }
+  if (command.commandId !== result.commandId
+    || command.runId !== expected.runId
+    || command.agentType !== expected.agentId
+    || command.generationKey !== expected.generationKey) {
+    throw new Error(`AGENT_RESULT_COMMAND_MISMATCH: expected ${expected.generationKey}`);
+  }
 }
 
 export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
@@ -349,58 +376,13 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
       sourceRoot: scenario.repositoryRoot,
       readablePaths,
     });
-    const evidence: Record<string, unknown> = {
-      moduleId: scenario.moduleId,
-      iteration: input.iteration,
-      workerId: input.workerId ?? null,
-      readablePaths: workspace.readablePaths,
-      allowedGeneratedPaths: scenario.allowedGeneratedPaths,
-      writingGuide: agentId === 'doc-gen' ? KNOWLEDGE_WRITING_GUIDE : undefined,
-    };
-    if (agentId === 'doc-worker') {
-      const workerIndex = input.workerIndex ?? 0;
-      evidence.assignedSourcePaths = scenario.sourcePaths.filter((_, index) =>
-        index % Math.max(1, input.workerCount) === workerIndex,
-      );
-    }
-    if (input.iteration > 0) {
-      const previousDocumentRef = input.context[contextKey('doc_gen', input.iteration - 1)] as ArtifactRef | undefined;
-      const previousReviewRef = input.context[contextKey('review', input.iteration - 1)] as ArtifactRef | undefined;
-      if (previousDocumentRef) evidence.previousDocument = await this.readAgentOutput<Record<string, unknown>>(
-        previousDocumentRef, 'doc-gen',
-      );
-      if (previousReviewRef) evidence.previousReview = await this.readAgentOutput<Record<string, unknown>>(
-        previousReviewRef, 'review',
-      );
-      const previousQuality = input.context[contextKey('qualityReport', input.iteration - 1)] as QualityReport | undefined;
-      if (previousQuality) evidence.previousQualityFeedback = previousQuality;
-    }
-    if (agentId === 'doc-gen') {
-      const fragments: Record<string, unknown>[] = [];
-      for (const [key, value] of Object.entries(input.context)) {
-        if (!key.startsWith(`doc_worker:${input.iteration}:`)) continue;
-        if (value && typeof value === 'object' && 'artifactId' in value) {
-          fragments.push(await this.readAgentOutput<Record<string, unknown>>(value as ArtifactRef, 'doc-worker'));
-        }
-      }
-      evidence.workerFragments = fragments;
-    }
-    const contextualRefs: Record<string, unknown> = {};
-    const contextAllowlist: Partial<Record<AgentId, string[]>> = {
-      code: ['candidateBodyRef'],
-      check: ['candidateBodyRef', 'code'],
-      review: ['candidateBodyRef', 'check', 'evaluationEvidenceRef'],
-    };
-    for (const [key, value] of Object.entries(input.context)) {
-      if (!key.endsWith(`:${input.iteration}`) || !value || typeof value !== 'object' || !('artifactId' in value)) continue;
-      if ((contextAllowlist[agentId] ?? []).some((name) => key.startsWith(name))) {
-        contextualRefs[key] = await this.readArtifact(value as ArtifactRef);
-      }
-    }
-    evidence.currentEvidence = contextualRefs;
+    const materials = await Promise.all(this.artifactRefsIn(command.payload).map(async (ref) => ({
+      ref,
+      content: await this.readArtifact(ref),
+    })));
     return this.agent.run({
       role: agentId,
-      prompt: `${input.prompt}\n\n受信 AgentCommand：\n${JSON.stringify(command)}\n\n受信工作流上下文：\n${JSON.stringify(evidence)}`,
+      prompt: `${input.prompt}\n\n受信 AgentCommand：\n${JSON.stringify(command)}\n\n命令引用工件（已校验内容摘要）：\n${JSON.stringify(materials)}`,
       outputSchema: outputSchemaFor(agentId, scenario),
       idempotencyKey: command.generationKey,
       command,
@@ -443,7 +425,7 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
       const rawRef = await this.flywheel.putArtifact(
         Buffer.from(JSON.stringify(output, null, 2)), 'application/json',
       );
-      const result = await this.normalizeAgentResult(command, input, scenario, output, rawRef);
+      const result = await this.normalizeAgentResult(command, commandRef, input, scenario, output, rawRef);
       this.contracts.assertResult(result);
       const resultRef = await this.flywheel.putArtifact(
         Buffer.from(JSON.stringify(result, null, 2)), 'application/json',
@@ -461,7 +443,7 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
   ): Promise<WorkflowStageResult> {
     const documentRef = input.context[contextKey('doc_gen', input.iteration)] as ArtifactRef | undefined;
     if (!documentRef) throw new Error('WORKFLOW_DOC_OUTPUT_MISSING');
-    const document = await this.readAgentOutput<DocumentOutput>(documentRef, 'doc-gen');
+    const document = await this.readAgentOutput<DocumentOutput>(documentRef, 'doc-gen', input);
     const checkpoint = await this.flywheel.executeNode({
       runId: input.runId,
       nodeId: input.nodeId,
@@ -555,7 +537,7 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
     if (!codeRef || !bodyRef || !checkRef || !oracleRef || typeof versionId !== 'string') {
       throw new Error('WORKFLOW_EVALUATION_INPUT_MISSING');
     }
-    const code = await this.readAgentOutput<CodeOutput>(codeRef, 'code');
+    const code = await this.readAgentOutput<CodeOutput>(codeRef, 'code', input);
     for (const file of code.files) {
       if (!scenario.allowedGeneratedPaths.includes(file.path)) throw new Error(`PROJECT_PATH_DENIED: ${file.path}`);
     }
@@ -647,8 +629,8 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
     if (!bodyRef || !codeRef || !checkRef || !oracleRef || typeof versionId !== 'string') {
       throw new Error('WORKFLOW_GATE_INPUT_MISSING');
     }
-    const check = await this.readAgentOutput<CheckOutput>(checkRef, 'check');
-    const review = reviewRef ? await this.readAgentOutput<ReviewOutput>(reviewRef, 'review') : null;
+    const check = await this.readAgentOutput<CheckOutput>(checkRef, 'check', input);
+    const review = reviewRef ? await this.readAgentOutput<ReviewOutput>(reviewRef, 'review', input) : null;
     const policy = input.context.gatePolicy as GatePolicy | undefined;
     const run = this.flywheel.getRun(input.runId);
     if (!policy || !run) throw new Error('WORKFLOW_GATE_POLICY_MISSING');
@@ -719,12 +701,57 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
         sourceRefs: [snapshot.manifestRef],
         publicInterfaceRefs,
       };
-      if (agentId === 'doc-gen' && input.iteration > 0) {
-        const previousResultRef = input.context[contextKey('doc_gen', input.iteration - 1)] as ArtifactRef | undefined;
-        if (previousResultRef) {
-          const previousResult = await this.readAgentResult(previousResultRef, 'doc-gen');
-          const baseKnowledgeRef = previousResult.payload['bodyRef'] as ArtifactRef | undefined;
-          if (baseKnowledgeRef) payload.baseKnowledgeRef = baseKnowledgeRef;
+      if (agentId === 'doc-worker') {
+        const workerIndex = input.workerIndex ?? 0;
+        const assignedSourcePaths = scenario.sourcePaths.filter((_, index) =>
+          index % Math.max(1, input.workerCount) === workerIndex,
+        );
+        if (assignedSourcePaths.length > 0) payload.assignedSourcePaths = assignedSourcePaths;
+      } else {
+        const workerFragmentRefs: ArtifactRef[] = [];
+        for (const [key, value] of Object.entries(input.context)) {
+          if (!key.startsWith(`doc_worker:${input.iteration}:`)
+            || !value || typeof value !== 'object' || !('artifactId' in value)) continue;
+          const workerId = key.split(':')[2];
+          const workerResult = await this.readAgentResult(
+            value as ArtifactRef,
+            'doc-worker',
+            input.runId,
+            this.expectedAgentGenerationKey(input, 'doc-worker', input.iteration, workerId),
+          );
+          const chunkRef = workerResult.payload['chunkRef'] as ArtifactRef | undefined;
+          if (chunkRef) workerFragmentRefs.push(chunkRef);
+        }
+        if (workerFragmentRefs.length > 0) payload.workerFragmentRefs = this.uniqueRefs(workerFragmentRefs);
+        if (input.iteration > 0) {
+          const previousResultRef = input.context[contextKey('doc_gen', input.iteration - 1)] as ArtifactRef | undefined;
+          if (previousResultRef) {
+            const previousResult = await this.readAgentResult(
+              previousResultRef,
+              'doc-gen',
+              input.runId,
+              this.expectedAgentGenerationKey(input, 'doc-gen', input.iteration - 1),
+            );
+            const baseKnowledgeRef = previousResult.payload['bodyRef'] as ArtifactRef | undefined;
+            if (baseKnowledgeRef) payload.baseKnowledgeRef = baseKnowledgeRef;
+          }
+          const previousReviewRef = input.context[contextKey('review', input.iteration - 1)] as ArtifactRef | undefined;
+          if (previousReviewRef) {
+            const previousReview = await this.readAgentResult(
+              previousReviewRef,
+              'review',
+              input.runId,
+              this.expectedAgentGenerationKey(input, 'review', input.iteration - 1),
+            );
+            const corrections = previousReview.payload['corrections'];
+            if (Array.isArray(corrections) && corrections.length > 0) payload.corrections = corrections;
+          }
+          const quality = input.context[contextKey('qualityReport', input.iteration - 1)] as QualityReport | undefined;
+          if (quality) {
+            payload.qualityFeedback = {
+              score: quality.score, signals: quality.signals, weakPoints: quality.weakPoints,
+            };
+          }
         }
       }
     } else if (agentId === 'test-gen') {
@@ -743,11 +770,17 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
         publicInterfaceRefs,
         languageId: this.scenarioLanguage(scenario),
         buildContractRef: scenarioRef,
+        allowedGeneratedPaths: scenario.allowedGeneratedPaths,
       };
     } else if (agentId === 'check') {
       const codeResultRef = input.context[contextKey('code', input.iteration)] as ArtifactRef | undefined;
       if (!codeResultRef) throw new Error('AGENT_COMMAND_INPUT_MISSING: check.diffRef');
-      const codeResult = await this.readAgentResult(codeResultRef, 'code');
+      const codeResult = await this.readAgentResult(
+        codeResultRef,
+        'code',
+        input.runId,
+        this.expectedAgentGenerationKey(input, 'code', input.iteration),
+      );
       const diffRef = codeResult.payload['codeRef'] as ArtifactRef | undefined;
       if (!diffRef) throw new Error('AGENT_COMMAND_INPUT_MISSING: check.diffRef');
       payload = { diffRef, criteriaRef: scenarioRef, publicInterfaceRefs };
@@ -772,6 +805,7 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
 
   private async normalizeAgentResult(
     command: AgentCommand,
+    commandRef: ArtifactRef,
     input: WorkflowStageInput,
     scenario: AutomatedProjectScenario,
     raw: Record<string, unknown>,
@@ -869,6 +903,7 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
     return {
       schemaVersion: '1.0',
       commandId: command.commandId,
+      commandRef,
       runId: command.runId,
       agentType: command.agentType,
       status: 'SUCCEEDED',
@@ -956,20 +991,51 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
     return JSON.parse(Buffer.from(await this.flywheel.getArtifact(ref)).toString('utf8')) as T;
   }
 
-  private async readAgentOutput<T>(ref: ArtifactRef, expectedAgent: AgentId): Promise<T> {
-    const result = await this.readAgentResult(ref, expectedAgent);
+  private async readAgentOutput<T>(
+    ref: ArtifactRef,
+    expectedAgent: AgentId,
+    input: WorkflowStageInput,
+  ): Promise<T> {
+    const result = await this.readAgentResult(
+      ref,
+      expectedAgent,
+      input.runId,
+      this.expectedAgentGenerationKey(input, expectedAgent, input.iteration),
+    );
     const rawRef = result.outputRefs.find((outputRef) => outputRef.mediaType === 'application/json');
     if (!rawRef) throw new Error(`AGENT_RESULT_RAW_OUTPUT_MISSING: ${expectedAgent}`);
     return this.readJson<T>(rawRef);
   }
 
-  private async readAgentResult(ref: ArtifactRef, expectedAgent: AgentId): Promise<AgentResult> {
+  private async readAgentResult(
+    ref: ArtifactRef,
+    expectedAgent: AgentId,
+    expectedRunId: string,
+    expectedGenerationKey: string,
+  ): Promise<AgentResult> {
     const result = await this.readJson<AgentResult>(ref);
     this.contracts.assertResult(result);
-    if (result.status !== 'SUCCEEDED' || result.agentType !== expectedAgent) {
-      throw new Error(`AGENT_RESULT_ROLE_MISMATCH: expected ${expectedAgent}`);
-    }
+    const command = await this.readJson<AgentCommand>(result.commandRef);
+    this.contracts.assertCommand(command);
+    assertAgentResultBinding(result, command, {
+      runId: expectedRunId, agentId: expectedAgent, generationKey: expectedGenerationKey,
+    });
     return result;
+  }
+
+  private expectedAgentGenerationKey(
+    input: WorkflowStageInput,
+    agentId: AgentId,
+    iteration: number,
+    workerId?: string,
+  ): string {
+    return this.agentGenerationKey({
+      ...input,
+      nodeId: NODE_BY_AGENT[agentId],
+      agentId,
+      iteration,
+      ...(workerId ? { workerId } : { workerId: undefined }),
+    }, agentId);
   }
 
   private async readArtifact(ref: ArtifactRef): Promise<unknown> {
