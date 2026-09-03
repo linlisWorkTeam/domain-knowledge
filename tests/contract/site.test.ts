@@ -266,6 +266,11 @@ test('production Console implements the F2 seven-page navigation and truthful da
   assert.doesNotMatch(consoleScript, /\/api\/v1\/(?:transition|evaluate|publish)/);
   assert.doesNotMatch(`${consoleHtml}\n${consoleScript}`, /Workspace owner|87\s*\/\s*100/);
   assert.doesNotMatch(consoleHtml, /fonts\.googleapis|fonts\.gstatic|unpkg|jsdelivr/i);
+  for (const visualHook of ['project-card', 'nav-section', 'overview-summary-grid', 'attention-queue', 'overview-rail']) {
+    assert.match(`${consoleHtml}\n${consoleScript}`, new RegExp(`class="[^"]*${visualHook}`), `Console misses reference-layout hook ${visualHook}`);
+    assert.match(consoleCss, new RegExp(`\\.${visualHook}`), `Console misses reference-layout styling ${visualHook}`);
+  }
+  assert.match(consoleScript, /不提供模拟 ETA/);
   assert.match(consoleHtml, /role="dialog" aria-modal="true" aria-labelledby="drawer-title"/);
   assert.match(consoleScript, /drawerReturnFocus/);
   assert.match(consoleScript, /event\.key === 'Tab'.*drawer\.classList\.contains\('open'\)/s);

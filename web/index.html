@@ -13,21 +13,28 @@
   <div class="app-shell">
     <aside id="sidebar" class="sidebar" aria-label="主导航" aria-hidden="false">
       <div class="brand">
-        <span class="brand-mark" aria-hidden="true">◇</span>
-        <div><strong>知识飞轮</strong><small>本地控制台</small></div>
+        <span class="brand-mark" aria-hidden="true">⌁</span>
+        <div><strong>domain<span>/</span>knowledge</strong></div>
+      </div>
+      <div class="project-card" aria-label="当前项目">
+        <span class="project-avatar" aria-hidden="true">WP</span>
+        <span><small>PROJECT</small><strong>wpKnowledge</strong></span>
+        <i aria-hidden="true">⌄</i>
       </div>
       <nav id="primary-nav">
+        <p class="nav-section">WORKSPACE</p>
         <button class="nav-item active" data-page="overview"><span aria-hidden="true">⌂</span>Action Center <em id="governance-count"></em></button>
         <button class="nav-item" data-page="runs"><span aria-hidden="true">◎</span>Flywheel Runs</button>
         <button class="nav-item" data-page="knowledge"><span aria-hidden="true">▤</span>Knowledge</button>
         <button class="nav-item" data-page="graph"><span aria-hidden="true">⌘</span>Graph</button>
+        <p class="nav-section">QUALITY</p>
         <button class="nav-item" data-page="evaluations"><span aria-hidden="true">◫</span>Evaluations</button>
         <button class="nav-item" data-page="sources"><span aria-hidden="true">⌕</span>Sources</button>
         <button class="nav-item" data-page="agent-settings"><span aria-hidden="true">✦</span>Agent Settings</button>
       </nav>
       <div class="sidebar-foot">
         <span id="registry-indicator" class="health-dot pending" aria-hidden="true"></span>
-        <div><strong id="registry-label">连接中</strong><small>本地注册表</small></div>
+        <div><strong id="registry-label">连接中</strong><small>Knowledge Registry</small></div>
       </div>
     </aside>
 
@@ -40,10 +47,10 @@
           <p id="page-description" class="subtitle">查看运行事实、知识发布状态，以及需要人工处理的问题。</p>
         </div>
         <div class="topbar-actions">
-          <button id="global-search-button" class="secondary-button" type="button" aria-label="搜索知识">⌕ 搜索</button>
-          <button id="theme-button" class="secondary-button theme-button" type="button" aria-label="切换到浅色主题">☼ 浅色</button>
+          <button id="global-search-button" class="secondary-button search-button" type="button" aria-label="搜索知识">⌕ 搜索知识　⌘ K</button>
+          <button id="theme-button" class="secondary-button theme-button" type="button" aria-label="切换到浅色主题">☼</button>
           <span id="mode-pill" class="status-pill">只读模式</span>
-          <button id="operator-button" class="secondary-button" type="button">治理模式</button>
+          <button id="operator-button" class="primary-button" type="button">＋ 治理模式</button>
         </div>
       </header>
       <section id="page-content" class="page-content" tabindex="-1" aria-live="polite">

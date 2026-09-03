@@ -29,7 +29,7 @@ let drawerReturnKey = null
 function applyTheme(theme, persist = false) {
   const normalized = theme === 'light' ? 'light' : 'dark'
   document.documentElement.dataset.theme = normalized
-  themeButton.textContent = normalized === 'dark' ? '☼ 浅色' : '◐ 深色'
+  themeButton.textContent = normalized === 'dark' ? '☼' : '◐'
   themeButton.setAttribute('aria-label', normalized === 'dark' ? '切换到浅色主题' : '切换到深色主题')
   if (persist) {
     try { localStorage.setItem('wp-knowledge-theme', normalized) } catch {}
@@ -206,33 +206,46 @@ function renderOverview() {
   const candidates = state.status ? status.candidates : (state.resourceErrors.knowledge ? '不可用' : state.knowledge.filter((item) => item.status === 'CANDIDATE').length)
   const recent = state.runs.slice(0, 6)
   const notices = ['status', 'runs', 'capabilities'].filter((key) => state.resourceErrors[key])
+  const latestRun = state.runs[0]
+  const runIssueRows = attention.length ? attention.slice(0, 5).map((run, index) => `
+    <button class="attention-row ${index === 0 ? 'selected' : ''}" data-run-id="${escapeHtml(run.runId)}" type="button">
+      <i class="attention-dot ${run.state === 'FAILED' ? 'danger' : 'warning'}" aria-hidden="true"></i>
+      <span><b>${escapeHtml(run.moduleId)}</b><small>${escapeHtml(shortId(run.runId, 26))} · ${escapeHtml(displayLabel(run.state))}</small></span>
+      ${badge(run.latestDecision?.outcome ?? run.state)}
+      <time>${escapeHtml(formatDate(run.updatedAt))}</time>
+    </button>`).join('') : emptyState('目前没有待处理事项', '正常运行会由工作流服务自动推进。')
+  const pulseRows = recent.slice(0, 3).map((run) => `
+    <button class="pulse-row" data-run-id="${escapeHtml(run.runId)}" type="button"><i class="${needsAttention(run) ? 'warning' : 'success'}"></i><span><b>${escapeHtml(run.moduleId)}</b><small>${escapeHtml(displayLabel(run.state))} · ${escapeHtml(formatDate(run.updatedAt))}</small></span></button>`).join('')
   content.innerHTML = `
     ${notices.length ? partialNotice(`${notices.join('、')} 获取失败；其余区域仍展示已读取的服务端事实。`) : ''}
-    <section class="metrics-grid" aria-label="关键指标">
-      ${metric('全部运行', state.resourceErrors.runs ? '不可用' : (status.runs ?? state.runs.length), state.resourceErrors.runs ? '运行列表读取失败' : `${active.length} 个正在运行`)}
-      ${metric('已验证知识', verified, state.status ? `${status.publications ?? 0} 条发布记录` : (state.resourceErrors.knowledge ? '知识目录读取失败' : '根据已读取知识列表统计'), 'success')}
-      ${metric('候选知识', candidates, state.status ? `${status.qualityRejected ?? 0} 条未通过质量检查` : (state.resourceErrors.knowledge ? '知识目录读取失败' : '根据已读取知识列表统计'), 'candidate')}
-      ${metric('需要治理', state.resourceErrors.runs ? '不可用' : attention.length, state.resourceErrors.runs ? '运行列表读取失败' : (attention.length ? '需要人工查看' : '当前没有阻塞'), attention.length ? 'danger' : '')}
+    <section class="overview-summary-grid" aria-label="关键摘要">
+      <article class="attention-summary">
+        <span class="attention-orb"><i></i></span>
+        <div><p class="eyebrow danger-text">NEEDS YOUR ATTENTION · PARTIAL</p><h2>${state.resourceErrors.runs ? '运行状态不可用' : `${attention.length} 项需要确认`}</h2><p>${state.resourceErrors.runs ? '无法读取运行列表' : `来自 ${state.runs.length} 个真实 Run 的只读投影`}</p></div>
+        <footer><i></i><i></i><i></i></footer>
+      </article>
+      <article class="knowledge-summary">
+        <header><p class="eyebrow">KNOWLEDGE REGISTRY</p><span>${state.resourceErrors.knowledge ? 'PARTIAL' : 'LIVE'}</span></header>
+        <div><strong>${escapeHtml(verified)}</strong><small>VERIFIED</small><b>${escapeHtml(candidates)} 候选</b></div>
+        <footer><span>发布记录 <b>${escapeHtml(status.publications ?? '—')}</b></span><span>质量未通过 <b>${escapeHtml(status.qualityRejected ?? '—')}</b></span></footer>
+      </article>
     </section>
-    <div class="dashboard-grid">
-      <section class="panel attention-panel">
-        <div class="section-heading"><div><p class="eyebrow">需要处理 · PARTIAL</p><h2>待人工确认</h2><p>当前由失败、低置信与 STOPPED Run 真实派生；独立 Action Item 生命周期将在 B2 接入。</p></div></div>
-        <div class="stack-list">${attention.length ? attention.slice(0, 4).map((run) => runRow(run, true)).join('') : emptyState('目前没有待处理事项', '正常运行会由工作流服务自动推进。')}</div>
+    <div class="overview-workspace">
+      <section class="attention-queue">
+        <header><div><h2>需要处理</h2><small>由失败、低置信与 STOPPED Run 派生</small></div><button class="text-button" data-page-link="runs">查看全部 →</button></header>
+        <div class="queue-filters"><button class="active">全部　${attention.length}</button><button>运行失败　${attention.filter((run) => run.state === 'FAILED').length}</button><button>低置信　${attention.filter((run) => run.state === 'LOW_CONFIDENCE').length}</button><span>PARTIAL</span></div>
+        <div class="queue-labels"><span>运行</span><span>状态</span><span>更新</span></div>
+        <div>${runIssueRows}</div>
       </section>
-      <section class="panel trust-panel">
-        <div class="section-heading"><div><p class="eyebrow">信任边界</p><h2>能力边界</h2></div></div>
-        <ul class="capability-list">
-          <li><span>知识登记簿连接</span>${badge(state.resourceErrors.status ? 'FAILED' : 'VERIFIED', state.resourceErrors.status ? '读取失败' : '已连接')}</li>
-          <li><span>自动工作流</span>${state.capabilities ? badge(state.capabilities.automatedWorkflow ? 'VERIFIED' : 'LOW_CONFIDENCE', state.capabilities.automatedWorkflow ? '已启用' : '尚未接入') : badge('FAILED', '读取失败')}</li>
-          <li><span>智能体源码隔离</span>${state.capabilities ? badge(state.capabilities.agentSourceIsolation === 'bubblewrap' ? 'VERIFIED' : 'LOW_CONFIDENCE', state.capabilities.agentSourceIsolation === 'bubblewrap' ? '已启用' : '未证明') : badge('FAILED', '读取失败')}</li>
-          <li><span>敌对代码执行隔离</span>${state.capabilities ? badge(state.capabilities.hostileCodeIsolation ? 'VERIFIED' : 'FAILED', state.capabilities.hostileCodeIsolation ? '已启用' : '未实现') : badge('FAILED', '读取失败')}</li>
-        </ul>
-      </section>
-    </div>
-    <section class="panel recent-panel">
-        <div class="section-heading"><div><p class="eyebrow">最近活动 · PARTIAL</p><h2>最近运行</h2><p>跨 Run Activity API 尚未接入，这里仅展示真实 Run 事实。</p></div><button class="text-button" data-page-link="runs">查看全部</button></div>
-      <div class="run-list">${recent.length ? recent.map((run) => runRow(run)).join('') : emptyState('还没有运行记录', '可以通过命令行或受信项目验收创建运行；通用启动接口完成后，这里也会开放启动入口。')}</div>
-    </section>`
+      <aside class="overview-rail">
+        <article class="current-run-card">
+          <header><small><i></i> FLYWHEEL ${active.length ? 'RUNNING' : 'STATUS'}</small><button class="text-button" data-page-link="runs">打开运行 ↗</button></header>
+          ${latestRun ? `<h3>${escapeHtml(shortId(latestRun.runId, 18))}</h3><p>${escapeHtml(latestRun.moduleId)} · ${escapeHtml(displayLabel(latestRun.state))}</p><div class="run-state-line"><i></i></div><div class="run-state-meta"><b>${escapeHtml(displayLabel(latestRun.state))}</b><span>不提供模拟 ETA</span></div>` : emptyState('暂无运行', 'Registry 中没有 Run 记录。')}
+          <ul class="fact-steps"><li><i>1</i><span>运行事实<small>${state.runs.length} 条 Run</small></span></li><li><i>2</i><span>工作流节点<small>进入 Graph 查看</small></span></li><li><i>3</i><span>门禁证据<small>进入 Evaluations 查看</small></span></li></ul>
+        </article>
+        <article class="recent-pulse"><header><h3>最近运行</h3><span>ACTIVITY PARTIAL</span></header>${pulseRows || '<p class="muted">暂无运行事实</p>'}</article>
+      </aside>
+    </div>`
 }
 
 function renderRuns() {

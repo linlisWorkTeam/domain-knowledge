@@ -1,6 +1,6 @@
 # 开发状态
 
-**当前阶段：DEV-005 F2 + B1 已完成实现与自动门禁、HCP-1 待人工验收｜更新时间：2026-09-03｜当前任务：DEV-005 HCP-1**
+**当前阶段：DEV-005 HCP-1 = Rework required，F2 视觉返工中｜更新时间：2026-09-03｜当前任务：DEV-005 F2 视觉对齐**
 
 本文件是 domain-knowledge 的**唯一开发进度入口**，用于记录当前阶段、已完成里程碑、正在进行或下一项工作、后续队列和最近验证结果。产品行为仍以 [`../specs/`](../specs/README.md) 为规范性事实源；需求级的 `Implemented / Partial / Planned` 状态仍只在[追踪矩阵](../specs/13-verification/traceability-matrix.md)维护。
 
@@ -42,7 +42,7 @@ This file is the single entry point for project-level development status, curren
 - DDD 分层已经对齐，UI/API 通过 Application App 进入系统，LangGraph、Provider 和持久化实现留在 Infrastructure。
 - 固定七 Agent 拓扑、并行、迭代、取消、Checkpoint、运行契约和配置快照已经通过自动化验证。
 - deterministic fixture 可以完成失败、修订、重新生成、评测和发布闭环。
-- 前台 F2 已完成最终七页面、真实 Run Agent Graph、绿色双主题、响应式、可访问性及真实/Partial/Disabled 状态；自动门禁通过，尚待 HCP-1 人工验收。
+- 前台 F2 已完成最终七页面、真实 Run Agent Graph、绿色双主题、响应式、可访问性及真实/Partial/Disabled 状态；首轮自动门禁通过，但 HCP-1 因目标布局与视觉差距判定 `Rework required`，正在按指定参考站返工。
 - B1 Preview API 破坏性迁移已经同步完成 Server、Console、DSH Adapter、测试和文档；旧公共 HTTP 路径不保留兼容别名，B2–B4 的 `Planned` 能力仍未实现。
 - DeepSeek Harness live Adapter 已存在；公司 CodeAgent CLI 尚未接入。
 - 真实 Agent 质量、公司环境容量、长期稳定性和敌对代码执行安全尚未形成验收结论。
@@ -58,7 +58,7 @@ This file is the single entry point for project-level development status, curren
 | DEV-003 | 固定七 Agent LangGraph 编排、Checkpoint 与确定性闭环 | Done | `tests/integration/langgraph-infrastructure.test.ts`、`tests/acceptance/automated-langgraph-flow.test.ts` |
 | DEV-004 | AgentCommand/AgentResult、Run 配置冻结与框架机械能力测评 | Done | [框架阶段性测评](report/框架阶段性测评.md)，结果 `6/6 ACCEPTED` |
 | DEV-UI-001 | 前台 F1 Knowledge Console | Done | `tests/contract/site.test.ts`、`tests/e2e/console.spec.ts`；只复用现有 API |
-| DEV-005 | Console 第一轮：F2 最终七页面 + B1 API 基线 + HCP-1 | In Progress | F2/B1 实现与自动门禁就绪；HCP-1 待人工结论，通过前不得开始 B2/B3 前台接线 |
+| DEV-005 | Console 第一轮：F2 最终七页面 + B1 API 基线 + HCP-1 | In Progress | B1 已就绪；HCP-1=`Rework required`，F2 正在按指定参考站返工，通过前不得开始 B2/B3 前台接线 |
 | DEV-006 | Console B2 Action Center 与 Runs 完整控制面 | Planned | Action Item、progress/retry/SSE、组件健康、Activity 与 Graph 实时更新；依赖 DEV-005 |
 | DEV-007 | Console B3 Knowledge、Evaluations 与 Sources | Planned | Knowledge 可由独立 Agent 并行；血缘/Diff、Evaluation 读模型与规则、Source Registry、Knowledge Health；依赖 DEV-005 |
 | DEV-008 | Console B4 运营面加固 | Planned | Provider status、指标口径、SSE 容量和大数据查询验收；依赖 DEV-006/007 |
@@ -123,6 +123,6 @@ DEV-009 不修改 `web/`、`site/`、前台产品设计、现有 HTTP 路由或�
 | --- | --- | --- |
 | 2026-09-03 | Agent 运行契约与框架测评合入后的 `main` | TypeScript 通过；Spec：7 schemas、7 commands、8 results、38 P0；测试 112/112；框架测评 6/6 `ACCEPTED` |
 | 2026-09-03 | 前台 F1 Knowledge Console 合入前基线 | TypeScript 通过；Spec：7 schemas、7 commands、8 results、51 P0；测试 114/114；框架测评 6/6 `ACCEPTED`；Chromium E2E 4/4 |
-| 2026-09-03 | DEV-005 F2 + B1 HCP-1 候选 | TypeScript 通过；Spec：7 schemas、7 commands、8 results、51 P0；测试 115/115；迁移后 Server 定向测试 4/4；干净 clone Chromium E2E 5/5；HCP-1 人工结论待定 |
+| 2026-09-03 | DEV-005 F2 + B1 HCP-1 首轮候选 | TypeScript 通过；Spec：7 schemas、7 commands、8 results、51 P0；测试 115/115；迁移后 Server 定向测试 4/4；干净 clone Chromium E2E 5/5；HCP-1=`Rework required`，原因是布局与目标视觉差距 |
 
 该结果只证明框架机械能力，不代表公司 CodeAgent 效果或生产可用性。
