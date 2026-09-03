@@ -647,7 +647,8 @@ body, :root[data-theme="light"] body { background: var(--bg); }
 @media (max-width: 767px) {
   .app-shell { display: block; }
   .main-area { width: 100%; margin-left: 0; }
-  .sidebar { width: min(290px, 86vw); }
+  .sidebar { width: min(290px, 86vw); overflow-y: auto; }
+  .sidebar .brand, .sidebar .project-card, .sidebar nav { flex-shrink: 0; }
   .topbar { min-height: 92px; padding: 15px; }
   .topbar-actions { width: auto; }
   .search-button { display: none; }
