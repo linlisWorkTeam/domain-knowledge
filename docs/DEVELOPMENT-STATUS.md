@@ -43,6 +43,7 @@ This file is the single entry point for project-level development status, curren
 - 固定七 Agent 拓扑、并行、迭代、取消、Checkpoint、运行契约和配置快照已经通过自动化验证。
 - deterministic fixture 可以完成失败、修订、重新生成、评测和发布闭环。
 - 前台 F1 已基于现有 API 完成八入口中文 Console、绿色双主题、响应式、可访问性和真实数据状态；没有新增或修改后端 API。
+- 前台后续页面缺口和 Preview API 破坏性迁移已统一写入 `specs/10-interfaces/http-api.md`；当前仅为 Accepted 目标契约，所有 `Planned` 与新路径均未实现，不改变 DEV-005 的下一任务顺序。
 - DeepSeek Harness live Adapter 已存在；公司 CodeAgent CLI 尚未接入。
 - 真实 Agent 质量、公司环境容量、长期稳定性和敌对代码执行安全尚未形成验收结论。
 
