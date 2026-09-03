@@ -64,7 +64,11 @@ test('generated result matches contract', () => assert.equal(calculate(), expect
       prompts: { getPromptAddon: (agentId) => composition.agents.getPromptAddon(agentId) },
       checkpoint: { kind: 'memory' },
     });
-    const workflow = new AutomatedProjectWorkflowService(composition.service, infrastructure.engine);
+    const workflow = new AutomatedProjectWorkflowService(
+      composition.service,
+      infrastructure.engine,
+      composition.runConfiguration,
+    );
     const observedPolicies: Parameters<typeof composition.service.recordEvaluation>[1][] = [];
     const recordEvaluation = composition.service.recordEvaluation.bind(composition.service);
     composition.service.recordEvaluation = async (evaluation, policy) => {
@@ -93,6 +97,7 @@ test('generated result matches contract', () => assert.equal(calculate(), expect
       requireAllTests: false, maxIterations: 3,
     };
     const handle = await workflow.start(scenario, { ...policy, workerCount: 1 });
+    assert.equal(composition.runConfiguration.get(handle.runId)?.agents.length, 7);
     const result = await workflow.wait(handle.runId);
 
     assert.equal(result.executionStatus, 'COMPLETED');

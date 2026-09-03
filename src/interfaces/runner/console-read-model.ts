@@ -7,7 +7,9 @@ import type {
   KnowledgeVersion,
 } from '../../domain/index.ts';
 import type { NodeCheckpoint } from '../../application/ports/index.ts';
-import type { AgentId, WorkflowNodeProjection } from '../../application/ports/index.ts';
+import type {
+  AgentId, RunConfigurationSnapshot, WorkflowNodeProjection,
+} from '../../application/ports/index.ts';
 
 export interface RunEvaluationRecord {
   report: EvaluationReport;
@@ -91,8 +93,16 @@ export class ConsoleReadModel {
       workflowNodes: this.listWorkflowNodes(runId),
       events: this.listSequencedEvents(runId),
       publications: this.listPublications(runId),
+      runConfiguration: this.getRunConfiguration(runId),
       latestDecision: evaluations.at(-1)?.decision ?? null,
     };
+  }
+
+  private getRunConfiguration(runId: string): RunConfigurationSnapshot | null {
+    const row = this.database.prepare(`
+      SELECT snapshot_json FROM run_configuration_snapshots WHERE run_id = ?
+    `).get(runId) as Record<string, unknown> | undefined;
+    return row ? parse<RunConfigurationSnapshot>(row.snapshot_json) : null;
   }
 
   private listPublications(runId: string): Record<string, unknown>[] {

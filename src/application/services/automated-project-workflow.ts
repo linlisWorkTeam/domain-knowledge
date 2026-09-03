@@ -11,6 +11,7 @@ import type {
   ProjectEvaluator,
   ProjectSnapshot,
   QualityReport,
+  RunConfigurationManager,
   WorkflowStageExecutor,
   WorkflowStageInput,
   WorkflowStageResult,
@@ -730,10 +731,16 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
 export class AutomatedProjectWorkflowService {
   readonly flywheel: KnowledgeFlywheelService;
   readonly workflow: WorkflowEngine;
+  readonly runConfiguration: RunConfigurationManager;
 
-  constructor(flywheel: KnowledgeFlywheelService, workflow: WorkflowEngine) {
+  constructor(
+    flywheel: KnowledgeFlywheelService,
+    workflow: WorkflowEngine,
+    runConfiguration: RunConfigurationManager,
+  ) {
     this.flywheel = flywheel;
     this.workflow = workflow;
+    this.runConfiguration = runConfiguration;
   }
 
   async start(
@@ -750,6 +757,7 @@ export class AutomatedProjectWorkflowService {
     assertInvariant(Number.isSafeInteger(input.workerCount ?? 1) && (input.workerCount ?? 1) >= 0 && (input.workerCount ?? 1) <= 5,
       'workflow workerCount must be an integer from 0 to 5');
     const run = this.flywheel.createRun(scenario.moduleId, input.policyId);
+    const configurationSnapshot = await this.runConfiguration.capture(run.runId);
     this.flywheel.transition(run.runId, 'PLANNED');
     return this.workflow.start({
       runId: run.runId,
@@ -757,6 +765,7 @@ export class AutomatedProjectWorkflowService {
       workerCount: input.workerCount ?? 1,
       context: {
         scenario,
+        configurationSnapshot,
         gatePolicy: {
           policyId: input.policyId,
           minimumStability: input.minimumStability,

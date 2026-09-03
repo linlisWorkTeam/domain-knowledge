@@ -7,8 +7,9 @@ import {
 } from '../../application/apps/index.ts';
 import {
   AgentCatalogService, AutomatedProjectWorkflowService, DeterministicQualityPolicy, OhMyWorkPanelWorkflowExecutor,
-  RegistryWorkflowObserver,
+  RegistryRunConfigurationService, RegistryWorkflowObserver,
 } from '../../application/services/index.ts';
+import { sha256 } from '../../domain/index.ts';
 import type { AutomatedProjectScenario } from '../../application/services/index.ts';
 import { DOMAIN_KNOWLEDGE_AGENT_DEFINITIONS } from '../../infrastructure/workflow/langgraph/index.ts';
 import { createDomainKnowledgeInfrastructure } from '../../infrastructure/workflow/langgraph/index.ts';
@@ -117,6 +118,34 @@ export function createComposition(input: {
   if (!['fixture', 'deepseek-harness', 'deepseek-harness-headless'].includes(agentProviderMode)) {
     throw new Error('CONFIG_INVALID: WP_FLYWHEEL_AGENT_PROVIDER must be fixture, deepseek-harness, or deepseek-harness-headless');
   }
+  const sdkProvider = process.env.WP_DSH_PROVIDER?.trim()
+    || (process.env.OPENCODE_GO_API_KEY ? 'opencode-go' : 'deepseek-official');
+  const providerModel = agentProviderMode === 'fixture'
+    ? 'schema-validated-fixture-v1'
+    : process.env.WP_DSH_MODEL?.trim() || 'deepseek-v4-flash';
+  const processIsolation = process.env.WP_DSH_PROCESS_ISOLATION?.trim() || 'bubblewrap';
+  if (processIsolation !== 'none' && processIsolation !== 'bubblewrap') {
+    throw new Error('CONFIG_INVALID: WP_DSH_PROCESS_ISOLATION must be none or bubblewrap');
+  }
+  const runConfiguration = new RegistryRunConfigurationService({
+    definitions: DOMAIN_KNOWLEDGE_AGENT_DEFINITIONS,
+    repository,
+    artifacts,
+    provider: {
+      kind: agentProviderMode,
+      model: providerModel,
+      parametersSha256: sha256(JSON.stringify({
+        provider: agentProviderMode === 'fixture' ? 'fixture' : sdkProvider,
+        profile: process.env.WP_DSH_PROFILE?.trim() || (agentProviderMode === 'fixture' ? 'fixture' : 'sdk'),
+        maxTokens: Number(process.env.WP_DSH_MAX_TOKENS ?? 32_768),
+        maxSchemaAttempts: Number(process.env.WP_DSH_MAX_SCHEMA_ATTEMPTS ?? 2),
+        processIsolation,
+        timeoutMs: Number(process.env.WP_DSH_TIMEOUT_MS ?? 600_000),
+        maxOutputBytes: Number(process.env.WP_DSH_MAX_OUTPUT_BYTES ?? 2 * 1024 * 1024),
+      })),
+    },
+    clock: input.clock,
+  });
   let workflowPromise: Promise<AutomatedProjectWorkflowService> | null = null;
   const workflow = () => {
     workflowPromise ??= (async () => {
@@ -129,17 +158,11 @@ export function createComposition(input: {
         await mkdir(auditDirectory, { recursive: true });
         await appendFile(auditPath, `${JSON.stringify(record)}\n`, { encoding: 'utf8', mode: 0o600 });
       };
-      const sdkProvider = process.env.WP_DSH_PROVIDER?.trim()
-        || (process.env.OPENCODE_GO_API_KEY ? 'opencode-go' : 'deepseek-official');
       const sdkPatches = process.env.WP_DSH_PATCHES_JSON
         ? JSON.parse(process.env.WP_DSH_PATCHES_JSON) as string[]
         : sdkProvider === 'opencode-go'
           ? [join(componentRoot, 'deploy', 'deepseek-harness', 'opencode-go.cordis.yml')]
           : [];
-      const processIsolation = process.env.WP_DSH_PROCESS_ISOLATION?.trim() || 'bubblewrap';
-      if (processIsolation !== 'none' && processIsolation !== 'bubblewrap') {
-        throw new Error('CONFIG_INVALID: WP_DSH_PROCESS_ISOLATION must be none or bubblewrap');
-      }
       const agent = agentProviderMode === 'deepseek-harness'
         ? new DeepSeekHarnessSdkAgent({
             ...(process.env.WP_DSH_BIN?.trim() ? { dshBin: process.env.WP_DSH_BIN.trim() } : {}),
@@ -147,7 +170,7 @@ export function createComposition(input: {
             patches: sdkPatches,
             dshHome: process.env.DSH_HOME?.trim() || join(runtimeDir, 'dsh'),
             provider: sdkProvider,
-            model: process.env.WP_DSH_MODEL?.trim() || 'deepseek-v4-flash',
+            model: providerModel,
             maxTokens: Number(process.env.WP_DSH_MAX_TOKENS ?? 32_768),
             maxSchemaAttempts: Number(process.env.WP_DSH_MAX_SCHEMA_ATTEMPTS ?? 2),
             processIsolation,
@@ -183,17 +206,18 @@ export function createComposition(input: {
       const infrastructure = await createDomainKnowledgeInfrastructure({
         executor,
         observer: workflowObserver,
-        prompts: { getPromptAddon: (agentId) => agents.getPromptAddon(agentId) },
+        prompts: runConfiguration,
         checkpoint: { kind: 'sqlite', filename: join(runtimeDir, 'workflow', 'checkpoints.sqlite') },
         clock: input.clock,
       });
-      return new AutomatedProjectWorkflowService(flywheelApp, infrastructure.engine);
+      return new AutomatedProjectWorkflowService(flywheelApp, infrastructure.engine, runConfiguration);
     })();
     return workflowPromise;
   };
   const orchestrator = new Orchestrator({
     workflow,
     agents,
+    runConfiguration,
     reports: {
       build: (runId) => buildDemoReport({
         runId, runtimeDir, repository, service: flywheelApp, artifacts,
@@ -219,6 +243,7 @@ export function createComposition(input: {
     scanner,
     agents,
     workflowObserver,
+    runConfiguration,
     agentProviderMode,
     automatedWorkflow: workflow,
     close: () => repository.close(),

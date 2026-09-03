@@ -63,6 +63,8 @@ export interface FlywheelRepository {
   failCheckpoint(generationKey: string, retryCount: number, event: DomainEvent, now: string): NodeCheckpoint;
   listAgentPromptConfigurations(): AgentPromptConfiguration[];
   saveAgentPromptConfiguration(configuration: AgentPromptConfiguration, event: DomainEvent): AgentPromptConfiguration;
+  saveRunConfiguration(snapshot: RunConfigurationSnapshot, event: DomainEvent): RunConfigurationSnapshot;
+  getRunConfiguration(runId: string): RunConfigurationSnapshot | null;
   recordWorkflowNodeProjection(projection: WorkflowNodeProjection, event: DomainEvent): void;
   listWorkflowNodeProjections(runId: string): WorkflowNodeProjection[];
   status(): Record<string, unknown>;
@@ -326,6 +328,38 @@ export interface AgentPromptConfiguration {
   updatedAt: string | null;
 }
 
+export interface AgentRunConfiguration {
+  agentId: AgentId;
+  promptRevision: number;
+  basePromptSha256: string;
+  promptAddonSha256: string;
+  effectivePromptSha256: string;
+  effectivePromptRef: ArtifactRef;
+  tools: string[];
+}
+
+export interface RunConfigurationSnapshot {
+  schemaVersion: '1.0';
+  runId: string;
+  provider: {
+    kind: string;
+    model: string;
+    parametersSha256: string;
+  };
+  contracts: {
+    commandSchema: 'https://wpknowledge.local/schemas/agent-command/v1';
+    resultSchema: 'https://wpknowledge.local/schemas/agent-result/v1';
+  };
+  agents: AgentRunConfiguration[];
+  capturedAt: string;
+}
+
+export interface RunConfigurationManager {
+  capture(runId: string): Promise<RunConfigurationSnapshot>;
+  get(runId: string): RunConfigurationSnapshot | null;
+  resolvePrompt(runId: string, agentId: AgentId): Promise<string>;
+}
+
 export type WorkflowNodeStatus = 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
 
 export interface WorkflowNodeProjection {
@@ -401,5 +435,7 @@ export interface WorkflowObserver {
 }
 
 export interface AgentPromptResolver {
-  getPromptAddon(agentId: AgentId): string;
+  resolvePrompt?(runId: string, agentId: AgentId): Promise<string>;
+  /** Compatibility path for tests without a persisted RunConfigurationSnapshot. */
+  getPromptAddon?(agentId: AgentId): string;
 }

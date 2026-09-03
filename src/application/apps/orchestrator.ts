@@ -1,4 +1,4 @@
-import type { AgentId, DemoReportBuilder } from '../ports/index.ts';
+import type { AgentId, DemoReportBuilder, RunConfigurationManager } from '../ports/index.ts';
 import type {
   AgentCatalogService, AutomatedProjectWorkflowService,
 } from '../services/index.ts';
@@ -11,15 +11,18 @@ export class Orchestrator {
   readonly workflow: () => Promise<AutomatedProjectWorkflowService>;
   readonly agents: AgentCatalogService;
   readonly reports: DemoReportBuilder;
+  readonly runConfiguration: RunConfigurationManager;
 
   constructor(input: {
     workflow: () => Promise<AutomatedProjectWorkflowService>;
     agents: AgentCatalogService;
     reports: DemoReportBuilder;
+    runConfiguration: RunConfigurationManager;
   }) {
     this.workflow = input.workflow;
     this.agents = input.agents;
     this.reports = input.reports;
+    this.runConfiguration = input.runConfiguration;
   }
 
   async start(...args: Parameters<AutomatedProjectWorkflowService['start']>) {
@@ -52,5 +55,9 @@ export class Orchestrator {
 
   buildDemoReport(runId: string): Promise<Record<string, unknown>> {
     return this.reports.build(runId);
+  }
+
+  getRunConfiguration(runId: string) {
+    return this.runConfiguration.get(runId);
   }
 }

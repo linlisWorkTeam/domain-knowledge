@@ -350,6 +350,9 @@ export { DeterministicQualityPolicy } from './quality-policy.ts';
 export { KnowledgeQueryService } from './query-service.ts';
 export { runRealSourceFlow } from './project-flow.ts';
 export { AgentCatalogService, RegistryWorkflowObserver } from './workflow-control.ts';
+export {
+  AGENT_COMMAND_SCHEMA_ID, AGENT_RESULT_SCHEMA_ID, RegistryRunConfigurationService,
+} from './run-configuration.ts';
 export { AutomatedProjectWorkflowService, OhMyWorkPanelWorkflowExecutor } from './automated-project-workflow.ts';
 export type { AutomatedProjectScenario } from './automated-project-workflow.ts';
 export type { RealSourceFlowReport, RealSourceScenario } from './project-flow.ts';

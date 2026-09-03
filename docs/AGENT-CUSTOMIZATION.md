@@ -172,7 +172,7 @@ npm run knowledge -- set-agent-prompt --agent doc-gen --prompt ''
 
 清空会生成新的 revision，而不是删除审计历史。
 
-目标行为由 ADR-011 固化：Run 启动时冻结 prompt revision、Provider/模型摘要、工具权限和 Schema URI，运行中的配置修改只影响新 Run。在该运行时能力完成前，仍应避免在 `RUNNING` 状态中修改提示词，追踪矩阵继续把对应能力标为未完成。
+Run 启动时会冻结 prompt revision、Provider/模型摘要、工具权限和 Schema URI，并把有效提示词正文作为不可变 CAS Artifact 保存；配置快照只保留摘要和 ArtifactRef。运行中的配置修改只影响新 Run，恢复执行仍读取原 Run 的冻结 Artifact。
 
 ## 什么时候必须进入核心开发
 

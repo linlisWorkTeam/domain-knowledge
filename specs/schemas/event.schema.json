@@ -7,7 +7,7 @@
   "properties": {
     "schemaVersion": {"const": "1.0"},
     "eventId": {"type": "string", "minLength": 1},
-    "eventType": {"enum": ["RunCreated", "RunStateChanged", "ArtifactCommitted", "GateDecided", "KnowledgePublished", "NodeCompleted", "NodeFailed", "AgentPromptConfigured", "WorkflowNodeStateChanged"]},
+    "eventType": {"enum": ["RunCreated", "RunStateChanged", "ArtifactCommitted", "GateDecided", "KnowledgePublished", "NodeCompleted", "NodeFailed", "AgentPromptConfigured", "WorkflowNodeStateChanged", "RunConfigurationCaptured"]},
     "runId": {"type": "string", "minLength": 1},
     "occurredAt": {"type": "string", "format": "date-time"},
     "causationId": {"type": ["string", "null"], "minLength": 1},
