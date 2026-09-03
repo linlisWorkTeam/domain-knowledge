@@ -4,15 +4,22 @@ import {
 import { randomUUID } from 'node:crypto';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
+import { fetch as undiciFetch } from 'undici';
 import type {
   ContentCommand, ContentGovernancePort,
 } from '../../../application/apps/content-governance-app.ts';
-import type { ArtifactStore } from '../../../application/ports/index.ts';
+import type {
+  ArtifactStore, ProviderEndpointPolicy,
+} from '../../../application/ports/index.ts';
 import type {
   ArtifactRef, EvaluationReport, GateDecision, KnowledgeVersion, ProvenanceRef,
 } from '../../../domain/index.ts';
 import { assertInvariant, sha256 } from '../../../domain/index.ts';
 import { structuredMarkdownDiff } from '../../../domain/services/markdown-diff.ts';
+import {
+  createPinnedHttpsDispatcher, PublicHttpsEndpointPolicy,
+} from '../../security/public-https.ts';
+import { projectActionItemObservation } from '../sqlite-action-items.ts';
 
 type Row = Record<string, unknown>;
 
@@ -115,6 +122,7 @@ export class SQLiteContentGovernance implements ContentGovernancePort {
   private readonly repositoryRoot: string;
   private readonly configuredRoots: string[];
   private readonly allowedRemoteHosts: Set<string>;
+  private readonly remoteEndpointPolicy: ProviderEndpointPolicy;
   private readonly defaultRule: Record<string, unknown>;
   private readonly clock: () => string;
 
@@ -124,6 +132,7 @@ export class SQLiteContentGovernance implements ContentGovernancePort {
     repositoryRoot: string;
     configuredRoots: string[];
     allowedRemoteHosts?: string[];
+    remoteEndpointPolicy?: ProviderEndpointPolicy;
     defaultRule: Record<string, unknown>;
     clock?: () => string;
   }) {
@@ -134,6 +143,7 @@ export class SQLiteContentGovernance implements ContentGovernancePort {
       isAbsolute(root) ? resolve(root) : resolve(this.repositoryRoot, root)
     ));
     this.allowedRemoteHosts = new Set((input.allowedRemoteHosts ?? []).map((host) => host.toLowerCase()));
+    this.remoteEndpointPolicy = input.remoteEndpointPolicy ?? new PublicHttpsEndpointPolicy();
     this.defaultRule = structuredClone(input.defaultRule);
     this.clock = input.clock ?? (() => new Date().toISOString());
   }
@@ -248,21 +258,9 @@ export class SQLiteContentGovernance implements ContentGovernancePort {
         INNER JOIN evaluation_rules AS rule
           ON rule.rule_id = binding.rule_id AND rule.revision = binding.revision
         WHERE json_extract(rule.config_json, '$.policyId') <> run.policy_id
-      );
-      INSERT OR IGNORE INTO evaluation_rule_bindings(report_id, rule_id, revision, bound_at)
-      SELECT evaluation.report_id, 'publication-gate',
-        (SELECT MAX(revision) FROM evaluation_rules WHERE rule_id = 'publication-gate'),
-        evaluation.created_at
-      FROM evaluations AS evaluation;
-      DELETE FROM evaluation_rule_bindings
-      WHERE report_id IN (
-        SELECT binding.report_id
-        FROM evaluation_rule_bindings AS binding
-        INNER JOIN evaluations AS evaluation ON evaluation.report_id = binding.report_id
-        INNER JOIN runs AS run ON run.run_id = evaluation.run_id
-        INNER JOIN evaluation_rules AS rule
-          ON rule.rule_id = binding.rule_id AND rule.revision = binding.revision
-        WHERE json_extract(rule.config_json, '$.policyId') <> run.policy_id
+          OR julianday(rule.created_at) IS NULL
+          OR julianday(evaluation.created_at) IS NULL
+          OR julianday(rule.created_at) > julianday(evaluation.created_at)
       );
       INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (8, datetime('now'));
     `);
@@ -314,6 +312,9 @@ export class SQLiteContentGovernance implements ContentGovernancePort {
         versionId: report.versionId,
         gate: decision?.outcome ?? null,
         ruleRef: row.rule_id === null ? null : { ruleId: String(row.rule_id), revision: Number(row.revision) },
+        ruleBinding: row.rule_id === null
+          ? { status: 'UNBOUND', reasonCode: 'RULE_REVISION_NOT_PROVABLE' }
+          : { status: 'BOUND', reasonCode: 'RULE_REVISION_BOUND' },
         href: `/api/v1/evaluations/${encodeURIComponent(report.reportId)}`,
       };
     }).filter((entry) => relevant.has(entry.versionId));
@@ -716,21 +717,27 @@ export class SQLiteContentGovernance implements ContentGovernancePort {
       const pinnedRevision = requestedPinned
         ?? (input.locator !== undefined ? observedRevision : latest.pinned_revision);
       const stale = pinnedRevision !== observedRevision;
-      const status = !enabled ? 'DISABLED' : stale ? 'STALE' : 'ACTIVE';
-      const drift = stale ? {
-        detected: true,
-        pinnedRevision,
-        observedRevision,
-        detectedAt: now,
-      } : null;
+      const status = !enabled
+        ? 'DISABLED'
+        : access === null ? latest.status
+          : stale ? 'STALE' : 'ACTIVE';
+      const drift = access === null
+        ? latest.drift_json
+        : stale ? json({
+            detected: true,
+            pinnedRevision,
+            observedRevision,
+            detectedAt: now,
+          }) : null;
+      const lastErrorCode = access === null ? latest.last_error_code : null;
       this.database.prepare(`
         UPDATE sources SET display_name = ?, locator = ?, pinned_revision = ?,
           observed_revision = ?, status = ?, record_revision = ?, last_sync_at = ?,
-          last_error_code = NULL, drift_json = ?, credential_ref = ?, updated_at = ?
+          last_error_code = ?, drift_json = ?, credential_ref = ?, updated_at = ?
         WHERE source_id = ? AND record_revision = ?
       `).run(displayName, access?.locator ?? latest.locator, pinnedRevision,
         observedRevision, status, nextRevision, access ? now : latest.last_sync_at,
-        drift === null ? null : json(drift), credentialRef, now, sourceId, expectedRevision);
+        lastErrorCode, drift, credentialRef, now, sourceId, expectedRevision);
       const auditId = this.insertSourceAudit(sourceId, 'UPDATE', expectedRevision, nextRevision, reason,
         command.actor, now, {
           displayName,
@@ -739,6 +746,17 @@ export class SQLiteContentGovernance implements ContentGovernancePort {
           revisionChanged: requestedPinned !== undefined,
           credentialChanged: input.credentialRef !== undefined,
         });
+      if (access !== null && status === 'STALE') {
+        this.projectSourceActionItem(
+          sourceId,
+          'SOURCE_DRIFT',
+          'MEDIUM',
+          'SOURCE_REVISION_DRIFT',
+          '来源内容与固定版本不一致，需要人工复核',
+          auditId,
+          now,
+        );
+      }
       const result = {
         resourceId: sourceId,
         eventId: auditId,
@@ -808,6 +826,27 @@ export class SQLiteContentGovernance implements ContentGovernancePort {
         failure ? 'Source access validation failed' : 'Source refresh completed', command.actor,
         completedAt, { jobId, status: failure ? 'FAILED' : 'SUCCEEDED', reasonCode: failure,
           observedRevision });
+      if (failure) {
+        this.projectSourceActionItem(
+          sourceId,
+          'SOURCE_UNAVAILABLE',
+          'HIGH',
+          failure,
+          '来源访问失败，需要检查访问边界或来源可用性',
+          auditId,
+          completedAt,
+        );
+      } else if (stale) {
+        this.projectSourceActionItem(
+          sourceId,
+          'SOURCE_DRIFT',
+          'MEDIUM',
+          'SOURCE_REVISION_DRIFT',
+          '来源内容与固定版本不一致，需要人工复核',
+          auditId,
+          completedAt,
+        );
+      }
       const result = {
         resourceId: sourceId,
         eventId: auditId,
@@ -918,6 +957,9 @@ export class SQLiteContentGovernance implements ContentGovernancePort {
       ruleRef: row.rule_id === null ? null : {
         ruleId: String(row.rule_id), revision: Number(row.rule_revision),
       },
+      ruleBinding: row.rule_id === null
+        ? { status: 'UNBOUND', reasonCode: 'RULE_REVISION_NOT_PROVABLE' }
+        : { status: 'BOUND', reasonCode: 'RULE_REVISION_BOUND' },
       createdAt: report.createdAt,
       links: {
         run: `/api/v1/runs/${encodeURIComponent(report.runId)}`,
@@ -1074,24 +1116,40 @@ export class SQLiteContentGovernance implements ContentGovernancePort {
     } catch {
       throw new Error('SOURCE_URL_INVALID: locator must be a valid URL');
     }
-    if (locator.protocol !== 'https:' || locator.username || locator.password || locator.hash) {
-      throw new Error('SOURCE_ACCESS_DENIED: only credential-free HTTPS locators are accepted');
+    if (locator.protocol !== 'https:' || locator.username || locator.password
+      || locator.hash || locator.search) {
+      throw new Error('SOURCE_ACCESS_DENIED: only credential-free HTTPS locators without query or fragment are accepted');
     }
     if (!this.allowedRemoteHosts.has(locator.hostname.toLowerCase())) {
       throw new Error('SOURCE_ACCESS_DENIED: remote host is not in WP_SOURCE_ALLOWED_HOSTS');
     }
+    let addresses: readonly string[];
+    try {
+      addresses = (await this.remoteEndpointPolicy.validate(locator.toString())).addresses;
+    } catch (error) {
+      const code = error instanceof Error ? error.message.split(':', 1)[0] : '';
+      if (code === 'PROVIDER_URL_UNREACHABLE') {
+        throw new Error('SOURCE_ACCESS_FAILED: HTTPS source host cannot be resolved');
+      }
+      throw new Error('SOURCE_ACCESS_DENIED: HTTPS source resolves to a restricted target');
+    }
+    const dispatcher = createPinnedHttpsDispatcher({ url: locator, addresses }, 10 * 1024 * 1024);
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 5_000);
     timeout.unref();
     try {
       const secret = credentialRef ? this.resolveCredential(credentialRef) : null;
-      const response = await fetch(locator, {
-        method: 'GET', redirect: 'error', signal: controller.signal,
+      const response = await undiciFetch(locator, {
+        method: 'GET', redirect: 'manual', signal: controller.signal, dispatcher,
         headers: {
           accept: 'text/markdown,text/plain;q=0.9,application/json;q=0.5',
           ...(secret ? { authorization: `Bearer ${secret}` } : {}),
         },
       });
+      if (response.status >= 300 && response.status < 400) {
+        await response.body?.cancel();
+        throw new Error('SOURCE_ACCESS_DENIED: HTTPS source redirects are forbidden');
+      }
       if (!response.ok) throw new Error(`SOURCE_ACCESS_FAILED: upstream returned ${response.status}`);
       const advertised = Number(response.headers.get('content-length') ?? 0);
       if (advertised > 10 * 1024 * 1024) throw new Error('SOURCE_ACCESS_DENIED: source exceeds 10 MiB');
@@ -1121,6 +1179,7 @@ export class SQLiteContentGovernance implements ContentGovernancePort {
       throw new Error('SOURCE_ACCESS_FAILED: HTTPS source could not be read');
     } finally {
       clearTimeout(timeout);
+      await dispatcher.close().catch(() => undefined);
     }
   }
 
@@ -1183,6 +1242,28 @@ export class SQLiteContentGovernance implements ContentGovernancePort {
     `).run(auditId, sourceId, action, fromRevision, toRevision,
       reason, actor, occurredAt, json(changes));
     return auditId;
+  }
+
+  private projectSourceActionItem(
+    sourceId: string,
+    type: 'SOURCE_DRIFT' | 'SOURCE_UNAVAILABLE',
+    severity: 'MEDIUM' | 'HIGH',
+    reasonCode: string,
+    summary: string,
+    eventId: string,
+    occurredAt: string,
+  ): void {
+    projectActionItemObservation(this.database, {
+      type,
+      severity,
+      subject: { kind: 'SOURCE', id: sourceId },
+      runId: null,
+      reasonCode,
+      summary,
+      eventId,
+      occurredAt,
+      allowedActions: ['ACKNOWLEDGE', 'RESOLVE'],
+    });
   }
 
   private receipt(scope: string, command: ContentCommand): Record<string, unknown> | null {

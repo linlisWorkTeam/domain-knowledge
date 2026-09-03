@@ -1,6 +1,6 @@
 # Preview HTTP API 规范
 
-**状态：Accepted；B1 与 DEV-006/B2 已实现｜版本：0.4.0｜日期：2026-09-03**
+**状态：Accepted；B1–B4 已实现｜版本：0.5.0｜日期：2026-09-04**
 
 本文是 Knowledge Console HTTP API 的唯一规范性入口，统一定义资源分组、页面能力、当前实现映射和待补接口。领域行为、状态机与发布门禁仍以对应领域和工作流规范为准；HTTP 路由不得创造第二套业务语义。
 
@@ -38,7 +38,7 @@
 
 ### 1.2 Command 与版本控制
 
-- `POST` Command 使用 `Idempotency-Key`；同一 key 与同一规范化请求返回同一结果，不同请求返回 `409 IDEMPOTENCY_CONFLICT`。
+- `POST` Command 使用 `Idempotency-Key`；持久化回执提交后，同一 key 与同一规范化请求返回同一结果，不同请求返回 `409 IDEMPOTENCY_CONFLICT`。业务变更与回执不共享事务的 Preview 例外必须在对应资源契约中显式列出。
 - `PATCH` 和规则类修改必须提交当前 revision；过期 revision 返回 `409 REVISION_CONFLICT`。
 - 成功写响应至少包含 `{ resourceId, eventId, revision, acceptedAt }`；异步任务另外返回 `runId` 或 `jobId`。
 - 时间使用 UTC RFC 3339，ID 在资源生命周期内稳定；所有枚举只允许追加或通过 API 大版本调整。
@@ -60,7 +60,7 @@
 | `POST /api/v1/runs` | Available | 创建并启动固定 profile Run；返回 `runId`、`eventId`。 |
 | `GET /api/v1/runs/:runId` | Available | Run、版本、评测、Decision、checkpoint、节点、事件和 publication 快照。 |
 | `GET /api/v1/runs/:runId/events?after=<seq>` | Available | 按 `event_seq` 增量读取运行事件。 |
-| `GET /api/v1/runs/:runId/workflow-nodes` | Available | 返回角色、轮次、尝试、执行状态和时间，不暴露 checkpoint 私有数据。 |
+| `GET /api/v1/runs/:runId/workflow-nodes` | Available | 返回角色、轮次、尝试、执行状态、`readyAt`、开始和完成时间；历史记录无法证明 `readyAt` 时返回 `null`，不暴露 checkpoint 私有数据。 |
 | `GET /api/v1/runs/:runId/workflow-status` | Available | 工作流执行状态，不替代 FlywheelRun 业务状态。 |
 | `GET /api/v1/runs/:runId/report` | Available | 下载脱敏审计报告；已由旧 `demo-report` 路径迁移。 |
 | `POST /api/v1/runs/:runId/resume` | Available | 从同一 checkpoint 恢复。 |
@@ -74,9 +74,9 @@
 | `POST /api/v1/action-items/:actionItemId/regenerate` | Available | 以冻结反馈创建新 Run，在配置快照保留来源事项、parentRunId 和 reason 摘要。 |
 | `GET /api/v1/activity` | Available | 跨 Run 审计活动列表，支持 type、runId、severity、时间和分页过滤。 |
 | `GET /api/v1/activity/stream` | Available | 跨 Run SSE 活动流，支持断线续传。 |
-| `GET /api/v1/knowledge/health` | Planned | 返回有明确口径和样本范围的 freshness、coverage、quality 聚合，不得输出模型臆测分数。 |
+| `GET /api/v1/knowledge/health?window=24h|7d|30d` | Available | 返回有明确分子、分母、样本窗口和规则版本的 freshness、coverage、quality，以及仅在三项均可用时计算的 0–100 总分；不得输出模型臆测分数。 |
 
-DEV-006A/B/C 已完成：异常与组件不可用事实形成可去重、可复发关联的持久化事项；进度来自冻结七 Agent 配置；治理命令具备管理员鉴权、revision、跨重启幂等与审计；regenerate 冻结因果链和反馈；批次与活动 SSE 已接入前台并在断线时退回轮询。Knowledge Health 仍属于 B3，不在本阶段伪造。
+DEV-006A/B/C 已完成：异常与组件不可用事实形成可去重、可复发关联的持久化事项；进度来自冻结七 Agent 配置；治理命令具备管理员鉴权、revision、跨重启幂等与审计；regenerate 冻结因果链和反馈；批次与活动 SSE 已接入前台并在断线时退回轮询。DEV-008 随后补齐了有明确口径的 Knowledge Health；无完整分母时仍返回 `unavailable` 和空值，不回退到原型演示分数。
 
 ### 3.1 DEV-006 最小交付边界
 
@@ -90,7 +90,7 @@ DEV-006 只补齐操作中心、飞轮批次和工作流图所需控制面，不
 
 待处理事项是持久化治理实体，不等同于 FlywheelRun、GateDecision 或普通事件。DEV-006 允许以下来源类型：
 
-第一阶段操作中心只能从 `FAILED`、`LOW_CONFIDENCE`、确定性门禁停止和影响活动批次的必需组件不可用事实产生事项；不得从前台占位内容或模型自由文本制造治理事实。
+操作中心只能从 `FAILED`、`LOW_CONFIDENCE`、确定性门禁停止、影响活动批次的必需组件不可用，以及来源刷新得到的漂移/访问失败事实产生事项；不得从前台占位内容、模型自由文本或正常的自动 `ITERATE` 制造治理事实。
 
 | `type` | 确定性触发事实 | 默认严重级别 |
 |---|---|---|
@@ -98,8 +98,10 @@ DEV-006 只补齐操作中心、飞轮批次和工作流图所需控制面，不
 | `LOW_CONFIDENCE` | 批次进入 `LOW_CONFIDENCE` | `MEDIUM` |
 | `GATE_STOPPED` | 最新 GateDecision 为 `STOPPED` | `HIGH` |
 | `COMPONENT_UNAVAILABLE` | 必需组件状态为 `UNAVAILABLE` 且影响活动批次 | `HIGH` |
+| `SOURCE_DRIFT` | 来源刷新或显式复验发现 observed revision 与 pinned revision 不一致 | `MEDIUM` |
+| `SOURCE_UNAVAILABLE` | 来源刷新经过访问边界校验后仍不可访问 | `HIGH` |
 
-来源漂移、知识冲突和规则质量问题属于 B3，不能在 DEV-006 中以自由文本假装为已实现类型。实体最小结构如下：
+评测的 `STOPPED` 已通过 `GATE_STOPPED` 确定性投影；普通失败评测会进入自动 Correction/迭代，不重复创建人工事项。来源事项的 subject.kind 为 `SOURCE`、runId 为 `null`，只允许 `ACKNOWLEDGE` 与 `RESOLVE`。安全事实事项等待 DEV-012 的完整权限拒绝审计后补齐，因此 `KF-SYS-033` 仍保持 Partial。实体最小结构如下：
 
 ```json
 {
@@ -209,36 +211,38 @@ DEV-006 只补齐操作中心、飞轮批次和工作流图所需控制面，不
 | `GET /api/v1/knowledge/:versionId` | Available | 正文、状态、quality 和 provenance 详情。 |
 | `POST /api/v1/knowledge/candidates` | Available | 创建候选但不表示发布；已由旧 `/api/v1/ingest` 迁移。 |
 | `POST /api/v1/knowledge/:versionId/feedback` | Available | 记录 `hit`、`rate` 或 `correct`，不得直接改变发布状态；已由旧 `/api/v1/feedback` 迁移。 |
-| `GET /api/v1/knowledge/:versionId/lineage` | Planned | 返回父子版本、关联 Run、Correction、Evaluation 和 publication。 |
-| `GET /api/v1/knowledge/:versionId/diff?against=<versionId>` | Planned | 返回结构化 Markdown Diff 和范围校验。 |
+| `GET /api/v1/knowledge/:versionId/lineage` | Available | 返回父子版本边、provenance，以及关联批次、Correction、Evaluation 和 publication 的反向关系。 |
+| `GET /api/v1/knowledge/:versionId/diff?against=<versionId>` | Available | 返回结构化 Markdown hunks、变更章节和 Correction 范围校验。 |
 
-第一阶段 Knowledge 是真实列表、检索与详情组成的 Preview；Add curated knowledge 暂不进入前台范围。
+Knowledge 页面以真实列表、检索、详情、血缘和差异组成可用 Preview，并可从关系记录反向进入批次和评测详情。人工添加精选知识仍不进入本轮前台范围。
 
 ## 5. 评测
 
 | 方法与路径 | 状态 | 用途与最小响应 |
 |---|---|---|
 | Run snapshot 的 `evaluations` 与 `latestDecision` | Available | 单 Run 评测和 Gate 的当前事实源。 |
-| `GET /api/v1/evaluations` | Planned | 跨 Run 评测列表；支持 runId、moduleId、gate、status、时间与分页。 |
-| `GET /api/v1/evaluations/:evaluationId` | Planned | 报告、策略版本、工具链摘要、reason codes 和 ArtifactRef。 |
-| `GET /api/v1/evaluations/:evaluationId/artifacts` | Planned | 按权限返回评测证据元数据和受控下载链接。 |
-| `GET /api/v1/evaluation-rules` | Planned | 只读返回规则、版本、适用范围和启用状态。 |
-| `PATCH /api/v1/evaluation-rules/:ruleId` | Planned | 管理员更新允许变更的规则配置，保留版本和审计记录。 |
+| `GET /api/v1/evaluations` | Available | 跨批次评测列表；支持 `runId`、`moduleId`、`gate`、`status`、`from`、`to`、`limit` 和 `cursor`。 |
+| `GET /api/v1/evaluations/:evaluationId` | Available | 返回不可变报告、Decision、规则版本、工具链摘要、reason codes 和 ArtifactRef。 |
+| `GET /api/v1/evaluations/:evaluationId/artifacts` | Available | 返回评测证据元数据；匿名读取不会得到可下载能力。 |
+| `GET /api/v1/evaluations/:evaluationId/artifacts/:artifactId` | Available | 使用管理员 Bearer token 读取并校验指定证据字节；浏览器必须以鉴权请求下载，不得把 token 放进 URL。 |
+| `GET /api/v1/evaluation-rules` | Available | 返回规则当前版本、适用范围和启用状态。 |
+| `GET /api/v1/evaluation-rules/:ruleId` | Available | 返回当前规则与不可变修订历史。 |
+| `PATCH /api/v1/evaluation-rules/:ruleId` | Available | 管理员只更新允许的 `scope`、`config`、`enabled`，要求 revision、reason、幂等键并保留审计记录。 |
 
-第一阶段评测页只能聚合现有批次 snapshot，并持续显示 `Partial`；全局筛选、规则管理和完整证据浏览不可宣称可用。
+评测页使用独立读模型完成跨批次筛选、详情、证据元数据、受控下载和规则修订；历史报告与历史规则版本保持不可变，新规则只影响后续评测。
 
 ## 6. 来源
 
 | 方法与路径 | 状态 | 用途与最小响应 |
 |---|---|---|
 | `GET /api/v1/sources/scan` | Available | 返回本次发现的来源候选，不等同于 Registry；已由旧 `/api/v1/scan` 迁移。 |
-| `GET /api/v1/sources` | Planned | 持久化来源列表；支持 type、status、project、分页和最后同步时间。 |
-| `POST /api/v1/sources` | Planned | 创建来源配置，校验路径/URL、访问边界和凭据引用。 |
-| `GET /api/v1/sources/:sourceId` | Planned | 返回来源配置、同步状态、最近错误和关联知识统计。 |
-| `PATCH /api/v1/sources/:sourceId` | Planned | 修改白名单字段并记录审计；不得回传秘密正文。 |
-| `POST /api/v1/sources/:sourceId/refresh` | Planned | 发起幂等扫描/同步任务并返回关联 runId 或 jobId。 |
+| `GET /api/v1/sources` | Available | 持久化来源列表；支持 `kind`、`status`、`project`、`limit`、`cursor` 和最后同步时间。 |
+| `POST /api/v1/sources` | Available | 创建 `FILE` 或 `HTTPS` 来源，先校验路径/URL、访问边界、固定 revision 和凭据引用。 |
+| `GET /api/v1/sources/:sourceId` | Available | 返回脱敏配置、固定/观测 revision、同步状态、漂移、最近错误、刷新任务、审计和关联知识统计。 |
+| `PATCH /api/v1/sources/:sourceId` | Available | 使用 revision、reason 与幂等键修改名称、启停、locator、固定 revision 或凭据引用；不得回传秘密正文。 |
+| `POST /api/v1/sources/:sourceId/refresh` | Available | 幂等复验来源并返回 `jobId`、状态、reasonCode 和最新来源快照。 |
 
-第一阶段来源页仅提供真实只读扫描候选；持久化管理、启停、刷新和来源统计均以禁用状态展示。
+来源页默认读取持久化注册；扫描候选仅在用户明确触发时读取，不能覆盖已加载的注册事实。`FILE` 只能位于配置的采集根，`HTTPS` 仅允许显式主机白名单、拒绝重定向和私网/本机目标，凭据只允许 `secret://env/<name>` 引用。Preview 不提供 DELETE：停用通过 `PATCH enabled=false` 完成，历史与审计保留。
 
 ## 7. Graph
 
@@ -261,14 +265,16 @@ Graph 使用真实节点投影与 SSE；断线时退回增量轮询。点击节�
 |---|---|---|
 | `GET /api/v1/agents` | Available | 返回固定 Agent 定义、职责、只读契约和当前 `promptAddon`。 |
 | `PUT /api/v1/agents/:agentId/prompt` | Available | 仅更新 `promptAddon`；拒绝职责、Schema、权限、节点边和 Provider 类名。 |
-| `GET /api/v1/agents/providers/status` | Planned | 返回 Provider 认证/可用状态、模型标识和受控错误摘要，不返回凭据。 |
-| `GET /api/v1/provider-settings` | Planned | 返回 Pi Agent Provider 类型、脱敏 API URL、API Key 是否已配置及验证状态，不返回完整凭据。 |
-| `PUT /api/v1/provider-settings` | Planned | 管理员保存 API URL 与可选 API Key，要求鉴权、幂等、地址安全校验和审计。 |
-| `POST /api/v1/provider-settings/verify` | Planned | 使用服务端持有凭据执行无副作用连接验证并返回分类结果。 |
-| `GET /api/v1/metrics/runs?window=24h|7d|30d` | Planned | 返回批次与节点耗时 P50/P95、调用、重试、Token、估算成本和样本量。 |
-| `GET /api/v1/metrics/governance?window=24h|7d|30d` | Planned | 返回自动修订通过率、三轮收敛率、人工介入、平均处理时间与短期复发率。 |
+| `GET /api/v1/agents/providers/status` | Available | 返回当前 Provider 的可用性、认证状态、模型、检查时间和受控 reasonCode，不返回凭据。 |
+| `GET /api/v1/provider-settings` | Available | 返回 Pi Agent 类型、脱敏 API URL、API Key 是否已配置、revision 与验证状态，不返回完整凭据。 |
+| `PUT /api/v1/provider-settings` | Available | 管理员保存 API URL、模型与可选 API Key，要求鉴权、revision、幂等、地址安全校验和脱敏审计；保存后默认未启用。 |
+| `POST /api/v1/provider-settings/verify` | Available | 使用服务端持有凭据执行无生成副作用的模型列表探测；成功后按请求启用，失败则保持关闭。 |
+| `GET /api/v1/metrics/runs?window=24h|7d|30d` | Available | 返回批次、节点与排队耗时 P50/P95、调用、`providerCalls.retries`、`workflowNodeRetries`、Token、估算成本、Provider/节点分组和样本量。 |
+| `GET /api/v1/metrics/governance?window=24h|7d|30d` | Available | 返回首次自动修订通过率、三轮收敛率、人工介入比例、平均处理时间与七日复发率。 |
 
-第一阶段 Agent 设置可以真实展示 Agent；若产品暂不开放写入，则隐藏或禁用提示词编辑。拓扑、工具权限、Schema 与 Provider 切换不提供假保存。
+Agent 设置同时展示固定 Agent 契约、Provider 配置/验证和运营指标。完整 API Key 仅在保存请求中从页面内存发送；服务端使用权限为 `0600` 的 AES-256-GCM 本地密钥文件持有，读接口、审计、运行快照和指标均不得包含秘密。API URL 必须是公开 `HTTPS`，保存和验证前均重新解析 DNS 并拒绝本机、私网、混合解析、用户信息、查询、fragment 与重定向。验证成功的配置有效期为 24 小时；只有已启用且验证有效的配置才使后续新批次冻结 `pi-agent`、模型和非秘密参数摘要。已经冻结为 Pi 的批次在到期、配置变化、不可用或恢复摘要不匹配时拒绝执行，不得退回 fixture；没有有效 Pi 配置时，新批次使用 `GET /api/v1/system/capabilities` 明确返回的部署 fallback，默认 fixture 仅代表本地验收。空输出或 Schema 不合法输出由全新 Pi 会话做 `1..3` 次有界总尝试，每次单独审计。Provider 设置文件与 SQLite 命令回执暂不共享崩溃原子性：加密文件已经提交但回执尚未提交时，进程重启后的重放会返回 revision 冲突；该恢复边界属于 DEV-012，不得宣称 crash-exactly-once。
+
+指标响应统一携带 `window`、`from`、`to`、`sampledAt`、`cohort`、`definitions` 和逐指标 `sampleSize`。排队耗时只使用同一次节点尝试的持久化 `readyAt → startedAt`；旧记录缺少 `readyAt` 时排除该样本。`providerCalls.retries` 只计算模型输出无效后的额外 Provider 尝试，`workflowNodeRetries.total` 只计算 attempt 大于一的额外工作流节点尝试，两者不得相加或互相代替。比率同时返回 numerator/denominator；空分母或缺少可信模型定价时返回 `null`，不能以 0 代替。fixture 与真实 Provider 样本必须通过 cohort 标识，前台不得把混合样本解释为生产模型水平。
 
 ## 9. Preview 破坏性迁移清单
 
@@ -285,13 +291,13 @@ Graph 使用真实节点投影与 SSE；断线时退回增量轮询。点击节�
 
 | 页面 | 第一阶段可真实使用 | 可预览但不完整 | 仍需后台 API |
 |---|---|---|---|
-| 操作中心 | 持久化事项、治理动作、组件健康、活动流和最近批次 | Knowledge Health 保持 Partial | 知识健康度属于 B3 |
+| 操作中心 | 持久化事项、治理动作、组件健康、活动流、最近批次和知识健康度 | 缺少完整样本时健康度显示 `—` | 安全事实事项仍随 DEV-012 权限审计补齐 |
 | 飞轮批次 | 列表、固定 profile、详情、可证明进度、节点、事件、受控重试、取消、恢复、报告和 SSE | 通用启动参数仍受限 | 任意项目的通用启动向导不属于 B2 |
-| 知识 | 列表、简单查询、详情、反馈 | 血缘和差异入口禁用 | 血缘、差异；不含人工添加精选知识 |
+| 知识 | 列表、组合查询、详情、反馈、血缘、结构化差异和反向关系 | 无样本时关系区 Empty | 不含人工添加精选知识 |
 | 工作流图 | 选择批次、真实固定拓扑、节点状态、实时事件和轮询降级 | 无 | 复用批次进度与 event-stream，不新增 Graph API |
-| 评测 | 从批次 snapshot 查看与聚合 | 全局列表标记 Partial | 独立列表/详情/证据/规则 API |
-| 来源 | 扫描候选只读查看 | 注册控件禁用 | 来源 CRUD、刷新和统计 |
-| Agent 设置 | Agent 定义和 promptAddon 事实 | Provider 健康与配置标记未接入 | Provider 状态、API URL/Key 安全配置与验证；固定 Agent 契约不得开放编辑 |
+| 评测 | 跨批次列表、筛选、详情、证据元数据/受控下载和规则修订 | 无 | 任意新建/删除规则不在 Preview 范围 |
+| 来源 | 持久化注册、筛选、创建、更新、启停、刷新、漂移和关联统计 | 扫描候选是显式辅助视图 | 删除与自动内容摄取不在本轮范围 |
+| Agent 设置 | Agent 定义、promptAddon、Provider 状态、安全配置/验证和运行/治理指标 | 无样本或无可信定价显示 `—` | 项目空间与企业级 KMS 后置；固定 Agent 契约不得开放编辑 |
 
 ## 11. 最终目标实施顺序
 
@@ -302,6 +308,6 @@ Graph 使用真实节点投影与 SSE；断线时退回增量轮询。点击节�
 | B4 运营最小可用面（DEV-007） | Provider status 与 Pi Agent API 配置；生成/治理速度、成本和效果观测；项目空间继续后置 | Agent Settings 显示真实 Provider 状态并安全配置默认 Pi Agent；新批次可使用真实 Provider；P50/P95、Token、成本与治理收敛指标具有样本量和明确口径。 |
 | B3 内容与质量面（DEV-008） | Knowledge lineage/diff；Evaluation 读模型与规则；Source Registry；Knowledge Health | Knowledge、Evaluations、Sources 的列表、详情、筛选、证据和允许动作全部来自服务端事实，健康指标具备完整输入和计算口径。 |
 
-B1–B4 的接口范围以本文件各表为准；Graph 重复引用批次 event-stream，不重复视为 Graph 专用接口。阶段可以拆分 PR，但不得在某阶段完成前把对应页面状态从 Preview/Partial/Disabled 提升为 Available。
+B1–B4 的接口范围以本文件各表为准，当前均已有实现和自动化验收；Graph 重复引用批次 event-stream，不重复视为 Graph 专用接口。项目空间、敌对代码隔离、完整安全事实事项和生产容量仍属于后续阶段，不能因 DEV-007/008 完成而外推为 Release 能力。
 
 HCP-1 已于 2026-09-03 获得 `Accepted`，当前七页信息架构、Graph 语义和 API 边界已经冻结；后续 B2/B3 接线不得恢复历史八入口结构。HCP-1 不替代本规范的自动化迁移验收门。

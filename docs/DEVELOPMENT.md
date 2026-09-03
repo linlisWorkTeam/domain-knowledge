@@ -20,7 +20,8 @@ uiApi / CLI / DSH / Web projection
                  ▼
             Application Apps
   Orchestrator / Flywheel / EvalRunner
-       Search / Discovery
+ Search / Discovery / Content Governance
+      Provider Operations / Metrics
                  │
         ┌────────┴────────┐
         ▼                 ▼
@@ -31,7 +32,7 @@ uiApi / CLI / DSH / Web projection
 ```
 
 - `src/domain`：领域实体、状态和 Flywheel/EvalRunner/Association 纯领域服务；不能导入 Adapter、数据库或工作流 SDK。
-- `src/application/apps`：Orchestrator、Flywheel、EvalRunner、KnowledgeSearch、KnowledgeDiscovery 五个用例入口。
+- `src/application/apps`：Orchestrator、Flywheel、EvalRunner、KnowledgeSearch、KnowledgeDiscovery、ContentGovernance、ProviderOperations、OperationalMetrics 八个用例入口。
 - `src/application/services`：App 使用的用例协调服务；只能依赖 Domain 和 Port，不能直接依赖具体 SQLite、HTTP、模型或编译器。
 - `src/infrastructure`：实现知识登记簿、内容寻址存储、智能体、外部适配和项目评测等技术边界。
 - `src/infrastructure/workflow/langgraph`：相对独立的 LangGraph 图、运行时和固定 Agent 定义；不能拥有 KnowledgeVersion、评测或发布事务。

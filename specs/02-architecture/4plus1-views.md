@@ -7,7 +7,7 @@
 ## 逻辑视图
 
 - **Domain**：Run、Module、Artifact、KnowledgeVersion、EvaluationReport、Correction、GateDecision，以及 Flywheel、EvalRunner、Association 三个纯领域服务。
-- **Application**：`Orchestrator`、`FlywheelApp`、`EvalRunnerApp`、`KnowledgeSearchApp`、`KnowledgeDiscoveryApp` 五个用例入口，以及工作流阶段执行器、权限策略、发布策略和幂等协调器。
+- **Application**：`Orchestrator`、`FlywheelApp`、`EvalRunnerApp`、`KnowledgeSearchApp`、`KnowledgeDiscoveryApp`、`ContentGovernanceApp`、`ProviderOperationsApp`、`OperationalMetricsApp` 八个用例入口，以及工作流阶段执行器、权限策略、发布策略和幂等协调器。
 - **Ports**：Agent、Workflow、Artifact、Knowledge、Sandbox、LanguagePlugin。
 - **Infrastructure**：相对独立的 `domain-knowledge` LangGraph 图、并行/循环、SQLite Checkpointer、固定 Agent 定义、数据库 Adapter，以及可选 Redis 运行状态 Adapter。
 - **Adapters**：DSH/进程 Provider、GLM、SQLite/CAS、项目评测和 C++ 插件。

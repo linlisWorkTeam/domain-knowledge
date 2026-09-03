@@ -24,11 +24,17 @@ flowchart TB
   APP --> EAPP[EvalRunnerApp]
   APP --> SAPP[KnowledgeSearchApp]
   APP --> DAPP[KnowledgeDiscoveryApp]
+  APP --> CAPP[ContentGovernanceApp]
+  APP --> PAPP[ProviderOperationsApp]
+  APP --> MAPP[OperationalMetricsApp]
   ORC --> DOMAIN[Domain Services]
   FAPP --> DOMAIN
   EAPP --> DOMAIN
   SAPP --> DOMAIN
   DAPP --> DOMAIN
+  CAPP --> DOMAIN
+  PAPP --> PORTS
+  MAPP --> PORTS
   INFRA[Infrastructure: LangGraph / DB / Redis Adapters] --> PORTS[Application Ports]
   APP --> PORTS
   DOMAIN --> PORTS

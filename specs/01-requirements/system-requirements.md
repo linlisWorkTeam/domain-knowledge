@@ -34,7 +34,7 @@
 | KF-SYS-028 | P1 | 官网和控制台的用户可见文案必须使用自然、统一的中文；除固定标题 `WORKPANEL · KNOWLEDGE FLYWHEEL` 外，不得使用中英文拼接的栏目名、状态名或说明句。源码标识符、项目名、命令和环境变量作为技术值原样保留。 | AC-DOC-004 |
 | KF-SYS-029 | P0 | 本地服务必须提供可提交的写入令牌配置样例、默认忽略的本地配置文件和页面内配置说明；未配置时继续默认拒绝写入，但必须告诉用户如何启用并重启服务。 | AC-SEC-004 |
 | KF-SYS-030 | P0 | 运行代码、Spec、测试和前台必须只在 domain-knowledge 演进；wpKnowledge 只能保存知识正文、研究、设计、证据与索引，不得保留可运行副本。 | AC-ARCH-003 |
-| KF-SYS-031 | P0 | UI/API 必须只通过 Orchestrator、Flywheel、EvalRunner、KnowledgeSearch 和 KnowledgeDiscovery Application App 进入系统；领域规则由 Flywheel、EvalRunner 和 Association Domain Service 持有，LangGraph、数据库与 Redis 实现只能位于 Infrastructure。 | AC-ARCH-004 |
+| KF-SYS-031 | P0 | UI/API 必须只通过 Orchestrator、Flywheel、EvalRunner、KnowledgeSearch、KnowledgeDiscovery、ContentGovernance、ProviderOperations 和 OperationalMetrics Application App 进入系统；领域规则由 Flywheel、EvalRunner 和 Association Domain Service 持有，LangGraph、Provider SDK、秘密持有、数据库与 Redis 实现只能位于 Infrastructure。 | AC-ARCH-004 |
 | KF-SYS-032 | P1 | Preview HTTP API 必须按 system、runs、knowledge、evaluations、sources、graph、agents 资源分组；迁移必须原子更新 Server、Console、DSH Adapter、测试和文档，首个 Release 前不得保留旧路由别名。 | AC-API-001 |
 | KF-SYS-033 | P1 | 系统必须提供持久化 Action Item 治理能力，能够从运行、评测、来源和安全事实确定性地产生、去重、处理和审计事项；治理动作不得改写既有 GateDecision 或 publication。 | AC-API-002 |
 | KF-SYS-034 | P1 | Run 必须提供可证明的进度、合法重试和可断线续传的实时事件；无法从固定工作单元计算时不得输出百分比或 ETA。 | AC-API-003 |

@@ -7,10 +7,10 @@
   "required": ["actionItemId", "type", "severity", "status", "subject", "runId", "reasonCode", "summary", "sourceEventId", "fingerprint", "allowedActions", "revision", "createdAt", "updatedAt", "resolvedAt", "resolution", "previousOccurrenceId"],
   "properties": {
     "actionItemId": { "type": "string", "pattern": "^ai_[a-f0-9]{24}$" },
-    "type": { "enum": ["RUN_FAILED", "LOW_CONFIDENCE", "GATE_STOPPED", "COMPONENT_UNAVAILABLE"] },
+    "type": { "enum": ["RUN_FAILED", "LOW_CONFIDENCE", "GATE_STOPPED", "COMPONENT_UNAVAILABLE", "SOURCE_DRIFT", "SOURCE_UNAVAILABLE"] },
     "severity": { "enum": ["MEDIUM", "HIGH"] },
     "status": { "enum": ["OPEN", "ACKNOWLEDGED", "RESOLVED"] },
-    "subject": { "type": "object", "additionalProperties": false, "required": ["kind", "id"], "properties": { "kind": { "const": "RUN" }, "id": { "type": "string", "minLength": 1 } } },
+    "subject": { "type": "object", "additionalProperties": false, "required": ["kind", "id"], "properties": { "kind": { "enum": ["RUN", "SOURCE"] }, "id": { "type": "string", "minLength": 1 } } },
     "runId": { "type": ["string", "null"] },
     "reasonCode": { "type": "string", "minLength": 1 },
     "summary": { "type": "string", "minLength": 1 },

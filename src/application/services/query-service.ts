@@ -114,6 +114,8 @@ export class KnowledgeQueryService {
       category: entry.version.category,
       tags: entry.version.tags,
       provenance: entry.version.provenance,
+      parentVersionId: entry.version.parentVersionId,
+      createdAt: entry.version.createdAt,
       relevance: Number(relevance.toFixed(4)),
       bm25: Number(bm25.toFixed(4)),
       snippet: entry.body.trim().replace(/\s+/g, ' ').slice(0, 240),

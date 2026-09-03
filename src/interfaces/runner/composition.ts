@@ -98,6 +98,8 @@ export function createComposition(input: {
   clock?: () => string;
   providerSettingsStore?: ProviderSettingsStore;
   providerEndpointPolicy?: ProviderEndpointPolicy;
+  sourceEndpointPolicy?: ProviderEndpointPolicy;
+  allowedSourceHosts?: string[];
   providerProbe?: ProviderConnectionProbe;
   operationalMetrics?: OperationalMetricsPort;
 } = {}) {
@@ -129,8 +131,9 @@ export function createComposition(input: {
     artifacts,
     repositoryRoot,
     configuredRoots: config.acquisition.roots,
-    allowedRemoteHosts: (process.env.WP_SOURCE_ALLOWED_HOSTS ?? '')
+    allowedRemoteHosts: input.allowedSourceHosts ?? (process.env.WP_SOURCE_ALLOWED_HOSTS ?? '')
       .split(',').map((host) => host.trim()).filter(Boolean),
+    remoteEndpointPolicy: input.sourceEndpointPolicy,
     defaultRule: {
       policyId: config.publicationGate.policyId,
       minimumStability: config.publicationGate.minimumStability,
@@ -187,6 +190,7 @@ export function createComposition(input: {
   const maxOutputBytes = Number(process.env.WP_DSH_MAX_OUTPUT_BYTES ?? 2 * 1024 * 1024);
   const maxTokens = Number(process.env.WP_DSH_MAX_TOKENS ?? 32_768);
   const maxSchemaAttempts = Number(process.env.WP_DSH_MAX_SCHEMA_ATTEMPTS ?? 2);
+  const piMaxSchemaAttempts = Number(process.env.WP_PI_MAX_SCHEMA_ATTEMPTS ?? 2);
   const allowedRoots = (process.env.WP_DSH_ALLOWED_ROOTS?.split(delimiter) ?? [repositoryRoot])
     .map((root) => root.trim()).filter(Boolean).map((root) => resolve(root));
   const agentWorkspaceRoot = join(runtimeDir, 'agent-workspaces');
@@ -282,7 +286,7 @@ export function createComposition(input: {
           completedAt: record.completedAt,
           durationMs: record.durationMs,
           status: record.status,
-          retryCount: Math.max(0, Number(record.metadata.providerAttempt ?? 1) - 1),
+          retryCount: Number(record.metadata.providerAttempt ?? 1) > 1 ? 1 : 0,
           inputTokens: null,
           outputTokens: null,
           cacheReadTokens: null,
@@ -333,6 +337,7 @@ export function createComposition(input: {
             settings: providerOperations.requireRuntimeConfiguration(snapshot.provider),
             agentDir: join(runtimeDir, 'pi-agent'),
             maxTokens,
+            maxSchemaAttempts: piMaxSchemaAttempts,
             endpointPolicy: providerEndpointPolicy,
             onInvocation: (record) => metrics.recordProviderInvocation(record),
           });

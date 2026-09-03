@@ -22,6 +22,25 @@ interface SafeAgentCall {
   metadata: Record<string, string | number | boolean | null>;
 }
 
+interface SafeProviderInvocation {
+  provider: string;
+  role: string;
+  startedAt: string;
+  completedAt: string;
+  durationMs: number;
+  status: string;
+  retryCount: number;
+  tokens: {
+    input: number | null;
+    output: number | null;
+    cacheRead: number | null;
+    cacheWrite: number | null;
+    total: number | null;
+  };
+  estimatedCostUsd: number | null;
+  errorCode: string | null;
+}
+
 function artifactRef(value: unknown): ArtifactRef | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const candidate = value as Record<string, unknown>;
@@ -79,6 +98,82 @@ function safeAgentCalls(runtimeDir: string): { calls: SafeAgentCall[]; ignoredLi
   return { calls, ignoredLines };
 }
 
+function safePiInvocations(
+  repository: SQLiteFlywheelRepository,
+  runId: string,
+): SafeProviderInvocation[] {
+  const table = repository.database.prepare(`
+    SELECT 1 AS present FROM sqlite_master
+    WHERE type = 'table' AND name = 'provider_invocations'
+  `).get() as Record<string, unknown> | undefined;
+  if (!table) return [];
+  const rows = repository.database.prepare(`
+    SELECT agent_id, provider, started_at, completed_at, duration_ms, status,
+      retry_count, input_tokens, output_tokens, cache_read_tokens,
+      cache_write_tokens, estimated_cost_usd, error_code
+    FROM provider_invocations
+    WHERE run_id = ? AND provider = 'pi-agent'
+    ORDER BY started_at, invocation_id
+  `).all(runId) as Record<string, unknown>[];
+  const optionalNumber = (value: unknown): number | null => value === null ? null : Number(value);
+  return rows.map((row) => {
+    const input = optionalNumber(row.input_tokens);
+    const output = optionalNumber(row.output_tokens);
+    const cacheRead = optionalNumber(row.cache_read_tokens);
+    const cacheWrite = optionalNumber(row.cache_write_tokens);
+    return {
+      provider: String(row.provider),
+      role: String(row.agent_id),
+      startedAt: String(row.started_at),
+      completedAt: String(row.completed_at),
+      durationMs: Number(row.duration_ms),
+      status: String(row.status),
+      retryCount: Number(row.retry_count),
+      tokens: {
+        input,
+        output,
+        cacheRead,
+        cacheWrite,
+        total: input === null || output === null
+          ? null : input + output + (cacheRead ?? 0) + (cacheWrite ?? 0),
+      },
+      estimatedCostUsd: optionalNumber(row.estimated_cost_usd),
+      errorCode: row.error_code === null ? null : String(row.error_code),
+    };
+  });
+}
+
+function callKey(call: SafeAgentCall | SafeProviderInvocation): string {
+  return JSON.stringify([
+    call.provider, call.role, call.startedAt, call.completedAt,
+    call.durationMs, call.status, call.errorCode,
+  ]);
+}
+
+function mergeAgentCalls(
+  fileCalls: SafeAgentCall[],
+  piCalls: SafeProviderInvocation[],
+): Array<SafeAgentCall | SafeProviderInvocation> {
+  const result: Array<SafeAgentCall | SafeProviderInvocation> = [...fileCalls];
+  const positions = new Map<string, number[]>();
+  result.forEach((call, index) => {
+    const key = callKey(call);
+    positions.set(key, [...(positions.get(key) ?? []), index]);
+  });
+  for (const call of piCalls) {
+    const key = callKey(call);
+    const duplicate = positions.get(key)?.shift();
+    if (duplicate === undefined) {
+      result.push(call);
+    } else {
+      // Prefer the Registry projection because it carries controlled usage
+      // fields and cannot contain prompt, path, or credential material.
+      result[duplicate] = call;
+    }
+  }
+  return result;
+}
+
 export async function buildDemoReport(input: {
   runId: string;
   runtimeDir: string;
@@ -98,13 +193,15 @@ export async function buildDemoReport(input: {
     verified: await input.artifacts.verify(ref),
   })));
   const agentAudit = safeAgentCalls(input.runtimeDir);
+  const fileCalls = agentAudit.calls.filter((call) => call.metadata.runId === input.runId);
+  const piCalls = safePiInvocations(input.repository, input.runId);
   return {
     schemaVersion: '1.0',
     reportKind: 'wpknowledge-governance-demo',
     generatedAt: (input.clock ?? (() => new Date()))().toISOString(),
     evidenceBoundary: '报告只导出 Registry 业务事实、Artifact 完整性结果和脱敏 Agent 调用摘要；不包含 Prompt 正文、模型正文、Session 日志或凭据。',
     snapshot,
-    agentCalls: agentAudit.calls.filter((call) => call.metadata.runId === input.runId),
+    agentCalls: mergeAgentCalls(fileCalls, piCalls),
     ignoredAgentAuditLines: agentAudit.ignoredLines,
     artifactIntegrity: {
       total: verification.length,

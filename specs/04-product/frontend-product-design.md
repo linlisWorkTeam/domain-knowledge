@@ -1,6 +1,6 @@
 # 知识飞轮前台产品设计
 
-**状态：Accepted；F2 最终 UI/UX 与 HCP-1 已冻结｜版本：0.5.8｜日期：2026-09-03**
+**状态：Accepted；F2 最终 UI/UX 已冻结，F4/F5 已接线｜版本：0.6.0｜日期：2026-09-04**
 
 本文定义 domain-knowledge 知识飞轮控制台的用户体验、信息架构、交互边界、接口需求和验收标准。领域状态、门禁、安全和发布语义以同仓库的[规范总入口](../README.md)为准；前台不得创造第二套状态或发布权威。
 
@@ -124,13 +124,13 @@ Knowledge Flywheel
 ├── 工作流图
 │   └── 所选批次的 Agent 拓扑、节点状态和详情
 ├── 评测
-│   └── EvaluationReport、Gate 与证据
+│   └── 评测报告、Gate、证据与规则
 ├── 来源
-│   └── 当前扫描候选；来源注册能力后续接入
+│   └── 来源注册、状态、漂移、刷新与扫描候选
 └── Agent 设置
     ├── Agent 目录与固定契约
     ├── 当前 Provider / 运行健康
-    └── 追加提示词与后续模型 API 配置
+    └── 追加提示词、模型 API 配置与运营指标
 ```
 
 “工作流图”不是工作流画布编辑器。节点名称、职责、依赖、输入输出 Schema、可读写范围和工具权限来自服务端固定定义，只读展示。治理模式下仅可修改 `promptAddon`；前台不得提交任意 Agent 类型、Provider 类名、节点边或 Schema。
@@ -141,9 +141,9 @@ Knowledge Flywheel
 
 F1 的八入口信息架构已经被 F2 取代，不再是有效产品设计。生产导航唯一有效版本为“操作中心、飞轮批次、知识、工作流图、评测、来源、Agent 设置”。其中：
 
-- 操作中心从批次状态与最新 GateDecision 派生批次级待治理事项，不声明独立 Action Item 生命周期。
-- 来源页只展示 `GET /api/v1/sources/scan` 返回的来源候选，不描述为持久化来源注册。
-- 工作流图复用批次工作台的真实节点投影，不是 Knowledge Graph；Knowledge Health、跨批次 Activity、精确进度百分比、ETA、多项目切换和用户身份在相应后续 API 完成前保持 Partial 或 Disabled。
+- 操作中心读取服务端持久化待处理事项、组件健康、跨批次活动和知识健康度，不从浏览器临时拼装治理事实。
+- 来源页默认展示持久化来源注册；`GET /api/v1/sources/scan` 只有在用户明确扫描时展示候选，不得覆盖或冒充注册事实。
+- 工作流图复用批次工作台的真实节点投影，不是 Knowledge Graph；Knowledge Health、跨批次 Activity 和可证明进度已接入服务端，ETA、多项目切换和用户身份继续保持 Partial 或 Disabled。
 - 页面只能展示服务端事实或本节允许的派生值。派生值必须能说明输入字段和计算规则，不得伪装成服务端指标。
 - API 失败、部分响应或空结果分别进入 Error、Partial 或 Empty 状态，不得回退到原型演示数据。
 
@@ -456,10 +456,10 @@ Console 使用 `14px` 全局基准；正文和操作文字通常不小于 `11px`
 产品层额外约束如下：
 
 - 首个 Release 前允许直接清理旧路由，但 Server、Console、DSH Adapter、测试和文档必须在同一变更中迁移。
-- 第一阶段优先保证“操作中心”与“飞轮批次”的真实可用性；“知识”提供真实预览，不实现人工添加精选知识。
-- “工作流图”使用所选批次的真实固定 Agent 拓扑和节点投影，B2 前采用轮询、B2 后接入 SSE；“评测”与“来源”独立成页，但不得把现有批次聚合或扫描候选冒充完整注册。
-- “Agent 设置”可以读取真实固定 Agent 定义；任何未接通的编辑控件不得产生假保存成功。
-- Planned API 上线前，相关界面必须隐藏、禁用或明确标记 Preview/Partial，且不得回退到演示数据。
+- 操作中心、飞轮批次、工作流图、知识、评测、来源和 Agent 设置均已接入 B2–B4 服务端事实；“知识”仍不实现人工添加精选知识。
+- “工作流图”使用所选批次的真实固定 Agent 拓扑、节点投影和 SSE；“评测”使用跨批次读模型，“来源”默认使用持久化注册，不能退回批次聚合或扫描候选冒充。
+- “Agent 设置”读取真实固定 Agent 定义，并接入 Provider 安全配置、连接验证和观测指标；编辑失败必须保留原事实并给出受控错误，不得产生假成功。
+- 仍未实现的项目空间、ETA、身份和生产 DFX 能力必须隐藏、禁用或明确标记 Preview/Partial，且不得回退到演示数据。
 
 ## 12. 产品需求与验收
 
@@ -485,7 +485,7 @@ Console 使用 `14px` 全局基准；正文和操作文字通常不小于 `11px`
 | KF-UI-018 | P0 | 写入关闭时，设置页必须提供 `.env.local` 的创建位置、变量示例和重启方式；配置前所有写操作仍默认拒绝，治理令牌只保存在页面内存中。 | AC-UI-018 |
 | KF-UI-019 | P0 | 前台只能展示服务端事实或具有公开计算规则的派生值；缺少领域模型或 API 支持的指标、身份、问题和关系不得以模拟数据呈现。 | AC-UI-019 |
 | KF-UI-020 | P2 | 左上角项目空间必须在后续阶段升级为真实选择器；选择项、当前项目空间和切换后的数据范围均由服务端事实驱动，本阶段不得实现无效下拉框。 | AC-UI-023 |
-| KF-UI-021 | P1 | 设置页后续必须支持本地管理员配置模型 API URL 与 API Key；有效配置启用后，新任务默认使用 Pi Agent 工具执行，且不得削弱既有 Agent 权限、隔离、审计和 Gate。 | AC-UI-024 |
+| KF-UI-021 | P1 | 设置页必须支持本地管理员配置模型 API URL 与 API Key；有效配置启用后，新任务默认使用 Pi Agent 工具执行，且不得削弱既有 Agent 权限、隔离、审计和 Gate。 | AC-UI-024 |
 
 ### 12.1 验收场景
 
@@ -556,13 +556,17 @@ F2 可访问验收环境和 B1 API 迁移 diff 就绪后，进入 B2/B3 并行�
 ### 前台交付 F4：运营最小可用面接线（DEV-007）
 
 - Agent 设置接入真实 Provider 状态。
-- 设置页接入模型 API 配置 Use Case：支持 API URL、API Key、脱敏状态和连接验证；服务端持有密钥并提供 `GET/PUT /api/v1/provider-settings` 与 `POST /api/v1/provider-settings/verify`。验证成功后以 Pi Agent 工具作为新任务的默认执行方式，失败时不得回退到演示数据或绕过现有安全门禁。
+- 设置页接入模型 API 配置 Use Case：支持 API URL、API Key、脱敏状态和连接验证；服务端持有密钥并提供 `GET/PUT /api/v1/provider-settings` 与 `POST /api/v1/provider-settings/verify`。验证成功后以 Pi Agent 工具作为新任务的默认执行方式；已经冻结为 Pi 的批次失败时不得回退到演示 Provider 或绕过现有安全门禁。未启用有效配置时必须如实展示部署 fallback，默认 fixture 只代表本地验收。
 - 接入生成与治理观测：批次/节点 P50/P95、调用、重试、Token、估算成本、自动修订通过率、三轮收敛率、人工介入比例、平均处理时间和短期复发率必须同时显示样本量；无样本时显示空值。
+
+完成结果：上述接口和页面均已接通；API Key 只在页面内存和服务端秘密边界间传递，已经冻结为 Pi 的批次在验证过期、不可用或配置变化时失败关闭。自动化以本地模拟的 OpenAI-compatible 上游验证真实 Pi SDK 七节点执行路径；外部生产凭据和模型效果仍需部署者人工验收。
 
 ### 前台交付 F5：内容与质量面接线（DEV-008）
 
 - 知识接入血缘与差异；评测接入独立列表、详情、证据和规则修订；来源接入注册、状态和刷新。
 - 知识、评测与来源的基础事实稳定后接入知识健康度，并展示分子、分母、窗口、采样时间与规则版本。
+
+完成结果：知识详情可反向导航批次、Correction、评测和 publication；评测支持筛选、受控证据下载与规则 revision；来源支持注册、启停、刷新、漂移和关联统计；健康度无完整样本时显示空值。
 
 ### 前台交付 F6：运营 DFX 加固
 
@@ -603,17 +607,20 @@ F2 可访问验收环境和 B1 API 迁移 diff 就绪后，进入 B2/B3 并行�
 | 全局框架、响应式导航和操作中心 | Implemented：桌面侧栏、移动导航、批次指标和能力边界已接入真实 API |
 | GitHub Pages 项目官网 | Implemented：纯静态、双主题、响应式，提供使用者命令和 Agent 配置 Prompt；不连接 Registry；站点源码只在 `site/`，分支/Jekyll 模式由根入口嵌入，切到 GitHub Actions Source 后由工作流直接发布该目录 |
 | 双主题知识目录、状态筛选、知识详情 | Implemented MVP：官网和 Console 支持深色/浅色切换；目录筛选、搜索、详情 Drawer、provenance 和正文使用同一套语义状态色 |
-| Quality / Behavioral Gate 区分 | Implemented MVP：分区展示并解释 `ACCEPTED` 不等于 `VERIFIED`；版本 Diff 仍待实现 |
+| Quality / Behavioral Gate 区分 | Implemented：分区展示并解释 `ACCEPTED` 不等于 `VERIFIED`；版本 Diff 与范围校验已接入 |
 | Feedback UI | Implemented：使用仅驻留页面内存的 bearer token，明确反馈不改变发布状态 |
 | 批次列表与工作台 | Implemented MVP：新增批次列表、snapshot、顺序事件、checkpoint、评测和 Gate API/UI |
 | 自动 Run 启动 | Implemented fixed profile：CLI/API/Console 可启动固定 ohMyWorkPanel LangGraph 流程；任意项目的通用来源/策略向导仍在规划 |
 | Agent 目录与定制 | Implemented：七个固定角色可查，只有 `promptAddon` 可在治理模式修改并形成 revision/audit |
 | LangGraph 节点投影 | Implemented：Run 工作台从 Knowledge Registry 显示节点、Agent、轮次、attempt 与状态，不读取 graph checkpoint |
 | 实时事件 | Implemented：批次与活动 SSE 使用持久化 cursor 续传，断线自动重连并退回增量轮询 |
-| Correction / Diff | Partial：固定场景有 Correction 和范围校验，尚无通用查询/UI |
-| Governance | Implemented：服务端持久化事项、revision、跨重启幂等、审计、受控重试和冻结反馈重新生成均已接入操作中心 |
-| Evidence | Implemented MVP：聚合 EvaluationReport、GateDecision、工具链、测试和证据引用摘要 |
-| 真实在线 Agent | Implemented（受限样例）：官方 DSH SDK 已跑通固定 ohMyWorkPanel；通用项目向导和稳定性统计仍待实现 |
+| Correction / Diff | Implemented：通用血缘、结构化 Diff、范围校验和反向关系已接入知识详情 |
+| Governance | Implemented MVP：服务端持久化事项、revision、跨重启幂等、审计、受控重试和冻结反馈重新生成均已接入操作中心；完整安全事实事项仍后置 |
+| Evidence | Implemented：跨批次评测详情、GateDecision、工具链、测试、规则版本和受控证据下载已接入 |
+| 来源注册与知识健康 | Implemented：持久化来源、访问边界、刷新/漂移、关联统计及带样本口径的健康度已接入 |
+| 真实在线 Agent | Implemented（Preview）：官方 DSH SDK 与 Pi SDK 七节点执行路径均已自动化跑通；真实外部凭据、模型效果基线和生产容量仍需部署验收 |
+| 前台交付 F4 | Implemented：Provider 安全配置/验证、新批次 Pi 默认选择及生成/治理指标已接入 Agent 设置 |
+| 前台交付 F5 | Implemented：知识血缘/差异、评测/规则、来源注册和知识健康度已接入七页最终结构 |
 | 敌对代码安全执行 | Planned；安全能力完成前必须 fail closed |
 | 前台交付 F1 | Superseded：八入口结构仅作为历史实现记录，不再指导产品页面 |
 | 前台交付 F2 | Accepted：最终七页、真实 Agent 工作流图、目标站布局与视觉 token、微软雅黑优先字体、双主题和数据真实性边界已冻结 |

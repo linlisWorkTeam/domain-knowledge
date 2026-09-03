@@ -3,7 +3,9 @@ import { once } from 'node:events';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import test from 'node:test';
+import { PublicHttpsEndpointPolicy } from '../../src/infrastructure/security/public-https.ts';
 import { createKnowledgeServer } from '../../src/interfaces/runner/server.ts';
 import { GOOD_BODY } from '../helpers/fixture.ts';
 
@@ -29,7 +31,15 @@ test('DEV-008 content governance APIs preserve lineage, evidence, rules, sources
   writeFileSync(sourcePath, '# Source\n\nPinned source v1.\n');
   writeFileSync(join(projectRoot, 'outside.md'), '# Outside\n');
   const token = 'content-admin-secret';
-  const instance = createKnowledgeServer({ repositoryRoot: projectRoot, runtimeDir, writeToken: token });
+  const instance = createKnowledgeServer({
+    repositoryRoot: projectRoot,
+    runtimeDir,
+    writeToken: token,
+    allowedSourceHosts: ['127.0.0.1', 'mixed.source.example', 'public.source.example'],
+    sourceEndpointPolicy: new PublicHttpsEndpointPolicy(async (hostname) => (
+      hostname === 'mixed.source.example' ? ['1.1.1.1', '10.0.0.1'] : ['1.1.1.1']
+    )),
+  });
   const base = await listen(instance);
   const auth = {
     authorization: `Bearer ${token}`,
@@ -58,6 +68,22 @@ test('DEV-008 content governance APIs preserve lineage, evidence, rules, sources
     assert.equal(deniedSource.status, 403);
     assert.equal((await deniedSource.json()).error.code, 'SOURCE_ACCESS_DENIED');
 
+    for (const [key, locator] of [
+      ['source-loopback-1', 'https://127.0.0.1/private'],
+      ['source-mixed-dns-1', 'https://mixed.source.example/private'],
+      ['source-query-secret-1', 'https://public.source.example/source.md?token=must-not-persist'],
+    ]) {
+      const deniedRemote = await fetch(`${base}/api/v1/sources`, {
+        method: 'POST',
+        headers: { ...auth, 'idempotency-key': key },
+        body: JSON.stringify({ kind: 'HTTPS', locator, displayName: 'Denied remote source' }),
+      });
+      assert.equal(deniedRemote.status, 403, locator);
+      assert.equal((await deniedRemote.json()).error.code, 'SOURCE_ACCESS_DENIED');
+    }
+    const sourcesAfterRemoteDenials = await (await fetch(`${base}/api/v1/sources`)).text();
+    assert.doesNotMatch(sourcesAfterRemoteDenials, /must-not-persist|127\.0\.0\.1|mixed\.source\.example/);
+
     const missingIdempotencyKey = await fetch(`${base}/api/v1/sources`, {
       method: 'POST',
       headers: auth,
@@ -70,7 +96,8 @@ test('DEV-008 content governance APIs preserve lineage, evidence, rules, sources
       method: 'POST',
       headers: { ...auth, 'idempotency-key': 'source-create-1' },
       body: JSON.stringify({
-        kind: 'FILE', locator: 'knowledge/inbox/source.md', displayName: 'Pinned Source', project: 'default',
+        project: 'default', displayName: 'Pinned Source',
+        locator: 'knowledge/inbox/source.md', kind: 'FILE',
       }),
     });
     assert.equal(sourceResponse.status, 201);
@@ -260,11 +287,17 @@ test('DEV-008 content governance APIs preserve lineage, evidence, rules, sources
     assert.equal(failedEvaluations.items.length, 1);
     assert.equal(failedEvaluations.items[0].evaluationId, secondEvaluation.report.reportId);
     assert.deepEqual(failedEvaluations.items[0].ruleRef, { ruleId: 'publication-gate', revision: 2 });
+    assert.deepEqual(failedEvaluations.items[0].ruleBinding, {
+      status: 'BOUND', reasonCode: 'RULE_REVISION_BOUND',
+    });
     const firstEvaluationDetail = await (await fetch(
       `${base}/api/v1/evaluations/${encodeURIComponent(firstEvaluation.report.reportId)}`,
     )).json();
     assert.equal(firstEvaluationDetail.immutable, true);
     assert.deepEqual(firstEvaluationDetail.ruleRef, { ruleId: 'publication-gate', revision: 1 });
+    assert.deepEqual(firstEvaluationDetail.ruleBinding, {
+      status: 'BOUND', reasonCode: 'RULE_REVISION_BOUND',
+    });
     const ruleHistory = await (await fetch(`${base}/api/v1/evaluation-rules/publication-gate`)).json();
     assert.deepEqual(ruleHistory.history.map((rule: { revision: number }) => rule.revision), [2, 1]);
 
@@ -314,6 +347,16 @@ test('DEV-008 content governance APIs preserve lineage, evidence, rules, sources
     assert.equal(refresh.source.status, 'STALE');
     assert.notEqual(refresh.source.observedRevision, refresh.source.revision);
     assert.equal(refresh.source.recordRevision, 2);
+    const driftItems = await (await fetch(`${base}/api/v1/action-items?type=SOURCE_DRIFT`, {
+      headers: { authorization: `Bearer ${token}` },
+    })).json();
+    assert.equal(driftItems.items.length, 1);
+    assert.equal(driftItems.items[0].severity, 'MEDIUM');
+    assert.deepEqual(driftItems.items[0].subject, { kind: 'SOURCE', id: sourceId });
+    assert.equal(driftItems.items[0].runId, null);
+    assert.equal(driftItems.items[0].reasonCode, 'SOURCE_REVISION_DRIFT');
+    assert.equal(driftItems.items[0].sourceEventId, refresh.eventId);
+    assert.deepEqual(driftItems.items[0].allowedActions, ['ACKNOWLEDGE', 'RESOLVE']);
     const acceptedDrift = await fetch(`${base}/api/v1/sources/${encodeURIComponent(sourceId)}`, {
       method: 'PATCH',
       headers: { ...auth, 'idempotency-key': 'source-update-1' },
@@ -336,6 +379,65 @@ test('DEV-008 content governance APIs preserve lineage, evidence, rules, sources
       'CREATE', 'REFRESH', 'UPDATE',
     ]);
     assert.doesNotMatch(JSON.stringify(updatedSource), /content-admin-secret|secret:\/\//);
+
+    rmSync(sourcePath);
+    const failedRefreshResponse = await fetch(`${base}/api/v1/sources/${encodeURIComponent(sourceId)}/refresh`, {
+      method: 'POST',
+      headers: { ...auth, 'idempotency-key': 'source-refresh-failed-1' },
+      body: '{}',
+    });
+    assert.equal(failedRefreshResponse.status, 202);
+    const failedRefresh = await failedRefreshResponse.json();
+    assert.equal(failedRefresh.status, 'FAILED');
+    assert.equal(failedRefresh.reasonCode, 'SOURCE_NOT_FOUND');
+    assert.equal(failedRefresh.source.status, 'DEGRADED');
+    assert.equal(failedRefresh.source.lastErrorCode, 'SOURCE_NOT_FOUND');
+    assert.equal(failedRefresh.source.recordRevision, 4);
+
+    const repeatedFailureResponse = await fetch(`${base}/api/v1/sources/${encodeURIComponent(sourceId)}/refresh`, {
+      method: 'POST',
+      headers: { ...auth, 'idempotency-key': 'source-refresh-failed-2' },
+      body: '{}',
+    });
+    assert.equal(repeatedFailureResponse.status, 202);
+    const repeatedFailure = await repeatedFailureResponse.json();
+    assert.equal(repeatedFailure.status, 'FAILED');
+    assert.equal(repeatedFailure.reasonCode, 'SOURCE_NOT_FOUND');
+    assert.equal(repeatedFailure.source.recordRevision, 5);
+    const unavailableItems = await (await fetch(`${base}/api/v1/action-items?type=SOURCE_UNAVAILABLE`, {
+      headers: { authorization: `Bearer ${token}` },
+    })).json();
+    assert.equal(unavailableItems.items.length, 1);
+    assert.equal(unavailableItems.items[0].severity, 'HIGH');
+    assert.deepEqual(unavailableItems.items[0].subject, { kind: 'SOURCE', id: sourceId });
+    assert.equal(unavailableItems.items[0].runId, null);
+    assert.equal(unavailableItems.items[0].reasonCode, 'SOURCE_NOT_FOUND');
+    assert.equal(unavailableItems.items[0].sourceEventId, failedRefresh.eventId);
+    assert.deepEqual(unavailableItems.items[0].allowedActions, ['ACKNOWLEDGE', 'RESOLVE']);
+    const unavailableDetail = await (await fetch(
+      `${base}/api/v1/action-items/${encodeURIComponent(unavailableItems.items[0].actionItemId)}`,
+      { headers: { authorization: `Bearer ${token}` } },
+    )).json();
+    assert.deepEqual(
+      new Set(unavailableDetail.observedSources.map((entry: { eventId: string }) => entry.eventId)),
+      new Set([failedRefresh.eventId, repeatedFailure.eventId]),
+    );
+
+    const renamedResponse = await fetch(`${base}/api/v1/sources/${encodeURIComponent(sourceId)}`, {
+      method: 'PATCH',
+      headers: { ...auth, 'idempotency-key': 'source-rename-degraded-1' },
+      body: JSON.stringify({
+        expectedRevision: 5,
+        reason: 'Clarify the display name without claiming recovery',
+        displayName: 'Pinned Source (offline)',
+      }),
+    });
+    assert.equal(renamedResponse.status, 200);
+    const renamed = await renamedResponse.json();
+    assert.equal(renamed.source.recordRevision, 6);
+    assert.equal(renamed.source.displayName, 'Pinned Source (offline)');
+    assert.equal(renamed.source.status, 'DEGRADED');
+    assert.equal(renamed.source.lastErrorCode, 'SOURCE_NOT_FOUND');
   } finally {
     await close(instance);
   }
@@ -362,13 +464,91 @@ test('DEV-008 content governance APIs preserve lineage, evidence, rules, sources
     const disabledResponse = await fetch(`${restartedBase}/api/v1/sources/${encodeURIComponent(source.sourceId)}`, {
       method: 'PATCH',
       headers: { ...auth, 'idempotency-key': 'source-disable-1' },
-      body: JSON.stringify({ expectedRevision: 3, reason: 'Disable source after verification', enabled: false }),
+      body: JSON.stringify({ expectedRevision: 6, reason: 'Disable source after verification', enabled: false }),
     });
     assert.equal(disabledResponse.status, 200);
     const disabled = await disabledResponse.json();
     assert.equal(disabled.source.status, 'DISABLED');
     const filtered = await (await fetch(`${restartedBase}/api/v1/sources?status=DISABLED`)).json();
     assert.equal(filtered.items.length, 1);
+  } finally {
+    await close(restarted);
+    rmSync(projectRoot, { recursive: true, force: true });
+  }
+});
+
+test('legacy evaluations remain explicitly unbound when no contemporaneous rule is provable', async () => {
+  const projectRoot = mkdtempSync(join(tmpdir(), 'wp-legacy-evaluation-'));
+  const runtimeDir = join(projectRoot, '.runtime');
+  const now = '2026-09-04T12:00:00.000Z';
+  const first = createKnowledgeServer({
+    repositoryRoot: projectRoot, runtimeDir, clock: () => now,
+  });
+  const firstBase = await listen(first);
+  let evaluationId = '';
+  try {
+    const candidate = await first.composition.service.ingestCandidate({
+      moduleId: 'legacy-evaluation',
+      body: GOOD_BODY,
+      title: 'Legacy evaluation',
+      description: 'Migration fixture.',
+      category: 'governance',
+      tags: [],
+      provenance: [{ path: 'legacy/source.md', commit: 'legacy-commit', pinned: true }],
+    });
+    let run = first.composition.service.createRun(
+      'legacy-evaluation', first.composition.config.publicationGate.policyId,
+    );
+    run = first.composition.service.transition(run.runId, 'PLANNED');
+    run = first.composition.service.transition(run.runId, 'GENERATING');
+    run = first.composition.service.transition(run.runId, 'EVALUATING');
+    const evidence = await first.composition.artifacts.put(
+      Buffer.from('legacy evaluation evidence'), 'text/plain; charset=utf-8',
+    );
+    const evaluation = await first.composition.service.recordEvaluation({
+      runId: run.runId,
+      versionId: candidate.version.versionId,
+      evidenceRefs: [evidence],
+      toolchainFingerprint: 'legacy-toolchain',
+      criticalFailures: 0,
+      testsPassed: 1,
+      testsTotal: 1,
+      stability: 1,
+    }, first.composition.config.publicationGate);
+    evaluationId = evaluation.report.reportId;
+    assert.ok(firstBase);
+  } finally {
+    await close(first);
+  }
+
+  const database = new DatabaseSync(join(runtimeDir, 'registry.sqlite'));
+  try {
+    const row = database.prepare('SELECT report_json FROM evaluations WHERE report_id = ?')
+      .get(evaluationId) as { report_json: string };
+    const report = JSON.parse(row.report_json) as Record<string, unknown>;
+    const legacyCreatedAt = '2026-08-01T00:00:00.000Z';
+    report.createdAt = legacyCreatedAt;
+    database.prepare('UPDATE evaluations SET report_json = ?, created_at = ? WHERE report_id = ?')
+      .run(JSON.stringify(report), legacyCreatedAt, evaluationId);
+  } finally {
+    database.close();
+  }
+
+  const restarted = createKnowledgeServer({
+    repositoryRoot: projectRoot, runtimeDir, clock: () => now,
+  });
+  const base = await listen(restarted);
+  try {
+    const response = await fetch(`${base}/api/v1/evaluations/${encodeURIComponent(evaluationId)}`);
+    assert.equal(response.status, 200);
+    const detail = await response.json();
+    assert.equal(detail.ruleRef, null);
+    assert.deepEqual(detail.ruleBinding, {
+      status: 'UNBOUND', reasonCode: 'RULE_REVISION_NOT_PROVABLE',
+    });
+    assert.equal(restarted.composition.repository.database.prepare(
+      'SELECT COUNT(*) AS count FROM evaluation_rule_bindings WHERE report_id = ?',
+    ).get(evaluationId)?.count, 0);
   } finally {
     await close(restarted);
     rmSync(projectRoot, { recursive: true, force: true });

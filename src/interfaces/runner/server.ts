@@ -199,8 +199,25 @@ async function body(request: IncomingMessage): Promise<Record<string, unknown>> 
   return parsed as Record<string, unknown>;
 }
 
+function canonicalJson(value: unknown): string {
+  if (value === null || typeof value === 'boolean' || typeof value === 'string') {
+    return JSON.stringify(value);
+  }
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) throw new Error('PAYLOAD_INVALID: JSON number must be finite');
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value as Record<string, unknown>).sort().map((key) => (
+      `${JSON.stringify(key)}:${canonicalJson((value as Record<string, unknown>)[key])}`
+    )).join(',')}}`;
+  }
+  throw new Error('PAYLOAD_INVALID: command fingerprint requires JSON data');
+}
+
 function payloadFingerprint(value: unknown): string {
-  return createHash('sha256').update(JSON.stringify(value)).digest('hex');
+  return createHash('sha256').update(canonicalJson(value)).digest('hex');
 }
 
 function requireOnlyKeys(payload: Record<string, unknown>, allowed: readonly string[]): void {
@@ -243,6 +260,8 @@ export function createKnowledgeServer(input: {
   writeToken?: string;
   providerSettingsStore?: ProviderSettingsStore;
   providerEndpointPolicy?: ProviderEndpointPolicy;
+  sourceEndpointPolicy?: ProviderEndpointPolicy;
+  allowedSourceHosts?: string[];
   providerProbe?: ProviderConnectionProbe;
   operationalMetrics?: OperationalMetricsPort;
   componentChecks?: Partial<Record<'registry' | 'artifactStore' | 'workflow' | 'provider' | 'evaluator', () => Promise<void> | void>>;
@@ -713,7 +732,7 @@ export function createKnowledgeServer(input: {
         const payload = await body(request);
         const command = {
           idempotencyKey: key.trim(),
-          fingerprint: JSON.stringify({ method: request.method, path: url.pathname, payload }),
+          fingerprint: payloadFingerprint({ method: request.method, path: url.pathname, payload }),
           actor: 'local-admin',
         };
         if (request.method === 'PATCH' && ruleUpdate) {
@@ -825,7 +844,7 @@ export function createKnowledgeServer(input: {
           const action = regenerationCommand
             ? 'REGENERATE'
             : String(actionItemCommand?.[2]).toUpperCase() as 'ACKNOWLEDGE' | 'RESOLVE' | 'RETRY';
-          const fingerprint = JSON.stringify({ actionItemId, action, payload });
+          const fingerprint = payloadFingerprint({ actionItemId, action, payload });
           const previous = idempotencyResults.get(normalizedKey)
             ?? composition.apps.flywheel.getCommandReceipt('action-item', normalizedKey);
           if (previous && previous.fingerprint !== fingerprint) throw new Error('IDEMPOTENCY_CONFLICT: key reused with different command');
@@ -922,7 +941,7 @@ export function createKnowledgeServer(input: {
           if (!repositoryRoot) throw new Error('ARGUMENT_REQUIRED: repositoryRoot');
           const key = request.headers['idempotency-key'];
           if (typeof key !== 'string' || !key.trim()) throw new Error('IDEMPOTENCY_KEY_REQUIRED: Idempotency-Key');
-          const fingerprint = JSON.stringify(payload);
+          const fingerprint = payloadFingerprint(payload);
           const previous = idempotencyResults.get(key);
           if (previous && previous.fingerprint !== fingerprint) throw new Error('IDEMPOTENCY_CONFLICT: key reused with different payload');
           if (previous) {
@@ -952,7 +971,7 @@ export function createKnowledgeServer(input: {
           const runId = decodeURIComponent(runCommand[1] ?? '');
           const key = request.headers['idempotency-key'];
           if (typeof key !== 'string' || !key.trim()) throw new Error('IDEMPOTENCY_KEY_REQUIRED: Idempotency-Key');
-          const fingerprint = JSON.stringify({ runId, command: runCommand[2], payload });
+          const fingerprint = payloadFingerprint({ runId, command: runCommand[2], payload });
           const previous = idempotencyResults.get(key);
           if (previous && previous.fingerprint !== fingerprint) throw new Error('IDEMPOTENCY_CONFLICT: key reused with different command');
           if (previous) {

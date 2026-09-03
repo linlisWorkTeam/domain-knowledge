@@ -2,6 +2,7 @@
 
 - 状态：Accepted
 - 日期：2026-09-03
+- 修订：2026-09-04（DEV-007/008 增加运营与内容治理用例入口）
 
 ## 背景
 
@@ -9,13 +10,18 @@
 
 ## 决策
 
-Application 固定暴露五个用例入口：
+Application 固定暴露八个用例入口：
 
 - `Orchestrator`：启动、恢复、取消和查询知识飞轮工作流；
 - `FlywheelApp`：管理 Run、候选知识、发布和幂等节点操作；
 - `EvalRunnerApp`：提交评测证据并取得确定性 Gate 决策；
 - `KnowledgeSearchApp`：查询已登记的知识版本；
-- `KnowledgeDiscoveryApp`：发现尚未进入知识库的候选内容。
+- `KnowledgeDiscoveryApp`：发现尚未进入知识库的候选内容；
+- `ContentGovernanceApp`：协调知识血缘/差异、评测证据与规则、来源注册和知识健康读写用例；
+- `ProviderOperationsApp`：协调模型服务设置的脱敏读取、安全保存、验证和启用；
+- `OperationalMetricsApp`：按稳定窗口读取运行速度、调用用量和治理效果指标。
+
+后三个入口同样只能依赖 Domain/Port。它们不把来源访问、Provider SDK、秘密持有、SQLite 聚合或 HTTP 细节带入 Application，也不新增领域状态权威。
 
 Domain 固定暴露三个领域服务边界：
 

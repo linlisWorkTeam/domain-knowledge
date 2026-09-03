@@ -1,6 +1,6 @@
 # JSON Schema
 
-首版 Schema 使用 JSON Schema Draft 2020-12。文件名稳定，`$id` 使用 `https://wpknowledge.local/schemas/.../v1`；破坏性修改新建 v2，不原地改变 v1 语义。
+首版 Schema 使用 JSON Schema Draft 2020-12。文件名稳定，`$id` 使用 `https://wpknowledge.local/schemas/.../v1`。首个 Release 之前仍处于 Preview，同一原子变更可以同步修改 v1 Schema、生产者、消费者、fixture、迁移与测试；Release 之后，破坏性修改必须新建 v2，不得原地改变已发布的 v1 语义。
 
 跨文件 `$ref` 必须引用目标 Schema 的绝对 `$id`；校验器加载契约集时必须将本目录全部 Schema 注册到同一 registry，不能依赖当前工作目录碰巧解析相对文件名。Agent 命令和成功结果按 `agentType` 使用封闭的角色 payload，未知字段与角色不匹配均失败；失败结果统一使用 `error` payload。
 

@@ -21,7 +21,7 @@ domain-knowledge/
 `src/` 使用四层结构：
 
 - `domain/` 保存实体、状态与 Flywheel、EvalRunner、Association 领域服务，不依赖数据库或工作流 SDK；
-- `application/apps/` 保存 Orchestrator、Flywheel、EvalRunner、KnowledgeSearch、KnowledgeDiscovery 五个用例入口；`application/ports/` 和 `application/services/` 保存契约与内部协调服务；
+- `application/apps/` 保存 Orchestrator、Flywheel、EvalRunner、KnowledgeSearch、KnowledgeDiscovery、ContentGovernance、ProviderOperations、OperationalMetrics 八个用例入口；`application/ports/` 和 `application/services/` 保存契约与内部协调服务；
 - `infrastructure/` 实现 LangGraph、Agent、评测、CAS、SQLite、Redis 运行状态 Adapter 与来源扫描；
 - `interfaces/ui-api/` 是 UI/HTTP 正式入口，`interfaces/runner/` 和 `interfaces/dsh/` 提供 CLI、兼容入口与 DSH 接口。
 

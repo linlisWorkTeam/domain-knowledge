@@ -31,6 +31,7 @@ interface GraphDependencies {
   observer: WorkflowObserver;
   prompts: AgentPromptResolver;
   signalFor(runId: string): AbortSignal | undefined;
+  readyAtFor(runId: string, nodeId: string, iteration: number, fallback: string): string;
   clock(): string;
 }
 
@@ -41,12 +42,14 @@ function projection(
   attempt: number,
   status: WorkflowNodeProjection['status'],
   now: string,
+  readyAt: string,
   detail = '',
   error: string | null = null,
 ): WorkflowNodeProjection {
   return {
     runId: state.runId, nodeId, agentId, status, iteration: state.iteration, attempt,
     detail, error,
+    readyAt,
     startedAt: status === 'RUNNING' ? now : null,
     completedAt: status === 'COMPLETED' || status === 'FAILED' || status === 'CANCELLED' ? now : null,
     updatedAt: now,
@@ -77,7 +80,12 @@ function createNode(deps: GraphDependencies, nodeId: string) {
         : `${definition.basePrompt}${promptAddon ? `\n\nOperator prompt add-on:\n${promptAddon}` : ''}`
       : '';
     const startedAt = deps.clock();
-    deps.observer.record(projection(state, renderedNodeId, agentId, attempt, 'RUNNING', startedAt));
+    const readyAt = deps.readyAtFor(
+      state.runId, renderedNodeId, state.iteration, state.readyAt || startedAt,
+    );
+    deps.observer.record(projection(
+      state, renderedNodeId, agentId, attempt, 'RUNNING', startedAt, readyAt,
+    ));
     try {
       const result = await deps.executor.execute({
         runId: state.runId,
@@ -95,19 +103,22 @@ function createNode(deps: GraphDependencies, nodeId: string) {
       });
       const completedAt = deps.clock();
       deps.observer.record(projection(
-        state, renderedNodeId, agentId, attempt, 'COMPLETED', completedAt, result.detail,
+        state, renderedNodeId, agentId, attempt, 'COMPLETED', completedAt, readyAt, result.detail,
       ));
       return {
         executionStatus: 'RUNNING',
         currentNode: renderedNodeId,
         activeAgent: agentId,
         attempts: { [attemptKey]: attempt },
+        readyAt: completedAt,
         ...(result.context ? { context: result.context } : {}),
         ...(result.route ? { route: result.route } : {}),
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      deps.observer.record(projection(state, renderedNodeId, agentId, attempt, 'FAILED', deps.clock(), '', message));
+      deps.observer.record(projection(
+        state, renderedNodeId, agentId, attempt, 'FAILED', deps.clock(), readyAt, '', message,
+      ));
       throw error;
     }
   };

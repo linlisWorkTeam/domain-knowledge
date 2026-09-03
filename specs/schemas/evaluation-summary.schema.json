@@ -3,7 +3,23 @@
   "$id": "https://wpknowledge.local/schemas/evaluation-summary/v1",
   "title": "Evaluation Summary",
   "type": "object",
-  "required": ["evaluationId", "runId", "moduleId", "versionId", "status", "gate", "reasonCodes", "tests", "stability", "toolchainFingerprint", "ruleRef", "createdAt", "links"],
+  "allOf": [
+    {
+      "if": {
+        "required": ["ruleBinding"],
+        "properties": {
+          "ruleBinding": {
+            "type": "object",
+            "required": ["status"],
+            "properties": { "status": { "const": "BOUND" } }
+          }
+        }
+      },
+      "then": { "properties": { "ruleRef": { "type": "object" } } },
+      "else": { "properties": { "ruleRef": { "type": "null" } } }
+    }
+  ],
+  "required": ["evaluationId", "runId", "moduleId", "versionId", "status", "gate", "reasonCodes", "tests", "stability", "toolchainFingerprint", "ruleRef", "ruleBinding", "createdAt", "links"],
   "properties": {
     "evaluationId": { "type": "string", "minLength": 1 },
     "runId": { "type": "string", "minLength": 1 },
@@ -34,6 +50,28 @@
           "properties": {
             "ruleId": { "type": "string", "minLength": 1 },
             "revision": { "type": "integer", "minimum": 1 }
+          }
+        }
+      ]
+    },
+    "ruleBinding": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "reasonCode"],
+          "properties": {
+            "status": { "const": "BOUND" },
+            "reasonCode": { "const": "RULE_REVISION_BOUND" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "reasonCode"],
+          "properties": {
+            "status": { "const": "UNBOUND" },
+            "reasonCode": { "const": "RULE_REVISION_NOT_PROVABLE" }
           }
         }
       ]

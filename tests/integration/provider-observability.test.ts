@@ -94,6 +94,16 @@ test('Provider HTTP contract redacts credentials, persists idempotency, and acti
     assert.equal(replay.status, 200);
     assert.deepEqual(await replay.json(), savedPayload);
     assert.equal(store.value?.revision, 1);
+    const reorderedReplay = await fetch(`${base}/api/v1/provider-settings`, {
+      method: 'PUT', headers: { ...auth, 'idempotency-key': 'save-1' },
+      body: JSON.stringify({
+        expectedRevision: 0, model: 'model-a', apiKey: secret,
+        apiUrl: 'https://provider.example/v1', provider: 'pi-agent',
+      }),
+    });
+    assert.equal(reorderedReplay.status, 200);
+    assert.deepEqual(await reorderedReplay.json(), savedPayload);
+    assert.equal(store.value?.revision, 1);
     const conflict = await fetch(`${base}/api/v1/provider-settings`, {
       method: 'PUT', headers: { ...auth, 'idempotency-key': 'save-1' },
       body: JSON.stringify({ ...requestBody, model: 'model-b' }),

@@ -1,6 +1,6 @@
 # 用户用例与交互时序
 
-**状态：Accepted｜版本：1.1.1｜基线日期：2026-09-02**
+**状态：Accepted｜版本：1.2.0｜基线日期：2026-09-04**
 
 本文把需求、验收场景和用户入口连接成可执行的交互视图。时序图中的“必须 / 不得”具有规范性；具体能力是否已经落地，以[追踪矩阵](../13-verification/traceability-matrix.md)为准。
 
@@ -43,9 +43,9 @@
 - API Key 只能提交给服务端凭据边界，不得写入 URL、日志、浏览器本地存储、运行快照或普通配置查询响应；后续查询只返回“已配置”和脱敏提示。
 - API URL 必须经过协议、主机和重定向策略校验，防止任意内网探测；错误必须区分地址无效、鉴权失败、模型不可用和超时。
 - 有效配置启用后，新任务默认由 Pi Agent 工具执行。Pi Agent 仍受既有 Agent 契约、工具权限、工作区隔离、超时、审计和确定性 Gate 约束，不能获得发布权限或绕过评测。
-- 未配置、验证失败或凭据失效时，真实任务必须明确禁用或失败关闭；不得静默回退到演示 Provider 并伪装成功。
+- 已经冻结为 `pi-agent` 的批次在验证过期、配置不可用或恢复摘要不匹配时必须失败关闭，不得回退到演示 Provider。没有启用有效 Pi 配置的新批次使用部署时明确公开的 fallback Provider；默认 fixture 只用于本地验收，`GET /api/v1/system/capabilities` 必须如实标识，不能伪装为真实模型执行。
 
-### 计划接口
+### 已实现接口
 
 | 目的 | 接口 | 最小语义 |
 |---|---|---|
@@ -53,7 +53,7 @@
 | 保存配置 | `PUT /api/v1/provider-settings` | 接收 `provider=pi-agent`、API URL 和可选的新 API Key；需要管理员鉴权、幂等与审计。 |
 | 验证连接 | `POST /api/v1/provider-settings/verify` | 使用服务端持有的待验证或已保存凭据执行无副作用探测，返回分类结果。 |
 
-该用例属于后续交付，本阶段只建立产品与安全契约，不实现页面控件或接口。
+该用例已在 DEV-007 实现。保存配置不会自动启用；只有无副作用探测成功且操作者请求启用时，后续新批次才冻结 `pi-agent`、模型和非秘密参数摘要。已经冻结为 Pi 的批次在验证过期、设置变更或恢复摘要不匹配时失败关闭；尚未冻结 Pi 的新批次使用可见的部署 fallback。
 
 ## UC-KF-001：查询已验证知识并反馈
 
@@ -385,7 +385,7 @@ sequenceDiagram
     Registry-->>Console: 新 revision
 
     Operator->>Console: 启动固定 ohMyWorkPanel Run
-    Console->>API: POST /api/v1/run-commands/start
+    Console->>API: POST /api/v1/runs
     API->>Registry: 保存 RunConfigurationSnapshot + Prompt ArtifactRef
     API->>Graph: start(runId, fixed scenario + frozen configuration)
     loop 每个节点变化
@@ -413,15 +413,16 @@ sequenceDiagram
 ## 最终前台入口映射
 
 - UC-KF-001 通过“知识”页面完成 `VERIFIED` 查询、详情、provenance 与 feedback；“添加知识”调用 ingest 时必须描述为创建候选，不得描述为人工发布或直接策展为 `VERIFIED`。
-- UC-KF-003 通过“操作中心、飞轮批次、工作流图”呈现。操作中心当前只从批次状态与最新 GateDecision 派生批次级事项，不承诺独立问题实体、严重级别或关闭生命周期。
+- UC-KF-003 通过“操作中心、飞轮批次、工作流图”呈现。操作中心读取持久化事项、严重级别、允许动作和审计历史；运行、Gate、组件和来源事实按确定性规则投影，安全事实仍随后续完整权限审计补齐。
 - UC-KF-006 通过“Agent 设置”和批次工作台呈现，固定契约与可编辑的 `promptAddon` 必须分区，WorkflowNodeProjection 与 FlywheelRun 状态必须分开标注。
-- “来源”页面只读取 `GET /api/v1/sources/scan` 的来源候选；它不是持久化来源注册，来源刷新、漂移治理和删除语义等待后续接口。
-- 产品 UI 不得调用 `/api/v1/transition`、`/api/v1/evaluate` 或 `/api/v1/publish` 模拟自动工作流。Graph 必须使用 Registry 中的真实节点投影；未实现的 Health、Activity、ETA 和 Action Item 能力必须隐藏或明确标记为尚未接入，不能回退到演示数据。
+- “来源”页面默认读取持久化来源注册，并支持创建、启停、更新和刷新；`GET /api/v1/sources/scan` 只有在用户明确扫描时作为候选辅助视图，不得覆盖注册事实。Preview 不提供删除语义。
+- 产品 UI 不得调用 `/api/v1/transition`、`/api/v1/evaluate` 或 `/api/v1/publish` 模拟自动工作流。Graph 必须使用注册中的真实节点投影；Health、Activity、Action Item、血缘、差异、评测、来源和 Provider 能力均读取服务端事实，无样本时显示 Empty/Partial/`—`。ETA 仍未实现，不能由浏览器猜测。
 
 ## 当前实现边界
 
 - UC-KF-001、UC-KF-002 的核心存储、查询、评测录入和发布路径已实现；通用评测的进程执行仍由独立受信评测器负责。
-- UC-KF-003 的状态、Correction 薄切片、增量修订、fresh 再生成和 PASS 后发布已由内嵌 LangGraph 在固定场景自动编排；通用候选的 CLI 仍支持人工逐步治理。自动 historical-best `ROLLBACK`、真实 AgentProvider 和生产沙箱仍按追踪矩阵标为 `Partial` 或 `Planned`。
+- UC-KF-003 的状态、Correction 薄切片、增量修订、fresh 再生成和 PASS 后发布已由内嵌 LangGraph 在固定场景自动编排；通用候选的 CLI 仍支持人工逐步治理。自动 historical-best `ROLLBACK` 和生产沙箱仍按追踪矩阵标为 `Partial` 或 `Planned`。
 - UC-KF-004 已以确定性 Scenario Agent 和受信 ProjectEvaluator 实现，不得外推为真实 GLM 质量或敌对代码隔离证明。
 - UC-KF-005 已实现为兼容门面，且不拥有发布能力。
 - UC-KF-006 已实现固定 Agent 目录、提示词 revision/audit、工作流节点投影和 Console 页面；它不允许可变拓扑或替换节点契约。
+- UC-KF-007 已实现安全配置、脱敏读取、无副作用验证、默认 Pi Agent 批次快照和运营指标；自动化使用本地模拟的 OpenAI-compatible 上游验证真实 Pi SDK 执行路径，实际外部凭据仍由部署者在本地人工验收。

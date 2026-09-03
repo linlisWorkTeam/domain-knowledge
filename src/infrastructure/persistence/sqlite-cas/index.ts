@@ -16,6 +16,9 @@ import type {
   AgentId, AgentPromptConfiguration, ArtifactStore, CandidateInput, FlywheelRepository,
   NodeCheckpoint, RunConfigurationSnapshot, WorkflowNodeProjection,
 } from '../../../application/ports/index.ts';
+import {
+  projectActionItemObservation, type ActionItemObservation,
+} from '../sqlite-action-items.ts';
 
 function json(value: unknown): string {
   return JSON.stringify(value);
@@ -243,6 +246,7 @@ export class SQLiteFlywheelRepository implements FlywheelRepository {
         attempt INTEGER NOT NULL,
         detail TEXT NOT NULL,
         error TEXT,
+        ready_at TEXT,
         started_at TEXT,
         completed_at TEXT,
         updated_at TEXT NOT NULL,
@@ -323,6 +327,14 @@ export class SQLiteFlywheelRepository implements FlywheelRepository {
     if (!historyColumns.some((column) => String(column.name) === 'actor')) {
       this.database.exec("ALTER TABLE action_item_history ADD COLUMN actor TEXT NOT NULL DEFAULT 'local-admin'");
     }
+    const workflowNodeColumns = this.database.prepare(
+      'PRAGMA table_info(workflow_node_projections)',
+    ).all() as Record<string, unknown>[];
+    if (!workflowNodeColumns.some((column) => String(column.name) === 'ready_at')) {
+      // Historical rows cannot be assigned a truthful scheduler-ready time, so
+      // the nullable column is intentionally not backfilled.
+      this.database.exec('ALTER TABLE workflow_node_projections ADD COLUMN ready_at TEXT');
+    }
     this.database.exec(`
       UPDATE events SET event_seq = rowid WHERE event_seq IS NULL;
       CREATE UNIQUE INDEX IF NOT EXISTS events_run_seq ON events(run_id, event_seq);
@@ -330,6 +342,7 @@ export class SQLiteFlywheelRepository implements FlywheelRepository {
       INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (3, datetime('now'));
       INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (4, datetime('now'));
       INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (5, datetime('now'));
+      INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (6, datetime('now'));
     `);
   }
 
@@ -487,11 +500,11 @@ export class SQLiteFlywheelRepository implements FlywheelRepository {
   }
 
   private projectActionItem(event: DomainEvent): void {
-    let type: string | null = null;
-    let severity = 'HIGH';
+    let type: ActionItemObservation['type'] | null = null;
+    let severity: ActionItemObservation['severity'] = 'HIGH';
     let reasonCode = '';
     let summary = '';
-    let allowedActions: string[] = [];
+    let allowedActions: ActionItemObservation['allowedActions'] = [];
     if (event.eventType === 'RunStateChanged' && event.payload.to === 'FAILED') {
       type = 'RUN_FAILED';
       reasonCode = String(event.payload.reasonCode ?? 'RUN_FAILED');
@@ -516,34 +529,17 @@ export class SQLiteFlywheelRepository implements FlywheelRepository {
       allowedActions = ['ACKNOWLEDGE', 'RESOLVE', 'RETRY'];
     }
     if (!type) return;
-    const fingerprint = `sha256:${sha256(`${type}\0RUN\0${event.runId}\0${reasonCode}`)}`;
-    const actionItemId = `ai_${sha256(`${fingerprint}\0${event.eventId}`).slice(0, 24)}`;
-    const previous = this.database.prepare(`
-      SELECT action_item_id FROM action_items
-      WHERE fingerprint = ? AND status = 'RESOLVED'
-      ORDER BY resolved_at DESC, action_item_id DESC LIMIT 1
-    `).get(fingerprint) as Record<string, unknown> | undefined;
-    this.database.prepare(`
-      INSERT INTO action_items(
-        action_item_id, type, severity, status, subject_kind, subject_id, run_id,
-        reason_code, summary, source_event_id, fingerprint, allowed_actions_json,
-        revision, created_at, updated_at, resolved_at, resolution_json, previous_occurrence_id
-      ) VALUES (?, ?, ?, 'OPEN', 'RUN', ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, NULL, NULL, ?)
-      ON CONFLICT DO NOTHING
-    `).run(
-      actionItemId, type, severity, event.runId, event.runId, reasonCode, summary,
-      event.eventId, fingerprint, json(allowedActions), event.occurredAt, event.occurredAt,
-      previous ? String(previous.action_item_id) : null,
-    );
-    const active = this.database.prepare(`
-      SELECT action_item_id FROM action_items WHERE fingerprint = ? AND status <> 'RESOLVED'
-    `).get(fingerprint) as Record<string, unknown> | undefined;
-    if (active) {
-      this.database.prepare(`
-        INSERT OR IGNORE INTO action_item_sources(action_item_id, event_id, observed_at)
-        VALUES (?, ?, ?)
-      `).run(String(active.action_item_id), event.eventId, event.occurredAt);
-    }
+    projectActionItemObservation(this.database, {
+      type,
+      severity,
+      subject: { kind: 'RUN', id: event.runId },
+      runId: event.runId,
+      reasonCode,
+      summary,
+      eventId: event.eventId,
+      occurredAt: event.occurredAt,
+      allowedActions,
+    });
   }
 
   saveRun(run: FlywheelRun, event: DomainEvent): void {
@@ -875,13 +871,14 @@ export class SQLiteFlywheelRepository implements FlywheelRepository {
       this.database.prepare(`
         INSERT INTO workflow_node_projections(
           run_id, node_id, agent_id, status, iteration, attempt, detail,
-          error, started_at, completed_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          error, ready_at, started_at, completed_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(run_id, node_id, iteration, attempt) DO UPDATE SET
           agent_id = excluded.agent_id,
           status = excluded.status,
           detail = excluded.detail,
           error = excluded.error,
+          ready_at = COALESCE(workflow_node_projections.ready_at, excluded.ready_at),
           started_at = COALESCE(workflow_node_projections.started_at, excluded.started_at),
           completed_at = excluded.completed_at,
           updated_at = excluded.updated_at
@@ -894,6 +891,7 @@ export class SQLiteFlywheelRepository implements FlywheelRepository {
         projection.attempt,
         projection.detail,
         projection.error,
+        projection.readyAt,
         projection.startedAt,
         projection.completedAt,
         projection.updatedAt,
@@ -920,6 +918,7 @@ export class SQLiteFlywheelRepository implements FlywheelRepository {
       attempt: Number(row.attempt),
       detail: String(row.detail),
       error: row.error === null ? null : String(row.error),
+      readyAt: row.ready_at === null ? null : String(row.ready_at),
       startedAt: row.started_at === null ? null : String(row.started_at),
       completedAt: row.completed_at === null ? null : String(row.completed_at),
       updatedAt: String(row.updated_at),

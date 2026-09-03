@@ -163,6 +163,25 @@ function validateSupporting(): void {
   const invalid = clone(event) as unknown as Record<string, unknown>;
   delete invalid.causationId;
   expectInvalid('event.schema.json', invalid, 'event causation is required');
+  validate('action-item.schema.json', {
+    actionItemId: `ai_${'a'.repeat(24)}`,
+    type: 'SOURCE_DRIFT',
+    severity: 'MEDIUM',
+    status: 'OPEN',
+    subject: { kind: 'SOURCE', id: `src_${'b'.repeat(24)}` },
+    runId: null,
+    reasonCode: 'SOURCE_REVISION_DRIFT',
+    summary: '来源内容与固定版本不一致，需要人工复核',
+    sourceEventId: `audit_${'c'.repeat(24)}`,
+    fingerprint: `sha256:${'d'.repeat(64)}`,
+    allowedActions: ['ACKNOWLEDGE', 'RESOLVE'],
+    revision: 1,
+    createdAt: '2026-09-04T00:00:00Z',
+    updatedAt: '2026-09-04T00:00:00Z',
+    resolvedAt: null,
+    resolution: null,
+    previousOccurrenceId: null,
+  });
 }
 
 function validateContentGovernance(): void {
@@ -202,8 +221,22 @@ function validateContentGovernance(): void {
     status: 'PASSED', gate: 'PASS', reasonCodes: ['ALL_DETERMINISTIC_GATES_PASSED'],
     tests: { passed: 2, total: 2, criticalFailures: 0 }, stability: 1,
     toolchainFingerprint: 'node-22', ruleRef: { ruleId: 'publication-gate', revision: 1 },
+    ruleBinding: { status: 'BOUND', reasonCode: 'RULE_REVISION_BOUND' },
     createdAt: '2026-09-04T00:00:00Z', links: {},
   });
+  const legacyEvaluation = {
+    evaluationId: 'legacy-evaluation-1', runId: 'legacy-run-1', moduleId: 'content', versionId: 'kv-content-1',
+    status: 'FAILED', gate: 'ITERATE', reasonCodes: ['QUALITY_THRESHOLD_NOT_MET'],
+    tests: { passed: 1, total: 2, criticalFailures: 0 }, stability: 0.5,
+    toolchainFingerprint: 'legacy-toolchain', ruleRef: null,
+    ruleBinding: { status: 'UNBOUND', reasonCode: 'RULE_REVISION_NOT_PROVABLE' },
+    createdAt: '2026-08-01T00:00:00Z', links: {},
+  };
+  validate('evaluation-summary.schema.json', legacyEvaluation);
+  expectInvalid('evaluation-summary.schema.json', {
+    ...legacyEvaluation,
+    ruleBinding: { status: 'BOUND', reasonCode: 'RULE_REVISION_BOUND' },
+  }, 'bound evaluation must identify its immutable rule revision');
   validate('evaluation-rule.schema.json', {
     ruleId: 'publication-gate', revision: 1, scope: { kind: 'GLOBAL' },
     config: { policyId: 'local-v1', minimumStability: 1, requireAllTests: true, maxIterations: 3 },

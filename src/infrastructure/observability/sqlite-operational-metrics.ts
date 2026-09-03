@@ -22,7 +22,7 @@ interface NodeSample {
   runId: string;
   agentId: string;
   durationMs: number;
-  queueDurationMs: number;
+  queueDurationMs: number | null;
   attempt: number;
 }
 
@@ -175,6 +175,10 @@ export class SQLiteOperationalMetrics implements OperationalMetricsPort {
     });
     const tokenSamples = invocations.filter((record) => record.inputTokens !== null && record.outputTokens !== null);
     const costSamples = invocations.filter((record) => record.estimatedCostUsd !== null);
+    const queueDurations = nodes.flatMap((node) => (
+      node.queueDurationMs === null ? [] : [node.queueDurationMs]
+    ));
+    const workflowRetries = nodes.filter((node) => node.attempt > 1).length;
     const providers = new Map<string, typeof invocations>();
     for (const invocation of invocations) {
       const key = `${invocation.provider}\0${invocation.model}`;
@@ -195,19 +199,24 @@ export class SQLiteOperationalMetrics implements OperationalMetricsPort {
       definitions: {
         runDurationMs: 'terminal run updatedAt minus createdAt',
         nodeDurationMs: 'completedAt minus startedAt for completed or failed node attempts',
-        queueDurationMs: 'node start minus the most recent completed work in the same run, or run creation for the first node',
+        queueDurationMs: 'node startedAt minus the scheduler-recorded readyAt for the same attempt; legacy rows without readyAt are excluded',
+        providerRetries: 'additional Provider attempts after an invalid model response; independent of workflow node recovery attempts',
+        workflowNodeRetries: 'workflow node attempts whose persisted attempt number is greater than one',
         estimatedCostUsd: 'reported Provider usage multiplied by configured model pricing; unavailable when pricing is unknown',
       },
       runDurationMs: distribution(runDurations),
       nodeDurationMs: distribution(nodes.map((node) => node.durationMs)),
-      queueDurationMs: distribution(nodes.map((node) => node.queueDurationMs)),
+      queueDurationMs: distribution(queueDurations),
       providerCalls: {
         sampleSize: invocations.length,
         total: invocations.length,
         succeeded: invocations.filter((record) => record.status === 'SUCCEEDED').length,
         failed: invocations.filter((record) => record.status === 'FAILED').length,
-        retries: invocations.reduce((sum, record) => sum + record.retryCount, 0)
-          + nodes.filter((node) => node.attempt > 1).length,
+        retries: invocations.reduce((sum, record) => sum + record.retryCount, 0),
+      },
+      workflowNodeRetries: {
+        sampleSize: nodes.length,
+        total: workflowRetries,
       },
       tokens: {
         sampleSize: tokenSamples.length,
@@ -233,10 +242,12 @@ export class SQLiteOperationalMetrics implements OperationalMetricsPort {
             agentId,
             sampleSize: samples.length,
             durationMs: distribution(samples.map((sample) => sample.durationMs)),
-            queueDurationMs: distribution(samples.map((sample) => sample.queueDurationMs)),
+            queueDurationMs: distribution(samples.flatMap((sample) => (
+              sample.queueDurationMs === null ? [] : [sample.queueDurationMs]
+            ))),
             calls: calls.length,
-            retries: calls.reduce((sum, record) => sum + record.retryCount, 0)
-              + samples.filter((sample) => sample.attempt > 1).length,
+            providerRetries: calls.reduce((sum, record) => sum + record.retryCount, 0),
+            workflowRetries: samples.filter((sample) => sample.attempt > 1).length,
             tokens: usage.length ? usage.reduce((sum, record) => sum
               + Number(record.inputTokens) + Number(record.outputTokens)
               + Number(record.cacheReadTokens ?? 0) + Number(record.cacheWriteTokens ?? 0), 0) : null,
@@ -395,29 +406,23 @@ export class SQLiteOperationalMetrics implements OperationalMetricsPort {
   }
 
   private nodeSamples(from: string): NodeSample[] {
-    const runRows = this.database.prepare(`
-      SELECT run_id, created_at FROM runs WHERE updated_at >= ?
-    `).all(from) as Record<string, unknown>[];
-    const runCreated = new Map(runRows.map((row) => [String(row.run_id), safeTimestamp(row.created_at)]));
     const rows = this.database.prepare(`
-      SELECT run_id, agent_id, started_at, completed_at, attempt
+      SELECT run_id, agent_id, ready_at, started_at, completed_at, attempt
       FROM workflow_node_projections
       WHERE started_at >= ? AND completed_at IS NOT NULL AND agent_id IS NOT NULL
       ORDER BY run_id, started_at, node_id, attempt
     `).all(from) as Record<string, unknown>[];
-    const previousCompletion = new Map<string, number>();
     return rows.flatMap((row) => {
       const runId = String(row.run_id);
+      const ready = row.ready_at === null ? null : safeTimestamp(row.ready_at);
       const started = safeTimestamp(row.started_at);
       const completed = safeTimestamp(row.completed_at);
       if (started === null || completed === null || completed < started) return [];
-      const eligibleAt = previousCompletion.get(runId) ?? runCreated.get(runId) ?? started;
-      previousCompletion.set(runId, Math.max(previousCompletion.get(runId) ?? 0, completed));
       return [{
         runId,
         agentId: String(row.agent_id),
         durationMs: completed - started,
-        queueDurationMs: Math.max(0, started - eligibleAt),
+        queueDurationMs: ready === null || ready > started ? null : started - ready,
         attempt: Number(row.attempt),
       }];
     });

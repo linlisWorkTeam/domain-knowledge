@@ -9,8 +9,7 @@ import {
 } from '@earendil-works/pi-coding-agent';
 import { streamSimple as streamOpenAiCompatible } from '@earendil-works/pi-ai/api/openai-completions';
 import type { Api, Context, Model, SimpleStreamOptions } from '@earendil-works/pi-ai';
-import { Agent as UndiciAgent, fetch as undiciFetch } from 'undici';
-import { isIP } from 'node:net';
+import { fetch as undiciFetch } from 'undici';
 import type {
   AgentProvider,
   AgentRequest,
@@ -20,6 +19,7 @@ import type {
   ProviderSettingsRecord,
 } from '../../../application/ports/index.ts';
 import { PublicHttpsEndpointPolicy } from './provider-security.ts';
+import { createPinnedHttpsDispatcher } from '../../security/public-https.ts';
 
 export { EncryptedFileProviderSettingsStore, isPublicAddress, OpenAiCompatibleProviderProbe, PublicHttpsEndpointPolicy } from './provider-security.ts';
 
@@ -35,6 +35,7 @@ interface PiAgentProviderOptions {
   settings: ProviderSettingsRecord;
   agentDir: string;
   maxTokens?: number;
+  maxSchemaAttempts?: number;
   contextWindow?: number;
   clock?: () => Date;
   endpointPolicy?: ProviderEndpointPolicy;
@@ -45,22 +46,7 @@ function pinnedProviderTransport(endpoint: ProviderEndpoint): {
   fetch: typeof globalThis.fetch;
   close: () => Promise<void>;
 } {
-  const approved = new Set(endpoint.addresses);
-  const pinnedAddress = endpoint.addresses[0];
-  if (!pinnedAddress) throw new Error('PROVIDER_URL_UNREACHABLE: approved endpoint has no address');
-  const dispatcher = new UndiciAgent({
-    maxResponseSize: 2 * 1024 * 1024,
-    autoSelectFamily: false,
-    connect: {
-      lookup: (_hostname, _options, callback) => {
-        if (!approved.has(pinnedAddress)) {
-          callback(new Error('PROVIDER_URL_DENIED'), '', 0);
-          return;
-        }
-        callback(null, pinnedAddress, isIP(pinnedAddress));
-      },
-    },
-  });
+  const dispatcher = createPinnedHttpsDispatcher(endpoint);
   const basePath = endpoint.url.pathname.endsWith('/')
     ? endpoint.url.pathname : `${endpoint.url.pathname}/`;
   const providerFetch: typeof globalThis.fetch = async (input, init) => {
@@ -147,7 +133,7 @@ function lastAssistantText(messages: unknown[]): string {
   const assistant = [...messages].reverse().find((message) => (
     message && typeof message === 'object' && (message as { role?: unknown }).role === 'assistant'
   )) as { content?: unknown[]; errorMessage?: unknown } | undefined;
-  if (!assistant) throw new Error('PI_AGENT_EMPTY_RESPONSE');
+  if (!assistant) throw new Error('AGENT_OUTPUT_INVALID: missing assistant response');
   if (typeof assistant.errorMessage === 'string' && assistant.errorMessage) {
     throw new Error('PI_AGENT_PROVIDER_FAILED');
   }
@@ -157,7 +143,7 @@ function lastAssistantText(messages: unknown[]): string {
       && typeof (content as { text?: unknown }).text === 'string'
       ? [(content as { text: string }).text] : []
   )).join('');
-  if (!text.trim()) throw new Error('PI_AGENT_EMPTY_RESPONSE');
+  if (!text.trim()) throw new Error('AGENT_OUTPUT_INVALID: empty assistant response');
   return text;
 }
 
@@ -171,6 +157,7 @@ export class PiCodingAgentProvider implements AgentProvider {
   readonly model: string;
   readonly agentDir: string;
   readonly maxTokens: number;
+  readonly maxSchemaAttempts: number;
   readonly contextWindow: number;
   readonly clock: () => Date;
   readonly endpointPolicy: ProviderEndpointPolicy;
@@ -183,6 +170,11 @@ export class PiCodingAgentProvider implements AgentProvider {
     this.model = options.settings.model;
     this.agentDir = options.agentDir;
     this.maxTokens = options.maxTokens ?? 32_768;
+    this.maxSchemaAttempts = options.maxSchemaAttempts ?? 2;
+    if (!Number.isSafeInteger(this.maxSchemaAttempts)
+      || this.maxSchemaAttempts < 1 || this.maxSchemaAttempts > 3) {
+      throw new Error('PI_AGENT_MAX_SCHEMA_ATTEMPTS_INVALID');
+    }
     this.contextWindow = options.contextWindow ?? 128_000;
     this.clock = options.clock ?? (() => new Date());
     this.endpointPolicy = options.endpointPolicy ?? new PublicHttpsEndpointPolicy();
@@ -190,6 +182,25 @@ export class PiCodingAgentProvider implements AgentProvider {
   }
 
   async run(request: AgentRequest, signal?: AbortSignal): Promise<Record<string, unknown>> {
+    let lastError: unknown;
+    for (let providerAttempt = 1; providerAttempt <= this.maxSchemaAttempts; providerAttempt += 1) {
+      try {
+        return await this.runAttempt(request, signal, providerAttempt);
+      } catch (error) {
+        lastError = error;
+        const code = error instanceof Error ? error.message.split(':', 1)[0] : '';
+        if (code !== 'AGENT_OUTPUT_INVALID'
+          || signal?.aborted || providerAttempt === this.maxSchemaAttempts) throw error;
+      }
+    }
+    throw lastError;
+  }
+
+  private async runAttempt(
+    request: AgentRequest,
+    signal: AbortSignal | undefined,
+    providerAttempt: number,
+  ): Promise<Record<string, unknown>> {
     if (signal?.aborted) throw new Error('AGENT_CANCELLED');
     const started = this.clock();
     let status: ProviderInvocationRecord['status'] = 'FAILED';
@@ -291,7 +302,9 @@ export class PiCodingAgentProvider implements AgentProvider {
         completedAt: completed.toISOString(),
         durationMs: Math.max(0, completed.getTime() - started.getTime()),
         status,
-        retryCount: 0,
+        // One row represents one Provider attempt. This flag therefore counts
+        // retry attempts without summing 0+1+2 for a three-attempt request.
+        retryCount: providerAttempt > 1 ? 1 : 0,
         inputTokens: stats?.tokens.input ?? null,
         outputTokens: stats?.tokens.output ?? null,
         cacheReadTokens: stats?.tokens.cacheRead ?? null,

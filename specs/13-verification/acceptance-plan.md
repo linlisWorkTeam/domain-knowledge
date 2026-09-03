@@ -29,7 +29,7 @@
 | AC-ARCH-001 | Given 替代假 Provider/Store/Workflow Adapter，When 跑契约套件，Then Domain/Application 不变且测试通过。 |
 | AC-ARCH-002 | Given 内嵌 domain-knowledge LangGraph runtime，When 扫描依赖并执行图，Then SDK 只存在于 infrastructure，且 Run、知识、评测和发布事实只写 Knowledge Registry。 |
 | AC-ARCH-003 | Given 两个仓库的默认分支，When 检查目录和入口，Then domain-knowledge 拥有唯一运行时、Spec、测试与前台，wpKnowledge 只含知识内容和仓库说明。 |
-| AC-ARCH-004 | Given uiApi、五个 Application App 和三个 Domain Service，When 扫描依赖与组合根，Then UI 只调用 App、App 只依赖 Domain/Port、Domain 不导入 SDK/数据库，七个 Agent 节点保持完整，Redis 边界不成为第二业务事实源。 |
+| AC-ARCH-004 | Given uiApi、八个 Application App 和三个 Domain Service，When 扫描依赖与组合根，Then UI 只调用 App、App 只依赖 Domain/Port、Domain 不导入 SDK/数据库，七个 Agent 节点保持完整，Provider 设置、指标与 Redis 边界不成为第二业务事实源。 |
 | AC-OBS-002 | Given 一个自动 Run，When LangGraph 节点开始、完成或失败，Then Console 可按 runId 读取节点、角色、轮次、尝试和时间投影，且不读取 graph checkpoint。 |
 | AC-OBS-003 | Given 一个成功或失败的自动 Run，When 执行 `workflow-report --run`，Then 报告按 runId 导出 Registry 事实、脱敏 Agent 摘要并逐一校验引用的 CAS Artifact，且注入审计文件的 Prompt/凭据字段不会出现在报告中。 |
 | AC-AGENT-003 | Given 七个固定 Agent，When 查看和修改配置，Then 全部契约可查，只有受信操作者能改 `promptAddon`，任何职责、Schema、拓扑、输入输出或工具字段均拒绝。 |
@@ -64,13 +64,13 @@
 
 UI 验收场景的规范正文以[前台产品设计的 AC-UI 场景](../04-product/frontend-product-design.md#121-验收场景)为准，本节只定义发布门，避免复制场景后产生漂移。当前 F2 七页 UI/UX 的 HCP-1 结论为 `Accepted`，F1 八入口结构已经失效。
 
-- 操作中心指标和治理条目必须来自 `/api/v1/status`、`/api/v1/runs` 及其最新 GateDecision；不得出现原型演示值。
+- 操作中心指标和治理条目必须来自 `/api/v1/system/status`、`/api/v1/runs`、`/api/v1/action-items`、`/api/v1/activity`、`/api/v1/system/components` 与 `/api/v1/knowledge/health`；不得出现原型演示值。
 - 批次工作台必须区分 FlywheelRun 业务状态和 WorkflowNodeProjection 执行状态，Evaluation 和 Gate 数据从批次 snapshot 读取。
-- Knowledge 查询、详情、状态、quality、provenance 和 feedback 使用现有 API；`CANDIDATE` 不得显示为已发布。
+- Knowledge 查询、详情、状态、quality、provenance、feedback、lineage 和 diff 使用规范 API；`CANDIDATE` 不得显示为已发布。
 - 无 token、错误 token、有效 token 和写 API 未配置必须呈现不同状态，治理 token 只能驻留页面内存。
 - 深浅主题、键盘导航、Drawer 焦点、Escape 关闭、焦点恢复、200% 缩放和移动端核心读取路径必须通过浏览器契约验证。
 - 页面不得加载第三方字体、脚本或样式，不得因视觉改版放宽 Content Security Policy。
-- API 空结果、部分失败和完全失败必须进入 Empty、Partial 或 Error 状态，不得回退到模拟 Health、ETA、Graph、Action Item、Activity、Workspace 或用户身份。
+- API 空结果、部分失败和完全失败必须进入 Empty、Partial 或 Error 状态，不得回退到模拟 Health、ETA、Graph、Action Item、Activity、Workspace 或用户身份；已实现的 Health、Action Item 与 Activity 必须显示服务端口径和采样信息。
 - 浏览器契约入口为 `npm run test:ui`，使用临时 Registry 和 Chromium 验证上述前台门禁，不复用开发者正在运行的工作目录或服务数据。
 
 ## Preview HTTP API 迁移验收门
@@ -90,7 +90,7 @@ UI 验收场景的规范正文以[前台产品设计的 AC-UI 场景](../04-prod
 F2 可访问环境和 B1 API 迁移 diff 都已准备后、B2/B3 前台接线开始前，产品用户必须完成一次人工检查：
 
 - 七个最终页面均可导航，桌面、移动端、深色和浅色主路径可验收；
-- 操作中心的治理入口、飞轮批次的业务/执行状态、知识预览、评测/来源的 Partial 边界和 Agent 设置的可编辑范围表达正确；
+- 操作中心的治理入口、飞轮批次的业务/执行状态、知识血缘/差异、评测/来源真实读写边界和 Agent 设置的可编辑范围表达正确；
 - 工作流图展示所选批次的真实固定 Agent 拓扑与节点投影，不是 Knowledge Graph，不读取 checkpoint，也没有编辑拓扑或人工推进节点的控件；
 - Graph 的七个 Agent 节点必须以七条有向边连接，完成、运行、失败和未开始状态具备一致图例；当前路径由 WorkflowNodeProjection 映射，不嵌入 LangGraph Studio 或引入第二套运行事实源；
 - 每个动态区域都能指出服务端 API、公开派生规则或明确未接状态，任何失败路径都不回退到演示数据；

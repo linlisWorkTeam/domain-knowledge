@@ -137,6 +137,21 @@ Console 提供“操作中心、飞轮批次、知识、工作流图、评测、
 
 Agent 元数据来自 `GET /api/v1/agents`。浏览器默认只读，操作员 token 仅保存在当前页面内存。持有 token 后，前台可以启动固定 ohMyWorkPanel 工作流和编辑 `promptAddon`；它不会通过串接原始状态迁移来模拟编排，也不能修改图契约。
 
+### 模型服务与 Pi Agent
+
+在治理模式打开“Agent 设置”，依次保存 API 地址、API Key 和模型，再执行“验证并启用”。对应接口为：
+
+- `GET /api/v1/agents/providers/status` 与 `GET /api/v1/provider-settings`：只读脱敏状态；
+- `PUT /api/v1/provider-settings`：要求 Bearer token、`Idempotency-Key` 和 `expectedRevision`；
+- `POST /api/v1/provider-settings/verify`：重新校验地址并调用无生成副作用的模型列表接口；
+- `GET /api/v1/metrics/runs` 与 `GET /api/v1/metrics/governance`：读取带样本量和口径的运营指标。
+
+模型地址只允许公开 HTTPS，拒绝本机、私网、混合 DNS、URL 凭据、查询、fragment 和重定向。配置使用 AES-256-GCM 保存在 `$WP_FLYWHEEL_HOME/secrets/provider-settings.enc`，独立 32 字节密钥在同目录，非 Windows 系统权限均为 `0600`。这只是 Preview 的本机秘密持有，不等同于企业 KMS；备份时应把这两个文件作为秘密处理。验证 24 小时后过期，保存新配置会立即禁用旧验证。只有处于已启用且验证有效状态的配置才会让后续新批次冻结 `pi-agent`、模型和非秘密摘要；已经冻结为 Pi 的批次在配置过期、不可用或恢复快照不一致时失败关闭，不会退回 fixture。没有启用有效 Pi 配置时，新批次继续使用启动时明确公布在 `GET /api/v1/system/capabilities` 中的 Provider；默认 fixture 仅用于可重复的本地验收，不代表真实模型执行。
+
+`WP_PI_MAX_SCHEMA_ATTEMPTS` 控制空输出或 Schema 不合法输出的总尝试次数，默认 `2`，范围 `1..3`。每次尝试都创建新会话并记录独立的脱敏调用事实。模型调用重试与工作流节点恢复是两项不同指标。Provider 设置文件与 SQLite 命令回执目前不共享事务：正常重放有幂等回执，但若进程恰好在加密文件提交后、回执写入前崩溃，重放会因 revision 冲突失败；DEV-012 将验证并收口该恢复窗口。
+
+来源注册的 `FILE` locator 只能位于配置的 acquisition roots；远程 `HTTPS` host 必须列入 `WP_SOURCE_ALLOWED_HOSTS`，凭据仅可使用 `secret://env/<变量名>` 引用。刷新发现内容变更时保留固定 revision 并标记漂移，不会自动把新内容发布为知识。
+
 稳定的本地 API 前缀是 `/api/v1`，进程探针 `/health` 不加版本。
 
 ## DSH

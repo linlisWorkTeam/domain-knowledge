@@ -310,6 +310,7 @@ export class ConsoleReadModel {
       attempt: Number(row.attempt),
       detail: String(row.detail),
       error: row.error === null ? null : String(row.error),
+      readyAt: row.ready_at === null ? null : String(row.ready_at),
       startedAt: row.started_at === null ? null : String(row.started_at),
       completedAt: row.completed_at === null ? null : String(row.completed_at),
       updatedAt: String(row.updated_at),

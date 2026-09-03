@@ -518,6 +518,8 @@ export interface WorkflowNodeProjection {
   attempt: number;
   detail: string;
   error: string | null;
+  /** Time at which the scheduler proved the node eligible for this attempt. */
+  readyAt: string | null;
   startedAt: string | null;
   completedAt: string | null;
   updatedAt: string;
