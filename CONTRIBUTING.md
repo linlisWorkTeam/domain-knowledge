@@ -12,7 +12,7 @@ Behavior changes must update the Spec, implementation, tests and traceability ma
 ## 开始之前
 
 1. 从最新 `main` 创建分支，一次 PR 处理一个明确问题。
-2. 阅读 [Spec 总入口](specs/README.md)和对应 ADR。
+2. 阅读[开发状态](docs/DEVELOPMENT-STATUS.md)、[Spec 总入口](specs/README.md)和对应 ADR。
 3. 使用 Node.js 24+，运行 `npm ci`。
 4. 先看 `git status`，不要覆盖别人尚未提交的文件。
 
@@ -39,7 +39,8 @@ Behavior changes must update the Spec, implementation, tests and traceability ma
 2. 更新 `specs/13-verification/traceability-matrix.md`；
 3. 实现最小闭环，不增加平行 Registry、Gate 或发布路径；
 4. 增加对应层级的测试；
-5. 同步使用、开发和运维文档。
+5. 同步使用、开发和运维文档；
+6. 如果任务状态、顺序、阶段结论或追踪矩阵状态发生变化，在同一 PR 回写 `docs/DEVELOPMENT-STATUS.md`。
 
 纯文档也要区分源码证据、运行证据和推断。解释性文字以中文为主，关键入口补相邻 English summary。知识内容不在本仓库落盘，请到 `wpKnowledge` 提 PR。
 

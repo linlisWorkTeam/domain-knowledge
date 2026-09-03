@@ -6,6 +6,7 @@
 
 | 任务 | 文档 | 适合谁 |
 | --- | --- | --- |
+| 查看当前开发进度、下一任务和后续队列 | [DEVELOPMENT-STATUS.md](DEVELOPMENT-STATUS.md) | 负责人、贡献者、评审者 |
 | 第一次安装、初始化和打开 Console；或把完整配置 Prompt 交给 Agent | [GETTING_STARTED.md](GETTING_STARTED.md) | 使用者、Agent、评审者 |
 | 理解治理上层、domain-knowledge/LangGraph 基础设施和知识生命周期 | [ARCHITECTURE.md](ARCHITECTURE.md) | 开发者、架构师 |
 | 搭建开发环境和实现变更 | [DEVELOPMENT.md](DEVELOPMENT.md) | 贡献者、Agent |
@@ -39,8 +40,9 @@
 ## 文档维护规则
 
 1. 文档只描述当前可证明行为；路线或假设必须明确标记。
-2. 行为变化先更新 Spec，再同步本目录的操作说明。
-3. 命令必须从仓库根目录可执行，并注明额外前提。
-4. 相对链接必须通过 `component-layout` 契约测试。
-5. 不在仓库根目录创建第二个 `docs/`；组件相关文档全部留在本目录。
-6. 解释性文字以中文为主；关键入口按 [I18n 约定](DOCUMENTATION-I18N.md)提供 English summary。
+2. 项目级进度只在 [DEVELOPMENT-STATUS.md](DEVELOPMENT-STATUS.md) 维护；需求级状态只在追踪矩阵维护，进度变化必须在同一 PR 回写。
+3. 行为变化先更新 Spec，再同步本目录的操作说明。
+4. 命令必须从仓库根目录可执行，并注明额外前提。
+5. 相对链接必须通过 `component-layout` 契约测试。
+6. 不在仓库根目录创建第二个 `docs/`；组件相关文档全部留在本目录。
+7. 解释性文字以中文为主；关键入口按 [I18n 约定](DOCUMENTATION-I18N.md)提供 English summary。

@@ -52,7 +52,7 @@ npm run knowledge:serve
 npm run knowledge -- workflow-run --repository /path/to/ohMyWorkPanel
 ```
 
-详细配置见[快速上手](docs/GETTING_STARTED.md)和[运维手册](docs/OPERATIONS.md)。真实运行记录与方案 PPT 保存在 [`wpKnowledge/knowledge`](https://github.com/linlisWorkTeam/wpKnowledge/tree/main/knowledge)。
+当前阶段、下一开发任务和后续队列见[开发状态](docs/DEVELOPMENT-STATUS.md)。详细配置见[快速上手](docs/GETTING_STARTED.md)和[运维手册](docs/OPERATIONS.md)。真实运行记录与方案 PPT 保存在 [`wpKnowledge/knowledge`](https://github.com/linlisWorkTeam/wpKnowledge/tree/main/knowledge)。
 
 ## 目录
 
@@ -84,6 +84,6 @@ npm run validate:specs
 npm test
 ```
 
-产品行为以 [Spec 总入口](specs/README.md)为准。调整 Agent 提示词前请阅读[Agent 定制指南](docs/AGENT-CUSTOMIZATION.md)；职责、输入输出、拓扑、工具权限和发布权不能从前台替换。
+产品行为以 [Spec 总入口](specs/README.md)为准，项目级开发进度以[开发状态](docs/DEVELOPMENT-STATUS.md)为唯一入口。调整 Agent 提示词前请阅读[Agent 定制指南](docs/AGENT-CUSTOMIZATION.md)；职责、输入输出、拓扑、工具权限和发布权不能从前台替换。
 
 固定项目评测只面向受信源码。它有临时工作区、环境净化和超时限制，但不是敌对代码沙箱，不应执行陌生仓库代码。
