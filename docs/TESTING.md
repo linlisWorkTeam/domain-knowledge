@@ -31,6 +31,8 @@ CI 在 Node.js 24 的 Linux 环境重复执行相同门禁。PR 中应记录实�
 
 `npm test` 运行仓库当前全部 Node 测试，并固定测试并发以避免共享运行目录互相干扰。
 
+需要汇报当前框架机制而不评价真实模型质量时，运行 `npm run evaluate:framework`。它聚合 DDD 边界、七 Agent 拓扑、运行时 Schema、配置冻结、Checkpoint/路由和 Fixture 端到端证据；结果口径见[框架阶段性测评](report/框架阶段性测评.md)。
+
 ## 如何选择测试
 
 - 纯领域规则：先写 unit；不要为了方便在 Adapter 测试中复制领域判断。

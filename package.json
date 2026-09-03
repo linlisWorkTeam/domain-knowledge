@@ -18,7 +18,8 @@
     "test:integration": "node --test --test-concurrency=1 tests/integration",
     "test:acceptance": "node --test --test-concurrency=1 tests/acceptance",
     "typecheck": "tsc --noEmit",
-    "validate:specs": "node specs/13-verification/validate-specs.ts"
+    "validate:specs": "node specs/13-verification/validate-specs.ts",
+    "evaluate:framework": "node scripts/evaluate-framework.mjs"
   },
   "dependencies": {
     "@deepseek-ai/dsh": "0.1.2-alpha.4",
