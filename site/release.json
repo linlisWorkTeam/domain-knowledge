@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "releaseId": "migration-2026-09-03-4e7695d",
-  "assetVersion": "20260904-2",
-  "contentDigest": "sha256:c2c181669a93a794c76b85a357abdc6c6a5c4b20695c4e5264e3bf9e033f4aa6",
+  "assetVersion": "20260904-3",
+  "contentDigest": "sha256:64060ec01cf9afa56838cfa92872fd1bad0870697de33cedc31b8ca4813d3f27",
   "contentCommit": "4e7695d31bb0cf40460b6d48b25ca49325261336",
   "sourceRepository": "linlisWorkTeam/wpKnowledge",
   "evidenceRunId": "5503b6bc-0350-4b53-98cc-6fbf3a13aaa9",
@@ -10,24 +10,24 @@
   "featureRelease": {
     "releaseId": "dev-007-dev-008-2026-09-04",
     "implementationRepository": "linlisWorkTeam/domain-knowledge",
-    "implementationBaseCommit": "e7d2cdd8cf2bd65d8221ac4512ca9df913437b82",
+    "implementationBaseCommit": "df0f4101aea8177d472aad82dff3d914dc01a937",
     "phases": ["DEV-007", "DEV-008"],
     "capture": {
       "script": "scripts/capture-console-demo.mjs",
-      "capturedAt": "2026-09-03T17:43:48.348Z",
+      "capturedAt": "2026-09-03T18:10:38.487Z",
       "provenance": "actual-console-persisted-deterministic-acceptance-seed",
       "viewport": "1280x800",
       "output": "960x600",
       "frames": 8,
-      "evidenceRunId": "a477108f-2b49-45b6-a9eb-6e9e16f03bfc",
+      "evidenceRunId": "1c4e5d5e-0617-4fe8-80f9-983da2713a96",
       "secretRendered": false,
       "gif": {
         "path": "site/console-dev007-dev008.gif",
-        "sha256": "5d10d0ca5343590384b58ca3525efdc352900aeca93125e30a648a661b2ecff7"
+        "sha256": "7babd5d45abefe7742f8bcc1fdd56caf08ce16a41a363a204649087c47f3f1f3"
       },
       "poster": {
         "path": "site/console-dev007-dev008-poster.webp",
-        "sha256": "ecce3114472ca189d0d52dfbd54faae297d1ec19c077382020ecf5ea5602cebe"
+        "sha256": "440dccc95a768ebc8ac216d0d1fe4c51bf941ebadedac9c251539436f5fe9a87"
       }
     }
   }
