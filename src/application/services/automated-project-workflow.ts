@@ -720,8 +720,12 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
         publicInterfaceRefs,
       };
       if (agentId === 'doc-gen' && input.iteration > 0) {
-        const baseKnowledgeRef = input.context[contextKey('doc_gen', input.iteration - 1)] as ArtifactRef | undefined;
-        if (baseKnowledgeRef) payload.baseKnowledgeRef = baseKnowledgeRef;
+        const previousResultRef = input.context[contextKey('doc_gen', input.iteration - 1)] as ArtifactRef | undefined;
+        if (previousResultRef) {
+          const previousResult = await this.readAgentResult(previousResultRef, 'doc-gen');
+          const baseKnowledgeRef = previousResult.payload['bodyRef'] as ArtifactRef | undefined;
+          if (baseKnowledgeRef) payload.baseKnowledgeRef = baseKnowledgeRef;
+        }
       }
     } else if (agentId === 'test-gen') {
       payload = {
@@ -741,7 +745,10 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
         buildContractRef: scenarioRef,
       };
     } else if (agentId === 'check') {
-      const diffRef = input.context[contextKey('code', input.iteration)] as ArtifactRef | undefined;
+      const codeResultRef = input.context[contextKey('code', input.iteration)] as ArtifactRef | undefined;
+      if (!codeResultRef) throw new Error('AGENT_COMMAND_INPUT_MISSING: check.diffRef');
+      const codeResult = await this.readAgentResult(codeResultRef, 'code');
+      const diffRef = codeResult.payload['codeRef'] as ArtifactRef | undefined;
       if (!diffRef) throw new Error('AGENT_COMMAND_INPUT_MISSING: check.diffRef');
       payload = { diffRef, criteriaRef: scenarioRef, publicInterfaceRefs };
     } else {
@@ -950,14 +957,19 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
   }
 
   private async readAgentOutput<T>(ref: ArtifactRef, expectedAgent: AgentId): Promise<T> {
+    const result = await this.readAgentResult(ref, expectedAgent);
+    const rawRef = result.outputRefs.find((outputRef) => outputRef.mediaType === 'application/json');
+    if (!rawRef) throw new Error(`AGENT_RESULT_RAW_OUTPUT_MISSING: ${expectedAgent}`);
+    return this.readJson<T>(rawRef);
+  }
+
+  private async readAgentResult(ref: ArtifactRef, expectedAgent: AgentId): Promise<AgentResult> {
     const result = await this.readJson<AgentResult>(ref);
     this.contracts.assertResult(result);
     if (result.status !== 'SUCCEEDED' || result.agentType !== expectedAgent) {
       throw new Error(`AGENT_RESULT_ROLE_MISMATCH: expected ${expectedAgent}`);
     }
-    const rawRef = result.outputRefs.find((outputRef) => outputRef.mediaType === 'application/json');
-    if (!rawRef) throw new Error(`AGENT_RESULT_RAW_OUTPUT_MISSING: ${expectedAgent}`);
-    return this.readJson<T>(rawRef);
+    return result;
   }
 
   private async readArtifact(ref: ArtifactRef): Promise<unknown> {
