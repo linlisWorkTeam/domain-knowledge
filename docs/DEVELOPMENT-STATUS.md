@@ -42,7 +42,7 @@ This file is the single entry point for project-level development status, curren
 - DDD 分层已经对齐，UI/API 通过 Application App 进入系统，LangGraph、Provider 和持久化实现留在 Infrastructure。
 - 固定七 Agent 拓扑、并行、迭代、取消、Checkpoint、运行契约和配置快照已经通过自动化验证。
 - deterministic fixture 可以完成失败、修订、重新生成、评测和发布闭环。
-- 前台 F2 已完成最终七页面、真实 Run Agent Graph、绿色双主题、响应式、可访问性及真实/Partial/Disabled 状态；已修正 103px Header 基线、14px 密度和重复 Page Intro，加入 `1363 × 936` 像素回归，HCP-1 仍为 `Rework required` 等待人工复验。
+- 前台 F2 已完成最终七页面、真实批次 Agent 工作流图、绿色双主题、响应式、可访问性及真实/部分/禁用状态；已修正 103px 顶栏基线、14px 密度、重复页面标题和中英文术语混用，加入 `1363 × 936` 像素回归，HCP-1 仍为 `Rework required` 等待人工复验。
 - B1 Preview API 破坏性迁移已经同步完成 Server、Console、DSH Adapter、测试和文档；旧公共 HTTP 路径不保留兼容别名，B2–B4 的 `Planned` 能力仍未实现。
 - DeepSeek Harness live Adapter 已存在；公司 CodeAgent CLI 尚未接入。
 - 真实 Agent 质量、公司环境容量、长期稳定性和敌对代码执行安全尚未形成验收结论。

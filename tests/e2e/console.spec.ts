@@ -40,14 +40,14 @@ test.beforeAll(async () => {
   }
 });
 
-test('Graph is a read-only Run Agent workflow backed by canonical node APIs', async ({ page }) => {
+test('工作流图由标准节点 API 支撑并保持只读', async ({ page }) => {
   const requests: string[] = [];
   page.on('request', (request) => requests.push(new URL(request.url()).pathname));
   await page.goto(baseUrl);
-  await page.getByRole('button', { name: /^Graph$/ }).click();
-  await expect(page.getByRole('heading', { name: 'Graph', level: 1 })).toBeVisible();
+  await page.getByRole('button', { name: /^工作流图$/ }).click();
+  await expect(page.getByRole('heading', { name: '工作流图', level: 1 })).toBeVisible();
   await expect(page.getByLabel('只读 Agent 工作流图')).toBeVisible();
-  await expect(page.getByText(/只读 · 10 秒刷新 · PARTIAL/)).toBeVisible();
+  await expect(page.getByText(/只读 · 每 10 秒刷新 · 数据不完整/)).toBeVisible();
   await expect(page.locator('.graph-node')).toHaveCount(7);
   await expect(page.locator('.graph-edge')).toHaveCount(7);
   await expect(page.locator('.graph-status-legend')).toContainText('运行中');
@@ -72,18 +72,19 @@ test('seven-page Console uses server facts and canonical Sources API', async ({ 
   page.on('request', (request) => requests.push(request.url()));
   await page.goto(baseUrl);
 
-  await expect(page.getByRole('heading', { name: 'Action Center', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '操作中心', level: 1 })).toBeVisible();
   await expect(page.getByText('browser-contract').first()).toBeVisible();
   await expect(page.getByText(/项需要确认/)).toBeVisible();
 
-  const labels = ['Action Center', 'Flywheel Runs', 'Knowledge', 'Graph', 'Evaluations', 'Sources', 'Agent Settings'];
+  const labels = ['操作中心', '飞轮批次', '知识', '工作流图', '评测', '来源', 'Agent 设置'];
   for (const label of labels) {
     await expect(page.getByRole('button', { name: new RegExp(label) }).first()).toBeVisible();
-    if (label !== 'Action Center') await page.getByRole('button', { name: new RegExp(`^${label}$`) }).click();
+    if (label !== '操作中心') await page.getByRole('button', { name: new RegExp(`^${label}$`) }).click();
     await expect(page.getByRole('heading', { name: label, exact: true })).toHaveCount(1);
+    await expect(page.getByText(/Action Center|Flywheel Runs|Knowledge Health|Recent Pulse|New run|Run history|PARTIAL|DISABLED/)).toHaveCount(0);
   }
 
-  await page.getByRole('button', { name: /^Sources$/ }).click();
+  await page.getByRole('button', { name: /^来源$/ }).click();
   await expect(page.getByRole('heading', { name: '当前来源候选' })).toBeVisible();
   expect(requests.some((url) => url.endsWith('/api/v1/sources/scan'))).toBe(true);
   expect(requests.every((url) => url.startsWith(baseUrl))).toBe(true);
@@ -142,11 +143,11 @@ test('light theme applies semantic surfaces across all seven pages and drawers',
     expect(offenders, `${pageName} contains dark-only surfaces in light theme`).toEqual([]);
   };
 
-  for (const label of ['Action Center', 'Flywheel Runs', 'Knowledge', 'Graph', 'Evaluations', 'Sources', 'Agent Settings']) {
-    if (label !== 'Action Center') await page.getByRole('button', { name: new RegExp(`^${label}$`) }).click();
+  for (const label of ['操作中心', '飞轮批次', '知识', '工作流图', '评测', '来源', 'Agent 设置']) {
+    if (label !== '操作中心') await page.getByRole('button', { name: new RegExp(`^${label}$`) }).click();
     await assertNoDarkSurfaces(label);
   }
-  await page.getByRole('button', { name: /^Knowledge$/ }).click();
+  await page.getByRole('button', { name: /^知识$/ }).click();
   await page.getByRole('combobox', { name: '知识状态' }).selectOption('');
   await page.getByRole('button', { name: /浏览器验收知识/ }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
@@ -157,10 +158,10 @@ test('Action Center preserves the reference header baseline and information stru
   await page.setViewportSize({ width: 1363, height: 936 });
   await page.addInitScript(() => localStorage.setItem('wp-knowledge-theme', 'light'));
   await page.goto(baseUrl);
-  await expect(page.getByRole('heading', { name: 'Action Center', level: 1 })).toBeVisible();
-  await expect(page.getByText('KNOWLEDGE HEALTH')).toBeVisible();
-  await expect(page.getByText('Recent Pulse')).toBeVisible();
-  for (const [index, stage] of ['Discover', 'Generate', 'Evaluate', 'Evolve'].entries()) {
+  await expect(page.getByRole('heading', { name: '操作中心', level: 1 })).toBeVisible();
+  await expect(page.getByText('知识健康度')).toBeVisible();
+  await expect(page.getByText('最近动态')).toBeVisible();
+  for (const [index, stage] of ['发现', '生成', '评测', '演进'].entries()) {
     await expect(page.locator('.flywheel-stages > li > span').nth(index)).toContainText(stage);
   }
 
@@ -196,9 +197,9 @@ test('mobile navigation, theme persistence and 200 percent zoom preserve core pa
   await page.goto(baseUrl);
   const navToggle = page.getByRole('button', { name: '打开主导航' });
   await navToggle.click();
-  await expect(page.getByRole('button', { name: /^Flywheel Runs$/ })).toBeVisible();
-  await page.getByRole('button', { name: /^Flywheel Runs$/ }).click();
-  await expect(page.getByRole('heading', { name: 'Flywheel Runs', level: 1 })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^飞轮批次$/ })).toBeVisible();
+  await page.getByRole('button', { name: /^飞轮批次$/ }).click();
+  await expect(page.getByRole('heading', { name: '飞轮批次', level: 1 })).toBeVisible();
   await expect(page.getByText('第 1 轮').first()).toBeVisible();
 
   const themeButton = page.locator('#theme-button');
@@ -213,8 +214,8 @@ test('mobile navigation, theme persistence and 200 percent zoom preserve core pa
   const session = await context.newCDPSession(page);
   await session.send('Emulation.setPageScaleFactor', { pageScaleFactor: 2 });
   await page.getByRole('button', { name: '打开主导航' }).click();
-  await page.getByRole('button', { name: /^Flywheel Runs$/ }).focus();
+  await page.getByRole('button', { name: /^飞轮批次$/ }).focus();
   await page.keyboard.press('Enter');
-  await expect(page.getByRole('heading', { name: 'Flywheel Runs', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '飞轮批次', level: 1 })).toBeVisible();
   await expect(page.getByText('browser-contract').first()).toBeVisible();
 });

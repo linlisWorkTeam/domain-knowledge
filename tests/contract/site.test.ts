@@ -133,14 +133,14 @@ test('project site exposes human and Agent onboarding without weakening trust ga
   }
 });
 
-test('public surfaces use consistent Chinese copy and keep only the approved English heading', () => {
+test('public surfaces use consistent Chinese copy and approved technical identifiers', () => {
   const consoleHtml = readFileSync('web/index.html', 'utf8');
   const consoleScript = readFileSync('web/app.js', 'utf8');
   const socialCard = readFileSync('site/social-card.svg', 'utf8');
   assert.match(html, /<html lang="zh-CN">/);
   assert.match(consoleHtml, /<html lang="zh-CN">/);
   assert.match(html, /<meta property="og:locale" content="zh_CN">/);
-  assert.match(consoleHtml, />WORKPANEL · KNOWLEDGE FLYWHEEL</);
+  assert.match(consoleHtml, />工作台 · 知识飞轮</);
   assert.doesNotMatch(html, /English summary|WHY WPKNOWLEDGE|THE FLYWHEEL|USE CASES|LIVE EVIDENCE|GET STARTED|BUILD KNOWLEDGE THAT HOLDS/);
   assert.doesNotMatch(consoleScript, /LANGGRAPH EXECUTION PROJECTION|LATEST GATE|EVENT SEQUENCE|IMMUTABLE EVIDENCE|HUMAN IN THE LOOP|PRODUCTIZATION/);
   assert.doesNotMatch(css, /content:\s*["']EVIDENCE["']/);
@@ -252,7 +252,7 @@ test('production Console implements the F2 seven-page navigation and truthful da
   const consoleCss = readFileSync('web/styles.css', 'utf8');
   const consoleScript = readFileSync('web/app.js', 'utf8');
 
-  for (const label of ['Action Center', 'Flywheel Runs', 'Knowledge', 'Graph', 'Evaluations', 'Sources', 'Agent Settings']) {
+  for (const label of ['操作中心', '飞轮批次', '知识', '工作流图', '评测', '来源', 'Agent 设置']) {
     assert.ok(consoleHtml.includes(`>${label}<`) || consoleHtml.includes(`${label} <`), `Console navigation misses ${label}`);
   }
   assert.match(consoleScript, /request\('\/api\/v1\/sources\/scan'\)/);
@@ -270,7 +270,7 @@ test('production Console implements the F2 seven-page navigation and truthful da
     assert.match(`${consoleHtml}\n${consoleScript}`, new RegExp(`class="[^"]*${visualHook}`), `Console misses reference-layout hook ${visualHook}`);
     assert.match(consoleCss, new RegExp(`\\.${visualHook}`), `Console misses reference-layout styling ${visualHook}`);
   }
-  assert.match(consoleScript, /不提供模拟 ETA/);
+  assert.match(consoleScript, /预计完成时间暂不可用/);
   assert.match(consoleHtml, /role="dialog" aria-modal="true" aria-labelledby="drawer-title"/);
   assert.match(consoleScript, /drawerReturnFocus/);
   assert.match(consoleScript, /event\.key === 'Tab'.*drawer\.classList\.contains\('open'\)/s);

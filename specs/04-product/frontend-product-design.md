@@ -1,6 +1,6 @@
 # 知识飞轮前台产品设计
 
-**状态：Accepted；B1 已就绪、F2 因 HCP-1=Rework required 正在视觉返工｜版本：0.5.4｜日期：2026-09-03**
+**状态：Accepted；B1 已就绪、F2 因 HCP-1=Rework required 正在视觉返工｜版本：0.5.5｜日期：2026-09-03**
 
 本文定义 domain-knowledge 知识飞轮控制台的用户体验、信息架构、交互边界、接口需求和验收标准。领域状态、门禁、安全和发布语义以同仓库的[规范总入口](../README.md)为准；前台不得创造第二套状态或发布权威。
 
@@ -44,6 +44,10 @@
 | 平台维护者 | 配置 Provider、Policy、评测器和安全边界，诊断基础设施失败 | 本地管理员 |
 
 ## 3. 产品原则
+
+### 3.0 前台术语
+
+用户可见界面以自然中文为主，品牌名、项目名、`Agent`、API/协议缩写、代码字段、枚举原值和不可翻译的技术标识符除外。`Registry` 统一写作“注册”；`Agent` 不翻译为“智能体”；`Run` 作动作时写作“运行”，作实体名词时写作“批次”。同一组件不得同时使用未经批准的中英文同义标签。
 
 ### 3.1 证据优先
 
@@ -488,7 +492,7 @@ Console 使用 `14px` 全局基准；正文和操作文字通常不小于 `11px`
 | KF-UI-014 | P0 | Agents 页面必须显示全部 Agent 的固定职责、输入输出、基础提示词和追加提示词；每次 Run 中的 Agent 节点状态在 Run 工作台显示。 | AC-UI-014 |
 | KF-UI-015 | P0 | 治理模式只能修改 Agent 的追加提示词；服务端必须拒绝任何拓扑、职责、Schema、Provider 实现或权限替换。 | AC-UI-015 |
 | KF-UI-016 | P0 | Run 工作台必须显示 LangGraph 节点投影，并明确区分执行状态与 FlywheelRun 业务状态。 | AC-UI-016 |
-| KF-UI-017 | P1 | 项目官网和控制台的用户可见文案必须使用自然、统一的中文；除固定标题 `WORKPANEL · KNOWLEDGE FLYWHEEL` 外，不得出现中英文拼接的栏目名、状态名或说明句。代码、命令、项目名、环境变量和协议标识符按原值展示。 | AC-UI-017 |
+| KF-UI-017 | P1 | 项目官网和控制台的用户可见文案必须使用自然、统一的中文；品牌、项目名、`Agent`、API/协议缩写、代码字段、枚举原值和技术标识符可以保持原值，其他栏目名、状态名或说明句不得中英文混用。 | AC-UI-017 |
 | KF-UI-018 | P0 | 写入关闭时，设置页必须提供 `.env.local` 的创建位置、变量示例和重启方式；配置前所有写操作仍默认拒绝，治理令牌只保存在页面内存中。 | AC-UI-018 |
 | KF-UI-019 | P0 | 前台只能展示服务端事实或具有公开计算规则的派生值；缺少领域模型或 API 支持的指标、身份、问题和关系不得以模拟数据呈现。 | AC-UI-019 |
 
@@ -512,7 +516,7 @@ Console 使用 `14px` 全局基准；正文和操作文字通常不小于 `11px`
 | AC-UI-014 | Given 已启动或未启动工作流，When 打开 Agents 页面和 Run 工作台，Then 七类 Agent 均可查阅，固定契约与可编辑提示词分离，节点状态按 runId 展示。 |
 | AC-UI-015 | Given 有效写 token，When 保存 promptAddon，Then 后续执行使用该值并产生审计；When 请求包含 role、inputs、outputs、tools 或 edges，Then 服务端拒绝。 |
 | AC-UI-016 | Given LangGraph 正在运行，When 打开 Run 工作台，Then 页面从 Knowledge Registry 的节点投影显示 pending/running/completed/failed，不把 graph route 当成知识发布状态。 |
-| AC-UI-017 | Given 用户打开项目官网或控制台，When 阅读栏目、状态、说明和错误提示，Then 除固定标题与原样技术标识符外，页面不出现英文栏目或中英文拼接句，中文表达自然且术语一致。 |
+| AC-UI-017 | Given 用户打开项目官网或控制台，When 阅读栏目、状态、说明和错误提示，Then 除品牌、项目名、`Agent`、API/协议缩写、代码字段、枚举原值和原样技术标识符外，页面不出现英文栏目或未经批准的中英文拼接句；`Registry` 写作“注册”，`Run` 的动作与实体语义分别写作“运行”与“批次”。 |
 | AC-UI-018 | Given 服务端未配置写入令牌，When 用户点击治理模式或打开设置页，Then 页面引导其从 `.env.example` 创建 `.env.local`、设置 `WP_KNOWLEDGE_WRITE_TOKEN` 并重启服务；令牌不会被写入网址或本地存储。 |
 | AC-UI-019 | Given 服务端只提供当前已实现 API，When 用户访问新版控制台全部页面或任一 API 失败，Then 页面保留原型规定的信息结构，但只显示服务端事实、规范允许的派生值或明确的 `—`/Empty/Partial/Disabled 状态，不显示模拟 Knowledge Health、ETA、Graph、Action Item、Activity、Workspace 或用户身份数据。 |
 | AC-UI-020 | Given Chromium 视口固定为 `1363 × 936`，When 打开浅色 Action Center，Then Header 高度为 `103px`、标题顶部位于 `40–45px`、操作区垂直居中、全局字号为 `14px`，并通过已提交基准图的像素回归。 |

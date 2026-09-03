@@ -56,7 +56,7 @@
 | AC-DOC-001 | Given DocGenAgent 首次生成或按 Correction 修订中文知识，When Orchestrator 发送生成请求并执行 Quality Gate，Then 两轮 Prompt 都包含自然写作约束，模板化填充、无来源宣传词和超长段落会降低 `humanReadability` 并形成 weak point；任何润色都不得改变事实、来源、验收条件或安全边界。 |
 | AC-DOC-002 | Given 一个跨层大规模特性，When 准备合入，Then Console、GitHub Pages、工程文档、Spec、追踪矩阵和自动化验收均已更新或在 PR 中明确说明不适用。 |
 | AC-DOC-003 | Given 仓库中已跟踪的 Markdown 和关键入口文档，When 执行文档契约测试，Then 每份文档都有中文说明，关键入口包含相邻的结构化 English summary，代码标识符和协议值仍可与源码直接互查。 |
-| AC-DOC-004 | Given 官网和控制台，When 检查静态文案、状态标签和运行时投影，Then 除固定标题 `WORKPANEL · KNOWLEDGE FLYWHEEL` 以及代码、命令、项目名和协议标识符外，用户看到的栏目、状态与说明均为自然中文。 |
+| AC-DOC-004 | Given 官网和控制台，When 检查静态文案、状态标签和运行时投影，Then 除品牌、项目名、`Agent`、API/协议缩写、代码字段、枚举原值和技术标识符外，用户看到的栏目、状态与说明均为自然中文；`Registry` 显示为“注册”，名词 `Run` 显示为“批次”。 |
 
 ## 前台交付 F1 验收门
 
@@ -92,6 +92,7 @@ F2 可访问环境和 B1 API 迁移 diff 都已准备后、B2/B3 前台接线开
 - 每个动态区域都能指出服务端 API、公开派生规则或明确未接状态，任何失败路径都不回退到演示数据；
 - 以 `1363 × 936` Chromium 固定视口核对 Action Center 基准截图；自动门禁必须同时断言 `103px` Header、标题 `y=40–45px`、操作区垂直居中、`14px` 全局字号以及关键原型组件仍存在；
 - 七个一级页面各自只能出现一个与导航同名的页面标题，统一由 Topbar 提供；内容区只保留指标、工具栏和有业务含义的分区标题，不得重复 Page Intro 或装饰性说明卡；
+- 用户可见术语遵循统一中文规则：`Agent` 保留原词，`Registry` 显示为“注册”，`Run` 作动词显示为“运行”、作名词显示为“批次”；其他英文只允许出现在品牌、API/协议缩写、代码字段、枚举原值和技术标识符中；
 - B1 新旧路由映射、删除范围以及 Console/DSH Adapter/测试同步修改边界获得确认。
 
 验收记录必须包含结论 `Accepted`、`Accepted with follow-ups` 或 `Rework required`，以及临时环境地址、桌面/移动端与双主题证据、数据来源/禁用能力清单、Graph 来源说明和自动化结果。只有前两种结论允许开始 B2/B3 前台接线；follow-up 不得改变已冻结的信息架构或 API 契约。
