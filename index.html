@@ -1,0 +1,5 @@
+---
+layout: null
+---
+{% capture project_site %}{% include_relative site/index.html %}{% endcapture %}
+{{ project_site | replace: 'href="./', 'href="./site/' | replace: 'src="./', 'src="./site/' | replace: 'https://linlisworkteam.github.io/domain-knowledge/social-card.svg', 'https://linlisworkteam.github.io/domain-knowledge/site/social-card.svg' }}

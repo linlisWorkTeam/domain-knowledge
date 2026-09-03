@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wpknowledge.local/schemas/language-plugin/v1",
+  "title": "LanguagePluginMessage",
+  "type": "object",
+  "required": ["schemaVersion", "kind", "languageId", "pluginVersion", "payload"],
+  "properties": {
+    "schemaVersion": {"const": "1.0"},
+    "kind": {"enum": ["capability", "discoveryRequest", "discoveryResult", "executionPlan", "normalizedResult"]},
+    "languageId": {"type": "string", "pattern": "^[a-z][a-z0-9+.-]*$"},
+    "pluginVersion": {"type": "string", "minLength": 1},
+    "payload": {"type": "object"},
+    "artifactRefs": {"type": "array", "items": {"$ref": "https://wpknowledge.local/schemas/artifact-ref/v1"}}
+  },
+  "additionalProperties": false
+}

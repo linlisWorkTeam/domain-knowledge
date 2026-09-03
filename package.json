@@ -1,41 +1,36 @@
 {
-  "name": "domain-knowledge-agent-framework",
+  "name": "@linlis-workteam/domain-knowledge",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "LangGraph-based multi-agent framework for domain knowledge generation and verification.",
-  "main": "./dist/src/index.js",
-  "types": "./dist/src/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/src/index.d.ts",
-      "import": "./dist/src/index.js"
-    }
-  },
-  "files": [
-    "dist/src",
-    "README.md"
-  ],
   "engines": {
-    "node": ">=20"
+    "node": ">=24.0.0"
   },
   "scripts": {
-    "build": "node scripts/build-typescript.mjs",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "preverify:company": "npm run build --silent",
-    "verify:company": "node scripts/verify-company-dependencies.mjs",
-    "precli": "npm run build --silent",
-    "cli": "node dist/src/cli.js"
+    "knowledge": "node --env-file-if-exists=.env.local src/interfaces/runner/cli.ts",
+    "knowledge:serve": "node --env-file-if-exists=.env.local src/interfaces/runner/server.ts",
+    "site:serve": "node site/dev-server.mjs",
+    "site:check": "node --test tests/contract/site.test.ts",
+    "acceptance:ohmyworkpanel": "node --env-file-if-exists=.env.local src/interfaces/runner/project-acceptance.ts",
+    "test": "node --test --test-concurrency=1",
+    "test:architecture": "node --test tests/contract/architecture.test.ts",
+    "test:domain": "node --test tests/unit",
+    "test:integration": "node --test --test-concurrency=1 tests/integration",
+    "test:acceptance": "node --test --test-concurrency=1 tests/acceptance",
+    "typecheck": "tsc --noEmit",
+    "validate:specs": "node specs/13-verification/validate-specs.ts"
   },
   "dependencies": {
-    "@langchain/langgraph": "^1.4.13",
-    "@langchain/langgraph-checkpoint-sqlite": "^1.0.4"
+    "@deepseek-ai/dsh": "0.1.2-alpha.4",
+    "@deepseek-ai/dsh-sdk-client": "0.1.2-alpha.4",
+    "@langchain/langgraph": "1.4.13",
+    "@langchain/langgraph-checkpoint-sqlite": "1.0.4",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
+    "yaml": "2.9.0"
   },
   "devDependencies": {
-    "@types/node": "^26.4.0",
-    "typescript": "^7.0.2",
-    "vitest": "^4.1.11"
+    "@types/node": "24.13.3",
+    "typescript": "7.0.2"
   }
 }

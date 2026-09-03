@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wpknowledge.local/schemas/evaluation-report/v1",
+  "title": "EvaluationReport",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "reportId",
+    "runId",
+    "iteration",
+    "inputRefs",
+    "policyVersion",
+    "toolchainFingerprint",
+    "pluginFingerprint",
+    "testSetVersion",
+    "modelConfigSummary",
+    "promptDigest",
+    "compile",
+    "criticalResults",
+    "repetitions",
+    "testSummary",
+    "stability",
+    "findings",
+    "scoreComponents",
+    "reasonCodes"
+  ],
+  "properties": {
+    "schemaVersion": {"const": "1.0"},
+    "reportId": {"type": "string", "minLength": 1},
+    "runId": {"type": "string", "minLength": 1},
+    "iteration": {"type": "integer", "minimum": 1},
+    "inputRefs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "https://wpknowledge.local/schemas/artifact-ref/v1"}
+    },
+    "policyVersion": {"type": "string", "minLength": 1},
+    "toolchainFingerprint": {"type": "string", "minLength": 1},
+    "pluginFingerprint": {"type": "string", "minLength": 1},
+    "testSetVersion": {"type": "string", "minLength": 1},
+    "modelConfigSummary": {
+      "type": "object",
+      "required": ["provider", "model", "parametersDigest"],
+      "properties": {
+        "provider": {"type": "string", "minLength": 1},
+        "model": {"type": "string", "minLength": 1},
+        "parametersDigest": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+      },
+      "additionalProperties": false
+    },
+    "promptDigest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "compile": {"enum": ["PASS", "FAIL"]},
+    "criticalResults": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["caseId", "status", "evidenceRefs"],
+        "properties": {
+          "caseId": {"type": "string", "minLength": 1},
+          "status": {"enum": ["PASS", "FAIL", "ERROR"]},
+          "evidenceRefs": {
+            "type": "array",
+            "minItems": 1,
+            "items": {"$ref": "https://wpknowledge.local/schemas/artifact-ref/v1"}
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "repetitions": {
+      "type": "array",
+      "minItems": 5,
+      "items": {
+        "type": "object",
+        "required": ["caseId", "attempt", "status", "durationMs", "evidenceRefs"],
+        "properties": {
+          "caseId": {"type": "string", "minLength": 1},
+          "attempt": {"type": "integer", "minimum": 1},
+          "status": {"enum": ["PASS", "FAIL", "ERROR"]},
+          "durationMs": {"type": "integer", "minimum": 0},
+          "evidenceRefs": {
+            "type": "array",
+            "minItems": 1,
+            "items": {"$ref": "https://wpknowledge.local/schemas/artifact-ref/v1"}
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "testSummary": {
+      "type": "object",
+      "required": ["total", "passed", "failed", "errors"],
+      "properties": {
+        "total": {"type": "integer", "minimum": 0},
+        "passed": {"type": "integer", "minimum": 0},
+        "failed": {"type": "integer", "minimum": 0},
+        "errors": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    },
+    "stability": {"enum": ["STABLE", "UNSTABLE"]},
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["findingId", "severity", "criterionId", "evidenceLocation", "message"],
+        "properties": {
+          "findingId": {"type": "string", "minLength": 1},
+          "severity": {"enum": ["BLOCKER", "HIGH", "MEDIUM", "LOW", "INFO"]},
+          "criterionId": {"type": "string", "minLength": 1},
+          "evidenceLocation": {"type": "string", "minLength": 1},
+          "message": {"type": "string", "minLength": 1}
+        },
+        "additionalProperties": false
+      }
+    },
+    "scoreComponents": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "oneOf": [
+          {"type": "number"},
+          {"const": "not_available"}
+        ]
+      }
+    },
+    "reasonCodes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    }
+  },
+  "additionalProperties": false
+}

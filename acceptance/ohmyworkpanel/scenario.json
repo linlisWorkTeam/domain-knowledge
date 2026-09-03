@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "1.0",
+  "name": "ohmyworkpanel-mentions-two-iteration",
+  "moduleId": "ohmyworkpanel-mentions",
+  "expectedCommit": "3b2e6073e01b42e2a595fca4de3acaad44715ddd",
+  "sourcePaths": ["src/chat/mentions.ts", "src/chat/mentions.test.ts"],
+  "publicInterfacePaths": ["src/types.ts", "package.json", "pnpm-lock.yaml"],
+  "allowedGeneratedPaths": ["src/chat/mentions.ts"],
+  "prepareCommands": [
+    {"tool": "pnpm", "purpose": "setup", "args": ["install", "--frozen-lockfile", "--offline"], "timeoutMs": 120000}
+  ],
+  "referenceCommands": [
+    {"tool": "pnpm", "purpose": "test", "args": ["exec", "vitest", "run", "src/chat/mentions.test.ts"], "timeoutMs": 120000}
+  ],
+  "firstIterationCommands": [
+    {"tool": "pnpm", "purpose": "test", "args": ["exec", "vitest", "run", "src/chat/mentions.test.ts"], "timeoutMs": 120000}
+  ],
+  "finalCommands": [
+    {"tool": "pnpm", "purpose": "test", "args": ["exec", "vitest", "run", "src/chat/mentions.test.ts"], "repetitions": 5, "timeoutMs": 120000},
+    {"tool": "pnpm", "purpose": "test", "args": ["test"], "timeoutMs": 120000},
+    {"tool": "pnpm", "purpose": "check", "args": ["build"], "timeoutMs": 120000},
+    {"tool": "cargo", "purpose": "test", "args": ["test", "--no-default-features", "--lib"], "cwd": "src-tauri", "timeoutMs": 300000}
+  ],
+  "assets": {
+    "knowledgeV1": "knowledge-v1.md",
+    "knowledgeV2": "knowledge-v2.md",
+    "codeV1": "mentions-v1.ts",
+    "codeV2": "mentions-v2.ts",
+    "correction": "correction.json",
+    "generatedPath": "src/chat/mentions.ts",
+    "title": "ohMyWorkPanel mention parsing",
+    "description": "Behavioral contract for resolving active group-member mentions without prefix ambiguity."
+  }
+}

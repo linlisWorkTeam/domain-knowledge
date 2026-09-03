@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-labelledby="title">
+  <title id="title">知识飞轮标志</title>
+  <defs>
+    <linearGradient id="g" x1="8" y1="7" x2="40" y2="42" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8BE2FF"/>
+      <stop offset="1" stop-color="#57E0B5"/>
+    </linearGradient>
+  </defs>
+  <rect x="1" y="1" width="46" height="46" rx="14" fill="#101722" stroke="#2B3A4C"/>
+  <path d="M24 8.5 39.5 24 24 39.5 8.5 24 24 8.5Z" fill="none" stroke="url(#g)" stroke-width="2.5"/>
+  <path d="m24 15 9 9-9 9-9-9 9-9Z" fill="url(#g)" fill-opacity=".14" stroke="url(#g)" stroke-width="1.5"/>
+  <circle cx="24" cy="24" r="3.2" fill="url(#g)"/>
+</svg>

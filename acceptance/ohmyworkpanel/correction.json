@@ -1,0 +1,6 @@
+{
+  "correctionId": "COR-OHMY-MENTION-ORDER-001",
+  "knowledgePath": "匹配规则",
+  "criterion": "前缀重叠的显示名必须按长度降序处理，完整名称先于短前缀进入结果",
+  "risk": "短名称先处理会改变可观察结果顺序，并可能把任务优先派给错误成员"
+}
