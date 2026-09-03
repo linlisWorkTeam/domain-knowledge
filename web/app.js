@@ -435,7 +435,8 @@ async function loadGraph(runId) {
   const encoded = encodeURIComponent(runId)
   const [snapshot, nodePayload, workflowStatus, eventPayload] = await Promise.all([
     request(`/api/v1/runs/${encoded}`), request(`/api/v1/runs/${encoded}/workflow-nodes`),
-    request(`/api/v1/runs/${encoded}/workflow-status`), request(`/api/v1/runs/${encoded}/events?after=0`),
+    request(`/api/v1/runs/${encoded}/workflow-status`).catch(() => ({ status: 'PENDING', partial: true })),
+    request(`/api/v1/runs/${encoded}/events?after=0`),
   ])
   const nodes = collection(nodePayload, 'nodes').length ? collection(nodePayload, 'nodes') : (snapshot.workflowNodes ?? [])
   const events = collection(eventPayload, 'events').length ? collection(eventPayload, 'events') : (snapshot.events ?? [])

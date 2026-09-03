@@ -255,7 +255,7 @@ export function createKnowledgeServer(input: {
         const result = await composition.apps.knowledgeSearch.search({
           query: q,
           top: 200,
-          statuses: statuses.length ? statuses : undefined,
+          statuses: statuses.length ? statuses : ['CANDIDATE', 'VERIFIED', 'LOW_CONFIDENCE', 'SUPERSEDED'],
           category,
         });
         send(response, 200, { ...page(result.hits, url), query: result.query, total: result.total });

@@ -65,7 +65,7 @@ export class KnowledgeQueryService {
       indexed.push({ version, body, terms, length: [...terms.values()].reduce((sum, value) => sum + value, 0) });
     }
     const requestedTop = input.top ?? 8;
-    const top = Number.isFinite(requestedTop) ? Math.max(1, Math.min(Math.trunc(requestedTop), 50)) : 8;
+    const top = Number.isFinite(requestedTop) ? Math.max(1, Math.min(Math.trunc(requestedTop), 200)) : 8;
     if (!input.query.trim()) {
       const hits = indexed
         .sort((a, b) => b.version.qualityScore - a.version.qualityScore)
