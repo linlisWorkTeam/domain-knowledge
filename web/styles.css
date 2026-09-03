@@ -495,6 +495,110 @@ small, .sidebar-foot small, .topbar .subtitle, .section-heading p:not(.eyebrow),
   .graph-actions select { min-width: 0; width: 100%; }
 }
 
+/* Reference-site page primitives, mapped to canonical API data. */
+.reference-page-intro { height: 137px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
+.reference-page-intro small { color: var(--accent); font: 8px ui-monospace, monospace; letter-spacing: .15em; }
+.reference-page-intro h2 { margin: 8px 0 5px; font-size: 25px; }
+.reference-page-intro p { margin: 0; color: var(--muted); font-size: 10px; }
+.reference-page-intro > button, .reference-page-intro > .status-pill { min-height: 38px; padding: 0 14px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); color: var(--text); font: 8px ui-monospace, monospace; }
+.reference-page-intro > button:disabled { opacity: .52; cursor: not-allowed; }
+.new { min-height: 38px; padding: 0 15px; border: 0; border-radius: 7px; background: var(--accent); color: #06110d; font: 600 8px ui-monospace, monospace; }
+.reference-metrics { margin: 20px 0 14px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.reference-metrics article, .reference-run-history, .reference-run-detail, .reference-domains, .reference-docs, .reference-graph-shell, .reference-knowledge-tools, .reference-start-form { border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+.reference-metrics article { padding: 18px; }
+.reference-metrics small { color: var(--muted); font: 7px ui-monospace, monospace; letter-spacing: .12em; }
+.reference-metrics b { display: block; margin: 12px 0 5px; font-size: 25px; }
+.reference-metrics .mint { color: var(--accent); }
+.reference-metrics p { margin: 0; color: var(--muted); font: 7px ui-monospace, monospace; }
+.reference-runs-grid { display: grid; grid-template-columns: 1.5fr .6fr; gap: 14px; }
+.reference-run-history { overflow: hidden; }
+.reference-run-history header { height: 64px; padding: 0 17px; border-bottom: 1px solid var(--border); display: flex; align-items: center; }
+.reference-run-history header h3 { margin-right: auto; }
+.reference-run-history header button { padding: 7px; border: 0; background: none; color: var(--muted); font: 7px ui-monospace, monospace; }
+.reference-run-history header button.active, .reference-run-history header .on { border: 1px solid var(--border); border-radius: 5px; background: var(--surface-2); color: var(--text); }
+.reference-run-item { width: 100%; min-height: 72px; padding: 0 16px; border: 0; border-bottom: 1px solid var(--border); background: transparent; color: var(--text); display: grid; grid-template-columns: 25px 1fr 85px 72px 65px 60px; align-items: center; text-align: left; cursor: pointer; }
+.reference-run-item.selected, .reference-run-item:hover { background: var(--surface-2); }
+.reference-run-item > i { width: 8px; height: 8px; border-radius: 50%; font-style: normal; }
+.run-live { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+.run-ok { color: var(--accent); }
+.run-bad { color: var(--danger); }
+.reference-run-item span b, .reference-run-item span small { display: block; }
+.reference-run-item span b { margin-bottom: 5px; font: 10px ui-monospace, monospace; }
+.reference-run-item span small, .reference-run-item > span, .reference-run-item strong, .reference-run-item time { color: var(--muted); font: 7px ui-monospace, monospace; }
+.reference-run-item em { color: var(--accent); font: 7px ui-monospace, monospace; font-style: normal; }
+.reference-run-detail { padding: 18px; }
+.reference-run-detail header { display: flex; justify-content: space-between; color: var(--muted); font: 7px ui-monospace, monospace; }
+.orbit-mini { width: 118px; height: 118px; margin: 22px auto; border: 1px dashed var(--accent); border-radius: 50%; box-shadow: inset 0 0 28px color-mix(in srgb, var(--accent) 12%, transparent); display: grid; place-items: center; }
+.orbit-mini span { color: var(--accent); font: 15px ui-monospace, monospace; text-align: center; }
+.orbit-mini small { display: block; margin-top: 5px; font-size: 6px; letter-spacing: .12em; }
+.reference-run-detail > p { display: grid; grid-template-columns: 18px 1fr; color: var(--muted); font: 8px ui-monospace, monospace; }
+.reference-run-detail > p small { grid-column: 2; display: block; margin-top: 3px; }
+.reference-run-detail .done, .reference-run-detail .doing { color: var(--accent); }
+.wide { width: 100%; min-height: 35px; margin-top: 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-2); color: var(--text); font: 8px ui-monospace, monospace; }
+.reference-start-form { margin-top: 14px; padding: 14px; display: grid; grid-template-columns: 1fr 110px auto; gap: 10px; align-items: end; }
+.reference-start-form label { color: var(--muted); font: 8px ui-monospace, monospace; }
+.reference-start-form input { margin-top: 6px; }
+.reference-knowledge-tools { height: 58px; margin: 20px 0 14px; padding: 0 14px; display: flex; align-items: center; color: var(--muted); font: 9px ui-monospace, monospace; }
+.reference-knowledge-tools label { min-width: 0; flex: 1; display: flex; align-items: center; }
+.reference-knowledge-tools input { border: 0; background: transparent; }
+.reference-knowledge-tools kbd { margin-left: auto; }
+.reference-knowledge-tools select { width: 150px; margin-left: 15px; border-width: 0 0 0 1px; border-radius: 0; }
+.reference-knowledge-grid { display: grid; grid-template-columns: 240px 1fr; gap: 14px; }
+.reference-domains { padding: 13px; }
+.reference-domains header { padding: 4px 8px 12px; display: flex; align-items: center; justify-content: space-between; }
+.reference-domains button { width: 100%; height: 40px; padding: 0 9px; border: 0; border-radius: 6px; background: none; color: var(--muted); display: flex; align-items: center; justify-content: space-between; font-size: 9px; text-align: left; }
+.reference-domains button.active { background: var(--surface-2); color: var(--text); }
+.reference-domains button b { font: 7px ui-monospace, monospace; }
+.reference-docs { overflow: hidden; }
+.reference-docs > header, .reference-doc { display: grid; grid-template-columns: 1fr 100px 80px 65px; align-items: center; }
+.reference-docs > header { height: 42px; padding: 0 17px; border-bottom: 1px solid var(--border); color: var(--muted); font: 7px ui-monospace, monospace; letter-spacing: .12em; }
+.reference-doc { width: 100%; min-height: 82px; padding: 0 17px; border: 0; border-bottom: 1px solid var(--border); background: transparent; color: var(--text); text-align: left; cursor: pointer; }
+.reference-doc:hover { background: var(--surface-2); }
+.reference-doc span:first-child em { display: inline-block; margin-right: 8px; padding: 4px 5px; border-radius: 3px; background: #242036; color: #b9a4ff; font: 6px ui-monospace, monospace; font-style: normal; }
+.reference-doc span:first-child em.verified { background: #173029; color: var(--accent); }
+.reference-doc span:first-child b { font-size: 10px; }
+.reference-doc span:first-child small { display: block; margin-top: 7px; color: var(--muted); font-size: 8px; }
+.reference-doc > span, .reference-doc time { color: var(--muted); font: 7px ui-monospace, monospace; }
+.reference-doc strong { color: var(--accent); font: 8px ui-monospace, monospace; }
+.reference-doc strong.risk { color: var(--danger); }
+.reference-graph-tools { height: 58px; margin: 20px 0 14px; padding: 0 14px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); display: flex; align-items: center; justify-content: space-between; color: var(--muted); font: 8px ui-monospace, monospace; }
+.reference-graph-tools label { display: flex; align-items: center; }
+.reference-graph-tools select { width: min(430px, 55vw); }
+.reference-graph-shell { min-height: 590px; position: relative; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1fr) 285px; }
+.reference-graph-canvas { min-height: 590px; padding: 40px; background-image: radial-gradient(var(--border) .8px, transparent .8px); background-size: 18px 18px; }
+.reference-graph-canvas .workflow-graph { align-content: center; min-height: 500px; }
+.reference-node-detail { padding: 20px; border-left: 1px solid var(--border); }
+.reference-node-detail header { display: flex; justify-content: space-between; }
+.reference-node-detail header em { padding: 4px 5px; border-radius: 3px; background: #242036; color: #b9a4ff; font: 6px ui-monospace, monospace; font-style: normal; }
+.reference-node-detail h3 { margin-top: 23px; font-size: 15px; }
+.reference-node-detail > p { color: var(--muted); font-size: 9px; line-height: 1.7; }
+.reference-node-detail > small { display: block; margin: 25px 0 10px; color: var(--muted); font: 7px ui-monospace, monospace; letter-spacing: .12em; }
+.reference-node-detail > div { padding: 12px 0; border-top: 1px solid var(--border); }
+.reference-node-detail > div span, .reference-node-detail > div b { display: block; }
+.reference-node-detail > div span { margin-bottom: 4px; color: var(--muted); font: 7px ui-monospace, monospace; }
+.reference-node-detail > div b { font-size: 9px; }
+@media (max-width: 1000px) {
+  .reference-metrics { grid-template-columns: repeat(2, 1fr); }
+  .reference-runs-grid { grid-template-columns: 1fr; }
+  .reference-run-detail { display: none; }
+  .reference-knowledge-grid { grid-template-columns: 1fr; }
+  .reference-domains, .reference-node-detail { display: none; }
+  .reference-graph-shell { grid-template-columns: 1fr; }
+}
+@media (max-width: 680px) {
+  .reference-page-intro { height: 112px; }
+  .reference-page-intro p { display: none; }
+  .reference-metrics { grid-template-columns: repeat(2, 1fr); }
+  .reference-run-item { grid-template-columns: 20px 1fr 55px; }
+  .reference-run-item em, .reference-run-item > span:nth-of-type(2), .reference-run-item strong { display: none; }
+  .reference-start-form { grid-template-columns: 1fr; }
+  .reference-docs > header, .reference-doc { grid-template-columns: 1fr 60px; }
+  .reference-docs > header span:nth-child(2), .reference-docs > header span:nth-child(3), .reference-doc > span:nth-child(2), .reference-doc > strong { display: none; }
+  .reference-graph-tools { align-items: stretch; flex-direction: column; height: auto; gap: 8px; padding-block: 10px; }
+  .reference-graph-tools select { width: 100%; }
+  .reference-graph-canvas { padding: 14px; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
