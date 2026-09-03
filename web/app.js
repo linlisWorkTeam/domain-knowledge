@@ -580,7 +580,14 @@ async function refreshKnowledgeList() {
   const result = await request(`/api/v1/knowledge${params.size ? `?${params}` : ''}`)
   const items = collection(result, 'knowledge')
   const list = document.querySelector('#knowledge-list')
-  if (list) list.innerHTML = knowledgeCards(items)
+  const focusedVersionId = document.activeElement?.dataset?.versionId
+  if (list) {
+    list.innerHTML = knowledgeCards(items)
+    if (focusedVersionId) {
+      list.querySelector(`[data-version-id="${CSS.escape(focusedVersionId)}"]`)
+        ?.focus({ preventScroll: true })
+    }
+  }
   applyKnowledgeModule(state.knowledgeModule)
 }
 

@@ -284,7 +284,12 @@ test('knowledge search and detail drawer are keyboard operable and restore focus
   const search = page.getByRole('searchbox');
   await expect(search).toBeFocused();
   await page.getByRole('combobox', { name: '知识状态' }).selectOption('');
+  const searchResponse = page.waitForResponse((response) => {
+    const url = new URL(response.url());
+    return url.pathname === '/api/v1/knowledge' && url.searchParams.get('q') === '浏览器验收';
+  });
   await search.fill('浏览器验收');
+  await searchResponse;
   await expect(page.getByRole('button', { name: /浏览器验收知识/ }).first()).toBeVisible();
 
   const card = page.getByRole('button', { name: /浏览器验收知识/ }).first();
