@@ -1034,7 +1034,8 @@ export class AutomatedProjectWorkflowService {
     return this.workflow.status(runId);
   }
 
-  resume(runId: string): Promise<WorkflowHandle> {
+  async resume(runId: string): Promise<WorkflowHandle> {
+    await this.runConfiguration.assertCompatible(runId);
     return this.workflow.resume(runId);
   }
 

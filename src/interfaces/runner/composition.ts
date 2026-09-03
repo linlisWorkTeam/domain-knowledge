@@ -6,7 +6,8 @@ import {
   EvalRunnerApp, FlywheelApp, KnowledgeDiscoveryApp, KnowledgeSearchApp, Orchestrator,
 } from '../../application/apps/index.ts';
 import {
-  AgentCatalogService, AutomatedProjectWorkflowService, DeterministicQualityPolicy, OhMyWorkPanelWorkflowExecutor,
+  AGENT_COMMAND_SCHEMA_ID, AGENT_RESULT_SCHEMA_ID, AgentCatalogService,
+  AutomatedProjectWorkflowService, DeterministicQualityPolicy, OhMyWorkPanelWorkflowExecutor,
   RegistryRunConfigurationService, RegistryWorkflowObserver,
 } from '../../application/services/index.ts';
 import { sha256 } from '../../domain/index.ts';
@@ -144,6 +145,16 @@ export function createComposition(input: {
         timeoutMs: Number(process.env.WP_DSH_TIMEOUT_MS ?? 600_000),
         maxOutputBytes: Number(process.env.WP_DSH_MAX_OUTPUT_BYTES ?? 2 * 1024 * 1024),
       })),
+    },
+    contracts: {
+      commandSchema: AGENT_COMMAND_SCHEMA_ID,
+      resultSchema: AGENT_RESULT_SCHEMA_ID,
+      commandSchemaSha256: sha256(readFileSync(
+        join(componentRoot, 'specs', 'schemas', 'agent-command.schema.json'),
+      )),
+      resultSchemaSha256: sha256(readFileSync(
+        join(componentRoot, 'specs', 'schemas', 'agent-result.schema.json'),
+      )),
     },
     clock: input.clock,
   });

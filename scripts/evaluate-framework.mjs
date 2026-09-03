@@ -28,7 +28,7 @@ const checks = [
   },
   {
     id: 'run-configuration-freeze',
-    claim: 'A Run keeps an immutable, secret-free snapshot of provider, prompt revisions, tools and schema versions',
+    claim: 'A Run keeps an immutable, secret-free snapshot and rejects recovery with changed provider, prompts, tools or schema digests',
     args: ['--test', 'tests/integration/run-configuration.test.ts'],
     evidence: ['tests/integration/run-configuration.test.ts'],
   },

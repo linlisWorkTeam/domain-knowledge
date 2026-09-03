@@ -23,6 +23,8 @@ test('RunConfigurationSnapshot freezes all Agent prompts and safe runtime identi
     assert.match(snapshot.provider.parametersSha256, /^[a-f0-9]{64}$/);
     assert.equal(snapshot.contracts.commandSchema, 'https://wpknowledge.local/schemas/agent-command/v1');
     assert.equal(snapshot.contracts.resultSchema, 'https://wpknowledge.local/schemas/agent-result/v1');
+    assert.match(snapshot.contracts.commandSchemaSha256, /^[a-f0-9]{64}$/);
+    assert.match(snapshot.contracts.resultSchemaSha256, /^[a-f0-9]{64}$/);
 
     const docGen = snapshot.agents.find(({ agentId }) => agentId === 'doc-gen');
     assert.equal(docGen?.promptRevision, 1);
@@ -38,6 +40,33 @@ test('RunConfigurationSnapshot freezes all Agent prompts and safe runtime identi
     ]);
     const serialized = JSON.stringify(snapshot);
     assert.doesNotMatch(serialized, /first frozen instruction|later instruction/);
+  } finally {
+    composition.close();
+    rmSync(runtimeDir, { recursive: true, force: true });
+  }
+});
+
+test('resume compatibility fails closed when frozen runtime inputs change', async () => {
+  const runtimeDir = mkdtempSync(join(tmpdir(), 'wp-run-configuration-'));
+  const composition = createComposition({ runtimeDir });
+  try {
+    const run = composition.apps.flywheel.createRun('resume-compatibility', 'local-v1');
+    const snapshot = await composition.runConfiguration.capture(run.runId);
+    composition.apps.orchestrator.updatePromptAddon('doc-gen', 'allowed for a future Run only');
+    await composition.runConfiguration.assertCompatible(run.runId);
+
+    composition.runConfiguration.provider.model = 'changed-model';
+    await assert.rejects(composition.runConfiguration.assertCompatible(run.runId), /provider configuration changed/);
+    composition.runConfiguration.provider.model = snapshot.provider.model;
+
+    composition.runConfiguration.contracts.commandSchemaSha256 = 'b'.repeat(64);
+    await assert.rejects(composition.runConfiguration.assertCompatible(run.runId), /schema configuration changed/);
+    composition.runConfiguration.contracts.commandSchemaSha256 = snapshot.contracts.commandSchemaSha256;
+
+    const orchestrator = composition.runConfiguration.definitions.find(({ agentId }) => agentId === 'orchestrator');
+    assert.ok(orchestrator);
+    orchestrator.tools.push('unexpected-tool');
+    await assert.rejects(composition.runConfiguration.assertCompatible(run.runId), /Agent tools changed/);
   } finally {
     composition.close();
     rmSync(runtimeDir, { recursive: true, force: true });

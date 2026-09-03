@@ -15,6 +15,7 @@ export class RegistryRunConfigurationService implements RunConfigurationManager 
   readonly repository: FlywheelRepository;
   readonly artifacts: ArtifactStore;
   readonly provider: RunConfigurationSnapshot['provider'];
+  readonly contracts: RunConfigurationSnapshot['contracts'];
   readonly clock: () => string;
 
   constructor(input: {
@@ -22,14 +23,18 @@ export class RegistryRunConfigurationService implements RunConfigurationManager 
     repository: FlywheelRepository;
     artifacts: ArtifactStore;
     provider: RunConfigurationSnapshot['provider'];
+    contracts: RunConfigurationSnapshot['contracts'];
     clock?: () => string;
   }) {
     assertInvariant(input.definitions.length === AGENT_IDS.length, 'run configuration requires all fixed Agents');
     assertInvariant(/^[a-f0-9]{64}$/.test(input.provider.parametersSha256), 'provider parameters digest is invalid');
+    assertInvariant(/^[a-f0-9]{64}$/.test(input.contracts.commandSchemaSha256), 'command schema digest is invalid');
+    assertInvariant(/^[a-f0-9]{64}$/.test(input.contracts.resultSchemaSha256), 'result schema digest is invalid');
     this.definitions = input.definitions.map((definition) => structuredClone(definition));
     this.repository = input.repository;
     this.artifacts = input.artifacts;
     this.provider = structuredClone(input.provider);
+    this.contracts = structuredClone(input.contracts);
     this.clock = input.clock ?? (() => new Date().toISOString());
   }
 
@@ -64,10 +69,7 @@ export class RegistryRunConfigurationService implements RunConfigurationManager 
       schemaVersion: '1.0',
       runId,
       provider: structuredClone(this.provider),
-      contracts: {
-        commandSchema: AGENT_COMMAND_SCHEMA_ID,
-        resultSchema: AGENT_RESULT_SCHEMA_ID,
-      },
+      contracts: structuredClone(this.contracts),
       agents,
       capturedAt,
     };
@@ -87,9 +89,30 @@ export class RegistryRunConfigurationService implements RunConfigurationManager 
     return this.repository.getRunConfiguration(runId);
   }
 
-  async resolvePrompt(runId: string, agentId: AgentId): Promise<string> {
+  async assertCompatible(runId: string): Promise<RunConfigurationSnapshot> {
     const snapshot = this.repository.getRunConfiguration(runId);
     assertInvariant(snapshot !== null, `run configuration not found: ${runId}`);
+    assertInvariant(JSON.stringify(snapshot.provider) === JSON.stringify(this.provider),
+      `run provider configuration changed: ${runId}`);
+    assertInvariant(JSON.stringify(snapshot.contracts) === JSON.stringify(this.contracts),
+      `run schema configuration changed: ${runId}`);
+    assertInvariant(snapshot.agents.length === this.definitions.length,
+      `run Agent configuration changed: ${runId}`);
+    for (const definition of this.definitions) {
+      const frozen = snapshot.agents.find((candidate) => candidate.agentId === definition.agentId);
+      assertInvariant(frozen !== undefined, `run configuration missing Agent: ${definition.agentId}`);
+      assertInvariant(frozen.basePromptSha256 === sha256(definition.basePrompt),
+        `run base prompt changed: ${definition.agentId}`);
+      assertInvariant(JSON.stringify(frozen.tools) === JSON.stringify(definition.tools),
+        `run Agent tools changed: ${definition.agentId}`);
+      assertInvariant(await this.artifacts.verify(frozen.effectivePromptRef),
+        `frozen prompt artifact is corrupt: ${definition.agentId}`);
+    }
+    return snapshot;
+  }
+
+  async resolvePrompt(runId: string, agentId: AgentId): Promise<string> {
+    const snapshot = await this.assertCompatible(runId);
     const agent = snapshot.agents.find((candidate) => candidate.agentId === agentId);
     assertInvariant(agent !== undefined, `run configuration missing Agent: ${agentId}`);
     assertInvariant(await this.artifacts.verify(agent.effectivePromptRef), `frozen prompt artifact is corrupt: ${agentId}`);

@@ -376,6 +376,8 @@ export interface RunConfigurationSnapshot {
   contracts: {
     commandSchema: 'https://wpknowledge.local/schemas/agent-command/v1';
     resultSchema: 'https://wpknowledge.local/schemas/agent-result/v1';
+    commandSchemaSha256: string;
+    resultSchemaSha256: string;
   };
   agents: AgentRunConfiguration[];
   capturedAt: string;
@@ -384,6 +386,7 @@ export interface RunConfigurationSnapshot {
 export interface RunConfigurationManager {
   capture(runId: string): Promise<RunConfigurationSnapshot>;
   get(runId: string): RunConfigurationSnapshot | null;
+  assertCompatible(runId: string): Promise<RunConfigurationSnapshot>;
   resolvePrompt(runId: string, agentId: AgentId): Promise<string>;
 }
 
