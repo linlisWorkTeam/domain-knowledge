@@ -81,7 +81,7 @@ npm run acceptance:ohmyworkpanel -- `
 
 评测器使用 `git archive`，生成文件只写临时目录；可执行工具限于 `node`、`pnpm` 和 `cargo`。它不经过 shell，会净化继承环境、限制命令时间与输出，并把工具版本、脱敏 argv、退出状态和脱敏输出保存到 CAS。
 
-默认 Agent Provider 重放经过 Schema 校验的 fixture，因此适合验证编排和执行路径。真实 DeepSeek Harness 接法、OpenCode Go patch 和公网调试说明见 [`deploy/deepseek-harness/README.md`](../deploy/deepseek-harness/README.md)。live 模式的 Agent 使用角色白名单工作区、官方 SDK 和 Bubblewrap；后续 ProjectEvaluator 仍只能运行受信源码。一次成功样例不是模型稳定性或敌对代码执行隔离证明。
+默认 Agent Provider 重放经过 Schema 校验的 fixture，因此适合验证编排和执行路径。真实 DeepSeek Harness 接法、OpenCode Go patch 和公网调试说明见 [`deploy/deepseek-harness/README.md`](../deploy/deepseek-harness/README.md)。live 模式的 Agent 使用角色白名单工作区、官方 SDK 和 Bubblewrap；角色工作区直接从 Run 快照绑定的 Git commit 读取文件，不复制可变工作树，DocWorker 只能读取自己的源码分块和共享公开接口。后续 ProjectEvaluator 仍只能运行受信源码。一次成功样例不是模型稳定性或敌对代码执行隔离证明。
 
 ## 内嵌 LangGraph 工作流
 
@@ -97,7 +97,9 @@ npm run knowledge -- workflow-report --run <run-id> --output /tmp/run-demo.json
 
 Agent 输出或进程出现可恢复错误时，`workflow-resume` 会从最近带 task error 的 LangGraph checkpoint 分支继续。已提交的 Artifact、Oracle 和 publication 仍由业务 GenerationKey 去重。候选知识未通过 Quality Gate 时不需要人工执行 resume：图会自动跳过本轮 CodeAgent，把质量 weak points 交给下一轮 DocGen。
 
-LangGraph 把执行 checkpoint 写到 `$WP_FLYWHEEL_HOME/workflow/checkpoints.sqlite`。不要把它当作业务 Registry，也不要暴露给浏览器。domain-knowledge 的 Knowledge Registry 持有 `FlywheelRun`、Agent prompt revision、节点投影、知识版本、评测报告、Event 和发布回执。两层用 `runId` 关联。
+LangGraph 把执行 checkpoint 写到 `$WP_FLYWHEEL_HOME/workflow/checkpoints.sqlite`。不要把它当作业务 Registry，也不要暴露给浏览器。domain-knowledge 的 Knowledge Registry 持有 `FlywheelRun`、Run 配置快照、Agent prompt revision、节点投影、知识版本、评测报告、Event 和发布回执。每个 Run 的有效提示词保存在 CAS，快照只记录 revision、摘要和 ArtifactRef；恢复不会读取后来修改的提示词。两层用 `runId` 关联。
+
+升级兼容边界：旧版本创建且没有 `RunConfigurationSnapshot` 的在途 Run 无法恢复，必须使用当前版本重新创建 Run。已有快照的 Run 只有在 Provider、模型、非敏感执行参数、基础 Prompt、工具权限及完整 Agent Schema 依赖摘要均与启动时一致时才允许恢复；不一致会 fail closed，不会静默改用新配置。此限制不改变任何现有 HTTP API。
 
 `workflow-report` 用于留存可复验 Demo。它导出 Registry 中的 Run、KnowledgeVersion、评测、Gate、节点尝试、业务 Checkpoint、Event 和 publication receipt，并逐一调用 CAS 完整性校验；若启用了真实 Provider，还会加入只含摘要的 Agent 调用记录。输出文件默认拒绝覆盖已有文件。报告不会读取 Prompt 正文、模型正文、Harness Session 日志或凭据。
 

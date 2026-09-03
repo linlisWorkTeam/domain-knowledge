@@ -14,7 +14,7 @@ import type {
 } from '../../../domain/index.ts';
 import type {
   AgentId, AgentPromptConfiguration, ArtifactStore, CandidateInput, FlywheelRepository,
-  NodeCheckpoint, WorkflowNodeProjection,
+  NodeCheckpoint, RunConfigurationSnapshot, WorkflowNodeProjection,
 } from '../../../application/ports/index.ts';
 
 function json(value: unknown): string {
@@ -227,6 +227,13 @@ export class SQLiteFlywheelRepository implements FlywheelRepository {
         updated_at TEXT NOT NULL
       );
 
+      CREATE TABLE IF NOT EXISTS run_configuration_snapshots (
+        run_id TEXT PRIMARY KEY,
+        snapshot_json TEXT NOT NULL,
+        captured_at TEXT NOT NULL,
+        FOREIGN KEY(run_id) REFERENCES runs(run_id)
+      );
+
       CREATE TABLE IF NOT EXISTS workflow_node_projections (
         run_id TEXT NOT NULL,
         node_id TEXT NOT NULL,
@@ -256,6 +263,7 @@ export class SQLiteFlywheelRepository implements FlywheelRepository {
       CREATE UNIQUE INDEX IF NOT EXISTS events_run_seq ON events(run_id, event_seq);
       INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (2, datetime('now'));
       INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (3, datetime('now'));
+      INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (4, datetime('now'));
     `);
   }
 
@@ -573,6 +581,33 @@ export class SQLiteFlywheelRepository implements FlywheelRepository {
       this.insertEvent(event);
       return structuredClone(configuration);
     });
+  }
+
+  saveRunConfiguration(
+    snapshot: RunConfigurationSnapshot,
+    event: DomainEvent,
+  ): RunConfigurationSnapshot {
+    return this.transaction(() => {
+      assertInvariant(snapshot.runId === event.runId, 'run configuration event scope mismatch');
+      const existing = this.getRunConfiguration(snapshot.runId);
+      if (existing) {
+        assertInvariant(json(existing) === json(snapshot), `run configuration is immutable: ${snapshot.runId}`);
+        return existing;
+      }
+      this.database.prepare(`
+        INSERT INTO run_configuration_snapshots(run_id, snapshot_json, captured_at)
+        VALUES (?, ?, ?)
+      `).run(snapshot.runId, json(snapshot), snapshot.capturedAt);
+      this.insertEvent(event);
+      return structuredClone(snapshot);
+    });
+  }
+
+  getRunConfiguration(runId: string): RunConfigurationSnapshot | null {
+    const row = this.database.prepare(`
+      SELECT snapshot_json FROM run_configuration_snapshots WHERE run_id = ?
+    `).get(runId) as Record<string, unknown> | undefined;
+    return row ? parse<RunConfigurationSnapshot>(row.snapshot_json) : null;
   }
 
   recordWorkflowNodeProjection(projection: WorkflowNodeProjection, event: DomainEvent): void {

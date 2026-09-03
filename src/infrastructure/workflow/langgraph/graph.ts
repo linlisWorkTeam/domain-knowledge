@@ -68,9 +68,13 @@ function createNode(deps: GraphDependencies, nodeId: string) {
     );
     const agentId = AGENT_BY_NODE[nodeId] ?? null;
     const definition = agentId ? agentDefinition(agentId) : null;
-    const promptAddon = agentId ? deps.prompts.getPromptAddon(agentId).trim() : '';
+    const promptAddon = agentId && deps.prompts.getPromptAddon
+      ? deps.prompts.getPromptAddon(agentId).trim()
+      : '';
     const prompt = definition
-      ? `${definition.basePrompt}${promptAddon ? `\n\nOperator prompt add-on:\n${promptAddon}` : ''}`
+      ? deps.prompts.resolvePrompt
+        ? await deps.prompts.resolvePrompt(state.runId, agentId as AgentId)
+        : `${definition.basePrompt}${promptAddon ? `\n\nOperator prompt add-on:\n${promptAddon}` : ''}`
       : '';
     const startedAt = deps.clock();
     deps.observer.record(projection(state, renderedNodeId, agentId, attempt, 'RUNNING', startedAt));

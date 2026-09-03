@@ -172,7 +172,7 @@ npm run knowledge -- set-agent-prompt --agent doc-gen --prompt ''
 
 清空会生成新的 revision，而不是删除审计历史。
 
-当前实现会在节点开始执行时读取最新的 `promptAddon`，还没有在 Run 启动时冻结一整套 Agent 配置快照。因此不要在 `RUNNING` 状态中修改提示词；否则尚未开始的节点可能读到新 revision，而已完成节点使用旧 revision。推荐先让当前 Run 到达终态，再保存配置并启动新 Run。
+Run 启动时会冻结 prompt revision、Provider/模型摘要、工具权限和 Schema URI，并把有效提示词正文作为不可变 CAS Artifact 保存；配置快照只保留摘要和 ArtifactRef。运行中的配置修改只影响新 Run，恢复执行仍读取原 Run 的冻结 Artifact。
 
 ## 什么时候必须进入核心开发
 

@@ -14,7 +14,7 @@
 | KF-SYS-008 | AC-FLOW-003 | Partial | `src/domain/index.ts` | `tests/unit/domain.test.ts` |
 | KF-SYS-009 | AC-PUB-001 | Implemented | `src/application/services/index.ts` + `src/infrastructure/persistence/sqlite-cas/index.ts` | `tests/acceptance/publication-flow.test.ts` |
 | KF-SYS-010 | AC-REC-001 | Partial | `src/application/services/index.ts` + `src/infrastructure/persistence/sqlite-cas/index.ts` | `tests/integration/sqlite-cas.test.ts` |
-| KF-SYS-011 | AC-SCHEMA-001 | Partial | `specs/schemas` + `src/application/ports` | `specs/13-verification/validate-specs.ts` |
+| KF-SYS-011 | AC-SCHEMA-001 | Implemented | `specs/schemas` + `src/application/ports` + `src/infrastructure/agents/contracts` + `src/application/services/automated-project-workflow.ts` | `specs/13-verification/validate-specs.ts` + `tests/integration/agent-contracts.test.ts` + `tests/acceptance/automated-langgraph-flow.test.ts` |
 | KF-SYS-012 | AC-LANG-001 | Implemented | `src/application/ports/index.ts` | `tests/contract/architecture.test.ts` |
 | KF-SYS-013 | AC-SEC-002 | Partial | `src/interfaces/runner/server.ts` | `tests/integration/server.test.ts` |
 | KF-SYS-014 | AC-LANG-002 | Planned | — | — |
@@ -40,7 +40,7 @@
 | NFR-003 | AC-REC-002 | Implemented | `src/application/services/index.ts` + `src/infrastructure/persistence/sqlite-cas/index.ts` | `tests/integration/sqlite-cas.test.ts` + `tests/acceptance/publication-flow.test.ts` |
 | NFR-004 | AC-OBS-001 | Partial | `src/infrastructure/persistence/sqlite-cas/index.ts` | `tests/acceptance/publication-flow.test.ts` |
 | NFR-005 | AC-ARCH-001 | Implemented | `src/domain` + `src/application/ports` | `tests/contract/architecture.test.ts` |
-| NFR-006 | AC-SCHEMA-001 | Partial | `specs/schemas` + `src/infrastructure/persistence/sqlite-cas/index.ts` | `specs/13-verification/validate-specs.ts` + `tests/contract/spec-validator.test.ts` |
+| NFR-006 | AC-SCHEMA-001 | Partial | `specs/schemas` + `src/infrastructure/agents/contracts` + `src/infrastructure/persistence/sqlite-cas/index.ts` | `specs/13-verification/validate-specs.ts` + `tests/contract/spec-validator.test.ts` + `tests/integration/agent-contracts.test.ts` |
 | NFR-007 | AC-LANG-002 | Planned | — | — |
 | NFR-008 | AC-EVAL-003 | Implemented | `src/domain/index.ts` + `src/infrastructure/evaluation/project/index.ts` | `tests/acceptance/real-source-flow.test.ts` |
 | NFR-009 | AC-SEC-003 | Partial | `src/infrastructure/agents/deepseek-harness` + `src/interfaces/runner/demo-report.ts` | `tests/integration/deepseek-harness-agent.test.ts` + `tests/integration/demo-report.test.ts` |

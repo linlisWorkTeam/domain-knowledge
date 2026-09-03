@@ -14,7 +14,7 @@ export type QualityOutcome = 'ACCEPTED' | 'REJECTED';
 export const DOMAIN_EVENT_TYPES = [
   'RunCreated', 'RunStateChanged', 'ArtifactCommitted', 'GateDecided',
   'KnowledgePublished', 'NodeCompleted', 'NodeFailed', 'AgentPromptConfigured',
-  'WorkflowNodeStateChanged',
+  'WorkflowNodeStateChanged', 'RunConfigurationCaptured',
 ] as const;
 export type DomainEventType = typeof DOMAIN_EVENT_TYPES[number];
 

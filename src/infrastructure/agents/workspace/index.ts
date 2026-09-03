@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
 import { mkdir, lstat, readFile, realpath, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, normalize, relative, resolve, sep } from 'node:path';
 import type { AgentWorkspaceProvider, AgentWorkspaceView } from '../../../application/ports/index.ts';
@@ -41,6 +42,24 @@ async function writeImmutable(path: string, bytes: Uint8Array): Promise<void> {
   }
 }
 
+function committedFile(repositoryRoot: string, commit: string, path: string): Buffer {
+  if (!/^[a-f0-9]{40}$/i.test(commit)) throw new Error(`AGENT_WORKSPACE_COMMIT_INVALID: ${commit}`);
+  const tree = spawnSync('git', ['ls-tree', commit, '--', path], {
+    cwd: repositoryRoot, encoding: 'utf8', shell: false, windowsHide: true,
+  });
+  if (tree.error) throw tree.error;
+  if (tree.status !== 0 || !tree.stdout.trim()) throw new Error(`AGENT_WORKSPACE_SOURCE_MISSING: ${path}`);
+  const mode = tree.stdout.trim().split(/\s+/, 1)[0];
+  if (mode !== '100644' && mode !== '100755') throw new Error(`AGENT_WORKSPACE_NOT_FILE: ${path}`);
+  const content = spawnSync('git', ['show', `${commit}:${path}`], {
+    cwd: repositoryRoot, encoding: null, shell: false, windowsHide: true,
+    maxBuffer: 16 * 1024 * 1024,
+  });
+  if (content.error) throw content.error;
+  if (content.status !== 0 || !content.stdout) throw new Error(`AGENT_WORKSPACE_SOURCE_MISSING: ${path}`);
+  return content.stdout;
+}
+
 /**
  * Copies an explicit allowlist into an immutable per-node view. This prevents
  * accidental source visibility. The DSH process sandbox is responsible for
@@ -60,6 +79,7 @@ export class LocalAgentWorkspace implements AgentWorkspaceProvider {
     isolationKey: string;
     role: string;
     sourceRoot: string;
+    sourceCommit?: string;
     readablePaths: string[];
   }): Promise<AgentWorkspaceView> {
     const sourceRoot = await realpath(resolve(input.sourceRoot));
@@ -72,24 +92,30 @@ export class LocalAgentWorkspace implements AgentWorkspaceProvider {
       isolationKey: input.isolationKey,
       role: input.role,
       sourceRoot,
+      sourceCommit: input.sourceCommit ?? null,
       readablePaths,
     });
     const viewRoot = join(this.workspaceRoot, digest(viewIdentity).slice(0, 32));
     await mkdir(viewRoot, { recursive: true, mode: 0o700 });
     const files: { path: string; sha256: string; bytes: number }[] = [];
     for (const path of readablePaths) {
-      await assertNoSymlink(sourceRoot, path);
       const pathSegments = path.split('/');
-      const source = await realpath(join(sourceRoot, ...pathSegments));
-      if (relative(sourceRoot, source).startsWith('..')) throw new Error(`AGENT_WORKSPACE_PATH_DENIED: ${path}`);
-      const stat = await lstat(source);
-      if (!stat.isFile()) throw new Error(`AGENT_WORKSPACE_NOT_FILE: ${path}`);
-      const bytes = await readFile(source);
+      let bytes: Uint8Array;
+      if (input.sourceCommit) {
+        bytes = committedFile(sourceRoot, input.sourceCommit, path);
+      } else {
+        await assertNoSymlink(sourceRoot, path);
+        const source = await realpath(join(sourceRoot, ...pathSegments));
+        if (relative(sourceRoot, source).startsWith('..')) throw new Error(`AGENT_WORKSPACE_PATH_DENIED: ${path}`);
+        const stat = await lstat(source);
+        if (!stat.isFile()) throw new Error(`AGENT_WORKSPACE_NOT_FILE: ${path}`);
+        bytes = await readFile(source);
+      }
       await writeImmutable(join(viewRoot, ...pathSegments), bytes);
       files.push({ path, sha256: digest(bytes), bytes: bytes.byteLength });
     }
     await writeImmutable(join(viewRoot, '.flywheel-workspace.json'), Buffer.from(JSON.stringify({
-      schemaVersion: '1.0', role: input.role, readablePaths, files,
+      schemaVersion: '1.0', role: input.role, sourceCommit: input.sourceCommit ?? null, readablePaths, files,
     }, null, 2)));
     return { workspaceRoot: viewRoot, readablePaths };
   }

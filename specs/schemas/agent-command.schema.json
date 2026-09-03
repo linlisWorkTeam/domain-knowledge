@@ -67,6 +67,17 @@
         "sourceRefs": {"$ref": "#/$defs/artifactRefArray"},
         "publicInterfaceRefs": {"$ref": "#/$defs/artifactRefArray"},
         "baseKnowledgeRef": {"$ref": "#/$defs/artifactRef"},
+        "workerFragmentRefs": {"$ref": "#/$defs/artifactRefArray"},
+        "qualityFeedback": {
+          "type": "object",
+          "required": ["score", "signals", "weakPoints"],
+          "properties": {
+            "score": {"type": "number"},
+            "signals": {"type": "object", "additionalProperties": {"type": "number"}},
+            "weakPoints": {"type": "array", "items": {"type": "string"}}
+          },
+          "additionalProperties": false
+        },
         "corrections": {
           "type": "array",
           "minItems": 1,
@@ -82,7 +93,13 @@
         "moduleId": {"type": "string", "minLength": 1},
         "sourceRefs": {"$ref": "#/$defs/artifactRefArray"},
         "publicInterfaceRefs": {"$ref": "#/$defs/artifactRefArray"},
-        "dependencyRefs": {"$ref": "#/$defs/artifactRefArray"}
+        "dependencyRefs": {"$ref": "#/$defs/artifactRefArray"},
+        "assignedSourcePaths": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        }
       },
       "additionalProperties": false
     },
@@ -105,7 +122,13 @@
         "knowledgeRef": {"$ref": "#/$defs/artifactRef"},
         "publicInterfaceRefs": {"$ref": "#/$defs/artifactRefArray"},
         "languageId": {"type": "string", "pattern": "^[a-z][a-z0-9+.-]*$"},
-        "buildContractRef": {"$ref": "#/$defs/artifactRef"}
+        "buildContractRef": {"$ref": "#/$defs/artifactRef"},
+        "allowedGeneratedPaths": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        }
       },
       "additionalProperties": false
     },

@@ -63,6 +63,8 @@ export interface FlywheelRepository {
   failCheckpoint(generationKey: string, retryCount: number, event: DomainEvent, now: string): NodeCheckpoint;
   listAgentPromptConfigurations(): AgentPromptConfiguration[];
   saveAgentPromptConfiguration(configuration: AgentPromptConfiguration, event: DomainEvent): AgentPromptConfiguration;
+  saveRunConfiguration(snapshot: RunConfigurationSnapshot, event: DomainEvent): RunConfigurationSnapshot;
+  getRunConfiguration(runId: string): RunConfigurationSnapshot | null;
   recordWorkflowNodeProjection(projection: WorkflowNodeProjection, event: DomainEvent): void;
   listWorkflowNodeProjections(runId: string): WorkflowNodeProjection[];
   status(): Record<string, unknown>;
@@ -182,6 +184,8 @@ export interface AgentRequest {
   prompt: string;
   outputSchema: Record<string, unknown>;
   idempotencyKey: string;
+  /** Validated workflow command. Providers may transport it but cannot redefine it. */
+  command?: AgentCommand;
   inputRefs?: ArtifactRef[];
   /** Trusted workspace selected by the workflow, never by model output. */
   workspaceRoot?: string;
@@ -191,6 +195,32 @@ export interface AgentRequest {
 
 export interface AgentProvider {
   run(request: AgentRequest, signal?: AbortSignal): Promise<Record<string, unknown>>;
+}
+
+export interface AgentCommand {
+  schemaVersion: '1.0';
+  commandId: string;
+  runId: string;
+  agentType: AgentId;
+  generationKey: string;
+  payload: Record<string, unknown>;
+}
+
+export interface AgentResult {
+  schemaVersion: '1.0';
+  commandId: string;
+  commandRef: ArtifactRef;
+  runId: string;
+  agentType: AgentId;
+  status: 'SUCCEEDED' | 'FAILED';
+  outputRefs: ArtifactRef[];
+  payload: Record<string, unknown>;
+}
+
+/** Runtime boundary for the versioned schemas under specs/schemas. */
+export interface AgentContractValidator {
+  assertCommand(command: AgentCommand): void;
+  assertResult(result: AgentResult): void;
 }
 
 export interface AgentWorkspaceView {
@@ -203,6 +233,8 @@ export interface AgentWorkspaceProvider {
     isolationKey: string;
     role: string;
     sourceRoot: string;
+    /** When present, files must be read from this immutable Git commit, not the worktree. */
+    sourceCommit?: string;
     readablePaths: string[];
   }): Promise<AgentWorkspaceView>;
 }
@@ -326,6 +358,41 @@ export interface AgentPromptConfiguration {
   updatedAt: string | null;
 }
 
+export interface AgentRunConfiguration {
+  agentId: AgentId;
+  promptRevision: number;
+  basePromptSha256: string;
+  promptAddonSha256: string;
+  effectivePromptSha256: string;
+  effectivePromptRef: ArtifactRef;
+  tools: string[];
+}
+
+export interface RunConfigurationSnapshot {
+  schemaVersion: '1.0';
+  runId: string;
+  provider: {
+    kind: string;
+    model: string;
+    parametersSha256: string;
+  };
+  contracts: {
+    commandSchema: 'https://wpknowledge.local/schemas/agent-command/v1';
+    resultSchema: 'https://wpknowledge.local/schemas/agent-result/v1';
+    commandSchemaSha256: string;
+    resultSchemaSha256: string;
+  };
+  agents: AgentRunConfiguration[];
+  capturedAt: string;
+}
+
+export interface RunConfigurationManager {
+  capture(runId: string): Promise<RunConfigurationSnapshot>;
+  get(runId: string): RunConfigurationSnapshot | null;
+  assertCompatible(runId: string): Promise<RunConfigurationSnapshot>;
+  resolvePrompt(runId: string, agentId: AgentId): Promise<string>;
+}
+
 export type WorkflowNodeStatus = 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
 
 export interface WorkflowNodeProjection {
@@ -401,5 +468,7 @@ export interface WorkflowObserver {
 }
 
 export interface AgentPromptResolver {
-  getPromptAddon(agentId: AgentId): string;
+  resolvePrompt?(runId: string, agentId: AgentId): Promise<string>;
+  /** Compatibility path for tests without a persisted RunConfigurationSnapshot. */
+  getPromptAddon?(agentId: AgentId): string;
 }

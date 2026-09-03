@@ -1,9 +1,16 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import { LocalAgentWorkspace } from '../../src/infrastructure/agents/workspace/index.ts';
+
+function git(root: string, args: string[]): string {
+  const result = spawnSync('git', args, { cwd: root, encoding: 'utf8', shell: false });
+  assert.equal(result.status, 0, result.stderr);
+  return result.stdout.trim();
+}
 
 test('role workspace copies only the explicit readable-path allowlist', async () => {
   const root = mkdtempSync(join(tmpdir(), 'wp-agent-view-'));
@@ -22,6 +29,40 @@ test('role workspace copies only the explicit readable-path allowlist', async ()
     assert.equal(existsSync(join(view.workspaceRoot, 'src', 'secret.ts')), false);
     assert.deepEqual(view.readablePaths, ['src/public.ts']);
     assert.match(readFileSync(join(view.workspaceRoot, '.flywheel-workspace.json'), 'utf8'), /"role": "code"/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('role workspace materializes the fixed Git commit instead of mutable worktree bytes', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'wp-agent-view-commit-'));
+  const source = join(root, 'source');
+  mkdirSync(join(source, 'src'), { recursive: true });
+  writeFileSync(join(source, 'src', 'module.ts'), 'export const value = "committed";\n');
+  try {
+    git(source, ['init']);
+    git(source, ['config', 'user.email', 'workspace@example.invalid']);
+    git(source, ['config', 'user.name', 'Workspace Test']);
+    git(source, ['add', '.']);
+    git(source, ['commit', '-m', 'fixture']);
+    const commit = git(source, ['rev-parse', 'HEAD']);
+    writeFileSync(join(source, 'src', 'module.ts'), 'export const value = "dirty";\n');
+
+    const provider = new LocalAgentWorkspace({
+      workspaceRoot: join(root, 'views'), allowedSourceRoots: [source],
+    });
+    const view = await provider.materialize({
+      isolationKey: 'fixed-commit', role: 'doc-worker', sourceRoot: source, sourceCommit: commit,
+      readablePaths: ['src/module.ts'],
+    });
+    assert.equal(
+      readFileSync(join(view.workspaceRoot, 'src', 'module.ts'), 'utf8'),
+      'export const value = "committed";\n',
+    );
+    assert.match(
+      readFileSync(join(view.workspaceRoot, '.flywheel-workspace.json'), 'utf8'),
+      new RegExp(commit),
+    );
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
