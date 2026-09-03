@@ -604,10 +604,10 @@ function closeDrawer() {
   drawer.classList.remove('open')
   drawer.setAttribute('aria-hidden', 'true')
   drawerBackdrop.hidden = true
+  drawer.hidden = true
   const returnTarget = document.contains(drawerReturnFocus) ? drawerReturnFocus : (drawerReturnKey ? document.querySelector(drawerReturnKey) : null)
   if (returnTarget instanceof HTMLElement) returnTarget.focus()
   setTimeout(() => {
-    if (!drawer.classList.contains('open')) drawer.hidden = true
     drawerReturnFocus = null
     drawerReturnKey = null
   }, 180)
