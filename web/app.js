@@ -1221,12 +1221,18 @@ function openDrawer(returnFocus = document.activeElement) {
 
 function closeDrawer() {
   if (drawer.hidden && !drawer.classList.contains('open')) return
+  const previousReturnFocus = drawerReturnFocus
+  const previousReturnKey = drawerReturnKey
   drawer.classList.remove('open')
   drawer.setAttribute('aria-hidden', 'true')
   drawerBackdrop.hidden = true
   drawer.hidden = true
-  const returnTarget = document.contains(drawerReturnFocus) ? drawerReturnFocus : (drawerReturnKey ? document.querySelector(drawerReturnKey) : null)
-  if (returnTarget instanceof HTMLElement) returnTarget.focus()
+  requestAnimationFrame(() => {
+    const returnTarget = document.contains(previousReturnFocus)
+      ? previousReturnFocus
+      : (previousReturnKey ? content.querySelector(previousReturnKey) : null)
+    if (returnTarget instanceof HTMLElement) returnTarget.focus({ preventScroll: true })
+  })
   setTimeout(() => {
     drawerReturnFocus = null
     drawerReturnKey = null
@@ -1586,7 +1592,10 @@ document.addEventListener('keydown', (event) => {
     event.preventDefault()
     globalSearchButton.click()
   }
-  if (event.key === 'Escape' && drawer.classList.contains('open')) closeDrawer()
+  if (event.key === 'Escape' && drawer.classList.contains('open')) {
+    event.preventDefault()
+    closeDrawer()
+  }
   else if (event.key === 'Escape' && sidebar.classList.contains('open')) { closeNavigation(); navToggle.focus() }
   if (event.key === 'Tab' && drawer.classList.contains('open')) {
     const focusable = [...drawer.querySelectorAll('button, a[href], input, select, textarea, [tabindex]:not([tabindex="-1"])')].filter((item) => !item.disabled && !item.hidden)
