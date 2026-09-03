@@ -1,6 +1,6 @@
 # Preview HTTP API 规范
 
-**状态：Accepted；B1 已实现、HCP-1 已验收｜版本：0.2.2｜日期：2026-09-03**
+**状态：Accepted；B1 已实现、DEV-006 契约已细化｜版本：0.3.0｜日期：2026-09-03**
 
 本文是 Knowledge Console HTTP API 的唯一规范性入口，统一定义资源分组、页面能力、当前实现映射和待补接口。领域行为、状态机与发布门禁仍以对应领域和工作流规范为准；HTTP 路由不得创造第二套业务语义。
 
@@ -77,6 +77,127 @@
 | `GET /api/v1/knowledge/health` | Planned | 返回有明确口径和样本范围的 freshness、coverage、quality 聚合，不得输出模型臆测分数。 |
 
 第一阶段操作中心只能从 `FAILED`、`LOW_CONFIDENCE` 和最新 GateDecision=`STOPPED` 派生批次级只读事项，并明确标记为 `Partial`；独立生命周期、处理状态、重新生成和跨批次活动流必须等待上述接口。
+
+### 3.1 DEV-006 最小交付边界
+
+DEV-006 只补齐操作中心、飞轮批次和工作流图所需控制面，不提前实现 B3 的来源漂移、Evaluation Rule、Knowledge lineage/diff 或 Knowledge Health，也不实现 B4 的项目空间和 Provider 配置。交付拆为三个可独立验收的切片：
+
+1. `DEV-006A`：组件健康、持久化待处理事项、批次进度和跨批次活动流的只读 API；前台从临时派生数据切换到服务端事实。
+2. `DEV-006B`：acknowledge、resolve、retry、regenerate 命令及完整权限、幂等和审计；读模型稳定前不得先开放写按钮。
+3. `DEV-006C`：批次与活动 SSE、断线续传、前台实时更新和轮询降级；SSE 故障不得使已持久化事实消失。
+
+### 3.2 待处理事项领域契约
+
+待处理事项是持久化治理实体，不等同于 FlywheelRun、GateDecision 或普通事件。DEV-006 允许以下来源类型：
+
+| `type` | 确定性触发事实 | 默认严重级别 |
+|---|---|---|
+| `RUN_FAILED` | 批次进入 `FAILED` | `HIGH` |
+| `LOW_CONFIDENCE` | 批次进入 `LOW_CONFIDENCE` | `MEDIUM` |
+| `GATE_STOPPED` | 最新 GateDecision 为 `STOPPED` | `HIGH` |
+| `COMPONENT_UNAVAILABLE` | 必需组件状态为 `UNAVAILABLE` 且影响活动批次 | `HIGH` |
+
+来源漂移、知识冲突和规则质量问题属于 B3，不能在 DEV-006 中以自由文本假装为已实现类型。实体最小结构如下：
+
+```json
+{
+  "actionItemId": "ai_...",
+  "type": "RUN_FAILED",
+  "severity": "HIGH",
+  "status": "OPEN",
+  "subject": { "kind": "RUN", "id": "run_..." },
+  "runId": "run_...",
+  "reasonCode": "AGENT_OUTPUT_INVALID",
+  "summary": "受控、可本地化的说明",
+  "sourceEventId": "evt_...",
+  "fingerprint": "sha256:...",
+  "allowedActions": ["ACKNOWLEDGE", "RETRY"],
+  "revision": 1,
+  "createdAt": "2026-09-03T00:00:00Z",
+  "updatedAt": "2026-09-03T00:00:00Z",
+  "resolvedAt": null,
+  "resolution": null
+}
+```
+
+- `fingerprint = SHA-256(type + subject.kind + subject.id + reasonCode)`；同一 fingerprint 同时最多存在一个非 `RESOLVED` 事项。事件重放只增加已观察来源，不创建重复事项。
+- 已解决事项再次发生同类新事实时创建新 `actionItemId`，并用 `previousOccurrenceId` 关联上一次事项，不覆盖历史。
+- 状态仅允许 `OPEN → ACKNOWLEDGED → RESOLVED` 或 `OPEN → RESOLVED`。acknowledge 表示已接手，不表示风险消失；resolve 必须提交非空 reason。
+- `allowedActions` 由服务端根据事项类型、批次状态、能力和权限计算；前台不得自行推导或展示未返回的动作。
+- 任何动作只追加治理历史和必要命令，不得修改历史 GateDecision、EvaluationReport、KnowledgeVersion 或 publication receipt。
+
+列表接口支持 `status`、`severity`、`type`、`runId`、`limit` 和 `cursor`，默认按 `updatedAt DESC, actionItemId DESC`。详情额外返回 `history[]`、受控证据引用和关联命令，不返回 Prompt、模型正文或任意文件路径。
+
+命令请求统一为：
+
+```json
+{
+  "expectedRevision": 1,
+  "reason": "人工判断依据",
+  "feedback": "仅 regenerate 可选；将进入新批次的冻结输入"
+}
+```
+
+`ACKNOWLEDGE` 和 `RESOLVE` 只改变事项状态；`RETRY` 仅适用于具有可恢复失败 checkpoint 的原批次，并复用既有 resume 语义；`REGENERATE` 创建新的批次和新的 RunConfigurationSnapshot，返回 `runId`，并通过 `causedByActionItemId`、`parentRunId` 保留因果链。retry/regenerate 接受成功不自动解决事项，只有目标批次达到与原因相符的成功条件后才可由确定性规则或管理员 resolve。
+
+### 3.3 可证明进度
+
+```json
+{
+  "runId": "run_...",
+  "mode": "DETERMINATE",
+  "completedUnits": 4,
+  "totalUnits": 7,
+  "ratio": 0.5714,
+  "currentStage": "EVALUATE",
+  "iteration": 1,
+  "retrying": false,
+  "sampledAt": "2026-09-03T00:00:00Z"
+}
+```
+
+- 工作单元来自冻结的 RunConfigurationSnapshot 与固定 Agent DAG；节点只有持久化为 `COMPLETED` 才计入 completed。
+- 同一节点的 attempt/retry 不增加 total；确定性迭代新增一轮时，服务端先原子扩展 total，再发布进度事件，ratio 不得超过 `1`。
+- 无法在查询时证明完整工作单元时返回 `mode=INDETERMINATE`，`completedUnits`、`totalUnits`、`ratio` 均为 `null`，仍可返回 currentStage 和 iteration。
+- DEV-006 不返回 ETA；前台显示阶段和可证明比例，不能根据本地计时猜测剩余时间。
+
+### 3.4 SSE 与恢复
+
+- 批次流 `GET /api/v1/runs/:runId/event-stream` 的每条 `id` 等于该批次已持久化 `event_seq`；客户端必须先读取 snapshot，再以 snapshot 的最后序号连接。
+- 服务端同时接受 `Last-Event-ID` 或 `after`，两者同时存在且不一致返回 `400 INVALID_EVENT_CURSOR`。重连从游标之后发送，不能跳过已提交事件。
+- 活动流 `GET /api/v1/activity/stream` 使用全局、单调递增且不透明的 activity cursor，不能复用单批次 `event_seq`。
+- 连接建立后先发送 `ready` 事件；空闲每 15 秒发送注释 heartbeat。单连接最长 30 分钟，正常关闭前发送 `reconnect` 提示。
+- 游标早于保留窗口返回 `409 CURSOR_EXPIRED` 并附 `snapshotRequired=true`；客户端重新读取对应列表/snapshot 后再连接。
+- 允许网络层重复投递，客户端必须按 cursor 去重；持久化事件顺序必须不重不漏。SSE 不可用时前台退回现有增量轮询并明确显示连接状态。
+
+### 3.5 跨批次活动流
+
+活动是现有不可变领域/审计事件的脱敏读模型，不建立第二套可写事实源。条目最小字段为 `activityId`、`cursor`、`type`、`occurredAt`、`runId?`、`subject`、`summary`、`severity`、`eventId` 和 `links`。列表支持 `type`、`runId`、`severity`、`occurredAfter`、`limit`、`cursor`，按全局 cursor 倒序；SSE 按正序续传。重复构建读模型必须得到同一 activityId。
+
+### 3.6 组件健康
+
+`GET /api/v1/system/components` 返回固定组件 `registry`、`artifactStore`、`workflow`、`provider`、`evaluator`：
+
+```json
+{
+  "items": [{
+    "component": "provider",
+    "status": "DEGRADED",
+    "reasonCode": "AUTH_EXPIRING",
+    "message": "受控说明",
+    "checkedAt": "2026-09-03T00:00:00Z",
+    "lastSucceededAt": "2026-09-02T23:59:00Z"
+  }],
+  "overall": "DEGRADED",
+  "sampledAt": "2026-09-03T00:00:00Z"
+}
+```
+
+状态只允许 `AVAILABLE`、`DEGRADED`、`UNAVAILABLE`、`UNKNOWN`；overall 取最差必需组件状态，但 `UNKNOWN` 不得显示为健康。检查必须有严格超时且不得触发模型生成、运行评测或其他有副作用操作。响应不得包含 API Key、token、Session、Prompt、文件路径或上游原始错误正文。
+
+### 3.7 权限、并发与错误
+
+列表、详情、进度、组件健康和 SSE 在本地 Preview 中可只读访问，但仍受部署访问边界约束；所有事项动作和 retry/regenerate 必须使用管理员 Bearer token。命令同时要求 `Idempotency-Key` 与 `expectedRevision`：重复同请求返回原结果，不同 payload 返回 `409 IDEMPOTENCY_CONFLICT`，过期 revision 返回 `409 REVISION_CONFLICT`。至少定义以下稳定错误码：`ACTION_NOT_ALLOWED`、`ACTION_ITEM_RESOLVED`、`RUN_NOT_RETRYABLE`、`CURSOR_EXPIRED`、`INVALID_EVENT_CURSOR`、`COMPONENT_CHECK_TIMEOUT`。
 
 ## 4. Knowledge
 

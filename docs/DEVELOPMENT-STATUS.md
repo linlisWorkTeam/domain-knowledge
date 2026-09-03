@@ -1,6 +1,6 @@
 # 开发状态
 
-**当前阶段：DEV-005 HCP-1 = Accepted，最终 UI/UX 已冻结｜更新时间：2026-09-03｜下一任务：DEV-006**
+**当前阶段：DEV-006 Spec 细化中，最终 UI/UX 已冻结｜更新时间：2026-09-03｜当前任务：DEV-006A**
 
 本文件是 domain-knowledge 的**唯一开发进度入口**，用于记录当前阶段、已完成里程碑、正在进行或下一项工作、后续队列和最近验证结果。产品行为仍以 [`../specs/`](../specs/README.md) 为规范性事实源；需求级的 `Implemented / Partial / Planned` 状态仍只在[追踪矩阵](../specs/13-verification/traceability-matrix.md)维护。
 
@@ -59,7 +59,7 @@ This file is the single entry point for project-level development status, curren
 | DEV-004 | AgentCommand/AgentResult、Run 配置冻结与框架机械能力测评 | Done | [框架阶段性测评](report/框架阶段性测评.md)，结果 `6/6 ACCEPTED` |
 | DEV-UI-001 | 前台 F1 Knowledge Console | Done | `tests/contract/site.test.ts`、`tests/e2e/console.spec.ts`；只复用现有 API |
 | DEV-005 | Console 第一轮：F2 最终七页面 + B1 API 基线 + HCP-1 | Done | B1 已就绪；当前七页 UI/UX 已冻结，HCP-1=`Accepted` |
-| DEV-006 | Console B2 操作中心与飞轮批次完整控制面 | Planned | 待处理事项、进度/重试/SSE、组件健康、活动流与工作流图实时更新；依赖 DEV-005 |
+| DEV-006 | Console B2 操作中心与飞轮批次完整控制面 | In Progress | DEV-006A 先交付只读事实；DEV-006B 再开放治理命令；DEV-006C 完成 SSE 与实时前台 |
 | DEV-007 | Console B3 知识、评测与来源 | Planned | 知识可由独立 Agent 并行；血缘/差异、评测读模型与规则、来源注册、知识健康度；依赖 DEV-005 |
 | DEV-008 | Console B4 运营面加固 | Planned | Provider status、指标口径、SSE 容量和大数据查询验收；依赖 DEV-006/007 |
 | DEV-009 | 公司 CodeAgent CLI Adapter 与契约验证 | Planned | 原 DEV-005；Console 优先队列完成后恢复排序 |
@@ -91,6 +91,20 @@ This file is the single entry point for project-level development status, curren
 4. 页面不展示模拟 Health、ETA、Activity、Action Item、Workspace 或用户身份；
 5. `npm run typecheck`、`npm run validate:specs`、`npm test`、`npm run site:check` 和 `npm run test:ui` 全部通过；
 6. HCP-1 证据与人工结论记录在对应 PR，开发状态在同一变更回写。
+
+## 当前开发任务：DEV-006A
+
+目标是先建立操作中心、飞轮批次和工作流图共用的服务端只读事实，避免在生命周期和恢复语义尚未稳定时提前开放治理写操作。
+
+范围：
+
+- 持久化待处理事项及确定性投影、去重和详情历史；
+- 固定/不可证明两种批次进度读模型，不提供 ETA；
+- 注册、制品存储、工作流、Provider、评测器五类组件健康；
+- 跨批次活动列表及稳定全局 cursor；
+- 前台操作中心与飞轮批次只读接线，保留明确的写操作 Disabled 状态。
+
+完成标准：对应 API Schema、持久化迁移、Application 读用例、HTTP 集成测试和前台 Empty/Partial/Error 状态全部通过；随后进入 DEV-006B 人工检查，确认事项类型、严重级别、允许动作和进度口径后才开放写命令。
 
 ## 后续开发任务：DEV-009 CompanyCodeAgentCliAdapter
 
