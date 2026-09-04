@@ -2,7 +2,7 @@
 
 ## 开发基线
 
-第一次参与开发请先阅读[从这里开始](START-HERE.md)；按任务定位代码和测试时，使用其中的任务表。
+第一次参与开发请先阅读[文档首页](README.md)；按任务定位代码和测试时，使用其中的任务表。
 
 从仓库根目录开始：
 
@@ -20,6 +20,15 @@ npm test
 `node_modules`，禁止通过符号链接共享。成功后脚本会在
 `.workpanel/worktree-bootstrap.json` 写入带 Node 版本和锁文件摘要的 `READY` 状态；
 Agent 启动器可先运行 `npm run bootstrap:worktree:check` 进行快速门禁。
+
+## 工程治理边界
+
+- 产品行为以 `specs/` 为唯一规范性事实源，项目进度以 `DEVELOPMENT-STATUS.md` 为准，需求实现状态只在追踪矩阵维护。
+- SQLite Registry 是运行时业务事实源；知识正文和研究证据保存在 `wpKnowledge`。
+- 不得建立第二套 Registry、Workflow、Gate 或发布路径，也不得恢复已经废弃的 Runner 包装目录。
+- `Implemented` 必须有代码和自动化验证；`Partial`、`Planned`、fixture 和 live 结果必须按实际证据表达。
+- 行为变化至少同步 Spec、实现、测试和追踪矩阵；影响使用、运维或阶段状态时同步对应文档。
+- Agent 输入输出遵循 JSON Schema，大对象通过 ArtifactRef 传递；外部命令限制路径、环境、权限、超时和输出，不受信执行能力未完成时必须 fail closed。
 
 ## 依赖方向
 
@@ -85,7 +94,7 @@ uiApi / CLI / DSH / Web projection
 
 ### 大规模特性
 
-任何跨层特性都要逐项检查 Console、GitHub Pages 静态网站、工程文档、Spec、追踪矩阵和验收证据。若某个界面不受影响，也要在 PR 说明原因；不能只更新代码，让对外说明与实现分叉。新增或重写文档时还要遵循[文档语言与 I18n 约定](DOCUMENTATION-I18N.md)。
+任何跨层特性都要逐项检查 Console、GitHub Pages 静态网站、工程文档、Spec、追踪矩阵和验收证据。若某个界面不受影响，也要在 PR 说明原因；不能只更新代码，让对外说明与实现分叉。新增或重写文档时还要遵循[文档语言与 I18n 约定](guides/documentation-i18n.md)。
 
 ## 配置与调试
 

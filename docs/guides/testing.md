@@ -31,7 +31,7 @@ CI 在 Node.js 24 的 Linux 环境重复执行相同门禁。PR 中应记录实�
 
 `npm test` 运行仓库当前全部 Node 测试，并固定测试并发以避免共享运行目录互相干扰。
 
-需要汇报当前框架机制而不评价真实模型质量时，运行 `npm run evaluate:framework`。它聚合 DDD 边界、七 Agent 拓扑、运行时 Schema、配置冻结、Checkpoint/路由和 Fixture 端到端证据；结果口径见[框架阶段性测评](report/框架阶段性测评.md)。
+需要汇报当前框架机制而不评价真实模型质量时，运行 `npm run evaluate:framework`。它聚合 DDD 边界、七 Agent 拓扑、运行时 Schema、配置冻结、Checkpoint/路由和 Fixture 端到端证据；结果口径见[框架阶段性测评](../status/reports/框架阶段性测评.md)。
 
 ## 如何选择测试
 
@@ -65,4 +65,4 @@ npm run acceptance:ohmyworkpanel -- \
 - 时间、随机数、工具版本和 Git commit 等影响结果的输入应固定或记录。
 - 失败证据应保留足够诊断信息，同时截断和脱敏敏感输出。
 
-验收场景与需求映射见[验收计划](../specs/13-verification/acceptance-plan.md)和[追踪矩阵](../specs/13-verification/traceability-matrix.md)。
+验收场景与需求映射见[验收计划](../../specs/13-verification/acceptance-plan.md)和[追踪矩阵](../../specs/13-verification/traceability-matrix.md)。

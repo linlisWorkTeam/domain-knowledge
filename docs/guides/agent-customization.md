@@ -17,12 +17,12 @@ Console 里看到的 Orchestrator、DocGen、DocWorker、TestGen、`code`、Chec
 
 对应代码：
 
-- 固定角色定义：[`src/infrastructure/workflow/langgraph/agent-definitions.ts`](../src/infrastructure/workflow/langgraph/agent-definitions.ts)
-- 节点到角色的映射：[`src/infrastructure/workflow/langgraph/graph.ts`](../src/infrastructure/workflow/langgraph/graph.ts)
-- Provider 装配：[`src/interfaces/runner/composition.ts`](../src/interfaces/runner/composition.ts)
-- Pi Agent Adapter：[`src/infrastructure/agents/pi-agent/index.ts`](../src/infrastructure/agents/pi-agent/index.ts)
-- 公司 CodeAgent CLI Adapter：[`src/infrastructure/agents/company-codeagent/index.ts`](../src/infrastructure/agents/company-codeagent/index.ts)
-- 角色工作区和证据装配：[`src/application/services/automated-project-workflow.ts`](../src/application/services/automated-project-workflow.ts)
+- 固定角色定义：[`src/infrastructure/workflow/langgraph/agent-definitions.ts`](../../src/infrastructure/workflow/langgraph/agent-definitions.ts)
+- 节点到角色的映射：[`src/infrastructure/workflow/langgraph/graph.ts`](../../src/infrastructure/workflow/langgraph/graph.ts)
+- Provider 装配：[`src/interfaces/runner/composition.ts`](../../src/interfaces/runner/composition.ts)
+- Pi Agent Adapter：[`src/infrastructure/agents/pi-agent/index.ts`](../../src/infrastructure/agents/pi-agent/index.ts)
+- 公司 CodeAgent CLI Adapter：[`src/infrastructure/agents/company-codeagent/index.ts`](../../src/infrastructure/agents/company-codeagent/index.ts)
+- 角色工作区和证据装配：[`src/application/services/automated-project-workflow.ts`](../../src/application/services/automated-project-workflow.ts)
 
 ## 允许改什么
 

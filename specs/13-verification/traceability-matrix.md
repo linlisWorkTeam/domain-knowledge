@@ -27,13 +27,13 @@
 | KF-SYS-021 | AC-AGENT-003 | Implemented | `src/infrastructure/workflow/langgraph/agent-definitions.ts` + `src/application/services/workflow-control.ts` + `web/app.js` | `tests/integration/server.test.ts` + `tests/contract/site.test.ts` |
 | KF-SYS-022 | AC-E2E-002 | Implemented | `src/application/services/automated-project-workflow.ts` + `src/infrastructure/workflow/langgraph/graph.ts` | `tests/acceptance/automated-langgraph-flow.test.ts` |
 | KF-SYS-023 | AC-DOC-002 | Implemented | `web` + `site` + `docs` + `specs` | `tests/contract/site.test.ts` + `tests/contract/component-layout.test.ts` |
-| KF-SYS-024 | AC-DOC-003 | Implemented | `docs/DOCUMENTATION-I18N.md` + `README.md` + `CONTRIBUTING.md` | `tests/contract/component-layout.test.ts` + `tests/contract/site.test.ts` |
+| KF-SYS-024 | AC-DOC-003 | Implemented | `docs/guides/documentation-i18n.md` + `README.md` + `CONTRIBUTING.md` | `tests/contract/component-layout.test.ts` + `tests/contract/site.test.ts` |
 | KF-SYS-025 | AC-E2E-003 | Implemented | `src/infrastructure/agents/deepseek-harness` + `src/application/services/automated-project-workflow.ts` + `deploy/deepseek-harness` | `tests/integration/deepseek-harness-agent.test.ts` |
 | KF-SYS-026 | AC-FLOW-005 | Implemented | `src/application/services/automated-project-workflow.ts` + `src/infrastructure/workflow/langgraph/graph.ts` | `tests/integration/langgraph-infrastructure.test.ts` |
 | KF-SYS-027 | AC-OBS-003 | Implemented | `src/interfaces/runner/demo-report.ts` + `src/interfaces/runner/cli.ts` | `tests/integration/demo-report.test.ts` |
 | KF-SYS-028 | AC-DOC-004 | Implemented | `site/index.html` + `site/app.js` + `web/index.html` + `web/app.js` | `tests/contract/site.test.ts` |
 | KF-SYS-029 | AC-SEC-004 | Implemented | `.env.example` + `package.json` + `web/app.js` | `tests/contract/site.test.ts` + `tests/integration/server.test.ts` |
-| KF-SYS-030 | AC-ARCH-003 | Implemented | `docs/REPOSITORY-MIGRATION.md` + `specs/adr/ADR-009-repository-split.md` | `tests/contract/component-layout.test.ts` |
+| KF-SYS-030 | AC-ARCH-003 | Implemented | `docs/migration/repository-split.md` + `specs/adr/ADR-009-repository-split.md` | `tests/contract/component-layout.test.ts` |
 | KF-SYS-031 | AC-ARCH-004 | Implemented | `src/domain/services` + `src/application/apps` + `src/interfaces/ui-api` + `src/infrastructure/persistence/redis` | `tests/contract/architecture.test.ts` + `tests/unit/ddd-domain-services.test.ts` + `tests/integration/redis-runtime-state.test.ts` |
 | KF-SYS-032 | AC-API-001 | Implemented | `src/interfaces/runner/server.ts` + `src/interfaces/dsh/index.ts` + `web/app.js` | `tests/integration/server.test.ts` + `tests/integration/dsh-adapter.test.ts` + `tests/e2e/console.spec.ts` |
 | KF-SYS-033 | AC-API-002 | Partial | `src/application/services/index.ts` + `src/infrastructure/persistence/sqlite-action-items.ts` + `src/infrastructure/persistence/sqlite-cas/index.ts` + `src/infrastructure/persistence/sqlite-content-governance/index.ts` + `src/interfaces/runner/server.ts` + `web/app.js` | `tests/integration/server.test.ts` + `tests/integration/content-governance.test.ts` + `tests/e2e/console.spec.ts` |

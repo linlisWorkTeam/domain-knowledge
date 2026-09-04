@@ -1,4 +1,4 @@
-# 仓库目录规则
+# 仓库目录参考
 
 目录直接表达依赖方向。domain-knowledge 是运行仓库，wpKnowledge 是内容仓库，两边不能再各放一套 Runner。
 

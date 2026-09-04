@@ -33,7 +33,7 @@ npm run knowledge -- status
 
 ## 发布 VERIFIED 版本
 
-创建 Run，将它推进到 `EVALUATING`，绑定不可变测试报告，再使用对应的 `PASS` 决定发布。完整命令见[运维手册](OPERATIONS.md)。
+创建 Run，将它推进到 `EVALUATING`，绑定不可变测试报告，再使用对应的 `PASS` 决定发布。完整命令见[运维手册](../OPERATIONS.md)。
 
 ## 回滚
 

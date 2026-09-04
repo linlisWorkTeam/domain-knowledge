@@ -24,13 +24,13 @@ test('Knowledge Flywheel implementation owns the domain-knowledge repository roo
     'src/interfaces/runner/server.ts',
     'src/interfaces/ui-api/index.ts',
     'docs/ARCHITECTURE.md',
-    'docs/AGENT-CUSTOMIZATION.md',
+    'docs/guides/agent-customization.md',
     'docs/DEVELOPMENT.md',
-    'docs/DOCUMENTATION-I18N.md',
+    'docs/guides/documentation-i18n.md',
     'docs/GETTING_STARTED.md',
     'docs/README.md',
-    'docs/REPOSITORY-GUIDE.md',
-    'docs/TESTING.md',
+    'docs/reference/repository-layout.md',
+    'docs/guides/testing.md',
     'src/infrastructure/workflow/langgraph/README.md',
     'src/infrastructure/workflow/langgraph/index.ts',
     'src/domain/index.ts',
@@ -59,9 +59,13 @@ test('Knowledge Flywheel implementation owns the domain-knowledge repository roo
 });
 
 test('tracked documentation is Chinese-first and key entries carry English summaries', () => {
-  const trackedMarkdown = execFileSync('git', ['ls-files', '-z', '*.md'], { encoding: 'utf8' })
+  const trackedMarkdown = execFileSync(
+    'git',
+    ['ls-files', '--cached', '--others', '--exclude-standard', '-z', '*.md'],
+    { encoding: 'utf8' },
+  )
     .split('\0')
-    .filter(Boolean);
+    .filter((document) => document.length > 0 && existsSync(document));
   assert.ok(trackedMarkdown.length > 0, 'no tracked Markdown documents found');
   for (const document of trackedMarkdown) {
     const markdown = readFileSync(document, 'utf8');
@@ -78,10 +82,10 @@ test('tracked documentation is Chinese-first and key entries carry English summa
     'SECURITY.md',
     join(componentRoot, 'docs/GETTING_STARTED.md'),
     join(componentRoot, 'docs/ARCHITECTURE.md'),
-    join(componentRoot, 'docs/AGENT-CUSTOMIZATION.md'),
+    join(componentRoot, 'docs/guides/agent-customization.md'),
     join(componentRoot, 'docs/OPERATIONS.md'),
-    join(componentRoot, 'docs/MIGRATION.md'),
-    join(componentRoot, 'docs/DOCUMENTATION-I18N.md'),
+    join(componentRoot, 'docs/migration/runner.md'),
+    join(componentRoot, 'docs/guides/documentation-i18n.md'),
     join(componentRoot, 'specs/README.md'),
     join(componentRoot, 'src/infrastructure/workflow/langgraph/README.md'),
     join(componentRoot, 'src/interfaces/dsh/README.md'),
