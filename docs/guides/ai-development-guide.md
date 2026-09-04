@@ -167,3 +167,122 @@ specs/README.md 和相关 Spec。行为变化使用 specs/changes 建立变更�
 5. PR diff：代码、测试、Spec 和文档是否表达同一件事。
 
 Vibe Coding 的速度来自把机械工作交给 AI；项目的可维护性来自 Spec、确定性门禁和可复验证据没有被省略。
+
+## `docs/` 目录树
+
+```text
+docs/
+├── README.md                         # 文档唯一首页和任务导航
+├── GETTING_STARTED.md                # 安装、配置和第一次运行
+├── ARCHITECTURE.md                   # 当前架构的解释
+├── DEVELOPMENT.md                    # 实现边界、门禁和完成定义
+├── OPERATIONS.md                     # 运行、评测、发布和排障
+├── DEVELOPMENT-STATUS.md             # 当前阶段、任务队列和验证基线
+│
+├── guides/
+│   ├── ai-development-guide.md       # 本指南：AI/Vibe Coding 协作方式
+│   ├── agent-customization.md        # Agent 提示词与定制边界
+│   ├── testing.md                    # 测试层级和证据要求
+│   └── documentation-i18n.md         # 中文主文和英文摘要约定
+│
+├── tutorials/
+│   ├── add-agent-capability.md       # 新增或调整 Agent 能力
+│   └── add-http-endpoint.md          # 新增 HTTP API
+│
+├── diagrams/
+│   ├── system-overview.md            # 系统边界和组件关系
+│   ├── knowledge-lifecycle.md        # 知识生命周期
+│   └── development-change-flow.md    # Spec 到实现、验证和 PR
+│
+├── reference/
+│   └── repository-layout.md          # 文件和目录应该放在哪里
+│
+├── migration/
+│   ├── runner.md                     # 从旧版 Runner 迁移
+│   └── repository-split.md           # domain-knowledge/wpKnowledge 拆分历史
+│
+├── status/
+│   └── reports/
+│       ├── YYYY-MM-DD-报告.md         # 带时间边界的项目快照
+│       └── 框架阶段性测评.md          # 阶段能力与未测边界
+│
+└── epitaph/
+    └── YYYY-MM-DD-HHMM-topic.md      # 未完成工作的可审计交接
+```
+
+## `specs/` 目录树
+
+```text
+specs/
+├── README.md                         # 规范入口、阅读顺序和阶段门
+├── glossary.md                       # 统一领域与协议术语
+│
+├── 01-requirements/
+│   ├── system-requirements.md        # KF-SYS 功能需求
+│   └── non-functional-requirements.md # NFR 安全、恢复、性能等要求
+│
+├── 02-architecture/
+│   ├── system-context.md             # 系统上下文、边界和端口
+│   └── 4plus1-views.md               # 逻辑、进程、开发、物理和场景视图
+│
+├── 03-domain/
+│   └── domain-model.md               # 聚合、状态、事件和核心规则
+│
+├── 04-product/
+│   └── frontend-product-design.md    # Console 产品行为和 KF-UI 需求
+│
+├── 05-workflows/
+│   ├── knowledge-flywheel-workflow.md # 知识飞轮主流程
+│   ├── user-use-cases.md             # 用户用例和交互时序
+│   ├── checkpoint-and-recovery.md    # Checkpoint、恢复和幂等
+│   └── real-source-acceptance.md     # 固定源码的真实闭环验收
+│
+├── 06-agents/
+│   ├── README.md                     # 固定 Agent 拓扑和总览
+│   ├── orchestration-agents.md       # 编排角色
+│   ├── documentation-agents.md       # 文档生成角色
+│   ├── code-and-check-agents.md      # 代码与检查角色
+│   ├── test-generation-agent.md      # 测试生成角色
+│   ├── review-agent.md               # 归因和修订角色
+│   └── knowledge-writing-style.md    # 知识正文写作约束
+│
+├── 07-language-plugins/
+│   ├── language-plugin-contract.md   # 通用语言插件契约
+│   ├── language-detection.md         # 语言识别规则
+│   └── cpp-plugin.md                 # C++ 插件规范
+│
+├── 08-evaluation/
+│   ├── evaluation-model.md           # 确定性评测模型
+│   └── knowledge-publication-gate.md # 发布门禁
+│
+├── 09-security/
+│   └── data-boundaries.md            # 数据分级、权限和执行边界
+│
+├── 10-interfaces/
+│   └── http-api.md                   # Preview HTTP API 契约
+│
+├── schemas/
+│   ├── README.md                     # Schema 版本和兼容规则
+│   └── *.schema.json                 # 命令、结果、事件和读模型机器契约
+│
+├── adr/
+│   ├── README.md                     # 决策索引和取代关系
+│   └── ADR-NNN-topic.md              # 已接受或被取代的架构决策
+│
+├── 13-verification/
+│   ├── acceptance-plan.md            # Given/When/Then 验收场景
+│   ├── traceability-matrix.md        # 需求→验收→实现→测试
+│   ├── traceability-validator.ts     # 追踪矩阵机器校验
+│   └── validate-specs.ts             # Spec、Schema 和链接总门禁
+│
+└── changes/
+    ├── active/
+    │   └── DEV-xxx-feature/
+    │       ├── proposal.md            # 为什么做、目标、范围和非目标
+    │       ├── spec-delta.md          # 对 baseline Spec 的语义增量
+    │       ├── plan.md                # 技术方案、风险和回退
+    │       ├── tasks.md               # AI 可执行任务
+    │       ├── acceptance.md          # 自动化、人工和 live 验收
+    │       └── evidence.md            # 实际结果和未验证边界
+    └── archive/                       # 已完成并合入 baseline 的变更包
+```
