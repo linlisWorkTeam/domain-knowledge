@@ -32,6 +32,8 @@ SQLite Registry 与 CAS 是运行时事实源，默认写到本仓库 `.workpane
 
 ## 五分钟启动
 
+第一次阅读或参与开发，请先看[从这里开始](docs/START-HERE.md)。治理原则集中见[工程治理原则](docs/GOVERNANCE-PRINCIPLES.md)。
+
 需要 Node.js 24 或更高版本。
 
 ```bash

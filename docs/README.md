@@ -4,6 +4,8 @@
 
 ## 按任务查找
 
+第一次接触项目请先阅读[从这里开始](START-HERE.md)。它提供 5 分钟运行路径、按任务定位代码和测试的入口。
+
 | 任务 | 文档 | 适合谁 |
 | --- | --- | --- |
 | 查看当前开发进度、下一任务和后续队列 | [DEVELOPMENT-STATUS.md](DEVELOPMENT-STATUS.md) | 负责人、贡献者、评审者 |
@@ -22,6 +24,14 @@
 | 了解跨仓库拆分 | [REPOSITORY-MIGRATION.md](REPOSITORY-MIGRATION.md) | 维护者、评审者 |
 | 本地预览或发布项目官网 | [site/README.md](../site/README.md) | 维护者 |
 
+## 开发教程与图示
+
+- [系统总览图](diagrams/system-overview.md)
+- [知识生命周期图](diagrams/knowledge-lifecycle.md)
+- [开发变更链路图](diagrams/development-change-flow.md)
+- [新增 HTTP API](tutorials/add-http-endpoint.md)
+- [新增或调整 Agent 能力](tutorials/add-agent-capability.md)
+
 ## 按角色阅读
 
 - **使用者**：快速上手 → 用户用例 → 运维手册的 Dashboard/API 部分。
@@ -39,7 +49,7 @@
 
 ## 文档维护规则
 
-1. 文档只描述当前可证明行为；路线或假设必须明确标记。
+1. 文档只描述当前可证明行为；路线或假设必须明确标记。共性规则集中见[工程治理原则](GOVERNANCE-PRINCIPLES.md)。
 2. 项目级进度只在 [DEVELOPMENT-STATUS.md](DEVELOPMENT-STATUS.md) 维护；需求级状态只在追踪矩阵维护，进度变化必须在同一 PR 回写。
 3. 行为变化先更新 Spec，再同步本目录的操作说明。
 4. 命令必须从仓库根目录可执行，并注明额外前提。
