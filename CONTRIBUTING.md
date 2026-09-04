@@ -11,6 +11,8 @@ Behavior changes must update the Spec, implementation, tests and traceability ma
 
 ## 开始之前
 
+第一次参与项目可先阅读[从这里开始](docs/START-HERE.md)，按任务选择对应的代码、规范和测试入口。
+
 1. 从最新 `main` 创建分支，一次 PR 处理一个明确问题。
 2. 阅读[开发状态](docs/DEVELOPMENT-STATUS.md)、[Spec 总入口](specs/README.md)和对应 ADR。
 3. 使用 Node.js 24+，运行 `npm ci`。
@@ -51,6 +53,8 @@ npm run typecheck
 npm run validate:specs
 npm test
 ```
+
+提交前检查清单：Spec、追踪矩阵、实现、正常/失败路径测试以及适用的使用或运维文档应保持一致；未运行的验证必须在 PR 中如实说明。
 
 固定 commit 的 ohMyWorkPanel 验收依赖本机源码，不是每个贡献者都能运行的通用门禁。没有运行就如实写进 PR，不能用 fixture 结果冒充真实模型质量。
 
