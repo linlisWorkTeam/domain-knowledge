@@ -1,6 +1,6 @@
 # 开发状态
 
-**当前阶段：DEV-009 Adapter 与契约验证已完成｜更新时间：2026-09-04｜下一任务：DEV-010 公司 CodeAgent 七角色真实闭环与效果基线**
+**当前阶段：DEV-010 公司环境验收受外部 CLI 阻塞｜更新时间：2026-09-04｜下一任务：提供已安装且已登录的公司 CodeAgent CLI 环境**
 
 本文件是 domain-knowledge 的**唯一开发进度入口**，用于记录当前阶段、已完成里程碑、正在进行或下一项工作、后续队列和最近验证结果。产品行为仍以 [`../specs/`](../specs/README.md) 为规范性事实源；需求级的 `Implemented / Partial / Planned` 状态仍只在[追踪矩阵](../specs/13-verification/traceability-matrix.md)维护。
 
@@ -64,7 +64,7 @@ This file is the single entry point for project-level development status, curren
 | DEV-007 | Console B4 运营最小可用面 | Done | Provider 状态、安全 API URL/Key 配置与验证、真实 Pi SDK 执行路径、默认新批次快照和生成/治理观测已接入 |
 | DEV-008 | Console B3 知识、评测与来源 | Done | 血缘/差异、评测读模型/证据/规则、来源注册/漂移/刷新、来源事项和知识健康度已接入 |
 | DEV-009 | 公司 CodeAgent CLI Adapter 与契约验证 | Done | 七角色、认证、stdin JSONL、session 恢复、超时/取消/错误分类、角色工具与工作区、脱敏审计、Run 摘要均有自动化验证 |
-| DEV-010 | 公司 CodeAgent 七角色真实闭环与效果基线 | Planned | 原 DEV-006；依赖 DEV-009 |
+| DEV-010 | 公司 CodeAgent 七角色真实闭环与效果基线 | Blocked | 当前执行环境无 `codeagent` 可执行文件，尚不能完成认证预检、最小协议探测或 live Run；依赖已安装且已登录的公司环境 |
 | DEV-011 | TestGen 候选测试的通用 Oracle 验证与门禁链路 | Planned | 原 DEV-007；对应 `KF-SYS-004` |
 | DEV-012 | 四点崩溃注入、完整权限拒绝审计与恢复加固 | Planned | 原 DEV-008；对应 `AC-REC-001`、`AC-SEC-002` |
 | DEV-013 | 生产容量、认证续期、并发与 Redis 启用决策 | Planned | 原 DEV-009；依赖真实运行数据，不改变 Registry 事实源地位 |
