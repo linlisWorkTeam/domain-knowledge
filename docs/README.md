@@ -45,6 +45,7 @@ npm run knowledge:serve
 
 ### 开发指南
 
+- [新开发者快速指南（含 worktree）](guides/development-quickstart.md)
 - [单个 Agent 角色定制](guides/agent-customization.md)
 - [测试策略](guides/testing.md)
 - [文档语言与 I18n](guides/documentation-i18n.md)
