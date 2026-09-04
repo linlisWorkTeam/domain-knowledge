@@ -139,11 +139,6 @@ AI 在用户明确要求后创建提交和 PR。PR 至少说明：
 
 完成后，稳定语义合入 baseline Spec，需求状态写回追踪矩阵，项目进度写回 `DEVELOPMENT-STATUS.md`，变更包移入 `specs/changes/archive/`。
 
-## worktree 只是执行隔离
-
-当多个 AI 或多个任务并行时，每个任务使用独立分支和 worktree，避免互相覆盖文件。AI 负责从最新 `origin/main` 创建它、运行 `npm run bootstrap:worktree` 并确认状态为 `READY`；每个 worktree 保留独立 `node_modules` 和 `.workpanel/`，不得通过符号链接共享依赖。PR 合并且修改已推送后，再由 AI 安全清理。
-
-使用者通常不需要关心 worktree 命令，只需要坚持“一项任务、一个变更包、一个分支、一个 PR”。
 
 ## 可以直接交给 AI 的任务模板
 
