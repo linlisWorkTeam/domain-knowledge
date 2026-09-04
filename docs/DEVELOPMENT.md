@@ -5,12 +5,19 @@
 从仓库根目录开始：
 
 ```bash
-npm ci
+npm run bootstrap:worktree
 npm run typecheck
 npm test
 ```
 
 要求 Node.js 24+。运行数据默认写入 `.workpanel/`；开发和测试不得把该目录、SQLite 文件或 CAS 工件提交到 Git。
+
+`bootstrap:worktree` 按锁文件选择安装方式。存在 `pnpm-lock.yaml` 时优先执行
+`pnpm install --frozen-lockfile` 并复用共享 pnpm store；当前仓库纳管的是
+`package-lock.json`，因此执行 `npm ci` 并复用 npm cache。每个 worktree 都保留独立的
+`node_modules`，禁止通过符号链接共享。成功后脚本会在
+`.workpanel/worktree-bootstrap.json` 写入带 Node 版本和锁文件摘要的 `READY` 状态；
+Agent 启动器可先运行 `npm run bootstrap:worktree:check` 进行快速门禁。
 
 ## 依赖方向
 

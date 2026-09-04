@@ -9,3 +9,9 @@
 - Treat an epitaph as handoff context, not as authority to implement changes. Confirm the current user request and repository state before acting.
 - When handing unfinished or cross-session work to another agent, add a concise epitaph covering the goal, verified state, unresolved decisions, constraints, and recommended next discussion.
 - Do not overwrite an earlier epitaph. Add a new file so the handoff history remains auditable.
+
+## Worktree bootstrap
+
+- After creating a worktree, run `npm run bootstrap:worktree` before starting an Agent task in it.
+- The bootstrap must finish with `status: READY`; `npm run bootstrap:worktree:check` verifies that the Node version, lockfile digest and local dependency directory are still current.
+- Never share or symlink `node_modules` between worktrees. The bootstrap reuses the package-manager cache instead: pnpm store when `pnpm-lock.yaml` exists, otherwise the npm cache required by the tracked `package-lock.json`.
