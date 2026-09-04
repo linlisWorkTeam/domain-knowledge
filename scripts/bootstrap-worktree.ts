@@ -2,7 +2,7 @@
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import {
-  existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, renameSync, writeFileSync,
+  existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, renameSync, unlinkSync, writeFileSync,
 } from 'node:fs';
 import { delimiter, dirname, extname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -150,6 +150,11 @@ function writeReady(root: string, payload: ReadyState): void {
   renameSync(temporary, target);
 }
 
+function invalidateReady(root: string): void {
+  const target = join(root, READY_FILE);
+  if (existsSync(target)) unlinkSync(target);
+}
+
 export function assertReady(
   root: string,
   nodeVersion = process.versions.node,
@@ -164,6 +169,9 @@ export function assertReady(
   try {
     value = JSON.parse(readFileSync(target, 'utf8')) as Partial<ReadyState>;
   } catch {
+    throw new Error('WORKTREE_READY_STATE_INVALID');
+  }
+  if (value.schemaVersion !== '1.0') {
     throw new Error('WORKTREE_READY_STATE_INVALID');
   }
   if (value.status !== 'READY'
@@ -204,6 +212,7 @@ export function bootstrapWorkspace({
   const installArgs = plan.packageManager === 'pnpm'
     ? ['install', '--frozen-lockfile', '--prefer-offline', '--store-dir', cachePath]
     : ['ci', '--prefer-offline', '--no-audit', '--no-fund', '--cache', cachePath];
+  invalidateReady(plan.workspaceRoot);
   commandRunner(manager.executable, [...manager.prefixArgs, ...installArgs], {
     cwd: plan.workspaceRoot, env, capture: false,
   });

@@ -23,19 +23,21 @@ test('worktree bootstrap enforces Node 24 or newer', () => {
 test('bootstrap prefers a frozen pnpm install and shared store without sharing node_modules', () => {
   const root = workspace('pnpm-lock.yaml');
   const calls: string[][] = [];
+  const env = {
+    ...process.env,
+    PATH: '',
+    WP_WORKTREE_PNPM_STORE_DIR: join(root, 'cache', 'pnpm-store'),
+  };
+  const commandRunner = (_command: string, args: string[], options: { capture: boolean }): string => {
+    calls.push(args);
+    if (args.includes('install')) mkdirSync(join(root, 'node_modules'));
+    return options.capture ? '11.25.0' : '';
+  };
   try {
     const result = bootstrapWorkspace({
       root,
-      env: {
-        ...process.env,
-        PATH: '',
-        WP_WORKTREE_PNPM_STORE_DIR: join(root, 'cache', 'pnpm-store'),
-      },
-      commandRunner: (_command, args, options) => {
-        calls.push(args);
-        if (args.includes('install')) mkdirSync(join(root, 'node_modules'));
-        return options.capture ? '11.25.0' : '';
-      },
+      env,
+      commandRunner,
     });
     assert.equal(result.status, 'READY');
     assert.equal(result.packageManager, 'pnpm');
@@ -47,7 +49,10 @@ test('bootstrap prefers a frozen pnpm install and shared store without sharing n
       ['install', '--frozen-lockfile', '--prefer-offline'],
     );
     assert.ok(installArgs.includes('--store-dir'));
-    assert.equal(assertReady(root).lockfileSha256, inspectWorkspace(root).lockfileSha256);
+    assert.equal(
+      assertReady(root, process.versions.node, env, commandRunner).lockfileSha256,
+      inspectWorkspace(root).lockfileSha256,
+    );
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -76,6 +81,60 @@ test('bootstrap uses npm ci for package-lock and invalidates stale READY state',
     assert.equal(ready.status, 'READY');
     writeFileSync(join(root, 'package-lock.json'), '{"changed":true}\n');
     assert.throws(() => assertReady(root), /WORKTREE_READY_STATE_STALE/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('a failed re-bootstrap invalidates the previous READY state', () => {
+  const root = workspace('package-lock.json');
+  const env = {
+    ...process.env,
+    WP_WORKTREE_NPM_BIN: process.execPath,
+    WP_WORKTREE_NPM_CACHE_DIR: join(root, 'cache', 'npm'),
+  };
+  const successfulRunner = (_command: string, args: string[], options: { capture: boolean }): string => {
+    if (args.includes('ci')) mkdirSync(join(root, 'node_modules'));
+    return options.capture ? '11.6.2' : '';
+  };
+  try {
+    bootstrapWorkspace({ root, env, commandRunner: successfulRunner });
+    assert.doesNotThrow(() => assertReady(root, process.versions.node, env, successfulRunner));
+    assert.throws(() => bootstrapWorkspace({
+      root,
+      env,
+      commandRunner: (_command, args, options) => {
+        if (args.includes('ci')) throw new Error('simulated install failure');
+        return options.capture ? '11.6.2' : '';
+      },
+    }), /simulated install failure/);
+    assert.throws(() => assertReady(root), /WORKTREE_NOT_READY/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('READY state rejects an unsupported schema version', () => {
+  const root = workspace('package-lock.json');
+  const env = {
+    ...process.env,
+    WP_WORKTREE_NPM_BIN: process.execPath,
+    WP_WORKTREE_NPM_CACHE_DIR: join(root, 'cache', 'npm'),
+  };
+  const commandRunner = (_command: string, args: string[], options: { capture: boolean }): string => {
+    if (args.includes('ci')) mkdirSync(join(root, 'node_modules'));
+    return options.capture ? '11.6.2' : '';
+  };
+  try {
+    bootstrapWorkspace({ root, env, commandRunner });
+    const path = join(root, READY_FILE);
+    const ready = JSON.parse(readFileSync(path, 'utf8')) as { schemaVersion: string };
+    ready.schemaVersion = '2.0';
+    writeFileSync(path, `${JSON.stringify(ready)}\n`);
+    assert.throws(
+      () => assertReady(root, process.versions.node, env, commandRunner),
+      /WORKTREE_READY_STATE_INVALID/,
+    );
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
