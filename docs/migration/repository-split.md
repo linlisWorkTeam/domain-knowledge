@@ -1,5 +1,7 @@
 # 从 wpKnowledge 拆出运行仓库
 
+本文记录仓库拆分的历史背景，不属于当前开发流程的必读内容。
+
 2026 年 9 月，Knowledge Flywheel 的代码从 `wpKnowledge/endlessWpKnowledgeRunner/` 迁到本仓库根目录。迁移不是复制一份长期维护的镜像：合并后，运行时只在 domain-knowledge 演进，wpKnowledge 只保存知识内容和证据。
 
 ## 迁移基线

@@ -32,7 +32,7 @@ SQLite Registry 与 CAS 是运行时事实源，默认写到本仓库 `.workpane
 
 ## 五分钟启动
 
-第一次阅读或参与开发，请先看[从这里开始](docs/START-HERE.md)。治理原则集中见[工程治理原则](docs/GOVERNANCE-PRINCIPLES.md)。
+第一次阅读或参与开发，请从[文档中心](docs/README.md)按任务进入；工程治理边界已收敛到[开发指南](docs/DEVELOPMENT.md)和[贡献指南](CONTRIBUTING.md)。
 
 需要 Node.js 24 或更高版本。
 
@@ -77,7 +77,7 @@ domain-knowledge/
 └── runner.config.json        # 默认本地配置
 ```
 
-旧仓库实现和原开放 PR 的承接关系见[迁移说明](docs/REPOSITORY-MIGRATION.md)。
+旧仓库实现和原开放 PR 的承接关系见[仓库拆分历史](docs/migration/repository-split.md)。
 
 ## 开发门禁
 
@@ -87,6 +87,6 @@ npm run validate:specs
 npm test
 ```
 
-产品行为以 [Spec 总入口](specs/README.md)为准，项目级开发进度以[开发状态](docs/DEVELOPMENT-STATUS.md)为唯一入口。调整 Agent 提示词前请阅读[Agent 定制指南](docs/AGENT-CUSTOMIZATION.md)；职责、输入输出、拓扑、工具权限和发布权不能从前台替换。
+产品行为以 [Spec 总入口](specs/README.md)为准，项目级开发进度以[开发状态](docs/DEVELOPMENT-STATUS.md)为唯一入口。调整 Agent 提示词前请阅读[Agent 定制指南](docs/guides/agent-customization.md)；职责、输入输出、拓扑、工具权限和发布权不能从前台替换。
 
 固定项目评测只面向受信源码。它有临时工作区、环境净化和超时限制，但不是敌对代码沙箱，不应执行陌生仓库代码。

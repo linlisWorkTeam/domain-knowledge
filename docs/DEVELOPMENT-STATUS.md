@@ -20,7 +20,7 @@ This file is the single entry point for project-level development status, curren
 | 可验收行为和完成条件 | [`specs/13-verification/acceptance-plan.md`](../specs/13-verification/acceptance-plan.md) |
 | 架构决策及取代关系 | [`specs/adr/`](../specs/adr/README.md) |
 | 单次变更的提交、审查和 CI 证据 | Git commit 与 Pull Request |
-| 阶段性测评结论和汇报口径 | [`docs/report/`](report/) |
+| 阶段性测评结论和汇报口径 | [`docs/status/reports/`](status/reports/) |
 
 本文件不复制全部需求行，也不以任务状态覆盖追踪矩阵。两者不一致时，需求级判断以追踪矩阵为准，并在同一 PR 修正本文件的项目级摘要。
 
@@ -57,7 +57,7 @@ This file is the single entry point for project-level development status, curren
 | DEV-001 | P0-A Spec、验收计划和追踪矩阵基线 | Done | `npm run validate:specs` |
 | DEV-002 | DDD Application/Domain/Infrastructure 边界对齐 | Done | `tests/contract/architecture.test.ts` |
 | DEV-003 | 固定七 Agent LangGraph 编排、Checkpoint 与确定性闭环 | Done | `tests/integration/langgraph-infrastructure.test.ts`、`tests/acceptance/automated-langgraph-flow.test.ts` |
-| DEV-004 | AgentCommand/AgentResult、Run 配置冻结与框架机械能力测评 | Done | [框架阶段性测评](report/框架阶段性测评.md)，结果 `6/6 ACCEPTED` |
+| DEV-004 | AgentCommand/AgentResult、Run 配置冻结与框架机械能力测评 | Done | [框架阶段性测评](status/reports/框架阶段性测评.md)，结果 `6/6 ACCEPTED` |
 | DEV-UI-001 | 前台 F1 Knowledge Console | Done | `tests/contract/site.test.ts`、`tests/e2e/console.spec.ts`；只复用现有 API |
 | DEV-005 | Console 第一轮：F2 最终七页面 + B1 API 基线 + HCP-1 | Done | B1 已就绪；当前七页 UI/UX 已冻结，HCP-1=`Accepted` |
 | DEV-006 | Console B2 操作中心与飞轮批次完整控制面 | Done | 持久化事项、可证明进度、完整治理命令、组件健康、活动流、SSE、前台实时接线与轮询降级 |

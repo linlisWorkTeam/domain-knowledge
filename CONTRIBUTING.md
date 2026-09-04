@@ -11,7 +11,7 @@ Behavior changes must update the Spec, implementation, tests and traceability ma
 
 ## 开始之前
 
-第一次参与项目可先阅读[从这里开始](docs/START-HERE.md)，按任务选择对应的代码、规范和测试入口。
+第一次参与项目先阅读[文档中心](docs/README.md)，按任务选择对应的代码、规范和测试入口。
 
 1. 从最新 `main` 创建分支，一次 PR 处理一个明确问题。
 2. 阅读[开发状态](docs/DEVELOPMENT-STATUS.md)、[Spec 总入口](specs/README.md)和对应 ADR。
@@ -31,7 +31,15 @@ Behavior changes must update the Spec, implementation, tests and traceability ma
 | Console 与项目网站 | `web/`、`site/` |
 | 知识正文、调研和治理证据 | [`wpKnowledge`](https://github.com/linlisWorkTeam/wpKnowledge) |
 
-不要重新建立 `endlessWpKnowledgeRunner/`、`packages/`、`apps/` 或第二套工作流实现。更完整的规则见[仓库目录说明](docs/REPOSITORY-GUIDE.md)。
+不要重新建立 `endlessWpKnowledgeRunner/`、`packages/`、`apps/` 或第二套工作流实现。更完整的规则见[仓库目录参考](docs/reference/repository-layout.md)。
+
+## 治理边界
+
+- 产品行为、项目进度、需求实现状态和架构决策分别以 `specs/`、`docs/DEVELOPMENT-STATUS.md`、追踪矩阵和 ADR 为事实源。
+- SQLite Registry 持有运行时业务事实；知识正文和研究证据只进入 `wpKnowledge`。
+- 不得建立第二套 Registry、Workflow、Gate 或发布路径。
+- fixture 只能证明确定性链路，不能冒充 live 模型效果；`Partial` 和 `Planned` 不得描述为已完成。
+- Agent 契约、ArtifactRef、外部命令权限与 fail-closed 边界必须与 Spec 和 Schema 一致。
 
 ## 修改流程
 
