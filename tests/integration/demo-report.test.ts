@@ -78,7 +78,14 @@ test('demo report exports authoritative run facts and allowlisted Agent audit fi
     });
     assert.equal(JSON.stringify(report).includes('PROMPT_MUST_NOT_LEAK'), false);
     assert.equal(JSON.stringify(report).includes('SECRET_MUST_NOT_LEAK'), false);
-    assert.doesNotMatch(JSON.stringify(report), /PI_KEY_MUST_NOT_LEAK|PI_PATH_MUST_NOT_LEAK|MODEL_BODY_MUST_NOT_LEAK|999/);
+    assert.doesNotMatch(
+      JSON.stringify(report),
+      /PI_KEY_MUST_NOT_LEAK|PI_PATH_MUST_NOT_LEAK|MODEL_BODY_MUST_NOT_LEAK/,
+    );
+    assert.equal(calls.some((call) => {
+      const tokens = call.tokens as { input?: number; output?: number } | undefined;
+      return tokens?.input === 999 || tokens?.output === 999;
+    }), false);
     assert.deepEqual(report.artifactIntegrity, { total: 0, verified: 0, failed: [] });
   } finally {
     composition.close();
