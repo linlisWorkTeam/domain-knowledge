@@ -2,6 +2,8 @@
 
 **当前阶段：DEV-019 R2 本地验收通过，PR #26 待审查｜更新时间：2026-09-07｜下一任务：审查合入后执行 T200，明确七角色开发契约**
 
+本轮验收详见 [DSH Agent 公共底座测试报告](status/report/2026-09-07-DSH-Agent底座测试报告.md)。
+
 本文件是 domain-knowledge 的**唯一开发进度入口**，用于记录当前阶段、已完成里程碑、正在进行或下一项工作、后续队列和最近验证结果。产品行为仍以 [`../specs/`](../specs/README.md) 为规范性事实源；需求级的 `Implemented / Partial / Planned` 状态仍只在[追踪矩阵](../specs/13-verification/traceability-matrix.md)维护。
 
 <details lang="en">
