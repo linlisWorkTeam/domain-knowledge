@@ -386,7 +386,7 @@ sequenceDiagram
     Catalog->>Registry: 保存 revision + AgentPromptConfigured
     Registry-->>Console: 新 revision
 
-    Operator->>Console: 启动固定 ohMyWorkPanel Run
+    Operator->>Console: 提交项目场景 JSON 启动 Run
     Console->>API: POST /api/v1/runs
     API->>Registry: 保存 RunConfigurationSnapshot + Prompt ArtifactRef
     API->>Graph: start(runId, fixed scenario + frozen configuration)

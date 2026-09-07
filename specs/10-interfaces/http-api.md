@@ -59,7 +59,7 @@
 | 方法与路径 | 状态 | 用途与最小响应 |
 |---|---|---|
 | `GET /api/v1/runs` | Available / Extend | Run 列表；补充 `status`、`moduleId`、`updatedAfter`、分页和稳定排序。 |
-| `POST /api/v1/runs` | Available | 创建并启动固定 profile Run；返回 `runId`、`eventId`。 |
+| `POST /api/v1/runs` | Available | 以 `scenario` JSON 与 `repositoryRoot` 创建并启动项目 Run；返回 `runId`、`eventId`。 |
 | `GET /api/v1/runs/:runId` | Available | Run、版本、评测、Decision、checkpoint、节点、事件和 publication 快照。 |
 | `GET /api/v1/runs/:runId/events?after=<seq>` | Available | 按 `event_seq` 增量读取运行事件。 |
 | `GET /api/v1/runs/:runId/workflow-nodes` | Available | 返回角色、轮次、尝试、执行状态、`readyAt`、开始和完成时间；历史记录无法证明 `readyAt` 时返回 `null`，不暴露 checkpoint 私有数据。 |
@@ -315,3 +315,9 @@ Agent 设置同时展示固定 Agent 契约、Provider 配置/验证和运营指
 B1–B4 的接口范围以本文件各表为准，当前均已有实现和自动化验收；Graph 重复引用批次 event-stream，不重复视为 Graph 专用接口。项目空间、敌对代码隔离、完整安全事实事项和生产容量仍属于后续阶段，不能因 DEV-007/008 完成而外推为 Release 能力。
 
 HCP-1 已于 2026-09-03 获得 `Accepted`，当前七页信息架构、Graph 语义和 API 边界已经冻结；后续 B2/B3 接线不得恢复历史八入口结构。HCP-1 不替代本规范的自动化迁移验收门。
+
+### 通用项目输入（DEV-019 / T105）
+
+`POST /api/v1/runs` 必须提交 `repositoryRoot` 和 `scenario`，不再默认为固定 profile。`scenario` 版本为 `1.0`，包含 `name`、`moduleId`、`sourcePaths`、`publicInterfacePaths`、`allowedGeneratedPaths`、`prepareCommands`、`referenceCommands`、`firstIterationCommands`、`finalCommands`，可指定完整 40 位 `expectedCommit`。命令声明 `tool`（node/pnpm/cargo）、`purpose`、`args` 及可选运行限制；所有命令仍经过可信评测器校验，不能传 shell 字符串。参考与生成评测命令不能为空。资产答案和未知字段被拒绝。
+
+CLI 对应 `workflow-run --scenario FILE [--repository PATH]`。Console 使用同一场景 JSON，工作流在 CAS/checkpoint 保存已解析到实际 Git commit 的场景；重新生成复用该场景，旧 Run 缺少场景时明确拒绝，不猜测项目模板。

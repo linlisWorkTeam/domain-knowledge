@@ -5,7 +5,8 @@ import { extname, join, resolve } from 'node:path';
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
-import { createComposition, loadOhMyWorkPanelScenario } from './composition.ts';
+import { createComposition } from './composition.ts';
+import { parseProjectScenario } from '../../application/services/project-scenario.ts';
 import type {
   OperationalMetricsPort, ProviderConnectionProbe, ProviderEndpointPolicy, ProviderSettingsStore,
 } from '../../application/ports/index.ts';
@@ -885,7 +886,7 @@ export function createKnowledgeServer(input: {
             if (!feedback) throw new Error('ARGUMENT_REQUIRED: feedback');
             const parent = composition.apps.flywheel.getRunSnapshot(parentRunId);
             if (!parent) throw new Error(`RUN_NOT_FOUND: ${parentRunId}`);
-            const scenario = loadOhMyWorkPanelScenario(composition.repositoryRoot);
+            const scenario = await composition.apps.orchestrator.scenarioForRun(parentRunId);
             const parentModuleId = String((parent.run as Record<string, unknown>).moduleId ?? '');
             if (parentModuleId !== scenario.moduleId) {
               throw new Error('ACTION_NOT_ALLOWED: regeneration profile is unavailable for this module');
@@ -937,8 +938,6 @@ export function createKnowledgeServer(input: {
         }
         if (request.method !== 'POST') throw new Error('METHOD_NOT_ALLOWED');
         if (url.pathname === '/api/v1/runs') {
-          const profile = String(payload.profile ?? 'ohmyworkpanel');
-          if (profile !== 'ohmyworkpanel') throw new Error(`WORKFLOW_PROFILE_UNSUPPORTED: ${profile}`);
           const repositoryRoot = String(payload.repositoryRoot ?? '').trim();
           if (!repositoryRoot) throw new Error('ARGUMENT_REQUIRED: repositoryRoot');
           const key = request.headers['idempotency-key'];
@@ -951,7 +950,7 @@ export function createKnowledgeServer(input: {
             return;
           }
           const value = await composition.apps.orchestrator.start(
-            loadOhMyWorkPanelScenario(repositoryRoot),
+            parseProjectScenario(payload.scenario, repositoryRoot),
             {
               policyId: String(payload.policyId ?? composition.config.publicationGate.policyId),
               minimumStability: Number(

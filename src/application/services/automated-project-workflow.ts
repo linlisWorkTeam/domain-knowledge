@@ -264,6 +264,10 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
         ...scenario, repositoryRoot: snapshot.repositoryRoot, expectedCommit: snapshot.commit,
       }, null, 2)), 'application/json');
     }
+    await this.flywheel.executeNode({
+      runId: input.runId, nodeId: 'project-scenario', generationKey: `${input.runId}:project-scenario`,
+      inputRefs: [scenarioRef!],
+    }, async () => [scenarioRef!]);
     const commandInput = { ...input, context: { ...input.context, snapshot, scenarioRef } };
     const agent = await this.runRole(commandInput, scenario, 'orchestrator');
     return {
@@ -1081,6 +1085,12 @@ export class AutomatedProjectWorkflowService {
         },
       },
     });
+  }
+
+  async scenarioForRun(runId: string): Promise<AutomatedProjectScenario> {
+    const ref = this.flywheel.repository.getCheckpoint(`${runId}:project-scenario`)?.outputRefs[0];
+    if (!ref) throw new Error('WORKFLOW_SCENARIO_UNAVAILABLE');
+    return JSON.parse(Buffer.from(await this.flywheel.getArtifact(ref)).toString('utf8'));
   }
 
   async wait(runId: string): Promise<WorkflowExecutionView> {

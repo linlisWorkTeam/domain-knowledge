@@ -110,3 +110,11 @@ AC-DSHF-001～005 全部尚未执行；普通 CPU 模块和示范角色的具体
 Node 24.13.0、DSH/SDK 0.1.2-alpha.4。验证命令：`npm run typecheck`（0）、`npm run validate:specs`（17 schemas / 7 commands / 8 results / 51 P0）、`npm run test:architecture`（6/6）、`npm test`（161/161，0 skip）。针对 DSH/业务契约/角色工作区的五文件回归 28/28，含非法输出、有限重试、超时、取消、迟到成功、session 错配与权限拒绝。完整测试临时输出 `/tmp/t102-full.log`；可复执行源码为 `tests/integration/dsh-native-tools.test.ts`、`deepseek-harness-agent.test.ts`、`agent-contracts.test.ts`、`dsh-project-stages.test.ts` 和 `tests/security/agent-workspace.test.ts`。
 
 AC-DSHF-002、003 自动化部分 PASS；R2 真实模型及 R4 完整崩溃恢复不计入本次证明。T105/T106 尚未完成。
+
+## R1 / T105 场景入口功能（2026-09-07）：PASS，任务仍待 Pi 迁出
+
+CLI `--scenario`、API/Console `scenario` 同步接入通用校验，固定项目 loader/assetRoot 从组合根移除。已解析 Git commit 的场景存入 CAS 和业务 checkpoint，重新生成从原 Run 读取；没有旧场景不自动套用模板。
+
+`tests/acceptance/automated-langgraph-flow.test.ts` 用 formatter/lib 与 normalizer/components/nested 两个模块和不同测试文件命令，经过同一 LangGraph 七角色接线、两轮真实 CPU 测试、纠正及确定性发布。角色输出明确使用 Fixture Adapter，不能算 live 模型。两个场景均验证冻结场景、七角色信封、评测输入和唯一发布。
+
+针对性验收：场景全流程加 Server 回归 9/9；新增场景验证 2/2；typecheck 与 Spec 校验通过。T105 的 Pi 迁出和 T106 的配置迁移需原子更新，下一功能继续完成；本次不提前勾选整个 T105。
