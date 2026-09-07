@@ -56,3 +56,12 @@ export async function acceptedCandidate(composition: ReturnType<typeof createTes
     provenance: [{ path: 'specs/08-evaluation/knowledge-publication-gate.md', commit: 'abc123', pinned: true }],
   });
 }
+
+export const GENERIC_SCENARIO = {
+  schemaVersion: '1.0' as const, name: 'cpu-module', moduleId: 'cpu-module', repositoryRoot: process.cwd(),
+  sourcePaths: ['src/domain/services/markdown-diff.ts'], publicInterfacePaths: [],
+  allowedGeneratedPaths: ['src/domain/services/markdown-diff.ts'], prepareCommands: [],
+  referenceCommands: [{ tool: 'node' as const, purpose: 'test' as const, args: ['--test', 'tests/unit/markdown-diff.test.ts'] }],
+  firstIterationCommands: [{ tool: 'node' as const, purpose: 'test' as const, args: ['--test', 'tests/unit/markdown-diff.test.ts'] }],
+  finalCommands: [{ tool: 'node' as const, purpose: 'test' as const, args: ['--test', 'tests/unit/markdown-diff.test.ts'] }],
+};

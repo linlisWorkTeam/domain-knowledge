@@ -1,3 +1,4 @@
+import { FixtureProjectWorkflowStages, type FixtureProjectScenario } from '../../src/infrastructure/agents/scenario/project-workflow-fixture.ts';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -5,8 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import {
-  AutomatedProjectWorkflowService, OhMyWorkPanelWorkflowExecutor,
-  type AutomatedProjectScenario,
+  AutomatedProjectWorkflowService,
 } from '../../src/application/services/index.ts';
 import { TrustedProjectEvaluator } from '../../src/infrastructure/evaluation/project/index.ts';
 import { JsonSchemaAgentContractValidator } from '../../src/infrastructure/agents/contracts/index.ts';
@@ -20,15 +20,16 @@ function git(root: string, args: string[]): string {
   return result.stdout.trim();
 }
 
-test('ohMyWorkPanel profile uses LangGraph nodes and deterministic publication authority', async () => {
+for (const [moduleId, layout, testName] of [['formatter', 'lib', 'format.test.js'], ['normalizer', 'components/nested', 'normalize.test.js']]) {
+test(`generic ${moduleId} scenario runs all LangGraph nodes and independent test commands`, async () => {
   const repositoryRoot = mkdtempSync(join(tmpdir(), 'wp-automated-source-'));
   const assetRoot = mkdtempSync(join(tmpdir(), 'wp-automated-assets-'));
   const runtimeDir = mkdtempSync(join(tmpdir(), 'wp-automated-runtime-'));
-  mkdirSync(join(repositoryRoot, 'src'));
+  mkdirSync(join(repositoryRoot, layout), { recursive: true });
   writeFileSync(join(repositoryRoot, 'package.json'), '{"name":"automated-source","type":"module"}\n');
-  writeFileSync(join(repositoryRoot, 'src', 'contract.js'), 'export const expected = 4;\n');
-  writeFileSync(join(repositoryRoot, 'src', 'module.js'), 'export const calculate = () => 4;\n');
-  writeFileSync(join(repositoryRoot, 'src', 'module.test.js'), `
+  writeFileSync(join(repositoryRoot, layout, 'contract.js'), 'export const expected = 4;\n');
+  writeFileSync(join(repositoryRoot, layout, 'module.js'), 'export const calculate = () => 4;\n');
+  writeFileSync(join(repositoryRoot, layout, testName), `
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { expected } from './contract.js';
@@ -53,7 +54,7 @@ test('generated result matches contract', () => assert.equal(calculate(), expect
   const composition = createComposition({ runtimeDir });
   try {
     composition.agents.updatePromptAddon('doc-gen', '先写清行为边界。');
-    const executor = new OhMyWorkPanelWorkflowExecutor({
+    const executor = new FixtureProjectWorkflowStages({
       flywheel: composition.apps.flywheel,
       evalRunner: composition.apps.evalRunner,
       evaluator: new TrustedProjectEvaluator(composition.artifacts),
@@ -78,19 +79,19 @@ test('generated result matches contract', () => assert.equal(calculate(), expect
       return recordEvaluation(evaluation, policy);
     };
     const command = (args: string[]) => ({ tool: 'node' as const, purpose: 'test' as const, args });
-    const scenario: AutomatedProjectScenario = {
-      schemaVersion: '1.0', name: 'automated-two-iteration', moduleId: 'automated-module',
+    const scenario: FixtureProjectScenario = {
+      schemaVersion: '1.0', name: 'automated-two-iteration', moduleId,
       repositoryRoot, expectedCommit: commit,
-      sourcePaths: ['src/module.js', 'src/module.test.js'],
-      publicInterfacePaths: ['src/contract.js', 'package.json'],
-      allowedGeneratedPaths: ['src/module.js'], prepareCommands: [],
-      referenceCommands: [command(['--test', 'src/module.test.js'])],
-      firstIterationCommands: [command(['--test', 'src/module.test.js'])],
-      finalCommands: [command(['--test', 'src/module.test.js'])],
+      sourcePaths: [`${layout}/module.js`, `${layout}/${testName}`],
+      publicInterfacePaths: [`${layout}/contract.js`, 'package.json'],
+      allowedGeneratedPaths: [`${layout}/module.js`], prepareCommands: [],
+      referenceCommands: [command(['--test', `${layout}/${testName}`])],
+      firstIterationCommands: [command(['--test', `${layout}/${testName}`])],
+      finalCommands: [command(['--test', `${layout}/${testName}`])],
       assets: {
         knowledgeV1: 'knowledge-v1.md', knowledgeV2: 'knowledge-v2.md',
         codeV1: 'code-v1.js', codeV2: 'code-v2.js', correction: 'correction.json',
-        generatedPath: 'src/module.js', title: 'Automated module',
+        generatedPath: `${layout}/module.js`, title: 'Automated module',
         description: 'LangGraph-driven knowledge verification fixture.',
       },
     };
@@ -102,7 +103,8 @@ test('generated result matches contract', () => assert.equal(calculate(), expect
     assert.equal(composition.runConfiguration.get(handle.runId)?.agents.length, 7);
     const result = await workflow.wait(handle.runId);
 
-    assert.equal(result.executionStatus, 'COMPLETED');
+    assert.equal(result.executionStatus, 'COMPLETED', result.error ?? '');
+    assert.deepEqual(await workflow.scenarioForRun(handle.runId), scenario);
     assert.equal(result.route, 'PASS');
     assert.equal(composition.repository.getRun(handle.runId)?.state, 'VERIFIED');
     assert.equal(composition.service.status().publications, 1);
@@ -162,3 +164,5 @@ test('generated result matches contract', () => assert.equal(calculate(), expect
     rmSync(runtimeDir, { recursive: true, force: true });
   }
 });
+
+}

@@ -92,7 +92,7 @@ npm run acceptance:ohmyworkpanel -- `
 面向生产形态的入口使用同一个固定 ohMyWorkPanel 场景，但通过内嵌 `domain-knowledge` LangGraph 基础设施运行：
 
 ```bash
-npm run knowledge -- workflow-run --repository /path/to/ohMyWorkPanel
+npm run knowledge -- workflow-run --scenario /path/to/scenario.json --repository /path/to/project
 npm run knowledge -- workflow-status --run <run-id>
 npm run knowledge -- workflow-resume --run <run-id>
 npm run knowledge -- workflow-cancel --run <run-id>
@@ -139,7 +139,7 @@ Console 提供“操作中心、飞轮批次、知识、工作流图、评测、
 - `GET /api/v1/runs/:runId/workflow-nodes`
 - `GET /api/v1/runs/:runId/events?after=<event-seq>`
 
-Agent 元数据来自 `GET /api/v1/agents`。浏览器默认只读，操作员 token 仅保存在当前页面内存。持有 token 后，前台可以启动固定 ohMyWorkPanel 工作流和编辑 `promptAddon`；它不会通过串接原始状态迁移来模拟编排，也不能修改图契约。
+Agent 元数据来自 `GET /api/v1/agents`。浏览器默认只读，操作员 token 仅保存在当前页面内存。持有 token 后，前台可以通过项目场景 JSON 启动通用工作流和编辑 `promptAddon`；它不会通过串接原始状态迁移来模拟编排，也不能修改图契约。
 
 ### 模型服务与 Pi Agent
 

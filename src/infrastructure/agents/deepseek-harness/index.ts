@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdirSync, readFileSync, realpathSync } from 'node:fs';
+import { mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DeepSeekHarness } from '@deepseek-ai/dsh-sdk-client';
@@ -21,6 +21,7 @@ export interface DeepSeekHarnessAuditRecord {
   provider: 'deepseek-harness-sdk' | 'deepseek-harness-headless';
   role: string;
   idempotencyKey: string;
+  sessionId?: string;
   workspaceRoot: string;
   promptSha256: string;
   schemaSha256: string;
@@ -291,11 +292,19 @@ export class DeepSeekHarnessSdkAgent implements AgentProvider {
     let notificationCount = 0;
     let errorCode: string | null = null;
     const dshHomeBase = resolve(this.options.dshHome ?? join(workspaceRoot, '.dsh'));
-    const dshHome = join(dshHomeBase, digest(request.idempotencyKey).slice(0, 32));
+    const dshHome = join(dshHomeBase, `${digest(request.idempotencyKey).slice(0, 24)}-${randomUUID()}`);
     mkdirSync(dshHome, { recursive: true, mode: 0o700 });
     const processIsolation = this.options.processIsolation ?? 'none';
     const runtimeBin = resolve(this.options.dshBin ?? installedDshBin());
-    const patches = (this.options.patches ?? []).map((path) => resolve(path));
+    const policyPath = join(dshHome, 'role-tools.mjs');
+    writeFileSync(policyPath, readFileSync(new URL('./role-tools.mjs', import.meta.url)), { mode: 0o600 });
+    const policyPatch = join(dshHome, 'role-policy.json');
+    writeFileSync(policyPatch, JSON.stringify([
+      ...['persistent-bash', 'persistent-pwsh', 'str-replace-editor'].map((id) => ({ id, disabled: true })),
+      { insert: [{ id: 'workpanel-role-tools', name: policyPath, config: { workspaceRoot, canRead: request.role !== 'orchestrator' } }] },
+    ]), { mode: 0o600 });
+    // The final patch and monotonic DSH guard enforce the business role view.
+    const patches = [...(this.options.patches ?? []).map((path) => resolve(path)), policyPatch];
     const launcher = fileURLToPath(new URL('./isolation-launcher.mjs', import.meta.url));
     const childEnv = {
       ...process.env,
@@ -313,7 +322,7 @@ export class DeepSeekHarnessSdkAgent implements AgentProvider {
     };
     const harness = (this.options.harnessFactory ?? ((options) => new DeepSeekHarness(options)))({
       dshBin: processIsolation === 'bubblewrap' ? launcher : runtimeBin,
-      profile: this.options.profile ?? 'sdk',
+      profile: this.options.profile ?? 'sdk-minimal',
       patches,
       dshHome,
       cwd: workspaceRoot,
@@ -333,16 +342,17 @@ export class DeepSeekHarnessSdkAgent implements AgentProvider {
     const deadline = new Promise<never>((_resolve, reject) => {
       timeout = setTimeout(() => {
         timedOut = true;
-        void harness.close();
+        void harness.close().catch(() => undefined);
         reject(new Error('DSH_AGENT_TIMEOUT'));
       }, this.timeoutMs);
       timeout.unref();
       abort = () => {
         cancelled = true;
-        void harness.close();
+        void harness.close().catch(() => undefined);
         reject(new Error('AGENT_CANCELLED'));
       };
       signal?.addEventListener('abort', abort, { once: true });
+      if (signal?.aborted) abort();
     });
     // Keep the deadline rejection observed even if the SDK throws before
     // Promise.race can attach its own handler.
@@ -360,6 +370,9 @@ export class DeepSeekHarnessSdkAgent implements AgentProvider {
       // in-flight run. Observe it here so Node never reports an unhandled error.
       void run.catch(() => undefined);
       const result = await Promise.race([run, deadline]);
+      if (signal?.aborted || cancelled) throw new Error('AGENT_CANCELLED');
+      if (timedOut) throw new Error('DSH_AGENT_TIMEOUT');
+      if (result.sessionId !== sessionId) throw new Error('DSH_AGENT_SESSION_MISMATCH');
       if (timeout) clearTimeout(timeout);
       if (abort) signal?.removeEventListener('abort', abort);
       stdoutBytes = Buffer.byteLength(result.finalResponse, 'utf8');
@@ -367,14 +380,14 @@ export class DeepSeekHarnessSdkAgent implements AgentProvider {
       const output = validateOutput(result.finalResponse, request.outputSchema);
       await recordAuditWithoutAffectingResult(() => this.audit(request, workspaceRoot, prompt, started, {
         timedOut, cancelled, stdoutBytes, notificationCount, status: 'SUCCEEDED', errorCode: null,
-        providerAttempt,
+        providerAttempt, sessionId,
       }));
       return output;
     } catch (error) {
       errorCode = error instanceof Error ? error.message.split(':', 1)[0] ?? 'DSH_AGENT_FAILED' : 'DSH_AGENT_FAILED';
       await recordAuditWithoutAffectingResult(() => this.audit(request, workspaceRoot, prompt, started, {
         timedOut, cancelled, stdoutBytes, notificationCount, status: 'FAILED', errorCode,
-        providerAttempt,
+        providerAttempt, sessionId,
       }));
       throw error;
     } finally {
@@ -392,14 +405,15 @@ export class DeepSeekHarnessSdkAgent implements AgentProvider {
     outcome: Pick<DeepSeekHarnessAuditRecord,
       'timedOut' | 'cancelled' | 'stdoutBytes' | 'notificationCount' | 'status' | 'errorCode'> & {
         providerAttempt: number;
+        sessionId: string;
       },
   ): Promise<void> {
     if (!this.onAudit) return;
     const completed = this.clock();
-    const { providerAttempt, ...auditOutcome } = outcome;
+    const { providerAttempt, sessionId, ...auditOutcome } = outcome;
     await this.onAudit({
       schemaVersion: '1.0', provider: 'deepseek-harness-sdk', role: request.role,
-      idempotencyKey: request.idempotencyKey, workspaceRoot,
+      idempotencyKey: request.idempotencyKey, sessionId, workspaceRoot,
       promptSha256: digest(prompt), schemaSha256: digest(JSON.stringify(request.outputSchema)),
       startedAt: started.toISOString(), completedAt: completed.toISOString(),
       durationMs: Math.max(0, completed.getTime() - started.getTime()),

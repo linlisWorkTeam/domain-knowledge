@@ -243,6 +243,56 @@ test('DSH SDK provider audits and closes when harness.run throws synchronously',
   }
 });
 
+test('DSH SDK rejects a result belonging to another session and records the expected session', async () => {
+  const workspace = mkdtempSync(join(tmpdir(), 'wp-dsh-session-binding-'));
+  const audits: DeepSeekHarnessAuditRecord[] = [];
+  let expectedSession = '';
+  let closed = false;
+  try {
+    const provider = new DeepSeekHarnessSdkAgent({
+      allowedWorkspaceRoots: [workspace], maxSchemaAttempts: 1,
+      onAudit: (record) => { audits.push(record); },
+      harnessFactory: () => ({
+        run: async (_prompt, options) => {
+          expectedSession = options!.sessionId!;
+          return { sessionId: 'another-session', finalResponse: '{"answer":"valid but unrelated"}', events: [], notifications: [] };
+        },
+        close: async () => { closed = true; },
+      }),
+    });
+    await assert.rejects(provider.run(request(workspace)), /DSH_AGENT_SESSION_MISMATCH/);
+    assert.equal(closed, true);
+    assert.equal(audits[0]?.sessionId, expectedSession);
+    assert.equal(audits[0]?.status, 'FAILED');
+  } finally {
+    rmSync(workspace, { recursive: true, force: true });
+  }
+});
+
+test('DSH SDK cancellation wins even if the same turn produces a valid result', async () => {
+  const workspace = mkdtempSync(join(tmpdir(), 'wp-dsh-cancel-result-'));
+  const controller = new AbortController();
+  const audits: DeepSeekHarnessAuditRecord[] = [];
+  try {
+    const provider = new DeepSeekHarnessSdkAgent({
+      allowedWorkspaceRoots: [workspace], maxSchemaAttempts: 1,
+      onAudit: (record) => { audits.push(record); },
+      harnessFactory: () => ({
+        run: async (_prompt, options) => {
+          controller.abort();
+          return { sessionId: options!.sessionId!, finalResponse: '{"answer":"late success"}', events: [], notifications: [] };
+        },
+        close: async () => undefined,
+      }),
+    });
+    await assert.rejects(provider.run(request(workspace), controller.signal), /AGENT_CANCELLED/);
+    assert.deepEqual(audits.map((record) => record.status), ['FAILED']);
+    assert.equal(audits[0]?.cancelled, true);
+  } finally {
+    rmSync(workspace, { recursive: true, force: true });
+  }
+});
+
 test('DeepSeek Harness headless provider escalates to SIGKILL when SIGTERM does not close the child', async () => {
   const workspace = mkdtempSync(join(tmpdir(), 'wp-dsh-agent-timeout-'));
   const signals: NodeJS.Signals[] = [];

@@ -21,7 +21,7 @@ npm run knowledge:serve
 
 ## 五个主要入口
 
-后续开发按[已确认的 DSH 目标架构](ARCHITECTURE.md#target-architecture)和[公共开发 SOP](guides/agent-customization.md#agent-development-sop)推进：先底座与范例，再七角色开发。目标尚未实现；当前可运行配置仍见快速上手，任务顺序见开发状态。
+后续开发按[已确认的 DSH 目标架构](ARCHITECTURE.md#target-architecture)和[公共开发 SOP](guides/agent-customization.md#agent-development-sop)推进：先底座与范例，再七角色开发。目标已进入 R1，但尚未完整实现；当前可运行配置仍见快速上手，任务顺序见开发状态。
 
 | 我想做什么 | 阅读 |
 | --- | --- |

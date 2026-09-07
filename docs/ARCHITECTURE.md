@@ -11,7 +11,7 @@ domain-knowledge owns knowledge governance and execution. Its Domain/Application
 
 <a id="target-architecture"></a>
 
-## 已确认的目标架构（2026-09-07，尚未实施）
+## 已确认的目标架构（2026-09-07，实施中，尚未完成）
 
 第一版先在外部环境完成真实闭环。LangGraph 编排七个角色，DSH 直接承担单个 Agent 的运行能力；项目保留业务输入输出约定和治理服务，不在两者之间再建设一套通用 Agent 运行框架。
 
@@ -36,7 +36,7 @@ flowchart TD
 
 业务输入输出约定不是新的运行框架：DSH 可以运行 DocGen，但“候选知识必须包含哪些事实、来源和字段”仍由项目定义。DSH 的原始响应与事件通过校验后才能成为业务工件。SDK 类型不进入 Domain/Application，版本化业务 Schema 与 ArtifactRef 边界继续保留。
 
-Pi 退出目标底座；其当前配置入口、依赖和旧 Run 的处置在实施阶段一并设计。`OhMyWorkPanelWorkflowExecutor` 退出公共运行入口，其中必要的输入准备、结果校验与证据交接应整理为通用节点接线。项目路径、固定 commit 和评测命令属于任务材料或验收样例，不能决定公共框架的结构。第一版不采用 DSH 再调用 CodeAgent CLI 的嵌套架构。
+Pi 退出目标底座；其当前配置入口、依赖和旧 Run 的处置仍待 R1 继续实施。首批代码已将 `OhMyWorkPanelWorkflowExecutor` 替换为 `ProjectWorkflowStages` 业务接线，预写输出与文件读取移至显式 `FixtureProjectWorkflowStages`；真实 Provider 路径不要求样例 assets，缺少 Provider 明确失败。公共 CLI/API 的固定场景选择与默认后端尚未完全迁出。项目路径、固定 commit 和评测命令属于任务材料或验收样例，不能决定公共框架的结构。第一版不采用 DSH 再调用 CodeAgent CLI 的嵌套架构。
 
 交付顺序为：**DSH 公共底座 → 普通 CPU 小模块的可运行角色范例 → 七角色能力开发与联调 → 外部真实闭环 → CodeAgent CLI 真实适配**。底座可用只证明开发者可以沿用范例开发角色，不代表七角色业务能力或第一版完整闭环已经验收。
 

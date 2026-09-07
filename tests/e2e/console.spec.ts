@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { createKnowledgeServer } from '../../src/interfaces/runner/server.ts';
-import { GOOD_BODY } from '../helpers/fixture.ts';
+import { GENERIC_SCENARIO, GOOD_BODY } from '../helpers/fixture.ts';
 
 let instance: ReturnType<typeof createKnowledgeServer>;
 let runtimeDir = '';
@@ -749,4 +749,31 @@ test('mobile navigation, theme persistence and 200 percent zoom preserve core pa
   await page.keyboard.press('Enter');
   await expect(page.getByRole('heading', { name: '飞轮批次', level: 1 })).toBeVisible();
   await expect(page.getByText('browser-contract').first()).toBeVisible();
+});
+
+
+test('项目场景表单拒绝非法输入并通过 API 提交通用场景', async ({ page }) => {
+  const originalStart = instance.composition.apps.orchestrator.start;
+  const starts: unknown[] = [];
+  instance.composition.apps.orchestrator.start = async (scenario) => {
+    starts.push(scenario);
+    return { runId: lineageRunId, executionStatus: 'RUNNING' };
+  };
+  try {
+    await page.goto(baseUrl);
+    await enterGovernance(page);
+    await navigateTo(page, '飞轮批次');
+    await page.getByLabel('受信项目路径').fill(repositoryDir);
+    const scenario = { ...GENERIC_SCENARIO, moduleId: 'browser-module', repositoryRoot: repositoryDir };
+    await page.getByLabel('项目场景 JSON').fill(JSON.stringify({ ...scenario, sourcePaths: ['../private'] }));
+    const denied = page.waitForResponse((response) => response.url().endsWith('/api/v1/runs') && response.request().method() === 'POST');
+    await page.getByRole('button', { name: '启动项目流程' }).click();
+    expect((await denied).status()).toBe(422);
+    expect(starts).toHaveLength(0);
+    await page.getByLabel('项目场景 JSON').fill(JSON.stringify(scenario));
+    const accepted = page.waitForResponse((response) => response.url().endsWith('/api/v1/runs') && response.request().method() === 'POST');
+    await page.getByRole('button', { name: '启动项目流程' }).click();
+    expect((await accepted).status()).toBe(202);
+    expect(starts).toEqual([scenario]);
+  } finally { instance.composition.apps.orchestrator.start = originalStart; }
 });
