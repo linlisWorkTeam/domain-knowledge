@@ -43,6 +43,6 @@ node scripts/capture-console-demo.mjs
 
 ## 发布
 
-本目录是公开站点的唯一源码。当前 Pages Source 是分支/Jekyll，根目录的薄入口会在构建时嵌入本页，并把资源指向本目录；不要在根目录复制页面资产。`.github/workflows/pages.yml` 会先探测 Source：分支模式下主动跳过，避免和 Jekyll 争抢发布环境；管理员日后若在 Settings → Pages 切换到 **GitHub Actions**，它会直接发布本目录。之后也可以从 Actions 页面手动运行。
+本目录是公开站点的唯一源码。根目录保留兼容分支/Jekyll 的薄入口，构建时嵌入本页，并把资源指向本目录；不要在根目录复制页面资产。`.github/workflows/pages.yml` 仅允许从 Actions 页面手动运行，不随 main 推送自动部署。使用前先在 Settings → Pages 启用站点并选择 **GitHub Actions**；工作流会探测 Source，Actions 模式发布本目录，分支模式跳过。未启用 Pages 时，探测接口可能返回 404，需先完成配置。
 
 默认地址是 <https://linlisworkteam.github.io/domain-knowledge/>。若组织或仓库改名，要同步更新 `index.html` 中的 canonical、Open Graph URL 和文档里的访问地址。

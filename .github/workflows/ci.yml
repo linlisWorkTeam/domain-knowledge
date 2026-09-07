@@ -2,9 +2,7 @@ name: CI
 
 on:
   pull_request:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -21,6 +19,7 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
         with:
+          # DocGen integration tests evaluate a pinned historical source commit.
           fetch-depth: 0
 
       - name: Set up Node.js
@@ -29,20 +28,42 @@ jobs:
           node-version: 24
           cache: npm
 
+      - name: Select checks for changed files
+        id: changes
+        run: |
+          node --input-type=module <<'NODE'
+          import { execFileSync } from 'node:child_process';
+          import { appendFileSync } from 'node:fs';
+          // PR checkout is the merge commit; its first parent is the tested base.
+          const files = process.env.GITHUB_EVENT_NAME === 'pull_request'
+            ? execFileSync('git', ['diff', '--no-renames', '--name-only', '-z', 'HEAD^1', 'HEAD'], { encoding: 'utf8' }).split('\0').filter(Boolean)
+            : [];
+          const docsOnly = files.length > 0 && files.every((file) => /^(?:[^/]+\.md|(?:docs|specs)\/.*\.md)$/.test(file));
+          appendFileSync(process.env.GITHUB_OUTPUT, `docs-only=${docsOnly}\n`);
+          NODE
+
       - name: Install dependencies
         run: npm ci
 
-      - name: Install browser for Console tests
-        run: npx playwright install --with-deps chromium
-
       - name: Type-check
+        if: steps.changes.outputs.docs-only != 'true'
         run: npm run typecheck
 
       - name: Validate specifications
         run: npm run validate:specs
 
+      - name: Check documentation contracts
+        if: steps.changes.outputs.docs-only == 'true'
+        run: node --test tests/contract/*.test.ts
+
       - name: Run test suite
+        if: steps.changes.outputs.docs-only != 'true'
         run: npm test
 
+      - name: Install browser for Console tests
+        if: steps.changes.outputs.docs-only != 'true'
+        run: npx playwright install --with-deps chromium
+
       - name: Run Console browser tests
+        if: steps.changes.outputs.docs-only != 'true'
         run: npm run test:ui

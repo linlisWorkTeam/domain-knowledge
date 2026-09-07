@@ -4,7 +4,7 @@
 
 ## 提交门禁
 
-每个 PR 至少执行：
+涉及代码、配置或测试的 PR 执行：
 
 ```bash
 npm run typecheck
@@ -12,7 +12,9 @@ npm run validate:specs
 npm test
 ```
 
-CI 在 Node.js 24 的 Linux 环境重复执行相同门禁。PR 中应记录实际结果；本地未运行的检查必须说明原因。
+CI 在 Node.js 24 的 Linux 环境执行上述门禁及 `npm run test:ui`。仅修改根目录 Markdown 或 `docs/`、`specs/` 内 Markdown 的 PR 执行 `npm run validate:specs` 和 `node --test tests/contract/*.test.ts`，跳过类型检查、全量 Node 测试和浏览器安装/测试。混合改动、其他路径及手动触发均执行完整检查。
+
+CI 只在 PR 更新时自动运行，合入 main 后不再重复执行；直接推送 main 也不会自动检查，需要在 Actions 手动运行 CI。`verify` 检查名称保持不变，新的 PR 提交会取消旧运行。网站部署也改为手动触发，启用 Pages 后按需运行。PR 中应记录实际结果；本地未运行的检查必须说明原因。
 
 ## 测试层级
 
