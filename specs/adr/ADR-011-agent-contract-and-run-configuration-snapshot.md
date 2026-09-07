@@ -55,3 +55,11 @@ ReviewAgent 只审查已经形成的正常评测报告。认证失败、超时�
 - Adapter 可以更换为公司 CodeAgent CLI，而不改变 Domain/Application 或节点契约。
 - Checkpoint 恢复能够重用同一配置与 Schema 版本，评测报告具备可复验配置摘要。
 - 新增 Schema 规范化和 CAS 写入步骤，但大对象不会膨胀 GraphState。
+
+## DEV-019：DSH 角色底座（2026-09-07，T102）
+
+LangGraph 负责业务图调度，DSH SDK 负责每次角色会话及工具分派。`ProjectWorkflowStages` 只组装业务命令、校验结果、关联 CAS/事件；预写场景输出位于独立 Fixture Adapter。Schema 重试最多三次且每次新 session/home，图级重试继续受业务 checkpoint 保护。取消与超时关闭 DSH，迟到成功不能覆盖取消或提交业务结果。
+
+DSH 默认适配配置为原生 `sdk-minimal`，最后一层项目策略关闭 Bash/编辑工具，通过 DSH 注册 `read_material` 并安装不可被 allow 覆盖的执行 guard。编排角色无工具，其余角色只读自身已物化材料；写入仅通过经过校验的业务 Result。Code 的参考源码隔离仍由固定 Git 版本、角色白名单与生产 bubblewrap 共同保证。该插件不维护额外会话、模型循环或工具调度。
+
+T102 验证使用真实 DSH SDK/进程和本地受控 SSE 模型服务，覆盖授权读取、越界/符号链接/隐藏文件及 shell 拒绝。它证明运行机制，不证明真实模型业务质量；默认服务配置与 Pi 迁出分别由 T106/T105 验收。

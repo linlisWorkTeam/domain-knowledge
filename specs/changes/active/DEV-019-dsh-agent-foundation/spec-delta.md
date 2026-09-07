@@ -47,3 +47,9 @@ CPU 范例选择本仓库 `structuredMarkdownDiff`，参考源码固定到文档
 | 旧 Pi 与固定场景 | 原固定执行器已移除；Pi SDK/配置/默认选择、固定 CLI/API 场景入口仍存在 | T105/T106 迁出全部运行依赖，完成 AC-DSHF-006/007 后才可声称仅依托 DSH |
 
 本轮不改变 HTTP API 或版本化 AgentCommand/AgentResult Schema；更新的是业务阶段实现、测试夹具隔离与 DSH 审计关联。正式规范中未实施的 Pi 配置条款暂保留，不将部分 R1 工作改记为全部完成。
+
+## T102 已实施
+
+KF-SYS-025 与 ADR-011 已同步 DSH 的会话/工具职责及应用业务契约边界。原生 `sdk-minimal` 配置加项目 DSH 插件：编排角色无工具，其余角色只能 `read_material`，输出写入由业务结果处理；权限不依赖提示词。每次 Schema 尝试使用独立 session/home，延续应用 checkpoint 幂等。
+
+锁定 DSH 上游包含 `dsh-llm-pi-ai` → `pi-ai` 模型适配依赖；原生 minimal 路径不加载此适配器。T105 移除的是项目直接依赖及执行的 Pi coding-agent 框架，不能把上游模型适配包的间接存在误报成框架迁出失败或声称锁文件完全无 `pi` 字符串。

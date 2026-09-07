@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdirSync, readFileSync, realpathSync } from 'node:fs';
+import { mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DeepSeekHarness } from '@deepseek-ai/dsh-sdk-client';
@@ -292,11 +292,19 @@ export class DeepSeekHarnessSdkAgent implements AgentProvider {
     let notificationCount = 0;
     let errorCode: string | null = null;
     const dshHomeBase = resolve(this.options.dshHome ?? join(workspaceRoot, '.dsh'));
-    const dshHome = join(dshHomeBase, digest(request.idempotencyKey).slice(0, 32));
+    const dshHome = join(dshHomeBase, `${digest(request.idempotencyKey).slice(0, 24)}-${randomUUID()}`);
     mkdirSync(dshHome, { recursive: true, mode: 0o700 });
     const processIsolation = this.options.processIsolation ?? 'none';
     const runtimeBin = resolve(this.options.dshBin ?? installedDshBin());
-    const patches = (this.options.patches ?? []).map((path) => resolve(path));
+    const policyPath = join(dshHome, 'role-tools.mjs');
+    writeFileSync(policyPath, readFileSync(new URL('./role-tools.mjs', import.meta.url)), { mode: 0o600 });
+    const policyPatch = join(dshHome, 'role-policy.json');
+    writeFileSync(policyPatch, JSON.stringify([
+      ...['persistent-bash', 'persistent-pwsh', 'str-replace-editor'].map((id) => ({ id, disabled: true })),
+      { insert: [{ id: 'workpanel-role-tools', name: policyPath, config: { workspaceRoot, canRead: request.role !== 'orchestrator' } }] },
+    ]), { mode: 0o600 });
+    // The final patch and monotonic DSH guard enforce the business role view.
+    const patches = [...(this.options.patches ?? []).map((path) => resolve(path)), policyPatch];
     const launcher = fileURLToPath(new URL('./isolation-launcher.mjs', import.meta.url));
     const childEnv = {
       ...process.env,
@@ -314,7 +322,7 @@ export class DeepSeekHarnessSdkAgent implements AgentProvider {
     };
     const harness = (this.options.harnessFactory ?? ((options) => new DeepSeekHarness(options)))({
       dshBin: processIsolation === 'bubblewrap' ? launcher : runtimeBin,
-      profile: this.options.profile ?? 'sdk',
+      profile: this.options.profile ?? 'sdk-minimal',
       patches,
       dshHome,
       cwd: workspaceRoot,

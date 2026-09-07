@@ -102,3 +102,11 @@ AC-DSHF-001～005 全部尚未执行；普通 CPU 模块和示范角色的具体
 ### 执行交接
 
 当前 R0=`PASS`；R1 开发中且整体验收未完成；R2～R4=`NOT_RUN`。本轮开发差异位于 `codex/dev019-dsh-foundation` 工作区，尚未提交或推送；此前文档已推送。下一步继续 R1：迁出 Pi SDK/配置与默认选择，落实 DSH 的真实配置/工具能力和旧 Run 拒绝跨后端恢复，打通通用 CLI/API 场景输入，再完成 AC-DSHF-006/007 及 T102 剩余检查。不要重新启动整体架构讨论，也不要把本批测试记为仅 DSH 的完整底座已验收。继续在现有证据文件追加记录，不新增阶段报告。
+
+## R1 / T102（2026-09-07）：PASS
+
+在 `512b2ed` 上完成 DSH 原生 minimal profile、项目只读工具插件、独立尝试 home 和角色工具快照。真实 DSH 进程对本地受控 SSE 服务完成读取和拒绝测试；运行审计关联 session、任务、角色，不含模型正文或密钥。应用契约/CAS/事件继续沿用既有实现；无新增 Agent 框架。
+
+Node 24.13.0、DSH/SDK 0.1.2-alpha.4。验证命令：`npm run typecheck`（0）、`npm run validate:specs`（17 schemas / 7 commands / 8 results / 51 P0）、`npm run test:architecture`（6/6）、`npm test`（161/161，0 skip）。针对 DSH/业务契约/角色工作区的五文件回归 28/28，含非法输出、有限重试、超时、取消、迟到成功、session 错配与权限拒绝。完整测试临时输出 `/tmp/t102-full.log`；可复执行源码为 `tests/integration/dsh-native-tools.test.ts`、`deepseek-harness-agent.test.ts`、`agent-contracts.test.ts`、`dsh-project-stages.test.ts` 和 `tests/security/agent-workspace.test.ts`。
+
+AC-DSHF-002、003 自动化部分 PASS；R2 真实模型及 R4 完整崩溃恢复不计入本次证明。T105/T106 尚未完成。
