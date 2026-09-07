@@ -21,7 +21,7 @@ npm run knowledge:serve
 
 ## 五个主要入口
 
-后续开发按[已确认的 DSH 目标架构](ARCHITECTURE.md#target-architecture)和[公共开发 SOP](guides/agent-customization.md#agent-development-sop)推进：先底座与范例，再七角色开发。R1 已合入，当前开发 R2 DocGen 范例；入口已实现，live 模型配置待补。可运行配置见快速上手，任务顺序见开发状态。
+后续开发按[已确认的 DSH 目标架构](ARCHITECTURE.md#target-architecture)和[公共开发 SOP](guides/agent-customization.md#agent-development-sop)推进：先底座与范例，再七角色开发。R1 已合入，R2 DocGen 范例与独立工作区 live 复现已通过本地验收，PR #26 待审查；合入后进入 T200。可运行配置见快速上手，任务顺序见开发状态。
 
 | 我想做什么 | 阅读 |
 | --- | --- |

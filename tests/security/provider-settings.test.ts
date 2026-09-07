@@ -62,3 +62,25 @@ test('Provider URL policy rejects credentials, local destinations, and mixed DNS
   assert.equal(isPublicAddress('::1'), false);
   assert.equal(isPublicAddress('2606:4700:4700::1111'), true);
 });
+
+test('Provider probe connects only to its approved address with Node family autoselection enabled', async () => {
+  const { createServer, getDefaultAutoSelectFamily, setDefaultAutoSelectFamily } = await import('node:net');
+  const { OpenAiCompatibleProviderProbe } = await import('../../src/infrastructure/security/provider-settings.ts');
+  let connected = false;
+  const server = createServer((socket) => { connected = true; socket.destroy(); });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const previous = getDefaultAutoSelectFamily();
+  setDefaultAutoSelectFamily(true);
+  try {
+    const port = (server.address() as { port: number }).port;
+    const result = await new OpenAiCompatibleProviderProbe(1000).verify({
+      endpoint: { url: new URL(`https://does-not-resolve.invalid:${port}/`), addresses: ['127.0.0.1'] },
+      apiKey: null, model: 'controlled',
+    });
+    assert.equal(connected, true, 'pinned lookup must reach the approved address before TLS starts');
+    assert.equal(result.status, 'FAILED', 'a closed TCP socket is not a verified HTTPS provider');
+  } finally {
+    setDefaultAutoSelectFamily(previous);
+    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
+});

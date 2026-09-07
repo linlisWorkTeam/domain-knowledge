@@ -37,7 +37,7 @@ This directory is the normative source for Knowledge Flywheel behavior. Requirem
 
 ## 阶段门
 
-2026-09-07 确认的后续方向为 LangGraph 编排、DSH 直接运行角色，先完成外部底座与 CPU 小模块范例，再开发七角色完整闭环；CodeAgent CLI 适配后置。变更提案见 [DEV-019](changes/active/DEV-019-dsh-agent-foundation/proposal.md)。R1 已实现默认 DSH、通用场景输入和旧 Pi 只读兼容，相关 baseline 随实现同步；范围与证据见 `spec-delta.md` 和 `evidence.md`。R2 live 范例及后续完整闭环仍待验收。
+2026-09-07 确认的后续方向为 LangGraph 编排、DSH 直接运行角色，先完成外部底座与 CPU 小模块范例，再开发七角色完整闭环；CodeAgent CLI 适配后置。变更提案见 [DEV-019](changes/active/DEV-019-dsh-agent-foundation/proposal.md)。R1 已实现默认 DSH、通用场景输入和旧 Pi 只读兼容，相关 baseline 随实现同步；范围与证据见 `spec-delta.md` 和 `evidence.md`。R2 live 范例已通过本地验收（PR #26 待审查）；R3/R4 完整闭环尚未验收。
 
 P0-A Spec 已 Accepted；这只表示需求、契约和验收基线可进入实现验证，不代表 P0-B 或生产能力已经完成。P0-B 的当前实现范围、验证证据、下一工作项和未测边界统一记录在[开发状态](../docs/DEVELOPMENT-STATUS.md)，本规范入口不再维护一份会随开发变化的平行进度摘要。
 

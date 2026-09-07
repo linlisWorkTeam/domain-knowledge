@@ -1,6 +1,6 @@
 # 教程：基于 DSH 开发一个 Agent 角色
 
-> 状态：R1 已合入，R2 DocGen 范例入口与受控回归已实现；真实模型验收因缺少 DSH 配置待完成。本文命令可执行，但不能据此将 T103/T104 或 R2 标为通过。
+> 状态：R1 已合入；R2 T103/T104 的真实 DocGen、独立检查和第二工作区修改复现已通过本地验收，PR #26 待审查。实际 Run、源码复核及失败记录见 [DEV-019 证据](../../specs/changes/active/DEV-019-dsh-agent-foundation/evidence.md#r2-live-验收2026-09-07)。R3/R4 未执行。
 
 ## 从公共范例开始
 
@@ -82,7 +82,7 @@ npm run example:docgen -- run --runtime /absolute/path/to/example-runtime
 npm run example:docgen -- check --document /absolute/path/to/document.md
 ```
 
-`checks.status=PASS` 只证明这些数据例子与引用范围通过；`semanticReview=REQUIRED` 表示仍须阅读正文，检查签名、行号语义、章节归属、空输入、LCS 阈值与回退描述是否被源码支持。引用行号合法不能证明引用支持该论断。人工检查完成前不能把 DocGen 业务质量标为通过；该范例始终 `publication=NOT_EVALUATED`。
+`checks.status=PASS` 只证明这些数据例子与引用范围通过；`semanticReview=REQUIRED` 表示仍须阅读正文，检查签名、行号语义、章节归属、空输入、LCS 阈值与回退描述是否被源码支持。引用行号合法不能证明引用支持该论断。源码复核完成前不能把本轮 DocGen 正文标为通过；复核记录须说明复核者、方法、源码版本与正文摘要，不能将自动检查或 Codex 复核冒充用户审查；该范例始终 `publication=NOT_EVALUATED`。
 
 修改已有指令文件或复制一份到本地，再启动新 Run：
 

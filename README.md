@@ -22,7 +22,7 @@ SQLite Registry 与 CAS 是运行时事实源，默认写到本仓库 `.workpane
 
 第一版先在外部使用 **LangGraph 编排 → DSH 运行角色 → 业务校验与独立评测** 完成闭环。先交付公共底座和普通 CPU 小模块的真实角色范例，再开发七个角色；不另建 Agent 运行框架。Pi 退出目标底座，固定项目执行器退出公共入口；CodeAgent CLI 仅保留后续适配位置，不阻塞第一版。
 
-R1 已将角色执行收敛到 DSH，通用项目场景从 CLI/API/Console 传入。Pi Agent 运行依赖已移除，旧记录保留可读且拒绝恢复；CodeAgent CLI 适配后置。R2 的真实 CPU DocGen 范例及后续完整闭环仍待验收。 详见[开发状态](docs/DEVELOPMENT-STATUS.md)和 [DEV-019](specs/changes/active/DEV-019-dsh-agent-foundation/proposal.md)。
+R1 已将角色执行收敛到 DSH，通用项目场景从 CLI/API/Console 传入。Pi Agent 运行依赖已移除，旧记录保留可读且拒绝恢复；CodeAgent CLI 适配后置。R2 的真实 CPU DocGen 范例和独立工作区复现已通过本地验收，PR #26 待审查；R3 七角色和 R4 完整闭环尚未验收。 详见[开发状态](docs/DEVELOPMENT-STATUS.md)和 [DEV-019](specs/changes/active/DEV-019-dsh-agent-foundation/proposal.md)。
 
 ## 当前已实现
 

@@ -2,7 +2,7 @@
 
 ## 开发基线
 
-下一阶段按 [DEV-019](../specs/changes/active/DEV-019-dsh-agent-foundation/proposal.md)收敛为 LangGraph 编排、DSH 角色运行；先完成底座与 CPU 范例，再开展七角色开发。当前已完成公共接线、通用场景和 DSH 配置迁移；R1 验收后进入 CPU 范例，以下目录和命令描述现有实现；角色开发使用[公共 SOP](guides/agent-customization.md#agent-development-sop)。
+下一阶段按 [DEV-019](../specs/changes/active/DEV-019-dsh-agent-foundation/proposal.md)收敛为 LangGraph 编排、DSH 角色运行；先完成底座与 CPU 范例，再开展七角色开发。当前已完成公共接线、通用场景和 DSH 配置迁移；R2 CPU 范例与独立工作区 live 复现已通过本地验收，PR #26 审查合入后进入 T200；以下目录和命令描述现有实现；角色开发使用[公共 SOP](guides/agent-customization.md#agent-development-sop)。
 
 第一次参与开发请先阅读[文档首页](README.md)；按任务定位代码和测试时，使用其中的任务表。
 
