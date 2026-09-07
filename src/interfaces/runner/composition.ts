@@ -34,9 +34,9 @@ import { SourceScanner } from '../../infrastructure/source-scan/index.ts';
 import { LocalAgentWorkspace } from '../../infrastructure/agents/workspace/index.ts';
 import {
   EncryptedFileProviderSettingsStore, OpenAiCompatibleProviderProbe,
-  PI_AGENT_DEFAULT_CONTEXT_WINDOW, PI_AGENT_DEFAULT_MAX_SCHEMA_ATTEMPTS,
-  PI_AGENT_DEFAULT_MAX_TOKENS, PiCodingAgentProvider, PublicHttpsEndpointPolicy,
-} from '../../infrastructure/agents/pi-agent/index.ts';
+  PublicHttpsEndpointPolicy,
+} from '../../infrastructure/security/provider-settings.ts';
+import { ConfiguredDshProvider, DSH_DEFAULT_CONTEXT_WINDOW, DSH_DEFAULT_MAX_SCHEMA_ATTEMPTS, DSH_DEFAULT_MAX_TOKENS } from '../../infrastructure/agents/deepseek-harness/configured-provider.ts';
 import { FixtureProjectWorkflowStages } from '../../infrastructure/agents/scenario/project-workflow-fixture.ts';
 import { JsonSchemaAgentContractValidator } from '../../infrastructure/agents/contracts/index.ts';
 import { SQLiteOperationalMetrics } from '../../infrastructure/observability/sqlite-operational-metrics.ts';
@@ -95,6 +95,7 @@ export function loadWorkpanelConfig(_repositoryRoot = defaultRepositoryRoot): Wo
 export function createComposition(input: {
   repositoryRoot?: string;
   fixtureAssetRoot?: string;
+  agentProviderMode?: 'fixture' | 'deepseek-harness' | 'company-codeagent-cli';
   runtimeDir?: string;
   clock?: () => string;
   providerSettingsStore?: ProviderSettingsStore;
@@ -149,41 +150,42 @@ export function createComposition(input: {
   );
   const operationalMetricsApp = new OperationalMetricsApp(metrics);
   const providerEndpointPolicy = input.providerEndpointPolicy ?? new PublicHttpsEndpointPolicy();
-  const piMaxTokens = Number(process.env.WP_PI_MAX_TOKENS ?? PI_AGENT_DEFAULT_MAX_TOKENS);
-  const piMaxSchemaAttempts = Number(
-    process.env.WP_PI_MAX_SCHEMA_ATTEMPTS ?? PI_AGENT_DEFAULT_MAX_SCHEMA_ATTEMPTS,
+  const configuredMaxTokens = Number(process.env.WP_DSH_MAX_TOKENS ?? DSH_DEFAULT_MAX_TOKENS);
+  const configuredMaxSchemaAttempts = Number(
+    process.env.WP_DSH_MAX_SCHEMA_ATTEMPTS ?? DSH_DEFAULT_MAX_SCHEMA_ATTEMPTS,
   );
-  const piContextWindow = Number(
-    process.env.WP_PI_CONTEXT_WINDOW ?? PI_AGENT_DEFAULT_CONTEXT_WINDOW,
+  const configuredContextWindow = Number(
+    process.env.WP_DSH_CONTEXT_WINDOW ?? DSH_DEFAULT_CONTEXT_WINDOW,
   );
-  if (!Number.isSafeInteger(piMaxTokens) || piMaxTokens < 1) {
-    throw new Error('CONFIG_INVALID: WP_PI_MAX_TOKENS must be a positive integer');
+  if (!Number.isSafeInteger(configuredMaxTokens) || configuredMaxTokens < 1) {
+    throw new Error('CONFIG_INVALID: WP_DSH_MAX_TOKENS must be a positive integer');
   }
-  if (!Number.isSafeInteger(piMaxSchemaAttempts)
-    || piMaxSchemaAttempts < 1 || piMaxSchemaAttempts > 3) {
-    throw new Error('CONFIG_INVALID: WP_PI_MAX_SCHEMA_ATTEMPTS must be 1..3');
+  if (!Number.isSafeInteger(configuredMaxSchemaAttempts)
+    || configuredMaxSchemaAttempts < 1 || configuredMaxSchemaAttempts > 3) {
+    throw new Error('CONFIG_INVALID: WP_DSH_MAX_SCHEMA_ATTEMPTS must be 1..3');
   }
-  if (!Number.isSafeInteger(piContextWindow) || piContextWindow < piMaxTokens) {
-    throw new Error('CONFIG_INVALID: WP_PI_CONTEXT_WINDOW must be an integer at least WP_PI_MAX_TOKENS');
+  if (!Number.isSafeInteger(configuredContextWindow) || configuredContextWindow < configuredMaxTokens) {
+    throw new Error('CONFIG_INVALID: WP_DSH_CONTEXT_WINDOW must be an integer at least WP_DSH_MAX_TOKENS');
   }
-  const piExecutionParameters = {
+  const configuredExecutionParameters = {
     api: 'openai-completions' as const,
-    maxTokens: piMaxTokens,
-    maxSchemaAttempts: piMaxSchemaAttempts,
-    contextWindow: piContextWindow,
+    maxTokens: configuredMaxTokens,
+    maxSchemaAttempts: configuredMaxSchemaAttempts,
+    contextWindow: configuredContextWindow,
   };
   const providerOperations = new ProviderOperationsApp({
     store: input.providerSettingsStore ?? new EncryptedFileProviderSettingsStore(
-      join(runtimeDir, 'secrets', 'provider-settings.enc'),
-      join(runtimeDir, 'secrets', 'provider-settings.key'),
+      join(runtimeDir, 'secrets', 'dsh-provider-settings.enc'),
+      join(runtimeDir, 'secrets', 'dsh-provider-settings.key'),
+      new EncryptedFileProviderSettingsStore(join(runtimeDir, 'secrets', 'provider-settings.enc'), join(runtimeDir, 'secrets', 'provider-settings.key')),
     ),
     endpointPolicy: providerEndpointPolicy,
     probe: input.providerProbe ?? new OpenAiCompatibleProviderProbe(),
-    executionParameters: piExecutionParameters,
+    executionParameters: configuredExecutionParameters,
     clock: input.clock,
     audit: (event) => {
       const domainEvent = createEvent(
-        'provider-settings:pi-agent', event.eventType, event.payload, event.occurredAt,
+        'provider-settings:deepseek-harness', event.eventType, event.payload, event.occurredAt,
       );
       repository.recordOperationalEvent({ ...domainEvent, eventId: event.eventId });
     },
@@ -194,12 +196,11 @@ export function createComposition(input: {
     clock: input.clock,
   });
   const workflowObserver = new RegistryWorkflowObserver(repository, input.clock);
-  const agentProviderMode = process.env.WP_FLYWHEEL_AGENT_PROVIDER?.trim() || 'fixture';
+  const agentProviderMode = input.agentProviderMode || process.env.WP_FLYWHEEL_AGENT_PROVIDER?.trim() || 'deepseek-harness';
   if (!['fixture', 'deepseek-harness', 'deepseek-harness-headless', 'company-codeagent-cli'].includes(agentProviderMode)) {
     throw new Error('CONFIG_INVALID: WP_FLYWHEEL_AGENT_PROVIDER must be fixture, deepseek-harness, deepseek-harness-headless, or company-codeagent-cli');
   }
-  const sdkProvider = process.env.WP_DSH_PROVIDER?.trim()
-    || (process.env.OPENCODE_GO_API_KEY ? 'opencode-go' : 'deepseek-official');
+  const sdkProvider = process.env.WP_DSH_PROVIDER?.trim() || 'deepseek-official';
   const providerModel = agentProviderMode === 'fixture'
     ? 'schema-validated-fixture-v1'
     : agentProviderMode === 'company-codeagent-cli'
@@ -209,7 +210,7 @@ export function createComposition(input: {
   if (processIsolation !== 'none' && processIsolation !== 'bubblewrap') {
     throw new Error('CONFIG_INVALID: WP_DSH_PROCESS_ISOLATION must be none or bubblewrap');
   }
-  const profile = process.env.WP_DSH_PROFILE?.trim() || 'sdk';
+  const profile = process.env.WP_DSH_PROFILE?.trim() || 'sdk-minimal';
   const dshBin = process.env.WP_DSH_BIN?.trim() || 'dsh';
   const dshHome = process.env.DSH_HOME?.trim() || join(runtimeDir, 'dsh');
   const bubblewrapCommand = process.env.WP_DSH_BWRAP_COMMAND?.trim() || 'bwrap';
@@ -277,6 +278,12 @@ export function createComposition(input: {
           maxOutputBytes: codeAgentMaxOutputBytes,
           allowedWorkspaceRoots: [...codeAgentAllowedRoots, agentWorkspaceRoot],
         };
+  providerOperations.executionParameters.runtimeSha256 = sha256(JSON.stringify({
+    profile: 'sdk-minimal', processIsolation, bubblewrapCommand, timeoutMs, maxOutputBytes,
+    allowedWorkspaceRoots: [...allowedRoots, agentWorkspaceRoot],
+    toolPolicy: sha256(readFileSync(new URL('../../infrastructure/agents/deepseek-harness/role-tools.mjs', import.meta.url))),
+    runtimeVersion: '0.1.2-alpha.4',
+  }));
   const schemaRoot = join(componentRoot, 'specs', 'schemas');
   const artifactRefSchemaSha256 = sha256(readFileSync(join(schemaRoot, 'artifact-ref.schema.json')));
   const correctionSchemaSha256 = sha256(readFileSync(join(schemaRoot, 'correction.schema.json')));
@@ -326,7 +333,7 @@ export function createComposition(input: {
           runId: String(auditMetadata.runId ?? ''),
           agentId: record.role,
           provider: record.provider,
-          model: providerModel,
+          model: String(auditMetadata.model ?? providerModel),
           startedAt: record.startedAt,
           completedAt: record.completedAt,
           durationMs: record.durationMs,
@@ -343,7 +350,7 @@ export function createComposition(input: {
       };
       const agent = agentProviderMode === 'deepseek-harness'
         ? new DeepSeekHarnessSdkAgent({
-            dshBin,
+            dshBin: dshBin === 'dsh' ? undefined : dshBin,
             profile,
             patches: sdkPatches,
             dshHome,
@@ -388,10 +395,16 @@ export function createComposition(input: {
         ...(agent ? { agent } : {}),
         agentResolver: (runId) => {
           const snapshot = runConfiguration.get(runId);
-          if (snapshot?.provider.kind !== 'pi-agent') return undefined;
-          return new PiCodingAgentProvider({
+          if (snapshot?.provider.kind === 'pi-agent') throw new Error('RUN_CONFIGURATION_INCOMPATIBLE: legacy Pi Run is read-only');
+          if (snapshot?.provider.kind !== 'deepseek-harness' || snapshot.provider.parametersSha256 === fallbackRunProvider.parametersSha256) return undefined;
+          return new ConfiguredDshProvider({
             ...providerOperations.requireRuntimeConfiguration(snapshot.provider),
-            agentDir: join(runtimeDir, 'pi-agent'),
+            dshHome: join(runtimeDir, 'dsh-configured'),
+            runtime: { processIsolation, bubblewrapCommand, timeoutMs, maxOutputBytes, allowedWorkspaceRoots: [...allowedRoots, agentWorkspaceRoot] },
+            onAudit: async (record) => {
+              await mkdir(auditDirectory, { recursive: true });
+              await appendFile(auditPath, `${JSON.stringify(record)}\n`, { encoding: 'utf8', mode: 0o600 });
+            },
             endpointPolicy: providerEndpointPolicy,
             onInvocation: (record) => metrics.recordProviderInvocation(record),
           });

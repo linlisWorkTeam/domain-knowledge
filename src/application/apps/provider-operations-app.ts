@@ -3,15 +3,15 @@ import { assertInvariant, sha256 } from '../../domain/index.ts';
 import type {
   ProviderConnectionProbe,
   ProviderEndpointPolicy,
-  PiAgentExecutionParameters,
-  PiAgentRuntimeConfiguration,
+  DshExecutionParameters,
+  DshRuntimeConfiguration,
   ProviderSettingsRecord,
   ProviderSettingsStore,
   RunConfigurationSnapshot,
 } from '../ports/index.ts';
 
 export interface ProviderSettingsView {
-  provider: 'pi-agent';
+  provider: ProviderSettingsRecord['provider'];
   apiUrlMasked: string | null;
   apiKeyConfigured: boolean;
   model: string | null;
@@ -49,7 +49,7 @@ function settingsFingerprint(record: Pick<ProviderSettingsRecord, 'provider' | '
 
 function runtimeDigest(
   record: ProviderSettingsRecord,
-  execution: PiAgentExecutionParameters,
+  execution: DshExecutionParameters,
 ): string {
   // Credentials and the mutable settings revision are intentionally excluded. A
   // rotated, reverified key may resume a Run; endpoint/model changes may not.
@@ -57,6 +57,7 @@ function runtimeDigest(
     provider: record.provider,
     apiUrl: record.apiUrl,
     model: record.model,
+    runtimeSha256: execution.runtimeSha256,
     api: execution.api,
     maxTokens: execution.maxTokens,
     maxSchemaAttempts: execution.maxSchemaAttempts,
@@ -71,14 +72,15 @@ export class ProviderOperationsApp {
   readonly clock: () => string;
   readonly audit: (event: ProviderAuditEvent) => void;
   readonly verificationMaxAgeMs: number;
-  readonly executionParameters: PiAgentExecutionParameters;
+  readonly executionParameters: DshExecutionParameters;
+  private readonly frozenConfigurations = new Map<string, DshRuntimeConfiguration>();
   private mutationTail: Promise<void> = Promise.resolve();
 
   constructor(input: {
     store: ProviderSettingsStore;
     endpointPolicy: ProviderEndpointPolicy;
     probe: ProviderConnectionProbe;
-    executionParameters: PiAgentExecutionParameters;
+    executionParameters: DshExecutionParameters;
     clock?: () => string;
     audit?: (event: ProviderAuditEvent) => void;
     verificationMaxAgeMs?: number;
@@ -87,17 +89,17 @@ export class ProviderOperationsApp {
     this.endpointPolicy = input.endpointPolicy;
     this.probe = input.probe;
     assertInvariant(input.executionParameters.api === 'openai-completions',
-      'PI_AGENT_API_INVALID: only openai-completions is supported');
+      'DSH_API_INVALID: only openai-completions is supported');
     assertInvariant(Number.isSafeInteger(input.executionParameters.maxTokens)
       && input.executionParameters.maxTokens > 0,
-    'PI_AGENT_MAX_TOKENS_INVALID: maxTokens must be a positive integer');
+    'DSH_MAX_TOKENS_INVALID: maxTokens must be a positive integer');
     assertInvariant(Number.isSafeInteger(input.executionParameters.maxSchemaAttempts)
       && input.executionParameters.maxSchemaAttempts >= 1
       && input.executionParameters.maxSchemaAttempts <= 3,
-    'PI_AGENT_MAX_SCHEMA_ATTEMPTS_INVALID: maxSchemaAttempts must be 1..3');
+    'DSH_MAX_SCHEMA_ATTEMPTS_INVALID: maxSchemaAttempts must be 1..3');
     assertInvariant(Number.isSafeInteger(input.executionParameters.contextWindow)
       && input.executionParameters.contextWindow >= input.executionParameters.maxTokens,
-    'PI_AGENT_CONTEXT_WINDOW_INVALID: contextWindow must be at least maxTokens');
+    'DSH_CONTEXT_WINDOW_INVALID: contextWindow must be at least maxTokens');
     this.executionParameters = structuredClone(input.executionParameters);
     this.clock = input.clock ?? (() => new Date().toISOString());
     this.audit = input.audit ?? (() => undefined);
@@ -134,6 +136,7 @@ export class ProviderOperationsApp {
             reasonCode: 'ENVIRONMENT_PROVIDER_UNVERIFIED',
           };
     }
+    if (record.provider === 'pi-agent') return { provider: record.provider, availability: 'UNAVAILABLE', authentication: 'UNVERIFIED', model: record.model, configured: true, enabled: false, checkedAt, reasonCode: 'PROVIDER_MIGRATION_REQUIRED' };
     const verified = record.verificationStatus === 'VERIFIED'
       && record.verifiedFingerprint === settingsFingerprint(record);
     const fresh = verified && this.verificationIsFresh(record, checkedAt);
@@ -172,7 +175,7 @@ export class ProviderOperationsApp {
     model?: unknown;
     expectedRevision: unknown;
   }): Promise<Record<string, unknown>> {
-    assertInvariant(input.provider === 'pi-agent', 'PROVIDER_UNSUPPORTED: provider must be pi-agent');
+    assertInvariant(input.provider === 'deepseek-harness', 'PROVIDER_UNSUPPORTED: provider must be deepseek-harness');
     assertInvariant(typeof input.apiUrl === 'string' && input.apiUrl.trim().length > 0,
       'PROVIDER_URL_INVALID: apiUrl is required');
     assertInvariant(Number.isSafeInteger(input.expectedRevision) && Number(input.expectedRevision) >= 0,
@@ -199,10 +202,10 @@ export class ProviderOperationsApp {
     const endpoint = await this.endpointPolicy.validate(input.apiUrl);
     const apiKey = input.clearApiKey === true
       ? null
-      : input.apiKey === undefined ? current?.apiKey ?? null : String(input.apiKey);
+      : input.apiKey === undefined ? (current?.provider === 'deepseek-harness' ? current.apiKey : null) : String(input.apiKey);
     const now = this.clock();
     const next: ProviderSettingsRecord = {
-      provider: 'pi-agent',
+      provider: 'deepseek-harness',
       apiUrl: endpoint.url.toString(),
       apiKey,
       model: input.model === undefined ? current?.model ?? null
@@ -232,7 +235,7 @@ export class ProviderOperationsApp {
       },
     });
     return {
-      resourceId: 'pi-agent',
+      resourceId: 'deepseek-harness',
       eventId,
       revision: next.revision,
       acceptedAt: now,
@@ -254,6 +257,7 @@ export class ProviderOperationsApp {
       'PROVIDER_SETTINGS_INVALID: enable must be boolean');
     const current = this.store.load();
     assertInvariant(current !== null, 'PROVIDER_SETTINGS_REQUIRED: save Provider settings first');
+    assertInvariant(current.provider === 'deepseek-harness', 'PROVIDER_MIGRATION_REQUIRED: save and verify DSH configuration');
     assertInvariant(current.revision === Number(input.expectedRevision),
       'REVISION_CONFLICT: Provider settings changed');
     // Resolve again immediately before probing. This closes the save/verify DNS rebinding gap.
@@ -294,7 +298,7 @@ export class ProviderOperationsApp {
       },
     });
     return {
-      resourceId: 'pi-agent',
+      resourceId: 'deepseek-harness',
       eventId,
       revision: next.revision,
       acceptedAt: now,
@@ -308,9 +312,12 @@ export class ProviderOperationsApp {
 
   runConfigurationProvider(fallback: RunConfigurationSnapshot['provider']): RunConfigurationSnapshot['provider'] {
     const current = this.store.load();
-    if (!current || !this.isEnabledAndVerified(current)) return structuredClone(fallback);
+    if (!current) return structuredClone(fallback);
+    if (current.provider !== 'deepseek-harness') throw new Error('PROVIDER_MIGRATION_REQUIRED: legacy configuration cannot start a new Run');
+    if (!this.isEnabledAndVerified(current)) throw new Error('DSH_CONFIGURATION_UNAVAILABLE: save and verify DSH configuration');
+    this.frozenConfigurations.set(runtimeDigest(current, this.executionParameters), { settings: structuredClone(current), ...structuredClone(this.executionParameters) });
     return {
-      kind: 'pi-agent',
+      kind: 'deepseek-harness',
       model: current.model as string,
       parametersSha256: runtimeDigest(current, this.executionParameters),
     };
@@ -318,14 +325,17 @@ export class ProviderOperationsApp {
 
   requireRuntimeConfiguration(
     expected: RunConfigurationSnapshot['provider'],
-  ): PiAgentRuntimeConfiguration {
+  ): DshRuntimeConfiguration {
     const current = this.store.load();
+    const frozen = this.frozenConfigurations.get(expected.parametersSha256);
+    if (expected.kind === 'deepseek-harness' && frozen?.settings.model === expected.model
+      && (!current || !this.isEnabledAndVerified(current) || runtimeDigest(current, this.executionParameters) !== expected.parametersSha256)) return structuredClone(frozen);
     assertInvariant(current !== null && this.isEnabledAndVerified(current),
-      'PI_AGENT_CONFIGURATION_UNAVAILABLE: verified Provider settings are required');
-    assertInvariant(expected.kind === 'pi-agent'
+      'DSH_CONFIGURATION_UNAVAILABLE: verified Provider settings are required');
+    assertInvariant(expected.kind === 'deepseek-harness'
       && expected.model === current.model
       && expected.parametersSha256 === runtimeDigest(current, this.executionParameters),
-    'PI_AGENT_CONFIGURATION_CHANGED: Provider settings no longer match the Run snapshot');
+    'DSH_CONFIGURATION_CHANGED: Provider settings no longer match the Run snapshot');
     return {
       settings: structuredClone(current),
       ...structuredClone(this.executionParameters),
@@ -333,7 +343,8 @@ export class ProviderOperationsApp {
   }
 
   private isEnabledAndVerified(record: ProviderSettingsRecord): boolean {
-    return record.enabled
+    return record.provider === 'deepseek-harness'
+      && record.enabled
       && record.model !== null
       && record.verificationStatus === 'VERIFIED'
       && record.verifiedFingerprint === settingsFingerprint(record)
@@ -351,7 +362,7 @@ export class ProviderOperationsApp {
   private view(record: ProviderSettingsRecord | null): ProviderSettingsView {
     if (!record) {
       return {
-        provider: 'pi-agent',
+        provider: 'deepseek-harness',
         apiUrlMasked: null,
         apiKeyConfigured: false,
         model: null,
@@ -372,8 +383,8 @@ export class ProviderOperationsApp {
       enabled: this.isEnabledAndVerified(record),
       revision: record.revision,
       verification: {
-        status: expired ? 'UNVERIFIED' : record.verificationStatus,
-        reasonCode: expired ? 'VERIFICATION_EXPIRED' : record.verificationReasonCode,
+        status: record.provider === 'pi-agent' || expired ? 'UNVERIFIED' : record.verificationStatus,
+        reasonCode: record.provider === 'pi-agent' ? 'PROVIDER_MIGRATION_REQUIRED' : expired ? 'VERIFICATION_EXPIRED' : record.verificationReasonCode,
         checkedAt: record.lastVerifiedAt,
       },
       updatedAt: record.updatedAt,

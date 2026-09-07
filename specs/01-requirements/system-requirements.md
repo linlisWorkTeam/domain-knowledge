@@ -1,6 +1,6 @@
 # 系统需求
 
-> 迁移提示（目标尚未实施）：下表保留当前 Accepted baseline。KF-SYS-022 的固定项目验收与 KF-SYS-041 的 Pi 默认执行将按 [DEV-019 Spec 增量](../changes/active/DEV-019-dsh-agent-foundation/spec-delta.md)调整；新方向为 LangGraph 编排、DSH 运行角色，先外部 CPU 范例，再七角色闭环。不得把旧条款当作继续扩展 Pi 或固定项目执行器的任务指令。
+> DEV-019 R1 已同步 KF-SYS-022/025/041 的通用场景与 DSH 配置条款；R2～R4 的真实范例和完整闭环仍按[分阶段验收](../changes/active/DEV-019-dsh-agent-foundation/acceptance.md)执行。
 
 状态：Accepted。优先级 `P0` 是 V1 发布阻塞项。
 
@@ -46,7 +46,7 @@
 | KF-SYS-038 | P1 | 系统必须提供持久化 Source Registry，管理来源身份、固定版本、同步状态、漂移、刷新任务、访问边界及其与知识的关联。 | AC-API-007 |
 | KF-SYS-039 | P1 | Console 必须为选定 Run 提供只读 Agent 工作流执行图，使用 Knowledge Registry 中的固定拓扑、WorkflowNodeProjection、Run snapshot 与事件展示节点状态、轮次、尝试和时间；不得读取 graph checkpoint、修改拓扑或人工推进节点。 | AC-API-008 |
 | KF-SYS-040 | P1 | Agent Settings 必须能够读取 Provider 可用性、认证状态、模型标识和受控错误摘要，但不得返回凭据或允许修改固定 Agent 契约。 | AC-API-009 |
-| KF-SYS-041 | P1 | 本地管理员必须能通过服务端安全配置、脱敏读取并无副作用验证模型 API URL 与 API Key；启用后新批次默认使用 Pi Agent 工具，完整凭据不得进入浏览器持久化、URL、日志或运行快照。 | AC-API-010 |
+| KF-SYS-041 | P1 | 本地管理员必须能通过服务端安全配置、脱敏读取并无副作用验证模型 API URL 与 API Key；启用后新批次默认使用 DSH 原生 SDK；运行中配置冻结，旧 Pi Run 可读但不跨后端恢复，完整凭据不得进入浏览器持久化、URL、日志或运行快照。 | AC-API-010 |
 | KF-SYS-042 | P1 | 系统必须按批次、节点、Provider 和模型记录排队与执行耗时、调用与重试、Token、可空估算成本、自动修订收敛和人工治理处理数据，并提供 P50/P95 聚合；缺少可信定价源时成本必须为 `null`，指标不得包含凭据、Prompt、模型正文或未脱敏上游错误。 | AC-OBS-004 |
 
 ## P0-B Spike（P0-A 后独立开展）

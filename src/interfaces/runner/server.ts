@@ -229,6 +229,7 @@ function requireOnlyKeys(payload: Record<string, unknown>, allowed: readonly str
 export function mapHttpError(error: unknown, id = 'req_unknown'): { status: number; body: ApiErrorBody } {
   const message = error instanceof Error ? error.message : String(error);
   const code = message.split(':', 1)[0] || 'INTERNAL_ERROR';
+  if (code === 'RUN_CONFIGURATION_INCOMPATIBLE' || code === 'PROVIDER_MIGRATION_REQUIRED' || code === 'DSH_CONFIGURATION_UNAVAILABLE') return { status: 409, body: errorBody(code, message, id) };
   if (code === 'INVALID_EVENT_CURSOR') return { status: 400, body: errorBody(code, message, id) };
   if (code === 'PAYLOAD_TOO_LARGE') return { status: 413, body: errorBody(code, 'Request payload is too large.', id) };
   if (code === 'METHOD_NOT_ALLOWED') return { status: 405, body: errorBody(code, 'Method not allowed.', id) };
@@ -333,10 +334,8 @@ export function createKnowledgeServer(input: {
           langGraphInfrastructure: true,
           agentProvider: activeProvider,
           agentPromptCustomization: 'promptAddon-only',
-          agentPromptTransport: activeProvider === 'pi-agent'
-            ? 'pi-agent-openai-compatible'
-            : activeProvider === 'deepseek-harness'
-            ? 'sdk-stdio-json-rpc'
+          agentPromptTransport: activeProvider === 'deepseek-harness'
+            ? 'dsh-sdk-jsonrpc'
             : activeProvider === 'deepseek-harness-headless'
               ? 'headless-stdin'
               : 'in-process-fixture',

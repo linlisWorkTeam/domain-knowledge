@@ -1,6 +1,6 @@
 # P0 验收计划
 
-> 验收版本说明：本表保留当前 baseline 的 AC。新 DSH 底座、CPU 角色范例和七角色真实闭环见 [DEV-019](../changes/active/DEV-019-dsh-agent-foundation/acceptance.md)，目前均未完成实现验收。现有 Pi、固定场景及公司 CLI 夹具证据不能替代新目标的证明；公司环境不是外部第一版的前置条件。
+> R1 的配置迁移与自动化机制已落地；R2 CPU 真实范例、R3 七角色业务验收和 R4 真实闭环仍未完成。受控模型服务和 Fixture 不能替代 live 证据，详见 [DEV-019](../changes/active/DEV-019-dsh-agent-foundation/acceptance.md)。
 
 所有场景使用 Given/When/Then，可自动化场景为发布阻塞项。
 
@@ -50,7 +50,7 @@
 | AC-API-007 | Given 扫描候选、合法来源和越界/漂移来源，When 创建、修改和刷新 Source，Then 只有通过访问校验的候选被持久化，revision 固定，越界默认拒绝，状态和关联统计可复验。 |
 | AC-API-008 | Given 一个含并行、迭代和失败 attempt 的 Run，When 打开 Graph 并选择节点，Then 固定七 Agent 的节点与依赖边稳定，状态、iteration、attempt、时间、ArtifactRef 和错误摘要来自 Registry 投影；刷新和 SSE 续传后状态一致，且页面不能读取 checkpoint、修改拓扑或人工推进节点。 |
 | AC-API-009 | Given Provider 可用、未认证、过期和故障状态，When 打开 Agent 设置，Then 返回稳定状态、模型、检查时间和受控原因，不返回凭据、会话或提示词，也不能修改固定 Agent 契约。 |
-| AC-API-010 | Given 本地管理员提交合法、非法、不可达和受限网络地址的 API URL 与可选 API Key，When 保存、读取和验证 Provider 配置，Then 只有通过地址与权限校验的配置被服务端加密或受限持有，读取只返回脱敏状态，验证无生成副作用；启用后新批次冻结 Pi Agent 协议、地址、模型、Token/上下文上限和 Schema 尝试上限的摘要但不冻结完整 Key，恢复时任一非秘密执行参数变化均失败关闭。 |
+| AC-API-010 | Given 本地管理员提交合法、非法、不可达和受限网络地址的 API URL 与可选 API Key，When 保存、读取和验证 Provider 配置，Then 只有通过地址与权限校验的配置被服务端加密或受限持有，读取只返回脱敏状态，验证无生成副作用；启用后新批次冻结 DSH 原生协议、地址、模型、Token/上下文上限和 Schema 尝试上限的摘要但不冻结完整 Key，恢复时任一非秘密执行参数变化均失败关闭。 |
 | AC-OBS-004 | Given 真实与 fixture 批次、重试、自动修订和人工治理事项，When 查询 24 小时与 7/30 天观测窗口，Then 返回有样本量的节点/批次 P50/P95、Token、可空估算成本、首次修订通过率、三轮收敛率、人工介入比例、平均处理时间和短期复发率；无样本或无可信定价源时成本返回空值，任何响应不含 Prompt、正文、凭据、Session 或上游原始错误。 |
 
 ## P1 内容质量验收

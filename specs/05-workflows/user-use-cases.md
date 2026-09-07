@@ -1,6 +1,6 @@
 # 用户用例与交互时序
 
-> 迁移提示：UC-KF-004 的固定源码样例与 UC-KF-007 的 Pi 配置描述当前 baseline。后续采用 [DEV-019](../changes/active/DEV-019-dsh-agent-foundation/spec-delta.md) 的外部 DSH 底座与 CPU 范例；Pi 退出目标路径，公司 CLI 后置。DSH 新配置流程尚未交付，现有 Pi 表单不能视为 DSH 配置入口。
+> DEV-019 R1 已将默认角色执行、模型配置与通用启动迁到 DSH；历史阶段不作为当前开发队列。R2 live CPU 范例尚待验收，下一项见[开发状态](../../docs/DEVELOPMENT-STATUS.md)。
 
 **状态：Accepted｜版本：1.2.0｜基线日期：2026-09-04**
 
@@ -18,7 +18,7 @@
 | UC-KF-004 | 发布验收者 | 对固定 commit 完成可复验的真实源码闭环 | KF-SYS-017、NFR-011；AC-E2E-001 |
 | UC-KF-005 | 旧 Runner 调用方 | 保持旧命令可用且不产生第二套事实源 | KF-SYS-016；AC-COMPAT-001 |
 | UC-KF-006 | 受信操作者 | 查阅全部 Agent 和节点状态，并只追加提示词 | KF-SYS-020、KF-SYS-021；AC-OBS-002、AC-AGENT-003 |
-| UC-KF-007 | 本地管理员 | 在设置中配置模型 API 并以 Pi Agent 工具作为默认任务执行方式 | KF-UI-021；AC-UI-024 |
+| UC-KF-007 | 本地管理员 | 在设置中配置模型 API 并以 DSH 工具作为默认任务执行方式 | KF-UI-021；AC-UI-024 |
 
 ## 参与者与责任
 
@@ -34,9 +34,9 @@
 | Deterministic Gate | 根据固化策略和证据产生 `PASS / ITERATE / ROLLBACK / STOPPED`。 |
 | Knowledge Publisher | 在一个事务中更新知识、Run、事件和 publication receipt。 |
 | 受信操作者 | 查看固定 Agent 契约和执行状态；只能追加提示词，不能改职责、Schema、拓扑或工具权限。 |
-| 本地管理员 | 配置模型 API URL 和 API Key、验证连通性并启用默认 Pi Agent 工具；不能从界面读回完整密钥。 |
+| 本地管理员 | 配置模型 API URL 和 API Key、验证连通性并启用默认 DSH 工具；不能从界面读回完整密钥。 |
 
-## UC-KF-007：配置模型 API 并启用 Pi Agent
+## UC-KF-007：配置模型 API 并启用 DSH
 
 ### 前置条件与结果
 
@@ -44,8 +44,8 @@
 - “设置”允许填写 API URL 与 API Key，并在保存前或保存后执行一次不产生领域副作用的连接测试。
 - API Key 只能提交给服务端凭据边界，不得写入 URL、日志、浏览器本地存储、运行快照或普通配置查询响应；后续查询只返回“已配置”和脱敏提示。
 - API URL 必须经过协议、主机和重定向策略校验，防止任意内网探测；错误必须区分地址无效、鉴权失败、模型不可用和超时。
-- 有效配置启用后，新任务默认由 Pi Agent 工具执行。Pi Agent 仍受既有 Agent 契约、工具权限、工作区隔离、超时、审计和确定性 Gate 约束，不能获得发布权限或绕过评测。
-- 已经冻结为 `pi-agent` 的批次在验证过期、配置不可用或恢复摘要不匹配时必须失败关闭，不得回退到演示 Provider。没有启用有效 Pi 配置的新批次使用部署时明确公开的 fallback Provider；默认 fixture 只用于本地验收，`GET /api/v1/system/capabilities` 必须如实标识，不能伪装为真实模型执行。
+- 有效配置启用后，新任务默认由 DSH 工具执行。DSH 仍受既有 Agent 契约、工具权限、工作区隔离、超时、审计和确定性 Gate 约束，不能获得发布权限或绕过评测。
+旧 Pi Run 保持可读并拒绝恢复；新 DSH 配置必须重新验证。运行中批次保持冻结的模型配置，设置变化只影响新批次；恢复时非秘密摘要必须一致，不回退 Fixture。
 
 ### 已实现接口
 
@@ -55,7 +55,7 @@
 | 保存配置 | `PUT /api/v1/provider-settings` | 接收 `provider=pi-agent`、API URL 和可选的新 API Key；需要管理员鉴权、幂等与审计。 |
 | 验证连接 | `POST /api/v1/provider-settings/verify` | 使用服务端持有的待验证或已保存凭据执行无副作用探测，返回分类结果。 |
 
-该用例已在 DEV-007 实现。保存配置不会自动启用；只有无副作用探测成功且操作者请求启用时，后续新批次才冻结 `pi-agent`、模型和非秘密参数摘要。已经冻结为 Pi 的批次在验证过期、设置变更或恢复摘要不匹配时失败关闭；尚未冻结 Pi 的新批次使用可见的部署 fallback。
+旧 Pi Run 保持可读并拒绝恢复；新 DSH 配置必须重新验证。运行中批次保持冻结的模型配置，设置变化只影响新批次；恢复时非秘密摘要必须一致，不回退 Fixture。
 
 ## UC-KF-001：查询已验证知识并反馈
 
@@ -427,4 +427,4 @@ sequenceDiagram
 - UC-KF-004 已以确定性 Scenario Agent 和受信 ProjectEvaluator 实现，不得外推为真实 GLM 质量或敌对代码隔离证明。
 - UC-KF-005 已实现为兼容门面，且不拥有发布能力。
 - UC-KF-006 已实现固定 Agent 目录、提示词 revision/audit、工作流节点投影和 Console 页面；它不允许可变拓扑或替换节点契约。
-- UC-KF-007 已实现安全配置、脱敏读取、无副作用验证、默认 Pi Agent 批次快照和运营指标；自动化使用本地模拟的 OpenAI-compatible 上游验证真实 Pi SDK 执行路径，实际外部凭据仍由部署者在本地人工验收。
+- UC-KF-007 已实现安全配置、脱敏读取、无副作用验证、默认 DSH 批次快照和运营指标；自动化使用本地模拟的 OpenAI-compatible 上游验证原生 DSH SDK 执行路径，实际外部凭据仍由部署者在本地人工验收。

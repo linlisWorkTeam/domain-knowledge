@@ -6,10 +6,10 @@ import test from 'node:test';
 import type { ProviderSettingsRecord } from '../../src/application/ports/index.ts';
 import {
   EncryptedFileProviderSettingsStore, isPublicAddress, PublicHttpsEndpointPolicy,
-} from '../../src/infrastructure/agents/pi-agent/index.ts';
+} from '../../src/infrastructure/security/provider-settings.ts';
 
 const RECORD: ProviderSettingsRecord = {
-  provider: 'pi-agent',
+  provider: 'deepseek-harness',
   apiUrl: 'https://api.example.test/v1/',
   apiKey: 'sk-super-secret-value',
   model: 'example-model',

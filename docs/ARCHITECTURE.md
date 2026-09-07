@@ -36,14 +36,14 @@ flowchart TD
 
 业务输入输出约定不是新的运行框架：DSH 可以运行 DocGen，但“候选知识必须包含哪些事实、来源和字段”仍由项目定义。DSH 的原始响应与事件通过校验后才能成为业务工件。SDK 类型不进入 Domain/Application，版本化业务 Schema 与 ArtifactRef 边界继续保留。
 
-Pi 退出目标底座；其当前配置入口、依赖和旧 Run 的处置仍待 R1 继续实施。首批代码已将 `OhMyWorkPanelWorkflowExecutor` 替换为 `ProjectWorkflowStages` 业务接线，预写输出与文件读取移至显式 `FixtureProjectWorkflowStages`；真实 Provider 路径不要求样例 assets，缺少 Provider 明确失败。公共 CLI/API 的固定场景选择与默认后端尚未完全迁出。项目路径、固定 commit 和评测命令属于任务材料或验收样例，不能决定公共框架的结构。第一版不采用 DSH 再调用 CodeAgent CLI 的嵌套架构。
+R1 已移除项目直接使用的 Pi Agent 框架；`ProjectWorkflowStages` 只做业务接线，预写输出位于显式 `FixtureProjectWorkflowStages`。默认配置使用 DSH 原生 sdk-minimal 和项目只读工具插件。项目路径、固定 commit、生成路径及评测命令属于版本化场景，通过公共 CLI/API 输入。DSH 不再嵌套调用 CodeAgent CLI。上游 DSH 间接依赖的 pi-ai 是可选模型适配包，不是项目 Pi Agent 执行链；原生 minimal 路径不加载它。
 
 交付顺序为：**DSH 公共底座 → 普通 CPU 小模块的可运行角色范例 → 七角色能力开发与联调 → 外部真实闭环 → CodeAgent CLI 真实适配**。底座可用只证明开发者可以沿用范例开发角色，不代表七角色业务能力或第一版完整闭环已经验收。
 
 <details lang="en">
 <summary>Target architecture summary</summary>
 
-The confirmed target uses LangGraph for workflow orchestration and DSH for individual agent execution. Business output contracts, evidence, evaluation and publication remain owned by this project. Pi and the project-specific executor leave the target foundation. CodeAgent CLI integration is reserved for a later stage. This is a documented direction, not an implemented or live-validated capability.
+The confirmed target uses LangGraph for workflow orchestration and DSH for individual agent execution. Business output contracts, evidence, evaluation and publication remain owned by this project. Pi and the project-specific executor leave the target foundation. CodeAgent CLI integration is reserved for a later stage. The R1 foundation is implemented and covered by controlled-provider tests; live model quality remains unverified.
 
 </details>
 
@@ -136,7 +136,7 @@ src/
 
 真实源码验收还定义了 `ProjectEvaluator` Port。本地受信 Adapter 会解析并归档指定 Git commit，在临时目录执行，不改变源码仓库当前 checkout。生成文件只写入临时目录；工具必须在白名单中，且不得经过 shell。完整进程证据最终写入 CAS。
 
-Orchestrator、DocWorker、DocGen、TestGen、Code、Check 和 Review 的输出都会经过角色专属 JSON Schema 校验。默认 Scenario Provider 是确定性测试设施；设置 `WP_FLYWHEEL_AGENT_PROVIDER=deepseek-harness` 后，组合根会通过官方 stdio JSON-RPC SDK 启动短生命周期 DSH runtime。管理员也可以在 Console 保存并验证 Pi Agent 的 OpenAI-compatible Provider；启用后，新批次会冻结非秘密 Provider 摘要并通过 `PiCodingAgentProvider` 执行。部署环境还可显式选择 `company-codeagent-cli`：该 Adapter 先做认证预检，再以 stdin、固定角色工具白名单、角色工作区和 JSONL 协议执行公司 CLI。三种 live 配置恢复时都按非秘密参数摘要 fail closed。Prompt 不进入 argv，Code 输出路径仍受场景白名单约束。一次成功 live Run 只能证明接线与样例结果，不能替代外部模型质量、稳定性或容量试验。
+七角色结果均经过角色 JSON Schema、业务信封绑定和 CAS 校验。默认 Provider 是 DSH，Console 保存并验证模型配置后，通过原生 DSH SDK 执行；角色工具由 DSH 分派，仅可读取物化白名单材料，写入由业务 Result 提交。每次尝试使用独立 session/home，Prompt 通过 stdin JSON-RPC 传入。API 配置的模型流量经受信地址转发，固定已批准 DNS，禁止重定向，实际上游密钥不进入 DSH 子进程。显式 Fixture 仅用于自动化验收，公司 CLI Adapter 后置。
 
 候选正文先过 Quality Gate。结构、验证锚点或可读性不足时，图会跳过本轮 CodeAgent，将 score、signals 和 weak points 放回下一轮 DocGen 上下文。行为评测仍在候选质量合格后执行，两个 Gate 不能合并。
 
@@ -158,7 +158,7 @@ Orchestrator、DocWorker、DocGen、TestGen、Code、Check 和 Review 的输出�
 - `/api/v1` 下的 HTTP GET 操作只读。
 - 只有配置 `WP_KNOWLEDGE_WRITE_TOKEN` 且请求携带 Bearer token 时，HTTP 写接口才会启用。
 - token 只是本地受信操作员边界，不是完整的用户、资源和动作授权矩阵。当前评测接口负责记录并校验提交的证据元数据，不自行编译或执行代码。
-- 查询侧 DSH Adapter 只访问带版本的 HTTP API，不启动 Python 或 shell。Agent 执行侧有三条 live 路径：`DeepSeekHarnessSdkAgent` 通过官方 stdin JSON-RPC SDK 传递 Prompt；`PiCodingAgentProvider` 读取已验证的加密设置，通过 Pi SDK 调用 OpenAI-compatible Provider；`CompanyCodeAgentCliAdapter` 对公司 CLI 做认证预检，以非 shell 子进程和 stdin 执行，并持久化可恢复 session ID。三条路径都执行角色 JSON Schema 校验并记录脱敏调用事实；旧 `DeepSeekHarnessHeadlessAgent` 仅作显式迁移兼容。查询 Adapter 与执行 Provider 不是同一职责。
+- 查询侧 DSH Adapter 只访问版本化 HTTP API；执行侧统一使用 DSH SDK。`ConfiguredDshProvider` 只将已验证模型配置映射到原生 SDK 并固定网络出口，不另建模型、会话或工具循环。旧 Pi Run 仅保留读取；诊断 headless 与后置公司 CLI 均不作为失败回退。
 - `LocalAgentWorkspace` 为每个节点复制显式允许的文件，拒绝路径穿越和源码符号链接。Linux live 模式再由 Bubblewrap 只读挂载角色视图、运行依赖和 patch，并给该节点单独挂载可写 DSH_HOME；参考仓库不进入该 mount namespace。
 - Bubblewrap 仍保留模型 API 所需的网络。它证明代码生成角色的模型会话看不到参考源码，不证明生成代码可以安全执行。`CodeAgent` 在旧设计文档里通常是角色名；只有部署显式选择 `company-codeagent-cli` 时才调用公司 CLI。
 - 受信项目评测器会净化环境、拒绝路径穿越和符号链接目标、限制时间与输出，并终止进程树。这些措施用于避免验收任务误伤宿主机；子进程仍共享宿主机内核，不能用来运行敌对代码。

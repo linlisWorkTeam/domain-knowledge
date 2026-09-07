@@ -2,7 +2,7 @@
 
 > 中文是本文默认语言。命令、环境变量、API 路径和状态值保留英文。
 
-> 运行范围：本文描述当前已实现接口。已确认的新方向为外部 DSH 底座、CPU 范例及后续七角色闭环，见[目标架构](ARCHITECTURE.md#target-architecture)。Pi 仍在当前实现中但将退出目标底座；公司 CLI 真实适配后置。新目标的具体部署步骤尚未交付。
+> R1 已将角色执行收敛到 DSH，通用项目场景从 CLI/API/Console 传入。Pi Agent 运行依赖已移除，旧记录保留可读且拒绝恢复；CodeAgent CLI 适配后置。R2 的真实 CPU DocGen 范例及后续完整闭环仍待验收。
 
 <details lang="en">
 <summary>English summary</summary>
@@ -85,7 +85,7 @@ npm run acceptance:ohmyworkpanel -- `
 
 评测器使用 `git archive`，生成文件只写临时目录；可执行工具限于 `node`、`pnpm` 和 `cargo`。它不经过 shell，会净化继承环境、限制命令时间与输出，并把工具版本、脱敏 argv、退出状态和脱敏输出保存到 CAS。
 
-默认 Agent Provider 重放经过 Schema 校验的 fixture，因此适合验证编排和执行路径。真实 DeepSeek Harness 接法、OpenCode Go patch 和公网调试说明见 [`deploy/deepseek-harness/README.md`](../deploy/deepseek-harness/README.md)。live 模式的 Agent 使用角色白名单工作区、官方 SDK 和 Bubblewrap；角色工作区直接从 Run 快照绑定的 Git commit 读取文件，不复制可变工作树，DocWorker 只能读取自己的源码分块和共享公开接口。后续 ProjectEvaluator 仍只能运行受信源码。一次成功样例不是模型稳定性或敌对代码执行隔离证明。
+默认 Agent Provider 为 DSH。Console 的模型配置走原生 sdk-minimal，进程由 Bubblewrap 隔离；来源从固定 Git commit 物化为逐角色白名单，DocWorker 只读分配分块。Fixture 是显式测试设施，不是无凭据时的回退。ProjectEvaluator 仍只运行受信源码；DSH 文件隔离不等于敌对生成代码沙箱。
 
 ## 内嵌 LangGraph 工作流
 
@@ -141,9 +141,9 @@ Console 提供“操作中心、飞轮批次、知识、工作流图、评测、
 
 Agent 元数据来自 `GET /api/v1/agents`。浏览器默认只读，操作员 token 仅保存在当前页面内存。持有 token 后，前台可以通过项目场景 JSON 启动通用工作流和编辑 `promptAddon`；它不会通过串接原始状态迁移来模拟编排，也不能修改图契约。
 
-### 模型服务与 Pi Agent
+### 模型服务与 DSH
 
-本节是现有 Pi 路径的操作说明，不是 DSH 配置方式。新底座实施时须同步配置入口与旧 Run 的处置，不能直接让历史批次切换执行后端。
+配置入口现在使用 DSH；旧 Pi Run 保留读取，恢复会返回 RUN_CONFIGURATION_INCOMPATIBLE。
 
 在治理模式打开“Agent 设置”，依次保存 API 地址、API Key 和模型，再执行“验证并启用”。对应接口为：
 
@@ -152,9 +152,9 @@ Agent 元数据来自 `GET /api/v1/agents`。浏览器默认只读，操作员 t
 - `POST /api/v1/provider-settings/verify`：重新校验地址并调用无生成副作用的模型列表接口；
 - `GET /api/v1/metrics/runs` 与 `GET /api/v1/metrics/governance`：读取带样本量和口径的运营指标。
 
-模型地址只允许公开 HTTPS，拒绝本机、私网、混合 DNS、URL 凭据、查询、fragment 和重定向。配置使用 AES-256-GCM 保存在 `$WP_FLYWHEEL_HOME/secrets/provider-settings.enc`，独立 32 字节密钥在同目录，非 Windows 系统权限均为 `0600`。这只是 Preview 的本机秘密持有，不等同于企业 KMS；备份时应把这两个文件作为秘密处理。验证 24 小时后过期，保存新配置会立即禁用旧验证。只有处于已启用且验证有效状态的配置才会让后续新批次冻结 `pi-agent`、模型和非秘密摘要；已经冻结为 Pi 的批次在配置过期、不可用或恢复快照不一致时失败关闭，不会退回 fixture。没有启用有效 Pi 配置时，新批次继续使用启动时明确公布在 `GET /api/v1/system/capabilities` 中的 Provider；默认 fixture 仅用于可重复的本地验收，不代表真实模型执行。
+模型地址只允许公开 HTTPS，拒绝本机、私网、混合 DNS、URL 凭据、查询、fragment 和重定向。新设置以 AES-256-GCM 保存到 `$WP_FLYWHEEL_HOME/secrets/dsh-provider-settings.enc`，密钥为同目录 `dsh-provider-settings.key`，文件权限 0600。旧 `provider-settings.enc/key` 不被改写或自动复制秘密。验证有效期 24 小时，新保存使验证失效；未重新验证的新批次失败关闭。运行中批次使用进程内冻结的配置，修改设置影响新批次；恢复时比较当前参数摘要，拒绝切换后端或模型。
 
-`WP_PI_MAX_SCHEMA_ATTEMPTS` 控制空输出或 Schema 不合法输出的总尝试次数，默认 `2`，范围 `1..3`；`WP_PI_MAX_TOKENS` 默认 `32768`，`WP_PI_CONTEXT_WINDOW` 默认 `128000` 且不得小于输出上限。协议、地址、模型与这三个非秘密执行参数全部进入批次摘要，恢复时发生变化会失败关闭；Pi 不复用 DSH 的 Token 配置。每次尝试都创建新会话并记录独立的脱敏调用事实。模型调用重试与工作流节点恢复是两项不同指标。Provider 设置文件与 SQLite 命令回执目前不共享事务：正常重放有幂等回执，但若进程恰好在加密文件提交后、回执写入前崩溃，重放会因 revision 冲突失败；DEV-012 将验证并收口该恢复窗口。
+`WP_DSH_MAX_SCHEMA_ATTEMPTS` 默认 2、范围 1..3，只重试 JSON/Schema 输出错误；每次新 session/home。`WP_DSH_MAX_TOKENS` 默认 32768，`WP_DSH_CONTEXT_WINDOW` 默认 128000。地址、协议、模型、输出/上下文上限、尝试次数、隔离参数及工具策略都进入摘要，凭据不进入快照。模型请求通过固定 DNS 的受信转发，禁止重定向，DSH 子进程只持有本次转发令牌；Token 用量来自上游 usage，无可信价格时成本为空。设置文件与 SQLite 回执的跨文件崩溃原子性仍由 DEV-012 收口。
 
 ### 公司 CodeAgent CLI
 

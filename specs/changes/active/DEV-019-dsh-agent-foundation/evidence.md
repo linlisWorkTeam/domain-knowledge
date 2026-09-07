@@ -128,3 +128,35 @@ GitHub Actions run `34096298827` 的失败来自三个真实回归：场景读�
 验证：`npm run typecheck` 通过；`npm run validate:specs` 为 17 schemas / 7 commands / 8 results / 51 P0；`npm test` 165/165、0 skip；`npm run test:ui` 14/14。新增浏览器测试通过实际 HTTP API 验证非法路径返回 422 且不调度，合法场景返回 202 并保留模块及仓库输入；只替换最终任务启动用于观察输入，不冒充模型闭环。首次新增浏览器测试因导航标题写错失败，修正为“飞轮批次”后完整重跑 14/14。
 
 本次补齐 #23 的浏览器验收，不代表 T105 整体、T106 或 R2 live 模型已完成。远程 CI 结果以本 PR 最新提交的 Actions 为准；临时输出 `/tmp/pr23-full.log`、`/tmp/pr23-ui-final.log`。
+
+## R1 / T105 剩余迁出与 T106 配置迁移（2026-09-07）：本地 PASS，待 PR 审查
+
+本次功能基于已审查的 T102、通用场景入口及 #23 CI 修复，分支 `codex/dev019-dsh-configuration`。由于此前 #22/#23 的目标分支是串联功能分支，其代码尚未进入 main，另提 #24 将已经审查的提交汇入 main；该汇总 PR 不增加功能，CI run `34097920624` 通过。当前功能及后续 PR 统一以 main 为目标，用户 review/合并后再进入下一功能，不自动合并。
+
+### 实现和验收边界
+
+- 删除项目直接依赖的 Pi coding-agent 与执行模块，配置加密及连接验证迁到独立 security 模块。锁定 DSH/SDK 仍为 `0.1.2-alpha.4`；DSH 上游可选 `dsh-llm-pi-ai` 间接模型适配依赖仍存在，原生 sdk-minimal 不加载它，不能声称 lockfile 完全没有 pi-ai。
+- 默认组合根、API/Console、环境示例和配置快照改用 DSH，CodeAgent 仅保留后置接口。父进程 relay 固定批准的 HTTPS/DNS 地址并拒绝重定向，上游密钥不交给 DSH 子进程；运行、有限 Schema 重试、工具与会话仍由已有 DSH Adapter/SDK 承担。
+- 新 DSH 加密设置与旧 Pi 文件分开；旧文件和 Run 保留可读，拒绝跨后端恢复，不自动复制旧密钥。进行中的 Run 使用冻结配置；模型/URL 修改影响新 Run，恢复检查参数兼容性。原业务 Schema、CAS、独立评测与 Gate 未改变。
+- `dsh-configured-provider.test.ts` 迁移原 Pi 的传输/Schema/审计断言：实际原生 DSH 对本地 SSE，验证凭据、批准地址、重定向拒绝、有限重试、新 session 与每次调用 Token 统计。`dsh-configuration-migration.test.ts` 验证冻结、默认选择、旧 Run 和秘密处置。
+- `tests/acceptance/dsh-configured-flow.test.ts` 经生产 `createComposition().automatedWorkflow()` 执行七个角色、独立 CPU 测试与唯一发布，七次调用各记录 input=100/output=20。模型响应由受控服务提供；该测试显式 `processIsolation=none`，进程/工具权限另由 T102 测试覆盖，不能作为 live 模型或完整敌对进程隔离证明。
+- 报告读取所有 Provider 的 Registry 指标，DSH 与旧 Pi 均验证跨 Run 过滤、调用去重、Token 数值及秘密不泄漏。公开操作文档、架构/ADR、API/前台/用例、追踪矩阵与本 Roadmap 同步；历史证据不改写。
+
+### 最终本地验证
+
+独立 worktree `/tmp/domain-knowledge-pr23-ci`，Node `24.13.0`；锁文件变更后重新执行 `npm run bootstrap:worktree`，check 为 `READY`。锁 SHA-256：`0e6672dc7ceb6e275fbc6c6ff67fc36eb9165a58a9d66f82919a281ea8e142a9`，node_modules 独立安装。
+
+| 命令/检查 | 结果 |
+| --- | --- |
+| `npm run typecheck` | 退出 0 |
+| `npm run validate:specs` | 17 schemas / 7 commands / 8 results / 51 P0 |
+| `npm test` | 168/168，0 fail/skip；`/tmp/dev019-config-final-all.log` |
+| `npm run test:ui` | 14/14，无重试；`/tmp/dev019-config-ui-final.log` |
+| `npm run evaluate:framework` | 7/7，frameworkMechanics=VERIFIED；`/tmp/dev019-config-framework.log` |
+| `npm run site:check` | 12/12 |
+| Markdown 本地路径/锚点检查 | 91 份文档、212 个本地链接有效；外部链接未联网验证 |
+| `git diff --check` | 通过 |
+
+首轮回归暴露旧 Pi 测试路径、默认 Fixture 的 Server/Console 断言与报告指标筛选遗漏，均已修正后按上述范围重验，没有删除原有安全或取消门禁来通过测试。最终远程 CI 以本功能 PR 对应提交为准。
+
+R0/R1=`PASS`；AC-DSHF-006/007 及 002/003 自动化部分通过，T105/T106 勾选。当前等待用户审查合并；下一步 R2 T103/T104 的真实 DocGen 范例和独立工作区复现。R2～R4=`NOT_RUN`，DEV-019 未完成；本轮未调用外部模型或公司 CLI。

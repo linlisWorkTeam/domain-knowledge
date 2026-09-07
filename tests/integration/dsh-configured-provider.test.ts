@@ -6,9 +6,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import type { ProviderInvocationRecord, ProviderSettingsRecord } from '../../src/application/ports/index.ts';
-import { PiCodingAgentProvider } from '../../src/infrastructure/agents/pi-agent/index.ts';
+import { ConfiguredDshProvider } from '../../src/infrastructure/agents/deepseek-harness/configured-provider.ts';
 
-test('Pi adapter executes through the official coding-agent SDK and reports token usage', async () => {
+test('DSH adapter executes through the official native DSH SDK and reports token usage', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'pi-agent-'));
   let authorization = '';
   let receivedPath = '';
@@ -37,15 +37,16 @@ test('Pi adapter executes through the official coding-agent SDK and reports toke
   const address = upstream.address();
   assert.ok(address && typeof address === 'object');
   const settings: ProviderSettingsRecord = {
-    provider: 'pi-agent', apiUrl: `http://provider.invalid:${address.port}/v1`, apiKey: 'test-key',
+    provider: 'deepseek-harness', apiUrl: `http://provider.invalid:${address.port}/v1`, apiKey: 'test-key',
     model: 'test-model', enabled: true, revision: 2, verificationStatus: 'VERIFIED',
     verificationReasonCode: 'READY', lastVerifiedAt: '2026-09-04T00:00:00.000Z',
     verifiedFingerprint: 'test-only', updatedAt: '2026-09-04T00:00:00.000Z',
   };
   const invocations: ProviderInvocationRecord[] = [];
-  const provider = new PiCodingAgentProvider({
+  const provider = new ConfiguredDshProvider({
     settings,
-    agentDir: join(directory, 'agent'),
+    runtime: { processIsolation: 'none', allowedWorkspaceRoots: [directory] },
+    dshHome: join(directory, 'agent'),
     endpointPolicy: {
       validate: async (raw) => ({ url: new URL(raw.endsWith('/') ? raw : `${raw}/`), addresses: ['127.0.0.1'] }),
     },
@@ -77,7 +78,7 @@ test('Pi adapter executes through the official coding-agent SDK and reports toke
       outputTokens: invocations[0]?.outputTokens,
       fixture: invocations[0]?.fixture,
     }, {
-      runId: 'run-pi-test', provider: 'pi-agent', model: 'test-model', status: 'SUCCEEDED',
+      runId: 'run-pi-test', provider: 'deepseek-harness', model: 'test-model', status: 'SUCCEEDED',
       inputTokens: 12, outputTokens: 5, fixture: false,
     });
   } finally {
@@ -87,7 +88,7 @@ test('Pi adapter executes through the official coding-agent SDK and reports toke
   }
 });
 
-test('Pi adapter does not follow Provider redirects after endpoint approval', async () => {
+test('DSH adapter does not follow Provider redirects after endpoint approval', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'pi-agent-redirect-'));
   let requests = 0;
   const upstream = createServer((_request, response) => {
@@ -101,14 +102,15 @@ test('Pi adapter does not follow Provider redirects after endpoint approval', as
   assert.ok(address && typeof address === 'object');
   const apiUrl = `http://provider.invalid:${address.port}/v1`;
   const failed: ProviderInvocationRecord[] = [];
-  const provider = new PiCodingAgentProvider({
+  const provider = new ConfiguredDshProvider({
     settings: {
-      provider: 'pi-agent', apiUrl, apiKey: 'test-key', model: 'test-model', enabled: true,
+      provider: 'deepseek-harness', apiUrl, apiKey: 'test-key', model: 'test-model', enabled: true,
       revision: 2, verificationStatus: 'VERIFIED', verificationReasonCode: 'READY',
       lastVerifiedAt: '2026-09-04T00:00:00.000Z', verifiedFingerprint: 'test-only',
       updatedAt: '2026-09-04T00:00:00.000Z',
     },
-    agentDir: join(directory, 'agent'),
+    runtime: { processIsolation: 'none', allowedWorkspaceRoots: [directory] },
+    dshHome: join(directory, 'agent'),
     endpointPolicy: {
       validate: async () => ({ url: new URL(`${apiUrl}/`), addresses: ['127.0.0.1'] }),
     },
@@ -119,7 +121,7 @@ test('Pi adapter does not follow Provider redirects after endpoint approval', as
       role: 'review', prompt: 'Return JSON.',
       outputSchema: { type: 'object', additionalProperties: true },
       idempotencyKey: 'redirect-test', metadata: { runId: 'run-redirect' }, workspaceRoot: directory,
-    }), /PI_AGENT_PROVIDER_FAILED/);
+    }), /PROVIDER_REDIRECT_DENIED/);
     assert.equal(requests, 1, 'the redirect target must not be requested');
     assert.equal(failed[0]?.status, 'FAILED');
   } finally {
@@ -129,7 +131,7 @@ test('Pi adapter does not follow Provider redirects after endpoint approval', as
   }
 });
 
-test('Pi adapter retries schema-invalid output with a fresh session and audits every attempt', async () => {
+test('DSH adapter retries schema-invalid output with a fresh session and audits every attempt', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'pi-agent-schema-retry-'));
   const bodies: string[] = [];
   const upstream = createServer(async (request, response) => {
@@ -156,14 +158,15 @@ test('Pi adapter retries schema-invalid output with a fresh session and audits e
   assert.ok(address && typeof address === 'object');
   const apiUrl = `http://provider.invalid:${address.port}/v1`;
   const invocations: ProviderInvocationRecord[] = [];
-  const provider = new PiCodingAgentProvider({
+  const provider = new ConfiguredDshProvider({
     settings: {
-      provider: 'pi-agent', apiUrl, apiKey: 'test-key', model: 'test-model', enabled: true,
+      provider: 'deepseek-harness', apiUrl, apiKey: 'test-key', model: 'test-model', enabled: true,
       revision: 2, verificationStatus: 'VERIFIED', verificationReasonCode: 'READY',
       lastVerifiedAt: '2026-09-04T00:00:00.000Z', verifiedFingerprint: 'test-only',
       updatedAt: '2026-09-04T00:00:00.000Z',
     },
-    agentDir: join(directory, 'agent'),
+    runtime: { processIsolation: 'none', allowedWorkspaceRoots: [directory] },
+    dshHome: join(directory, 'agent'),
     endpointPolicy: {
       validate: async () => ({ url: new URL(`${apiUrl}/`), addresses: ['127.0.0.1'] }),
     },
@@ -197,14 +200,14 @@ test('Pi adapter retries schema-invalid output with a fresh session and audits e
   }
 });
 
-test('Pi adapter fails after the configured schema-attempt budget is exhausted', async () => {
+test('DSH adapter fails after the configured schema-attempt budget is exhausted', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'pi-agent-schema-exhausted-'));
   let requests = 0;
   const upstream = createServer((_request, response) => {
     requests += 1;
     response.writeHead(200, { 'content-type': 'text/event-stream; charset=utf-8' });
     const common = { id: `chatcmpl-${requests}`, object: 'chat.completion.chunk', created: 1, model: 'test-model' };
-    const content = requests === 1 ? '' : requests === 2 ? 'not-json' : '{"wrong":true}';
+    const content = requests === 1 ? 'not-json' : requests === 2 ? 'not-json' : '{"wrong":true}';
     response.write(`data: ${JSON.stringify({
       ...common,
       choices: [{ index: 0, delta: { role: 'assistant', content }, finish_reason: null }],
@@ -220,15 +223,16 @@ test('Pi adapter fails after the configured schema-attempt budget is exhausted',
   assert.ok(address && typeof address === 'object');
   const apiUrl = `http://provider.invalid:${address.port}/v1`;
   const invocations: ProviderInvocationRecord[] = [];
-  const provider = new PiCodingAgentProvider({
+  const provider = new ConfiguredDshProvider({
     settings: {
-      provider: 'pi-agent', apiUrl, apiKey: 'test-key', model: 'test-model', enabled: true,
+      provider: 'deepseek-harness', apiUrl, apiKey: 'test-key', model: 'test-model', enabled: true,
       revision: 2, verificationStatus: 'VERIFIED', verificationReasonCode: 'READY',
       lastVerifiedAt: '2026-09-04T00:00:00.000Z', verifiedFingerprint: 'test-only',
       updatedAt: '2026-09-04T00:00:00.000Z',
     },
     maxSchemaAttempts: 3,
-    agentDir: join(directory, 'agent'),
+    runtime: { processIsolation: 'none', allowedWorkspaceRoots: [directory] },
+    dshHome: join(directory, 'agent'),
     endpointPolicy: {
       validate: async () => ({ url: new URL(`${apiUrl}/`), addresses: ['127.0.0.1'] }),
     },
@@ -246,8 +250,8 @@ test('Pi adapter fails after the configured schema-attempt budget is exhausted',
     }), /AGENT_OUTPUT_INVALID/);
     assert.equal(requests, 3);
     assert.deepEqual(invocations.map((record) => [record.status, record.errorCode, record.retryCount]), [
-      ['FAILED', 'AGENT_OUTPUT_INVALID', 0],
-      ['FAILED', 'AGENT_OUTPUT_INVALID', 1],
+      ['FAILED', 'DSH_AGENT_OUTPUT_NOT_JSON', 0],
+      ['FAILED', 'DSH_AGENT_OUTPUT_NOT_JSON', 1],
       ['FAILED', 'AGENT_OUTPUT_INVALID', 1],
     ]);
   } finally {

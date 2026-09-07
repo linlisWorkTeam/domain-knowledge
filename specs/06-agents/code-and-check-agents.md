@@ -1,6 +1,6 @@
 # 代码与检查类 Agent
 
-> 运行方向见 [Agent 规范入口](README.md)：角色在 DSH 上开发。R1 首批已分离通用业务阶段与显式夹具；固定 CLI/API 场景和 Pi 配置仍待迁移，当前进度见 [DEV-019](../changes/active/DEV-019-dsh-agent-foundation/spec-delta.md)。
+> 运行方向见 [Agent 规范入口](README.md)：角色在 DSH 上开发。R1 已分离通用业务阶段与显式夹具，并迁移通用场景入口和默认 DSH 配置；R2 live 范例待验收，当前进度见 [DEV-019](../changes/active/DEV-019-dsh-agent-foundation/spec-delta.md)。
 
 ## CodeAgent
 

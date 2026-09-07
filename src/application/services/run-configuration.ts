@@ -117,9 +117,14 @@ export class RegistryRunConfigurationService implements RunConfigurationManager 
   }
 
   async assertCompatible(runId: string): Promise<RunConfigurationSnapshot> {
+    return this.assertSnapshotCompatible(runId, true);
+  }
+
+  private async assertSnapshotCompatible(runId: string, checkProvider: boolean): Promise<RunConfigurationSnapshot> {
     const snapshot = this.repository.getRunConfiguration(runId);
     assertInvariant(snapshot !== null, `run configuration not found: ${runId}`);
-    assertInvariant(JSON.stringify(snapshot.provider) === JSON.stringify(this.currentProvider()),
+    if (snapshot.provider.kind === 'pi-agent') throw new Error('RUN_CONFIGURATION_INCOMPATIBLE: legacy Pi Run is read-only');
+    if (checkProvider) assertInvariant(JSON.stringify(snapshot.provider) === JSON.stringify(this.currentProvider()),
       `run provider configuration changed: ${runId}`);
     assertInvariant(JSON.stringify(snapshot.contracts) === JSON.stringify(this.contracts),
       `run schema configuration changed: ${runId}`);
@@ -139,7 +144,7 @@ export class RegistryRunConfigurationService implements RunConfigurationManager 
   }
 
   async resolvePrompt(runId: string, agentId: AgentId): Promise<string> {
-    const snapshot = await this.assertCompatible(runId);
+    const snapshot = await this.assertSnapshotCompatible(runId, false);
     const agent = snapshot.agents.find((candidate) => candidate.agentId === agentId);
     assertInvariant(agent !== undefined, `run configuration missing Agent: ${agentId}`);
     assertInvariant(await this.artifacts.verify(agent.effectivePromptRef), `frozen prompt artifact is corrupt: ${agentId}`);

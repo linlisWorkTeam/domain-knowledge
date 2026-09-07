@@ -231,7 +231,7 @@ export interface AgentProvider {
 export type ProviderVerificationStatus = 'NOT_CONFIGURED' | 'UNVERIFIED' | 'VERIFIED' | 'FAILED';
 
 export interface ProviderSettingsRecord {
-  provider: 'pi-agent';
+  provider: 'deepseek-harness' | 'pi-agent';
   apiUrl: string;
   apiKey: string | null;
   model: string | null;
@@ -244,14 +244,15 @@ export interface ProviderSettingsRecord {
   updatedAt: string;
 }
 
-export interface PiAgentExecutionParameters {
+export interface DshExecutionParameters {
+  runtimeSha256?: string;
   api: 'openai-completions';
   maxTokens: number;
   maxSchemaAttempts: number;
   contextWindow: number;
 }
 
-export interface PiAgentRuntimeConfiguration extends PiAgentExecutionParameters {
+export interface DshRuntimeConfiguration extends DshExecutionParameters {
   settings: ProviderSettingsRecord;
 }
 

@@ -115,8 +115,8 @@ test('HTTP adapter rejects missing credentials and accepts authenticated candida
     assert.equal(capabilities.writeEnabled, true);
     assert.equal(capabilities.automatedWorkflow, true);
     assert.equal(capabilities.langGraphInfrastructure, true);
-    assert.equal(capabilities.agentPromptTransport, 'in-process-fixture');
-    assert.equal(capabilities.agentSourceIsolation, 'not-proven');
+    assert.equal(capabilities.agentPromptTransport, 'dsh-sdk-jsonrpc');
+    assert.equal(capabilities.agentSourceIsolation, 'bubblewrap');
     assert.equal(capabilities.hostileCodeIsolation, false);
 
     const agents = await (await fetch(`${base}/api/v1/agents`)).json();
@@ -208,7 +208,7 @@ test('HTTP adapter rejects missing credentials and accepts authenticated candida
 
     const components = await (await fetch(`${base}/api/v1/system/components`)).json();
     assert.equal(components.items.length, 5);
-    assert.equal(components.overall, 'DEGRADED');
+    assert.equal(components.overall, 'UNKNOWN');
     assert.deepEqual(components.items.map((item: { component: string }) => item.component), [
       'registry', 'artifactStore', 'workflow', 'provider', 'evaluator',
     ]);

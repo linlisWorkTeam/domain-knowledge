@@ -30,14 +30,14 @@ test('verified Provider settings expire closed and stop becoming the default for
   let now = '2026-09-04T00:00:00.000Z';
   const app = createApp(store, () => now);
   await app.put({
-    provider: 'pi-agent', apiUrl: 'https://provider.example/v1', apiKey: 'secret',
+    provider: 'deepseek-harness', apiUrl: 'https://provider.example/v1', apiKey: 'secret',
     model: 'model-a', expectedRevision: 0,
   });
   await app.verify({ expectedRevision: 1 });
   assert.equal(app.getStatus({ provider: 'fixture', model: 'fixture-v1' }).availability, 'AVAILABLE');
   assert.equal(app.runConfigurationProvider({
     kind: 'fixture', model: 'fixture-v1', parametersSha256: 'a'.repeat(64),
-  }).kind, 'pi-agent');
+  }).kind, 'deepseek-harness');
 
   now = '2026-09-05T00:00:00.001Z';
   const expired = app.getStatus({ provider: 'fixture', model: 'fixture-v1' });
@@ -45,16 +45,16 @@ test('verified Provider settings expire closed and stop becoming the default for
   assert.equal(expired.authentication, 'UNVERIFIED');
   assert.equal(expired.reasonCode, 'VERIFICATION_EXPIRED');
   assert.equal(expired.enabled, false);
-  assert.equal(app.runConfigurationProvider({
+  assert.throws(() => app.runConfigurationProvider({
     kind: 'fixture', model: 'fixture-v1', parametersSha256: 'a'.repeat(64),
-  }).kind, 'fixture');
+  }), /DSH_CONFIGURATION_UNAVAILABLE/);
 });
 
 test('Provider revision checks are serialized across concurrent verification requests', async () => {
   const store = new Store();
   const app = createApp(store, () => '2026-09-04T00:00:00.000Z');
   await app.put({
-    provider: 'pi-agent', apiUrl: 'https://provider.example/v1', apiKey: 'secret',
+    provider: 'deepseek-harness', apiUrl: 'https://provider.example/v1', apiKey: 'secret',
     model: 'model-a', expectedRevision: 0,
   });
   const results = await Promise.allSettled([

@@ -53,6 +53,8 @@ export interface DeepSeekHarnessAgentOptions {
 }
 
 export interface DeepSeekHarnessSdkAgentOptions {
+  transportFailure?: () => string | null;
+  nativeConnection?: { baseURL: string; contextWindow: number };
   dshBin?: string;
   profile?: string;
   patches?: string[];
@@ -300,6 +302,13 @@ export class DeepSeekHarnessSdkAgent implements AgentProvider {
     writeFileSync(policyPath, readFileSync(new URL('./role-tools.mjs', import.meta.url)), { mode: 0o600 });
     const policyPatch = join(dshHome, 'role-policy.json');
     writeFileSync(policyPatch, JSON.stringify([
+      ...(this.options.nativeConnection ? [{ id: 'llm-deepseek', config: {
+        apiKeyEnv: 'DEEPSEEK_API_KEY', baseURL: this.options.nativeConnection.baseURL,
+        thinking: 'disabled', defaultContextWindow: this.options.nativeConnection.contextWindow,
+        maxTokens: this.options.maxTokens, retryPolicy: { mode: 'normal', maxRetries: 0 },
+        models: [{ id: this.options.model, contextWindow: this.options.nativeConnection.contextWindow,
+          maxTokens: this.options.maxTokens }],
+      } }] : []),
       ...['persistent-bash', 'persistent-pwsh', 'str-replace-editor'].map((id) => ({ id, disabled: true })),
       { insert: [{ id: 'workpanel-role-tools', name: policyPath, config: { workspaceRoot, canRead: request.role !== 'orchestrator' } }] },
     ]), { mode: 0o600 });
@@ -370,6 +379,8 @@ export class DeepSeekHarnessSdkAgent implements AgentProvider {
       // in-flight run. Observe it here so Node never reports an unhandled error.
       void run.catch(() => undefined);
       const result = await Promise.race([run, deadline]);
+      const transportFailure = this.options.transportFailure?.();
+      if (transportFailure) throw new Error(transportFailure);
       if (signal?.aborted || cancelled) throw new Error('AGENT_CANCELLED');
       if (timedOut) throw new Error('DSH_AGENT_TIMEOUT');
       if (result.sessionId !== sessionId) throw new Error('DSH_AGENT_SESSION_MISMATCH');

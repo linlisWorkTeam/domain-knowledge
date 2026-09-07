@@ -1,6 +1,6 @@
 # Preview HTTP API 规范
 
-> 迁移提示：本文接口与 Available 状态描述当前实现。provider-settings 仍绑定 Pi，Run 启动仍是固定 profile；[DEV-019](../changes/active/DEV-019-dsh-agent-foundation/spec-delta.md) 已确认迁出方向，尚未交付新的 DSH 配置或通用启动 API。实施时按 Preview 规则原子同步生产者、消费者和测试，不能只改文档中的 Provider 名称。
+> R1 已将 provider-settings 迁到 DSH、Run 启动迁到通用场景 JSON。生产者、Console 和回归测试同步更新；真实模型范例仍由 R2 验收。
 
 **状态：Accepted；B1–B4 已实现｜版本：0.5.0｜日期：2026-09-04**
 
@@ -268,13 +268,13 @@ Graph 使用真实节点投影与 SSE；断线时退回增量轮询。点击节�
 | `GET /api/v1/agents` | Available | 返回固定 Agent 定义、职责、只读契约和当前 `promptAddon`。 |
 | `PUT /api/v1/agents/:agentId/prompt` | Available | 仅更新 `promptAddon`；拒绝职责、Schema、权限、节点边和 Provider 类名。 |
 | `GET /api/v1/agents/providers/status` | Available | 返回当前 Provider 的可用性、认证状态、模型、检查时间和受控 reasonCode，不返回凭据。 |
-| `GET /api/v1/provider-settings` | Available | 返回 Pi Agent 类型、脱敏 API URL、API Key 是否已配置、revision 与验证状态，不返回完整凭据。 |
+| `GET /api/v1/provider-settings` | Available | 返回 DSH 类型（旧 Pi 只读）、脱敏 API URL、API Key 是否已配置、revision 与验证状态，不返回完整凭据。 |
 | `PUT /api/v1/provider-settings` | Available | 管理员保存 API URL、模型与可选 API Key，要求鉴权、revision、幂等、地址安全校验和脱敏审计；保存后默认未启用。 |
 | `POST /api/v1/provider-settings/verify` | Available | 使用服务端持有凭据执行无生成副作用的模型列表探测；成功后按请求启用，失败则保持关闭。 |
 | `GET /api/v1/metrics/runs?window=24h|7d|30d` | Available | 返回批次、节点与排队耗时 P50/P95、调用、`providerCalls.retries`、`workflowNodeRetries`、Token、可空估算成本、Provider/节点分组和样本量；当前内置 Adapter 没有可信定价源，因此成本保持 `null`。 |
 | `GET /api/v1/metrics/governance?window=24h|7d|30d` | Available | 返回首次自动修订通过率、三轮收敛率、人工介入比例、平均处理时间与七日复发率。 |
 
-Agent 设置同时展示固定 Agent 契约、Provider 配置/验证和运营指标。完整 API Key 仅在保存请求中从页面内存发送；服务端使用权限为 `0600` 的 AES-256-GCM 本地密钥文件持有，读接口、审计、运行快照和指标均不得包含秘密。API URL 必须是公开 `HTTPS`，保存和验证前均重新解析 DNS 并拒绝本机、私网、混合解析、用户信息、查询、fragment 与重定向。验证成功的配置有效期为 24 小时；只有已启用且验证有效的配置才使后续新批次冻结 `pi-agent`、模型和非秘密参数摘要。已经冻结为 Pi 的批次在到期、配置变化、不可用或恢复摘要不匹配时拒绝执行，不得退回 fixture；没有有效 Pi 配置时，新批次使用 `GET /api/v1/system/capabilities` 明确返回的部署 fallback，默认 fixture 仅代表本地验收。空输出或 Schema 不合法输出由全新 Pi 会话做 `1..3` 次有界总尝试，每次单独审计。Provider 设置文件与 SQLite 命令回执暂不共享崩溃原子性：加密文件已经提交但回执尚未提交时，进程重启后的重放会返回 revision 冲突；该恢复边界属于 DEV-012，不得宣称 crash-exactly-once。
+Agent 设置展示固定角色契约、DSH 模型配置和运营指标。`PUT /api/v1/provider-settings` 只接受 `provider=deepseek-harness`；旧设置 GET 仍可返回 `pi-agent`，但 enabled=false、验证原因 PROVIDER_MIGRATION_REQUIRED。保存和验证均检查公开 HTTPS/DNS，生成请求固定已批准地址且不跟随重定向。新设置写入独立加密文件，旧秘密不迁移。验证有效期 24 小时；无效配置阻止新批次，正在运行的批次保留冻结配置。恢复旧 Pi Run 返回 RUN_CONFIGURATION_INCOMPATIBLE；参数改变拒绝恢复，不回退 Fixture。配置文件与命令回执的跨文件崩溃原子性仍属 DEV-012。
 
 指标响应统一携带 `window`、`from`、`to`、`sampledAt`、`cohort`、`definitions` 和逐指标 `sampleSize`。排队耗时只使用同一次节点尝试的持久化 `readyAt → startedAt`；旧记录缺少 `readyAt` 时排除该样本。`providerCalls.retries` 只计算模型输出无效后的额外 Provider 尝试，`workflowNodeRetries.total` 只计算 attempt 大于一的额外工作流节点尝试，两者不得相加或互相代替。比率同时返回 numerator/denominator；空分母或缺少可信模型定价时返回 `null`，不能以 0 代替。fixture 与真实 Provider 样本必须通过 cohort 标识，前台不得把混合样本解释为生产模型水平。
 
@@ -309,7 +309,7 @@ Agent 设置同时展示固定 Agent 契约、Provider 配置/验证和运营指
 |---|---|---|
 | B1 API 基线 | 11 个旧接口的资源化迁移；分页、错误、认证、幂等、revision 通用契约 | 旧 HTTP 路由全部删除，Server、Console、DSH Adapter、测试和文档只引用新路径。 |
 | B2 核心控制面 | 待处理事项；批次进度/重试/SSE；组件健康与活动流；工作流图实时更新 | 操作中心、飞轮批次和 Agent 工作流执行图不依赖模拟或浏览器私有状态即可完成查看、治理、重试和断线恢复。 |
-| B4 运营最小可用面（DEV-007） | Provider status 与 Pi Agent API 配置；生成/治理速度、成本和效果观测；项目空间继续后置 | Agent Settings 显示真实 Provider 状态并安全配置默认 Pi Agent；新批次可使用真实 Provider；P50/P95、Token、成本与治理收敛指标具有样本量和明确口径。 |
+| B4 运营最小可用面（DEV-007） | Provider status 与 DSH API 配置；生成/治理速度、成本和效果观测；项目空间继续后置 | Agent Settings 显示真实 Provider 状态并安全配置默认 DSH；新批次可使用真实 Provider；P50/P95、Token、成本与治理收敛指标具有样本量和明确口径。 |
 | B3 内容与质量面（DEV-008） | Knowledge lineage/diff；Evaluation 读模型与规则；Source Registry；Knowledge Health | Knowledge、Evaluations、Sources 的列表、详情、筛选、证据和允许动作全部来自服务端事实，健康指标具备完整输入和计算口径。 |
 
 B1–B4 的接口范围以本文件各表为准，当前均已有实现和自动化验收；Graph 重复引用批次 event-stream，不重复视为 Graph 专用接口。项目空间、敌对代码隔离、完整安全事实事项和生产容量仍属于后续阶段，不能因 DEV-007/008 完成而外推为 Release 能力。

@@ -1,78 +1,54 @@
 # DeepSeek Harness 部署
 
-> 本文是当前固定场景 SDK 路径的部署说明。已确认的后续底座直接使用 DSH 运行角色，见[目标架构](../../docs/ARCHITECTURE.md#target-architecture)。CPU 通用范例尚未交付，下面的 ohMyWorkPanel 路径是当前验收数据，不是公共底座的架构依赖。外部 DSH 第一版无需公司 CodeAgent CLI 环境。
-
-这个目录保存知识飞轮调用 DeepSeek Harness 时使用的无密钥配置。Harness 是 Agent 执行基础设施；知识版本、评测、Gate 和发布仍由 domain-knowledge 持有。
+LangGraph 编排七角色，DSH 负责模型、会话和工具执行。知识、工件、独立评测与发布仍归 domain-knowledge。R1 验证原生 DSH 与受控模型服务；真实 CPU 范例及模型质量由 R2 验收。
 
 <details lang="en">
 <summary>English summary</summary>
 
-This deployment runs DeepSeek Harness through its official stdio JSON-RPC SDK. Credentials stay in environment variables, role-specific workspaces are mounted with Bubblewrap on Linux, and domain-knowledge remains authoritative for knowledge governance and publication.
+The default role framework is DSH, using its native sdk-minimal profile. Configure and verify the model in the Console. Linux deployments require Bubblewrap. Business contracts, evaluation and publication remain owned by domain-knowledge; live model quality is evaluated separately.
 
 </details>
 
 ## 本地准备
 
-Harness 仍处于开发者预览阶段，所以仓库把 `@deepseek-ai/dsh` 和 `@deepseek-ai/dsh-sdk-client` 固定在 `0.1.2-alpha.4`。`opencode-go.cordis.yml` 使用 OpenCode Go 的 OpenAI 兼容端点和 DeepSeek V4 Flash；`provider.cordis.yml` 是备用的 Anthropic Messages 兼容配置。任何密钥都不得写入仓库。
+使用 Node 24，执行 `npm ci`；新 worktree 执行 `npm run bootstrap:worktree` 至 READY。锁定 DSH 与 SDK 版本均为 `0.1.2-alpha.4`。Linux 需安装 Bubblewrap，并用 `bwrap --version` 检查；缺少隔离工具时任务失败，不回退宿主目录或 Fixture。
 
 ```bash
-npm install
-bwrap --version
-```
-
-默认生产形态要求 Linux 与 Bubblewrap。缺少 `bwrap` 时，`deepseek-harness` Provider 会启动失败，不会悄悄退回无遮罩的宿主工作区。
-
-## 接入知识飞轮
-
-```bash
-export WP_FLYWHEEL_AGENT_PROVIDER=deepseek-harness
-export WP_DSH_PROVIDER=opencode-go
-export WP_DSH_MODEL=deepseek-v4-flash
+export WP_DSH_ALLOWED_ROOTS='/absolute/path/to/project'
+export WP_FLYWHEEL_HOME='/absolute/path/to/runtime'
 export WP_DSH_PROCESS_ISOLATION=bubblewrap
-export WP_DSH_ALLOWED_ROOTS='/absolute/path/ohMyWorkPanel'
-export WP_DSH_TIMEOUT_MS=600000
-export WP_DSH_MAX_SCHEMA_ATTEMPTS=2
-export WP_FLYWHEEL_HOME='/absolute/path/domain-knowledge/.workpanel/live-sdk'
-export DSH_HOME="$WP_FLYWHEEL_HOME/dsh"
-export DSH_PERMISSION_MODE=read-only
-export DSH_TELEMETRY_DISABLED=1
-export OPENCODE_GO_API_KEY='<runtime-secret>'
-
-npm run knowledge -- workflow-run \
-  --repository /absolute/path/ohMyWorkPanel \
-  --workers 1 \
-  --max-iterations 3
+npm run knowledge:serve
 ```
 
-组合根为每个节点建立不可变角色工作区。DocWorker、DocGen、TestGen 可读场景声明的来源文件；代码生成、Check、Review 角色只挂载公开接口，候选知识、代码与评测证据通过 CAS 内容按角色白名单注入。`code` 的输出 Schema 把 `files[].path` 收紧到场景的 `allowedGeneratedPaths`，模型即使提出测试或配置文件也不能越过边界。这里的 `code` 是图节点角色，由 `DeepSeekHarnessSdkAgent` 执行，不是独立的 CodeAgent CLI。
-
-Prompt 通过官方 SDK 的 stdin JSON-RPC 传输，不出现在进程 argv。Provider 对最终回答执行 JSON 解析与调用方 Schema 校验；审计只保存 Prompt/Schema 的 SHA-256、角色、Run/Node 关联、耗时、状态和错误分类，不保存 Prompt 正文或密钥，位置为 `$WP_FLYWHEEL_HOME/demo/agent-runs.jsonl`。Harness Session 位于按节点幂等键分开的 `DSH_HOME` 子目录。
-
-JSON 无法解析或不符合 Schema 时，SDK Adapter 默认自动再试一次；每次尝试都使用新的 DSH session，并分别记录 `providerAttempt`。超时、取消、权限拒绝、路径拒绝和完整性错误不会借这个机制重试。可用 `WP_DSH_MAX_SCHEMA_ATTEMPTS=1..3` 调整上限，默认 `2`。
-
-需要诊断旧版 Headless 行为时，可显式设置 `WP_FLYWHEEL_AGENT_PROVIDER=deepseek-harness-headless` 与 `WP_DSH_COMMAND`、`WP_DSH_ARGS_JSON`。这条兼容路径会把 Prompt 放进 argv，没有进程级源码隔离，只用于迁移和故障对照，不是推荐部署。
-
-2026-09-02 的完整实跑记录保存在 [wpKnowledge](https://github.com/linlisWorkTeam/wpKnowledge/blob/main/knowledge/3.workpanel/%E8%AF%81%E6%8D%AE/2026-09-02-DeepSeek-Harness%E7%9C%9F%E5%AE%9EAgent%E6%B2%BB%E7%90%86%E6%BC%94%E7%A4%BA.md)。
-
-## 公网演示界面
-
-`web-public.cordis.yml` 把 WebServer 绑定到 `0.0.0.0`。Harness 会输出一次性认证 URL；首页用该 URL 换取签名 Cookie，普通未认证请求返回 401。启动时必须把公网 authority 加入 trusted host：
+默认 Provider 为 `deepseek-harness`。治理模式下打开“Agent 设置”，保存公开 HTTPS 的 DeepSeek Chat Completions 兼容 API 地址、API Key 与模型，再“验证并启用”。验证只访问模型列表，不生成内容。旧 Pi 配置不会自动迁移凭据，旧 Pi Run 只读且拒绝恢复。
 
 ```bash
-export WP_DSH_WEB_PORT=3080
-npx --yes @deepseek-ai/dsh@0.1.2-alpha.4 web \
-  --patch "$PWD/deploy/deepseek-harness/opencode-go.cordis.yml" \
-  --patch "$PWD/deploy/deepseek-harness/web-public.cordis.yml" \
-  --trusted-host '<公网 IP>:3080' \
-  --no-open
+npm run knowledge -- workflow-run \
+  --scenario /absolute/path/to/scenario.json \
+  --repository /absolute/path/to/project \
+  --workers 1 --max-iterations 3
 ```
 
-认证 URL 等同管理员凭据，不得写入仓库、日志示例或截图。当前配置没有 TLS，只用于短期演示；长期部署必须在前面增加 HTTPS 反向代理和独立身份认证。
+场景字段见[API 说明](../../specs/10-interfaces/http-api.md)。通用入口不要求 ohMyWorkPanel 布局或预写资产；历史样例仍在 `acceptance/ohmyworkpanel/`。公司 CodeAgent CLI 不作为启动前置，其真实协议适配由 DEV-010 后置处理。
 
-## 安全边界
+## 原生运行与配置
 
-- 自动治理使用 `read-only` Harness 权限；生成代码通过 JSON Artifact 返回，不允许 Agent 直接修改受治理仓库。
-- `WP_DSH_ALLOWED_ROOTS` 是来源复制白名单。路径穿越和符号链接会被拒绝；Bubblewrap 只挂载该节点的角色工作区、运行依赖、独立 DSH_HOME 与可信 patch，不挂载参考仓库。
-- Bubblewrap 保留模型 Provider 所需的网络，隐藏宿主项目树并遮蔽 PID 1 的环境读取；它解决的是 Agent 的源码可见性，不是生成代码执行安全。
-- 当前 `TrustedProjectEvaluator` 只能运行受信项目命令。完成 hostile-code 沙箱、资源限额和网络策略前，不要向任意公网用户开放工作流启动权限。
-- DeepSeek Harness Web 自身不提供可直接暴露公网的 TLS 或通用登录层；公网部署应放在带认证的反向代理之后。
+Console 配置使用原生 `sdk-minimal`，项目最后一层工具策略关闭命令行/编辑工具，在 DSH 注册只读 `read_material`。编排角色无工具，其余角色只读物化授权材料。DocWorker 只读分配的源码分块，Code 不读取参考实现；模型返回文件内容，应用校验后写入 CAS/评测工作区。
+
+`WP_DSH_MAX_TOKENS=32768`、`WP_DSH_CONTEXT_WINDOW=128000`、`WP_DSH_MAX_SCHEMA_ATTEMPTS=2` 是默认值，尝试上限范围 1..3。JSON/Schema 失败才重试；每次独立 session/home。`WP_DSH_TIMEOUT_MS` 默认 600000，`WP_DSH_MAX_OUTPUT_BYTES` 默认 2097152。配置、隔离参数、工具策略摘要冻结到 Run；正在运行的批次保留配置，恢复则检查当前摘要是否兼容。
+
+模型生成流量通过父进程内的受信 HTTP 转发固定已批准 DNS，拒绝重定向；实际上游密钥不传给 DSH，DSH 只得到本次转发令牌。新秘密位于运行目录 `secrets/dsh-provider-settings.enc` 与 `dsh-provider-settings.key`，AES-256-GCM、权限 0600。旧文件不改写。认证、Prompt 和模型原始内容不进入公开审计；Token 使用上游 usage，无可靠价格时成本为空。
+
+运行审计为 `$WP_FLYWHEEL_HOME/demo/agent-runs.jsonl`，关联 Run/角色/session、Schema/Prompt 摘要、时长与状态。原始会话为运行数据，应按秘密管理，不提交仓库。
+
+## 显式环境与诊断路径
+
+已有环境部署仍可显式配置 `WP_DSH_PROVIDER`、`WP_DSH_MODEL`、`WP_DSH_PROFILE`、`WP_DSH_PATCHES_JSON` 与模型环境变量；没有 Console 设置时使用这些部署参数，状态明确为未验证。默认 profile 是原生 `sdk-minimal`；其他 profile/patch 属于管理员可信部署配置，其内容摘要也进入快照。
+
+目录中的 `opencode-go.cordis.yml`、`provider.cordis.yml` 和 `web-public.cordis.yml` 保留用于 DSH 自身的历史调试，不是 Console 原生配置所需文件。它们可能使用上游 pi-ai 模型适配器；项目已移除直接 Pi coding-agent 框架依赖，DSH minimal 不加载 pi-ai。
+
+`deepseek-harness-headless` 仅是显式诊断入口，Prompt 经 stdin 输入，没有等价的生产源码隔离，不是 SDK 失败时的回退。DSH Web 和知识飞轮 Console 是不同入口，后者由 `knowledge:serve` 提供。
+
+## 边界
+
+角色白名单与 Bubblewrap 控制 Agent 材料可见性。`TrustedProjectEvaluator` 仍只适用于受信项目，不能据此声称已具备敌对生成代码沙箱、公司 CLI live 兼容或生产容量。

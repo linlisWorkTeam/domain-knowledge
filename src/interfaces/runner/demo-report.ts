@@ -98,7 +98,7 @@ function safeAgentCalls(runtimeDir: string): { calls: SafeAgentCall[]; ignoredLi
   return { calls, ignoredLines };
 }
 
-function safePiInvocations(
+function safeProviderInvocations(
   repository: SQLiteFlywheelRepository,
   runId: string,
 ): SafeProviderInvocation[] {
@@ -112,7 +112,7 @@ function safePiInvocations(
       retry_count, input_tokens, output_tokens, cache_read_tokens,
       cache_write_tokens, estimated_cost_usd, error_code
     FROM provider_invocations
-    WHERE run_id = ? AND provider = 'pi-agent'
+    WHERE run_id = ?
     ORDER BY started_at, invocation_id
   `).all(runId) as Record<string, unknown>[];
   const optionalNumber = (value: unknown): number | null => value === null ? null : Number(value);
@@ -152,7 +152,7 @@ function callKey(call: SafeAgentCall | SafeProviderInvocation): string {
 
 function mergeAgentCalls(
   fileCalls: SafeAgentCall[],
-  piCalls: SafeProviderInvocation[],
+  providerCalls: SafeProviderInvocation[],
 ): Array<SafeAgentCall | SafeProviderInvocation> {
   const result: Array<SafeAgentCall | SafeProviderInvocation> = [...fileCalls];
   const positions = new Map<string, number[]>();
@@ -160,7 +160,7 @@ function mergeAgentCalls(
     const key = callKey(call);
     positions.set(key, [...(positions.get(key) ?? []), index]);
   });
-  for (const call of piCalls) {
+  for (const call of providerCalls) {
     const key = callKey(call);
     const duplicate = positions.get(key)?.shift();
     if (duplicate === undefined) {
@@ -194,14 +194,14 @@ export async function buildDemoReport(input: {
   })));
   const agentAudit = safeAgentCalls(input.runtimeDir);
   const fileCalls = agentAudit.calls.filter((call) => call.metadata.runId === input.runId);
-  const piCalls = safePiInvocations(input.repository, input.runId);
+  const providerCalls = safeProviderInvocations(input.repository, input.runId);
   return {
     schemaVersion: '1.0',
     reportKind: 'wpknowledge-governance-demo',
     generatedAt: (input.clock ?? (() => new Date()))().toISOString(),
     evidenceBoundary: '报告只导出 Registry 业务事实、Artifact 完整性结果和脱敏 Agent 调用摘要；不包含 Prompt 正文、模型正文、Session 日志或凭据。',
     snapshot,
-    agentCalls: mergeAgentCalls(fileCalls, piCalls),
+    agentCalls: mergeAgentCalls(fileCalls, providerCalls),
     ignoredAgentAuditLines: agentAudit.ignoredLines,
     artifactIntegrity: {
       total: verification.length,
