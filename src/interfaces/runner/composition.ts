@@ -43,6 +43,8 @@ import { SQLiteOperationalMetrics } from '../../infrastructure/observability/sql
 import { migrateLegacyOkf } from '../../infrastructure/migration/legacy-okf/index.ts';
 import { ConsoleReadModel } from './console-read-model.ts';
 import { buildDemoReport } from './demo-report.ts';
+import { DocgenExampleService } from '../../application/services/docgen-example.ts';
+import { executeDocgenExample } from '../../infrastructure/workflow/langgraph/docgen-example.ts';
 
 export interface WorkpanelConfig {
   schemaVersion: '1.0';
@@ -314,9 +316,7 @@ export function createComposition(input: {
     },
     clock: input.clock,
   });
-  let workflowPromise: Promise<AutomatedProjectWorkflowService> | null = null;
-  const workflow = () => {
-    workflowPromise ??= (async () => {
+  const projectStages = () => {
       const auditDirectory = join(runtimeDir, 'demo');
       const auditPath = join(auditDirectory, 'agent-runs.jsonl');
       const writeAudit = async (record: Parameters<NonNullable<ConstructorParameters<typeof DeepSeekHarnessSdkAgent>[0]['onAudit']>>[0] | CompanyCodeAgentAuditRecord) => {
@@ -419,8 +419,17 @@ export function createComposition(input: {
             ...stageOptions, assetRoot: input.fixtureAssetRoot ?? repositoryRoot,
           })
         : new ProjectWorkflowStages(stageOptions);
+      return executor;
+  };
+  const docgenExample = new DocgenExampleService({
+    flywheel: flywheelApp, runConfiguration, evaluator: new TrustedProjectEvaluator(artifacts),
+    execute: (stage) => executeDocgenExample(stage, projectStages(), workflowObserver),
+  });
+  let workflowPromise: Promise<AutomatedProjectWorkflowService> | null = null;
+  const workflow = () => {
+    workflowPromise ??= (async () => {
       const infrastructure = await createDomainKnowledgeInfrastructure({
-        executor,
+        executor: projectStages(),
         observer: workflowObserver,
         prompts: runConfiguration,
         checkpoint: { kind: 'sqlite', filename: join(runtimeDir, 'workflow', 'checkpoints.sqlite') },
@@ -447,6 +456,7 @@ export function createComposition(input: {
     artifacts,
     repository,
     apps: {
+      docgenExample,
       flywheel: flywheelApp,
       evalRunner: evalRunnerApp,
       knowledgeSearch: knowledgeSearchApp,

@@ -91,3 +91,7 @@
 | AC-DSHF-007 | PASS | `tests/integration/dsh-configuration-migration.test.ts` 验证默认 DSH、运行冻结、新 Run 配置、旧 Pi 读取/拒绝恢复及秘密不迁移；`provider-observability.test.ts`、`tests/e2e/console.spec.ts` 验证 HTTP/Console |
 
 AC-DSHF-002/003 的 R1 自动化部分见 T102 证据；001/004 的 live 范例、005 完整闭环及 008 逐角色交付均未计为通过。完整命令和结果在 DEV-019 `evidence.md` 追加。
+
+## DEV-019 R2 范例进度
+
+`src/interfaces/runner/docgen-example.ts` 提供 prepare/run/check；`tests/integration/docgen-example.test.ts` 覆盖固定参考、受控 DSH 接线、独立例子检查、快照与取消。原七角色图继续使用相同业务阶段。AC-DSHF-001/004 的真实模型与独立工作区 live 条件因缺少 DSH 配置保持 BLOCKED，不能提高完整底座或业务闭环的实现状态。执行方法见 [角色教程](../../docs/tutorials/add-agent-capability.md)，结果见 DEV-019 evidence.md。

@@ -1,6 +1,6 @@
 # 分阶段验收
 
-状态：R1 的 AC-DSHF-006、007 及 002、003 自动化部分已通过本地验收；配置/依赖条款已同步 baseline，待 PR 审查。R2～R4 live 范例和完整闭环尚未验收，详见 evidence.md。
+状态：R1 的 AC-DSHF-006、007 及 002、003 自动化部分已通过本地验收；配置/依赖条款已同步 baseline 并合入。R2～R4 live 范例和完整闭环尚未验收，详见 evidence.md。
 
 ## 底座与范例
 
@@ -69,7 +69,7 @@ R1 已新增或迁移 AC-DSHF-006、007 对应行为测试：`tests/integration/
 
 ### R2、R3 真实角色与 R4 闭环
 
-新范例和通用 live 入口尚未实现，所以当前没有可直接复制的新启动命令。交付 T103 时，实施者必须在既有[角色教程](../../../../docs/tutorials/add-agent-capability.md)补齐实际命令、前置条件与检查步骤，并在 evidence.md 记录实际执行命令；T201 同样补齐通用七角色闭环命令，不能继续把固定 ohMyWorkPanel 入口当作通用启动证明。
+R2 入口现为 `npm run example:docgen -- prepare|run|check`，独立工作区与角色修改步骤见[角色教程](../../../../docs/tutorials/add-agent-capability.md)。缺少实际 DSH 配置时 live 验收保持 BLOCKED；在 evidence.md 分别记录参考测试、受控回归和实际模型结果。T201 同样补齐通用七角色闭环命令，不能继续把固定 ohMyWorkPanel 入口当作通用启动证明。
 
 实际验收按以下步骤进行：
 

@@ -7,6 +7,7 @@ import type { SQLiteFlywheelRepository } from '../../infrastructure/persistence/
 import { ConsoleReadModel } from './console-read-model.ts';
 
 interface SafeAgentCall {
+  sessionId?: string;
   provider: string;
   role: string;
   idempotencyKey: string;
@@ -30,6 +31,7 @@ interface SafeProviderInvocation {
   durationMs: number;
   status: string;
   retryCount: number;
+  correlation?: Record<string, string | number>;
   tokens: {
     input: number | null;
     output: number | null;
@@ -76,6 +78,7 @@ function safeAgentCalls(runtimeDir: string): { calls: SafeAgentCall[]; ignoredLi
       const record = JSON.parse(line) as Record<string, unknown>;
       calls.push({
         provider: String(record.provider ?? ''),
+        ...(typeof record.sessionId === 'string' ? { sessionId: record.sessionId } : {}),
         role: String(record.role ?? ''),
         idempotencyKey: String(record.idempotencyKey ?? ''),
         workspaceRoot: String(record.workspaceRoot ?? ''),
@@ -145,7 +148,7 @@ function safeProviderInvocations(
 
 function callKey(call: SafeAgentCall | SafeProviderInvocation): string {
   return JSON.stringify([
-    call.provider, call.role, call.startedAt, call.completedAt,
+    call.provider === 'deepseek-harness-sdk' ? 'deepseek-harness' : call.provider, call.role, call.startedAt, call.completedAt,
     call.durationMs, call.status, call.errorCode,
   ]);
 }
@@ -168,7 +171,16 @@ function mergeAgentCalls(
     } else {
       // Prefer the Registry projection because it carries controlled usage
       // fields and cannot contain prompt, path, or credential material.
-      result[duplicate] = call;
+      const original = result[duplicate];
+      const correlation: Record<string, string | number> = {};
+      if (original && 'metadata' in original && original.provider === 'deepseek-harness-sdk') {
+        if (original.sessionId) correlation.sessionId = original.sessionId;
+        for (const key of ['runId', 'nodeId', 'commandId', 'iteration', 'attempt', 'providerAttempt']) {
+          const value = original.metadata[key];
+          if (typeof value === 'string' || typeof value === 'number') correlation[key] = value;
+        }
+      }
+      result[duplicate] = Object.keys(correlation).length ? { ...call, correlation } : call;
     }
   }
   return result;

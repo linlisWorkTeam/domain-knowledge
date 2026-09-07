@@ -1,0 +1,6 @@
+为 structuredMarkdownDiff 编写中文开发文档，先用 read_material 阅读可见源码。
+说明函数签名、返回字段、1 起算行号、CRLF 归一化、空输入、LCS 与大输入回退的边界和章节归属。
+以 src/domain/services/markdown-diff.ts:L起始-L结束 格式引用实际源码行号。不要宣称候选文档已验证发布。
+正文必须包含且只包含一个 json 代码块，内容为 examples 数组，每项包含 before、after、expectedHunkCount、expectedChangedSections。
+至少提供三种不同的可执行例子：相同内容、仅 CRLF 差异、标题下替换正文。预期须由源码推导，不调用测试文件、不生成脚本。
+返回规定的 JSON 对象（body、title、description），不要用 Markdown 代码块包裹整个输出。

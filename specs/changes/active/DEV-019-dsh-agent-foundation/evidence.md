@@ -160,3 +160,37 @@ GitHub Actions run `34096298827` 的失败来自三个真实回归：场景读�
 首轮回归暴露旧 Pi 测试路径、默认 Fixture 的 Server/Console 断言与报告指标筛选遗漏，均已修正后按上述范围重验，没有删除原有安全或取消门禁来通过测试。最终远程 CI 以本功能 PR 对应提交为准。
 
 R0/R1=`PASS`；AC-DSHF-006/007 及 002/003 自动化部分通过，T105/T106 勾选。当前等待用户审查合并；下一步 R2 T103/T104 的真实 DocGen 范例和独立工作区复现。R2～R4=`NOT_RUN`，DEV-019 未完成；本轮未调用外部模型或公司 CLI。
+
+## R2 / T103、T104 范例入口（2026-09-07）：机制 PASS，live BLOCKED
+
+用户授权在 #24/#25 合入后进入 T103/T104。起点 main 为 `98614347162d8bca9eda432044fcdd9168430b7c`，实现位于 `codex/dev019-docgen-example`，工作区 `/tmp/domain-knowledge-r2`。R1 的 Pi 迁出与配置迁移不再作为未合入前提。
+
+### 本次实现
+
+- `npm run example:docgen -- prepare|run|check` 提供固定 CPU 源码的参考测试、真实 DSH DocGen 入口及独立数据例子检查。运行步骤写入原有角色教程，示范指令及公开声明在 `examples/docgen/`，没有新增 Agent 运行框架或七角色任务书。
+- 一个固定 LangGraph 开发节点调用与生产图相同的 `ProjectWorkflowStages`，复用 DSH 配置、快照、角色材料、业务信封、checkpoint 和 CAS。只调用 DocGen，不发布；示范 Run 保持 CREATED，节点完成单独记录，必须使用独立 runtime，不能据此宣称完整业务 Run 已完成。
+- 可信源码仍固定到 R0 的 `3f999204f988697cc5bb9473c5a10ad5b4fc1f78`，源码和 7 项参考测试摘要不变。每次 prepare 从 Git 导出并实际跑测试，不执行模型生成的脚本。子进程移除继承的 NODE_TEST_CONTEXT，避免在测试运行器内错误解析 TAP 计数。
+- 独立检查只比较文档 JSON 例子的 hunk 数、changedSections 和引用行号范围；检查通过仍标 semanticReview=REQUIRED，不能自动证明正文的所有结论。真实文档必须另行阅读核对。
+- 联调发现报告中的 `deepseek-harness-sdk` 与 `deepseek-harness` 名称导致同次调用重复计数，且原报告漏掉顶层 sessionId；已修复同次调用匹配，保留受控的会话/命令关联及实际指标。旧 Pi 报告回归继续通过。
+
+### 验证
+
+两个工作区均使用 Node 24.13.0，独立 bootstrap/check=`READY`，未共享 node_modules；DSH/SDK 仍为 0.1.2-alpha.4，锁文件 SHA-256 仍为 `0e6672dc7ceb6e275fbc6c6ff67fc36eb9165a58a9d66f82919a281ea8e142a9`。
+
+| 检查 | 实际结果 |
+| --- | --- |
+| `npm run example:docgen -- prepare --runtime /tmp/dev019-r2-evidence` | 固定参考 7/7，source/test 摘要匹配 R0 |
+| `npm run typecheck`、`npm run validate:specs` | 退出 0；17 schemas / 7 commands / 8 results / 51 P0 |
+| DocGen 与报告针对性回归 | 6/6，含错误预期、缺覆盖、非法引用、生产 DSH 接线、Prompt 冻结、失败/取消；`/tmp/dev019-r2-tests.log` |
+| `npm test` | 172/172，0 fail/skip；`/tmp/dev019-r2-full.log` |
+| `npm run evaluate:framework` | 7/7，frameworkMechanics=VERIFIED；`/tmp/dev019-r2-framework.log` |
+| 独立工作区 `/tmp/domain-knowledge-r2-repro` | 从相同 main 创建，独立 bootstrap 后应用本功能差异；prepare 7/7，范例回归 4/4，包含不同指令的两次独立 DocGen 调用；`/tmp/dev019-r2-repro-tests.log` |
+| Markdown 路径/锚点及 `git diff --check` | 92 份文档、216 个本地链接有效；差异检查通过 |
+
+上述 DocGen 调用均为真实原生 DSH 进程对本地受控 SSE 服务，传输测试显式关闭进程隔离；权限仍复用 R1/T102 证明。两次独立工作区的受控复现只证明机制，不能将 T104 的 live 条件算作通过。测试里的 Token 数值是受控响应数据，真实入口不要求固定 Token 数。
+
+### live 阻塞与下一步
+
+执行 `npm run example:docgen -- run --runtime /tmp/dev019-r2-live` 完成参考测试后返回退出 1：`DOCGEN_LIVE_CONFIGURATION_REQUIRED`；`/tmp/dev019-r2-live.log`。当前进程没有 DEEPSEEK_API_KEY，项目无 .env.local，示范 runtime 没有已验证 DSH 设置。没有调用外部模型、没有生成真实文档。已向用户询问可用配置目录或凭据文件路径，不请求把密钥贴进对话。
+
+T103/T104 保持未勾选，R2=`BLOCKED`（live 配置缺失），R3/R4=`NOT_RUN`。本次仅提交可审查的范例入口与机制验证。补齐实际 DSH 配置后，按教程在两个独立工作区真实运行 DocGen、修改角色再次运行，检查文档语义与独立例子，记录 Run/session/工件摘要，再决定是否满足 AC-DSHF-001～004。不得直接跳到七角色开发或以受控输出补 live 证据。
