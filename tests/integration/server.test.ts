@@ -20,7 +20,7 @@ async function readSse(response: Response, expected: RegExp): Promise<string> {
   assert.match(text, expected);
   return text;
 }
-import { GOOD_BODY } from '../helpers/fixture.ts';
+import { GENERIC_SCENARIO, GOOD_BODY } from '../helpers/fixture.ts';
 
 test('server binding defaults to config and supports explicit deployment overrides', () => {
   assert.deepEqual(
@@ -318,10 +318,13 @@ test('HTTP adapter rejects missing credentials and accepts authenticated candida
     assert.ok(resolvedDetail.history.every((entry: { actor: string }) => entry.actor === 'local-admin'));
     assert.doesNotMatch(JSON.stringify(resolvedDetail), /test-secret/);
 
-    const regenerationParent = instance.composition.service.createRun('ohmyworkpanel-mentions', 'local-v1');
+    const regenerationParent = instance.composition.service.createRun('cpu-module', 'local-v1');
     instance.composition.service.transition(regenerationParent.runId, 'PLANNED');
     instance.composition.service.transition(regenerationParent.runId, 'GENERATING');
     instance.composition.service.transition(regenerationParent.runId, 'LOW_CONFIDENCE');
+    const scenarioRef = await instance.composition.service.putArtifact(Buffer.from(JSON.stringify(GENERIC_SCENARIO)), 'application/json');
+    await instance.composition.service.executeNode({ runId: regenerationParent.runId, nodeId: 'project-scenario',
+      generationKey: `${regenerationParent.runId}:project-scenario`, inputRefs: [scenarioRef] }, async () => [scenarioRef]);
     const regenerationItems = await (await fetch(
       `${base}/api/v1/action-items?runId=${encodeURIComponent(regenerationParent.runId)}`,
     )).json();
@@ -529,7 +532,7 @@ test('run command idempotency treats reordered JSON object keys as the same payl
     const first = await fetch(`${base}/api/v1/runs`, {
       method: 'POST', headers,
       body: JSON.stringify({
-        profile: 'ohmyworkpanel', repositoryRoot: process.cwd(),
+        scenario: GENERIC_SCENARIO, repositoryRoot: process.cwd(),
         maxIterations: 2, workerCount: 1,
       }),
     });
@@ -539,7 +542,7 @@ test('run command idempotency treats reordered JSON object keys as the same payl
       method: 'POST', headers,
       body: JSON.stringify({
         workerCount: 1, maxIterations: 2,
-        repositoryRoot: process.cwd(), profile: 'ohmyworkpanel',
+        repositoryRoot: process.cwd(), scenario: GENERIC_SCENARIO,
       }),
     });
     assert.equal(replay.status, 202);

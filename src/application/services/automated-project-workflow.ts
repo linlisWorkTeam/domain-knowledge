@@ -266,6 +266,11 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
     }
     const commandInput = { ...input, context: { ...input.context, snapshot, scenarioRef } };
     const agent = await this.runRole(commandInput, scenario, 'orchestrator');
+    if (input.signal?.aborted) throw new Error('AGENT_CANCELLED');
+    await this.flywheel.executeNode({
+      runId: input.runId, nodeId: 'project-scenario', generationKey: `${input.runId}:project-scenario`,
+      inputRefs: [scenarioRef!],
+    }, async () => [scenarioRef!]);
     return {
       detail: `planned iteration ${input.iteration}`,
       context: { snapshot, scenarioRef, [contextKey(input.nodeId, input.iteration)]: agent },
@@ -1081,6 +1086,14 @@ export class AutomatedProjectWorkflowService {
         },
       },
     });
+  }
+
+  async scenarioForRun(runId: string): Promise<AutomatedProjectScenario> {
+    const ref = this.flywheel.getCommittedNodeOutputs({
+      runId, nodeId: 'project-scenario', generationKey: `${runId}:project-scenario`,
+    })?.[0];
+    if (!ref) throw new Error('WORKFLOW_SCENARIO_UNAVAILABLE');
+    return JSON.parse(Buffer.from(await this.flywheel.getArtifact(ref)).toString('utf8'));
   }
 
   async wait(runId: string): Promise<WorkflowExecutionView> {

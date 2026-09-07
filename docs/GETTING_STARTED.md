@@ -122,7 +122,7 @@ Pi Agent 对空输出或不符合角色 JSON Schema 的输出使用全新会话�
 准备一个包含验收场景固定 commit 的 ohMyWorkPanel 本地仓库，然后运行：
 
 ```bash
-npm run knowledge -- workflow-run --repository /path/to/ohMyWorkPanel
+npm run knowledge -- workflow-run --scenario /path/to/scenario.json --repository /path/to/project
 ```
 
 命令会创建 `FlywheelRun`，以内嵌 LangGraph 执行全部 Agent 节点，并等待失败迭代、独立评测和发布结束。另一个终端打开 Console，就能按同一 `runId` 查看节点状态。没有启用已验证的 Pi Agent 配置时，默认 Agent Provider 是可重复的 fixture，适合先确认环境与治理链路；启用后只影响新批次，已有批次继续遵循冻结快照。

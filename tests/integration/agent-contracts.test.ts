@@ -9,6 +9,7 @@ import type { KnowledgeFlywheelService } from '../../src/application/services/in
 import {
   assertAgentResultBinding, ProjectWorkflowStages, type AutomatedProjectScenario,
 } from '../../src/application/services/automated-project-workflow.ts';
+import { createTestComposition } from '../helpers/fixture.ts';
 import { JsonSchemaAgentContractValidator } from '../../src/infrastructure/agents/contracts/index.ts';
 
 const artifactRef: ArtifactRef = {
@@ -139,4 +140,24 @@ test('generic stages require a provider and do not commit results after cancella
     }), mode === 'missing' ? /WORKFLOW_LIVE_AGENT_UNAVAILABLE/ : /AGENT_CANCELLED/);
     assert.equal(committed, 0);
   }
+});
+
+
+test('committed node output lookup refuses cross-run and uncommitted scenario checkpoints', async () => {
+  const composition = createTestComposition();
+  try {
+    const run = composition.service.createRun('scenario-owner', 'local-v1');
+    const other = composition.service.createRun('another-module', 'local-v1');
+    const input = { runId: run.runId, nodeId: 'project-scenario', generationKey: `${run.runId}:project-scenario` };
+    assert.equal(composition.service.getCommittedNodeOutputs(input), null);
+    const ref = await composition.service.putArtifact(Buffer.from('{}'), 'application/json');
+    await assert.rejects(composition.service.executeNode({ ...input, inputRefs: [ref] }, async () => {
+      throw new Error('interrupted');
+    }), /interrupted/);
+    assert.equal(composition.service.getCommittedNodeOutputs(input), null);
+    await composition.service.executeNode({ ...input, inputRefs: [ref] }, async () => [ref]);
+    assert.deepEqual(composition.service.getCommittedNodeOutputs(input), [ref]);
+    assert.throws(() => composition.service.getCommittedNodeOutputs({ ...input, runId: other.runId }), /scope mismatch/);
+    assert.throws(() => composition.service.getCommittedNodeOutputs({ ...input, nodeId: 'another-node' }), /scope mismatch/);
+  } finally { composition.dispose(); }
 });

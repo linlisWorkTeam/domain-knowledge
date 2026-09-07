@@ -3,7 +3,8 @@ import { readFileSync } from 'node:fs';
 import { isAbsolute, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { ArtifactRef, RunState } from '../../domain/index.ts';
-import { createComposition, loadOhMyWorkPanelScenario } from './composition.ts';
+import { createComposition } from './composition.ts';
+import { loadProjectScenario } from './project-scenario.ts';
 
 interface ParsedArgs {
   command: string;
@@ -65,7 +66,7 @@ function help(): void {
   process.stdout.write(`  transition --run ID --state STATE\n`);
   process.stdout.write(`  evaluate --run ID --version ID --tests-passed N --tests-total N --stability 1 --evidence-file PATH\n`);
   process.stdout.write(`  publish --run ID --version ID --decision ID\n`);
-  process.stdout.write(`  workflow-run --repository PATH [--workers 1 --max-iterations 3]\n`);
+  process.stdout.write(`  workflow-run --scenario FILE [--repository PATH] [--workers 1 --max-iterations 3]\n`);
   process.stdout.write(`  workflow-resume --run ID\n`);
   process.stdout.write(`  workflow-status --run ID\n`);
   process.stdout.write(`  workflow-report --run ID [--output PATH]\n`);
@@ -214,7 +215,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     if (args.command === 'workflow-run') {
       const workflow = composition.apps.orchestrator;
       const handle = await workflow.start(
-        loadOhMyWorkPanelScenario(required(args, 'repository')),
+        loadProjectScenario(required(args, 'scenario'), option(args, 'repository') || undefined),
         {
           policyId: option(args, 'policy', composition.config.publicationGate.policyId),
           minimumStability: composition.config.publicationGate.minimumStability,

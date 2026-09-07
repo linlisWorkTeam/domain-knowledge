@@ -29,6 +29,10 @@ export class Orchestrator {
     return (await this.workflow()).start(...args);
   }
 
+  async scenarioForRun(runId: string) {
+    return (await this.workflow()).scenarioForRun(runId);
+  }
+
   async wait(...args: Parameters<AutomatedProjectWorkflowService['wait']>) {
     return (await this.workflow()).wait(...args);
   }

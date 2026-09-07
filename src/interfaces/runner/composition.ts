@@ -37,7 +37,7 @@ import {
   PI_AGENT_DEFAULT_CONTEXT_WINDOW, PI_AGENT_DEFAULT_MAX_SCHEMA_ATTEMPTS,
   PI_AGENT_DEFAULT_MAX_TOKENS, PiCodingAgentProvider, PublicHttpsEndpointPolicy,
 } from '../../infrastructure/agents/pi-agent/index.ts';
-import { FixtureProjectWorkflowStages, type FixtureProjectScenario } from '../../infrastructure/agents/scenario/project-workflow-fixture.ts';
+import { FixtureProjectWorkflowStages } from '../../infrastructure/agents/scenario/project-workflow-fixture.ts';
 import { JsonSchemaAgentContractValidator } from '../../infrastructure/agents/contracts/index.ts';
 import { SQLiteOperationalMetrics } from '../../infrastructure/observability/sqlite-operational-metrics.ts';
 import { migrateLegacyOkf } from '../../infrastructure/migration/legacy-okf/index.ts';
@@ -64,12 +64,6 @@ export const componentRoot = resolve(moduleDirectory, '../../..');
 export const defaultRepositoryRoot = resolve(
   process.env.WP_KNOWLEDGE_REPOSITORY?.trim() || componentRoot,
 );
-
-export function loadOhMyWorkPanelScenario(repositoryRoot: string): FixtureProjectScenario {
-  const scenarioPath = join(componentRoot, 'acceptance', 'ohmyworkpanel', 'scenario.json');
-  const scenario = JSON.parse(readFileSync(scenarioPath, 'utf8')) as Omit<FixtureProjectScenario, 'repositoryRoot'>;
-  return { ...scenario, repositoryRoot: resolve(repositoryRoot) };
-}
 
 export function loadWorkpanelConfig(_repositoryRoot = defaultRepositoryRoot): WorkpanelConfig {
   const configPath = process.env.WP_FLYWHEEL_CONFIG
@@ -100,6 +94,7 @@ export function loadWorkpanelConfig(_repositoryRoot = defaultRepositoryRoot): Wo
 
 export function createComposition(input: {
   repositoryRoot?: string;
+  fixtureAssetRoot?: string;
   runtimeDir?: string;
   clock?: () => string;
   providerSettingsStore?: ProviderSettingsStore;
@@ -408,7 +403,7 @@ export function createComposition(input: {
       };
       const executor = agentProviderMode === 'fixture'
         ? new FixtureProjectWorkflowStages({
-            ...stageOptions, assetRoot: join(componentRoot, 'acceptance', 'ohmyworkpanel'),
+            ...stageOptions, assetRoot: input.fixtureAssetRoot ?? repositoryRoot,
           })
         : new ProjectWorkflowStages(stageOptions);
       const infrastructure = await createDomainKnowledgeInfrastructure({

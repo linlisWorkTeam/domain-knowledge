@@ -110,3 +110,21 @@ AC-DSHF-001～005 全部尚未执行；普通 CPU 模块和示范角色的具体
 Node 24.13.0、DSH/SDK 0.1.2-alpha.4。验证命令：`npm run typecheck`（0）、`npm run validate:specs`（17 schemas / 7 commands / 8 results / 51 P0）、`npm run test:architecture`（6/6）、`npm test`（161/161，0 skip）。针对 DSH/业务契约/角色工作区的五文件回归 28/28，含非法输出、有限重试、超时、取消、迟到成功、session 错配与权限拒绝。完整测试临时输出 `/tmp/t102-full.log`；可复执行源码为 `tests/integration/dsh-native-tools.test.ts`、`deepseek-harness-agent.test.ts`、`agent-contracts.test.ts`、`dsh-project-stages.test.ts` 和 `tests/security/agent-workspace.test.ts`。
 
 AC-DSHF-002、003 自动化部分 PASS；R2 真实模型及 R4 完整崩溃恢复不计入本次证明。T105/T106 尚未完成。
+
+## R1 / T105 场景入口功能（2026-09-07）：PASS，任务仍待 Pi 迁出
+
+CLI `--scenario`、API/Console `scenario` 同步接入通用校验，固定项目 loader/assetRoot 从组合根移除。已解析 Git commit 的场景存入 CAS 和业务 checkpoint，重新生成从原 Run 读取；没有旧场景不自动套用模板。
+
+`tests/acceptance/automated-langgraph-flow.test.ts` 用 formatter/lib 与 normalizer/components/nested 两个模块和不同测试文件命令，经过同一 LangGraph 七角色接线、两轮真实 CPU 测试、纠正及确定性发布。角色输出明确使用 Fixture Adapter，不能算 live 模型。两个场景均验证冻结场景、七角色信封、评测输入和唯一发布。
+
+针对性验收：场景全流程加 Server 回归 9/9；新增场景验证 2/2；typecheck 与 Spec 校验通过。T105 的 Pi 迁出和 T106 的配置迁移需原子更新，下一功能继续完成；本次不提前勾选整个 T105。
+
+## PR #23 CI 修复（2026-09-07）：本地验收 PASS
+
+GitHub Actions run `34096298827` 的失败来自三个真实回归：场景读取绕过 Application 直接访问 Repository；场景 checkpoint 在 AgentCommand 校验前执行；缺 Provider/取消场景仍提交场景 checkpoint。修复为应用服务提供带 Run/节点范围校验的已提交输出查询，并把场景 checkpoint 放在编排角色成功之后。保留原有架构、命令校验和取消断言，新增跨 Run/未提交 checkpoint 拒绝检查。
+
+在独立 worktree `/tmp/domain-knowledge-pr23-ci` 从 PR 原提交 `9af91b4` 启动，`npm run bootstrap:worktree` 与 `bootstrap:worktree:check` 均为 READY；Node 24.13.0，按该 PR 锁文件独立安装依赖，未使用另一工作区中尚未验收的 DSH 配置迁移代码。
+
+验证：`npm run typecheck` 通过；`npm run validate:specs` 为 17 schemas / 7 commands / 8 results / 51 P0；`npm test` 165/165、0 skip；`npm run test:ui` 14/14。新增浏览器测试通过实际 HTTP API 验证非法路径返回 422 且不调度，合法场景返回 202 并保留模块及仓库输入；只替换最终任务启动用于观察输入，不冒充模型闭环。首次新增浏览器测试因导航标题写错失败，修正为“飞轮批次”后完整重跑 14/14。
+
+本次补齐 #23 的浏览器验收，不代表 T105 整体、T106 或 R2 live 模型已完成。远程 CI 结果以本 PR 最新提交的 Actions 为准；临时输出 `/tmp/pr23-full.log`、`/tmp/pr23-ui-final.log`。

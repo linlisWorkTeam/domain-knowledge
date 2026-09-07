@@ -223,6 +223,15 @@ export class KnowledgeFlywheelService {
     }, now));
   }
 
+  getCommittedNodeOutputs(input: { runId: string; nodeId: string; generationKey: string }): ArtifactRef[] | null {
+    this.requireRun(input.runId);
+    const checkpoint = this.repository.getCheckpoint(input.generationKey);
+    if (!checkpoint) return null;
+    assertInvariant(checkpoint.runId === input.runId && checkpoint.nodeId === input.nodeId,
+      'checkpoint scope mismatch');
+    return checkpoint.status === 'COMMITTED' ? structuredClone(checkpoint.outputRefs) : null;
+  }
+
   async executeNode(
     input: Omit<NodeCheckpoint, 'status' | 'outputRefs' | 'retryCount' | 'updatedAt'>,
     operation: () => Promise<ArtifactRef[]>,

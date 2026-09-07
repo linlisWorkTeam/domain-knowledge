@@ -612,7 +612,7 @@ F2 可访问验收环境和 B1 API 迁移 diff 就绪后，进入 B2/B3 并行�
 | Quality / Behavioral Gate 区分 | Implemented：分区展示并解释 `ACCEPTED` 不等于 `VERIFIED`；版本 Diff 与范围校验已接入 |
 | Feedback UI | Implemented：使用仅驻留页面内存的 bearer token，明确反馈不改变发布状态 |
 | 批次列表与工作台 | Implemented MVP：新增批次列表、snapshot、顺序事件、checkpoint、评测和 Gate API/UI |
-| 自动 Run 启动 | Implemented fixed profile：CLI/API/Console 可启动固定 ohMyWorkPanel LangGraph 流程；任意项目的通用来源/策略向导仍在规划 |
+| 自动 Run 启动 | Implemented scenario input：CLI/API/Console 以场景 JSON 启动通用 LangGraph 流程；图形化来源/策略向导仍在规划 |
 | Agent 目录与定制 | Implemented：七个固定角色可查，只有 `promptAddon` 可在治理模式修改并形成 revision/audit |
 | LangGraph 节点投影 | Implemented：Run 工作台从 Knowledge Registry 显示节点、Agent、轮次、attempt 与状态，不读取 graph checkpoint |
 | 实时事件 | Implemented：批次与活动 SSE 使用持久化 cursor 续传，断线自动重连并退回增量轮询 |
