@@ -1,6 +1,6 @@
 # 开发状态
 
-**当前阶段：DEV-019 R2 已合入，角色代码开发指南待审查｜更新时间：2026-09-07｜下一任务：按指南分工，继续 T200 契约对齐及 T210/T211 开发**
+**当前阶段：DEV-019 R2 与角色代码开发指南已合入｜更新时间：2026-09-07｜下一任务：按指南分工，继续 T200 契约对齐及 T210/T211 开发**
 
 本轮验收详见 [DSH Agent 公共底座测试报告](status/report/2026-09-07-DSH-Agent底座测试报告.md)。七角色分工可查[目录、类与功能定位指南](guides/agent-customization.md#角色定位表)；本次补充代码导航和开发步骤，不代表 T200 全部规范交付或 T210/T211 已完成。
 
@@ -45,7 +45,7 @@ R1 已将角色执行收敛到 DSH，通用项目场景从 CLI/API/Console 传�
 1. R0 已完成环境与基线核实，固定 CPU 样例和参考测试，明确 DSH 接线及旧配置/Run 处置。
 2. R1 已完成 Pi 迁出、DSH 配置与通用接线，R1 PR 已合入，R2 DocGen 范例与独立工作区真实复现已通过本地验收，PR #26 已合入。
 3. R3 按公共 SOP 开发七角色并联调；R4 在外部完成真实闭环。候选测试验证与 DEV-011 对齐，第一版相关恢复/权限要求与 DEV-012 对齐，不能因任务另列而跳过。
-4. DEV-010 公司 CLI 真实适配与验收后置；保留接入位置，不要求先迁移公司平台。DEV-013 的容量与部署决策仍依赖真实数据。
+4. DEV-010 公司 CLI 真实适配与验收后置；保留接入位置，不要求先迁移公司平台。[接入架构](ARCHITECTURE.md#codeagent-cli-integration)和[协议、隔离、配置及验收步骤](OPERATIONS.md#codeagent-cli)已整理；仅文档设计，当前环境仍缺真实 CLI，DEV-010 保持 Planned。DEV-013 的容量与部署决策仍依赖真实数据。
 
 本次实现与证据见 [DEV-019](../specs/changes/active/DEV-019-dsh-agent-foundation/proposal.md)、[架构](ARCHITECTURE.md)和[开发 SOP](guides/agent-customization.md)。范例入口、真实模型调用与独立工作区修改复现已通过本地验收；R2 追踪矩阵已同步。第一版完整闭环尚未验收，R3/R4 保持未执行。
 
@@ -81,7 +81,7 @@ DEV-014 及其引用的 DEV-015～018 是其他 worktree 中的旧 DFX 草稿上
 | DEV-007 | Console B4 运营最小可用面 | Done | Provider 状态、安全 API URL/Key 配置与验证、真实 Pi SDK 执行路径、默认新批次快照和生成/治理观测已接入 |
 | DEV-008 | Console B3 知识、评测与来源 | Done | 血缘/差异、评测读模型/证据/规则、来源注册/漂移/刷新、来源事项和知识健康度已接入 |
 | DEV-009 | 公司 CodeAgent CLI Adapter 与契约验证 | Done | 七角色、认证、stdin JSONL、session 恢复、超时/取消/错误分类、角色工具与工作区、脱敏审计、Run 摘要均有自动化验证 |
-| DEV-010 | 公司 CodeAgent 七角色真实闭环与效果基线 | Planned | 已后置；仍缺可验证的 CLI 环境，且现有协议须与真实版本重新对齐。不作为外部 DSH 第一版的前置条件 |
+| DEV-010 | 公司 CodeAgent 七角色真实闭环与效果基线 | Planned | [接入步骤](OPERATIONS.md#codeagent-cli)已落稿；缺真实 CLI 环境，待核对协议、最小工具/文件隔离、session 恢复及配置优先级。外部 DSH 第一版完成后再实施验收 |
 | DEV-011 | TestGen 候选测试的通用 Oracle 验证与门禁链路 | Planned | 原 DEV-007；对应 `KF-SYS-004` |
 | DEV-012 | 四点崩溃注入、完整权限拒绝审计与恢复加固 | Planned | 原 DEV-008；对应 `AC-REC-001`、`AC-SEC-002` |
 | DEV-013 | 生产容量、认证续期、并发与 Redis 启用决策 | Planned | 原 DEV-009；依赖真实运行数据，不改变 Registry 事实源地位 |
