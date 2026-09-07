@@ -2,6 +2,13 @@
 
 **每人负责一个角色，复用同一套 LangGraph → DSH 底座。** 底座与 DocGen 范例已合入 #26；七角色业务开发尚未全部完成。下面按“找到代码 → 修改功能 → 验收提 PR”使用。
 
+<details lang="en">
+<summary>English summary</summary>
+
+Find each role's code, extend the shared LangGraph and DSH foundation, and verify changes before opening a pull request. The foundation and DocGen example are available; the complete seven-role workflow is still in development.
+
+</details>
+
 ## 1. 目录与类
 
 <a id="目录与类"></a>

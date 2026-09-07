@@ -402,7 +402,7 @@ test('Pages workflow deploys the static directory only for an Actions source', (
     run?: string;
     with?: { path?: string };
   }>;
-  assert.deepEqual(config.on.push.branches, ['main']);
+  assert.deepEqual(Object.keys(config.on), ['workflow_dispatch']);
   assert.deepEqual(config.permissions, {
     contents: 'read', pages: 'write', 'id-token': 'write',
   });
