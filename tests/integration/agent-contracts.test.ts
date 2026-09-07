@@ -7,7 +7,7 @@ import type {
 import type { ArtifactRef } from '../../src/domain/index.ts';
 import type { KnowledgeFlywheelService } from '../../src/application/services/index.ts';
 import {
-  assertAgentResultBinding, OhMyWorkPanelWorkflowExecutor, type AutomatedProjectScenario,
+  assertAgentResultBinding, ProjectWorkflowStages, type AutomatedProjectScenario,
 } from '../../src/application/services/automated-project-workflow.ts';
 import { JsonSchemaAgentContractValidator } from '../../src/infrastructure/agents/contracts/index.ts';
 
@@ -58,16 +58,11 @@ test('command validation runs before checkpoint dispatch and provider invocation
     schemaVersion: '1.0', name: 'contract-order', moduleId: 'module', repositoryRoot: '/tmp/source',
     sourcePaths: ['src/a.ts'], publicInterfacePaths: ['src/a.ts'], allowedGeneratedPaths: ['src/out.ts'],
     prepareCommands: [], referenceCommands: [], firstIterationCommands: [], finalCommands: [],
-    assets: {
-      knowledgeV1: '', knowledgeV2: '', codeV1: '', codeV2: '', correction: '',
-      generatedPath: 'src/out.ts', title: 'title', description: 'description',
-    },
   };
-  const executor = new OhMyWorkPanelWorkflowExecutor({
+  const executor = new ProjectWorkflowStages({
     flywheel,
     evalRunner: {} as never,
     evaluator: { inspect: async () => snapshot, evaluate: async () => { throw new Error('unused'); } },
-    assetRoot: process.cwd(),
     contracts: rejectingContracts,
     agent: provider,
     agentWorkspaces: { materialize: async () => ({ workspaceRoot: '/tmp/source', readablePaths: [] }) },
@@ -104,4 +99,44 @@ test('AgentResult binding rejects cross-Run and wrong-command reuse', () => {
     /AGENT_RESULT_COMMAND_MISMATCH/);
   assert.throws(() => assertAgentResultBinding(result, { ...command, generationKey: 'wrong-generation-key' }, expected),
     /AGENT_RESULT_COMMAND_MISMATCH/);
+});
+
+test('generic stages require a provider and do not commit results after cancellation', async () => {
+  for (const mode of ['missing', 'cancelled'] as const) {
+    const controller = new AbortController();
+    let committed = 0;
+    const flywheel = {
+      getRun: () => ({ state: 'GENERATING' }),
+      putArtifact: async () => artifactRef,
+      getArtifact: async () => Buffer.from('{}'),
+      executeNode: async (_input: unknown, operation: () => Promise<ArtifactRef[]>) => {
+        const outputRefs = await operation();
+        committed += 1;
+        return { outputRefs };
+      },
+    } as unknown as KnowledgeFlywheelService;
+    const stages = new ProjectWorkflowStages({
+      flywheel, evalRunner: {} as never, evaluator: {} as never,
+      contracts: { assertCommand: () => undefined, assertResult: () => undefined },
+      agentWorkspaces: { materialize: async () => ({ workspaceRoot: '/tmp/source', readablePaths: [] }) },
+      ...(mode === 'cancelled' ? { agent: { run: async () => {
+        controller.abort();
+        return { strategy: 'late result', iteration: 0, parallel: ['documentation'] };
+      } } } : {}),
+    });
+    const scenario: AutomatedProjectScenario = {
+      schemaVersion: '1.0', name: 'no-assets', moduleId: 'module', repositoryRoot: '/tmp/source',
+      sourcePaths: [], publicInterfacePaths: [], allowedGeneratedPaths: ['generated.ts'],
+      prepareCommands: [], referenceCommands: [], firstIterationCommands: [], finalCommands: [],
+    };
+    await assert.rejects(stages.execute({
+      runId: 'run', nodeId: 'orchestrator', agentId: 'orchestrator', iteration: 0,
+      attempt: 1, maxIterations: 1, workerCount: 0, prompt: 'plan', signal: controller.signal,
+      context: {
+        scenario, scenarioRef: artifactRef, gatePolicy: { policyId: 'test' },
+        snapshot: { repositoryRoot: '/tmp/source', commit: 'test', manifestRef: artifactRef },
+      },
+    }), mode === 'missing' ? /WORKFLOW_LIVE_AGENT_UNAVAILABLE/ : /AGENT_CANCELLED/);
+    assert.equal(committed, 0);
+  }
 });

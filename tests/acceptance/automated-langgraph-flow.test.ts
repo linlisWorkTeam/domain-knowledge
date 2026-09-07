@@ -1,3 +1,4 @@
+import { FixtureProjectWorkflowStages, type FixtureProjectScenario } from '../../src/infrastructure/agents/scenario/project-workflow-fixture.ts';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -5,8 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import {
-  AutomatedProjectWorkflowService, OhMyWorkPanelWorkflowExecutor,
-  type AutomatedProjectScenario,
+  AutomatedProjectWorkflowService,
 } from '../../src/application/services/index.ts';
 import { TrustedProjectEvaluator } from '../../src/infrastructure/evaluation/project/index.ts';
 import { JsonSchemaAgentContractValidator } from '../../src/infrastructure/agents/contracts/index.ts';
@@ -53,7 +53,7 @@ test('generated result matches contract', () => assert.equal(calculate(), expect
   const composition = createComposition({ runtimeDir });
   try {
     composition.agents.updatePromptAddon('doc-gen', '先写清行为边界。');
-    const executor = new OhMyWorkPanelWorkflowExecutor({
+    const executor = new FixtureProjectWorkflowStages({
       flywheel: composition.apps.flywheel,
       evalRunner: composition.apps.evalRunner,
       evaluator: new TrustedProjectEvaluator(composition.artifacts),
@@ -78,7 +78,7 @@ test('generated result matches contract', () => assert.equal(calculate(), expect
       return recordEvaluation(evaluation, policy);
     };
     const command = (args: string[]) => ({ tool: 'node' as const, purpose: 'test' as const, args });
-    const scenario: AutomatedProjectScenario = {
+    const scenario: FixtureProjectScenario = {
       schemaVersion: '1.0', name: 'automated-two-iteration', moduleId: 'automated-module',
       repositoryRoot, expectedCommit: commit,
       sourcePaths: ['src/module.js', 'src/module.test.js'],

@@ -1,6 +1,6 @@
 # 代码与检查类 Agent
 
-> 运行方向见 [Agent 规范入口](README.md)：角色在 DSH 上开发。下文的固定 ohMyWorkPanel Adapter 是当前实现说明，迁出公共入口的目标见 [DEV-019](../changes/active/DEV-019-dsh-agent-foundation/spec-delta.md)，不是后续 Code/Check 开发范例。
+> 运行方向见 [Agent 规范入口](README.md)：角色在 DSH 上开发。R1 首批已分离通用业务阶段与显式夹具；固定 CLI/API 场景和 Pi 配置仍待迁移，当前进度见 [DEV-019](../changes/active/DEV-019-dsh-agent-foundation/spec-delta.md)。
 
 ## CodeAgent
 
@@ -8,7 +8,7 @@
 - **输入 Schema**：`agent-command.schema.json` 的 `codegen` payload：knowledgeRef、publicInterfaceRefs、languageId、buildContractRef。
 - **输出 Schema**：`agent-result.schema.json` 的 `codeArtifact` payload，至少包含 `codeRef`，可附 `buildManifestRef`。
 - **禁止**：读取参考源码、探针、候选/门禁测试、旧轮实现和生成者推理历史；不得运行门禁或自称通过。
-- **固定 ohMyWorkPanel Adapter**：当前自动验收桥接层把候选知识作为 CAS 正文、公开接口作为角色工作区文件传入，要求输出闭合的 `{ files: [{ path, content }] }`。运行时会把 `path` 的 JSON Schema 动态收紧到场景 `allowedGeneratedPaths`，并拒绝重复路径；桥接格式不能被前台 `promptAddon` 修改。
+- **业务接线**：`ProjectWorkflowStages` 把候选知识作为 CAS 正文、公开接口作为角色工作区文件传入，要求输出闭合的 `{ files: [{ path, content }] }`。运行时会把 `path` 的 JSON Schema 动态收紧到场景 `allowedGeneratedPaths`，并拒绝重复路径；桥接格式不能被前台 `promptAddon` 修改。预写知识/代码仅由显式 `FixtureProjectWorkflowStages` 读取；真实角色不要求场景带有 assets，缺失 Provider 不回退到夹具。
 
 ## CheckAgent
 

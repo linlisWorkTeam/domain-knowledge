@@ -10,7 +10,7 @@ import type {
   ProviderEndpointPolicy, ProviderInvocationRecord, ProviderSettingsRecord, ProviderSettingsStore,
 } from '../../src/application/ports/index.ts';
 import {
-  AutomatedProjectWorkflowService, OhMyWorkPanelWorkflowExecutor,
+  AutomatedProjectWorkflowService, ProjectWorkflowStages,
   type AutomatedProjectScenario,
 } from '../../src/application/services/index.ts';
 import { JsonSchemaAgentContractValidator } from '../../src/infrastructure/agents/contracts/index.ts';
@@ -68,7 +68,6 @@ function agentOutput(agentType: string): Record<string, unknown> {
 test('a minimum complete Run sends all seven governed nodes through the real Pi SDK adapter', async () => {
   const repositoryRoot = mkdtempSync(join(tmpdir(), 'pi-flow-source-'));
   const runtimeDir = mkdtempSync(join(tmpdir(), 'pi-flow-runtime-'));
-  const assetRoot = mkdtempSync(join(tmpdir(), 'pi-flow-assets-'));
   mkdirSync(join(repositoryRoot, 'src'));
   writeFileSync(join(repositoryRoot, 'package.json'), '{"name":"pi-flow","type":"module"}\n');
   writeFileSync(join(repositoryRoot, 'src', 'contract.js'), 'export const expected = 4;\n');
@@ -142,11 +141,10 @@ test('generated behavior', () => assert.equal(calculate(), expected));
       endpointPolicy,
       onInvocation: (record) => { invocations.push(record); },
     });
-    const executor = new OhMyWorkPanelWorkflowExecutor({
+    const executor = new ProjectWorkflowStages({
       flywheel: composition.apps.flywheel,
       evalRunner: composition.apps.evalRunner,
       evaluator: new TrustedProjectEvaluator(composition.artifacts),
-      assetRoot,
       contracts: new JsonSchemaAgentContractValidator(join(process.cwd(), 'specs', 'schemas')),
       agent: provider,
       agentWorkspaces: new LocalAgentWorkspace({
@@ -170,10 +168,6 @@ test('generated behavior', () => assert.equal(calculate(), expected));
       publicInterfacePaths: ['src/contract.js', 'package.json'],
       allowedGeneratedPaths: ['src/module.js'], prepareCommands: [],
       referenceCommands: [command], firstIterationCommands: [command], finalCommands: [command],
-      assets: {
-        knowledgeV1: 'unused', knowledgeV2: 'unused', codeV1: 'unused', codeV2: 'unused',
-        correction: 'unused', generatedPath: 'src/module.js', title: 'unused', description: 'unused',
-      },
     };
     const handle = await workflow.start(scenario, {
       policyId: 'pi-agent-acceptance-v1', minimumStability: 1, requireAllTests: true,
@@ -196,6 +190,5 @@ test('generated behavior', () => assert.equal(calculate(), expected));
     await once(upstream, 'close');
     rmSync(repositoryRoot, { recursive: true, force: true });
     rmSync(runtimeDir, { recursive: true, force: true });
-    rmSync(assetRoot, { recursive: true, force: true });
   }
 });

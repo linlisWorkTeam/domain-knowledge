@@ -30,3 +30,20 @@ KF-SYS-004 的候选 oracle 验证、006 的证据、010 的恢复幂等、011 �
 ## 合并要求
 
 实现变更须同步受影响的 baseline、ADR、测试和操作文档。Preview API 若变化，按 KF-SYS-032 原子更新生产者与消费者；业务 Schema 是否变化需显式说明，不能静默替换。需求状态按实际证据更新，旧 ID 不复用，新 AC 与需求绑定后再进入正式追踪矩阵。
+
+## R0 已核实的接线选择与 R1 进度
+
+CPU 范例选择本仓库 `structuredMarkdownDiff`，参考源码固定到文档提交 `3f999204f988697cc5bb9473c5a10ad5b4fc1f78`，默认示范 DocGen；公开输入为前后两个字符串，输出为 hunks、changedSections、rangeValidation。测试覆盖正常编辑、空/相同输入、CRLF、远距修改、插入/删除、大输入和非法类型；Code 阶段只允许生成该模块路径，参考实现及测试不交给 Code。R2 再交付独立的公开契约材料和 live 命令，当前不伪称已存在通用入口。
+
+锁定 `@deepseek-ai/dsh` 与 `@deepseek-ai/dsh-sdk-client` 均为 `0.1.2-alpha.4`。SDK 的 `run` 接收 Prompt、session ID 和通知回调，`close` 关闭其运行进程；模型路由、profile、patches、工作目录和环境在启动参数中指定。高层 `run` 未提供逐角色工具白名单参数；细粒度工具限制需继续结合 profile/patches 和实际工作区验证，不能凭接口推定支持。
+
+| 责任 | 本轮核实/实施结果 | 后续验证 |
+| --- | --- | --- |
+| LangGraph | 业务节点、迭代及恢复；Registry/CAS 持有幂等与结果 | 沿用 checkpoint/发布回归；完整恢复仍按 R4 门槛 |
+| DSH | 角色模型/工具会话、通知、进程关闭；SDK 本身不持有业务发布权 | R2 实际模型，R1 补细粒度工具与事件检查 |
+| 业务接线 | `ProjectWorkflowStages` 保留命令、校验、工件及确定性阶段；预写输出移出到显式 Infrastructure 夹具 | 无 assets 的双目录场景验证；公共入口通用化仍待完成 |
+| 超时/取消/重试 | Adapter 管单次期限和有限 Schema 重试，每次新 session；工作流管业务恢复；迟到输出不能提交为成功 | 现有失败矩阵及新增取消同刻返回、session 错配检查 |
+| 配置与旧 Run | 继续采用旧记录保留可读、禁止 Pi 快照跨后端恢复、不自动复制旧秘密的方案；本轮未迁移数据 | T106 补实际 DSH 配置、API/Console 和旧记录回归 |
+| 旧 Pi 与固定场景 | 原固定执行器已移除；Pi SDK/配置/默认选择、固定 CLI/API 场景入口仍存在 | T105/T106 迁出全部运行依赖，完成 AC-DSHF-006/007 后才可声称仅依托 DSH |
+
+本轮不改变 HTTP API 或版本化 AgentCommand/AgentResult Schema；更新的是业务阶段实现、测试夹具隔离与 DSH 审计关联。正式规范中未实施的 Pi 配置条款暂保留，不将部分 R1 工作改记为全部完成。

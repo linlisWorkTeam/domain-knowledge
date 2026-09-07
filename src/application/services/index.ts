@@ -425,6 +425,6 @@ export { AgentCatalogService, RegistryWorkflowObserver } from './workflow-contro
 export {
   AGENT_COMMAND_SCHEMA_ID, AGENT_RESULT_SCHEMA_ID, RegistryRunConfigurationService,
 } from './run-configuration.ts';
-export { AutomatedProjectWorkflowService, OhMyWorkPanelWorkflowExecutor } from './automated-project-workflow.ts';
+export { AutomatedProjectWorkflowService, ProjectWorkflowStages } from './automated-project-workflow.ts';
 export type { AutomatedProjectScenario } from './automated-project-workflow.ts';
 export type { RealSourceFlowReport, RealSourceScenario } from './project-flow.ts';

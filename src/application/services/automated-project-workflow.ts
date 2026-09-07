@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { resolve, sep } from 'node:path';
 import Ajv2020Import from 'ajv/dist/2020.js';
 import type {
   AgentId,
@@ -110,20 +108,7 @@ const NODE_BY_AGENT: Record<AgentId, string> = {
   review: 'review',
 };
 
-interface AutomatedAssets {
-  knowledgeV1: string;
-  knowledgeV2: string;
-  codeV1: string;
-  codeV2: string;
-  correction: string;
-  generatedPath: string;
-  title: string;
-  description: string;
-}
-
-export interface AutomatedProjectScenario extends RealSourceScenario {
-  assets: AutomatedAssets;
-}
+export interface AutomatedProjectScenario extends RealSourceScenario {}
 
 interface DocumentOutput {
   body: string;
@@ -207,11 +192,10 @@ export function assertAgentResultBinding(
   }
 }
 
-export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
+export class ProjectWorkflowStages implements WorkflowStageExecutor {
   readonly flywheel: KnowledgeFlywheelService;
   readonly evalRunner: EvalRunnerUseCase;
   readonly evaluator: ProjectEvaluator;
-  readonly assetRoot: string;
   readonly agent?: AgentProvider;
   readonly agentResolver?: (runId: string) => AgentProvider | undefined;
   readonly agentWorkspaces?: AgentWorkspaceProvider;
@@ -221,7 +205,6 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
     flywheel: KnowledgeFlywheelService;
     evalRunner: EvalRunnerUseCase;
     evaluator: ProjectEvaluator;
-    assetRoot: string;
     contracts: AgentContractValidator;
     agent?: AgentProvider;
     agentResolver?: (runId: string) => AgentProvider | undefined;
@@ -230,7 +213,6 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
     this.flywheel = input.flywheel;
     this.evalRunner = input.evalRunner;
     this.evaluator = input.evaluator;
-    this.assetRoot = resolve(input.assetRoot);
     this.contracts = input.contracts;
     this.agent = input.agent;
     this.agentResolver = input.agentResolver;
@@ -283,13 +265,7 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
       }, null, 2)), 'application/json');
     }
     const commandInput = { ...input, context: { ...input.context, snapshot, scenarioRef } };
-    const agent = this.agentForRun(input.runId)
-      ? await this.runLiveAgentCheckpoint(commandInput, scenario, 'orchestrator')
-      : await this.commitAgentOutput(commandInput, scenario, 'orchestrator', {
-        strategy: 'fixed-knowledge-flywheel-v1',
-        iteration: input.iteration,
-        parallel: ['documentation', 'test-generation'],
-      });
+    const agent = await this.runRole(commandInput, scenario, 'orchestrator');
     return {
       detail: `planned iteration ${input.iteration}`,
       context: { snapshot, scenarioRef, [contextKey(input.nodeId, input.iteration)]: agent },
@@ -301,61 +277,20 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
     scenario: AutomatedProjectScenario,
     agentId: AgentId,
   ): Promise<WorkflowStageResult> {
-    if (this.agentForRun(input.runId)) {
-      const ref = await this.runLiveAgentCheckpoint(input, scenario, agentId);
-      return {
-        detail: `${agentId} produced schema-validated Provider output`,
-        context: { [contextKey(input.nodeId, input.iteration, input.workerId)]: ref },
-      };
-    }
-    let output: Record<string, unknown>;
-    if (agentId === 'doc-gen') {
-      output = {
-        body: this.asset(input.iteration === 0 ? scenario.assets.knowledgeV1 : scenario.assets.knowledgeV2),
-        title: scenario.assets.title,
-        description: scenario.assets.description,
-      };
-    } else if (agentId === 'code') {
-      output = { files: [{
-        path: scenario.assets.generatedPath,
-        content: this.asset(input.iteration === 0 ? scenario.assets.codeV1 : scenario.assets.codeV2),
-      }] };
-    } else if (agentId === 'review') {
-      const evaluationRef = input.context[contextKey('evaluationEvidenceRef', input.iteration)] as ArtifactRef | undefined;
-      if (!evaluationRef) throw new Error('WORKFLOW_REVIEW_EVALUATION_MISSING');
-      const evaluation = await this.readJson<ProjectEvaluation>(evaluationRef);
-      output = {
-        blocking: false,
-        recommendation: evaluation.passed ? 'PASS' : 'ITERATE',
-        correction: evaluation.passed
-          ? null
-          : JSON.parse(this.asset(scenario.assets.correction)) as Record<string, unknown>,
-      };
-    } else if (agentId === 'test-gen') {
-      output = { candidateCommands: scenario.finalCommands, oracleRequired: true };
-    } else if (agentId === 'check') {
-      output = { blocking: false, findings: [], scope: scenario.allowedGeneratedPaths };
-    } else if (agentId === 'doc-worker') {
-      output = {
-        workerId: input.workerId,
-        fragment: `Source partition ${input.workerId ?? 'default'} prepared for DocGen.`,
-        provenance: scenario.sourcePaths,
-      };
-    } else {
-      output = { iteration: input.iteration, strategy: 'fixed-knowledge-flywheel-v1' };
-    }
-    const ref = await this.commitAgentOutput(input, scenario, agentId, output);
+    const ref = await this.runRole(input, scenario, agentId);
     return {
-      detail: `${agentId} produced schema-bound fixture output`,
+      detail: `${agentId} produced schema-validated role output`,
       context: { [contextKey(input.nodeId, input.iteration, input.workerId)]: ref },
     };
   }
 
-  private async runLiveAgentCheckpoint(
+  /** Business handoff only; sessions and tools belong to the injected provider. */
+  protected async runRole(
     input: WorkflowStageInput,
     scenario: AutomatedProjectScenario,
     agentId: AgentId,
   ): Promise<ArtifactRef> {
+    if (!this.agentForRun(input.runId)) throw new Error('WORKFLOW_LIVE_AGENT_UNAVAILABLE');
     return this.executeAgentCheckpoint(input, scenario, agentId);
   }
 
@@ -427,7 +362,9 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
       generationKey: command.generationKey,
       inputRefs,
     }, async () => {
+      if (input.signal?.aborted) throw new Error('AGENT_CANCELLED');
       const output = fixtureOutput ?? await this.runLiveAgent(input, scenario, agentId, command);
+      if (input.signal?.aborted) throw new Error('AGENT_CANCELLED');
       this.validateAgentOutput(output, outputSchema);
       if (agentId === 'code') assertAllowedGeneratedFiles(output, scenario.allowedGeneratedPaths);
       const rawRef = await this.flywheel.putArtifact(
@@ -438,6 +375,7 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
       const resultRef = await this.flywheel.putArtifact(
         Buffer.from(JSON.stringify(result, null, 2)), 'application/json',
       );
+      if (input.signal?.aborted) throw new Error('AGENT_CANCELLED');
       return [resultRef, rawRef];
     });
     const ref = checkpoint.outputRefs[0];
@@ -711,7 +649,7 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
     };
   }
 
-  private async commitAgentOutput(
+  protected async commitAgentOutput(
     input: WorkflowStageInput,
     scenario: AutomatedProjectScenario,
     agentId: AgentId,
@@ -1028,14 +966,6 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
       .sort((left, right) => left.artifactId.localeCompare(right.artifactId));
   }
 
-  private asset(relativePath: string): string {
-    const target = resolve(this.assetRoot, relativePath);
-    if (target !== this.assetRoot && !target.startsWith(`${this.assetRoot}${sep}`)) {
-      throw new Error(`WORKFLOW_ASSET_DENIED: ${relativePath}`);
-    }
-    return readFileSync(target, 'utf8');
-  }
-
   private async readJson<T>(ref: ArtifactRef): Promise<T> {
     return JSON.parse(Buffer.from(await this.flywheel.getArtifact(ref)).toString('utf8')) as T;
   }
@@ -1092,7 +1022,7 @@ export class OhMyWorkPanelWorkflowExecutor implements WorkflowStageExecutor {
     return ref.mediaType.includes('json') ? JSON.parse(text) as unknown : text;
   }
 
-  private agentForRun(runId: string): AgentProvider | undefined {
+  protected agentForRun(runId: string): AgentProvider | undefined {
     return this.agentResolver?.(runId) ?? this.agent;
   }
 }
