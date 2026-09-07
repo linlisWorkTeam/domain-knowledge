@@ -49,6 +49,7 @@ npm run knowledge:serve
 
 - [AI 协作开发指南（Vibe Coding）](guides/ai-development-guide.md)
 - [Agent 开发 SOP 与现有角色定制](guides/agent-customization.md)
+- [CodeAgent CLI 接入架构](ARCHITECTURE.md#codeagent-cli-integration)与[协议核验、配置及验收步骤](OPERATIONS.md#codeagent-cli)
 - [测试策略](guides/testing.md)
 - [文档语言与 I18n](guides/documentation-i18n.md)
 

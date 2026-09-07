@@ -48,6 +48,8 @@ src/
 
 模型原始 JSON 与规范化后的 `AgentResult` 是两层契约；改输出时要同时检查转换及消费者，业务契约变化同步 `specs/schemas/`。会话、工具、重试、取消由公共底座维护。
 
+后续公司 CodeAgent CLI 由公共底座统一适配同一个 `AgentProvider`；角色开发继续复用上述业务逻辑。接入位置见[架构方案](../ARCHITECTURE.md#codeagent-cli-integration)，真实协议、工具隔离和公司环境验收见[运维步骤](../OPERATIONS.md#codeagent-cli)。
+
 ## 2. 七角色改哪里
 
 <a id="角色定位表"></a>

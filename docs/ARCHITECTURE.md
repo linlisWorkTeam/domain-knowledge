@@ -49,6 +49,36 @@ The confirmed target uses LangGraph for workflow orchestration and DSH for indiv
 
 实施增量及验收分层见 [DEV-019](../specs/changes/active/DEV-019-dsh-agent-foundation/proposal.md)，角色开发流程见[开发指南](guides/agent-customization.md)。以下章节描述当前代码；与目标的差异尚未通过实现消除。
 
+<a id="codeagent-cli-integration"></a>
+
+## CodeAgent CLI 接入方案（DEV-010，待真实适配）
+
+CodeAgent CLI 接在现有 `AgentProvider` Port，作为 DSH 的替代实现。接入目标是用这一公司运行工具执行七个业务角色；其中 `code` 只是本项目的代码生成角色。LangGraph 继续负责节点调度、并行、迭代和恢复，CLI 每次只执行被分配的角色任务，不接管整条飞轮，也不经 DSH 嵌套调用。
+
+```mermaid
+flowchart TD
+    G[LangGraph] --> S[ProjectWorkflowStages：准备任务和授权材料]
+    S --> P[AgentProvider：按 Run 冻结后端]
+    P --> D[DeepSeekHarnessSdkAgent：外部第一版]
+    P --> C[CompanyCodeAgentCliAdapter：公司环境后置适配]
+    D --> R[原始 JSON 校验与结果规范化]
+    C --> R
+    R --> B[业务 AgentResult、CAS、独立评测与确定性 Gate]
+```
+
+上图是接入目标；现有 CLI 类和组合根分支已存在，真实协议、材料隔离和后端选择仍须按[接入步骤](OPERATIONS.md#codeagent-cli)核验。复用边界如下：
+
+| 层与代码入口 | 接入时的职责 |
+| --- | --- |
+| [AgentProvider / AgentRequest](../src/application/ports/index.ts) | 保持 `run(request, signal)`：输入角色、Prompt、输出 Schema、幂等键、受信命令、工件引用和工作区；返回原始 JSON，CLI 专有字段留在 Adapter |
+| [ProjectWorkflowStages](../src/application/services/automated-project-workflow.ts) | 复用 `buildAgentCommand()`、`runLiveAgent()`、`normalizeAgentResult()`；准备同样的授权材料，将原始 JSON 转为 CAS 工件与业务 `AgentResult`，继续校验身份与归属 |
+| [CompanyCodeAgentCliAdapter](../src/infrastructure/agents/company-codeagent/index.ts) | 根据真实 CLI 版本实现认证、stdin、最终事件解析、工具映射、进程隔离、session、取消及脱敏审计 |
+| [createComposition](../src/interfaces/runner/composition.ts) 与 [RegistryRunConfigurationService](../src/application/services/run-configuration.ts) | 装配后端并冻结实际生效配置；核验已有 DSH 设置的优先级、CLI 版本与权限策略摘要及旧 Run 恢复兼容性 |
+
+角色指令、业务输入输出、场景、工作流和独立评测可以复用；DSH 的 `read_material` 插件、Bubblewrap 启动方式和 session 协议不能视为已被 CLI 继承。接入必须对齐现有[角色材料权限](../specs/09-security/data-boundaries.md)，并补足 CLI 自身的可验证实现。Code 返回允许路径的 `files`，由业务侧独立评测；CLI 不持有 Registry、发布凭据或 Gate 决策权。
+
+本节是后续实施设计，不变更 Accepted Spec 或 DEV-010 验收状态。第一版仍按 DEV-019 完成外部闭环，后续 CLI 交付相同业务契约；不要求七个角色开发者各写一套 CLI 适配。
+
 ## 当前实现的架构边界
 
 运行时采用 DDD 与六边形依赖方向：
