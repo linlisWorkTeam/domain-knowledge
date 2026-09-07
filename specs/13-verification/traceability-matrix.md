@@ -1,6 +1,6 @@
 # 追踪矩阵
 
-> [DEV-019](../changes/active/DEV-019-dsh-agent-foundation/spec-delta.md) 的 R1 已实现 DSH 配置、依赖迁出和通用启动；本表同步当前实现路径。受控模型测试证明执行机制，R2 live CPU 范例及 R3/R4 完整闭环仍待验收。
+> [DEV-019](../changes/active/DEV-019-dsh-agent-foundation/spec-delta.md) 的 R1 已实现 DSH 配置、依赖迁出和通用启动；本表同步当前实现路径。受控模型测试证明执行机制；R2 live CPU 范例已通过本地验收，R3/R4 完整闭环尚未验收。
 
 实现状态按当前代码和可执行测试记录。`Implemented` 表示已有对应代码与自动化验证，`Partial` 表示只实现安全子集，`Planned` 表示规范仍保留但不得宣称为当前能力。实现和测试路径均相对 domain-knowledge 根目录；人工审计证据另存于 wpKnowledge。
 
@@ -90,4 +90,8 @@
 | AC-DSHF-006 | PASS | 直接 Pi coding-agent 依赖与固定项目公共执行器已移除；`tests/acceptance/automated-langgraph-flow.test.ts` 验证不同模块、目录和命令经同一接线执行；原生 DSH 路径由 `tests/acceptance/dsh-configured-flow.test.ts` 验证 |
 | AC-DSHF-007 | PASS | `tests/integration/dsh-configuration-migration.test.ts` 验证默认 DSH、运行冻结、新 Run 配置、旧 Pi 读取/拒绝恢复及秘密不迁移；`provider-observability.test.ts`、`tests/e2e/console.spec.ts` 验证 HTTP/Console |
 
-AC-DSHF-002/003 的 R1 自动化部分见 T102 证据；001/004 的 live 范例、005 完整闭环及 008 逐角色交付均未计为通过。完整命令和结果在 DEV-019 `evidence.md` 追加。
+AC-DSHF-002/003 的 R1 自动化部分见 T102 证据；001/004 的后续 live 结果见下节。005 完整闭环及 008 逐角色交付未计为通过。完整命令和结果在 DEV-019 `evidence.md` 追加。
+
+## DEV-019 R2 范例进度
+
+`src/interfaces/runner/docgen-example.ts` 提供 prepare/run/check；`tests/integration/docgen-example.test.ts` 覆盖固定参考、受控 DSH 接线、独立例子检查、快照与取消。原七角色图继续使用相同业务阶段。AC-DSHF-001/004 已通过真实 DeepSeek 模型与独立 worktree 修改复现验收；002/003 沿用 R1 的权限和失败矩阵，并补充本轮非法输出、独立检查拒绝与取消回归。T103/T104 本地验收 PASS，PR #26 待审查；005/008 仍为 NOT_RUN，未提高七角色或完整业务闭环状态。执行方法见 [角色教程](../../docs/tutorials/add-agent-capability.md)，结果见 DEV-019 evidence.md。

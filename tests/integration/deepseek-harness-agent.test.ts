@@ -381,6 +381,19 @@ test('DeepSeek Harness provider ignores unmatched quotes in CLI diagnostics befo
   }
 });
 
+test('DeepSeek Harness extracts a valid terminal object after unfinished object prose', async () => {
+  const workspace = mkdtempSync(join(tmpdir(), 'wp-dsh-agent-object-prose-'));
+  const script = join(workspace, 'fake-dsh.mjs');
+  const output = 'Analysis: { unfinished "field" and code. Final response: {"answer":"valid-tail"}';
+  writeFileSync(script, `process.stdout.write(${JSON.stringify(output)});\n`);
+  try {
+    const provider = new DeepSeekHarnessHeadlessAgent({
+      command: process.execPath, args: [script], allowedWorkspaceRoots: [workspace],
+    });
+    assert.deepEqual(await provider.run(request(workspace)), { answer: 'valid-tail' });
+  } finally { rmSync(workspace, { recursive: true, force: true }); }
+});
+
 test('DeepSeek Harness provider fails closed on schema-invalid model output', async () => {
   const workspace = mkdtempSync(join(tmpdir(), 'wp-dsh-agent-invalid-'));
   const script = join(workspace, 'fake-dsh.mjs');

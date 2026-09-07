@@ -22,7 +22,8 @@
     "test:acceptance": "node --test --test-concurrency=1 tests/acceptance",
     "typecheck": "tsc --noEmit",
     "validate:specs": "node specs/13-verification/validate-specs.ts",
-    "evaluate:framework": "node scripts/evaluate-framework.mjs"
+    "evaluate:framework": "node scripts/evaluate-framework.mjs",
+    "example:docgen": "node --env-file-if-exists=.env.local src/interfaces/runner/docgen-example.ts"
   },
   "dependencies": {
     "@deepseek-ai/dsh": "0.1.2-alpha.4",

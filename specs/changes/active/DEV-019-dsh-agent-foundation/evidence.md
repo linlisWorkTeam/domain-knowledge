@@ -160,3 +160,90 @@ GitHub Actions run `34096298827` 的失败来自三个真实回归：场景读�
 首轮回归暴露旧 Pi 测试路径、默认 Fixture 的 Server/Console 断言与报告指标筛选遗漏，均已修正后按上述范围重验，没有删除原有安全或取消门禁来通过测试。最终远程 CI 以本功能 PR 对应提交为准。
 
 R0/R1=`PASS`；AC-DSHF-006/007 及 002/003 自动化部分通过，T105/T106 勾选。当前等待用户审查合并；下一步 R2 T103/T104 的真实 DocGen 范例和独立工作区复现。R2～R4=`NOT_RUN`，DEV-019 未完成；本轮未调用外部模型或公司 CLI。
+
+## R2 / T103、T104 范例入口（2026-09-07）：机制 PASS，live BLOCKED
+
+用户授权在 #24/#25 合入后进入 T103/T104。起点 main 为 `98614347162d8bca9eda432044fcdd9168430b7c`，实现位于 `codex/dev019-docgen-example`，工作区 `/tmp/domain-knowledge-r2`。R1 的 Pi 迁出与配置迁移不再作为未合入前提。
+
+### 本次实现
+
+- `npm run example:docgen -- prepare|run|check` 提供固定 CPU 源码的参考测试、真实 DSH DocGen 入口及独立数据例子检查。运行步骤写入原有角色教程，示范指令及公开声明在 `examples/docgen/`，没有新增 Agent 运行框架或七角色任务书。
+- 一个固定 LangGraph 开发节点调用与生产图相同的 `ProjectWorkflowStages`，复用 DSH 配置、快照、角色材料、业务信封、checkpoint 和 CAS。只调用 DocGen，不发布；示范 Run 保持 CREATED，节点完成单独记录，必须使用独立 runtime，不能据此宣称完整业务 Run 已完成。
+- 可信源码仍固定到 R0 的 `3f999204f988697cc5bb9473c5a10ad5b4fc1f78`，源码和 7 项参考测试摘要不变。每次 prepare 从 Git 导出并实际跑测试，不执行模型生成的脚本。子进程移除继承的 NODE_TEST_CONTEXT，避免在测试运行器内错误解析 TAP 计数。
+- 独立检查只比较文档 JSON 例子的 hunk 数、changedSections 和引用行号范围；检查通过仍标 semanticReview=REQUIRED，不能自动证明正文的所有结论。真实文档必须另行阅读核对。
+- 联调发现报告中的 `deepseek-harness-sdk` 与 `deepseek-harness` 名称导致同次调用重复计数，且原报告漏掉顶层 sessionId；已修复同次调用匹配，保留受控的会话/命令关联及实际指标。旧 Pi 报告回归继续通过。
+
+### 验证
+
+两个工作区均使用 Node 24.13.0，独立 bootstrap/check=`READY`，未共享 node_modules；DSH/SDK 仍为 0.1.2-alpha.4，锁文件 SHA-256 仍为 `0e6672dc7ceb6e275fbc6c6ff67fc36eb9165a58a9d66f82919a281ea8e142a9`。
+
+| 检查 | 实际结果 |
+| --- | --- |
+| `npm run example:docgen -- prepare --runtime /tmp/dev019-r2-evidence` | 固定参考 7/7，source/test 摘要匹配 R0 |
+| `npm run typecheck`、`npm run validate:specs` | 退出 0；17 schemas / 7 commands / 8 results / 51 P0 |
+| DocGen 与报告针对性回归 | 6/6，含错误预期、缺覆盖、非法引用、生产 DSH 接线、Prompt 冻结、失败/取消；`/tmp/dev019-r2-tests.log` |
+| `npm test` | 172/172，0 fail/skip；`/tmp/dev019-r2-full.log` |
+| `npm run evaluate:framework` | 7/7，frameworkMechanics=VERIFIED；`/tmp/dev019-r2-framework.log` |
+| 独立工作区 `/tmp/domain-knowledge-r2-repro` | 从相同 main 创建，独立 bootstrap 后应用本功能差异；prepare 7/7，范例回归 4/4，包含不同指令的两次独立 DocGen 调用；`/tmp/dev019-r2-repro-tests.log` |
+| Markdown 路径/锚点及 `git diff --check` | 92 份文档、216 个本地链接有效；差异检查通过 |
+
+上述 DocGen 调用均为真实原生 DSH 进程对本地受控 SSE 服务，传输测试显式关闭进程隔离；权限仍复用 R1/T102 证明。两次独立工作区的受控复现只证明机制，不能将 T104 的 live 条件算作通过。测试里的 Token 数值是受控响应数据，真实入口不要求固定 Token 数。
+
+### live 阻塞与下一步
+
+执行 `npm run example:docgen -- run --runtime /tmp/dev019-r2-live` 完成参考测试后返回退出 1：`DOCGEN_LIVE_CONFIGURATION_REQUIRED`；`/tmp/dev019-r2-live.log`。当前进程没有 DEEPSEEK_API_KEY，项目无 .env.local，示范 runtime 没有已验证 DSH 设置。没有调用外部模型、没有生成真实文档。已向用户询问可用配置目录或凭据文件路径，不请求把密钥贴进对话。
+
+T103/T104 保持未勾选，R2=`BLOCKED`（live 配置缺失），R3/R4=`NOT_RUN`。本次仅提交可审查的范例入口与机制验证。补齐实际 DSH 配置后，按教程在两个独立工作区真实运行 DocGen、修改角色再次运行，检查文档语义与独立例子，记录 Run/session/工件摘要，再决定是否满足 AC-DSHF-001～004。不得直接跳到七角色开发或以受控输出补 live 证据。
+
+
+## R2 live 验收（2026-09-07）
+
+用户提供实际 DeepSeek 凭据并授权先运行再更新 PR #26。本节替代上一节“配置缺失”的当前状态，保留早期失败作为历史证据。R2/T103/T104 本地验收 PASS，待用户审查；R3/R4 仍为 NOT_RUN，DEV-019 未关闭。
+
+### 环境与执行
+
+- 主工作区 `/tmp/domain-knowledge-r2`，独立复现工作区 `/tmp/domain-knowledge-r2-live-repro`；均基于 PR 提交 `9ac5b8e1981038d8ab552fd74e8e485623d219d8`，应用本次 Provider DNS 和 DSH JSON 提取修复。第二工作区独立 bootstrap 为 READY，未共享或链接 node_modules；两处运行目录分别为 `/tmp/dev019-r2-live`、`/tmp/dev019-r2-live-repro`。
+- Node `24.13.0`，DSH/SDK `0.1.2-alpha.4`，Bubblewrap `0.11.0`，锁文件 SHA-256 `0e6672dc7ceb6e275fbc6c6ff67fc36eb9165a58a9d66f82919a281ea8e142a9`。本轮 live 使用默认 Bubblewrap 隔离，未关闭进程隔离。
+- 已验证并启用 `https://api.deepseek.com/`、`deepseek-v4-flash`。凭据只写入专属 runtime 的加密设置，设置及密钥文件均为 0600；不写入 Git、PR、范例源码或公开证据。
+- 两处先运行 `npm run example:docgen -- prepare --runtime <runtime>`，固定参考源码及测试摘要与 R0 一致，均实际通过 7/7 非空参考测试。DocGen 只接收固定源码，不接收参考测试。
+- 主工作区执行 `npm run example:docgen -- run --runtime /tmp/dev019-r2-live`。第二工作区先真实执行基线指令（Run `7667d0c0-7009-4612-b213-b34cff115a11`，数据格式检查失败），再修改已有 prompt 文件，要求增加“维护者检查清单”和插入、删除两个独立例子，并按独立检查与源码反馈重新执行 `run --runtime /tmp/dev019-r2-live-repro`。
+- 对下表两份原始 `document.md` 分别在各自工作区运行 `npm run example:docgen -- check --document <absolute-document-path>`；检查器重新执行固定参考测试，例子检查均 PASS。没有手工改写模型产物。源码复核由 Codex 执行，不代表用户审查；记录保存为各运行输出目录中的 `semantic-review.json`，绑定固定源码 commit 和正文 SHA-256。
+
+### 最终成功运行
+
+| 项目 | 默认范例 | 独立工作区修改版 |
+| --- | --- | --- |
+| Run | `44d4dbdf-c94f-4ee3-a18f-3bddd2f7835b` | `4c1c9f00-241c-4706-aa8b-cfe49d53619c` |
+| DSH session | `wp-0bd30c34f83347c4ab074901fcd2555c` | `wp-0de86b96f0344766a3bf19eeb14c6b5f` |
+| 例子 / 完整范围引用 | `3 / 9` | `5 / 14` |
+| 节点 / 业务 checkpoint | `COMPLETED / COMMITTED` | `COMPLETED / COMMITTED` |
+| 实际 input / output Tokens | `11875 / 8479` | `12248 / 21327` |
+| DSH 调用耗时（毫秒） | `47511` | `129319` |
+| 正文 SHA-256 | `62c442a6e2615d78faa80dfd82ee914c999202fe9e1c6f3bc5f3102ecfe80d29` | `e27e0d44a5947aef1e91bf634167dce5a0de80fd1f8f1cfa706006d98d8638d1` |
+| 业务结果 CAS SHA-256 | `2d4712c1e6e38f9bdf3e91a9e0771088847f9f2e3571f2142c849d8c4671e068` | `b064bfc6a414bf0942c85a2780107a78e4d024aa33d21bf68427b7b58eb7d14f` |
+| 冻结的 promptAddon SHA-256 | `b7539a71811a923211ce2595e418cec50c789a8541f175487cc6d07411510819` | `fe7cbc8e1b8e8eb404420918d83d05bb77c0b81240ad7171a93118b04dabf55c` |
+| 冻结的 effectivePrompt SHA-256 | `054212b235687d22ac4f9543112c44b3d47377d74883f02f429f7825d1c6586e` | `d46a1761ce26392dd4f14bad28cf71521e81dd28d3119988b1ddb508cb95529e` |
+| CAS 完整性 | `5/5，失败 0` | `5/5，失败 0` |
+| 源码复核 | `PASS（Codex）` | `PASS（Codex）` |
+
+运行产物在 `<runtime>/examples/<Run>/` 下，包括 `document.md`、`result.json`、`audit.json` 和单独的源码复核记录；不纳入 Git。表中摘要均来自实际冻结快照和工件；审计 Token 是 SDK 返回用量，未用受控测试中的固定数字替代。默认版实际调用 read_material 两次读取授权源码；修改版一次成功读取授权相对路径，两次仓库绝对路径请求返回 DSH_MATERIAL_UNAVAILABLE，未读取工作区外材料。
+
+源码复核覆盖签名与字段、1 起算行号、CRLF 和空输入、LCS 阈值及回退复杂度适用范围、ADD 查 after/REMOVE 查 before、标题规范化及引用支持性。修改版包含维护者检查清单和新增插入/删除例子。自动检查仍报告 `semanticReview=REQUIRED`，不会自动将正文或知识判为真实；本次单独复核只针对表中两个摘要。范例业务 Run 保持 CREATED，单 DocGen 节点完成且 checkpoint 入库，versions/evaluations/publications 均为空，`publication=NOT_EVALUATED`；不伪称七角色业务发布完成。
+
+### 实测发现与修复
+
+| 发现 | 处理与复验 |
+| --- | --- |
+| Node 24 默认地址族自动选择要求多地址 lookup，但 Provider 探针返回固定单地址，导致有效凭据仍报 PROVIDER_UNREACHABLE | 探针显式关闭 autoSelectFamily，继续只连接已经批准的固定地址；回归在开启全局自动选择时验证实际 TCP 到达固定地址，并确认失败 TLS 不会验证成功 |
+| Run `6c610dc7-06cd-43ad-bbe8-564e8ecfcd66` 的输出含未闭合的正文前缀，原扫描器漏掉末尾合法 JSON，DSH_AGENT_OUTPUT_NOT_JSON / AGENT_OUTPUT_INVALID | 增加有界的末尾对象候选提取，只接受严格 JSON 并继续 Schema 校验；增加未闭合前缀回归，无非法 JSON 修复或 Schema 放宽 |
+| 独立工作区 Run `83b411a0-e188-4624-b34f-4d063623b1b4` 缺完整引用；基线 Run `7667d0c0-7009-4612-b213-b34cff115a11` 把章节数组输出成数字；主工作区 Run `6cc542e5-c488-4a94-987f-d48248ea7f82` 使用省略路径及错误行号 | 独立检查保留 FAIL；角色指令明确 JSON 对象、字段类型、完整引用与实际行号，再真实运行。未降低检查标准或编辑生成产物 |
+| 主工作区 Run `4b5200db-43fe-4a9a-88c1-8322856d5b2e` 错称原样保留标题；独立工作区 Run `5d298d01-7474-4f51-a151-6574fa9567a4` 错称 LCS 与回退结果一致，虽数据例子 PASS，正文不合格 | 两次均另存 semantic-review.json FAIL；将源码反馈补入角色指令，重新调用模型，最终两份正文复核 PASS。说明例子 PASS 不等于全文正确，也不证明模型首轮成功率 |
+
+此前中间生成和失败产物保留在两个 runtime；最终验收只采用上表两份文档，不将中间输出算成全部成功。
+
+### 回归与阶段结论
+
+- `npm test`：174/174 PASS，0 失败、0 跳过；`npm run evaluate:framework`：7/7 PASS，结论限定为机制验证。
+- `npm run typecheck` PASS；新增连接/解析修复的定向回归 `node --test --test-concurrency=1 tests/security/provider-settings.test.ts tests/integration/deepseek-harness-agent.test.ts`：20/20 PASS。实际 HTTP 验证、两个独立 live 范例、两次独立 check 另计，不混入受控测试数量。
+- AC-DSHF-001/004：真实调用、同一生产业务阶段接线、第二工作区修改与独立检查 PASS；AC-DSHF-002/003：保留 R1 权限/失败/取消矩阵，补本次非法输出拒绝、生成例子拒绝与既有范例取消回归，PASS。四点崩溃、七角色逐项能力、确定性发布、公司 CLI 和生产容量未由本轮证明。
+- T103/T104 勾选，R0/R1/R2 为 PASS；PR #26 待用户 review，R3/R4 为 NOT_RUN。合入后下一项 T200：在既有 specs/06-agents 中落实各角色输入、职责、输出、权限和验证要求，再推进 T210/T211。

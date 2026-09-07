@@ -5,7 +5,7 @@ import {
 import { createCipheriv, createDecipheriv, randomBytes, randomUUID } from 'node:crypto';
 import { request as httpsRequest, type RequestOptions } from 'node:https';
 import { dirname } from 'node:path';
-import { isIP } from 'node:net';
+import { isIP, type TcpNetConnectOpts } from 'node:net';
 import type {
   ProviderConnectionProbe,
   ProviderEndpoint,
@@ -126,12 +126,14 @@ export class OpenAiCompatibleProviderProbe implements ProviderConnectionProbe {
     const approved = new Set(input.endpoint.addresses);
     const pinnedAddress = input.endpoint.addresses[0] as string;
     const targetHostname = input.endpoint.url.hostname.replace(/^\[|\]$/g, '');
-    const options: RequestOptions = {
+    const options: RequestOptions & Pick<TcpNetConnectOpts, 'autoSelectFamily'> = {
       protocol: 'https:',
       hostname: targetHostname,
       port: input.endpoint.url.port || 443,
       path: `${target.pathname}${target.search}`,
       method: 'GET',
+      // The approved lookup returns one pinned address, not an all-address array.
+      autoSelectFamily: false,
       ...(isIP(targetHostname) ? {} : { servername: targetHostname }),
       headers: {
         accept: 'application/json',

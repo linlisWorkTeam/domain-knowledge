@@ -8,7 +8,7 @@
 
 ## 背景与目标
 
-提案起点已有 LangGraph、DSH SDK、业务 Schema、Registry/CAS 和独立评测基础，公共角色逻辑集中在 `OhMyWorkPanelWorkflowExecutor`，前台模型配置绑定 Pi。R1 已拆出 `ProjectWorkflowStages` 与显式夹具，默认配置和通用启动迁到 DSH；R2 live 范例仍待完成。
+提案起点已有 LangGraph、DSH SDK、业务 Schema、Registry/CAS 和独立评测基础，公共角色逻辑集中在 `OhMyWorkPanelWorkflowExecutor`，前台模型配置绑定 Pi。R1 已拆出 `ProjectWorkflowStages` 与显式夹具，默认配置和通用启动迁到 DSH；R2 live 范例与独立工作区修改复现已通过本地验收，PR #26 待审查；后续为 R3/R4。
 
 用户确认的目标是 LangGraph 编排、DSH 直接运行角色，系统持有业务结果校验与治理。复用 DSH 的会话、模型、工具及事件能力，不新建通用 Agent 运行框架。先完成底座与一个可复现范例，再由不同负责人开发七个角色。
 

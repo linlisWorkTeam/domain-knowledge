@@ -1,6 +1,6 @@
 # 快速上手
 
-> R1 已将角色执行收敛到 DSH，通用项目场景从 CLI/API/Console 传入。Pi Agent 运行依赖已移除，旧记录保留可读且拒绝恢复；CodeAgent CLI 适配后置。R2 的真实 CPU DocGen 范例及后续完整闭环仍待验收。
+> R1 已将角色执行收敛到 DSH，通用项目场景从 CLI/API/Console 传入。Pi Agent 运行依赖已移除，旧记录保留可读且拒绝恢复；CodeAgent CLI 适配后置。R2 的真实 CPU DocGen 范例和独立工作区复现已通过本地验收，PR #26 待审查；R3 七角色和 R4 完整闭环尚未验收。
 
 本指南有两条路径。你可以自己运行命令，也可以把后面的 Prompt 交给 Agent，让它完成环境检查、安装、验证和启动。两条路径都不会伪造评测证据或自动发布 `VERIFIED` 知识。
 

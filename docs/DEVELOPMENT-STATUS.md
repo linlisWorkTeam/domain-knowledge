@@ -1,6 +1,8 @@
 # 开发状态
 
-**当前阶段：DEV-019 R1 本地验收通过，待 PR 审查｜更新时间：2026-09-07｜下一任务：R1 PR 审查后执行 R2 T103/T104**
+**当前阶段：DEV-019 R2 本地验收通过，PR #26 待审查｜更新时间：2026-09-07｜下一任务：审查合入后执行 T200，明确七角色开发契约**
+
+本轮验收详见 [DSH Agent 公共底座测试报告](status/report/2026-09-07-DSH-Agent底座测试报告.md)。
 
 本文件是 domain-knowledge 的**唯一开发进度入口**，用于记录当前阶段、已完成里程碑、正在进行或下一项工作、后续队列和最近验证结果。产品行为仍以 [`../specs/`](../specs/README.md) 为规范性事实源；需求级的 `Implemented / Partial / Planned` 状态仍只在[追踪矩阵](../specs/13-verification/traceability-matrix.md)维护。
 
@@ -38,16 +40,16 @@ This file is the single entry point for project-level development status, curren
 
 ## 当前方向与开发顺序（2026-09-07）
 
-R1 已将角色执行收敛到 DSH，通用项目场景从 CLI/API/Console 传入。Pi Agent 运行依赖已移除，旧记录保留可读且拒绝恢复；CodeAgent CLI 适配后置。R2 的真实 CPU DocGen 范例及后续完整闭环仍待验收。 公共接线为 ProjectWorkflowStages，预写输出独立为 Fixture Adapter。
+R1 已将角色执行收敛到 DSH，通用项目场景从 CLI/API/Console 传入。Pi Agent 运行依赖已移除，旧记录保留可读且拒绝恢复；CodeAgent CLI 适配后置。R2 的真实 CPU DocGen 范例和独立工作区复现已通过本地验收，PR #26 待审查；R3 七角色和 R4 完整闭环尚未验收。 公共接线为 ProjectWorkflowStages，预写输出独立为 Fixture Adapter。
 
 1. R0 已完成环境与基线核实，固定 CPU 样例和参考测试，明确 DSH 接线及旧配置/Run 处置。
-2. R1 已完成 Pi 迁出、DSH 配置与通用接线，本功能 PR 合并后进入 R2：交付 DocGen 示范角色并真实验收底座。
+2. R1 已完成 Pi 迁出、DSH 配置与通用接线，R1 PR 已合入，R2 DocGen 范例与独立工作区真实复现已通过本地验收，待审查 PR #26。
 3. R3 按公共 SOP 开发七角色并联调；R4 在外部完成真实闭环。候选测试验证与 DEV-011 对齐，第一版相关恢复/权限要求与 DEV-012 对齐，不能因任务另列而跳过。
 4. DEV-010 公司 CLI 真实适配与验收后置；保留接入位置，不要求先迁移公司平台。DEV-013 的容量与部署决策仍依赖真实数据。
 
-本次实现与证据见 [DEV-019](../specs/changes/active/DEV-019-dsh-agent-foundation/proposal.md)、[架构](ARCHITECTURE.md)和[开发 SOP](guides/agent-customization.md)。底座范例尚未交付，不能据此宣称第一版完整闭环已验收；R1 对应 baseline 与追踪矩阵已同步，R2～R4 状态未提高。
+本次实现与证据见 [DEV-019](../specs/changes/active/DEV-019-dsh-agent-foundation/proposal.md)、[架构](ARCHITECTURE.md)和[开发 SOP](guides/agent-customization.md)。范例入口、真实模型调用与独立工作区修改复现已通过本地验收；R2 追踪矩阵已同步。第一版完整闭环尚未验收，R3/R4 保持未执行。
 
-可执行阶段、依赖和退出条件统一维护在 [Roadmap](../specs/changes/active/DEV-019-dsh-agent-foundation/plan.md)。T100/T101 已完成：Node 24、锁定 DSH SDK、Bubblewrap 及 28 项基线验证通过；CPU 范例选 `structuredMarkdownDiff`，固定源码上的 7 项参考测试通过。R1 已完成 T102/T105/T106：原生 DSH 工具权限和失败矩阵、通用双场景入口、默认 DSH 配置、旧 Pi 只读兼容及受控七角色流程。当前功能 PR 合并后进入 R2 T103/T104。R2～R4 尚未执行，未做真实模型验收。
+可执行阶段、依赖和退出条件统一维护在 [Roadmap](../specs/changes/active/DEV-019-dsh-agent-foundation/plan.md)。T100/T101 已完成：Node 24、锁定 DSH SDK、Bubblewrap 及 28 项基线验证通过；CPU 范例选 `structuredMarkdownDiff`，固定源码上的 7 项参考测试通过。R1 已完成 T102/T105/T106：原生 DSH 工具权限和失败矩阵、通用双场景入口、默认 DSH 配置、旧 Pi 只读兼容及受控七角色流程。T103/T104 已完成真实 DSH 调用：默认版 3 个例子、独立工作区修改版 5 个例子通过可信参考实现检查，正文由 Codex 对照固定源码复核；两个 Run 的会话、Token 与 CAS 工件可追踪。174 项测试和框架 7 项检查通过，PR #26 待审查。合入后执行 T200；R3/R4 未执行。
 
 DEV-014 及其引用的 DEV-015～018 是其他 worktree 中的旧 DFX 草稿上下文。本轮未完成或接管那些实现；后续只复用符合当前目标的部分，不自动承接旧报告的全部范围。
 
@@ -83,7 +85,7 @@ DEV-014 及其引用的 DEV-015～018 是其他 worktree 中的旧 DFX 草稿上
 | DEV-011 | TestGen 候选测试的通用 Oracle 验证与门禁链路 | Planned | 原 DEV-007；对应 `KF-SYS-004` |
 | DEV-012 | 四点崩溃注入、完整权限拒绝审计与恢复加固 | Planned | 原 DEV-008；对应 `AC-REC-001`、`AC-SEC-002` |
 | DEV-013 | 生产容量、认证续期、并发与 Redis 启用决策 | Planned | 原 DEV-009；依赖真实运行数据，不改变 Registry 事实源地位 |
-| DEV-019 | DSH 公共底座、CPU 角色范例与外部七角色闭环 | In Progress | R0/T102 和通用场景入口已通过审查；T105/T106 本地验收通过，待本次 PR 审查，R2 live 范例未开始 |
+| DEV-019 | DSH 公共底座、CPU 角色范例与外部七角色闭环 | In Progress | R0/T102 和通用场景入口已通过审查；T105/T106 已合入；T103/T104 live 与独立工作区修改复现本地验收通过，PR #26 待审查；下一项 T200，R3/R4 未执行 |
 
 状态含义：`Ready / Next` 表示下一项已排序但尚未开始；`In Progress` 表示已有活动开发分支；`Blocked` 必须写明外部依赖；`Done` 必须给出可复验结果。
 

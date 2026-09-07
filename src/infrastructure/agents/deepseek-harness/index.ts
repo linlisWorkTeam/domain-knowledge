@@ -142,6 +142,14 @@ function extractJsonCandidates(stdout: string): Record<string, unknown>[] {
       }
     }
   }
+  // Prose before the final response can contain an unfinished object literal.
+  // Try bounded terminal object candidates as well; never repair invalid JSON.
+  const terminalStarts: number[] = [];
+  for (const match of trimmed.matchAll(/\{(?=\s*")/g)) {
+    terminalStarts.push(match.index);
+    if (terminalStarts.length > 64) terminalStarts.shift();
+  }
+  for (const offset of terminalStarts) texts.push(trimmed.slice(offset).replace(/\s*```$/, '').trim());
   const outputs: Record<string, unknown>[] = [];
   const seen = new Set<string>();
   for (const candidate of texts) {
