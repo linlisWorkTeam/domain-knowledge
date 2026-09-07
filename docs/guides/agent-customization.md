@@ -1,38 +1,214 @@
 # Agent 开发与现有角色定制指南
 
-本指南分为目标开发方式与现有定制操作。2026-09-07 已确认先完成 DSH 公共底座，再由各负责人开发七个角色；R1 已合入，R2 范例与独立工作区真实复现已通过本地验收，PR #26 待审查。现有 Console 的 `promptAddon` 仅用于调整已固定角色的表达，不能代替完整的角色开发。
+本文供七个 Agent 的负责人按代码分工使用。基线为已合入 #26 的主线 `aff42aa`：DSH 公共底座与 DocGen 真实范例已验收；其余角色有接线与受控回归，七角色完整业务能力仍需按 R3 验收。本次文档提供代码定位和开发步骤，不宣称角色开发已完成。
 
-## 目标开发方式：公共底座先行
+先读[目录与类](#目录与类)，再按[角色定位表](#角色定位表)找到自己的分支。运行命令与模型配置复用[DocGen 教程](../tutorials/add-agent-capability.md)，职责约束以 [Agent Spec](../../specs/06-agents/README.md) 为准。
 
-架构边界以[目标架构](../ARCHITECTURE.md#target-architecture)和 [DEV-019 提案](../../specs/changes/active/DEV-019-dsh-agent-foundation/proposal.md)为准。LangGraph 管工作流，DSH 管单角色运行；开发者使用 DSH 的能力，不另写模型会话、工具调度或通用 Agent 运行器。
+## 目录与类
 
-先交付以下公共能力，再开始角色分工：
+**目前没有七个独立的 `OrchestratorAgent.ts` / `DocGenAgent.ts` 类。一个角色由“定义项 + 业务分支 + 共享 DSH 执行 + 测试”组成。** `agent-definitions.ts` 定义身份和基础指令，真正的材料准备、结果处理在 `ProjectWorkflowStages` 中；不要只改提示词就认为功能已实现。
 
-- 从 LangGraph 调用 DSH 中的角色，并准备授权的任务材料；
-- 接收 DSH 响应和事件，校验业务结果并存储工件，保留任务与调用的关联；
-- 明确失败、取消、重试与工作流恢复的责任，防止重复业务提交；
-- 提供一个普通 CPU 可运行的小模块，包含固定源码版本、公开接口、现成测试及一个 DSH 真实执行的示范角色；
-- 提供范例的运行、独立验证和接回工作流的方法。范例尚未交付前，不把目标教程当作可执行命令。
+以下路径均相对仓库根目录，省略与角色开发无关的文件：
+
+```text
+src/
+├── application/
+│   ├── ports/index.ts                    # AgentProvider / Request / Command / Result 等接口
+│   └── services/
+│       ├── automated-project-workflow.ts # ProjectWorkflowStages：七角色业务分支与结果转换
+│       │                                 # AutomatedProjectWorkflowService：完整工作流生命周期
+│       ├── docgen-example.ts             # DocgenExampleService：单角色开发范例
+│       ├── run-configuration.ts          # RegistryRunConfigurationService：冻结运行配置
+│       └── quality-policy.ts             # DeterministicQualityPolicy：候选知识质量检查
+├── infrastructure/
+│   ├── workflow/langgraph/
+│   │   ├── agent-definitions.ts          # 七角色 ID、nodeId、basePrompt、工具声明
+│   │   ├── graph.ts                      # 节点映射、调用、并行、汇合与路由
+│   │   ├── runtime.ts                    # 工作流启动、等待、恢复、取消的基础设施
+│   │   ├── state.ts                      # 图状态与上下文合并规则
+│   │   └── docgen-example.ts             # executeDocgenExample：只有 doc_gen 的示范图
+│   ├── agents/
+│   │   ├── deepseek-harness/
+│   │   │   ├── configured-provider.ts    # ConfiguredDshProvider：已验证模型配置与受信转发
+│   │   │   ├── index.ts                  # DeepSeekHarnessSdkAgent：原生 DSH 调用与事件
+│   │   │   ├── role-tools.mjs            # read_material 工具和拒绝规则
+│   │   │   └── isolation-launcher.mjs    # Bubblewrap 进程隔离入口
+│   │   ├── workspace/index.ts           # LocalAgentWorkspace：按固定 commit 物化授权文件
+│   │   ├── contracts/index.ts           # JsonSchemaAgentContractValidator：业务信封校验
+│   │   └── scenario/project-workflow-fixture.ts # FixtureProjectWorkflowStages：预写回归夹具
+│   └── evaluation/project/index.ts      # TrustedProjectEvaluator：可信副本中的构建与测试
+└── interfaces/runner/
+    ├── composition.ts                   # createComposition：装配业务阶段、Provider、评测器
+    ├── docgen-example.ts                # example:docgen 的 prepare / run / check
+    └── demo-report.ts                   # Run、session、工件及调用审计的报告投影
+examples/docgen/
+├── prompt.txt                           # DocGen 示范追加指令，不是所有 DocGen 的基础提示词
+└── markdown-diff.d.ts                    # CPU 范例公开接口
+specs/
+├── 06-agents/                           # 角色职责、材料边界与业务要求
+└── schemas/
+    ├── agent-command.schema.json        # 工作流发给角色的业务命令
+    ├── agent-result.schema.json         # 规范化后的角色业务结果
+    └── correction.schema.json           # Review 修订建议约束
+```
+
+| 类 / 接口 | 作用 | 角色负责人何时需要看 |
+| --- | --- | --- |
+| [`ProjectWorkflowStages`](../../src/application/services/automated-project-workflow.ts) | 分派节点、准备角色输入、校验模型原始输出、转为业务结果；也包含候选、评测和 Gate 接线 | 修改角色输入、输出及上下游交接时的主要入口 |
+| 同文件 `AutomatedProjectWorkflowService` | 创建完整业务 Run、冻结配置、启动图，以及 wait/status/resume/cancel | 联调完整工作流；它不是某个角色的实现 |
+| [`AgentProvider` / `AgentRequest`](../../src/application/ports/index.ts) | 业务侧调用模型执行的接口；请求含角色、Prompt、输出 Schema、授权工作区、关联标识 | 了解角色与 DSH 的接缝；通常不为每个角色新增 Provider |
+| [`ConfiguredDshProvider`](../../src/infrastructure/agents/deepseek-harness/configured-provider.ts) | 使用验证过的配置连接模型，隔离真实凭据并收集调用用量 | 模型接入故障，由底座负责人维护 |
+| [`DeepSeekHarnessSdkAgent`](../../src/infrastructure/agents/deepseek-harness/index.ts) | 调用原生 DSH、创建会话、挂载工具策略、处理输出/超时/取消/审计 | DSH 执行故障或工具能力变化；同文件 Headless 类不是当前默认角色框架 |
+| [`LocalAgentWorkspace`](../../src/infrastructure/agents/workspace/index.ts) | 把明确授权的文件从固定 Git commit 放入角色视图 | 调整可见材料；权限必须由代码执行，不能只写在 Prompt 中 |
+| [`JsonSchemaAgentContractValidator`](../../src/infrastructure/agents/contracts/index.ts) | 校验版本化 Command/Result；拒绝未知字段和角色错配 | 修改业务契约时与 Schema、上下游一起检查 |
+| [`RegistryRunConfigurationService`](../../src/application/services/run-configuration.ts) | 冻结角色指令、工具和 Provider 摘要；后续配置不污染旧 Run | 调试“改了 Prompt，为何旧 Run 没变” |
+| [`TrustedProjectEvaluator`](../../src/infrastructure/evaluation/project/index.ts) | 在可信副本中执行配置好的构建与测试，保存实际证据 | TestGen、Code 的独立评测接线；不能用模型自报成功代替 |
+
+## 一个角色实际怎样执行
+
+下面是 DSH 默认路径，调用最终由 [`createComposition()`](../../src/interfaces/runner/composition.ts) 装配：
+
+```text
+LangGraph graph.ts：createNode()
+  → ProjectWorkflowStages.execute()：按 nodeId 分派
+  → orchestrate() 或 executeAgent()
+  → runRole() → executeAgentCheckpoint()
+      1. buildAgentCommand()：组装业务命令，校验并保存 commandRef
+      2. runLiveAgent()：准备授权工作区、物化命令引用的 CAS 材料
+         → ConfiguredDshProvider.run()
+         → DeepSeekHarnessSdkAgent.run() → DSH 模型 / 工具会话
+      3. validateAgentOutput()：校验模型原始输出
+      4. normalizeAgentResult()：保存正文/代码等工件，转换为 AgentResult
+      5. 校验 Result，提交 checkpoint，返回 ArtifactRef
+  → 下游按角色、Run、Command、GenerationKey 校验后读取工件
+```
+
+这里有两种不同的输出约束：`AGENT_OUTPUT_SCHEMAS` 定义**模型要返回什么 JSON**；`agent-result.schema.json` 定义**底座规范化后交给下游什么结果**。不要让模型自行填 CAS ID、Run ID 或完整业务信封。修改原始输出时，必须检查 `normalizeAgentResult()` 和下游读取逻辑是否同步；修改业务契约还须同步 Spec/Schema。
+
+定位时优先搜索符号，避免文件增删行后行号失效：
+
+```bash
+rg -n 'agentId:|nodeId:' src/infrastructure/workflow/langgraph/agent-definitions.ts
+rg -n 'AGENT_OUTPUT_SCHEMAS|buildAgentCommand|normalizeAgentResult|runLiveAgent' src/application/services/automated-project-workflow.ts
+rg -n "agentId === 'doc-gen'|agentType === 'doc-gen'" src/application/services/automated-project-workflow.ts
+```
+
+## 角色定位表
+
+七个角色的定义均在 [`agent-definitions.ts`](../../src/infrastructure/workflow/langgraph/agent-definitions.ts) 按 `agentId` 查找；下表列出 [`automated-project-workflow.ts`](../../src/application/services/automated-project-workflow.ts) 中与之配套的现有原始输出和规范化结果。字段列用于定位，不替代该文件中完整的必填、类型和长度约束。
+
+| 负责人 / agentId | 图 nodeId | 原始输出字段（AGENT_OUTPUT_SCHEMAS） | 规范化 resultKind | 业务定位 |
+| --- | --- | --- | --- | --- |
+| Orchestrator / `orchestrator` | `orchestrator` | `strategy, iteration, parallel` | `plan` | `orchestrate()`；命令及结果函数中的 orchestrator 分支 |
+| DocWorker / `doc-worker` | `doc_worker` | `workerId, fragment, provenance` | `knowledgeChunk` | `assignedSourcePaths()`；doc-worker 分支；DocGen 的 workerFragmentRefs 汇集 |
+| DocGen / `doc-gen` | `doc_gen` | `body, title, description` | `knowledgeCandidate` | doc-gen 分支；`commitCandidate()`；迭代时旧正文与 Correction 组装 |
+| TestGen / `test-gen` | `test_gen` | `candidateCommands, oracleRequired` | `testCandidates` | test-gen 分支；`validateOracle()` 和 `evaluate()` 的评测边界 |
+| Code / `code` | `code` | `files: [{path, content}]` | `codeArtifact` | code 分支；`outputSchemaFor()`、`assertAllowedGeneratedFiles()`、`evaluate()` |
+| Check / `check` | `check` | `blocking, findings, scope` | `findings` | check 分支；`recordGateDecision()` 对阻塞项的消费 |
+| Review / `review` | `review` | `blocking, recommendation, correction` | `attribution` | 命令和结果函数末尾的 Review `else` 分支；`recordGateDecision()`；下一轮 DocGen |
+
+### 1. Orchestrator 负责人
+
+- **读哪里**：[编排 Spec](../../specs/06-agents/orchestration-agents.md)、定义项 `orchestrator`、`orchestrate()`、`buildAgentCommand()` / `normalizeAgentResult()` 的对应分支，以及 `graph.ts` 的 `AGENT_BY_NODE` 和 `buildInfrastructureGraph()`。
+- **当前功能**：业务阶段固定源码快照、运行策略并调用角色；模型返回规划摘要。规范化的 `plan.nodes` 目前由代码中的固定列表生成；图并行度和分支来自受信图状态，不由模型的 `parallel` 字段直接驱动。
+- **要开发什么**：基于策略与模块元数据形成可靠的计划与风险说明；如果需要更多业务计划信息，明确原始输出、规范化结果与固定图之间的消费关系，协同底座负责人修改。不能只让模型输出一个下游根本不读取的新字段。
+- **材料与验收**：不向其暴露源码正文，不给文件工具；验证计划与当前任务一致、非法任务不扩展图、不授予权限。参考 `tests/integration/langgraph-infrastructure.test.ts` 和 `tests/integration/agent-contracts.test.ts`。
+
+### 2. DocWorker 负责人
+
+- **读哪里**：[知识生产 Spec](../../specs/06-agents/documentation-agents.md)、定义项 `doc-worker`、`assignedSourcePaths()`、`runLiveAgent()` 的分块材料选择，以及 DocGen 的 `workerFragmentRefs` 汇集逻辑。
+- **当前功能**：源码路径按 workerIndex/workerCount 分配；角色返回片段和来源字符串。片段存为 `chunkRef`，DocGen 按当前轮和 worker 标识收集。当前规范化 provenance 使用场景与清单引用，并非已经逐条验证模型来源字符串。
+- **要开发什么**：把分配范围中的行为、边界、依赖和未决问题整理成 DocGen 能消费的片段，补来源定位及不足材料的表达；来源校验、风险字段变更须同时检查两层输出契约。
+- **材料与验收**：只读分配源码及公开接口；验证两个分块不会串材料、来源缺失不编造、片段正确交给本轮 DocGen。参考 `tests/security/agent-workspace.test.ts`、`tests/integration/langgraph-infrastructure.test.ts` 和 `tests/acceptance/dsh-configured-flow.test.ts`。
+
+### 3. DocGen 负责人
+
+- **读哪里**：[知识生产 Spec](../../specs/06-agents/documentation-agents.md)与[写作规范](../../specs/06-agents/knowledge-writing-style.md)、定义项 `doc-gen`、命令分支中的 `workerFragmentRefs/baseKnowledgeRef/corrections/qualityFeedback`、结果分支和 `commitCandidate()`。
+- **当前功能**：根据可见源码与工件生成 `body/title/description`；正文保存为 `bodyRef`，完整流程再摄取候选并执行质量检查。单角色范例已真实验收，但不运行完整发布图；当前结果来源仍以场景与清单绑定为主。
+- **要开发什么**：补完整知识结构、行为来源、风险表达和可控修订；验证知识片段汇总、失败反馈修订和未变内容保持。改善范例指令可改 `examples/docgen/prompt.txt`；影响所有生产 DocGen 的基础行为则改定义项和相应业务分支。
+- **材料与验收**：允许源码与公开接口，以及命令绑定的旧知识和反馈；不能自行发布。参考 `tests/integration/docgen-example.test.ts`、`tests/unit/quality-policy.test.ts`、`tests/integration/agent-contracts.test.ts`。例子 PASS 之外还须复核正文支持性。
+
+### 4. TestGen 负责人
+
+- **读哪里**：[测试生产 Spec](../../specs/06-agents/test-generation-agent.md)、定义项 `test-gen`、输入/结果分支、`validateOracle()`、`evaluate()`，以及 `TrustedProjectEvaluator`。
+- **当前功能**：模型输出候选命令和 oracleRequired，结果引用已入库。**当前 `validateOracle()` 执行场景的 referenceCommands，`evaluate()` 执行 firstIterationCommands/finalCommands，尚未将模型 candidateCommands 接成受信门禁。** 不要把已有受控流程当作候选测试已验收。
+- **要开发什么**：生成可执行候选测试、用例清单和预期依据；与评测负责人一起补候选验证、合法执行及独立证据的消费链路，对齐 DEV-011/T201。候选命令不能直接拼进宿主 shell，未经可信参考验证的 expected 不能用于门禁。
+- **材料与验收**：可读参考源码和公开接口，不读候选知识或生成实现；验证正常、零测试、损坏测试、错误预期及不支持语言。参考 `tests/unit/project-evaluator-counts.test.ts`、`tests/acceptance/real-source-flow.test.ts`，在角色测试中补候选到验证证据的用例。
+
+### 5. Code 负责人
+
+- **读哪里**：[代码与检查 Spec](../../specs/06-agents/code-and-check-agents.md)、定义项 `code`、输入中的 `knowledgeRef/allowedGeneratedPaths`、`outputSchemaFor()`、`assertAllowedGeneratedFiles()` 和 `evaluate()`。
+- **当前功能**：候选知识以命令工件内容传入，公开接口物化为只读文件。模型返回 `files`；原始 Schema 动态限制允许路径，业务层再拒绝重复/越界路径，评测器负责将文件落到独立评测副本。
+- **要开发什么**：仅依据知识、接口和构建约定生成完整实现，处理依赖、边界及知识不足；补多种允许路径和模块场景的生成验证。
+- **材料与验收**：每次尝试使用新 DSH session；不能读取参考实现、门禁测试或旧轮实现。当前角色不通过 shell/Edit 直接改仓库。参考 `tests/acceptance/dsh-configured-flow.test.ts`、`tests/security/agent-workspace.test.ts`、`tests/integration/dsh-native-tools.test.ts`；独立评测确认实现行为。
+
+### 6. Check 负责人
+
+- **读哪里**：[代码与检查 Spec](../../specs/06-agents/code-and-check-agents.md)、定义项 `check`、命令中的 `diffRef/criteriaRef`、结果分支，以及 `recordGateDecision()`。
+- **当前功能**：`diffRef` 目前引用 Code 的文件 JSON 工件，不是预先生成的文本 diff；代码内容通过命令材料内联。原始 findings 是字符串数组，规范化时统一使用 blocking 决定级别、scope 第一项决定位置，尚非逐问题精细结构。
+- **要开发什么**：检查语义、边界及接口一致性，给每个问题提供可定位证据；需要逐问题级别或判据时同时调整原始 Schema、结果转换与消费者，不能只在 Prompt 中要求额外字段。
+- **材料与验收**：只读工件、判据与公开接口，不读参考源码、不改实现；不能因角色目录缺少生成文件而报缺陷。验证预设缺陷被识别、正确实现无无据阻塞。参考 `tests/integration/agent-contracts.test.ts` 和 `tests/acceptance/dsh-configured-flow.test.ts`。
+
+### 7. Review 负责人
+
+- **读哪里**：[评审 Spec](../../specs/06-agents/review-agent.md)、定义项 `review`、`buildAgentCommand()` / `normalizeAgentResult()` 最后分支、`recordGateDecision()` 和 DocGen 下一轮命令组装。
+- **当前功能**：命令直接绑定候选知识、评测报告和判据；尚未单独绑定 Check findings 工件。原始输出只能带单个 correction 或 null，规范化后成为 corrections 数组，evidenceRefs 由底座绑定评测证据；`recommendation` 不直接控制路由。
+- **要开发什么**：将真实失败定位到知识路径，产出明确判据和修订要求，证据不足则保留风险。若需 Check 明细、历史修订或多项 Correction，应同步命令授权与材料物化、原始 Schema、结果转换和下轮 DocGen 消费，不通过未绑定 Prompt 偷传材料。
+- **材料与验收**：不读参考源码、不运行测试、不改知识或发布状态；验证有证据的修订、无须修订的空结果、证据不足和跨 Run 证据拒绝。参考 `tests/integration/agent-contracts.test.ts`、`tests/acceptance/dsh-configured-flow.test.ts`；联调确认 Correction 真正进入下一轮 DocGen。
+
+## 共享文件怎样分工
+
+当前七人会共同涉及 `agent-definitions.ts` 和 `automated-project-workflow.ts`，不能按“每人一个现成类”分配文件所有权。角色负责人认领自己的定义项、输入/输出分支和测试；公共底座负责人维护共享执行、工具隔离、快照、图路由、CAS 与 Gate，并审查跨角色字段变更。每人独立分支/worktree，保持 PR 小且及时同步主线；未受影响的分支不顺手重写。
+
+| 想改什么 | 修改入口 | 必须一起检查 |
+| --- | --- | --- |
+| 所有 Run 的角色基础行为 | `agent-definitions.ts` 的对应项 | 角色输出 Schema、角色验收；不能靠改 basePrompt 增加工具权限 |
+| 临时措辞与范例实验 | Console 的 promptAddon；或 DocGen 范例 prompt.txt / --prompt-file | 新 Run 生效；旧 Run 使用冻结快照 |
+| 角色看见哪些输入 | `buildAgentCommand()`、`runLiveAgent()`、必要时 `assignedSourcePaths()` | Command Schema、ArtifactRef 完整性、工作区权限、上下游 |
+| 输出字段与业务结果 | `AGENT_OUTPUT_SCHEMAS` / `outputSchemaFor()`、`normalizeAgentResult()` | Result Schema、原始输出读取者及下游消费者 |
+| 增加工具 | `role-tools.mjs`、SDK `runAttempt()` 策略、定义项 tools 和工作区规则 | 运行时 guard 与隔离测试；当前除 Orchestrator 无文件工具外，其余仅 read_material，shell/编辑器被禁用 |
+| 改并行、汇合或路由 | `graph.ts`、`state.ts`、业务阶段 | 底座负责人统一处理，模型计划不能自行改变拓扑 |
+
+若共享文件冲突频繁，可以在后续代码 PR 中讨论把某角色的纯输入/输出转换拆为模块，由公共阶段调用；这是可选重构，不是已有目录，也不需要复制 DSH Provider、会话或工具运行框架。本指南不实施该拆分。
 
 <a id="agent-development-sop"></a>
 
-## 公共开发 SOP（底座交付后使用）
+## 公共开发 SOP
 
-| 步骤 | 开发者要完成的事 | 交付 |
-| --- | --- | --- |
-| 1. 阅读范例 | 运行公共范例，了解本角色的职责、可见材料、输出及上下游 | 能复现的范例结果与已知问题 |
-| 2. 定义角色 | 沿用现有业务规范，明确角色指令、所需 DSH 工具和业务结果；必要的规范变化单独记录 | 角色说明、配置与输入输出样例 |
-| 3. 开发能力 | 使用 DSH 完成角色行为，把合法业务结果交回系统 | 角色实现及必要的业务接线 |
-| 4. 独立验证 | 验证正常结果、材料不足、非法输出、权限边界和执行失败；区分夹具与真实模型证据 | 角色测试与脱敏结果 |
-| 5. 联调交付 | 将角色接回 LangGraph，确认上下游、工件和日志关联，检查失败路径 | 联调证据、使用说明和未解决项 |
+1. **准备工作区**：使用 Node 24+；阅读最新 epitaph 与角色 Spec；从已合入底座的主线建自己的 worktree，执行 `npm run bootstrap:worktree` 至 READY，再执行 `npm run bootstrap:worktree:check`。不共享 node_modules。
+2. **跑懂现有调用**：按教程配置自己的专属 runtime，执行 `example:docgen prepare/run/check`；沿上面的调用链观察命令、模型原始输出和规范化结果。当前没有通用的 `--role` 单角色 CLI，不能把 DocGen 命令替换角色名就认为能运行其他角色。
+3. **确认改动点**：在现有 `specs/06-agents/` 对应章节记录角色输入、职责、输出、权限和验收；列出本次涉及的定义项、业务分支、测试及上下游字段。新增契约先和上下游对齐。
+4. **实现并独立验证**：从自己的业务分支开发；其他角色可用明确标识的受控输入协助测试。测试覆盖正常、材料不足、非法输出、身份错配和权限拒绝；共享超时/取消矩阵复用底座回归。当前原始 Schema 没有统一材料不足字段，不要擅自返回未知字段；需要新失败表达时同步契约和处理逻辑。
+5. **接回固定图**：至少验证一次真实 DSH 角色调用和上下游工件消费。完整接线参考 `tests/acceptance/dsh-configured-flow.test.ts`，其本地 SSE 是受控机制测试，不是现成的真实模型质量验收。独立角色测试装配可参考 `tests/integration/dsh-project-stages.test.ts` 中 `ProjectWorkflowStages` + `WorkflowStageInput` 的用法。
+6. **交付 PR**：给出 Spec/实现/测试、运行命令、真实 Run/session/工件摘要及独立检查结论。一个可审查功能一个 PR，review 合入后继续；最终按 [AC-DSHF-008](../../specs/changes/active/DEV-019-dsh-agent-foundation/acceptance.md#七角色逐项验收r3)逐角色验收，不因 JSON 合法就认定业务正确。
 
-每个 Agent 的负责人负责该角色的行为规范、提示词、角色逻辑、测试与上下游联调。公共底座负责人统一维护 DSH 接入、LangGraph 接线及共享治理能力。按需修改共同边界时同步上下游，不要求每个角色复制一套执行适配器。
+角色修改后的检查入口如下；按改动选择相关测试，提交前完成仓库门禁。纯文档调整检查路径、链接和 Spec 即可。
 
-底座和范例明确后，基于同一 SOP 按职责分发七角色开发；输入、交付和验收写回现有 `specs/06-agents/` 对应章节，不再新建七份任务书。执行顺序与阶段验收见 [DEV-019 Roadmap](../../specs/changes/active/DEV-019-dsh-agent-foundation/plan.md)，R0 已核实，当前继续 R1 实施。常规文件拆分和接线选择由实施者按实际能力落实；CodeAgent CLI 仅保留后续适配位置，不要求角色开发者当前实现双后端。
+```bash
+npm run typecheck
+npm run validate:specs
+node --test --test-concurrency=1 tests/integration/agent-contracts.test.ts tests/security/agent-workspace.test.ts
+# 修改 DSH 工具策略时：
+node --test tests/integration/dsh-native-tools.test.ts
+# 复核生产接线（受控模型，不计作 live）：
+node --test tests/acceptance/dsh-configured-flow.test.ts
+npm test
+npm run evaluate:framework
+```
+
+### 排障先看哪里
+
+| 现象 | 首先检查 |
+| --- | --- |
+| 改了提示词没有效果 | 改的是示范 prompt.txt、生产 basePrompt 还是 promptAddon；Run 是否沿用旧冻结快照 |
+| 材料读不到 | `runLiveAgent()` 的可见路径、`LocalAgentWorkspace` 的固定 commit、`read_material` 的相对路径限制；不要直接扩大权限 |
+| 输出被拒绝 | 模型原始 Schema 与业务 Result Schema 分别定位；检查未知字段、路径白名单及身份绑定 |
+| 角色输出成功但下游无变化 | `normalizeAgentResult()` 是否保留该字段；命令组装与消费者是否实际读取它 |
+| 范例失败 | 专属 runtime 的 `examples/<runId>/result.json` / `audit.json`；SDK 早期失败看 Registry 节点事件与 `demo/agent-runs.jsonl`，详见教程 |
 
 ## 当前实现与操作说明
 
-R1 已将角色执行收敛到 DSH，通用项目场景从 CLI/API/Console 传入。Pi Agent 运行依赖已移除，旧记录保留可读且拒绝恢复；CodeAgent CLI 适配后置。R2 的真实 CPU DocGen 范例和独立工作区复现已通过本地验收，PR #26 待审查；R3 七角色和 R4 完整闭环尚未验收。
+R1 已将角色执行收敛到 DSH，通用项目场景从 CLI/API/Console 传入。Pi Agent 运行依赖已移除，旧记录保留可读且拒绝恢复；CodeAgent CLI 适配后置。R2 的真实 CPU DocGen 范例和独立工作区复现已通过验收，PR #26 已合入；R3 七角色和 R4 完整闭环尚未验收。
 
 <details lang="en">
 <summary>English summary</summary>

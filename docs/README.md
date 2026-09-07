@@ -21,7 +21,7 @@ npm run knowledge:serve
 
 ## 五个主要入口
 
-后续开发按[已确认的 DSH 目标架构](ARCHITECTURE.md#target-architecture)和[公共开发 SOP](guides/agent-customization.md#agent-development-sop)推进：先底座与范例，再七角色开发。R1 已合入，R2 DocGen 范例与独立工作区 live 复现已通过本地验收，PR #26 待审查；合入后进入 T200。可运行配置见快速上手，任务顺序见开发状态。
+后续开发按[已确认的 DSH 目标架构](ARCHITECTURE.md#target-architecture)和[公共开发 SOP](guides/agent-customization.md#agent-development-sop)推进：先底座与范例，再七角色开发。R1/R2 已合入；现有[角色开发指南](guides/agent-customization.md#目录与类)提供七角色的代码定位与分工步骤，后续按 T200/T210/T211 推进。可运行配置见快速上手，任务顺序见开发状态。
 
 | 我想做什么 | 阅读 |
 | --- | --- |
@@ -37,7 +37,7 @@ npm run knowledge:serve
 | --- | --- | --- | --- |
 | 修改领域规则 | [领域模型](../specs/03-domain/domain-model.md) | `src/domain/` | `tests/unit/` |
 | 修改工作流 | [工作流规范](../specs/05-workflows/knowledge-flywheel-workflow.md) | `src/infrastructure/workflow/langgraph/` | `tests/integration/langgraph-infrastructure.test.ts` |
-| 修改 Agent | [Agent 规范](../specs/06-agents/README.md) | `src/infrastructure/workflow/langgraph/agent-definitions.ts` | `tests/integration/agent-contracts.test.ts` |
+| 开发一个 Agent 角色 | [Agent 规范](../specs/06-agents/README.md)与[开发步骤](guides/agent-customization.md#agent-development-sop) | [目录、类与逐角色定位](guides/agent-customization.md#角色定位表) | `tests/integration/agent-contracts.test.ts`；逐角色测试见指南 |
 | 增加 API | [HTTP API](../specs/10-interfaces/http-api.md) | `src/interfaces/ui-api/` | `tests/integration/server.test.ts` |
 | 修改 Console | [前台设计](../specs/04-product/frontend-product-design.md) | `web/` | `tests/e2e/` |
 
