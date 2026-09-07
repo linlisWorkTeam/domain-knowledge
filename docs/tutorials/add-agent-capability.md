@@ -1,6 +1,6 @@
 # 教程：基于 DSH 开发一个 Agent 角色
 
-> 状态：R1 已合入；R2 T103/T104 的真实 DocGen、独立检查和第二工作区修改复现已通过本地验收，PR #26 待审查。实际 Run、源码复核及失败记录见 [DEV-019 证据](../../specs/changes/active/DEV-019-dsh-agent-foundation/evidence.md#r2-live-验收2026-09-07)。R3/R4 未执行。
+> 状态：R1 已合入；R2 T103/T104 的真实 DocGen、独立检查和第二工作区修改复现已通过本地验收，PR #26 已合入。实际 Run、源码复核及失败记录见 [DEV-019 证据](../../specs/changes/active/DEV-019-dsh-agent-foundation/evidence.md#r2-live-验收2026-09-07)。R3/R4 未执行。
 
 ## 从公共范例开始
 
@@ -9,6 +9,8 @@
 首个范例选用普通 CPU 可运行的小模块，默认示范角色为 DocGen。范例应提供固定源码版本、公开接口、现成测试、所需环境说明、一个真实 DSH 角色和可检查的输出。R0 固定样例为 `structuredMarkdownDiff`，下文提供运行和独立检查命令；不把 ohMyWorkPanel 写成公共运行器的前提，也不要求先准备昇腾硬件或公司 CodeAgent 环境。
 
 ## 开发一个角色
+
+按文件定位职责、业务分支和测试，请先查[角色开发指南](../guides/agent-customization.md#目录与类)。本教程负责范例运行与检查，代码分工在指南统一维护。
 
 1. 复现范例，阅读 `specs/06-agents/` 中本角色的职责及可见材料。
 2. 在 DSH 上定义角色指令与所需工具，按业务 Schema 准备输入输出样例。复用 DSH 的会话、模型和工具运行能力。
