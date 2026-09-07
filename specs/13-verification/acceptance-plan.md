@@ -1,5 +1,7 @@
 # P0 验收计划
 
+> 验收版本说明：本表保留当前 baseline 的 AC。新 DSH 底座、CPU 角色范例和七角色真实闭环见 [DEV-019](../changes/active/DEV-019-dsh-agent-foundation/acceptance.md)，目前均未完成实现验收。现有 Pi、固定场景及公司 CLI 夹具证据不能替代新目标的证明；公司环境不是外部第一版的前置条件。
+
 所有场景使用 Given/When/Then，可自动化场景为发布阻塞项。
 
 验收场景对应的用户目标、参与者边界、成功/失败分支和接口入口见[用户用例与交互时序](../05-workflows/user-use-cases.md)。

@@ -13,6 +13,8 @@ Behavior changes must update the Spec, implementation, tests and traceability ma
 
 第一次参与项目先阅读[文档中心](docs/README.md)，按任务选择对应的代码、规范和测试入口。
 
+当前下一工作项是 [DEV-019 DSH 底座](specs/changes/active/DEV-019-dsh-agent-foundation/proposal.md)：先底座与 CPU 角色范例，再按[公共 SOP](docs/guides/agent-customization.md#agent-development-sop)分发角色开发。复用 DSH 运行能力，不复制 Pi 或固定项目执行器作为新开发范式；公司 CLI 的真实适配后置。
+
 1. 从最新 `main` 创建分支，一次 PR 处理一个明确问题。
 2. 阅读[开发状态](docs/DEVELOPMENT-STATUS.md)、[Spec 总入口](specs/README.md)和对应 ADR。
 3. 使用 Node.js 24+，运行 `npm ci`。

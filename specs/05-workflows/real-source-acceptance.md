@@ -1,8 +1,10 @@
 # 真实源码验收工作流
 
+> 验收范围说明：下文是当前 ohMyWorkPanel 固定验收基线，不是所有文档 PR 或新底座开发的环境前提。[DEV-019 分阶段验收](../changes/active/DEV-019-dsh-agent-foundation/acceptance.md) 已区分 CPU 角色范例与七角色外部真实闭环；新公共入口不绑定本项目路径，历史证据不改写为新底座成果。
+
 ## 目的
 
-合成 `EvaluationReport` 只能验证发布约束，不能证明系统会执行真实软件门禁。PR 合入前必须用 ohMyWorkPanel 的固定 Git commit 运行一次独立、可重放的薄切片，覆盖失败、归因、增量修订、fresh 生成、真实执行和发布。
+合成 `EvaluationReport` 只能验证发布约束，不能证明系统会执行真实软件门禁。涉及本固定场景执行行为的 PR 合入前，必须用 ohMyWorkPanel 的固定 Git commit 运行一次独立、可重放的薄切片，覆盖失败、归因、增量修订、fresh 生成、真实执行和发布。DEV-019 新底座按其分阶段验收推进；文档同步不等于执行了本场景。
 
 ## 固定输入
 

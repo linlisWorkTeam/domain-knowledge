@@ -1,5 +1,7 @@
 # 知识飞轮前台产品设计
 
+> 迁移提示：本文记录已接受的 Preview 设计与历史阶段。KF-UI-021、AC-UI-024 和 UC-KF-007 的 Pi 默认执行属于现有功能；[DEV-019](../changes/active/DEV-019-dsh-agent-foundation/spec-delta.md) 已明确 Pi 退出目标底座。DSH 配置入口及其实施验收尚未设计完成，不能把旧 F4/Phase 顺序当作当前开发队列；下一任务以[开发状态](../../docs/DEVELOPMENT-STATUS.md)为准。
+
 **状态：Accepted；F2 最终 UI/UX 已冻结，F4/F5 已接线｜版本：0.6.0｜日期：2026-09-04**
 
 本文定义 domain-knowledge 知识飞轮控制台的用户体验、信息架构、交互边界、接口需求和验收标准。领域状态、门禁、安全和发布语义以同仓库的[规范总入口](../README.md)为准；前台不得创造第二套状态或发布权威。

@@ -1,6 +1,6 @@
 # 开发状态
 
-**当前阶段：DEV-010 公司环境验收受外部 CLI 阻塞｜更新时间：2026-09-04｜下一任务：提供已安装且已登录的公司 CodeAgent CLI 环境**
+**当前阶段：DSH Roadmap 已拆解，代码尚未实施｜更新时间：2026-09-07｜下一任务：执行 DEV-019 R0 基线核实 → R1 公共底座开发**
 
 本文件是 domain-knowledge 的**唯一开发进度入口**，用于记录当前阶段、已完成里程碑、正在进行或下一项工作、后续队列和最近验证结果。产品行为仍以 [`../specs/`](../specs/README.md) 为规范性事实源；需求级的 `Implemented / Partial / Planned` 状态仍只在[追踪矩阵](../specs/13-verification/traceability-matrix.md)维护。
 
@@ -36,7 +36,22 @@ This file is the single entry point for project-level development status, curren
 
 回写时必须更新顶部日期、工作项状态和实际验证证据。没有代码、测试或运行证据的能力不得标记为完成。纯重构只有在改变里程碑或任务顺序时才需要更新本文件。
 
-## 当前结论
+## 当前方向与开发顺序（2026-09-07）
+
+用户已确认：LangGraph 编排，DSH 直接承担角色运行能力，业务服务持有结果校验、工件、独立评测和发布门禁。不增加独立通用 Agent 运行框架。Pi 退出目标底座，`OhMyWorkPanelWorkflowExecutor` 退出公共运行入口；现有代码尚未按此方向修改。
+
+1. 执行 DEV-019 R0：核实环境与现有回归，固定 CPU 样例和参考测试，落实 DSH 接线及旧配置/Run 处置；随后直接进入 R1 开发，不再重复整体架构讨论。
+2. R1 移除 Pi 运行依赖和固定项目公共执行器，完成 DSH 配置与通用接线；R2 交付 DocGen 默认示范角色并真实验收底座。
+3. R3 按公共 SOP 开发七角色并联调；R4 在外部完成真实闭环。候选测试验证与 DEV-011 对齐，第一版相关恢复/权限要求与 DEV-012 对齐，不能因任务另列而跳过。
+4. DEV-010 公司 CLI 真实适配与验收后置；保留接入位置，不要求先迁移公司平台。DEV-013 的容量与部署决策仍依赖真实数据。
+
+本次文档交付见 [DEV-019](../specs/changes/active/DEV-019-dsh-agent-foundation/proposal.md)、[架构](ARCHITECTURE.md)和[开发 SOP](guides/agent-customization.md)。底座范例尚未交付，不能据此宣称第一版完整闭环已验收；Accepted baseline 的拟变化已写入 spec-delta，需求实现状态未调整。
+
+可执行阶段、依赖和退出条件统一维护在 [Roadmap](../specs/changes/active/DEV-019-dsh-agent-foundation/plan.md)。下一执行项是 T100、T101 → T102/T105/T106；当前 R0～R4 均为 `NOT_RUN`。R0～R4 全通过才完成 DEV-019，后置公司 CLI 不阻塞其关闭；角色要求与证据沿用既有文档。
+
+DEV-014 及其引用的 DEV-015～018 是其他 worktree 中的旧 DFX 草稿上下文。本轮未完成或接管那些实现；后续只复用符合当前目标的部分，不自动承接旧报告的全部范围。
+
+## 当前实现结论（历史能力，尚未按新方向调整）
 
 - P0-A Spec 已 Accepted，P0-B 处于实现验证阶段。
 - DDD 分层已经对齐，UI/API 通过 Application App 进入系统，LangGraph、Provider 和持久化实现留在 Infrastructure。
@@ -44,7 +59,7 @@ This file is the single entry point for project-level development status, curren
 - deterministic fixture 可以完成失败、修订、重新生成、评测和发布闭环。
 - 前台 F2 已完成最终七页面、真实批次 Agent 工作流图、绿色双主题、响应式、可访问性及真实/部分/禁用状态；用户已确认当前版本为最终 UI/UX，HCP-1=`Accepted`。
 - B1–B4 Preview API 与前台接线已经完成；操作中心、批次、工作流图、知识血缘/差异、评测/规则、来源注册、知识健康、Provider 配置和观测指标均使用服务端事实。
-- DeepSeek Harness、Pi SDK 与公司 CodeAgent CLI AgentProvider Adapter 已存在；CodeAgent CLI 已完成协议夹具和组合根接线，公司环境 live Run 与效果基线仍待 DEV-010。
+- DeepSeek Harness、Pi SDK 与公司 CodeAgent CLI AgentProvider Adapter 已存在；CodeAgent CLI 的协议夹具和组合根接线不能证明真实兼容。用户提供的 CLI 反馈与现有启动参数、session 和认证解析存在差异，需在后置的 DEV-010 重新核对真实协议及 live 结果。
 - 来源漂移与不可用会形成可去重的持久化事项；完整安全事实事项仍等待 DEV-012 的权限拒绝审计。
 - 外部真实模型质量、公司环境容量、长期稳定性、企业 KMS 和敌对代码执行安全尚未形成验收结论。
 
@@ -64,10 +79,11 @@ This file is the single entry point for project-level development status, curren
 | DEV-007 | Console B4 运营最小可用面 | Done | Provider 状态、安全 API URL/Key 配置与验证、真实 Pi SDK 执行路径、默认新批次快照和生成/治理观测已接入 |
 | DEV-008 | Console B3 知识、评测与来源 | Done | 血缘/差异、评测读模型/证据/规则、来源注册/漂移/刷新、来源事项和知识健康度已接入 |
 | DEV-009 | 公司 CodeAgent CLI Adapter 与契约验证 | Done | 七角色、认证、stdin JSONL、session 恢复、超时/取消/错误分类、角色工具与工作区、脱敏审计、Run 摘要均有自动化验证 |
-| DEV-010 | 公司 CodeAgent 七角色真实闭环与效果基线 | Blocked | 当前执行环境无 `codeagent` 可执行文件，尚不能完成认证预检、最小协议探测或 live Run；依赖已安装且已登录的公司环境 |
+| DEV-010 | 公司 CodeAgent 七角色真实闭环与效果基线 | Planned | 已后置；仍缺可验证的 CLI 环境，且现有协议须与真实版本重新对齐。不作为外部 DSH 第一版的前置条件 |
 | DEV-011 | TestGen 候选测试的通用 Oracle 验证与门禁链路 | Planned | 原 DEV-007；对应 `KF-SYS-004` |
 | DEV-012 | 四点崩溃注入、完整权限拒绝审计与恢复加固 | Planned | 原 DEV-008；对应 `AC-REC-001`、`AC-SEC-002` |
 | DEV-013 | 生产容量、认证续期、并发与 Redis 启用决策 | Planned | 原 DEV-009；依赖真实运行数据，不改变 Registry 事实源地位 |
+| DEV-019 | DSH 公共底座、CPU 角色范例与外部七角色闭环 | Next | Roadmap 已拆解；下一步执行 R0 → R1；各阶段按任务、验收和证据推进，代码及 live 验收尚未执行 |
 
 状态含义：`Ready / Next` 表示下一项已排序但尚未开始；`In Progress` 表示已有活动开发分支；`Blocked` 必须写明外部依赖；`Done` 必须给出可复验结果。
 
@@ -161,6 +177,8 @@ DEV-009 不修改 `web/`、`site/`、前台产品设计、现有 HTTP 路由或�
 
 | 日期 | 基线 | 结果 |
 | --- | --- | --- |
+| 2026-09-07 | DEV-019 可执行 Roadmap 拆解 | R0～R4 任务、退出条件及 AC-DSHF-006～008 已写入现有变更包；Spec 和 17 项文档/站点契约通过，94 份 Markdown 的 240 个本地链接/锚点有效；仅文档检查，开发阶段均未执行 |
+| 2026-09-07 | DEV-019 文档方向与全库同步复核（代码基线 `1e826bb`） | 仅文档；Spec 通过，文档/站点相关契约 17/17；全库本地链接/锚点与差异检查通过。详见[验证证据](../specs/changes/active/DEV-019-dsh-agent-foundation/evidence.md)，不代表 DSH 新底座已实施 |
 | 2026-09-03 | Agent 运行契约与框架测评合入后的 `main` | TypeScript 通过；Spec：7 schemas、7 commands、8 results、38 P0；测试 112/112；框架测评 6/6 `ACCEPTED` |
 | 2026-09-03 | 前台 F1 Knowledge Console 合入前基线 | TypeScript 通过；Spec：7 schemas、7 commands、8 results、51 P0；测试 114/114；框架测评 6/6 `ACCEPTED`；Chromium E2E 4/4 |
 | 2026-09-03 | DEV-005 F2 + B1 HCP-1 最终基线 | TypeScript 通过；Spec：7 schemas、7 commands、8 results、51 P0；测试 115/115；Chromium E2E 7/7，含七页亮色语义面审计及操作中心 `1363 × 936` 像素基线；HCP-1=`Accepted` |

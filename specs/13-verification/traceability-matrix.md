@@ -1,5 +1,7 @@
 # 追踪矩阵
 
+> 目标与现状分开追踪：[DEV-019](../changes/active/DEV-019-dsh-agent-foundation/spec-delta.md) 记录 DSH 底座增量，当前表格的状态与路径继续对应现有代码。尤其 KF-SYS-022、041 和 KF-UI-021 的历史 Implemented 不表示 CPU 通用范例或 DSH 配置已实现；AC-DSHF-001～005 尚未验收，不提高本表状态。
+
 实现状态按当前代码和可执行测试记录。`Implemented` 表示已有对应代码与自动化验证，`Partial` 表示只实现安全子集，`Planned` 表示规范仍保留但不得宣称为当前能力。实现和测试路径均相对 domain-knowledge 根目录；人工审计证据另存于 wpKnowledge。
 
 | 需求 ID | 验收 | 状态 | 实现 | 测试 |

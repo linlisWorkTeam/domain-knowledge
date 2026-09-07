@@ -1,5 +1,7 @@
 # 系统上下文
 
+> 目标架构已在 [DEV-019](../changes/active/DEV-019-dsh-agent-foundation/proposal.md)确认：LangGraph 调度、DSH 运行角色、业务服务负责工件与评测发布，不新增 Agent 运行框架。以下图与端口表保留当前 baseline；端口是业务边界，不要求再包一套 DSH。
+
 ```mermaid
 flowchart LR
   U[工程师/知识治理者] -->|提交仓库、策略、审批| F[知识飞轮系统]

@@ -2,6 +2,8 @@
 
 本目录保留已确认决策及其取代关系。除明确标为 `Superseded` 的历史 ADR 外，当前决策状态为 Accepted；Spike 可以补充证据或触发新的 superseding ADR，不得静默改写历史。
 
+2026-09-07 确认的 DSH 角色运行方向记录于 [DEV-019](../changes/active/DEV-019-dsh-agent-foundation/spec-delta.md)。该方向保留 LangGraph 编排、业务层隔离、ArtifactRef 和唯一发布权威；涉及 Pi、固定场景、运行接线的稳定增量与 ADR 取代关系在实施设计中落实。以下 ADR 保留原决策记录，不将未实施目标伪装成历史事实。
+
 - [ADR-001：TypeScript 平台与六边形边界](ADR-001-typescript-hexagonal-core.md)
 - [ADR-002：LangGraph V1 编排与可替换端口](ADR-002-langgraph-workflow.md)
 - [ADR-003：Artifact 交接与内容寻址](ADR-003-artifact-handoffs.md)

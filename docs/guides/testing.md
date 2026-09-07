@@ -16,6 +16,8 @@ CI 在 Node.js 24 的 Linux 环境重复执行相同门禁。PR 中应记录实�
 
 ## 测试层级
 
+以下是当前仓库已有测试。下一阶段 [DEV-019](../../specs/changes/active/DEV-019-dsh-agent-foundation/acceptance.md) 分别验收底座范例与外部完整闭环：先在普通 CPU 小模块上真实运行一个 DSH 角色，证明开发接线可复用；七角色实际协作和发布另行验收。Pi 或固定场景回归通过不表示新底座已完成，公司 CLI live 后置。CPU 范例也不替代既有 C++ 语言插件与权限门槛。
+
 | 层级 | 目录/命令 | 主要证明 |
 | --- | --- | --- |
 | Unit | `npm run test:domain` | 领域规则、Gate、状态转换等纯逻辑 |
@@ -25,6 +27,7 @@ CI 在 Node.js 24 的 Linux 环境重复执行相同门禁。PR 中应记录实�
 | LangGraph integration | `tests/integration/langgraph-infrastructure.test.ts` | 真实 StateGraph 并行、循环、提示词追加和节点投影 |
 | Automated flywheel | `tests/acceptance/automated-langgraph-flow.test.ts` | LangGraph 与 Knowledge Registry、真实项目评测和原子发布协同 |
 | DSH SDK Adapter | `tests/integration/deepseek-harness-agent.test.ts` | stdin JSON-RPC、Schema 重试、超时、取消、审计脱敏与 Bubblewrap 来源隔离 |
+| Company CLI Adapter | `tests/integration/company-codeagent-cli.test.ts` | 现有自建协议夹具；不证明实际 CLI 参数、认证、会话或文件权限兼容 |
 | Agent workspace security | `tests/security/agent-workspace.test.ts` | 角色文件白名单、路径穿越与来源符号链接拒绝 |
 | Demo report | `tests/integration/demo-report.test.ts` | Run 证据聚合、CAS 完整性和 Prompt/凭据脱敏 |
 | Real-source acceptance | `npm run acceptance:ohmyworkpanel -- ...` | 固定受信源码的失败、Correction、再生成、独立执行和发布 |

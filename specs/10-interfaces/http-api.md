@@ -1,5 +1,7 @@
 # Preview HTTP API 规范
 
+> 迁移提示：本文接口与 Available 状态描述当前实现。provider-settings 仍绑定 Pi，Run 启动仍是固定 profile；[DEV-019](../changes/active/DEV-019-dsh-agent-foundation/spec-delta.md) 已确认迁出方向，尚未交付新的 DSH 配置或通用启动 API。实施时按 Preview 规则原子同步生产者、消费者和测试，不能只改文档中的 Provider 名称。
+
 **状态：Accepted；B1–B4 已实现｜版本：0.5.0｜日期：2026-09-04**
 
 本文是 Knowledge Console HTTP API 的唯一规范性入口，统一定义资源分组、页面能力、当前实现映射和待补接口。领域行为、状态机与发布门禁仍以对应领域和工作流规范为准；HTTP 路由不得创造第二套业务语义。
@@ -299,7 +301,9 @@ Agent 设置同时展示固定 Agent 契约、Provider 配置/验证和运营指
 | 来源 | 持久化注册、筛选、创建、更新、启停、刷新、漂移和关联统计 | 扫描候选是显式辅助视图 | 删除与自动内容摄取不在本轮范围 |
 | Agent 设置 | Agent 定义、promptAddon、Provider 状态、安全配置/验证和运行/治理指标 | 无样本或无可信定价显示 `—` | 项目空间与企业级 KMS 后置；固定 Agent 契约不得开放编辑 |
 
-## 11. 最终目标实施顺序
+## 11. 原 Preview 实施顺序（历史阶段）
+
+下表保留 B1–B4 的交付顺序与原完成条件，不是当前后续任务。DSH 底座及公司 CLI 后置的顺序以[开发状态](../../docs/DEVELOPMENT-STATUS.md)为准。
 
 | 阶段 | 后台能力 | 完成出口 |
 |---|---|---|

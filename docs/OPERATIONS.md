@@ -2,6 +2,8 @@
 
 > 中文是本文默认语言。命令、环境变量、API 路径和状态值保留英文。
 
+> 运行范围：本文描述当前已实现接口。已确认的新方向为外部 DSH 底座、CPU 范例及后续七角色闭环，见[目标架构](ARCHITECTURE.md#target-architecture)。Pi 仍在当前实现中但将退出目标底座；公司 CLI 真实适配后置。新目标的具体部署步骤尚未交付。
+
 <details lang="en">
 <summary>English summary</summary>
 
@@ -35,6 +37,8 @@ npm run knowledge -- ingest `
 ```
 
 命令返回质量报告和 `KnowledgeVersion`，此时状态仍是 `CANDIDATE`。
+
+<a id="behavioral-evaluation-and-publication"></a>
 
 ## 行为评测与发布
 
@@ -139,6 +143,8 @@ Agent 元数据来自 `GET /api/v1/agents`。浏览器默认只读，操作员 t
 
 ### 模型服务与 Pi Agent
 
+本节是现有 Pi 路径的操作说明，不是 DSH 配置方式。新底座实施时须同步配置入口与旧 Run 的处置，不能直接让历史批次切换执行后端。
+
 在治理模式打开“Agent 设置”，依次保存 API 地址、API Key 和模型，再执行“验证并启用”。对应接口为：
 
 - `GET /api/v1/agents/providers/status` 与 `GET /api/v1/provider-settings`：只读脱敏状态；
@@ -152,7 +158,9 @@ Agent 元数据来自 `GET /api/v1/agents`。浏览器默认只读，操作员 t
 
 ### 公司 CodeAgent CLI
 
-部署账户先完成 CLI 登录，并确认 `codeagent auth status --json` 返回已认证且未过期，再设置 `WP_FLYWHEEL_AGENT_PROVIDER=company-codeagent-cli`。Adapter 不经 shell 启动 CLI，Prompt 只写 stdin；`orchestrator` 不开放工具，文档与测试角色仅开放受控读写/检索工具，`check`/`review` 只读，`code` 虽可编辑和执行命令但仍只能看到工作流为该角色物化的隔离视图。JSON/JSONL 最终结果在进入 AgentResult 前校验角色与 Schema。
+本节仅说明现有 Adapter 的设计，不能作为真实 CLI 的已验收操作指南。代码当前假定 `auth status --json`、`run --non-interactive` 和自定义 session 参数；用户提供的版本反馈不同，DEV-010 需重新核对实际协议。`WP_FLYWHEEL_AGENT_PROVIDER=company-codeagent-cli` 只选择适配器，不证明认证或调用成功。
+
+Adapter 以非 shell 子进程传递 stdin，按角色构造工具参数，并校验 JSON/JSONL 输出。参数声明和不同工作目录不能证明真实 CLI 已执行文件隔离；工具权限、认证、会话、取消和结果结构均须以实际版本单独验证。
 
 session ID 按幂等键保存到 `$WP_FLYWHEEL_HOME/codeagent/sessions/`，目录权限 `0700`、文件权限 `0600`。CLI 路径、基础参数、模型、时限、输出上限和允许根进入 Run 非秘密摘要；恢复时任一项变化都会失败关闭。超时或取消会终止整个进程组。审计只保存 Prompt/Schema 摘要、耗时、状态、错误码、run/session/idempotency 关联 ID，不保存 Prompt、凭据或任意请求 metadata。当前自动化只证明 Adapter 协议，生产登录、模型质量、容量和长期稳定性由 DEV-010 验收。
 
@@ -161,6 +169,8 @@ session ID 按幂等键保存到 `$WP_FLYWHEEL_HOME/codeagent/sessions/`，目�
 稳定的本地 API 前缀是 `/api/v1`，进程探针 `/health` 不加版本。
 
 ## DSH
+
+DSH 有两个方向：作为角色运行框架时，LangGraph 调用其 SDK，当前配置见[DSH 部署说明](../deploy/deepseek-harness/README.md)；下面的 Cordis 插件则让外部 DSH 调用知识库 HTTP API，不承担七角色调度。新底座优先复用前者，不另建 Agent 运行框架。
 
 把 `src/interfaces/dsh/index.ts` 作为普通 Cordis plugin 挂载，并配置：
 

@@ -1,5 +1,7 @@
 # domain-knowledge 基础设施层
 
+后续开发遵循[DSH 目标架构](../../../../docs/ARCHITECTURE.md#target-architecture)：本模块负责七角色编排，DSH 负责单角色运行，节点仅做必要的业务接线。当前固定项目执行器尚未迁出；不以其项目路径或 Pi 接入方式定义新的公共底座。角色开发范式见[公共 SOP](../../../../docs/guides/agent-customization.md#agent-development-sop)。
+
 本目录保存 Knowledge Flywheel 内嵌的 LangGraph 执行层。它与 `src/domain`、`src/application/services` 分开维护，使图运行时、AgentRunner Provider、工作区策略和 checkpoint 实现能够独立演进，同时避免 LangGraph 变成知识治理依赖。
 
 <details lang="en">

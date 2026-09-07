@@ -1,5 +1,7 @@
 # 快速上手
 
+> 本文命令适用于当前代码。后续方向已确认为 DSH 公共底座与 CPU 角色范例，尚未交付，见[开发状态](DEVELOPMENT-STATUS.md)和[目标架构](ARCHITECTURE.md#target-architecture)。当前 Pi 配置及固定 ohMyWorkPanel 流程保留为现状说明，不是新底座的必需步骤；公司 CLI 适配后置。
+
 本指南有两条路径。你可以自己运行命令，也可以把后面的 Prompt 交给 Agent，让它完成环境检查、安装、验证和启动。两条路径都不会伪造评测证据或自动发布 `VERIFIED` 知识。
 
 <details lang="en">
@@ -111,7 +113,7 @@ WP_KNOWLEDGE_WRITE_TOKEN='<local-secret>' npm run knowledge:serve
 
 不要把 token 提交到仓库，也不要在公网明文 HTTP 上启用写操作。公网只读部署和 TLS 要求见[运维手册](OPERATIONS.md#dashboard-and-api)。
 
-进入治理模式后，可在“Agent 设置”保存公开 HTTPS 的 OpenAI-compatible API 地址、API Key 和模型标识，再点击“验证并启用”。保存会使旧验证失效，只有无副作用的模型列表探测成功后，新批次才默认使用 Pi Agent。页面不会读回完整 Key；服务端把加密配置与本地密钥存放在 `$WP_FLYWHEEL_HOME/secrets/`，文件权限限制为 `0600`。不要备份或提交该目录，也不要把模型地址指向本机、私网或会重定向的目标。
+当前“Agent 设置”的模型配置仍绑定 Pi；这不是 DSH 配置入口。进入治理模式后，可保存公开 HTTPS 的 OpenAI-compatible API 地址、API Key 和模型标识，再点击“验证并启用”。保存会使旧验证失效，只有无副作用的模型列表探测成功后，新批次才默认使用 Pi Agent。页面不会读回完整 Key；服务端把加密配置与本地密钥存放在 `$WP_FLYWHEEL_HOME/secrets/`，文件权限限制为 `0600`。不要备份或提交该目录，也不要把模型地址指向本机、私网或会重定向的目标。
 
 Pi Agent 对空输出或不符合角色 JSON Schema 的输出使用全新会话做有限重试。`WP_PI_MAX_SCHEMA_ATTEMPTS` 表示总尝试次数，默认 `2`，只允许 `1..3`；`WP_PI_MAX_TOKENS` 默认 `32768`，`WP_PI_CONTEXT_WINDOW` 默认 `128000` 且不得小于输出上限。这三个非秘密执行参数连同协议、地址与模型一起进入批次摘要，恢复时任何变化都会失败关闭；每次尝试单独记录脱敏调用事实，不与工作流节点恢复次数混算。
 
@@ -127,7 +129,7 @@ npm run knowledge -- workflow-run --repository /path/to/ohMyWorkPanel
 
 需要接入真实 DeepSeek Harness 时，按 [`deploy/deepseek-harness/README.md`](../deploy/deepseek-harness/README.md) 安装 Bubblewrap，配置 `OPENCODE_GO_API_KEY`、Provider 和来源 allowlist，再设置 `WP_FLYWHEEL_AGENT_PROVIDER=deepseek-harness`。Prompt 通过官方 SDK 的 stdin JSON-RPC 发送；每个 Agent 只得到角色允许的工作区。密钥只放进运行时环境，不写配置文件。公开 Web 只是 DSH 自身的临时调试面，知识飞轮 Console 仍由 `knowledge:serve` 提供。
 
-需要接入公司 CodeAgent CLI 时，先在部署账户执行 CLI 登录，再设置 `WP_FLYWHEEL_AGENT_PROVIDER=company-codeagent-cli`。默认命令是 `codeagent`，模型为 `company-default`；其他非秘密参数见 [`.env.example`](../.env.example)。Adapter 会在每次 Agent 调用前运行 `codeagent auth status --json`，Prompt 仅经 stdin 发送，session ID 保存在 `$WP_FLYWHEEL_HOME/codeagent/sessions/` 的 0600 文件中。CLI 必须符合 `.env.example` 记录的参数与 JSONL 输出协议；未登录、凭据过期或恢复参数变化都会失败关闭。协议夹具通过不代表公司环境的真实模型质量或稳定性已经验收。
+公司 CodeAgent CLI 不是当前外部第一版的启动前提。现有 `company-codeagent-cli` 选项和 [`.env.example`](../.env.example) 记录的是 Adapter 的协议假设，不是已验证的真实 CLI 使用说明；用户反馈与其启动参数、认证字段、session 格式存在差异。后置的 DEV-010 必须先取得实际版本的帮助信息和脱敏输入输出，修正适配并验证后再提供可用步骤。不能仅配置开关就宣称接入成功。
 
 Run 结束后，可以把完整步骤导成一个脱敏 Demo 报告：
 

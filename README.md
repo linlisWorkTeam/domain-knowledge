@@ -18,14 +18,20 @@ domain-knowledge is the executable Knowledge Flywheel repository. It owns orches
 
 SQLite Registry 与 CAS 是运行时事实源，默认写到本仓库 `.workpanel/`。需要扫描 `wpKnowledge` 时，通过 `WP_KNOWLEDGE_REPOSITORY` 指向它的本地检出。当前发布事务不会自动提交或推送 Git；知识文件进入 `wpKnowledge` 仍要走普通 PR 评审。
 
-## 已实现
+## 已确认的后续方向
+
+第一版先在外部使用 **LangGraph 编排 → DSH 运行角色 → 业务校验与独立评测** 完成闭环。先交付公共底座和普通 CPU 小模块的真实角色范例，再开发七个角色；不另建 Agent 运行框架。Pi 退出目标底座，固定项目执行器退出公共入口；CodeAgent CLI 仅保留后续适配位置，不阻塞第一版。
+
+目标尚未实施。当前代码仍含 Pi 与 ohMyWorkPanel 场景，以下功能和启动命令描述现状。后续开发见[目标架构](docs/ARCHITECTURE.md#target-architecture)、[公共开发 SOP](docs/guides/agent-customization.md#agent-development-sop)和 [DEV-019](specs/changes/active/DEV-019-dsh-agent-foundation/proposal.md)。
+
+## 当前已实现
 
 - 七类 Agent 通过 LangGraph 执行，支持并行、循环、取消和 Checkpoint 恢复；
 - uiApi 统一进入 Orchestrator、Flywheel、EvalRunner、KnowledgeSearch、KnowledgeDiscovery、ContentGovernance、ProviderOperations、OperationalMetrics Application App；
 - Flywheel、EvalRunner、Association Domain Service 与 Agent/工作流/持久化 Adapter 保持单向依赖；
 - 候选知识绑定来源，工件使用 SHA-256 内容寻址；
 - 质量 Gate 与行为发布 Gate 分开，只有完整证据和 `PASS` 能产生 `VERIFIED`；
-- DeepSeek Harness 官方 SDK、可在 Console 配置并验证的 Pi Agent Provider、公司 CodeAgent CLI Adapter、角色工作区和 Linux Bubblewrap 隔离；
+- DeepSeek Harness 官方 SDK、当前 Console 的 Pi Agent Provider、角色工作区和 DSH Linux Bubblewrap 隔离；公司 CodeAgent CLI Adapter 仅通过自建协议夹具，真实参数与兼容性仍待核对；
 - 知识血缘与差异、评测证据与规则、来源注册与漂移、知识健康度和生成/治理观测；
 - CLI、资源化 HTTP API、DSH Adapter、双主题 Console 和项目网站；
 - 固定 ohMyWorkPanel 场景、真实评测与脱敏演示证据。
@@ -49,7 +55,7 @@ npm run knowledge:serve
 
 打开 <http://127.0.0.1:4174>。不需要扫描知识仓库时，可以不设置 `WP_KNOWLEDGE_REPOSITORY`。
 
-固定 ohMyWorkPanel 工作流：
+当前固定 ohMyWorkPanel 验收工作流（不是尚未交付的通用 CPU 范例）：
 
 ```bash
 npm run knowledge -- workflow-run --repository /path/to/ohMyWorkPanel

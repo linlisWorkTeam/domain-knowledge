@@ -35,6 +35,8 @@ domain-knowledge 的 SQLite Registry 与 CAS 仍是一次运行中的业务事�
 
 ## 新文件决策表
 
+目录表描述当前分层，不要求再建设通用 Agent 框架。后续角色使用 DSH 运行能力，项目只保留业务契约、节点接线及治理服务；具体 DSH 角色文件布局在 [DEV-019](../../specs/changes/active/DEV-019-dsh-agent-foundation/proposal.md) 实施阶段确定。不要复制 Pi 或固定项目执行器来增加新角色。
+
 | 新内容 | 放置位置 |
 | --- | --- |
 | 领域实体、Domain Service、Gate 或状态规则 | `src/domain/`、`src/domain/services/` |
