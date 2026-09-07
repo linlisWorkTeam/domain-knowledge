@@ -9,7 +9,47 @@ domain-knowledge owns knowledge governance and execution. Its Domain/Application
 
 </details>
 
-## 架构边界
+<a id="target-architecture"></a>
+
+## 已确认的目标架构（2026-09-07，尚未实施）
+
+第一版先在外部环境完成真实闭环。LangGraph 编排七个角色，DSH 直接承担单个 Agent 的运行能力；项目保留业务输入输出约定和治理服务，不在两者之间再建设一套通用 Agent 运行框架。
+
+```mermaid
+flowchart TD
+    A[LangGraph：节点调度、并行、迭代与恢复] --> B[DSH：对应角色的会话、模型与工具执行]
+    B --> C[业务结果校验与工件存储]
+    C --> D[独立评测、归因与确定性发布门禁]
+    D -->|需要迭代| A
+    D -->|发布或停止| E[结束]
+```
+
+图中表示职责和结果流向；发布或停止后流程结束，只有符合工作流规则的迭代才回到下一轮。评测和发布继续由系统服务执行，不交给模型自行判定。
+
+| 部分 | 目标职责 |
+| --- | --- |
+| LangGraph | 工作流状态、节点依赖、并行、业务迭代和恢复；调用 DSH 中对应的角色 |
+| DSH | 复用其会话、模型调用、工具运行和事件能力；各开发者在 DSH 上开发角色 |
+| 节点接线 | 将任务材料交给角色、接收结果并关联业务任务；保持必要的集成代码，不复制 DSH 的运行框架 |
+| Domain / Application | 定义各角色应交付的业务结果，验证 Schema、权限与工件归属，持有 Registry/CAS、独立评测和发布权威 |
+| CodeAgent CLI | 保留未来接入位置，使其交付相同的业务结果；真实协议适配与公司环境验收后置，不阻塞外部第一版 |
+
+业务输入输出约定不是新的运行框架：DSH 可以运行 DocGen，但“候选知识必须包含哪些事实、来源和字段”仍由项目定义。DSH 的原始响应与事件通过校验后才能成为业务工件。SDK 类型不进入 Domain/Application，版本化业务 Schema 与 ArtifactRef 边界继续保留。
+
+Pi 退出目标底座；其当前配置入口、依赖和旧 Run 的处置在实施阶段一并设计。`OhMyWorkPanelWorkflowExecutor` 退出公共运行入口，其中必要的输入准备、结果校验与证据交接应整理为通用节点接线。项目路径、固定 commit 和评测命令属于任务材料或验收样例，不能决定公共框架的结构。第一版不采用 DSH 再调用 CodeAgent CLI 的嵌套架构。
+
+交付顺序为：**DSH 公共底座 → 普通 CPU 小模块的可运行角色范例 → 七角色能力开发与联调 → 外部真实闭环 → CodeAgent CLI 真实适配**。底座可用只证明开发者可以沿用范例开发角色，不代表七角色业务能力或第一版完整闭环已经验收。
+
+<details lang="en">
+<summary>Target architecture summary</summary>
+
+The confirmed target uses LangGraph for workflow orchestration and DSH for individual agent execution. Business output contracts, evidence, evaluation and publication remain owned by this project. Pi and the project-specific executor leave the target foundation. CodeAgent CLI integration is reserved for a later stage. This is a documented direction, not an implemented or live-validated capability.
+
+</details>
+
+实施增量及验收分层见 [DEV-019](../specs/changes/active/DEV-019-dsh-agent-foundation/proposal.md)，角色开发流程见[开发指南](guides/agent-customization.md)。以下章节描述当前代码；与目标的差异尚未通过实现消除。
+
+## 当前实现的架构边界
 
 运行时采用 DDD 与六边形依赖方向：
 

@@ -37,6 +37,8 @@ This directory is the normative source for Knowledge Flywheel behavior. Requirem
 
 ## 阶段门
 
+2026-09-07 确认的后续方向为 LangGraph 编排、DSH 直接运行角色，先完成外部底座与 CPU 小模块范例，再开发七角色完整闭环；CodeAgent CLI 适配后置。变更提案见 [DEV-019](changes/active/DEV-019-dsh-agent-foundation/proposal.md)。目标尚未实现，Pi 默认执行和 ohMyWorkPanel 固定场景等现行条款的拟修改范围在 `spec-delta.md` 中记录；本轮未将其覆盖为新的 Accepted baseline，也未提高需求实现状态。
+
 P0-A Spec 已 Accepted；这只表示需求、契约和验收基线可进入实现验证，不代表 P0-B 或生产能力已经完成。P0-B 的当前实现范围、验证证据、下一工作项和未测边界统一记录在[开发状态](../docs/DEVELOPMENT-STATUS.md)，本规范入口不再维护一份会随开发变化的平行进度摘要。
 
 需求级状态仍以[追踪矩阵](13-verification/traceability-matrix.md)为准。Application App、Domain Service、固定七 Agent、LangGraph 与持久化的约束分别由 ADR-006、ADR-010、ADR-011 和对应验收场景定义，不因进度文档调整而改变。

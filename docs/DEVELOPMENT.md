@@ -2,6 +2,8 @@
 
 ## 开发基线
 
+下一阶段按 [DEV-019](../specs/changes/active/DEV-019-dsh-agent-foundation/proposal.md)收敛为 LangGraph 编排、DSH 角色运行；先完成底座与 CPU 范例，再开展七角色开发。当前代码尚未迁移，以下目录和命令仍描述现有实现；角色开发使用[公共 SOP](guides/agent-customization.md#agent-development-sop)。
+
 第一次参与开发请先阅读[文档首页](README.md)；按任务定位代码和测试时，使用其中的任务表。
 
 从仓库根目录开始：
@@ -79,6 +81,8 @@ uiApi / CLI / DSH / Web projection
 - 不在 Console 中用一串原始 transition 请求模拟 Orchestrator。
 
 ### 增加 Agent 或 Evaluator
+
+目标中的 Agent 会话、模型与工具运行直接复用 DSH，LangGraph 节点仅保留必要业务接线。Pi 和 `OhMyWorkPanelWorkflowExecutor` 不是后续角色开发模板；CodeAgent CLI 只保留未来接入位置。独立评测器与发布门禁仍属业务服务，不交给 DSH 自行判定。
 
 - 输入输出遵循 `specs/schemas/` JSON Schema；大对象通过 ArtifactRef 传递。
 - Agent 输出必须先做 schema validation，再进入领域流程。

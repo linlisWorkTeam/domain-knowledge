@@ -1,5 +1,7 @@
 # 4+1 架构视图
 
+> 后续开发使用 [DEV-019 的 DSH 目标架构](../changes/active/DEV-019-dsh-agent-foundation/proposal.md)。以下是现行 baseline 视图；Pi 与固定项目执行器退出目标底座，公司 CLI 适配后置，SDK/业务层分离和唯一 Registry/Gate 不变。
+
 ## 场景视图（+1）
 
 `源码快照 → Doc/Test 两条独立链路 → 知识驱动 Code → Check → 确定性 Eval → Review → iterate/stopped/pass`。关键场景详见 `AC-FLOW-001`、`AC-SEC-001`、`AC-REC-001`；面向知识消费者、治理者、工程师、验收者和旧调用方的交互见[用户用例与交互时序](../05-workflows/user-use-cases.md)。

@@ -21,6 +21,8 @@ npm run knowledge:serve
 
 ## 五个主要入口
 
+后续开发按[已确认的 DSH 目标架构](ARCHITECTURE.md#target-architecture)和[公共开发 SOP](guides/agent-customization.md#agent-development-sop)推进：先底座与范例，再七角色开发。目标尚未实现；当前可运行配置仍见快速上手，任务顺序见开发状态。
+
 | 我想做什么 | 阅读 |
 | --- | --- |
 | 第一次运行项目 | [快速上手](GETTING_STARTED.md) |
@@ -46,7 +48,7 @@ npm run knowledge:serve
 ### 开发指南
 
 - [AI 协作开发指南（Vibe Coding）](guides/ai-development-guide.md)
-- [单个 Agent 角色定制](guides/agent-customization.md)
+- [Agent 开发 SOP 与现有角色定制](guides/agent-customization.md)
 - [测试策略](guides/testing.md)
 - [文档语言与 I18n](guides/documentation-i18n.md)
 
@@ -74,6 +76,8 @@ npm run knowledge:serve
 - 当前状态只看[开发状态](DEVELOPMENT-STATUS.md)。
 - 日期化快照和阶段性测评位于 [`status/reports/`](status/reports/)。
 - 跨会话、未完成工作的交接记录位于 [`epitaph/`](epitaph/)。
+
+历史报告、ADR 和交接保留当时事实；其中的“下一步”或待评审方案不覆盖当前 DSH 方向，也不是继续旧 DFX/Pi 路线的授权。具体顺序以开发状态与 DEV-019 为准。
 
 ## 文档维护边界
 

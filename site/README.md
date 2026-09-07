@@ -35,6 +35,8 @@ node scripts/capture-console-demo.mjs
 
 脚本会启动真实的 `createKnowledgeServer`，在临时目录中通过正式 API 写入知识版本、评测证据、来源漂移和已验证的 Pi Agent 配置，并通过正式工作流观察器、治理命令和 SQLite 观测组件写入确定性验收事实，再用 Chromium 依次截取操作中心、知识血缘与差异、评测、来源、Agent 设置、治理指标和浅色主题。输出会覆盖 GIF 与静态替代图，临时数据库和来源目录在结束时删除。
 
+这些素材展示的是已有 Preview 与确定性验收事实，不是新 DSH 底座或真实模型效果证据。[DEV-019](../specs/changes/active/DEV-019-dsh-agent-foundation/proposal.md) 已确认 DSH 角色运行方向；Pi 退出目标底座，但新实现交付前不得把旧截图改标为 DSH 成果。
+
 这些记录只用于复验数据链路，不代表外部生产表现。调用耗时、Token 和重试来自持久化验收事实；未配置可信模型定价时，估算成本保持显示为 `—`。
 
 演示使用专用假密钥。录制前会检查所有密码输入框与可见文字，发现密钥值就直接失败；生成的公开资产不包含密钥。该脚本需要项目依赖已经安装，并需要 Playwright Chromium 可用。

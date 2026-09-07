@@ -1,5 +1,7 @@
 # DeepSeek Harness 部署
 
+> 本文是当前固定场景 SDK 路径的部署说明。已确认的后续底座直接使用 DSH 运行角色，见[目标架构](../../docs/ARCHITECTURE.md#target-architecture)。CPU 通用范例尚未交付，下面的 ohMyWorkPanel 路径是当前验收数据，不是公共底座的架构依赖。外部 DSH 第一版无需公司 CodeAgent CLI 环境。
+
 这个目录保存知识飞轮调用 DeepSeek Harness 时使用的无密钥配置。Harness 是 Agent 执行基础设施；知识版本、评测、Gate 和发布仍由 domain-knowledge 持有。
 
 <details lang="en">

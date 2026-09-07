@@ -1,5 +1,7 @@
 # Agent 规范
 
+> 开发方向：七角色后续直接基于 DSH 开发，先底座与 CPU 范例，再按[公共 SOP](../../docs/guides/agent-customization.md#agent-development-sop)分工。下文的 AgentCommand/AgentResult 是业务输入输出约定，不是需要自建的 Agent 运行框架；具体 DSH 配置留待 [DEV-019](../changes/active/DEV-019-dsh-agent-foundation/proposal.md)实施。
+
 六类规范覆盖七个运行角色：
 
 1. [编排类](orchestration-agents.md)：OrchestratorAgent

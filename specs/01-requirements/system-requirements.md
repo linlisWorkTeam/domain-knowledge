@@ -1,5 +1,7 @@
 # 系统需求
 
+> 迁移提示（目标尚未实施）：下表保留当前 Accepted baseline。KF-SYS-022 的固定项目验收与 KF-SYS-041 的 Pi 默认执行将按 [DEV-019 Spec 增量](../changes/active/DEV-019-dsh-agent-foundation/spec-delta.md)调整；新方向为 LangGraph 编排、DSH 运行角色，先外部 CPU 范例，再七角色闭环。不得把旧条款当作继续扩展 Pi 或固定项目执行器的任务指令。
+
 状态：Accepted。优先级 `P0` 是 V1 发布阻塞项。
 
 | ID | 优先级 | 需求 | 验收场景 |

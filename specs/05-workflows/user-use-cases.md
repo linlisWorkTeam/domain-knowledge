@@ -1,5 +1,7 @@
 # 用户用例与交互时序
 
+> 迁移提示：UC-KF-004 的固定源码样例与 UC-KF-007 的 Pi 配置描述当前 baseline。后续采用 [DEV-019](../changes/active/DEV-019-dsh-agent-foundation/spec-delta.md) 的外部 DSH 底座与 CPU 范例；Pi 退出目标路径，公司 CLI 后置。DSH 新配置流程尚未交付，现有 Pi 表单不能视为 DSH 配置入口。
+
 **状态：Accepted｜版本：1.2.0｜基线日期：2026-09-04**
 
 本文把需求、验收场景和用户入口连接成可执行的交互视图。时序图中的“必须 / 不得”具有规范性；具体能力是否已经落地，以[追踪矩阵](../13-verification/traceability-matrix.md)为准。

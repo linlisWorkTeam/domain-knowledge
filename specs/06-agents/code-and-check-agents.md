@@ -1,5 +1,7 @@
 # 代码与检查类 Agent
 
+> 运行方向见 [Agent 规范入口](README.md)：角色在 DSH 上开发。下文的固定 ohMyWorkPanel Adapter 是当前实现说明，迁出公共入口的目标见 [DEV-019](../changes/active/DEV-019-dsh-agent-foundation/spec-delta.md)，不是后续 Code/Check 开发范例。
+
 ## CodeAgent
 
 - **职责**：仅根据候选知识和公开接口，在 fresh session 中生成可构建实现。

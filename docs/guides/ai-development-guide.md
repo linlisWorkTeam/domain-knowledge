@@ -75,6 +75,8 @@ Spec 与代码冲突时，AI 不得静默选择一边。先判断是实现偏离
 
 ## AI 开始任务时读什么
 
+当前架构方向已经由用户确认，见 [DEV-019](../../specs/changes/active/DEV-019-dsh-agent-foundation/proposal.md)：LangGraph 编排、DSH 运行角色，先底座和 CPU 范例，后续再分发角色任务。旧 DFX 报告、旧 epitaph 及 Pi/固定项目的历史实现不能作为继续旧路线的授权；具体实施设计仍需按当前请求推进。
+
 AI 不需要把整个仓库文档全部塞进上下文。推荐顺序是：
 
 1. `AGENTS.md` 和 `docs/epitaph/` 中最新交接；
