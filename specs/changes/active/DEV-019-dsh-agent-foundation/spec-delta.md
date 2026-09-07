@@ -1,8 +1,8 @@
 # Spec 增量（Draft）
 
-架构方向已确认，以下记录待实施时合入 baseline 的语义变化。当前 Accepted Spec 与追踪矩阵保留现状，本文件不是已实现能力声明。
+以下保留提案时的差异与 R0 核实记录。R1 的 DSH 依赖、配置、通用场景和旧记录处置已实施并同步 baseline；最新实现范围见末尾 T105/T106 节，真实模型验收仍待 R2～R4。
 
-## 拟修改
+## 提案时的差异
 
 | 规范位置 / 需求 | 当前语义 | 目标增量 |
 | --- | --- | --- |
@@ -31,7 +31,7 @@ KF-SYS-004 的候选 oracle 验证、006 的证据、010 的恢复幂等、011 �
 
 实现变更须同步受影响的 baseline、ADR、测试和操作文档。Preview API 若变化，按 KF-SYS-032 原子更新生产者与消费者；业务 Schema 是否变化需显式说明，不能静默替换。需求状态按实际证据更新，旧 ID 不复用，新 AC 与需求绑定后再进入正式追踪矩阵。
 
-## R0 已核实的接线选择与 R1 进度
+## R0 已核实的接线选择与 R1 首批进度（历史）
 
 CPU 范例选择本仓库 `structuredMarkdownDiff`，参考源码固定到文档提交 `3f999204f988697cc5bb9473c5a10ad5b4fc1f78`，默认示范 DocGen；公开输入为前后两个字符串，输出为 hunks、changedSections、rangeValidation。测试覆盖正常编辑、空/相同输入、CRLF、远距修改、插入/删除、大输入和非法类型；Code 阶段只允许生成该模块路径，参考实现及测试不交给 Code。R2 再交付独立的公开契约材料和 live 命令，当前不伪称已存在通用入口。
 
@@ -53,3 +53,11 @@ CPU 范例选择本仓库 `structuredMarkdownDiff`，参考源码固定到文档
 KF-SYS-025 与 ADR-011 已同步 DSH 的会话/工具职责及应用业务契约边界。原生 `sdk-minimal` 配置加项目 DSH 插件：编排角色无工具，其余角色只能 `read_material`，输出写入由业务结果处理；权限不依赖提示词。每次 Schema 尝试使用独立 session/home，延续应用 checkpoint 幂等。
 
 锁定 DSH 上游包含 `dsh-llm-pi-ai` → `pi-ai` 模型适配依赖；原生 minimal 路径不加载此适配器。T105 移除的是项目直接依赖及执行的 Pi coding-agent 框架，不能把上游模型适配包的间接存在误报成框架迁出失败或声称锁文件完全无 `pi` 字符串。
+
+## T105/T106 已实施
+
+项目直接 Pi SDK 依赖及其执行路径已移除，配置安全模块迁到 `src/infrastructure/security/`。Console/API 保存 `deepseek-harness`，生产组合根默认原生 DSH；只有显式 fixture 配置才使用夹具。通用场景入口在 T105 前一功能交付，本次完成剩余配置迁移。Command/Result Schema 版本不变；Preview Provider 设置值由生产者和消费者一起更新。
+
+模型配置经公开 HTTPS/DNS 检查与无副作用验证后启用。父进程持有上游密钥，通过每次调用独立的本地 relay 为原生 DSH 提供经过批准的传输；固定已批准地址、拒绝重定向，Schema 重试交给已有 DSH Adapter。运行中使用冻结模型配置，恢复时比较当前运行参数摘要；旧 Pi 快照拒绝恢复且保留读取，旧加密文件不改写、密钥不自动迁移。配置、安全、审计指标、快照和 HTTP/Console 回归同步迁到 DSH。
+
+生产默认 bubblewrap，受控模型传输测试显式不使用进程隔离，权限边界另由 T102 原生工具与工作区测试证明。本地 SSE 服务驱动真实 DSH 七节点及独立 CPU 评测，只证明机制；R2～R4 live 结果仍为 NOT_RUN。CodeAgent CLI 仅保留后置 Adapter，不计为已验证集成。

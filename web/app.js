@@ -147,7 +147,7 @@ const AGENT_LABELS = {
 
 const PROVIDER_LABELS = {
   fixture: '本地验收模拟器',
-  'pi-agent': 'Pi Agent',
+  'pi-agent': 'Pi Agent（历史记录）',
   'deepseek-harness': 'DeepSeek Harness',
   'deepseek-harness-headless': 'DeepSeek Harness 无界面模式',
 }
@@ -1090,7 +1090,7 @@ async function saveProviderSettings(form) {
     await request('/api/v1/provider-settings', {
       method: 'PUT',
       body: JSON.stringify({
-        provider: 'pi-agent', apiUrl: String(data.get('apiUrl') ?? ''),
+        provider: 'deepseek-harness', apiUrl: String(data.get('apiUrl') ?? ''),
         ...(String(data.get('apiKey') ?? '') ? { apiKey: String(data.get('apiKey')) } : {}),
         clearApiKey: data.get('clearApiKey') === 'on',
         model: String(data.get('model') ?? '').trim() || null,
@@ -1123,7 +1123,7 @@ async function verifyProviderSettings() {
       error.code = verification?.reasonCode ?? 'VERIFICATION_REQUIRED'
       throw error
     }
-    showToast('连接验证成功，新批次将默认使用 Pi Agent。', 'success')
+    showToast('连接验证成功，新批次将默认使用 DSH。', 'success')
   } catch (error) {
     await loadAgentOperations(true)
     renderAgents()

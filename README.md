@@ -22,7 +22,7 @@ SQLite Registry 与 CAS 是运行时事实源，默认写到本仓库 `.workpane
 
 第一版先在外部使用 **LangGraph 编排 → DSH 运行角色 → 业务校验与独立评测** 完成闭环。先交付公共底座和普通 CPU 小模块的真实角色范例，再开发七个角色；不另建 Agent 运行框架。Pi 退出目标底座，固定项目执行器退出公共入口；CodeAgent CLI 仅保留后续适配位置，不阻塞第一版。
 
-目标正在分阶段实施：公共业务接线已与预写夹具分离；当前代码仍含 Pi 配置及默认后端、固定场景入口，以下功能和启动命令描述现状。后续开发见[目标架构](docs/ARCHITECTURE.md#target-architecture)、[公共开发 SOP](docs/guides/agent-customization.md#agent-development-sop)和 [DEV-019](specs/changes/active/DEV-019-dsh-agent-foundation/proposal.md)。
+R1 已将角色执行收敛到 DSH，通用项目场景从 CLI/API/Console 传入。Pi Agent 运行依赖已移除，旧记录保留可读且拒绝恢复；CodeAgent CLI 适配后置。R2 的真实 CPU DocGen 范例及后续完整闭环仍待验收。 详见[开发状态](docs/DEVELOPMENT-STATUS.md)和 [DEV-019](specs/changes/active/DEV-019-dsh-agent-foundation/proposal.md)。
 
 ## 当前已实现
 
@@ -31,7 +31,7 @@ SQLite Registry 与 CAS 是运行时事实源，默认写到本仓库 `.workpane
 - Flywheel、EvalRunner、Association Domain Service 与 Agent/工作流/持久化 Adapter 保持单向依赖；
 - 候选知识绑定来源，工件使用 SHA-256 内容寻址；
 - 质量 Gate 与行为发布 Gate 分开，只有完整证据和 `PASS` 能产生 `VERIFIED`；
-- DeepSeek Harness 官方 SDK、当前 Console 的 Pi Agent Provider、角色工作区和 DSH Linux Bubblewrap 隔离；公司 CodeAgent CLI Adapter 仅通过自建协议夹具，真实参数与兼容性仍待核对；
+- DeepSeek Harness 官方 SDK、Console 的 DSH 模型配置、角色工作区和 DSH Linux Bubblewrap 隔离；公司 CodeAgent CLI Adapter 仅通过自建协议夹具，真实参数与兼容性仍待核对；
 - 知识血缘与差异、评测证据与规则、来源注册与漂移、知识健康度和生成/治理观测；
 - CLI、资源化 HTTP API、DSH Adapter、双主题 Console 和项目网站；
 - 固定 ohMyWorkPanel 场景、真实评测与脱敏演示证据。

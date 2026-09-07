@@ -1,6 +1,6 @@
 # 分阶段验收
 
-状态：本变更内的拟验收项，尚未合入 baseline，也尚未通过实现验证。
+状态：R1 的 AC-DSHF-006、007 及 002、003 自动化部分已通过本地验收；配置/依赖条款已同步 baseline，待 PR 审查。R2～R4 live 范例和完整闭环尚未验收，详见 evidence.md。
 
 ## 底座与范例
 
@@ -65,7 +65,7 @@ npm run test:architecture
 node --test --test-concurrency=1 tests/integration/deepseek-harness-agent.test.ts tests/integration/agent-contracts.test.ts tests/security/agent-workspace.test.ts
 ```
 
-R1 还须新增或改造 AC-DSHF-006、007 对应的行为测试，并执行受影响的 Provider、server、Console 和固定场景测试；配置页面发生变化时执行 `npm run test:ui`，对可见结果检查错误状态、配置生效及旧 Run 提示。以上基线命令不能替代新场景测试。测试文件迁移时同步本文的真实路径。
+R1 已新增或迁移 AC-DSHF-006、007 对应行为测试：`tests/integration/dsh-configuration-migration.test.ts`、`dsh-configured-provider.test.ts`、`tests/acceptance/dsh-configured-flow.test.ts` 及双场景全流程测试；继续执行受影响的 Provider、server 和 Console 回归。配置页面发生变化时执行 `npm run test:ui`，对可见结果检查错误状态、配置生效及旧 Run 提示。以上基线命令不能替代新场景测试。测试文件迁移时同步本文的真实路径。
 
 ### R2、R3 真实角色与 R4 闭环
 

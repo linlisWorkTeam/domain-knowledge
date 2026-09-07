@@ -127,7 +127,7 @@ function recordProviderInvocation({
     invocationId,
     runId: run.runId,
     agentId,
-    provider: 'pi-agent',
+    provider: 'deepseek-harness',
     model: 'pi-governance-demo',
     startedAt,
     completedAt: offset(startedAt, durationMs),
@@ -146,7 +146,7 @@ function recordProviderInvocation({
 
 async function captureRunConfiguration(run) {
   const snapshot = await instance.composition.runConfiguration.capture(run.runId);
-  assert.equal(snapshot.provider.kind, 'pi-agent');
+  assert.equal(snapshot.provider.kind, 'deepseek-harness');
   assert.equal(snapshot.provider.model, 'pi-governance-demo');
   return snapshot;
 }
@@ -168,7 +168,7 @@ async function seed(baseUrl) {
     method: 'PUT',
     headers: mutationHeaders('site-demo-provider-save'),
     body: JSON.stringify({
-      provider: 'pi-agent',
+      provider: 'deepseek-harness',
       apiUrl: 'https://provider.demo.invalid/v1',
       apiKey: providerSecret,
       model: 'pi-governance-demo',

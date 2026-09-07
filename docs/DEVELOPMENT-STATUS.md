@@ -1,6 +1,6 @@
 # 开发状态
 
-**当前阶段：DEV-019 R0 已通过，R1 开发中｜更新时间：2026-09-07｜下一任务：继续 R1 的 Pi 配置/依赖、默认后端及通用场景入口迁移**
+**当前阶段：DEV-019 R1 本地验收通过，待 PR 审查｜更新时间：2026-09-07｜下一任务：R1 PR 审查后执行 R2 T103/T104**
 
 本文件是 domain-knowledge 的**唯一开发进度入口**，用于记录当前阶段、已完成里程碑、正在进行或下一项工作、后续队列和最近验证结果。产品行为仍以 [`../specs/`](../specs/README.md) 为规范性事实源；需求级的 `Implemented / Partial / Planned` 状态仍只在[追踪矩阵](../specs/13-verification/traceability-matrix.md)维护。
 
@@ -38,16 +38,16 @@ This file is the single entry point for project-level development status, curren
 
 ## 当前方向与开发顺序（2026-09-07）
 
-用户已确认：LangGraph 编排，DSH 直接承担角色运行能力，业务服务持有结果校验、工件、独立评测和发布门禁。不增加独立通用 Agent 运行框架。首批已将 `OhMyWorkPanelWorkflowExecutor` 替换为 `ProjectWorkflowStages` 业务接线，预写输出分离到显式夹具。Pi 配置、依赖、默认后端及固定场景入口仍待迁移，尚不能声明底座仅依赖 DSH。
+R1 已将角色执行收敛到 DSH，通用项目场景从 CLI/API/Console 传入。Pi Agent 运行依赖已移除，旧记录保留可读且拒绝恢复；CodeAgent CLI 适配后置。R2 的真实 CPU DocGen 范例及后续完整闭环仍待验收。 公共接线为 ProjectWorkflowStages，预写输出独立为 Fixture Adapter。
 
-1. 执行 DEV-019 R0：核实环境与现有回归，固定 CPU 样例和参考测试，落实 DSH 接线及旧配置/Run 处置；随后直接进入 R1 开发，不再重复整体架构讨论。
-2. R1 移除 Pi 运行依赖和固定项目公共执行器，完成 DSH 配置与通用接线；R2 交付 DocGen 默认示范角色并真实验收底座。
+1. R0 已完成环境与基线核实，固定 CPU 样例和参考测试，明确 DSH 接线及旧配置/Run 处置。
+2. R1 已完成 Pi 迁出、DSH 配置与通用接线，本功能 PR 合并后进入 R2：交付 DocGen 示范角色并真实验收底座。
 3. R3 按公共 SOP 开发七角色并联调；R4 在外部完成真实闭环。候选测试验证与 DEV-011 对齐，第一版相关恢复/权限要求与 DEV-012 对齐，不能因任务另列而跳过。
 4. DEV-010 公司 CLI 真实适配与验收后置；保留接入位置，不要求先迁移公司平台。DEV-013 的容量与部署决策仍依赖真实数据。
 
-本次文档交付见 [DEV-019](../specs/changes/active/DEV-019-dsh-agent-foundation/proposal.md)、[架构](ARCHITECTURE.md)和[开发 SOP](guides/agent-customization.md)。底座范例尚未交付，不能据此宣称第一版完整闭环已验收；Accepted baseline 的拟变化已写入 spec-delta，需求实现状态未调整。
+本次实现与证据见 [DEV-019](../specs/changes/active/DEV-019-dsh-agent-foundation/proposal.md)、[架构](ARCHITECTURE.md)和[开发 SOP](guides/agent-customization.md)。底座范例尚未交付，不能据此宣称第一版完整闭环已验收；R1 对应 baseline 与追踪矩阵已同步，R2～R4 状态未提高。
 
-可执行阶段、依赖和退出条件统一维护在 [Roadmap](../specs/changes/active/DEV-019-dsh-agent-foundation/plan.md)。T100/T101 已完成：Node 24、锁定 DSH SDK、Bubblewrap 及 28 项基线验证通过；CPU 范例选 `structuredMarkdownDiff`，固定源码上的 7 项参考测试通过。R1 首批覆盖通用业务阶段、SDK session 关联及取消提交检查，两个不同目录场景经受控 SDK 测试；下一步继续 T102/T105/T106。R2～R4 尚未执行，未做真实模型验收。
+可执行阶段、依赖和退出条件统一维护在 [Roadmap](../specs/changes/active/DEV-019-dsh-agent-foundation/plan.md)。T100/T101 已完成：Node 24、锁定 DSH SDK、Bubblewrap 及 28 项基线验证通过；CPU 范例选 `structuredMarkdownDiff`，固定源码上的 7 项参考测试通过。R1 已完成 T102/T105/T106：原生 DSH 工具权限和失败矩阵、通用双场景入口、默认 DSH 配置、旧 Pi 只读兼容及受控七角色流程。当前功能 PR 合并后进入 R2 T103/T104。R2～R4 尚未执行，未做真实模型验收。
 
 DEV-014 及其引用的 DEV-015～018 是其他 worktree 中的旧 DFX 草稿上下文。本轮未完成或接管那些实现；后续只复用符合当前目标的部分，不自动承接旧报告的全部范围。
 
@@ -59,7 +59,7 @@ DEV-014 及其引用的 DEV-015～018 是其他 worktree 中的旧 DFX 草稿上
 - deterministic fixture 可以完成失败、修订、重新生成、评测和发布闭环。
 - 前台 F2 已完成最终七页面、真实批次 Agent 工作流图、绿色双主题、响应式、可访问性及真实/部分/禁用状态；用户已确认当前版本为最终 UI/UX，HCP-1=`Accepted`。
 - B1–B4 Preview API 与前台接线已经完成；操作中心、批次、工作流图、知识血缘/差异、评测/规则、来源注册、知识健康、Provider 配置和观测指标均使用服务端事实。
-- DeepSeek Harness、Pi SDK 与公司 CodeAgent CLI AgentProvider Adapter 已存在；CodeAgent CLI 的协议夹具和组合根接线不能证明真实兼容。用户提供的 CLI 反馈与现有启动参数、session 和认证解析存在差异，需在后置的 DEV-010 重新核对真实协议及 live 结果。
+- 角色执行统一使用 DSH 原生 SDK，项目 Pi Agent 依赖已移除。公司 CodeAgent CLI 仅保留后置接口，真实兼容性未验收。
 - 来源漂移与不可用会形成可去重的持久化事项；完整安全事实事项仍等待 DEV-012 的权限拒绝审计。
 - 外部真实模型质量、公司环境容量、长期稳定性、企业 KMS 和敌对代码执行安全尚未形成验收结论。
 
@@ -83,7 +83,7 @@ DEV-014 及其引用的 DEV-015～018 是其他 worktree 中的旧 DFX 草稿上
 | DEV-011 | TestGen 候选测试的通用 Oracle 验证与门禁链路 | Planned | 原 DEV-007；对应 `KF-SYS-004` |
 | DEV-012 | 四点崩溃注入、完整权限拒绝审计与恢复加固 | Planned | 原 DEV-008；对应 `AC-REC-001`、`AC-SEC-002` |
 | DEV-013 | 生产容量、认证续期、并发与 Redis 启用决策 | Planned | 原 DEV-009；依赖真实运行数据，不改变 Registry 事实源地位 |
-| DEV-019 | DSH 公共底座、CPU 角色范例与外部七角色闭环 | In Progress | `codex/dev019-dsh-foundation`：R0 通过，R1 首批代码及全量 160/160 回归通过；Pi/默认配置/固定入口迁移仍待完成，live 尚未验收 |
+| DEV-019 | DSH 公共底座、CPU 角色范例与外部七角色闭环 | In Progress | R0/T102 和通用场景入口已通过审查；T105/T106 本地验收通过，待本次 PR 审查，R2 live 范例未开始 |
 
 状态含义：`Ready / Next` 表示下一项已排序但尚未开始；`In Progress` 表示已有活动开发分支；`Blocked` 必须写明外部依赖；`Done` 必须给出可复验结果。
 
@@ -125,7 +125,7 @@ DEV-014 及其引用的 DEV-015～018 是其他 worktree 中的旧 DFX 草稿上
 
 ## 已完成开发任务：DEV-007 与 DEV-008
 
-DEV-007 的目标是形成单项目最小完整可用闭环：管理员能安全接入 Pi Agent Provider，新批次默认使用已验证配置，并能用真实数据判断生成速度、治理速度和治理效果；成本仅在存在可信模型定价时计算，否则保持为空。DEV-008 同轮并行补齐知识、评测、来源和健康度页面所需的内容与质量事实。
+以下为 DEV-007 当时的交付记录，Pi 路径现由 DEV-019 迁到 DSH。DEV-007 的目标是形成单项目最小完整可用闭环：管理员能安全接入 Pi Agent Provider，新批次默认使用已验证配置，并能用真实数据判断生成速度、治理速度和治理效果；成本仅在存在可信模型定价时计算，否则保持为空。DEV-008 同轮并行补齐知识、评测、来源和健康度页面所需的内容与质量事实。
 
 范围：
 

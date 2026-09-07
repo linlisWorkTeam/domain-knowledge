@@ -1,6 +1,6 @@
 # 追踪矩阵
 
-> 目标与现状分开追踪：[DEV-019](../changes/active/DEV-019-dsh-agent-foundation/spec-delta.md) 记录 DSH 底座增量，当前表格的状态与路径继续对应现有代码。尤其 KF-SYS-022、041 和 KF-UI-021 的历史 Implemented 不表示 CPU 通用范例或 DSH 配置已实现；AC-DSHF-001～005 尚未验收，不提高本表状态。
+> [DEV-019](../changes/active/DEV-019-dsh-agent-foundation/spec-delta.md) 的 R1 已实现 DSH 配置、依赖迁出和通用启动；本表同步当前实现路径。受控模型测试证明执行机制，R2 live CPU 范例及 R3/R4 完整闭环仍待验收。
 
 实现状态按当前代码和可执行测试记录。`Implemented` 表示已有对应代码与自动化验证，`Partial` 表示只实现安全子集，`Planned` 表示规范仍保留但不得宣称为当前能力。实现和测试路径均相对 domain-knowledge 根目录；人工审计证据另存于 wpKnowledge。
 
@@ -46,7 +46,7 @@
 | KF-SYS-038 | AC-API-007 | Implemented | `src/infrastructure/persistence/sqlite-content-governance/index.ts` + `src/interfaces/runner/server.ts` + `web/app.js` | `tests/integration/content-governance.test.ts` + `tests/e2e/console.spec.ts` |
 | KF-SYS-039 | AC-API-008 | Implemented | `src/application/services/workflow-control.ts` + `src/interfaces/runner/console-read-model.ts` + `web/app.js` | `tests/integration/server.test.ts` + `tests/acceptance/automated-langgraph-flow.test.ts` + `tests/e2e/console.spec.ts` |
 | KF-SYS-040 | AC-API-009 | Implemented | `src/application/apps/provider-operations-app.ts` + `src/interfaces/runner/server.ts` + `web/app.js` | `tests/integration/provider-observability.test.ts` + `tests/e2e/console.spec.ts` |
-| KF-SYS-041 | AC-API-010 | Implemented | `src/application/apps/provider-operations-app.ts` + `src/infrastructure/agents/pi-agent` + `src/interfaces/runner/composition.ts` + `web/app.js` | `tests/security/provider-settings.test.ts` + `tests/integration/pi-agent-provider.test.ts` + `tests/acceptance/pi-agent-flow.test.ts` + `tests/e2e/console.spec.ts` |
+| KF-SYS-041 | AC-API-010 | Implemented | `src/application/apps/provider-operations-app.ts` + `src/infrastructure/agents/deepseek-harness` + `src/interfaces/runner/composition.ts` + `web/app.js` | `tests/security/provider-settings.test.ts` + `tests/integration/dsh-configured-provider.test.ts` + `tests/acceptance/dsh-configured-flow.test.ts` + `tests/e2e/console.spec.ts` |
 | KF-SYS-042 | AC-OBS-004 | Implemented | `src/application/apps/operational-metrics-app.ts` + `src/infrastructure/observability/sqlite-operational-metrics.ts` + `web/app.js` | `tests/integration/operational-metrics.test.ts` + `tests/integration/provider-observability.test.ts` + `tests/e2e/console.spec.ts` |
 | KF-UI-001 | AC-UI-001 | Implemented | `web/app.js` + `src/interfaces/runner/server.ts` | `tests/contract/site.test.ts` + `tests/integration/server.test.ts` |
 | KF-UI-002 | AC-UI-002 | Implemented | `web/app.js` + `src/interfaces/runner/console-read-model.ts` | `tests/contract/site.test.ts` + `tests/integration/server.test.ts` |
@@ -67,7 +67,7 @@
 | KF-UI-017 | AC-UI-017 | Implemented | `web/index.html` + `web/app.js` + `site/index.html` + `site/app.js` | `tests/contract/site.test.ts` |
 | KF-UI-018 | AC-UI-018 | Implemented | `.env.example` + `web/app.js` | `tests/contract/site.test.ts` + `tests/integration/server.test.ts` |
 | KF-UI-019 | AC-UI-019 | Implemented | `web/index.html` + `web/styles.css` + `web/app.js` | `tests/contract/site.test.ts` + `tests/e2e/console.spec.ts` |
-| KF-UI-021 | AC-UI-024 | Implemented | `src/application/apps/provider-operations-app.ts` + `src/infrastructure/agents/pi-agent` + `web/app.js` | `tests/security/provider-settings.test.ts` + `tests/integration/provider-observability.test.ts` + `tests/acceptance/pi-agent-flow.test.ts` + `tests/e2e/console.spec.ts` |
+| KF-UI-021 | AC-UI-024 | Implemented | `src/application/apps/provider-operations-app.ts` + `src/infrastructure/agents/deepseek-harness` + `web/app.js` | `tests/security/provider-settings.test.ts` + `tests/integration/provider-observability.test.ts` + `tests/acceptance/dsh-configured-flow.test.ts` + `tests/e2e/console.spec.ts` |
 | NFR-001 | AC-SEC-002 | Partial | `src/interfaces/runner/server.ts` | `tests/integration/server.test.ts` |
 | NFR-002 | AC-REC-001 | Partial | `src/application/services/index.ts` + `src/infrastructure/persistence/sqlite-cas/index.ts` | `tests/integration/sqlite-cas.test.ts` |
 | NFR-003 | AC-REC-002 | Implemented | `src/application/services/index.ts` + `src/infrastructure/persistence/sqlite-cas/index.ts` | `tests/integration/sqlite-cas.test.ts` + `tests/acceptance/publication-flow.test.ts` |
@@ -82,3 +82,12 @@
 | NFR-012 | AC-UI-012 | Implemented | `web/index.html` + `web/styles.css` + `web/app.js` | `tests/contract/site.test.ts` + `tests/e2e/console.spec.ts` |
 
 `SPK-001` 的官方 SDK 接缝、stdin JSON-RPC、超时关闭和 Bubblewrap 角色工作区已有自动化验证；端到端 SDK Run `5503b6bc-0350-4b53-98cc-6fbf3a13aaa9` 已归档，`KF-SYS-025` 的接线验收完成。公司 CodeAgent CLI Adapter 的认证预检、stdin、JSON/JSONL、角色工具、可恢复 session、进程组终止、错误分类和脱敏审计已由协议夹具验证；公司环境 live Run 留在 DEV-010，不以夹具冒充。`SPK-002` 的 LangGraph 选型结果已由 ADR-006 和自动化测试固化；失败 task checkpoint 恢复已有自动化用例，四个崩溃注入点仍是恢复加固项。单次 live Run 不能替代稳定性试验，Agent 源码隔离也不能证明敌对代码执行安全。
+
+## DEV-019 R1 验收增量
+
+| 验收项 | 本地状态 | 实现与行为证据 |
+| --- | --- | --- |
+| AC-DSHF-006 | PASS | 直接 Pi coding-agent 依赖与固定项目公共执行器已移除；`tests/acceptance/automated-langgraph-flow.test.ts` 验证不同模块、目录和命令经同一接线执行；原生 DSH 路径由 `tests/acceptance/dsh-configured-flow.test.ts` 验证 |
+| AC-DSHF-007 | PASS | `tests/integration/dsh-configuration-migration.test.ts` 验证默认 DSH、运行冻结、新 Run 配置、旧 Pi 读取/拒绝恢复及秘密不迁移；`provider-observability.test.ts`、`tests/e2e/console.spec.ts` 验证 HTTP/Console |
+
+AC-DSHF-002/003 的 R1 自动化部分见 T102 证据；001/004 的 live 范例、005 完整闭环及 008 逐角色交付均未计为通过。完整命令和结果在 DEV-019 `evidence.md` 追加。

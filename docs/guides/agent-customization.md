@@ -32,7 +32,7 @@
 
 ## 当前实现与操作说明
 
-以下说明当前已存在的固定角色及 `promptAddon` 操作。Pi 配置与默认后端、固定场景入口仍待迁出；原固定执行器已替换为通用业务接线，预写输出移到显式夹具。这些旧操作不作为后续角色开发模板。
+R1 已将角色执行收敛到 DSH，通用项目场景从 CLI/API/Console 传入。Pi Agent 运行依赖已移除，旧记录保留可读且拒绝恢复；CodeAgent CLI 适配后置。R2 的真实 CPU DocGen 范例及后续完整闭环仍待验收。
 
 <details lang="en">
 <summary>English summary</summary>
@@ -45,14 +45,14 @@ domain-knowledge exposes seven fixed Agent roles. A trusted operator may append 
 
 Console 里看到的 Orchestrator、DocGen、DocWorker、TestGen、`code`、Check 和 Review 是七类固定角色。它们描述“这个节点负责什么”，不是七个分别安装的 Agent 产品。
 
-以 `code` 为例：旧设计常把它叫作 `CodeAgent`，当前前台改称“代码生成角色（Code role）”。真实运行时，它和其他角色一样由当前 `AgentProvider` 执行。本项目当前有 DeepSeek Harness SDK、Pi Agent 和公司 CodeAgent CLI 三种 Adapter；Pi 由管理员在 Console 配置，CodeAgent CLI 则由部署环境显式启用。Adapter 接线不等于公司环境的真实效果与容量已经验收。
+`code` 是七角色之一，由 DSH 执行，产出经过业务 Schema 校验的文件内容；不是公司 CodeAgent CLI。Console 管理 DSH 模型配置。角色开发复用 DSH 工具和会话能力，项目只保留输入材料、业务结果和评测发布规则。
 
 对应代码：
 
 - 固定角色定义：[`src/infrastructure/workflow/langgraph/agent-definitions.ts`](../../src/infrastructure/workflow/langgraph/agent-definitions.ts)
 - 节点到角色的映射：[`src/infrastructure/workflow/langgraph/graph.ts`](../../src/infrastructure/workflow/langgraph/graph.ts)
 - Provider 装配：[`src/interfaces/runner/composition.ts`](../../src/interfaces/runner/composition.ts)
-- Pi Agent Adapter：[`src/infrastructure/agents/pi-agent/index.ts`](../../src/infrastructure/agents/pi-agent/index.ts)
+- DSH 配置适配：[`configured-provider.ts`](../../src/infrastructure/agents/deepseek-harness/configured-provider.ts)
 - 公司 CodeAgent CLI Adapter：[`src/infrastructure/agents/company-codeagent/index.ts`](../../src/infrastructure/agents/company-codeagent/index.ts)
 - 角色工作区和证据装配：[`src/application/services/automated-project-workflow.ts`](../../src/application/services/automated-project-workflow.ts)
 

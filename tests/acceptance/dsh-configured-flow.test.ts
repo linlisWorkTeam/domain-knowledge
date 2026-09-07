@@ -9,15 +9,7 @@ import test from 'node:test';
 import type {
   ProviderEndpointPolicy, ProviderInvocationRecord, ProviderSettingsRecord, ProviderSettingsStore,
 } from '../../src/application/ports/index.ts';
-import {
-  AutomatedProjectWorkflowService, ProjectWorkflowStages,
-  type AutomatedProjectScenario,
-} from '../../src/application/services/index.ts';
-import { JsonSchemaAgentContractValidator } from '../../src/infrastructure/agents/contracts/index.ts';
-import { PiCodingAgentProvider } from '../../src/infrastructure/agents/pi-agent/index.ts';
-import { LocalAgentWorkspace } from '../../src/infrastructure/agents/workspace/index.ts';
-import { TrustedProjectEvaluator } from '../../src/infrastructure/evaluation/project/index.ts';
-import { createDomainKnowledgeInfrastructure } from '../../src/infrastructure/workflow/langgraph/index.ts';
+import type { AutomatedProjectScenario } from '../../src/application/services/index.ts';
 import { createComposition } from '../../src/interfaces/runner/composition.ts';
 import { GOOD_BODY } from '../helpers/fixture.ts';
 
@@ -46,8 +38,8 @@ function agentOutput(agentType: string): Record<string, unknown> {
     case 'doc-gen':
       return {
         body: `${GOOD_BODY}\n\n## 行为契约\n\n公开函数必须返回固定数值 4，且由隔离行为测试验证。`,
-        title: 'Pi Agent 最小知识批次',
-        description: '使用真实 Pi Agent SDK 生成并通过确定性门禁的知识。',
+        title: 'DSH 最小知识批次',
+        description: '使用真实 DSH SDK 生成并通过确定性门禁的知识。',
       };
     case 'test-gen':
       return {
@@ -65,11 +57,11 @@ function agentOutput(agentType: string): Record<string, unknown> {
   }
 }
 
-test('a minimum complete Run sends all seven governed nodes through the real Pi SDK adapter', async () => {
-  const repositoryRoot = mkdtempSync(join(tmpdir(), 'pi-flow-source-'));
-  const runtimeDir = mkdtempSync(join(tmpdir(), 'pi-flow-runtime-'));
+test('a minimum complete Run sends all seven governed nodes through the real native DSH SDK adapter', async () => {
+  const repositoryRoot = mkdtempSync(join(tmpdir(), 'dsh-flow-source-'));
+  const runtimeDir = mkdtempSync(join(tmpdir(), 'dsh-flow-runtime-'));
   mkdirSync(join(repositoryRoot, 'src'));
-  writeFileSync(join(repositoryRoot, 'package.json'), '{"name":"pi-flow","type":"module"}\n');
+  writeFileSync(join(repositoryRoot, 'package.json'), '{"name":"dsh-flow","type":"module"}\n');
   writeFileSync(join(repositoryRoot, 'src', 'contract.js'), 'export const expected = 4;\n');
   writeFileSync(join(repositoryRoot, 'src', 'module.js'), 'export const calculate = () => 4;\n');
   writeFileSync(join(repositoryRoot, 'src', 'module.test.js'), `
@@ -81,7 +73,7 @@ test('generated behavior', () => assert.equal(calculate(), expected));
 `.trimStart());
   git(repositoryRoot, ['init']);
   git(repositoryRoot, ['config', 'user.email', 'pi-agent@example.invalid']);
-  git(repositoryRoot, ['config', 'user.name', 'Pi Agent Acceptance']);
+  git(repositoryRoot, ['config', 'user.name', 'DSH Acceptance']);
   git(repositoryRoot, ['add', '.']);
   git(repositoryRoot, ['commit', '-m', 'fixture']);
   const commit = git(repositoryRoot, ['rev-parse', 'HEAD']);
@@ -122,47 +114,26 @@ test('generated behavior', () => assert.equal(calculate(), expected));
     validate: async () => ({ url: new URL(`${apiUrl}/`), addresses: ['127.0.0.1'] }),
   };
   const store = new MemorySettings();
+  const invocations: ProviderInvocationRecord[] = [];
+  const previousIsolation = process.env.WP_DSH_PROCESS_ISOLATION;
+  process.env.WP_DSH_PROCESS_ISOLATION = 'none'; // controlled transport test; isolation has dedicated tests
   const composition = createComposition({
-    runtimeDir,
+    runtimeDir, repositoryRoot,
+    operationalMetrics: { recordProviderInvocation: (record) => { invocations.push(record); }, runs: () => ({}), governance: () => ({}) },
     providerSettingsStore: store,
     providerEndpointPolicy: endpointPolicy,
     providerProbe: { verify: async ({ model }) => ({ status: 'VERIFIED', reasonCode: 'READY', model }) },
   });
-  const invocations: ProviderInvocationRecord[] = [];
   try {
     await composition.apps.providerOperations.put({
-      provider: 'pi-agent', apiUrl, apiKey: 'acceptance-key', model: 'test-model', expectedRevision: 0,
+      provider: 'deepseek-harness', apiUrl, apiKey: 'acceptance-key', model: 'test-model', expectedRevision: 0,
     });
     await composition.apps.providerOperations.verify({ expectedRevision: 1 });
     assert.ok(store.value);
-    const provider = new PiCodingAgentProvider({
-      settings: store.value,
-      agentDir: join(runtimeDir, 'pi-agent'),
-      endpointPolicy,
-      onInvocation: (record) => { invocations.push(record); },
-    });
-    const executor = new ProjectWorkflowStages({
-      flywheel: composition.apps.flywheel,
-      evalRunner: composition.apps.evalRunner,
-      evaluator: new TrustedProjectEvaluator(composition.artifacts),
-      contracts: new JsonSchemaAgentContractValidator(join(process.cwd(), 'specs', 'schemas')),
-      agent: provider,
-      agentWorkspaces: new LocalAgentWorkspace({
-        workspaceRoot: join(runtimeDir, 'agent-workspaces'), allowedSourceRoots: [repositoryRoot],
-      }),
-    });
-    const infrastructure = await createDomainKnowledgeInfrastructure({
-      executor,
-      observer: composition.workflowObserver,
-      prompts: composition.runConfiguration,
-      checkpoint: { kind: 'memory' },
-    });
-    const workflow = new AutomatedProjectWorkflowService(
-      composition.service, infrastructure.engine, composition.runConfiguration,
-    );
+    const workflow = await composition.automatedWorkflow();
     const command = { tool: 'node' as const, purpose: 'test' as const, args: ['--test', 'src/module.test.js'] };
     const scenario: AutomatedProjectScenario = {
-      schemaVersion: '1.0', name: 'pi-agent-minimum', moduleId: 'pi-agent-module',
+      schemaVersion: '1.0', name: 'dsh-minimum', moduleId: 'dsh-module',
       repositoryRoot, expectedCommit: commit,
       sourcePaths: ['src/module.js', 'src/module.test.js'],
       publicInterfacePaths: ['src/contract.js', 'package.json'],
@@ -170,13 +141,13 @@ test('generated behavior', () => assert.equal(calculate(), expected));
       referenceCommands: [command], firstIterationCommands: [command], finalCommands: [command],
     };
     const handle = await workflow.start(scenario, {
-      policyId: 'pi-agent-acceptance-v1', minimumStability: 1, requireAllTests: true,
+      policyId: 'dsh-acceptance-v1', minimumStability: 1, requireAllTests: true,
       maxIterations: 1, workerCount: 1,
     });
     const result = await workflow.wait(handle.runId);
-    assert.equal(result.executionStatus, 'COMPLETED');
+    assert.equal(result.executionStatus, 'COMPLETED', result.error ?? '');
     assert.equal(result.route, 'PASS');
-    assert.equal(composition.runConfiguration.get(handle.runId)?.provider.kind, 'pi-agent');
+    assert.equal(composition.runConfiguration.get(handle.runId)?.provider.kind, 'deepseek-harness');
     assert.deepEqual([...new Set(invokedRoles)].sort(), [
       'check', 'code', 'doc-gen', 'doc-worker', 'orchestrator', 'review', 'test-gen',
     ]);
@@ -186,6 +157,8 @@ test('generated behavior', () => assert.equal(calculate(), expected));
     assert.equal(composition.service.status().publications, 1);
   } finally {
     composition.close();
+    if (previousIsolation === undefined) delete process.env.WP_DSH_PROCESS_ISOLATION;
+    else process.env.WP_DSH_PROCESS_ISOLATION = previousIsolation;
     upstream.close();
     await once(upstream, 'close');
     rmSync(repositoryRoot, { recursive: true, force: true });

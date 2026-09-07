@@ -9,7 +9,7 @@ import { createComposition } from '../../src/interfaces/runner/composition.ts';
 
 test('RunConfigurationSnapshot freezes all Agent prompts and safe runtime identity', async () => {
   const runtimeDir = mkdtempSync(join(tmpdir(), 'wp-run-configuration-'));
-  const composition = createComposition({ runtimeDir });
+  const composition = createComposition({ runtimeDir, agentProviderMode: 'fixture' });
   try {
     composition.apps.orchestrator.updatePromptAddon('doc-gen', 'first frozen instruction');
     const run = composition.apps.flywheel.createRun('snapshot-module', 'local-v1');
@@ -198,12 +198,12 @@ test('Company CodeAgent snapshot freezes all non-secret CLI execution parameters
   }
 });
 
-test('Pi RunConfigurationSnapshot freezes every non-secret execution parameter', async () => {
-  const root = mkdtempSync(join(tmpdir(), 'wp-pi-provider-digest-'));
+test('DSH RunConfigurationSnapshot freezes every non-secret execution parameter', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'wp-dsh-provider-digest-'));
   const runtimeDir = join(root, 'runtime');
   const trackedKeys = [
-    'WP_PI_MAX_TOKENS', 'WP_PI_MAX_SCHEMA_ATTEMPTS', 'WP_PI_CONTEXT_WINDOW',
-    'WP_DSH_MAX_TOKENS',
+    'WP_DSH_MAX_TOKENS', 'WP_DSH_MAX_SCHEMA_ATTEMPTS', 'WP_DSH_CONTEXT_WINDOW',
+    'WP_PI_MAX_TOKENS',
   ] as const;
   const previous = new Map(trackedKeys.map((key) => [key, process.env[key]]));
   const compositions: ReturnType<typeof createComposition>[] = [];
@@ -224,19 +224,19 @@ test('Pi RunConfigurationSnapshot freezes every non-secret execution parameter',
     return composition;
   };
   try {
-    process.env.WP_PI_MAX_TOKENS = '4096';
-    process.env.WP_PI_MAX_SCHEMA_ATTEMPTS = '2';
-    process.env.WP_PI_CONTEXT_WINDOW = '16384';
-    process.env.WP_DSH_MAX_TOKENS = '1111';
+    process.env.WP_DSH_MAX_TOKENS = '4096';
+    process.env.WP_DSH_MAX_SCHEMA_ATTEMPTS = '2';
+    process.env.WP_DSH_CONTEXT_WINDOW = '16384';
+    process.env.WP_PI_MAX_TOKENS = '1111';
     const first = create();
     await first.apps.providerOperations.put({
-      provider: 'pi-agent', apiUrl: 'https://provider.example/v1', apiKey: 'snapshot-secret',
+      provider: 'deepseek-harness', apiUrl: 'https://provider.example/v1', apiKey: 'snapshot-secret',
       model: 'model-a', expectedRevision: 0,
     });
     await first.apps.providerOperations.verify({ expectedRevision: 1 });
-    const run = first.apps.flywheel.createRun('pi-runtime-snapshot', 'local-v1');
+    const run = first.apps.flywheel.createRun('dsh-runtime-snapshot', 'local-v1');
     const snapshot = await first.runConfiguration.capture(run.runId);
-    assert.equal(snapshot.provider.kind, 'pi-agent');
+    assert.equal(snapshot.provider.kind, 'deepseek-harness');
     const runtime = first.apps.providerOperations.requireRuntimeConfiguration(snapshot.provider);
     assert.deepEqual({
       api: runtime.api,
@@ -249,13 +249,13 @@ test('Pi RunConfigurationSnapshot freezes every non-secret execution parameter',
     assert.doesNotMatch(JSON.stringify(snapshot), /snapshot-secret/);
     first.close();
 
-    // DSH settings no longer affect the Pi execution digest.
-    process.env.WP_DSH_MAX_TOKENS = '2222';
+    // Retired Pi settings cannot alter the DSH execution digest.
+    process.env.WP_PI_MAX_TOKENS = '2222';
     const dshChanged = create();
     await dshChanged.runConfiguration.assertCompatible(run.runId);
     dshChanged.close();
 
-    process.env.WP_PI_MAX_TOKENS = '4097';
+    process.env.WP_DSH_MAX_TOKENS = '4097';
     const tokenChanged = create();
     await assert.rejects(
       tokenChanged.runConfiguration.assertCompatible(run.runId),
@@ -263,8 +263,8 @@ test('Pi RunConfigurationSnapshot freezes every non-secret execution parameter',
     );
     tokenChanged.close();
 
-    process.env.WP_PI_MAX_TOKENS = '4096';
-    process.env.WP_PI_MAX_SCHEMA_ATTEMPTS = '3';
+    process.env.WP_DSH_MAX_TOKENS = '4096';
+    process.env.WP_DSH_MAX_SCHEMA_ATTEMPTS = '3';
     const attemptsChanged = create();
     await assert.rejects(
       attemptsChanged.runConfiguration.assertCompatible(run.runId),

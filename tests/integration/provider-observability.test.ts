@@ -25,7 +25,7 @@ const endpointPolicy: ProviderEndpointPolicy = {
   validate: async (raw) => ({ url: new URL(raw.endsWith('/') ? raw : `${raw}/`), addresses: ['1.1.1.1'] }),
 };
 
-test('Provider HTTP contract redacts credentials, persists idempotency, and activates Pi for new Runs', async () => {
+test('Provider HTTP contract redacts credentials, persists idempotency, and activates DSH for new Runs', async () => {
   const runtimeDir = mkdtempSync(join(tmpdir(), 'provider-http-'));
   const store = new MemoryProviderSettingsStore();
   let policyCalls = 0;
@@ -67,13 +67,13 @@ test('Provider HTTP contract redacts credentials, persists idempotency, and acti
     assert.equal(unauthorized.status, 401);
     const missingKey = await fetch(`${base}/api/v1/provider-settings`, {
       method: 'PUT', headers: auth,
-      body: JSON.stringify({ provider: 'pi-agent', apiUrl: 'https://provider.example/v1', expectedRevision: 0 }),
+      body: JSON.stringify({ provider: 'deepseek-harness', apiUrl: 'https://provider.example/v1', expectedRevision: 0 }),
     });
     assert.equal(missingKey.status, 422);
     assert.equal((await missingKey.json()).error.code, 'IDEMPOTENCY_KEY_REQUIRED');
 
     const requestBody = {
-      provider: 'pi-agent', apiUrl: 'https://provider.example/v1', apiKey: secret,
+      provider: 'deepseek-harness', apiUrl: 'https://provider.example/v1', apiKey: secret,
       model: 'model-a', expectedRevision: 0,
     };
     const saved = await fetch(`${base}/api/v1/provider-settings`, {
@@ -98,7 +98,7 @@ test('Provider HTTP contract redacts credentials, persists idempotency, and acti
       method: 'PUT', headers: { ...auth, 'idempotency-key': 'save-1' },
       body: JSON.stringify({
         expectedRevision: 0, model: 'model-a', apiKey: secret,
-        apiUrl: 'https://provider.example/v1', provider: 'pi-agent',
+        apiUrl: 'https://provider.example/v1', provider: 'deepseek-harness',
       }),
     });
     assert.equal(reorderedReplay.status, 200);
@@ -129,22 +129,22 @@ test('Provider HTTP contract redacts credentials, persists idempotency, and acti
       enabled: status.enabled,
       reasonCode: status.reasonCode,
     }, {
-      provider: 'pi-agent', availability: 'AVAILABLE', authentication: 'AUTHENTICATED',
+      provider: 'deepseek-harness', availability: 'AVAILABLE', authentication: 'AUTHENTICATED',
       enabled: true, reasonCode: 'READY',
     });
     const piCapabilities = await (await fetch(`${base}/api/v1/system/capabilities`)).json();
-    assert.equal(piCapabilities.agentProvider, 'pi-agent');
-    assert.equal(piCapabilities.agentPromptTransport, 'pi-agent-openai-compatible');
+    assert.equal(piCapabilities.agentProvider, 'deepseek-harness');
+    assert.equal(piCapabilities.agentPromptTransport, 'dsh-sdk-jsonrpc');
 
     const run = instance.composition.apps.flywheel.createRun('provider-contract', 'local-v1');
     const snapshot = await instance.composition.runConfiguration.capture(run.runId);
-    assert.equal(snapshot.provider.kind, 'pi-agent');
+    assert.equal(snapshot.provider.kind, 'deepseek-harness');
     assert.equal(snapshot.provider.model, 'model-a');
     assert.doesNotMatch(JSON.stringify(snapshot), /sk-never-return-this|apiKey/i);
     assert.equal(instance.composition.repository.database.prepare(
       "SELECT COUNT(*) AS count FROM command_receipts WHERE fingerprint LIKE '%sk-never%'",
     ).get()?.count, 0);
-    const audit = instance.composition.repository.listEvents('provider-settings:pi-agent');
+    const audit = instance.composition.repository.listEvents('provider-settings:deepseek-harness');
     assert.deepEqual(audit.map((event) => event.eventType), [
       'ComponentStatusChanged', 'ComponentStatusChanged',
     ]);
@@ -171,7 +171,7 @@ test('Provider HTTP contract redacts credentials, persists idempotency, and acti
     const resaved = await fetch(`${base}/api/v1/provider-settings`, {
       method: 'PUT', headers: { ...auth, 'idempotency-key': 'save-2' },
       body: JSON.stringify({
-        provider: 'pi-agent', apiUrl: 'https://provider.example/v1', model: 'model-a', expectedRevision: 2,
+        provider: 'deepseek-harness', apiUrl: 'https://provider.example/v1', model: 'model-a', expectedRevision: 2,
       }),
     });
     assert.equal(resaved.status, 200);
@@ -190,7 +190,7 @@ test('Provider HTTP contract redacts credentials, persists idempotency, and acti
     assert.equal(failedSettings.enabled, false);
     assert.equal(failedSettings.verification.status, 'FAILED');
     const fallbackCapabilities = await (await fetch(`${base}/api/v1/system/capabilities`)).json();
-    assert.equal(fallbackCapabilities.agentProvider, 'fixture');
+    assert.equal(fallbackCapabilities.agentProvider, 'deepseek-harness');
   } finally {
     instance.server.close();
     await once(instance.server, 'close');

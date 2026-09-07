@@ -34,6 +34,7 @@ export function createTestComposition(clock?: () => string) {
   let tick = 0;
   const composition = createComposition({
     runtimeDir,
+    agentProviderMode: 'fixture',
     clock: clock ?? (() => `2026-08-31T00:00:${String(tick++).padStart(2, '0')}.000Z`),
   });
   return {

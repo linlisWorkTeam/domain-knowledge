@@ -12,11 +12,11 @@ import type {
   ProviderProbeResult,
   ProviderSettingsRecord,
   ProviderSettingsStore,
-} from '../../../application/ports/index.ts';
+} from '../../application/ports/index.ts';
 
 export {
   isPublicAddress, PublicHttpsEndpointPolicy,
-} from '../../security/public-https.ts';
+} from './public-https.ts';
 
 interface SealedSettings {
   version: 1;
@@ -47,13 +47,16 @@ export class EncryptedFileProviderSettingsStore implements ProviderSettingsStore
   readonly settingsPath: string;
   readonly keyPath: string;
 
-  constructor(settingsPath: string, keyPath: string) {
+  readonly legacy?: ProviderSettingsStore;
+
+  constructor(settingsPath: string, keyPath: string, legacy?: ProviderSettingsStore) {
+    this.legacy = legacy;
     this.settingsPath = settingsPath;
     this.keyPath = keyPath;
   }
 
   load(): ProviderSettingsRecord | null {
-    if (!existsSync(this.settingsPath)) return null;
+    if (!existsSync(this.settingsPath)) return this.legacy?.load() ?? null;
     try {
       const sealed = JSON.parse(readFileSync(this.settingsPath, 'utf8')) as SealedSettings;
       if (sealed.version !== 1) throw new Error('unsupported version');
