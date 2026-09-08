@@ -433,8 +433,8 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
         body: document.body,
         title: document.title,
         description: document.description,
-        category: 'automated-ohmyworkpanel',
-        tags: ['ohmyworkpanel', 'langgraph'],
+        category: 'automated-project',
+        tags: ['langgraph'],
         provenance: scenario.sourcePaths.map((path) => ({
           path,
           commit: (input.context.snapshot as ProjectSnapshot).commit,

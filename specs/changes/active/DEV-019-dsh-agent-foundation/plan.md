@@ -40,7 +40,7 @@ R1、R2 是公共底座交付；R3、R4 是基于底座完成第一版。DEV-011
 | `src/infrastructure/agents/deepseek-harness/`、`src/infrastructure/workflow/langgraph/` | 复用 DSH SDK；节点仅准备授权材料、映射业务结果及关联事件；受限工作区、失败/超时/取消可验证 |
 | `src/application/apps/provider-operations-app.ts`、业务 ports、Provider 存储、server/Console | DSH 配置、验证、默认选择与 Run 快照一致；公共业务类型不依赖 Pi 或 DSH SDK 类型 |
 | `src/infrastructure/agents/pi-agent/`、`package.json`、锁文件及调用方 | 删除 Pi 运行依赖；通用配置安全功能迁到独立位置继续复用；历史标识解析可保留，但不能加载 Pi SDK |
-| 场景数据、评测入口和 `acceptance/ohmyworkpanel/` | 固定路径、源码版本和命令成为场景数据；旧样例通过同一公共接线运行，不保留第二套生产执行器 |
+| 场景数据与评测入口 | 项目路径、源码版本和命令由显式场景提供；移除旧项目专属验收目录与命令，通用验收夹具只在测试中创建 |
 | 当前 AgentProvider/业务 Schema 与公司 Adapter | 保留 CodeAgent CLI 未来交付相同业务结果的接口；默认启动不要求安装、认证或加载公司 CLI，不开发 DSH → CLI 嵌套运行 |
 
 SDK 当前能力以仓库锁定版本和本地代码为准；需要升级时在实施差异中说明，不能按用户转述的公司 CLI 参数直接替换现有协议。

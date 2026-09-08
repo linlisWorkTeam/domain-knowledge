@@ -32,7 +32,7 @@ CI 只在 PR 更新时自动运行，合入 main 后不再重复执行；直接�
 | Company CLI Adapter | `tests/integration/company-codeagent-cli.test.ts` | 现有自建协议夹具；不证明实际 CLI 参数、认证、会话或文件权限兼容 |
 | Agent workspace security | `tests/security/agent-workspace.test.ts` | 角色文件白名单、路径穿越与来源符号链接拒绝 |
 | Demo report | `tests/integration/demo-report.test.ts` | Run 证据聚合、CAS 完整性和 Prompt/凭据脱敏 |
-| Real-source acceptance | `npm run acceptance:ohmyworkpanel -- ...` | 固定受信源码的失败、Correction、再生成、独立执行和发布 |
+| Real-source acceptance | `tests/acceptance/real-source-flow.test.ts` | 固定受信源码的失败、Correction、再生成、独立执行和发布 |
 
 `npm test` 运行仓库当前全部 Node 测试，并固定测试并发以避免共享运行目录互相干扰。
 
@@ -51,16 +51,13 @@ CI 只在 PR 更新时自动运行，合入 main 后不再重复执行；直接�
 
 ## 真实源码验收
 
-固定 commit 的 ohMyWorkPanel 验收需要本地仓库包含 `acceptance/ohmyworkpanel/scenario.json` 指定的 Git object：
+自动回归在临时目录创建独立的最小 Git 项目，不依赖外部 WorkPanel 仓库、固定预写资产目录或真实密钥：
 
 ```bash
-npm run acceptance:ohmyworkpanel -- \
-  --repository /path/to/ohMyWorkPanel \
-  --runtime /tmp/wp-ohmy-acceptance \
-  --output summary
+node --test tests/acceptance/real-source-flow.test.ts tests/acceptance/automated-langgraph-flow.test.ts
 ```
 
-该验收证明当前编排和受信执行链路，不证明 live 模型质量，也不构成敌对代码隔离测试。若环境不具备固定 commit，应如实标为未运行。
+真实 DSH 验收通过 `workflow-run --scenario /path/to/scenario.json --repository /path/to/project` 使用显式可信项目。场景固定 commit、公开接口、可生成路径与命令；测试必须非空，失败归因和修订路径必须可复验。底座 CPU 范例使用 `npm run example:docgen -- prepare|run|check`，完整闭环按 DEV-019 R3/R4 验收。未执行 live 验收不得标为通过。
 
 ## 测试数据纪律
 

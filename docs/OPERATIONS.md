@@ -72,16 +72,9 @@ npm run knowledge -- publish `
 
 ## 固定 commit 的真实源码验收
 
-项目验收命令会对固定的 ohMyWorkPanel commit 运行完整两轮流程。它验证 reference gate、首轮故意失败、结构化 Correction、知识增量修订、fresh 代码生成、独立进程评测、确定性 `PASS` 和幂等发布。
+V1 的验收项目由场景文件指定，不绑定某个外部仓库。公共入口使用 `workflow-run --scenario <file>`，要求受信源码、固定 commit、允许生成路径及测试命令。旧项目专属验收命令和预写资产已移除。
 
-```powershell
-npm run acceptance:ohmyworkpanel -- `
-  --repository D:\AI\LinlisWorkPanel `
-  --runtime D:\temp\wp-ohmy-acceptance `
-  --output summary
-```
-
-源码仓库必须包含 `acceptance/ohmyworkpanel/scenario.json` 固定的 commit；对象缺失或不一致时会 fail closed。当前分支可以继续前进：报告会区分 checkout HEAD 和归档验收 commit，整个过程不会 checkout 或修改源码仓库。
+自动回归通过 `tests/acceptance/real-source-flow.test.ts` 和 `automated-langgraph-flow.test.ts` 在临时 Git 仓库验证首轮失败、Correction、fresh 再生成、独立执行和幂等发布；这些夹具验证机制，不证明真实模型质量。外部真实闭环仍按 DEV-019 的 R3/R4 单独验收。
 
 评测器使用 `git archive`，生成文件只写临时目录；可执行工具限于 `node`、`pnpm` 和 `cargo`。它不经过 shell，会净化继承环境、限制命令时间与输出，并把工具版本、脱敏 argv、退出状态和脱敏输出保存到 CAS。
 
@@ -89,7 +82,7 @@ npm run acceptance:ohmyworkpanel -- `
 
 ## 内嵌 LangGraph 工作流
 
-面向生产形态的入口使用同一个固定 ohMyWorkPanel 场景，但通过内嵌 `domain-knowledge` LangGraph 基础设施运行：
+公共入口使用显式项目场景，通过内嵌 `domain-knowledge` LangGraph 基础设施运行：
 
 ```bash
 npm run knowledge -- workflow-run --scenario /path/to/scenario.json --repository /path/to/project
@@ -215,7 +208,7 @@ session ID 文件位于 `$WP_FLYWHEEL_HOME/codeagent/sessions/`，新建目录�
 
 ## DSH
 
-DSH 有两个方向：作为角色运行框架时，LangGraph 调用其 SDK，当前配置见[DSH 部署说明](../deploy/deepseek-harness/README.md)；下面的 Cordis 插件则让外部 DSH 调用知识库 HTTP API，不承担七角色调度。新底座优先复用前者，不另建 Agent 运行框架。
+DSH 有两个方向：作为角色运行框架时，LangGraph 调用其 SDK，当前配置见[DSH 部署说明](guides/dsh-runtime.md)；下面的 Cordis 插件则让外部 DSH 调用知识库 HTTP API，不承担七角色调度。新底座优先复用前者，不另建 Agent 运行框架。
 
 把 `src/interfaces/dsh/index.ts` 作为普通 Cordis plugin 挂载，并配置：
 

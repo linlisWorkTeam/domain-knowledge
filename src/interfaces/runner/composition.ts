@@ -38,6 +38,7 @@ import {
 } from '../../infrastructure/security/provider-settings.ts';
 import { ConfiguredDshProvider, DSH_DEFAULT_CONTEXT_WINDOW, DSH_DEFAULT_MAX_SCHEMA_ATTEMPTS, DSH_DEFAULT_MAX_TOKENS } from '../../infrastructure/agents/deepseek-harness/configured-provider.ts';
 import { FixtureProjectWorkflowStages } from '../../infrastructure/agents/scenario/project-workflow-fixture.ts';
+import { writeOpenCodeGoPatch } from '../../infrastructure/agents/deepseek-harness/opencode-go.ts';
 import { JsonSchemaAgentContractValidator } from '../../infrastructure/agents/contracts/index.ts';
 import { SQLiteOperationalMetrics } from '../../infrastructure/observability/sqlite-operational-metrics.ts';
 import { migrateLegacyOkf } from '../../infrastructure/migration/legacy-okf/index.ts';
@@ -225,8 +226,12 @@ export function createComposition(input: {
   const agentWorkspaceRoot = join(runtimeDir, 'agent-workspaces');
   const sdkPatches = process.env.WP_DSH_PATCHES_JSON
     ? JSON.parse(process.env.WP_DSH_PATCHES_JSON) as string[]
-    : sdkProvider === 'opencode-go'
-      ? [join(componentRoot, 'deploy', 'deepseek-harness', 'opencode-go.cordis.yml')]
+    : agentProviderMode === 'deepseek-harness' && sdkProvider === 'opencode-go'
+      ? [writeOpenCodeGoPatch({
+          runtimeDir, profile, baseURL: process.env.OPENCODE_GO_BASE_URL, model: providerModel, maxTokens,
+          contextWindow: process.env.WP_DSH_CONTEXT_WINDOW
+            ? Number(process.env.WP_DSH_CONTEXT_WINDOW) : undefined,
+        })]
       : [];
   const headlessCommand = process.env.WP_DSH_COMMAND?.trim() || 'dsh';
   const headlessArgs = process.env.WP_DSH_ARGS_JSON

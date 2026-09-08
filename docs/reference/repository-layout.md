@@ -7,8 +7,6 @@
 ```text
 domain-knowledge/
 ├── src/                     # 生产代码
-├── acceptance/              # 固定场景夹具
-├── deploy/                  # 部署配置
 ├── docs/                    # 工程说明
 ├── specs/                   # 规范性事实源
 ├── tests/                   # 自动化验证

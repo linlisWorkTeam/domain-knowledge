@@ -108,6 +108,11 @@ test('generated result matches contract', () => assert.equal(calculate(), expect
     assert.equal(result.route, 'PASS');
     assert.equal(composition.repository.getRun(handle.runId)?.state, 'VERIFIED');
     assert.equal(composition.service.status().publications, 1);
+    const published = composition.repository.listKnowledgeVersions(['VERIFIED']);
+    assert.equal(published.length, 1);
+    assert.equal(published[0]?.moduleId, moduleId);
+    assert.equal(published[0]?.category, 'automated-project');
+    assert.deepEqual(published[0]?.tags, ['langgraph']);
     const projections = composition.repository.listWorkflowNodeProjections(handle.runId);
     assert.deepEqual([...new Set(projections.map((projection) => projection.agentId).filter(Boolean))].sort(), [
       'check', 'code', 'doc-gen', 'doc-worker', 'orchestrator', 'review', 'test-gen',

@@ -18,7 +18,7 @@
 4. LangGraph 节点状态通过受控观察端口投影到 Knowledge Registry。Console 读取该投影，不直接查询 LangGraph checkpoint 数据库。
 5. LangGraph 的工作流路由和知识发布门禁分开。工作流路由决定继续、迭代、回滚请求、停止或失败；只有 wpKnowledge 发布门禁和发布事务可以产生 `VERIFIED`。
 6. 全部 Agent 使用固定的节点定义：职责、依赖、可见输入、输出 Schema、工具权限和拓扑不能从前台修改。前台只允许为 Agent 保存一段追加提示词；覆盖值有长度限制、鉴权、持久化和审计。
-7. ohMyWorkPanel 是固定的集成验收样例。它必须验证 LangGraph 节点可见、首轮失败、Review/修订、fresh 生成、真实项目评测和 wpKnowledge 原子发布。
+7. 集成验收使用显式可信项目场景（2026-09-08 修订：移除原固定项目专属入口，不再绑定 ohMyWorkPanel）。它必须验证 LangGraph 节点可见、首轮失败、Review/修订、fresh 生成、真实项目评测和 wpKnowledge 原子发布。
 8. 每次大规模能力建设必须同步检查产品 Console、GitHub Pages、文档、Spec、追踪矩阵和验收测试。
 
 ## 依赖方向

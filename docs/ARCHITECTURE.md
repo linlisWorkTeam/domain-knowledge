@@ -209,4 +209,6 @@ src/
 
 ## 运行要求
 
+项目场景由公共 CLI/API 显式传入，验收不依赖 WorkPanel 专属资产。OpenCode Go 由 DSH 适配层根据环境变量生成非秘密运行配置，不读取仓库部署目录；密钥只通过 `OPENCODE_GO_API_KEY` 提供，参数与优先级见 [DSH 运行配置](guides/dsh-runtime.md)。
+
 本地 Adapter 使用内置 `node:sqlite` API，因此要求 Node.js 24 或更高版本。运行依赖包括内嵌 LangGraph/checkpointer 包，以及一次性迁移旧 OKF 所需的 `yaml`。正常知识存储使用 JSON 列和 CAS，不依赖 YAML 解析。

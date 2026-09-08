@@ -38,9 +38,9 @@
 | AC-LANG-001 | Given 非 C++ 假插件，When 运行发现与标准化契约测试，Then 核心成功且通用消息无 C/C++ 专属字段。 |
 | AC-LANG-002 | Given C++ 示例及 CPU/内存/超时/进程树攻击，When 沙箱执行，Then正常结果标准化、超限终止并审计。 |
 | AC-COMPAT-001 | Given 旧 Runner 的 init/ingest/query/status/scan/feedback 调用，When 通过兼容入口执行，Then 参数被确定性映射到新 CLI、所有持久状态仅写入同一 SQLite/CAS，已退休且会错误表达发布权威的 score/eval/harvest 调用明确失败。 |
-| AC-E2E-001 | Given 固定 commit 且基线门禁通过的 ohMyWorkPanel 源码，When 在仓库外隔离副本运行两轮知识驱动再生成，Then 首轮真实测试失败并形成带证据 Correction，第二轮 fresh 生成通过前端全测、生产构建与 Rust 全测，最终只发布第二版且 run 审计包含全部节点、评测与发布证据。 |
-| AC-E2E-002 | Given 固定 ohMyWorkPanel 场景，When 内嵌 LangGraph 执行全部 Agent、一次失败迭代和真实项目评测，Then 同一 runId 下保留七类节点投影、两版知识 lineage、PASS decision 和唯一 publication receipt。 |
-| AC-E2E-003 | Given 配置好的 DeepSeek Harness AgentProvider 与固定 ohMyWorkPanel commit，When 运行自动治理并从 Agent 输出错误恢复，Then 七类 live Agent 输出均经过 Schema 校验、调用摘要脱敏、质量反馈自动迭代，最终行为证据与发布仍由 Knowledge Gate 决定。 |
+| AC-E2E-001 | Given 场景指定固定 commit 且基线门禁通过的可信项目源码，When 在仓库外隔离副本运行两轮知识驱动再生成，Then 首轮真实测试失败并形成带证据 Correction，第二轮 fresh 生成通过场景要求的全部测试、稳定性与构建检查，最终只发布第二版且 run 审计包含全部节点、评测与发布证据。 |
+| AC-E2E-002 | Given 显式可信项目场景，When 内嵌 LangGraph 执行全部 Agent、一次失败迭代和真实项目评测，Then 同一 runId 下保留七类节点投影、两版知识 lineage、PASS decision 和唯一 publication receipt。 |
+| AC-E2E-003 | Given 配置好的 DeepSeek Harness AgentProvider 与场景指定的固定源码 commit，When 运行自动治理并从 Agent 输出错误恢复，Then 七类 live Agent 输出均经过 Schema 校验、调用摘要脱敏、质量反馈自动迭代，最终行为证据与发布仍由 Knowledge Gate 决定。 |
 | AC-API-001 | Given Preview API 迁移变更，When 扫描 Server、Console、DSH Adapter、测试和文档并执行契约测试，Then 只存在规范资源路径，旧 HTTP 路由返回 404，内部 transition/evaluate/publish 不可通过 HTTP 调用。 |
 | AC-API-002 | Given 相同 `type + subject + reasonCode` 的失败事实被重复投影，When 创建并处理待处理事项，Then 同时只有一个非 RESOLVED 事项、重放不重复创建；ACKNOWLEDGE/RESOLVE 严格遵循 revision 和幂等键，RETRY 只恢复可恢复 checkpoint，REGENERATE 创建带 parentRunId 的新批次，既有 GateDecision 和 publication 字节不变。 |
 | AC-API-003 | Given 固定七节点、增加迭代和不可证明工作单元三种批次，When 查询进度并从已持久化 event_seq 中断后续传，Then completed/total 可由 snapshot 重建、重试 attempt 不扩大 total、迭代先扩展 total、不可证明计划返回 INDETERMINATE 且无 ETA；SSE 游标之后的持久化事件按序完整到达，过期游标要求重读 snapshot。 |

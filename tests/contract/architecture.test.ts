@@ -23,6 +23,7 @@ test('domain core has no SDK, database, language, or adapter dependency', () => 
 test('application depends on ports and domain, never concrete adapters', () => {
   const source = files('src/application').map((path) => readFileSync(path, 'utf8')).join('\n');
   assert.doesNotMatch(source, /from\s+['"][^'"]*(?:infrastructure|interfaces)[^'"]*['"]/);
+  assert.doesNotMatch(source, /ohmyworkpanel/i, 'shared application logic must not depend on a specific acceptance project');
 });
 
 test('infrastructure never depends on interface entrypoints', () => {

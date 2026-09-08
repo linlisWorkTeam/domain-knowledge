@@ -36,7 +36,7 @@ R1 已将角色执行收敛到 DSH，通用项目场景从 CLI/API/Console 传�
 - DeepSeek Harness 官方 SDK、Console 的 DSH 模型配置、角色工作区和 DSH Linux Bubblewrap 隔离；公司 CodeAgent CLI Adapter 仅通过自建协议夹具，真实参数与兼容性仍待核对；
 - 知识血缘与差异、评测证据与规则、来源注册与漂移、知识健康度和生成/治理观测；
 - CLI、资源化 HTTP API、DSH Adapter、双主题 Console 和项目网站；
-- 固定 ohMyWorkPanel 场景、真实评测与脱敏演示证据。
+- 项目无关的场景输入、真实评测与脱敏演示证据。
 
 ## 五分钟启动
 
@@ -76,13 +76,11 @@ domain-knowledge/
 │   ├── application/          # Apps、Port 与用例协调服务
 │   ├── infrastructure/       # LangGraph、Agent、DB/Redis Adapter 和评测
 │   └── interfaces/           # uiApi、CLI、Runner 与 DSH 接口
-├── acceptance/               # 固定项目验收夹具
 ├── docs/                     # 上手、架构、开发和运维说明
 ├── specs/                    # 规范性事实源、ADR 与 Schema
 ├── tests/                    # 单元、契约、集成、验收和安全测试
 ├── web/                      # 本地 Console
 ├── site/                     # GitHub Pages 静态网站
-├── deploy/                   # DeepSeek Harness 部署配置
 └── runner.config.json        # 默认本地配置
 ```
 
