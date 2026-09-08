@@ -207,6 +207,8 @@ DEV-006 只补齐操作中心、飞轮批次和工作流图所需控制面，不
 
 ## 4. Knowledge
 
+新增 [SearchAgent](../06-agents/search-agent.md) 为待实现的 Application 直调角色，当前下列接口仍是普通查询能力，不表示已执行该 Agent。后续接线由 `KnowledgeSearchApp` 经受控 Port 调用，绕过 OrchestratorAgent / LangGraph。SearchAgent 的工具必须在服务端强制限定当前 `VERIFIED` 且具有发布回执的版本，不能直接继承治理目录默认全状态或详情任意版本的读取权限。本次仅更新设计，不新增路由或改变现有查询参数语义。
+
 | 方法与路径 | 状态 | 用途与最小响应 |
 |---|---|---|
 | `GET /api/v1/knowledge` | Available | 治理知识目录与简单检索；统一支持 `q`、`status`、`category`、`limit`、`cursor`，未给 `status` 时返回 `CANDIDATE,VERIFIED,LOW_CONFIDENCE,SUPERSEDED`。面向知识消费者的调用必须显式使用 `status=VERIFIED`；该路由已取代 `/api/v1/query`。 |

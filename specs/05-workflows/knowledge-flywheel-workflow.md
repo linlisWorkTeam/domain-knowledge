@@ -1,5 +1,40 @@
 # 知识飞轮工作流
 
+## Agent 治理与检索关系
+
+下图表示目标职责与结果流向；治理子图内的调度、并行和迭代均由 LangGraph 执行，OrchestratorAgent 只产出计划。SearchAgent 是新增的独立角色（待实现），由 Application 直接调用，不加入治理子图。
+
+```mermaid
+flowchart TD
+    User["用户"] --> App["Application"]
+    App -->|治理任务：Orchestrator 用例入口| OA
+    subgraph Flywheel["LangGraph：七角色治理工作流"]
+        OA["OrchestratorAgent：计划与委派"] --> DW["DocWorkerAgent：分块提取"]
+        DW --> DG["DocGenAgent：生成 / 修订知识"]
+        OA --> TG["TestGenAgent：候选测试"]
+        DG --> Q["确定性 Quality Gate"]
+        Q -->|ACCEPTED| Code["CodeAgent：fresh 实现"]
+        Q -->|拒绝且有预算：质量反馈| DG
+        Q -->|预算耗尽| Stop["停止并保留治理证据"]
+        Code --> Check["CheckAgent：只读检查"]
+        Check --> Eval["独立 EvalRunner"]
+        TG -->|oracle 验证后的测试| Eval
+        Eval --> Review["ReviewAgent：归因与 Correction"]
+        Review --> Gate["确定性发布 Gate"]
+        Gate -->|ITERATE / 可继续的 ROLLBACK| OA
+        Gate -->|STOPPED| Stop
+    end
+    Gate -->|PASS| Publish["原子发布 / 发布回执"]
+    Publish --> Knowledge["当前 VERIFIED 合格文档"]
+    App -->|检索请求| SearchApp["KnowledgeSearchApp"]
+    SearchApp -->|直接调度| Search["SearchAgent：待实现"]
+    Search -->|受控只读检索| Knowledge
+    Search -->|命中文档与可追溯引用| SearchApp
+    SearchApp -->|检索结果| User
+```
+
+图中的服务节点不增加 Agent 角色。检索不创建 FlywheelRun，不触发生成、评测、发布或恢复；候选质量通过并不足以进入检索范围，必须完成原子发布。完整检索边界见 [SearchAgent](../06-agents/search-agent.md)。
+
 ## 状态机
 
 | 当前状态 | 事件/守卫 | 下一状态 | 副作用 |

@@ -66,6 +66,8 @@ npm run knowledge:serve
 
 ### 图示与教程
 
+- [SearchAgent 规范：Application 直接调度已发布知识检索](../specs/06-agents/search-agent.md)（设计已确认，待实现）
+- [Agent 治理与检索流程图](../specs/05-workflows/knowledge-flywheel-workflow.md#agent-治理与检索关系)
 - [系统总览图](diagrams/system-overview.md)
 - [知识生命周期图](diagrams/knowledge-lifecycle.md)
 - [开发变更链路图](diagrams/development-change-flow.md)

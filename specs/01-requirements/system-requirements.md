@@ -49,6 +49,14 @@
 | KF-SYS-041 | P1 | 本地管理员必须能通过服务端安全配置、脱敏读取并无副作用验证模型 API URL 与 API Key；启用后新批次默认使用 DSH 原生 SDK；运行中配置冻结，旧 Pi Run 可读但不跨后端恢复，完整凭据不得进入浏览器持久化、URL、日志或运行快照。 | AC-API-010 |
 | KF-SYS-042 | P1 | 系统必须按批次、节点、Provider 和模型记录排队与执行耗时、调用与重试、Token、可空估算成本、自动修订收敛和人工治理处理数据，并提供 P50/P95 聚合；缺少可信定价源时成本必须为 `null`，指标不得包含凭据、Prompt、模型正文或未脱敏上游错误。 | AC-OBS-004 |
 
+## 新增检索角色（2026-09-08，设计已确认，待实现）
+
+| ID | 优先级 | 需求 | 验收场景 |
+|---|---|---|---|
+| KF-SYS-043 | P1 | 用户检索必须由 Application 的 KnowledgeSearchApp 直接调度 SearchAgent，不经过 OrchestratorAgent 或 LangGraph，不创建或推进 FlywheelRun。Agent 只能读取和返回经飞轮治理、原子发布、当前状态为 VERIFIED 且正文完整性有效的文档及授权元数据；结果包含版本、来源和 Artifact 引用，无命中不得自动生成知识或启动治理。 | AC-SEARCH-001 |
+
+详细职责、独立请求/结果契约与现有查询基础的关系见 [SearchAgent](../06-agents/search-agent.md)。本项不增加七角色飞轮拓扑节点。
+
 ## P0-B Spike（P0-A 后独立开展）
 
 | ID | 假设 | Spike 出口证据 | 未通过时默认方案 |

@@ -10,6 +10,7 @@
 | CodeAgent | - | R | R | - | - | W | - | - | - |
 | CheckAgent | - | R | R | - | - | R(diff) | - | - | - |
 | ReviewAgent | - | R | R | - | - | - | R | - | - |
+| SearchAgent（待实现） | - | - | - | - | - | - | - | R（仅当前 VERIFIED 正文及授权元数据） | - |
 | EvalRunner | R(oracle验证) | R | R | R | R | R/X | W | - | 事件W |
 | Workflow Service | 元数据R | 元数据R | 元数据R | 元数据R | 元数据R | 元数据R | 元数据R | - | R/W |
 | Knowledge Publisher | - | R | - | - | - | - | R | P | 事件W |
@@ -17,7 +18,9 @@
 
 ## 数据级别
 
-`SOURCE_RESTRICTED`（源码/门禁测试）、`CANDIDATE`, `INTERNAL`, `PUBLISHED`, `SECRET`。密钥仅由 Provider/Sandbox Adapter 在调用瞬间取得，不成为 Artifact。日志只记摘要和引用；stdout/stderr 先脱敏并受大小限制。授权令牌绑定 runId、主体、资源摘要、动作、过期时间，不可跨 Agent/session 转移。
+SearchAgent 由 Application 直接调用，其权限以独立请求 ID、主体、资源摘要、动作和有效期绑定，不伪造治理 runId。受信读取服务先核验当前 `VERIFIED`、发布回执、访问范围与正文摘要，再提供材料；发布元数据核验不授予 Agent 读取评测正文的权限。provenance 仅提供可追溯引用，不授予参考源码、测试或未发布历史正文的读取权限。SearchAgent 无发布、反馈写入或工作流调度工具；用户反馈走独立 Application 用例。
+
+`SOURCE_RESTRICTED`（源码/门禁测试）、`CANDIDATE`, `INTERNAL`, `PUBLISHED`, `SECRET`。密钥仅由 Provider/Sandbox Adapter 在调用瞬间取得，不成为 Artifact。日志只记摘要和引用；stdout/stderr 先脱敏并受大小限制。飞轮调用的授权令牌绑定 runId、主体、资源摘要、动作、过期时间，不可跨 Agent/session 转移；独立检索按上文绑定请求 ID。
 
 ## 当前执行边界
 

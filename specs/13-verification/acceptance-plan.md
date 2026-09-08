@@ -53,6 +53,20 @@
 | AC-API-010 | Given 本地管理员提交合法、非法、不可达和受限网络地址的 API URL 与可选 API Key，When 保存、读取和验证 Provider 配置，Then 只有通过地址与权限校验的配置被服务端加密或受限持有，读取只返回脱敏状态，验证无生成副作用；启用后新批次冻结 DSH 原生协议、地址、模型、Token/上下文上限和 Schema 尝试上限的摘要但不冻结完整 Key，恢复时任一非秘密执行参数变化均失败关闭。 |
 | AC-OBS-004 | Given 真实与 fixture 批次、重试、自动修订和人工治理事项，When 查询 24 小时与 7/30 天观测窗口，Then 返回有样本量的节点/批次 P50/P95、Token、可空估算成本、首次修订通过率、三轮收敛率、人工介入比例、平均处理时间和短期复发率；无样本或无可信定价源时成本返回空值，任何响应不含 Prompt、正文、凭据、Session 或上游原始错误。 |
 
+## SearchAgent 验收（设计已确认，待实现）
+
+| ID | 场景 |
+|---|---|
+| AC-SEARCH-001 | Given 同时存在已发布 VERIFIED、仅 Quality ACCEPTED 的候选、LOW_CONFIDENCE、SUPERSEDED 和缺少发布回执的版本，When 用户经 Application / KnowledgeSearchApp 调用 SearchAgent，Then 仅合法已发布文档能进入 Agent 上下文和结果，且每项包含可验证的版本、provenance 和正文 Artifact 引用；显式请求其他状态或直接读取候选 versionId 同样不能绕过限制。 |
+
+该场景还须覆盖以下断言，未执行前不得以普通查询测试替代 SearchAgent 验收：
+
+- Application 直接调用 SearchAgent；Orchestrator 用例、OrchestratorAgent 和 Workflow Port 调用次数为零，无新 Run、节点投影、图 checkpoint、评测或发布副作用。
+- 检索中被替代的版本在返回前被剔除或重新检索；索引或缓存不能覆盖 Registry 当前发布状态。
+- 命中片段来自指定版本，正文摘要校验失败、存储不可用、权限拒绝和超时返回受控错误，不伪装为空结果。
+- 无命中返回空列表；不补充模型生成文档，不触发 DocGen、反馈写入或治理任务。
+- 输入输出经独立版本化 Schema 校验，以请求 ID 关联；模型不能扩大读取范围或编造版本、来源、Artifact 引用。
+
 ## P1 内容质量验收
 
 | ID | 场景 |

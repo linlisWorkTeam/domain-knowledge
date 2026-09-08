@@ -48,6 +48,7 @@
 | KF-SYS-040 | AC-API-009 | Implemented | `src/application/apps/provider-operations-app.ts` + `src/interfaces/runner/server.ts` + `web/app.js` | `tests/integration/provider-observability.test.ts` + `tests/e2e/console.spec.ts` |
 | KF-SYS-041 | AC-API-010 | Implemented | `src/application/apps/provider-operations-app.ts` + `src/infrastructure/agents/deepseek-harness` + `src/interfaces/runner/composition.ts` + `web/app.js` | `tests/security/provider-settings.test.ts` + `tests/integration/dsh-configured-provider.test.ts` + `tests/acceptance/dsh-configured-flow.test.ts` + `tests/e2e/console.spec.ts` |
 | KF-SYS-042 | AC-OBS-004 | Implemented | `src/application/apps/operational-metrics-app.ts` + `src/infrastructure/observability/sqlite-operational-metrics.ts` + `web/app.js` | `tests/integration/operational-metrics.test.ts` + `tests/integration/provider-observability.test.ts` + `tests/e2e/console.spec.ts` |
+| KF-SYS-043 | AC-SEARCH-001 | Planned | — | — |
 | KF-UI-001 | AC-UI-001 | Implemented | `web/app.js` + `src/interfaces/runner/server.ts` | `tests/contract/site.test.ts` + `tests/integration/server.test.ts` |
 | KF-UI-002 | AC-UI-002 | Implemented | `web/app.js` + `src/interfaces/runner/console-read-model.ts` | `tests/contract/site.test.ts` + `tests/integration/server.test.ts` |
 | KF-UI-003 | AC-UI-003 | Implemented | `src/application/services/automated-project-workflow.ts` + `web/app.js` | `tests/acceptance/automated-langgraph-flow.test.ts` + `tests/contract/site.test.ts` |

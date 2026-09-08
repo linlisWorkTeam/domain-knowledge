@@ -5,26 +5,37 @@
 <details lang="en">
 <summary>English summary</summary>
 
-domain-knowledge owns knowledge governance and execution. Its Domain/Application layers own `FlywheelRun`, evidence, `KnowledgeVersion`, the deterministic publication Gate and atomic publication. The isolated LangGraph infrastructure module owns fan-out, loops, cancellation and graph checkpoints. Both layers share `runId`, but LangGraph state never becomes a second business registry. wpKnowledge is the separate Git repository for reviewed knowledge content and evidence.
+domain-knowledge owns knowledge governance and execution. Its Domain/Application layers own `FlywheelRun`, evidence, `KnowledgeVersion`, the deterministic publication Gate and atomic publication. The isolated LangGraph infrastructure module owns fan-out, loops, cancellation and graph checkpoints. Both layers share `runId`, but LangGraph state never becomes a second business registry. wpKnowledge is the separate Git repository for reviewed knowledge content and evidence. The planned SearchAgent is invoked directly by Application to retrieve published VERIFIED documents, independently of OrchestratorAgent and the seven-role governance workflow.
 
 </details>
 
 <a id="target-architecture"></a>
 
-## 已确认的目标架构（2026-09-07，实施中，尚未完成）
+## 已确认的目标架构（2026-09-08，实施中，尚未完成）
 
 第一版先在外部环境完成真实闭环。LangGraph 编排七个角色，DSH 直接承担单个 Agent 的运行能力；项目保留业务输入输出约定和治理服务，不在两者之间再建设一套通用 Agent 运行框架。
 
+目标新增独立的 [SearchAgent](../specs/06-agents/search-agent.md)：用户从 Application 的 `KnowledgeSearchApp` 直接调用它，检索飞轮治理后已发布的 `VERIFIED` 文档。SearchAgent 不经过 OrchestratorAgent 或 LangGraph，不加入七角色治理拓扑；当前仅完成设计文档，尚未实现。
+
 ```mermaid
 flowchart TD
+    U[用户 / Application] -->|治理任务| A
+    U -->|知识检索| S[KnowledgeSearchApp]
+    S -->|直接调度| SA[SearchAgent：待实现]
+    SA -->|受控只读检索| K[已发布 VERIFIED 文档与来源引用]
+    SA -->|命中文档及引用| S
     A[LangGraph：节点调度、并行、迭代与恢复] --> B[DSH：对应角色的会话、模型与工具执行]
     B --> C[业务结果校验与工件存储]
     C --> D[独立评测、归因与确定性发布门禁]
     D -->|需要迭代| A
-    D -->|发布或停止| E[结束]
+    D -->|PASS| P[Registry：原子发布]
+    P --> K
+    D -->|停止| E[结束并保留证据]
 ```
 
 图中表示职责和结果流向；发布或停止后流程结束，只有符合工作流规则的迭代才回到下一轮。评测和发布继续由系统服务执行，不交给模型自行判定。
+
+检索请求用独立请求 ID 关联，由 Application 校验输入、权限和结果，通过 Port 使用 Agent Runtime 与知识读取工具。查询不创建 FlywheelRun、图 checkpoint 或节点投影，也不触发评测和发布。`ACCEPTED`、候选、低置信和已替代版本不能进入 SearchAgent 上下文；读取前核验 Registry 发布事实及 CAS 完整性。已有 `KnowledgeSearchApp` 普通查询是实现基础，不等于已具备 SearchAgent。
 
 | 部分 | 目标职责 |
 | --- | --- |
@@ -153,6 +164,8 @@ src/
 ## Agent 定制边界
 
 七个图角色是 Orchestrator、DocGen、DocWorker、TestGen、Code、Check 和 Review。它们的标识、职责、输入输出契约、拓扑和工具权限固定在 `src/infrastructure/workflow/langgraph/agent-definitions.ts`。
+
+上述清单只描述飞轮图角色。目标中的 SearchAgent 属于 Application 直接调用的检索角色，使用独立请求/结果契约，不加入该清单、治理 Run 配置快照或批次工作流图。
 
 操作员可以在 Console 查看所有角色，但只能维护 `promptAddon`。运行时把追加提示词拼在有版本的基础提示词后面，不替换基础提示词，也不改变节点契约。`AgentCatalogService` 会记录提示词修订和审计信息。
 

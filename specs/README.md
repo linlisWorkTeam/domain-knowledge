@@ -37,6 +37,8 @@ This directory is the normative source for Knowledge Flywheel behavior. Requirem
 
 ## 阶段门
 
+2026-09-08 新增 [SearchAgent 设计](06-agents/search-agent.md)及 `KF-SYS-043`：目标为七个飞轮角色加一个独立检索角色，Application 直接调度 SearchAgent，只读取治理后已发布的 `VERIFIED` 文档，不经过 OrchestratorAgent / LangGraph。该能力为 Planned；已有七角色枚举、Run 信封和批次图规则仍只适用于飞轮。调用流程见 [Agent 治理与检索关系](05-workflows/knowledge-flywheel-workflow.md#agent-治理与检索关系)。
+
 2026-09-07 确认的后续方向为 LangGraph 编排、DSH 直接运行角色，先完成外部底座与 CPU 小模块范例，再开发七角色完整闭环；CodeAgent CLI 适配后置。变更提案见 [DEV-019](changes/active/DEV-019-dsh-agent-foundation/proposal.md)。R1 已实现默认 DSH、通用场景输入和旧 Pi 只读兼容，相关 baseline 随实现同步；范围与证据见 `spec-delta.md` 和 `evidence.md`。R2 live 范例已通过本地验收（PR #26 待审查）；R3/R4 完整闭环尚未验收。
 
 P0-A Spec 已 Accepted；这只表示需求、契约和验收基线可进入实现验证，不代表 P0-B 或生产能力已经完成。P0-B 的当前实现范围、验证证据、下一工作项和未测边界统一记录在[开发状态](../docs/DEVELOPMENT-STATUS.md)，本规范入口不再维护一份会随开发变化的平行进度摘要。
