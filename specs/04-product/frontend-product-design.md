@@ -189,7 +189,7 @@ F1 的八入口信息架构已经被 F2 取代，不再是有效产品设计。�
 
 需要处理
 ┌────────────────────────────────────────────────────────────────────┐
-│ HIGH  ohmyworkpanel-mentions · STOPPED · 迭代预算耗尽  [查看]     │
+│ HIGH  example-module · STOPPED · 迭代预算耗尽  [查看]     │
 │ MED   cpp-parser · INFRA_FAILURE · evaluator unavailable [诊断]  │
 └────────────────────────────────────────────────────────────────────┘
 
@@ -581,9 +581,9 @@ F2 可访问验收环境和 B1 API 迁移 diff 就绪后，进入 B2/B3 并行�
 - 固化 FlywheelRun、GraphState、GenerationKey、graph checkpoint 和双 Gate 的所有权。
 - 建立 Agent 定义、提示词覆盖和节点执行投影的 Registry Schema。
 
-### 系统实施 Phase 2：ohMyWorkPanel 自动垂直切片
+### 系统实施 Phase 2：显式项目场景的自动垂直切片
 
-- 以固定 commit 的 ohMyWorkPanel 场景启动真实 LangGraph。
+- 以固定 commit 的可信项目场景启动真实 LangGraph，项目布局与测试命令由场景指定。
 - 打通候选知识、首轮失败、Review、增量修订、fresh Code generation、真实 ProjectEvaluator 和 Knowledge Registry 发布事务。
 - 用 GenerationKey 防止 graph checkpoint 边界重放外部副作用。
 

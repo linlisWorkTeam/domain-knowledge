@@ -29,7 +29,7 @@ Behavior changes must update the Spec, implementation, tests and traceability ma
 | LangGraph、Agent、SQLite/CAS、评测器 | `src/infrastructure/` |
 | CLI、HTTP、DSH 接口 | `src/interfaces/` |
 | 产品规范、ADR、Schema | `specs/` |
-| 测试与验收夹具 | `tests/`、`acceptance/` |
+| 测试与验收夹具 | `tests/` |
 | Console 与项目网站 | `web/`、`site/` |
 | 知识正文、调研和治理证据 | [`wpKnowledge`](https://github.com/linlisWorkTeam/wpKnowledge) |
 
@@ -66,7 +66,7 @@ npm test
 
 提交前检查清单：Spec、追踪矩阵、实现、正常/失败路径测试以及适用的使用或运维文档应保持一致；未运行的验证必须在 PR 中如实说明。
 
-固定 commit 的 ohMyWorkPanel 验收依赖本机源码，不是每个贡献者都能运行的通用门禁。没有运行就如实写进 PR，不能用 fixture 结果冒充真实模型质量。
+真实 DSH 验收依赖显式项目场景、受信源码和模型配置，不是每个贡献者都能运行的无凭据门禁。没有运行就如实写进 PR，不能用 fixture 结果冒充真实模型质量。
 
 不要提交 `.workpanel/`、`.env.local`、API key、Bearer token、外部 CLI 登录态、数据库或临时验收目录。安全问题请按 [`SECURITY.md`](SECURITY.md) 私下报告。
 

@@ -30,7 +30,7 @@
 | KF-SYS-022 | AC-E2E-002 | Implemented | `src/application/services/automated-project-workflow.ts` + `src/infrastructure/workflow/langgraph/graph.ts` | `tests/acceptance/automated-langgraph-flow.test.ts` |
 | KF-SYS-023 | AC-DOC-002 | Implemented | `web` + `site` + `docs` + `specs` | `tests/contract/site.test.ts` + `tests/contract/component-layout.test.ts` |
 | KF-SYS-024 | AC-DOC-003 | Implemented | `docs/guides/documentation-i18n.md` + `README.md` + `CONTRIBUTING.md` | `tests/contract/component-layout.test.ts` + `tests/contract/site.test.ts` |
-| KF-SYS-025 | AC-E2E-003 | Implemented | `src/infrastructure/agents/deepseek-harness` + `src/application/services/automated-project-workflow.ts` + `deploy/deepseek-harness` | `tests/integration/deepseek-harness-agent.test.ts` |
+| KF-SYS-025 | AC-E2E-003 | Implemented | `src/infrastructure/agents/deepseek-harness` + `src/application/services/automated-project-workflow.ts` | `tests/integration/deepseek-harness-agent.test.ts` + `tests/integration/opencode-go-config.test.ts` |
 | KF-SYS-026 | AC-FLOW-005 | Implemented | `src/application/services/automated-project-workflow.ts` + `src/infrastructure/workflow/langgraph/graph.ts` | `tests/integration/langgraph-infrastructure.test.ts` |
 | KF-SYS-027 | AC-OBS-003 | Implemented | `src/interfaces/runner/demo-report.ts` + `src/interfaces/runner/cli.ts` | `tests/integration/demo-report.test.ts` |
 | KF-SYS-028 | AC-DOC-004 | Implemented | `site/index.html` + `site/app.js` + `web/index.html` + `web/app.js` | `tests/contract/site.test.ts` |

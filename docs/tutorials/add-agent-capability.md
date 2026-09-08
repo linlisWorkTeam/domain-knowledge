@@ -52,7 +52,7 @@ npm run example:docgen -- prepare
 
 `prepare` 从固定 commit 导出可信源码、核对源码与参考测试 SHA-256，再实际执行 7 项非空参考测试。失败时不启动模型，临时参考副本位于运行目录的 `reference-checks/`。需要完整 Git 历史；浅克隆须先取回固定 commit。
 
-默认使用独立运行目录 `.workpanel/docgen-example`。Linux 真实运行要求 Bubblewrap 可用，原生 DSH 模型配置方法见 [DSH 部署说明](../../deploy/deepseek-harness/README.md)。可以使用已经安全配置的 `DEEPSEEK_API_KEY` 环境变量，或通过 Console 在同一个运行目录保存并验证模型：
+默认使用独立运行目录 `.workpanel/docgen-example`。Linux 真实运行要求 Bubblewrap 可用，原生 DSH 模型配置方法见 [DSH 部署说明](../guides/dsh-runtime.md)。可以使用已经安全配置的 `DEEPSEEK_API_KEY` 环境变量，或通过 Console 在同一个运行目录保存并验证模型：
 
 ```bash
 WP_FLYWHEEL_HOME="$PWD/.workpanel/docgen-example" npm run knowledge:serve

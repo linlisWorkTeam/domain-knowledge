@@ -40,6 +40,8 @@ This file is the single entry point for project-level development status, curren
 
 ## 当前方向与开发顺序（2026-09-07）
 
+2026-09-08 清理：移除旧项目专属验收目录、命令及公共服务中的 WorkPanel 分类/标签；通用真实源码测试与双场景 LangGraph 验收保留。OpenCode Go 模型接入改为由 DSH 适配层根据环境变量生成非秘密运行配置，旧部署目录移除，使用方法集中到 [DSH 运行配置](guides/dsh-runtime.md)。Node 24 下类型与规范校验、176 项完整回归及 14 项 Console 测试通过；随后补足 minimal profile 插件注册，3 项 OpenCode Go 配置/真实 SDK 启动回归通过。没有执行外部模型请求，不将此变更视为 R3/R4 live 验收。
+
 2026-09-08 补充：用户要求先明确独立 [SearchAgent](../specs/06-agents/search-agent.md) 的文档与 Mermaid 图。目标调用链为用户 → Application / KnowledgeSearchApp → SearchAgent，只检索已发布的 `VERIFIED` 文档，绕过 OrchestratorAgent 与 LangGraph；七角色飞轮开发范围保持原边界。该角色的代码接线、独立 Schema、工具权限与自动验收尚未实施，后续单独安排，不计为 DEV-019 七角色交付。
 
 R1 已将角色执行收敛到 DSH，通用项目场景从 CLI/API/Console 传入。Pi Agent 运行依赖已移除，旧记录保留可读且拒绝恢复；CodeAgent CLI 适配后置。R2 的真实 CPU DocGen 范例和独立工作区复现已通过本地验收，PR #26 已合入；R3 七角色和 R4 完整闭环尚未验收。 公共接线为 ProjectWorkflowStages，预写输出独立为 Fixture Adapter。

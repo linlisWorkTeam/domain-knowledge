@@ -20,7 +20,6 @@ function markdownFiles(root: string): string[] {
 test('Knowledge Flywheel implementation owns the domain-knowledge repository root', () => {
   assert.equal(existsSync('endlessWpKnowledgeRunner'), false, 'retired wrapper directory must not be reintroduced');
   for (const required of [
-    'acceptance/ohmyworkpanel/scenario.json',
     'src/interfaces/runner/server.ts',
     'src/interfaces/ui-api/index.ts',
     'docs/ARCHITECTURE.md',

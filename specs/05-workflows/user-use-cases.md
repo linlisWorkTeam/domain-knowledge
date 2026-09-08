@@ -330,10 +330,8 @@ sequenceDiagram
 ### 用户入口
 
 ```text
-npm run acceptance:ohmyworkpanel --
-  --repository <受信仓库路径>
-  --runtime <仓库外运行目录>
-  --output summary
+npm run knowledge -- workflow-run --scenario <场景文件> --repository <受信仓库路径>
+npm run knowledge -- workflow-report --run <run-id> --output <报告文件>
 ```
 
 固定 commit 来自场景定义；用户不得用任意分支 HEAD 隐式替换。完整流程和证据要求见[真实源码验收工作流](real-source-acceptance.md)。

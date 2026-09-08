@@ -110,6 +110,8 @@ test('generated behavior matches the public contract', () => assert.equal(calcul
     assert.equal(isolationResult?.exitCode, 0);
     assert.equal(report.finalDecision.outcome, 'PASS');
     assert.equal(report.finalVersion.parentVersionId, report.firstVersion.versionId);
+    assert.deepEqual(report.firstVersion.tags, ['e2e']);
+    assert.deepEqual(report.finalVersion.tags, ['e2e']);
     assert.equal(composition.service.getKnowledgeVersion(report.firstVersion.versionId)?.status, 'CANDIDATE');
     assert.equal(composition.service.getKnowledgeVersion(report.finalVersion.versionId)?.status, 'VERIFIED');
     assert.equal(composition.repository.listEvents(report.runId).at(-1)?.eventType, 'KnowledgePublished');

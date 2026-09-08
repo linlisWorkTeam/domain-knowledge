@@ -14,7 +14,6 @@
     "site:serve": "node site/dev-server.mjs",
     "site:check": "node --test tests/contract/site.test.ts",
     "test:ui": "playwright test",
-    "acceptance:ohmyworkpanel": "node --env-file-if-exists=.env.local src/interfaces/runner/project-acceptance.ts",
     "test": "node --test --test-concurrency=1",
     "test:architecture": "node --test tests/contract/architecture.test.ts",
     "test:domain": "node --test tests/unit",

@@ -274,7 +274,7 @@ export async function runRealSourceFlow(input: {
     body: firstDocument.output.body,
     title: firstDocument.output.title,
     description: firstDocument.output.description,
-    category: 'real-source-acceptance', tags: ['ohmyworkpanel', 'e2e'],
+    category: 'real-source-acceptance', tags: ['e2e'],
     provenance: input.scenario.sourcePaths.map((path) => ({ path, commit: snapshot.commit, pinned: true })),
     metadata: { scenario: input.scenario.name, iteration: 0 },
   });
@@ -348,7 +348,7 @@ export async function runRealSourceFlow(input: {
     body: finalDocument.output.body,
     title: finalDocument.output.title,
     description: finalDocument.output.description,
-    category: 'real-source-acceptance', tags: ['ohmyworkpanel', 'e2e'],
+    category: 'real-source-acceptance', tags: ['e2e'],
     provenance: input.scenario.sourcePaths.map((path) => ({ path, commit: snapshot.commit, pinned: true })),
     metadata: {
       scenario: input.scenario.name,
