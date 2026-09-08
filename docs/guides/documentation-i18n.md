@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明文档语言与 I18n 约定。
+-->
 # 文档语言与 I18n 约定
 
 本文是按需查阅的文档编写指南，不属于项目入门必读内容。

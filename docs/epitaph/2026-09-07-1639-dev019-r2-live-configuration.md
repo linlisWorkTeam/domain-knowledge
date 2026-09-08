@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明DEV-019 R2 入口已实现，live 配置待补。
+-->
 # DEV-019 R2 入口已实现，live 配置待补
 
 - 用户授权进入 T103/T104；#24/#25 已合入 main `9861434`。当前分支 `codex/dev019-docgen-example`、工作区 `/tmp/domain-knowledge-r2`，按 SOP commit/push 并提 PR，不自动合并。

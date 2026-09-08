@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明架构决策记录。
+-->
 # 架构决策记录
 
 本目录保留已确认决策及其取代关系。除明确标为 `Superseded` 的历史 ADR 外，当前决策状态为 Accepted；Spike 可以补充证据或触发新的 superseding ADR，不得静默改写历史。

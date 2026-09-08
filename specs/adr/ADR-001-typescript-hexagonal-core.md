@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明ADR-001：TypeScript 平台与六边形边界。
+-->
 # ADR-001：TypeScript 平台与六边形边界
 
 - 状态：Accepted

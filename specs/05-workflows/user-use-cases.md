@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明用户用例与交互时序。
+-->
 # 用户用例与交互时序
 
 > DEV-019 R1 已将默认角色执行、模型配置与通用启动迁到 DSH；历史阶段不作为当前开发队列。R2 live CPU 范例已通过本地验收，下一项见[开发状态](../../docs/DEVELOPMENT-STATUS.md)。

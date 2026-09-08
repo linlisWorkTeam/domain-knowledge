@@ -1,10 +1,15 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明知识写作风格。
+-->
 # 知识写作风格
 
 ## 目标
 
 知识是写给下一位工程师看的。他通常正带着一个具体问题来到这里，不需要一段宏大的开场，也不想从宣传词里猜真正的限制。
 
-DocGenAgent 首次生成和按 Correction 修订时，必须收到同一份版本化写作约束。当前实现位于 `src/application/services/knowledge-writing-guide.ts`，规则参考 [Humanizer-zh](https://github.com/op7418/Humanizer-zh)，并针对工程知识收紧。
+DocGenAgent 首次生成和按 Correction 修订时，必须收到同一份版本化写作约束。当前实现位于 `src/application/services/KnowledgeWritingGuide.ts`，规则参考 [Humanizer-zh](https://github.com/op7418/Humanizer-zh)，并针对工程知识收紧。
 
 ## 写法
 

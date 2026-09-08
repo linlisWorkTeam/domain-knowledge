@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明DSH 底座开发 Roadmap。
+-->
 # DSH 底座开发 Roadmap
 
 状态：R0/R1 已通过并合入；R2 T103/T104 的真实 DocGen、独立检查与第二工作区修改复现已通过本地验收，PR #26 待审查。R3/R4 未开始；合入后执行 T200。实际证据见 evidence.md。
@@ -36,10 +41,10 @@ R1、R2 是公共底座交付；R3、R4 是基于底座完成第一版。DEV-011
 
 | 现有位置 | 开发目标 |
 | --- | --- |
-| `src/interfaces/runner/composition.ts`、`src/application/services/automated-project-workflow.ts` | 通用任务材料进入 LangGraph 节点；不再实例化 `OhMyWorkPanelWorkflowExecutor`，不得只改类名后保留固定路径/测试逻辑 |
-| `src/infrastructure/agents/deepseek-harness/`、`src/infrastructure/workflow/langgraph/` | 复用 DSH SDK；节点仅准备授权材料、映射业务结果及关联事件；受限工作区、失败/超时/取消可验证 |
-| `src/application/apps/provider-operations-app.ts`、业务 ports、Provider 存储、server/Console | DSH 配置、验证、默认选择与 Run 快照一致；公共业务类型不依赖 Pi 或 DSH SDK 类型 |
-| `src/infrastructure/agents/pi-agent/`、`package.json`、锁文件及调用方 | 删除 Pi 运行依赖；通用配置安全功能迁到独立位置继续复用；历史标识解析可保留，但不能加载 Pi SDK |
+| `src/interfaces/runner/Composition.ts`、`src/application/services/AutomatedProjectWorkflow.ts` | 通用任务材料进入 LangGraph 节点；不再实例化 `OhMyWorkPanelWorkflowExecutor`，不得只改类名后保留固定路径/测试逻辑 |
+| `src/infrastructure/agentAdapters/deepseek-harness/`、`src/infrastructure/langgraph/` | 复用 DSH SDK；节点仅准备授权材料、映射业务结果及关联事件；受限工作区、失败/超时/取消可验证 |
+| `src/application/apps/ProviderOperationsApp.ts`、业务 ports、Provider 存储、server/Console | DSH 配置、验证、默认选择与 Run 快照一致；公共业务类型不依赖 Pi 或 DSH SDK 类型 |
+| `src/infrastructure/agentAdapters/pi-agent/`、`package.json`、锁文件及调用方 | 删除 Pi 运行依赖；通用配置安全功能迁到独立位置继续复用；历史标识解析可保留，但不能加载 Pi SDK |
 | 场景数据与评测入口 | 项目路径、源码版本和命令由显式场景提供；移除旧项目专属验收目录与命令，通用验收夹具只在测试中创建 |
 | 当前 AgentProvider/业务 Schema 与公司 Adapter | 保留 CodeAgent CLI 未来交付相同业务结果的接口；默认启动不要求安装、认证或加载公司 CLI，不开发 DSH → CLI 嵌套运行 |
 

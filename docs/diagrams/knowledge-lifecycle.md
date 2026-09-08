@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明知识生命周期。
+-->
 # 知识生命周期
 
 ```mermaid

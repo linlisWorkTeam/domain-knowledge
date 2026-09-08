@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：提供social-card界面展示或验收使用的图像资源。
+-->
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
   <title id="title">WORKPANEL · KNOWLEDGE FLYWHEEL</title>
   <desc id="desc">可验证的知识飞轮</desc>

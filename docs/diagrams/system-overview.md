@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明系统总览。
+-->
 # 系统总览
 
 ## 目标运行关系（已确认，实施中）

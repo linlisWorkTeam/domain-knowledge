@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明解耦 PR 与合并后的分支清理。
+-->
 # 解耦 PR 与合并后的分支清理
 
 - 用户已要求为 `refactor/remove-project-fixtures` 提 PR，并授权在合并后删除该分支的本地和远程引用；无需再次询问删除许可。

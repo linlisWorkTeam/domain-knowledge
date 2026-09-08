@@ -1,3 +1,8 @@
+/**
+ * Copyright (c) 2026 linlisWorkTeam
+ * SPDX-License-Identifier: MIT
+ * 文件功能：提供app页面的展示、交互或样式资源。
+ */
 const stages = {
   ingest: {
     kicker: '输入 · 来源记录',

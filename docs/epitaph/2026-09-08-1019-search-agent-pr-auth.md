@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明SearchAgent PR 交付与账号边界。
+-->
 # SearchAgent PR 交付与账号边界
 
 ## 目标与当前状态

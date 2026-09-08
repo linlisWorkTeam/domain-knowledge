@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明ADR-005：标准协议与 Adapter。
+-->
 # ADR-005：标准协议与 Adapter
 
 - 状态：Proposed（有实际消费者时再接受）

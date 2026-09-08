@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明AI 协作开发指南。
+-->
 # AI 协作开发指南
 
 本项目默认由人提出目标、边界和验收判断，由 AI 完成调研、Spec 对齐、实现、测试、提交和 PR。这里的 Vibe Coding 不是跳过设计，而是让人专注于“要什么”，让 AI 在可审计的规范和证据约束下完成“怎么做”。

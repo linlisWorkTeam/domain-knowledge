@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明从旧版 Runner 迁移。
+-->
 # 从旧版 Runner 迁移
 
 > 中文是本文默认语言。命令、目录和状态值保留英文。

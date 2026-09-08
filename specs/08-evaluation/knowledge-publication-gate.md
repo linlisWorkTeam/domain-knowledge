@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明知识发布门禁。
+-->
 # 知识发布门禁
 
 ## PASS 的必要且充分条件

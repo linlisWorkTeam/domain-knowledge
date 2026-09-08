@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明开发状态。
+-->
 # 开发状态
 
 **当前阶段：DEV-019 R2 与角色代码开发指南已合入；新增 SearchAgent 文档设计｜更新时间：2026-09-08｜下一任务：按指南分工，继续 T200 契约对齐及 T210/T211 开发**
@@ -76,10 +81,10 @@ DEV-014 及其引用的 DEV-015～018 是其他 worktree 中的旧 DFX 草稿上
 | ID | 工作项 | 状态 | 结果或证据 |
 | --- | --- | --- | --- |
 | DEV-001 | P0-A Spec、验收计划和追踪矩阵基线 | Done | `npm run validate:specs` |
-| DEV-002 | DDD Application/Domain/Infrastructure 边界对齐 | Done | `tests/contract/architecture.test.ts` |
-| DEV-003 | 固定七 Agent LangGraph 编排、Checkpoint 与确定性闭环 | Done | `tests/integration/langgraph-infrastructure.test.ts`、`tests/acceptance/automated-langgraph-flow.test.ts` |
+| DEV-002 | DDD Application/Domain/Infrastructure 边界对齐 | Done | `tests/contract/Architecture.test.ts` |
+| DEV-003 | 固定七 Agent LangGraph 编排、Checkpoint 与确定性闭环 | Done | `tests/integration/LanggraphInfrastructure.test.ts`、`tests/acceptance/AutomatedLanggraphFlow.test.ts` |
 | DEV-004 | AgentCommand/AgentResult、Run 配置冻结与框架机械能力测评 | Done | [框架阶段性测评](status/reports/框架阶段性测评.md)，结果 `6/6 ACCEPTED` |
-| DEV-UI-001 | 前台 F1 Knowledge Console | Done | `tests/contract/site.test.ts`、`tests/e2e/console.spec.ts`；只复用现有 API |
+| DEV-UI-001 | 前台 F1 Knowledge Console | Done | `tests/contract/Site.test.ts`、`tests/e2e/Console.spec.ts`；只复用现有 API |
 | DEV-005 | Console 第一轮：F2 最终七页面 + B1 API 基线 + HCP-1 | Done | B1 已就绪；当前七页 UI/UX 已冻结，HCP-1=`Accepted` |
 | DEV-006 | Console B2 操作中心与飞轮批次完整控制面 | Done | 持久化事项、可证明进度、完整治理命令、组件健康、活动流、SSE、前台实时接线与轮询降级 |
 | DEV-007 | Console B4 运营最小可用面 | Done | Provider 状态、安全 API URL/Key 配置与验证、真实 Pi SDK 执行路径、默认新批次快照和生成/治理观测已接入 |

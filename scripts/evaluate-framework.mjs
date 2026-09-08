@@ -1,4 +1,9 @@
 #!/usr/bin/env node
+/**
+ * Copyright (c) 2026 linlisWorkTeam
+ * SPDX-License-Identifier: MIT
+ * 文件功能：执行evaluateframework相关的开发与工程维护操作。
+ */
 import { spawnSync } from 'node:child_process';
 import { performance } from 'node:perf_hooks';
 
@@ -7,21 +12,21 @@ const checks = [
   {
     id: 'architecture-boundaries',
     claim: 'DDD dependency direction and the fixed seven-Agent ownership remain enforced',
-    args: ['--test', 'tests/contract/architecture.test.ts'],
-    evidence: ['tests/contract/architecture.test.ts'],
+    args: ['--test', 'tests/contract/Architecture.test.ts'],
+    evidence: ['tests/contract/Architecture.test.ts'],
   },
   {
     id: 'agent-topology-and-recovery',
     claim: 'LangGraph executes the fixed topology, parallel branches, routes, cancellation and checkpoint recovery',
-    args: ['--test', 'tests/integration/langgraph-infrastructure.test.ts'],
-    evidence: ['tests/integration/langgraph-infrastructure.test.ts'],
+    args: ['--test', 'tests/integration/LanggraphInfrastructure.test.ts'],
+    evidence: ['tests/integration/LanggraphInfrastructure.test.ts'],
   },
   {
     id: 'runtime-contracts',
     claim: 'AgentCommand is rejected before dispatch and every node emits a validated AgentResult',
-    args: ['--test', 'tests/integration/agent-contracts.test.ts'],
+    args: ['--test', 'tests/integration/AgentContracts.test.ts'],
     evidence: [
-      'tests/integration/agent-contracts.test.ts',
+      'tests/integration/AgentContracts.test.ts',
       'specs/schemas/agent-command.schema.json',
       'specs/schemas/agent-result.schema.json',
     ],
@@ -29,29 +34,29 @@ const checks = [
   {
     id: 'company-codeagent-contract',
     claim: 'Company CodeAgent CLI preserves role, stdin, session, cancellation, error, and output validation boundaries',
-    args: ['--test', 'tests/integration/company-codeagent-cli.test.ts'],
+    args: ['--test', 'tests/integration/CompanyCodeagentCli.test.ts'],
     evidence: [
-      'src/infrastructure/agents/company-codeagent/index.ts',
-      'tests/integration/company-codeagent-cli.test.ts',
+      'src/infrastructure/agentAdapters/company-codeagent/CompanyCodeAgentCliAdapter.ts',
+      'tests/integration/CompanyCodeagentCli.test.ts',
     ],
   },
   {
     id: 'run-configuration-freeze',
     claim: 'A Run keeps an immutable, secret-free snapshot and rejects recovery with changed provider, prompts, tools or schema digests',
-    args: ['--test', 'tests/integration/run-configuration.test.ts'],
-    evidence: ['tests/integration/run-configuration.test.ts'],
+    args: ['--test', 'tests/integration/RunConfiguration.test.ts'],
+    evidence: ['tests/integration/RunConfiguration.test.ts'],
   },
   {
     id: 'schema-conformance',
     claim: 'Versioned schemas, positive/negative role fixtures and P0 traceability remain valid',
-    args: ['specs/13-verification/validate-specs.ts'],
-    evidence: ['specs/13-verification/validate-specs.ts'],
+    args: ['specs/13-verification/ValidateSpecs.ts'],
+    evidence: ['specs/13-verification/ValidateSpecs.ts'],
   },
   {
     id: 'fixture-end-to-end',
     claim: 'All seven Agents participate in a deterministic fail-correct-regenerate-evaluate-publish flow',
-    args: ['--test', 'tests/acceptance/automated-langgraph-flow.test.ts'],
-    evidence: ['tests/acceptance/automated-langgraph-flow.test.ts'],
+    args: ['--test', 'tests/acceptance/AutomatedLanggraphFlow.test.ts'],
+    evidence: ['tests/acceptance/AutomatedLanggraphFlow.test.ts'],
   },
 ];
 

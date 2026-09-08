@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明分阶段验收。
+-->
 # 分阶段验收
 
 状态：R1 的 AC-DSHF-006、007 及 002、003 自动化部分已通过本地验收；配置/依赖条款已同步 baseline 并合入。R2 的 AC-DSHF-001～004 已通过本地验收（002/003 沿用 R1 回归并补本轮证据），PR #26 待审查；R3/R4 未执行，详见 evidence.md。
@@ -34,7 +39,7 @@ AC-DSHF-005（关联 KF-SYS-001、004、017、025）：Given 固定版本的可�
 
 源码扫描用于定位残留，不能替代启动、模块依赖与行为测试。旧 Pi 专用测试应迁移其仍适用的配置安全、可观测性和恢复断言；不能只删测试来达到通过。DSH headless 诊断入口不能作为不满足工作区隔离时的回退。
 
-2026-09-08 解耦补充：AC-DSHF-006 同时检查公共服务不硬编码特定验收项目的知识分类和标签。移除旧项目专属资产和 CLI 后，真实源码两轮回归、双场景 LangGraph 回归和幂等发布断言仍须通过。OpenCode Go 环境配置须在没有部署目录时正常生成 DSH patch，密钥值不写入 patch/快照，地址、模型和上下文变化使旧 Run 恢复校验失败；已保存 Console 配置与显式 patches 的优先级保持既有语义。自动验证入口为 `tests/integration/opencode-go-config.test.ts`，不替代真实模型调用验收。
+2026-09-08 解耦补充：AC-DSHF-006 同时检查公共服务不硬编码特定验收项目的知识分类和标签。移除旧项目专属资产和 CLI 后，真实源码两轮回归、双场景 LangGraph 回归和幂等发布断言仍须通过。OpenCode Go 环境配置须在没有部署目录时正常生成 DSH patch，密钥值不写入 patch/快照，地址、模型和上下文变化使旧 Run 恢复校验失败；已保存 Console 配置与显式 patches 的优先级保持既有语义。自动验证入口为 `tests/integration/OpencodeGoConfig.test.ts`，不替代真实模型调用验收。
 
 ## 七角色逐项验收（R3）
 
@@ -64,10 +69,10 @@ AC-DSHF-008（关联 KF-SYS-001、004、011、021、025、031）：在已通过 
 npm run typecheck
 npm run validate:specs
 npm run test:architecture
-node --test --test-concurrency=1 tests/integration/deepseek-harness-agent.test.ts tests/integration/agent-contracts.test.ts tests/security/agent-workspace.test.ts
+node --test --test-concurrency=1 tests/integration/DeepseekHarnessAgent.test.ts tests/integration/AgentContracts.test.ts tests/security/AgentWorkspace.test.ts
 ```
 
-R1 已新增或迁移 AC-DSHF-006、007 对应行为测试：`tests/integration/dsh-configuration-migration.test.ts`、`dsh-configured-provider.test.ts`、`tests/acceptance/dsh-configured-flow.test.ts` 及双场景全流程测试；继续执行受影响的 Provider、server 和 Console 回归。配置页面发生变化时执行 `npm run test:ui`，对可见结果检查错误状态、配置生效及旧 Run 提示。以上基线命令不能替代新场景测试。测试文件迁移时同步本文的真实路径。
+R1 已新增或迁移 AC-DSHF-006、007 对应行为测试：`tests/integration/DshConfigurationMigration.test.ts`、`dsh-configured-provider.test.ts`、`tests/acceptance/DshConfiguredFlow.test.ts` 及双场景全流程测试；继续执行受影响的 Provider、server 和 Console 回归。配置页面发生变化时执行 `npm run test:ui`，对可见结果检查错误状态、配置生效及旧 Run 提示。以上基线命令不能替代新场景测试。测试文件迁移时同步本文的真实路径。
 
 ### R2、R3 真实角色与 R4 闭环
 

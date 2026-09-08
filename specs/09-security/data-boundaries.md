@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明数据边界与权限矩阵。
+-->
 # 数据边界与权限矩阵
 
 动作缩写：`R` 读、`W` 创建新 Artifact、`X` 隔离执行、`P` 发布、`-` 拒绝。表中未出现的主体、资源或动作一律拒绝。

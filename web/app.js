@@ -1,3 +1,8 @@
+/**
+ * Copyright (c) 2026 linlisWorkTeam
+ * SPDX-License-Identifier: MIT
+ * 文件功能：提供app页面的展示、交互或样式资源。
+ */
 const content = document.querySelector('#page-content')
 const nav = document.querySelector('#primary-nav')
 const title = document.querySelector('#page-title')

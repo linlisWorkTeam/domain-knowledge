@@ -1,3 +1,8 @@
+/**
+ * Copyright (c) 2026 linlisWorkTeam
+ * SPDX-License-Identifier: MIT
+ * 文件功能：提供styles页面的展示、交互或样式资源。
+ */
 :root {
   color-scheme: dark;
   --bg: #080b10;

@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明教程：新增 HTTP API。
+-->
 # 教程：新增 HTTP API
 
 ## 目标

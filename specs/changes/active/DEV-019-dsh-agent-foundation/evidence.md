@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明验证证据。
+-->
 # 验证证据
 
 ## 基线与本次范围
@@ -15,8 +20,8 @@
 | 检查 | 结果 |
 | --- | --- |
 | `git diff --check` | 退出 0，无空白错误 |
-| `/root/.nvm/versions/node/v24.13.0/bin/node specs/13-verification/validate-specs.ts` | 退出 0；`SPEC_VALIDATION_OK schemas=17 commands=7 results=8 p0=51` |
-| `/root/.nvm/versions/node/v24.13.0/bin/node --test tests/contract/site.test.ts` | 退出 0，测试文件通过，无失败或跳过 |
+| `/root/.nvm/versions/node/v24.13.0/bin/node specs/13-verification/ValidateSpecs.ts` | 退出 0；`SPEC_VALIDATION_OK schemas=17 commands=7 results=8 p0=51` |
+| `/root/.nvm/versions/node/v24.13.0/bin/node --test tests/contract/Site.test.ts` | 退出 0，测试文件通过，无失败或跳过 |
 | 本地 Markdown 链接与锚点检查 | 覆盖 6 份修改文档和本变更包 6 文件，共 86 个本地链接，缺失路径/锚点 0；未检查外部链接 |
 
 链接检查读取上述文件的 Markdown 链接，跳过代码块与外部 URL，将相对路径按文档目录解析，并核对目标文件及标题/显式锚点。人工复核确认：当前实现与目标分开、未将 Pi 或固定执行器记为已删除、底座与完整闭环分别验收、DEV-010 后置、所有实现和 live 任务仍未勾选。
@@ -31,7 +36,7 @@
 | --- | --- |
 | 全库 Markdown 本地链接/锚点 | 含本轮交接共 94 份 Markdown、230 个本地链接，缺失路径/锚点 0；外部链接未联网验证 |
 | Spec 校验（Node 24.13.0） | `SPEC_VALIDATION_OK schemas=17 commands=7 results=8 p0=51` |
-| `node --test --test-concurrency=1 tests/contract/component-layout.test.ts tests/contract/site.test.ts`（Node 24.13.0） | 17/17 通过，无失败或跳过 |
+| `node --test --test-concurrency=1 tests/contract/ComponentLayout.test.ts tests/contract/Site.test.ts`（Node 24.13.0） | 17/17 通过，无失败或跳过 |
 | `git diff --check` | 退出 0，无空白错误 |
 
 链接扫描覆盖根目录、docs、specs、部署、源码 README、站点、验收样例和模板；逐行排除 fenced code，解析相对路径并核对 Markdown 标题或显式锚点。历史记录同样纳入链接检查。没有修改运行代码、API、Schema 或依赖，没有重跑全量实现测试、真实模型或公司 CLI。
@@ -75,8 +80,8 @@ AC-DSHF-001～005 全部尚未执行；普通 CPU 模块和示范角色的具体
 - DSH 与 SDK 均为 `0.1.2-alpha.4`，Bubblewrap `0.11.0`。已读本地 SDK `types.d.ts`、`api.d.ts` 及项目 Adapter、业务阶段、配置组合根，职责与待补能力写回 spec-delta.md。
 - 本轮进程未提供 `OPENCODE_GO_API_KEY`/`DEEPSEEK_API_KEY`，仓库无 `.env.local`；没有执行真实模型或网络认证探测。R2 live 前仍需配置并验证实际路由和凭据，不能以本轮夹具替代。
 - R0 类型与 Spec 通过；架构、角色契约、DSH、工作区四组测试 28/28 通过。受限沙箱最初拦截 Git 子进程（EPERM），申请权限后按相同范围重跑通过，无基线代码修复。
-- CPU 样例选用 `src/domain/services/markdown-diff.ts` 的 `structuredMarkdownDiff`，源码 commit 固定 `3f999204f988697cc5bb9473c5a10ad5b4fc1f78`，源码 SHA-256 `58ac3ba8b93fb94fa9c8abedb7c6cb8017b28ccfa4dfec2f9923f767ab52eb80`。参考契约为两个字符串输入及结构化差异输出；R2 补独立公开声明，后续允许生成路径仅为该模块，不暴露参考测试给 Code。
-- 新增独立参考测试 `tests/unit/markdown-diff.test.ts`，SHA-256 `17ed0b564ffcfc6387ecb57ac1e33d4dd8fb72694b69694eab31ace7b973f199`。用 `git archive 3f99920 src/domain` 构建 `/tmp/dev019-cpu-reference`，将该测试复制进去后执行 `node /tmp/dev019-cpu-reference/tests/unit/markdown-diff.test.ts`，7/7 通过；不依赖修改中的工作区源码、公司平台或 NPU。
+- CPU 样例选用 `src/domain/services/MarkdownDiff.ts` 的 `structuredMarkdownDiff`，源码 commit 固定 `3f999204f988697cc5bb9473c5a10ad5b4fc1f78`，源码 SHA-256 `58ac3ba8b93fb94fa9c8abedb7c6cb8017b28ccfa4dfec2f9923f767ab52eb80`。参考契约为两个字符串输入及结构化差异输出；R2 补独立公开声明，后续允许生成路径仅为该模块，不暴露参考测试给 Code。
+- 新增独立参考测试 `tests/unit/MarkdownDiff.test.ts`，SHA-256 `17ed0b564ffcfc6387ecb57ac1e33d4dd8fb72694b69694eab31ace7b973f199`。用 `git archive 3f99920 src/domain` 构建 `/tmp/dev019-cpu-reference`，将该测试复制进去后执行 `node /tmp/dev019-cpu-reference/tests/unit/MarkdownDiff.test.ts`，7/7 通过；不依赖修改中的工作区源码、公司平台或 NPU。
 
 ### R1 当前已实施范围
 
@@ -92,7 +97,7 @@ AC-DSHF-001～005 全部尚未执行；普通 CPU 模块和示范角色的具体
 | 检查 | 结果与定位 |
 | --- | --- |
 | `npm run typecheck` 的等价命令 `node node_modules/typescript/bin/tsc --noEmit` | 退出 0 |
-| `node specs/13-verification/validate-specs.ts` | `SPEC_VALIDATION_OK schemas=17 commands=7 results=8 p0=51` |
+| `node specs/13-verification/ValidateSpecs.ts` | `SPEC_VALIDATION_OK schemas=17 commands=7 results=8 p0=51` |
 | R0 四组基线 | 28/28，`/tmp/dev019-r0-tests-unrestricted.log` |
 | 固定源码参考测试 | 7/7，源码 commit 与测试摘要如上 |
 | `npm test` | 160/160，无失败/跳过；`/tmp/dev019-r1-full.log`。首轮 159/160，新取消测试缺少 getArtifact 夹具；补齐后重跑全量通过 |
@@ -107,7 +112,7 @@ AC-DSHF-001～005 全部尚未执行；普通 CPU 模块和示范角色的具体
 
 在 `512b2ed` 上完成 DSH 原生 minimal profile、项目只读工具插件、独立尝试 home 和角色工具快照。真实 DSH 进程对本地受控 SSE 服务完成读取和拒绝测试；运行审计关联 session、任务、角色，不含模型正文或密钥。应用契约/CAS/事件继续沿用既有实现；无新增 Agent 框架。
 
-Node 24.13.0、DSH/SDK 0.1.2-alpha.4。验证命令：`npm run typecheck`（0）、`npm run validate:specs`（17 schemas / 7 commands / 8 results / 51 P0）、`npm run test:architecture`（6/6）、`npm test`（161/161，0 skip）。针对 DSH/业务契约/角色工作区的五文件回归 28/28，含非法输出、有限重试、超时、取消、迟到成功、session 错配与权限拒绝。完整测试临时输出 `/tmp/t102-full.log`；可复执行源码为 `tests/integration/dsh-native-tools.test.ts`、`deepseek-harness-agent.test.ts`、`agent-contracts.test.ts`、`dsh-project-stages.test.ts` 和 `tests/security/agent-workspace.test.ts`。
+Node 24.13.0、DSH/SDK 0.1.2-alpha.4。验证命令：`npm run typecheck`（0）、`npm run validate:specs`（17 schemas / 7 commands / 8 results / 51 P0）、`npm run test:architecture`（6/6）、`npm test`（161/161，0 skip）。针对 DSH/业务契约/角色工作区的五文件回归 28/28，含非法输出、有限重试、超时、取消、迟到成功、session 错配与权限拒绝。完整测试临时输出 `/tmp/t102-full.log`；可复执行源码为 `tests/integration/DshNativeTools.test.ts`、`deepseek-harness-agent.test.ts`、`agent-contracts.test.ts`、`dsh-project-stages.test.ts` 和 `tests/security/AgentWorkspace.test.ts`。
 
 AC-DSHF-002、003 自动化部分 PASS；R2 真实模型及 R4 完整崩溃恢复不计入本次证明。T105/T106 尚未完成。
 
@@ -115,7 +120,7 @@ AC-DSHF-002、003 自动化部分 PASS；R2 真实模型及 R4 完整崩溃恢�
 
 CLI `--scenario`、API/Console `scenario` 同步接入通用校验，固定项目 loader/assetRoot 从组合根移除。已解析 Git commit 的场景存入 CAS 和业务 checkpoint，重新生成从原 Run 读取；没有旧场景不自动套用模板。
 
-`tests/acceptance/automated-langgraph-flow.test.ts` 用 formatter/lib 与 normalizer/components/nested 两个模块和不同测试文件命令，经过同一 LangGraph 七角色接线、两轮真实 CPU 测试、纠正及确定性发布。角色输出明确使用 Fixture Adapter，不能算 live 模型。两个场景均验证冻结场景、七角色信封、评测输入和唯一发布。
+`tests/acceptance/AutomatedLanggraphFlow.test.ts` 用 formatter/lib 与 normalizer/components/nested 两个模块和不同测试文件命令，经过同一 LangGraph 七角色接线、两轮真实 CPU 测试、纠正及确定性发布。角色输出明确使用 Fixture Adapter，不能算 live 模型。两个场景均验证冻结场景、七角色信封、评测输入和唯一发布。
 
 针对性验收：场景全流程加 Server 回归 9/9；新增场景验证 2/2；typecheck 与 Spec 校验通过。T105 的 Pi 迁出和 T106 的配置迁移需原子更新，下一功能继续完成；本次不提前勾选整个 T105。
 
@@ -139,7 +144,7 @@ GitHub Actions run `34096298827` 的失败来自三个真实回归：场景读�
 - 默认组合根、API/Console、环境示例和配置快照改用 DSH，CodeAgent 仅保留后置接口。父进程 relay 固定批准的 HTTPS/DNS 地址并拒绝重定向，上游密钥不交给 DSH 子进程；运行、有限 Schema 重试、工具与会话仍由已有 DSH Adapter/SDK 承担。
 - 新 DSH 加密设置与旧 Pi 文件分开；旧文件和 Run 保留可读，拒绝跨后端恢复，不自动复制旧密钥。进行中的 Run 使用冻结配置；模型/URL 修改影响新 Run，恢复检查参数兼容性。原业务 Schema、CAS、独立评测与 Gate 未改变。
 - `dsh-configured-provider.test.ts` 迁移原 Pi 的传输/Schema/审计断言：实际原生 DSH 对本地 SSE，验证凭据、批准地址、重定向拒绝、有限重试、新 session 与每次调用 Token 统计。`dsh-configuration-migration.test.ts` 验证冻结、默认选择、旧 Run 和秘密处置。
-- `tests/acceptance/dsh-configured-flow.test.ts` 经生产 `createComposition().automatedWorkflow()` 执行七个角色、独立 CPU 测试与唯一发布，七次调用各记录 input=100/output=20。模型响应由受控服务提供；该测试显式 `processIsolation=none`，进程/工具权限另由 T102 测试覆盖，不能作为 live 模型或完整敌对进程隔离证明。
+- `tests/acceptance/DshConfiguredFlow.test.ts` 经生产 `createComposition().automatedWorkflow()` 执行七个角色、独立 CPU 测试与唯一发布，七次调用各记录 input=100/output=20。模型响应由受控服务提供；该测试显式 `processIsolation=none`，进程/工具权限另由 T102 测试覆盖，不能作为 live 模型或完整敌对进程隔离证明。
 - 报告读取所有 Provider 的 Registry 指标，DSH 与旧 Pi 均验证跨 Run 过滤、调用去重、Token 数值及秘密不泄漏。公开操作文档、架构/ADR、API/前台/用例、追踪矩阵与本 Roadmap 同步；历史证据不改写。
 
 ### 最终本地验证
@@ -244,6 +249,6 @@ T103/T104 保持未勾选，R2=`BLOCKED`（live 配置缺失），R3/R4=`NOT_RUN
 ### 回归与阶段结论
 
 - `npm test`：174/174 PASS，0 失败、0 跳过；`npm run evaluate:framework`：7/7 PASS，结论限定为机制验证。
-- `npm run typecheck` PASS；新增连接/解析修复的定向回归 `node --test --test-concurrency=1 tests/security/provider-settings.test.ts tests/integration/deepseek-harness-agent.test.ts`：20/20 PASS。实际 HTTP 验证、两个独立 live 范例、两次独立 check 另计，不混入受控测试数量。
+- `npm run typecheck` PASS；新增连接/解析修复的定向回归 `node --test --test-concurrency=1 tests/security/ProviderSettings.test.ts tests/integration/DeepseekHarnessAgent.test.ts`：20/20 PASS。实际 HTTP 验证、两个独立 live 范例、两次独立 check 另计，不混入受控测试数量。
 - AC-DSHF-001/004：真实调用、同一生产业务阶段接线、第二工作区修改与独立检查 PASS；AC-DSHF-002/003：保留 R1 权限/失败/取消矩阵，补本次非法输出拒绝、生成例子拒绝与既有范例取消回归，PASS。四点崩溃、七角色逐项能力、确定性发布、公司 CLI 和生产容量未由本轮证明。
 - T103/T104 勾选，R0/R1/R2 为 PASS；PR #26 待用户 review，R3/R4 为 NOT_RUN。合入后下一项 T200：在既有 specs/06-agents 中落实各角色输入、职责、输出、权限和验证要求，再推进 T210/T211。

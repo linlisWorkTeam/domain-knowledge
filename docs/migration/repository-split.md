@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明从 wpKnowledge 拆出运行仓库。
+-->
 # 从 wpKnowledge 拆出运行仓库
 
 本文记录仓库拆分的历史背景，不属于当前开发流程的必读内容。
@@ -24,7 +29,7 @@
 | `endlessWpKnowledgeRunner/{docs,specs,tests}` | `{docs,specs,tests}` |
 | `endlessWpKnowledgeRunner/{web,site,deploy,acceptance}` | `{web,site,deploy,acceptance}` |
 
-domain-knowledge 原来的实验框架没有继续作为第二套源码保留。它的提交历史仍在本仓库，迁移前状态可从 `68b0fde` 检出。新的 `src/infrastructure/workflow/langgraph/` 承接拓扑、并行、循环和 Checkpoint；治理状态与发布事务由同仓库的 Domain/Application 层负责。
+domain-knowledge 原来的实验框架没有继续作为第二套源码保留。它的提交历史仍在本仓库，迁移前状态可从 `68b0fde` 检出。新的 `src/infrastructure/langgraph/` 承接拓扑、并行、循环和 Checkpoint；治理状态与发布事务由同仓库的 Domain/Application 层负责。
 
 ## 本地知识仓库
 

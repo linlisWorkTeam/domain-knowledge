@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明编排类 Agent。
+-->
 # 编排类 Agent
 
 ## OrchestratorAgent

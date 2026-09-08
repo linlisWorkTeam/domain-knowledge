@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明知识控制台 UI/UX 原型。
+-->
 # 知识控制台 UI/UX 原型
 
 本目录保存 domain-knowledge 产品控制台第一轮 UI/UX 视觉原型，用于评审信息层级、布局和交互风格，不是生产前台。

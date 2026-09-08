@@ -1,3 +1,6 @@
+# Copyright (c) 2026 linlisWorkTeam
+# SPDX-License-Identifier: MIT
+# 文件功能：维护ci相关的项目配置与工程说明。
 name: CI
 
 on:

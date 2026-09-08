@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明领域模型。
+-->
 # 领域模型
 
 ## 聚合与值对象

@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明非功能需求。
+-->
 # 非功能需求
 
 | ID | 优先级 | 可测约束 | 验收场景 |

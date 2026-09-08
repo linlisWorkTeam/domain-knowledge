@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明Preview HTTP API 规范。
+-->
 # Preview HTTP API 规范
 
 > R1 已将 provider-settings 迁到 DSH、Run 启动迁到通用场景 JSON。生产者、Console 和回归测试同步更新；真实模型范例仍由 R2 验收。

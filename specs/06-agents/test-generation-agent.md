@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明测试生产类 Agent。
+-->
 # 测试生产类 Agent
 
 ## TestGenAgent

@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明知识飞轮工作流。
+-->
 # 知识飞轮工作流
 
 ## Agent 治理与检索关系

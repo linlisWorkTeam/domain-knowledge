@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明DEV-010 公司 CLI 环境阻塞交接。
+-->
 # DEV-010 公司 CLI 环境阻塞交接
 
 ## 目标

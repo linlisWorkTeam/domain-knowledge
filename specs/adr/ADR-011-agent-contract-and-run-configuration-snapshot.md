@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明ADR-011：Agent 运行契约与 Run 配置快照。
+-->
 # ADR-011：Agent 运行契约与 Run 配置快照
 
 - 状态：Accepted
@@ -48,7 +53,7 @@ ReviewAgent 只审查已经形成的正常评测报告。认证失败、超时�
 4. 基础设施失败不会调用 ReviewAgent；正常评测仍经过 ReviewAgent。
 5. 原有七个 Agent 和 LangGraph 边保持不变。
 
-当前实现证据：运行配置冻结由 `tests/integration/run-configuration.test.ts` 验证；七类运行时结果信封、命令先验校验及原拓扑覆盖由 `tests/integration/agent-contracts.test.ts` 和 `tests/acceptance/automated-langgraph-flow.test.ts` 验证。真实模型输出质量不属于本 ADR 的完成条件。
+当前实现证据：运行配置冻结由 `tests/integration/RunConfiguration.test.ts` 验证；七类运行时结果信封、命令先验校验及原拓扑覆盖由 `tests/integration/AgentContracts.test.ts` 和 `tests/acceptance/AutomatedLanggraphFlow.test.ts` 验证。真实模型输出质量不属于本 ADR 的完成条件。
 
 ## 后果
 
@@ -70,4 +75,4 @@ T102 验证使用真实 DSH SDK/进程和本地受控 SSE 模型服务，覆盖�
 
 配置捕获时，将已验证的非敏感参数绑定到快照摘要，并在进程内保留对应运行配置。管理员修改模型或 URL 后，进行中的 Run 继续使用冻结配置和 Prompt；新 Run 使用新配置。节点读取 Prompt 仍校验契约、基础 Prompt、工具和工件完整性，但不因管理员修改当前 Provider 而切换或阻断已运行批次。恢复入口始终检查当前 Provider 与快照一致；进程重启后不能靠内存缓存绕过该检查。凭据不进入快照，参数一致时允许使用重新验证后的轮换密钥。
 
-历史 Pi Run 与旧加密配置保持可读，禁止跨后端恢复；旧密钥不会自动复制到 DSH。设置中的旧记录显示 `PROVIDER_MIGRATION_REQUIRED`，须重新配置并验证后创建新 Run。回归证据见 `tests/integration/dsh-configuration-migration.test.ts`、`dsh-configured-provider.test.ts` 和 `tests/acceptance/dsh-configured-flow.test.ts`；七角色使用真实 DSH 进程和受控模型响应，R2 live 模型验收另计。
+历史 Pi Run 与旧加密配置保持可读，禁止跨后端恢复；旧密钥不会自动复制到 DSH。设置中的旧记录显示 `PROVIDER_MIGRATION_REQUIRED`，须重新配置并验证后创建新 Run。回归证据见 `tests/integration/DshConfigurationMigration.test.ts`、`dsh-configured-provider.test.ts` 和 `tests/acceptance/DshConfiguredFlow.test.ts`；七角色使用真实 DSH 进程和受控模型响应，R2 live 模型验收另计。

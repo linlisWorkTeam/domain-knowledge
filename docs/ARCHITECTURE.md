@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明Knowledge Flywheel 架构。
+-->
 # Knowledge Flywheel 架构
 
 > 文档语言：中文是规范说明的默认语言。类名、接口名和状态值保留英文，方便与代码互查。
@@ -5,7 +10,7 @@
 <details lang="en">
 <summary>English summary</summary>
 
-domain-knowledge owns knowledge governance and execution. Its Domain/Application layers own `FlywheelRun`, evidence, `KnowledgeVersion`, the deterministic publication Gate and atomic publication. The isolated LangGraph infrastructure module owns fan-out, loops, cancellation and graph checkpoints. Both layers share `runId`, but LangGraph state never becomes a second business registry. wpKnowledge is the separate Git repository for reviewed knowledge content and evidence. The planned SearchAgent is invoked directly by Application to retrieve published VERIFIED documents, independently of OrchestratorAgent and the seven-role governance workflow.
+domain-knowledge owns knowledge governance and execution. Its Domain/Application layers own `FlywheelRun`, evidence, `KnowledgeVersion`, the deterministic publication Gate and atomic publication. Domain workflow defines fan-out and routing policies. The isolated LangGraph infrastructure executes these policies and manages cancellation and graph checkpoints. Both layers share `runId`, but LangGraph state never becomes a second business registry. wpKnowledge is the separate Git repository for reviewed knowledge content and evidence. The planned SearchAgent is invoked directly by Application to retrieve published VERIFIED documents, independently of OrchestratorAgent and the seven-role governance workflow.
 
 </details>
 
@@ -81,10 +86,10 @@ flowchart TD
 
 | 层与代码入口 | 接入时的职责 |
 | --- | --- |
-| [AgentProvider / AgentRequest](../src/application/ports/index.ts) | 保持 `run(request, signal)`：输入角色、Prompt、输出 Schema、幂等键、受信命令、工件引用和工作区；返回原始 JSON，CLI 专有字段留在 Adapter |
-| [ProjectWorkflowStages](../src/application/services/automated-project-workflow.ts) | 加载可信材料、构造命令并调用 `src/domain/agents/<role>/execute`；角色返回业务结果和待保存工件，`RoleExecutionService` 完成 CAS、信封绑定和事务提交，继续校验身份与归属 |
-| [CompanyCodeAgentCliAdapter](../src/infrastructure/agents/company-codeagent/index.ts) | 根据真实 CLI 版本实现认证、stdin、最终事件解析、工具映射、进程隔离、session、取消及脱敏审计 |
-| [createComposition](../src/interfaces/runner/composition.ts) 与 [RegistryRunConfigurationService](../src/application/services/run-configuration.ts) | 装配后端并冻结实际生效配置；核验已有 DSH 设置的优先级、CLI 版本与权限策略摘要及旧 Run 恢复兼容性 |
+| [AgentProvider / AgentRequest](../src/application/ports/ApplicationPorts.ts) | 保持 `run(request, signal)`：输入角色、Prompt、输出 Schema、幂等键、受信命令、工件引用和工作区；返回原始 JSON，CLI 专有字段留在 Adapter |
+| [ProjectWorkflowStages](../src/application/services/AutomatedProjectWorkflow.ts) | 加载可信材料、构造命令并调用 `src/domain/agents/XxxAgent/execute`；角色返回业务结果和待保存工件，`RoleExecutionService` 完成 CAS、信封绑定和事务提交，继续校验身份与归属 |
+| [CompanyCodeAgentCliAdapter](../src/infrastructure/agentAdapters/company-codeagent/CompanyCodeAgentCliAdapter.ts) | 根据真实 CLI 版本实现认证、stdin、最终事件解析、工具映射、进程隔离、session、取消及脱敏审计 |
+| [createComposition](../src/interfaces/runner/Composition.ts) 与 [RegistryRunConfigurationService](../src/application/services/RunConfiguration.ts) | 装配后端并冻结实际生效配置；核验已有 DSH 设置的优先级、CLI 版本与权限策略摘要及旧 Run 恢复兼容性 |
 
 角色指令、业务输入输出、场景、工作流和独立评测可以复用；DSH 的 `read_material` 插件、Bubblewrap 启动方式和 session 协议不能视为已被 CLI 继承。接入必须对齐现有[角色材料权限](../specs/09-security/data-boundaries.md)，并补足 CLI 自身的可验证实现。Code 返回允许路径的 `files`，由业务侧独立评测；CLI 不持有 Registry、发布凭据或 Gate 决策权。
 
@@ -146,9 +151,9 @@ src/
 
 交互层和基础设施层可以依赖应用层，应用层可以依赖领域层，反向依赖一律禁止。目录收敛及旧源码根的处置见 [ADR-007](../specs/adr/ADR-007-ddd-layered-source-layout.md)。
 
-`src/domain` 不引入工作流 SDK、数据库、模型 Provider、编译器或特定语言类型。`src/application/apps` 与 `src/application/services` 只依赖领域层和 Port。`src/infrastructure/workflow/langgraph` 用 LangGraph 实现工作流 Port，并保持独立模块形态。这样，图运行时可以继续演进，知识治理规则仍留在上层。架构契约测试会检查这些边界。详细决策见 [ADR-010](../specs/adr/ADR-010-application-domain-service-boundaries.md)。
+`src/domain` 不引入工作流 SDK、数据库、模型 Provider、编译器或特定语言类型。`src/application/apps` 与 `src/application/services` 只依赖领域层和 Port。`src/infrastructure/langgraph` 用 LangGraph 实现工作流 Port，并保持独立模块形态。这样，图运行时可以继续演进，知识治理规则仍留在上层。架构契约测试会检查这些边界。详细决策见 [ADR-010](../specs/adr/ADR-010-application-domain-service-boundaries.md)。
 
-`fw.mjs` 是 CLI 边缘的兼容门面。组件内统一维护产品 Spec、浏览器资源、HTTP Adapter、Console 只读投影、共享核心包、测试和验收 fixture。`src/interfaces/runner/server.ts` 是唯一 HTTP 实现。所有写路径都委派给共享 Application Service，不能另建 Registry、生命周期、评分、工作流或发布权威。
+`fw.mjs` 是 CLI 边缘的兼容门面。组件内统一维护产品 Spec、浏览器资源、HTTP Adapter、Console 只读投影、共享核心包、测试和验收 fixture。`src/interfaces/runner/Server.ts` 是唯一 HTTP 实现。所有写路径都委派给共享 Application Service，不能另建 Registry、生命周期、评分、工作流或发布权威。
 
 ## 两类状态
 
@@ -163,13 +168,13 @@ src/
 
 ## 七角色 Domain 执行边界
 
-Domain 代码控制阶段，模型执行 Port 仅表达 Prompt、输出约束、可读材料和授权能力；DSH Adapter 负责工作区、会话、工具、网络与格式修复重试、超时和取消。Domain 不接触数据库、文件路径操作、CAS 或 SDK，也不接收通用 WorkflowStageInput。角色无业务重试循环，保持迁移前的一次模型调用。
+Domain 代码控制阶段，模型执行 Port 仅表达 Prompt、输出约束、可读材料和授权能力；DSH Adapter 负责工作区、会话、工具、网络与格式修复重试、超时和取消。角色 Domain 不接触数据库、文件路径操作、CAS 或 SDK，也不接收通用 WorkflowStageInput。角色无业务重试循环，保持迁移前的一次模型调用。
 
 `RoleExecutionService` 是生产和独立开发共用的持久化边界；Fixture 注入模型实现，经过同一角色校验。`agent:run` 不启动图、评测或发布。运行配置新增 `roleExecutionVersion`，跨执行版本的恢复明确失败，历史记录仍可读，不迁移旧 checkpoint。开发步骤见 [角色指南](guides/agent-customization.md)。
 
 ## Agent 定制边界
 
-七个图角色是 Orchestrator、DocGen、DocWorker、TestGen、Code、Check 和 Review。角色 ID 与业务命令/结果类型由 `src/domain/agents/contracts.ts` 拥有；每个角色目录拥有执行步骤、专属契约、基础提示词和授权能力。显式注册位于 `src/domain/agents/index.ts`，节点映射位于 `src/infrastructure/workflow/langgraph/agent-definitions.ts`，图连接位于 `graph.ts`。
+七个图角色是 Orchestrator、DocGen、DocWorker、TestGen、Code、Check 和 Review。角色 ID 与业务命令/结果类型由 `src/domain/agents/AgentContracts.ts` 拥有；每个角色目录拥有执行步骤、专属契约、基础提示词和授权能力。显式注册位于 `src/domain/agents/AgentRegistry.ts`，节点映射位于 `src/domain/services/workflow/AgentDefinitions.ts`，业务连接与路由位于 `src/domain/services/workflow/Workflow.ts`，`src/infrastructure/langgraph/Graph.ts` 负责映射到执行引擎。
 
 上述清单只描述飞轮图角色。目标中的 SearchAgent 属于 Application 直接调用的检索角色，使用独立请求/结果契约，不加入该清单、治理 Run 配置快照或批次工作流图。
 
@@ -218,3 +223,7 @@ Domain 代码控制阶段，模型执行 Port 仅表达 Prompt、输出约束、
 项目场景由公共 CLI/API 显式传入，验收不依赖 WorkPanel 专属资产。OpenCode Go 由 DSH 适配层根据环境变量生成非秘密运行配置，不读取仓库部署目录；密钥只通过 `OPENCODE_GO_API_KEY` 提供，参数与优先级见 [DSH 运行配置](guides/dsh-runtime.md)。
 
 本地 Adapter 使用内置 `node:sqlite` API，因此要求 Node.js 24 或更高版本。运行依赖包括内嵌 LangGraph/checkpointer 包，以及一次性迁移旧 OKF 所需的 `yaml`。正常知识存储使用 JSON 列和 CAS，不依赖 YAML 解析。
+
+### 资源模块的目录边界
+
+按本轮目录要求，源码发现、固定 Git 提交的角色工作空间和旧 OKF 导入分别归入 `domain/sourceScan/`、`domain/workspace/`、`domain/migration/`。快速迁移保留了这些资源模块既有的文件系统、Git 子进程及 YAML 解析行为；它们通过最小领域契约协作，不依赖 Application、Infrastructure 或工作流 SDK。七角色本身仍保持无文件系统依赖。基础设施取消 `workflow/`、`persistence/`、`security/` 分组，LangGraph、SQLite、Redis 直接作为子目录。

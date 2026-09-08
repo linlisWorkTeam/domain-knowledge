@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明ADR-003：Artifact 交接与内容寻址。
+-->
 # ADR-003：Artifact 交接与内容寻址
 
 - 状态：Accepted

@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明任务清单。
+-->
 # 任务清单
 
 任务应足够具体，包含稳定 ID、目标文件或组件、依赖和完成证据。

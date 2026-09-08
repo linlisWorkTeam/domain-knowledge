@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明Checkpoint 与恢复。
+-->
 # Checkpoint 与恢复
 
 ## 两层 checkpoint

@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明教程：基于 DSH 开发一个 Agent 角色。
+-->
 # 教程：基于 DSH 开发一个 Agent 角色
 
 > 状态：R1 已合入；R2 T103/T104 的真实 DocGen、独立检查和第二工作区修改复现已通过本地验收，PR #26 已合入。实际 Run、源码复核及失败记录见 [DEV-019 证据](../../specs/changes/active/DEV-019-dsh-agent-foundation/evidence.md#r2-live-验收2026-09-07)。R3/R4 未执行。
@@ -40,7 +45,7 @@
 
 ## 运行 CPU DocGen 范例
 
-范例入口为 `src/interfaces/runner/docgen-example.ts`，公开签名见 [markdown-diff.d.ts](../../examples/docgen/markdown-diff.d.ts)，角色指令见 [prompt.txt](../../examples/docgen/prompt.txt)。源码固定到 `3f999204f988697cc5bb9473c5a10ad5b4fc1f78` 的 `src/domain/services/markdown-diff.ts`，不读取当前工作树中的修改。DocGen 的工作区只物化该源码（其中包含完整公开签名），参考测试和运行凭据不作为材料提供。
+范例入口为 `src/interfaces/runner/DocgenExample.ts`，公开签名见 [markdown-diff.d.ts](../../examples/docgen/MarkdownDiff.d.ts)，角色指令见 [prompt.txt](../../examples/docgen/prompt.txt)。源码固定到 `3f999204f988697cc5bb9473c5a10ad5b4fc1f78` 的 `src/domain/services/markdown-diff.ts`，不读取当前工作树中的修改。DocGen 的工作区只物化该源码（其中包含完整公开签名），参考测试和运行凭据不作为材料提供。
 
 使用 Node 24。新 worktree 必须先完成 bootstrap，依赖目录独立：
 
@@ -94,7 +99,7 @@ cp examples/docgen/prompt.txt /tmp/docgen-prompt.txt
 npm run example:docgen -- run --prompt-file /tmp/docgen-prompt.txt
 ```
 
-入口通过现有 promptAddon 更新 DocGen 指令；旧 Run 的 Prompt 快照不会改变。比较两次 Run 的指令摘要、正文和独立检查结果，确认改动生效。不要把这一步当作授权增加工具或改变角色职责。完整业务图也使用相同 `ProjectWorkflowStages` 的 doc_gen 接线；它的回归由 `tests/acceptance/dsh-configured-flow.test.ts` 覆盖。
+入口通过现有 promptAddon 更新 DocGen 指令；旧 Run 的 Prompt 快照不会改变。比较两次 Run 的指令摘要、正文和独立检查结果，确认改动生效。不要把这一步当作授权增加工具或改变角色职责。完整业务图也使用相同 `ProjectWorkflowStages` 的 doc_gen 接线；它的回归由 `tests/acceptance/DshConfiguredFlow.test.ts` 覆盖。
 
 T104 还要求从本 PR 提交创建第二个独立 worktree，重新 bootstrap（不得共享 node_modules），重跑 prepare、真实 run 和 check，并修改指令再次真实运行。记录两个不同工作区的提交、运行 ID、会话与工件摘要；受控 SSE 回归不能代替这两次 live 调用。
 
@@ -103,7 +108,7 @@ T104 还要求从本 PR 提交创建第二个独立 worktree，重新 bootstrap�
 ```bash
 npm run typecheck
 npm run validate:specs
-node --test tests/integration/docgen-example.test.ts
+node --test tests/integration/DocgenExample.test.ts
 npm test
 npm run evaluate:framework
 ```

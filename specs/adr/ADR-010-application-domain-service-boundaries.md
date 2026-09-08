@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明ADR-010：Application App 与 Domain Service 边界。
+-->
 # ADR-010：Application App 与 Domain Service 边界
 
 - 状态：Accepted

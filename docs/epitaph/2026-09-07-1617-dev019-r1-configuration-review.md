@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明DEV-019 R1 配置迁移待审查。
+-->
 # DEV-019 R1 配置迁移待审查
 
 - 目标与授权：用户要求在已合入 PR 后继续下一功能；按既定 SOP 每个功能 commit/push、向 main 提 PR，用户 review/合并后再推进。

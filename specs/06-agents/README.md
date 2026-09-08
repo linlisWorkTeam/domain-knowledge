@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明Agent 规范。
+-->
 # Agent 规范
 
 > 开发方向：七角色后续直接基于 DSH 开发，先底座与 CPU 范例，再按[公共 SOP](../../docs/guides/agent-customization.md#agent-development-sop)分工。下文的 AgentCommand/AgentResult 是业务输入输出约定，不是需要自建的 Agent 运行框架；具体 DSH 配置留待 [DEV-019](../changes/active/DEV-019-dsh-agent-foundation/proposal.md)实施。
@@ -20,7 +25,7 @@
 
 ## 固定节点与有限定制
 
-`src/infrastructure/workflow/langgraph/agent-definitions.ts` 是运行时 Agent 清单，固定七个角色的标识、职责、输入、输出、基础提示词和工具权限。Console 必须完整展示这些信息，但受信操作者只能维护 `promptAddon`：运行时把它追加到基础提示词，不能覆盖基础提示词。前台或 API 不得修改节点职责、Schema、边、并行关系、工具权限或 Agent 标识；这些变化必须走 Spec、Schema、代码和测试评审。
+`src/domain/services/workflow/AgentDefinitions.ts` 是运行时 Agent 清单，固定七个角色的标识、职责、输入、输出、基础提示词和工具权限。Console 必须完整展示这些信息，但受信操作者只能维护 `promptAddon`：运行时把它追加到基础提示词，不能覆盖基础提示词。前台或 API 不得修改节点职责、Schema、边、并行关系、工具权限或 Agent 标识；这些变化必须走 Spec、Schema、代码和测试评审。
 
 每次提示词变更都要记录 revision、操作者和审计事件。节点执行状态经 `WorkflowObserver` 转成 `WorkflowNodeProjection`，按 `runId` 在前台显示；Agent 自己无权直接写这份投影。
 

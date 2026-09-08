@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明Spec 增量。
+-->
 # Spec 增量
 
 ## 变更摘要

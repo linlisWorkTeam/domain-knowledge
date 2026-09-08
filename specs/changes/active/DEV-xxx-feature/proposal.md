@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明变更提案。
+-->
 # 变更提案
 
 > 将本目录复制并重命名为真实的 `DEV-<编号>-<简短名称>` 后使用。

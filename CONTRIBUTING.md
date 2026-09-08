@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明贡献指南。
+-->
 # 贡献指南
 
 domain-knowledge 以 Spec 驱动。改了行为，就要同时改对应的 Spec、实现、测试和追踪矩阵；只改其中一处，评审者无法判断哪份才是真的。

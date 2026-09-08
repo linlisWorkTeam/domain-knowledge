@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明语言检测。
+-->
 # 语言检测
 
 检测只影响插件选择，不改变领域实体。

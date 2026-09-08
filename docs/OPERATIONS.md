@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明Knowledge Flywheel 运维手册。
+-->
 # Knowledge Flywheel 运维手册
 
 > 中文是本文默认语言。命令、环境变量、API 路径和状态值保留英文。
@@ -74,7 +79,7 @@ npm run knowledge -- publish `
 
 V1 的验收项目由场景文件指定，不绑定某个外部仓库。公共入口使用 `workflow-run --scenario <file>`，要求受信源码、固定 commit、允许生成路径及测试命令。旧项目专属验收命令和预写资产已移除。
 
-自动回归通过 `tests/acceptance/real-source-flow.test.ts` 和 `automated-langgraph-flow.test.ts` 在临时 Git 仓库验证首轮失败、Correction、fresh 再生成、独立执行和幂等发布；这些夹具验证机制，不证明真实模型质量。外部真实闭环仍按 DEV-019 的 R3/R4 单独验收。
+自动回归通过 `tests/acceptance/RealSourceFlow.test.ts` 和 `automated-langgraph-flow.test.ts` 在临时 Git 仓库验证首轮失败、Correction、fresh 再生成、独立执行和幂等发布；这些夹具验证机制，不证明真实模型质量。外部真实闭环仍按 DEV-019 的 R3/R4 单独验收。
 
 评测器使用 `git archive`，生成文件只写临时目录；可执行工具限于 `node`、`pnpm` 和 `cargo`。它不经过 shell，会净化继承环境、限制命令时间与输出，并把工具版本、脱敏 argv、退出状态和脱敏输出保存到 CAS。
 
@@ -157,7 +162,7 @@ Agent 元数据来自 `GET /api/v1/agents`。浏览器默认只读，操作员 t
 
 #### 现有实现与待补差异
 
-源码见 [Adapter](../src/infrastructure/agents/company-codeagent/index.ts)、[工作区](../src/infrastructure/agents/workspace/index.ts)和[组合根](../src/interfaces/runner/composition.ts)。
+源码见 [Adapter](../src/infrastructure/agentAdapters/company-codeagent/CompanyCodeAgentCliAdapter.ts)、[工作区](../src/domain/workspace/LocalAgentWorkspace.ts)和[组合根](../src/interfaces/runner/Composition.ts)。
 
 | 环节 | 当前代码事实 | 真实接入要补什么 |
 | --- | --- | --- |
@@ -169,7 +174,7 @@ Agent 元数据来自 `GET /api/v1/agents`。浏览器默认只读，操作员 t
 | 取消与审计 | 有超时、总输出字节上限、AbortSignal；POSIX 发送进程组 TERM/KILL，Windows 仅终止直接子进程；审计保存摘要和关联 ID | 实测 CLI 及工具后代退出、迟到结果不落业务状态；认证续期、模型不可用、权限拒绝和限流等真实错误映射；Windows 如需支持须单独验收 |
 | Run 配置 | 摘要覆盖 CLI 路径、基础参数、模型、时限、输出上限和允许根 | 补实际 CLI 版本/制品标识、协议映射与工具/隔离策略摘要；同路径二进制升级也应检测到恢复不兼容 |
 
-现有 [CLI 集成测试](../tests/integration/company-codeagent-cli.test.ts)用 fake spawn 和通用 `answer` Schema 验证协议机制，没有启动公司 CLI，也未验证七角色真实业务输出。与 [Run 配置测试](../tests/integration/run-configuration.test.ts)一起保留为回归入口，新增真实样本后再补行为覆盖。
+现有 [CLI 集成测试](../tests/integration/CompanyCodeagentCli.test.ts)用 fake spawn 和通用 `answer` Schema 验证协议机制，没有启动公司 CLI，也未验证七角色真实业务输出。与 [Run 配置测试](../tests/integration/RunConfiguration.test.ts)一起保留为回归入口，新增真实样本后再补行为覆盖。
 
 #### 实施顺序与退出条件
 
@@ -196,7 +201,7 @@ Agent 元数据来自 `GET /api/v1/agents`。浏览器默认只读，操作员 t
 | `WP_CODEAGENT_ALLOWED_ROOTS` | CLI 工作目录允许根；多个路径使用系统路径分隔符（Linux 为 `:`）；组合根还加入角色工作区根 |
 | `WP_DSH_ALLOWED_ROOTS` | 当前 `LocalAgentWorkspace.allowedSourceRoots` 仍读取此配置，与 CLI 工作目录允许根不同；公司接入也须核对源码根是否可物化 |
 
-**配置优先级需显式验收。** 当前 [ProviderOperationsApp.runConfigurationProvider()](../src/application/apps/provider-operations-app.ts) 在存在已验证 DSH 设置时返回 DSH 快照，优先于环境 fallback；未验证设置会使新 Run 失败。因此设置 CLI 开关不能证明实际调用 CLI。首轮使用没有 DSH 设置的专属 runtime，不删除已有设置；后续如调整优先级，须同步配置规范与回归测试。Console 的 API 地址/Key 验证入口目前只支持 DSH，不负责公司 CLI 登录；恢复已有 DSH Run 时不能切换后端。
+**配置优先级需显式验收。** 当前 [ProviderOperationsApp.runConfigurationProvider()](../src/application/apps/ProviderOperationsApp.ts) 在存在已验证 DSH 设置时返回 DSH 快照，优先于环境 fallback；未验证设置会使新 Run 失败。因此设置 CLI 开关不能证明实际调用 CLI。首轮使用没有 DSH 设置的专属 runtime，不删除已有设置；后续如调整优先级，须同步配置规范与回归测试。Console 的 API 地址/Key 验证入口目前只支持 DSH，不负责公司 CLI 登录；恢复已有 DSH Run 时不能切换后端。
 
 session ID 文件位于 `$WP_FLYWHEEL_HOME/codeagent/sessions/`，新建目录权限 `0700`、文件权限 `0600`；当前仅在成功后保存。组合根审计位于 `$WP_FLYWHEEL_HOME/demo/agent-runs.jsonl`，保存 Prompt/Schema 摘要、耗时、状态、错误码和 run/session/idempotency 关联，不保存 Prompt 正文或任意 metadata；这是应用审计范围，CLI 自己的历史/日志仍须单独核查。排障先区分 `CODEAGENT_CLI_UNAVAILABLE`、认证错误、`CODEAGENT_TIMEOUT`、`AGENT_CANCELLED`、`AGENT_OUTPUT_INVALID` 与业务 Gate 不通过，不能靠降低 Schema 或跳过评测修复运行失败。
 
@@ -210,7 +215,7 @@ session ID 文件位于 `$WP_FLYWHEEL_HOME/codeagent/sessions/`，新建目录�
 
 DSH 有两个方向：作为角色运行框架时，LangGraph 调用其 SDK，当前配置见[DSH 部署说明](guides/dsh-runtime.md)；下面的 Cordis 插件则让外部 DSH 调用知识库 HTTP API，不承担七角色调度。新底座优先复用前者，不另建 Agent 运行框架。
 
-把 `src/interfaces/dsh/index.ts` 作为普通 Cordis plugin 挂载，并配置：
+把 `src/interfaces/dsh/Dsh.ts` 作为普通 Cordis plugin 挂载，并配置：
 
 ```text
 WP_KNOWLEDGE_URL=http://127.0.0.1:4174

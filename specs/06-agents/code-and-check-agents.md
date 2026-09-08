@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明代码与检查类 Agent。
+-->
 # 代码与检查类 Agent
 
 > 运行方向见 [Agent 规范入口](README.md)：角色在 DSH 上开发。R1 已分离通用业务阶段与显式夹具，并迁移通用场景入口和默认 DSH 配置；R2 live 范例已通过本地验收，当前进度见 [DEV-019](../changes/active/DEV-019-dsh-agent-foundation/spec-delta.md)。

@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明C++ 语言插件。
+-->
 # C++ 语言插件
 
 状态：Accepted；这是 Adapter 规范，不改变通用契约。

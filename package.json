@@ -7,23 +7,23 @@
     "node": ">=24.0.0"
   },
   "scripts": {
-    "bootstrap:worktree": "node scripts/bootstrap-worktree.ts",
-    "bootstrap:worktree:check": "node scripts/bootstrap-worktree.ts --check",
-    "knowledge": "node --env-file-if-exists=.env.local src/interfaces/runner/cli.ts",
-    "knowledge:serve": "node --env-file-if-exists=.env.local src/interfaces/ui-api/index.ts",
+    "bootstrap:worktree": "node scripts/BootstrapWorktree.ts",
+    "bootstrap:worktree:check": "node scripts/BootstrapWorktree.ts --check",
+    "knowledge": "node --env-file-if-exists=.env.local src/interfaces/runner/Cli.ts",
+    "knowledge:serve": "node --env-file-if-exists=.env.local src/interfaces/ui-api/UiApi.ts",
     "site:serve": "node site/dev-server.mjs",
-    "site:check": "node --test tests/contract/site.test.ts",
-    "test:ui": "playwright test",
+    "site:check": "node --test tests/contract/Site.test.ts",
+    "test:ui": "playwright test --config Playwright.config.ts",
     "test": "node --test --test-concurrency=1",
-    "test:architecture": "node --test tests/contract/architecture.test.ts",
+    "test:architecture": "node --test tests/contract/Architecture.test.ts",
     "test:domain": "node --test tests/unit",
     "test:integration": "node --test --test-concurrency=1 tests/integration",
     "test:acceptance": "node --test --test-concurrency=1 tests/acceptance",
     "typecheck": "tsc --noEmit",
-    "validate:specs": "node specs/13-verification/validate-specs.ts",
+    "validate:specs": "node specs/13-verification/ValidateSpecs.ts",
     "evaluate:framework": "node scripts/evaluate-framework.mjs",
-    "agent:run": "node --env-file-if-exists=.env.local src/interfaces/runner/agent-run.ts",
-    "example:docgen": "node --env-file-if-exists=.env.local src/interfaces/runner/docgen-example.ts"
+    "agent:run": "node --env-file-if-exists=.env.local src/interfaces/runner/AgentRun.ts",
+    "example:docgen": "node --env-file-if-exists=.env.local src/interfaces/runner/DocgenExample.ts"
   },
   "dependencies": {
     "@deepseek-ai/dsh": "0.1.2-alpha.4",

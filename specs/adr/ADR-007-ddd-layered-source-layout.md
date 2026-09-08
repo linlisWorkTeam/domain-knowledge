@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明ADR-007：按领域驱动设计收敛源码目录。
+-->
 # ADR-007：按领域驱动设计收敛源码目录
 
 - 状态：Accepted
@@ -45,8 +50,8 @@ src/
 
 ## 验证
 
-- `tests/contract/component-layout.test.ts` 检查新目录存在，并拒绝旧源码根重新出现。
-- `tests/contract/architecture.test.ts` 检查领域层和应用层的依赖方向。
+- `tests/contract/ComponentLayout.test.ts` 检查新目录存在，并拒绝旧源码根重新出现。
+- `tests/contract/Architecture.test.ts` 检查领域层和应用层的依赖方向。
 - `npm run typecheck`、`npm test` 和真实源码验收共同证明移动没有改变运行行为。
 
 <details lang="en">

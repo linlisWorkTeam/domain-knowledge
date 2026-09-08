@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明Knowledge Flywheel 规范集。
+-->
 # Knowledge Flywheel 规范集
 
 **规范状态：Accepted｜版本：1.8.0｜基线日期：2026-09-04**

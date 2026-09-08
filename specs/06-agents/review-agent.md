@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明评审类 Agent。
+-->
 # 评审类 Agent
 
 ## ReviewAgent

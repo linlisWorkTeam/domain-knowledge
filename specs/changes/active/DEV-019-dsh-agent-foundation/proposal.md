@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明DEV-019 DSH 公共底座与角色开发范式。
+-->
 # DEV-019 DSH 公共底座与角色开发范式
 
 - 状态：架构方向已由用户确认，可执行 Roadmap 已落稿；实施 Spec 增量为 Draft；R0 已通过，R1 首批业务接线/夹具拆分与 DSH 关联检查已实现，完整 R1 尚未通过。

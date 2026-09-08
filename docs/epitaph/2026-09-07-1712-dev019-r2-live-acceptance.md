@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明DEV-019 R2 live 通过，等待 PR 审查。
+-->
 # DEV-019 R2 live 通过，等待 PR 审查
 
 - 用户授权使用其提供的 DeepSeek 凭据，先完成真实运行再更新 PR #26。工作区 `/tmp/domain-knowledge-r2`、分支 `codex/dev019-docgen-example`；本轮修复 DNS 探针的 Node 24 地址族兼容、DSH 末尾 JSON 提取，完善示范角色指令。

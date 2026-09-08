@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明项目验收解耦与 OpenCode Go 环境配置。
+-->
 # 项目验收解耦与 OpenCode Go 环境配置
 
 ## 用户目标与范围

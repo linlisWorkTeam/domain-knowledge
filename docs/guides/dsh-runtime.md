@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明DeepSeek Harness 运行配置。
+-->
 # DeepSeek Harness 运行配置
 
 LangGraph 编排七角色，DSH 负责模型、会话和工具执行。知识、工件、独立评测与发布仍归 domain-knowledge。R1 验证原生 DSH 与受控模型服务；真实 CPU 范例及模型质量由 R2 验收。
@@ -73,7 +78,7 @@ Console 配置使用原生 `sdk-minimal`，项目最后一层工具策略关闭�
 
 已有环境部署仍可显式配置 `WP_DSH_PROVIDER`、`WP_DSH_MODEL`、`WP_DSH_PROFILE`、`WP_DSH_PATCHES_JSON` 与模型环境变量；没有 Console 设置时使用这些部署参数，状态明确为未验证。默认 profile 是原生 `sdk-minimal`；其他 profile/patch 属于管理员可信部署配置，其内容摘要也进入快照。
 
-旧的 Provider 和 DSH Web 调试 YAML 已移除。模型接入由 `src/infrastructure/agents/deepseek-harness/` 维护，OpenCode Go 通过上文的环境配置生成运行文件；默认原生 DeepSeek / Console 路径不加载 OpenCode Go 的模型插件。
+旧的 Provider 和 DSH Web 调试 YAML 已移除。模型接入由 `src/infrastructure/agentAdapters/deepseek-harness/` 维护，OpenCode Go 通过上文的环境配置生成运行文件；默认原生 DeepSeek / Console 路径不加载 OpenCode Go 的模型插件。
 
 `deepseek-harness-headless` 仅是显式诊断入口，Prompt 经 stdin 输入，没有等价的生产源码隔离，不是 SDK 失败时的回退。DSH Web 和知识飞轮 Console 是不同入口，后者由 `knowledge:serve` 提供。
 

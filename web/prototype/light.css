@@ -1,3 +1,8 @@
+/**
+ * Copyright (c) 2026 linlisWorkTeam
+ * SPDX-License-Identifier: MIT
+ * 文件功能：提供light页面的展示、交互或样式资源。
+ */
 [data-theme=light] body{background:#f3f5f7;color:#17201e}
 [data-theme=light] .sidebar,[data-theme=light] .drawer{background:#fff}
 [data-theme=light] .project,[data-theme=light] .search,[data-theme=light] .theme-toggle,[data-theme=light] .overview article,[data-theme=light] .queue,[data-theme=light] .rail article,[data-theme=light] .metrics article,[data-theme=light] .run-history,[data-theme=light] .run-detail,[data-theme=light] .domains,[data-theme=light] .docs,[data-theme=light] .graph-shell,[data-theme=light] .knowledge-tools{background:#fff;border-color:#dce2e5;color:#17201e}

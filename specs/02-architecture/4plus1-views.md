@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明4+1 架构视图。
+-->
 # 4+1 架构视图
 
 > 后续开发使用 [DEV-019 的 DSH 目标架构](../changes/active/DEV-019-dsh-agent-foundation/proposal.md)。以下是现行 baseline 视图；Pi 与固定项目执行器退出目标底座，公司 CLI 适配后置，SDK/业务层分离和唯一 Registry/Gate 不变。
@@ -32,4 +37,4 @@ V1 部署在个人电脑：domain-knowledge runner + Knowledge Registry + LangGr
 
 ## 约束验证
 
-架构测试扫描 `src/domain` 和 `src/application/services`，禁止 LangGraph SDK 穿透，并检查只有 `src/infrastructure/workflow/langgraph` 持有 StateGraph；该模块不得持有 KnowledgeVersion、Publication、HTTP 或 Console 实现。语言插件契约测试使用非 C++ 假插件证明核心无语言假设。
+架构测试扫描 `src/domain` 和 `src/application/services`，禁止 LangGraph SDK 穿透，并检查只有 `src/infrastructure/langgraph` 持有 StateGraph；该模块不得持有 KnowledgeVersion、Publication、HTTP 或 Console 实现。语言插件契约测试使用非 C++ 假插件证明核心无语言假设。

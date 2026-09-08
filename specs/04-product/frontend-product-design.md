@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明知识飞轮前台产品设计。
+-->
 # 知识飞轮前台产品设计
 
 > DEV-019 R1 已将默认角色执行、模型配置与通用启动迁到 DSH；历史阶段不作为当前开发队列。R2 live CPU 范例已通过本地验收，下一项见[开发状态](../../docs/DEVELOPMENT-STATUS.md)。
@@ -100,7 +105,7 @@ domain-knowledge/
 └── web/                   # HTML、CSS 与浏览器交互
 ```
 
-控制台服务适配器与只读投影分别位于 `src/interfaces/runner/server.ts` 和 `src/interfaces/runner/console-read-model.ts`。控制台不得为了页面查询扩张 `src/application/services`、`src/application/ports` 或写侧持久化仓库；状态变更仍只能委托共享应用服务。
+控制台服务适配器与只读投影分别位于 `src/interfaces/runner/Server.ts` 和 `src/interfaces/runner/ConsoleReadModel.ts`。控制台不得为了页面查询扩张 `src/application/services`、`src/application/ports` 或写侧持久化仓库；状态变更仍只能委托共享应用服务。
 
 ```text
 Knowledge Flywheel

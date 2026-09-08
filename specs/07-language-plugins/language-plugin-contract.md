@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明语言插件契约。
+-->
 # 语言插件契约
 
 核心通过 `LanguagePlugin` 端口调用语言能力：

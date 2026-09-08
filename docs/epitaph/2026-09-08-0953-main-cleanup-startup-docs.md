@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明主目录清理与启动文档补充。
+-->
 # 主目录清理与启动文档补充
 
 ## 用户目标与结果

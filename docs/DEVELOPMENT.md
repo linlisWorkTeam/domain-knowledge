@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明开发指南。
+-->
 # 开发指南
 
 ## 开发基线
@@ -55,7 +60,7 @@ uiApi / CLI / DSH / Web projection
 - `src/application/apps`：Orchestrator、Flywheel、EvalRunner、KnowledgeSearch、KnowledgeDiscovery、ContentGovernance、ProviderOperations、OperationalMetrics 八个用例入口。
 - `src/application/services`：App 使用的用例协调服务；只能依赖 Domain 和 Port，不能直接依赖具体 SQLite、HTTP、模型或编译器。
 - `src/infrastructure`：实现知识登记簿、内容寻址存储、智能体、外部适配和项目评测等技术边界。
-- `src/infrastructure/workflow/langgraph`：相对独立的 LangGraph 图、运行时和固定 Agent 定义；不能拥有 KnowledgeVersion、评测或发布事务。
+- `src/infrastructure/langgraph`：相对独立的 LangGraph 图、运行时和固定 Agent 定义；不能拥有 KnowledgeVersion、评测或发布事务。
 - `src/interfaces/ui-api`：UI/HTTP 的正式入站入口，只调用 Application App。
 - `src/interfaces/runner`：组合根、CLI、兼容 HTTP Server 和 Console read model。
 - `web`：浏览器界面；不能复制状态机或发布判断。
@@ -93,7 +98,7 @@ uiApi / CLI / DSH / Web projection
 ### 修改前台
 
 - 先对齐[前台产品设计](../specs/04-product/frontend-product-design.md)和[用户用例](../specs/05-workflows/user-use-cases.md)。
-- Console read model 位于 `src/interfaces/runner/console-read-model.ts`，写操作必须经过共享应用服务。
+- Console read model 位于 `src/interfaces/runner/ConsoleReadModel.ts`，写操作必须经过共享应用服务。
 - 未实现的自动化能力应呈现真实状态，不制作会绕过权限边界的假按钮。
 
 ### 大规模特性
@@ -112,7 +117,7 @@ uiApi / CLI / DSH / Web projection
 | `WP_KNOWLEDGE_WRITE_TOKEN` | 启用受保护写 API |
 | `WP_SOURCE_ALLOWED_HOSTS` | 允许 Source Registry 访问的 HTTPS host（逗号分隔；默认全部拒绝） |
 
-Redis Adapter 位于 `src/infrastructure/persistence/redis`，对应 `AgentContextStore` 和 `RunningStateStore`。Agent Context 只保存轮次、attempt、ArtifactRef 和路由等可重建状态，单条上限 64 KiB；运行租约使用 ownerId + leaseId 做 fencing。当前本地组合根仍使用 SQLite Checkpoint 和进程内运行表；在 Redis 的地址、认证、TTL、故障语义确定前，不要把它设为业务事实源或绕过 Registry。
+Redis Adapter 位于 `src/infrastructure/redis`，对应 `AgentContextStore` 和 `RunningStateStore`。Agent Context 只保存轮次、attempt、ArtifactRef 和路由等可重建状态，单条上限 64 KiB；运行租约使用 ownerId + leaseId 做 fencing。当前本地组合根仍使用 SQLite Checkpoint 和进程内运行表；在 Redis 的地址、认证、TTL、故障语义确定前，不要把它设为业务事实源或绕过 Registry。
 
 为每个实验使用独立 `WP_FLYWHEEL_HOME`，可以避免开发数据互相污染。配置默认值见 [`../runner.config.json`](../runner.config.json)。需要启用本地写入时，从仓库根目录执行 `copy .env.example .env.local`，将 `WP_KNOWLEDGE_WRITE_TOKEN` 的占位值换成随机长令牌，再重启 `npm run knowledge:serve`。`.env.local` 已被 Git 忽略，不得提交。
 

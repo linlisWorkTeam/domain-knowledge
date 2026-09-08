@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明术语表。
+-->
 # 术语表
 
 | 术语 | 稳定定义 |

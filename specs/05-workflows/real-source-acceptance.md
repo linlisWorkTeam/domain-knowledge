@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明真实源码验收工作流。
+-->
 # 真实源码验收工作流
 
 > 验收范围说明（2026-09-08）：V1 使用显式可信项目场景，已移除旧项目专属验收目录和命令。[DEV-019 分阶段验收](../changes/active/DEV-019-dsh-agent-foundation/acceptance.md) 已区分 CPU 角色范例与七角色外部真实闭环；新公共入口不绑定本项目路径，历史证据不改写为新底座成果。
@@ -27,7 +32,7 @@
 6. EvalRunner 执行场景指定的最终测试和构建检查命令。全部命令退出码为零、无超时且证据完整时，Gate 才能 PASS。
 7. Run 必须先进入 REVIEWING，再由确定性 Gate 进入 PUBLISHING；原子发布只验证第二版，重复发布返回同一 receipt。
 
-自动化整合验收使用 `src/infrastructure/workflow/langgraph` 的真实 StateGraph 执行同一多轮语义，并要求七个 Agent 均留下节点投影。LangGraph 的 `pass` 路由只调度 publication 阶段，最终 `VERIFIED` 和 receipt 仍由 Knowledge Publication Gate 与 Registry 事务产生。2026-09-02 的 live 样例保存在 [wpKnowledge](https://github.com/linlisWorkTeam/wpKnowledge/blob/main/knowledge/3.workpanel/%E8%AF%81%E6%8D%AE/2026-09-02-DeepSeek-Harness%E7%9C%9F%E5%AE%9EAgent%E6%B2%BB%E7%90%86%E6%BC%94%E7%A4%BA.md)。
+自动化整合验收使用 `src/infrastructure/langgraph` 的真实 StateGraph 执行同一多轮语义，并要求七个 Agent 均留下节点投影。LangGraph 的 `pass` 路由只调度 publication 阶段，最终 `VERIFIED` 和 receipt 仍由 Knowledge Publication Gate 与 Registry 事务产生。2026-09-02 的 live 样例保存在 [wpKnowledge](https://github.com/linlisWorkTeam/wpKnowledge/blob/main/knowledge/3.workpanel/%E8%AF%81%E6%8D%AE/2026-09-02-DeepSeek-Harness%E7%9C%9F%E5%AE%9EAgent%E6%B2%BB%E7%90%86%E6%BC%94%E7%A4%BA.md)。
 
 场景中的每条命令必须声明为 `setup`、`test` 或 `check`。只有 `test` 命令可以贡献测试计数；其输出必须能解析出大于零的真实测试总数，否则即使退出码为零也不得形成 PASS 证据。构建、语法检查和空输出命令不得伪造测试通过数。
 

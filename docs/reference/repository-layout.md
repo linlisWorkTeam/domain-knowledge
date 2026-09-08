@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明仓库目录参考。
+-->
 # 仓库目录参考
 
 目录直接表达依赖方向。domain-knowledge 是运行仓库，wpKnowledge 是内容仓库，两边不能再各放一套 Runner。
@@ -20,7 +25,7 @@ domain-knowledge/
 
 - `domain/` 保存实体、状态与 Flywheel、EvalRunner、Association 领域服务，不依赖数据库或工作流 SDK；
 - `application/apps/` 保存 Orchestrator、Flywheel、EvalRunner、KnowledgeSearch、KnowledgeDiscovery、ContentGovernance、ProviderOperations、OperationalMetrics 八个用例入口；`application/ports/` 和 `application/services/` 保存契约与内部协调服务；
-- `infrastructure/` 实现 LangGraph、Agent、评测、CAS、SQLite、Redis 运行状态 Adapter 与来源扫描；
+- `infrastructure/` 实现 LangGraph、Agent、评测、CAS、SQLite、Redis 运行状态 Adapter；
 - `interfaces/ui-api/` 是 UI/HTTP 正式入口，`interfaces/runner/` 和 `interfaces/dsh/` 提供 CLI、兼容入口与 DSH 接口。
 
 旧的 `endlessWpKnowledgeRunner/` 包装目录已经取消。不要恢复根级 `apps/`、`packages/`，也不要把旧 `src/graph` 框架作为第二套实现搬回来；需要追溯时查看迁移前提交 `68b0fde`。
@@ -40,9 +45,11 @@ domain-knowledge 的 SQLite Registry 与 CAS 仍是一次运行中的业务事�
 | 领域实体、Domain Service、Gate 或状态规则 | `src/domain/`、`src/domain/services/` |
 | 对外用例入口 | `src/application/apps/` |
 | 用例协调或 Port | `src/application/services/`、`src/application/ports/` |
-| Agent、评测器、持久化或来源扫描 | `src/infrastructure/` |
-| LangGraph 图和 Checkpoint | `src/infrastructure/workflow/langgraph/` |
-| Agent Context、Running State 的 Redis Adapter | `src/infrastructure/persistence/redis/` |
+| 角色业务、来源扫描、迁移和角色工作空间 | `src/domain/agents/`、`src/domain/sourceScan/`、`src/domain/migration/`、`src/domain/workspace/` |
+| 跨角色业务流程 | `src/domain/services/workflow/` |
+| 模型、评测器与持久化适配器 | `src/infrastructure/` |
+| LangGraph 图和 Checkpoint | `src/infrastructure/langgraph/` |
+| Agent Context、Running State 的 Redis Adapter | `src/infrastructure/redis/` |
 | UI/HTTP API | `src/interfaces/ui-api/` |
 | CLI、兼容 Runner 或 DSH 接口 | `src/interfaces/runner/`、`src/interfaces/dsh/` |
 | 产品或架构契约 | `specs/` |
@@ -56,7 +63,7 @@ domain-knowledge 的 SQLite Registry 与 CAS 仍是一次运行中的业务事�
 2. 移动文件时同步修改 import、npm script、TypeScript include 和相对链接。
 3. `.workpanel/`、数据库、外部源码检出和模型输出不得进入 Git。
 4. 中文是解释性文档的默认语言；稳定的跨语言入口补简短 English summary。
-5. `tests/contract/component-layout.test.ts` 会阻止旧包装目录和过时分层回流。
+5. `tests/contract/ComponentLayout.test.ts` 会阻止旧包装目录和过时分层回流。
 
 <details lang="en">
 <summary>English summary</summary>
@@ -65,4 +72,8 @@ domain-knowledge owns executable code, specs, tests and product surfaces at the 
 
 </details>
 
-七角色实现位于 `src/domain/agents/<role>/`；共享提交在 `src/application/services/role-execution.ts`，独立入口在 `src/interfaces/runner/agent-run.ts`。目录职责及显式注册位置见 [Agent 开发指南](../guides/agent-customization.md)。
+七角色实现位于 `src/domain/agents/XxxAgent/`；共享提交在 `src/application/services/RoleExecution.ts`，独立入口在 `src/interfaces/runner/AgentRun.ts`。目录职责及显式注册位置见 [Agent 开发指南](../guides/agent-customization.md)。
+
+## 文件命名与说明
+
+全仓库 TypeScript 文件采用 PascalCase（按明确要求保留 `domain/migration/legacyOkf.ts`），测试和声明保留 `.test.ts`、`.spec.ts`、`.d.ts` 后缀。七角色使用 `src/domain/agents/XxxAgent/XxxAgent.ts`；模型基础设施适配器位于 `src/infrastructure/agentAdapters/`。源码和支持注释的文本带有版权及功能文件头，JSON、锁文件和二进制资源的元数据集中在 [文件清单](FileCatalog.json)，不改变原始数据格式。对外类型、函数和公开成员使用中文注释。

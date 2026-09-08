@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明DSH 底座方向与开发指导交接。
+-->
 # DSH 底座方向与开发指导交接
 
 ## 当前用户确认

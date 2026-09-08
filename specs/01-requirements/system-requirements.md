@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明系统需求。
+-->
 # 系统需求
 
 > DEV-019 R1 已同步 KF-SYS-022/025/041 的通用场景与 DSH 配置条款；R2～R4 的真实范例和完整闭环仍按[分阶段验收](../changes/active/DEV-019-dsh-agent-foundation/acceptance.md)执行。

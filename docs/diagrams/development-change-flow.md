@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明开发变更链路。
+-->
 # 开发变更链路
 
 ```mermaid

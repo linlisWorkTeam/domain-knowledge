@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明SearchAgent 文档设计交接。
+-->
 # SearchAgent 文档设计交接
 
 ## 用户目标与本轮结果

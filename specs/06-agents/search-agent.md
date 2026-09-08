@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明检索类 Agent。
+-->
 # 检索类 Agent
 
 **设计已确认（2026-09-08）；实现状态：Planned。** 本轮只定义文档与调用边界；当前 `KnowledgeSearchApp` 提供普通查询，尚未接入 SearchAgent。需求与验收见 `KF-SYS-043` / `AC-SEARCH-001`。

@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明Spec 增量（Draft）。
+-->
 # Spec 增量（Draft）
 
 以下保留提案时的差异与 R0 核实记录。R1 的 DSH 依赖、配置、通用场景和旧记录处置已实施并同步 baseline；R2 的真实 DocGen 与独立复现已通过本地验收，PR #26 待审查，证据见 evidence.md；R3/R4 未执行。
@@ -56,7 +61,7 @@ KF-SYS-025 与 ADR-011 已同步 DSH 的会话/工具职责及应用业务契约
 
 ## T105/T106 已实施
 
-项目直接 Pi SDK 依赖及其执行路径已移除，配置安全模块迁到 `src/infrastructure/security/`。Console/API 保存 `deepseek-harness`，生产组合根默认原生 DSH；只有显式 fixture 配置才使用夹具。通用场景入口在 T105 前一功能交付，本次完成剩余配置迁移。Command/Result Schema 版本不变；Preview Provider 设置值由生产者和消费者一起更新。
+项目直接 Pi SDK 依赖及其执行路径已移除，凭据存储位于 `src/infrastructure/agentAdapters/provider/`，HTTPS 校验位于 `src/infrastructure/http/`。Console/API 保存 `deepseek-harness`，生产组合根默认原生 DSH；只有显式 fixture 配置才使用夹具。通用场景入口在 T105 前一功能交付，本次完成剩余配置迁移。Command/Result Schema 版本不变；Preview Provider 设置值由生产者和消费者一起更新。
 
 模型配置经公开 HTTPS/DNS 检查与无副作用验证后启用。父进程持有上游密钥，通过每次调用独立的本地 relay 为原生 DSH 提供经过批准的传输；固定已批准地址、拒绝重定向，Schema 重试交给已有 DSH Adapter。运行中使用冻结模型配置，恢复时比较当前运行参数摘要；旧 Pi 快照拒绝恢复且保留读取，旧加密文件不改写、密钥不自动迁移。配置、安全、审计指标、快照和 HTTP/Console 回归同步迁到 DSH。
 

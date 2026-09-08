@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明ADR-008：回滚能力显式降级。
+-->
 # ADR-008：回滚能力显式降级
 
 - 状态：Accepted

@@ -1,3 +1,8 @@
+/**
+ * Copyright (c) 2026 linlisWorkTeam
+ * SPDX-License-Identifier: MIT
+ * 文件功能：提供dev-server页面的展示、交互或样式资源。
+ */
 import { createReadStream, statSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { dirname, extname, resolve, sep } from 'node:path';

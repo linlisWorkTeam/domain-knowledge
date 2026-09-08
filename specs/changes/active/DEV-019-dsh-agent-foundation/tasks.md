@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明任务清单。
+-->
 # 任务清单
 
 阶段依赖与退出条件见 [plan.md](plan.md)，每项勾选须有 [evidence.md](evidence.md) 中的命令、结果和产物依据。R0、T102/T105/T106 已验收合入；T103/T104 的真实 DocGen、独立检查和第二工作区修改复现已通过本地验收，PR #26 待审查。合入后下一项为 T200；R3/R4 未执行。

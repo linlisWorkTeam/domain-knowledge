@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明JSON Schema。
+-->
 # JSON Schema
 
 首版 Schema 使用 JSON Schema Draft 2020-12。文件名稳定，`$id` 使用 `https://wpknowledge.local/schemas/.../v1`。首个 Release 之前仍处于 Preview，同一原子变更可以同步修改 v1 Schema、生产者、消费者、fixture、迁移与测试；Release 之后，破坏性修改必须新建 v2，不得原地改变已发布的 v1 语义。

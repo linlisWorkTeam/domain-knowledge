@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明DSH 方向文档同步复核交接。
+-->
 # DSH 方向文档同步复核交接
 
 ## 目标与约束

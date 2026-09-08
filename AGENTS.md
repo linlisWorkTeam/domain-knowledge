@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明Agent working agreement。
+-->
 # Agent working agreement
 
 本文件是仓库级协作约定：每个任务开始前先阅读最新墓志铭，交接时保留可审计的新记录。

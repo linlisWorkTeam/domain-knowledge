@@ -1,3 +1,8 @@
+/**
+ * Copyright (c) 2026 linlisWorkTeam
+ * SPDX-License-Identifier: MIT
+ * 文件功能：执行captureconsoledemo相关的开发与工程维护操作。
+ */
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -6,9 +11,9 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import sharp from 'sharp';
-import { SQLiteOperationalMetrics } from '../src/infrastructure/observability/sqlite-operational-metrics.ts';
-import { createKnowledgeServer } from '../src/interfaces/runner/server.ts';
-import { GOOD_BODY } from '../tests/helpers/fixture.ts';
+import { SQLiteOperationalMetrics } from '../src/infrastructure/observability/SqliteOperationalMetrics.ts';
+import { createKnowledgeServer } from '../src/interfaces/runner/Server.ts';
+import { GOOD_BODY } from '../tests/helpers/Fixture.ts';
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const gifPath = join(projectRoot, 'site', 'console-dev007-dev008.gif');

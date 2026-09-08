@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明domain-knowledge。
+-->
 # domain-knowledge
 
 `domain-knowledge` 是 Knowledge Flywheel 的运行仓库。它负责 Agent 编排、知识摄取、来源追踪、独立评测、确定性 Gate、版本发布、反馈和查询服务。原来放在 `wpKnowledge/endlessWpKnowledgeRunner/` 的 TypeScript 实现已经迁到这里；`wpKnowledge` 从此只保存可评审的知识、研究材料和运行证据。

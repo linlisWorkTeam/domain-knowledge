@@ -1,6 +1,11 @@
 #!/usr/bin/env node
-import { main } from './src/interfaces/runner/cli.ts';
-import { translateLegacyArgs } from './src/interfaces/runner/compat.ts';
+/**
+ * Copyright (c) 2026 linlisWorkTeam
+ * SPDX-License-Identifier: MIT
+ * 文件功能：维护fw相关的项目配置与工程说明。
+ */
+import { main } from './src/interfaces/runner/Cli.ts';
+import { translateLegacyArgs } from './src/interfaces/runner/Compat.ts';
 
 try {
   await main(translateLegacyArgs(process.argv.slice(2)));

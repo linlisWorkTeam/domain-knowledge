@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明七角色重构 PR 交付准备。
+-->
 # 七角色重构 PR 交付准备
 
 用户要求创建 PR 审查七角色 DDD 重构。GitHub API 已核验为 `skelitalynn`；目标仓库 `linlisWorkTeam/domain-knowledge`，base 为 `main`，head 为 `refactor/seven-role-domain-agents`，不自动合并。

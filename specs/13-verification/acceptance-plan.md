@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明P0 验收计划。
+-->
 # P0 验收计划
 
 > R1 的配置迁移与自动化机制已落地；R2 CPU 真实范例与独立工作区修改复现已通过本地验收；R3 七角色业务验收和 R4 真实闭环仍未完成。受控模型服务和 Fixture 不能替代 live 证据，详见 [DEV-019](../changes/active/DEV-019-dsh-agent-foundation/acceptance.md)。

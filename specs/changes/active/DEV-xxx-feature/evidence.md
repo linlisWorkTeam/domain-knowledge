@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明验证证据。
+-->
 # 验证证据
 
 本文件只记录可复验事实，不用计划结果代替实际结果。

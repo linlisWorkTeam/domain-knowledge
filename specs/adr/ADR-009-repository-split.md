@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明ADR-009：运行仓库与知识仓库分离。
+-->
 # ADR-009：运行仓库与知识仓库分离
 
 - 状态：Accepted

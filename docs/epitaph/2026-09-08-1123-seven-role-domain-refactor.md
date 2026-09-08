@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明七角色 Domain 重构交接。
+-->
 # 七角色 Domain 重构交接
 
 ## 目标与完成状态

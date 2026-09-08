@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明ADR-002：LangGraph V1 编排与可替换端口。
+-->
 # ADR-002：LangGraph V1 编排与可替换端口
 
 - 状态：Superseded by ADR-006

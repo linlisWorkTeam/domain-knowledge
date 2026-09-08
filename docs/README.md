@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明Knowledge Flywheel 文档中心。
+-->
 # Knowledge Flywheel 文档中心
 
 本页是 domain-knowledge 文档的唯一首页。产品行为、权限、状态机和验收条件以 [`../specs/`](../specs/README.md) 为规范性事实源；这里的工程文档说明如何理解、运行、修改和维护当前实现。
@@ -89,9 +94,9 @@ npm run knowledge:serve
 | 任务 | 规范入口 | 代码入口 | 测试入口 |
 | --- | --- | --- | --- |
 | 修改领域规则 | [领域模型](../specs/03-domain/domain-model.md) | `src/domain/` | `tests/unit/` |
-| 修改工作流 | [工作流规范](../specs/05-workflows/knowledge-flywheel-workflow.md) | `src/infrastructure/workflow/langgraph/` | `tests/integration/langgraph-infrastructure.test.ts` |
-| 开发一个 Agent 角色 | [Agent 规范](../specs/06-agents/README.md)与[开发步骤](guides/agent-customization.md#agent-development-sop) | [目录、类与逐角色定位](guides/agent-customization.md#角色定位表) | `tests/integration/agent-contracts.test.ts`；逐角色测试见指南 |
-| 增加 API | [HTTP API](../specs/10-interfaces/http-api.md) | `src/interfaces/ui-api/` | `tests/integration/server.test.ts` |
+| 修改工作流 | [工作流规范](../specs/05-workflows/knowledge-flywheel-workflow.md) | `src/infrastructure/langgraph/` | `tests/integration/LanggraphInfrastructure.test.ts` |
+| 开发一个 Agent 角色 | [Agent 规范](../specs/06-agents/README.md)与[开发步骤](guides/agent-customization.md#agent-development-sop) | [目录、类与逐角色定位](guides/agent-customization.md#角色定位表) | `tests/integration/AgentContracts.test.ts`；逐角色测试见指南 |
+| 增加 API | [HTTP API](../specs/10-interfaces/http-api.md) | `src/interfaces/ui-api/` | `tests/integration/Server.test.ts` |
 | 修改 Console | [前台设计](../specs/04-product/frontend-product-design.md) | `web/` | `tests/e2e/` |
 
 行为变化必须同步 Spec、实现、测试和追踪矩阵。具体步骤和完成定义见[开发指南](DEVELOPMENT.md)。

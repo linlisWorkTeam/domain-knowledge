@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明ADR-004：确定性评测和发布权分离。
+-->
 # ADR-004：确定性评测和发布权分离
 
 - 状态：Accepted
