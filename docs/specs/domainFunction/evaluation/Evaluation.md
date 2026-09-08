@@ -5,7 +5,7 @@ SPDX-License-Identifier: MIT
 -->
 # 确定性评测判定设计
 
-代码位置：[src/domain/services/EvalRunnerDomainService.ts](../../../../src/domain/services/EvalRunnerDomainService.ts)、[src/domain/Domain.ts](../../../../src/domain/Domain.ts)。
+代码位置：[src/domain/evaluation/EvalRunnerDomainService.ts](../../../../src/domain/evaluation/EvalRunnerDomainService.ts)、[src/domain/Domain.ts](../../../../src/domain/Domain.ts)。
 
 
 ## 输入与判定顺序

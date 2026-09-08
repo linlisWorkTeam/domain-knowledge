@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：验证角色契约的行为、约束及失败场景。
  */
-import { NODE_BY_AGENT } from '../../src/domain/services/workflow/AgentDefinitions.ts';
+import { NODE_BY_AGENT } from '../../src/domain/workflow/AgentDefinitions.ts';
 import { modelExecutionFactory } from '../../src/infrastructure/agentAdapters/ModelExecution.ts';
 import assert from 'node:assert/strict';
 import { join } from 'node:path';

@@ -5,12 +5,14 @@ SPDX-License-Identifier: MIT
 -->
 # 系统架构
 
-代码位置：[src/interfaces/runner/Composition.ts](../../../src/interfaces/runner/Composition.ts)、[src/application/apps/ApplicationApps.ts](../../../src/application/apps/ApplicationApps.ts)、[src/domain/services/workflow/Workflow.ts](../../../src/domain/services/workflow/Workflow.ts)、[src/infrastructure/langgraph/Graph.ts](../../../src/infrastructure/langgraph/Graph.ts)。
+代码位置：[src/interfaces/runner/Composition.ts](../../../src/interfaces/runner/Composition.ts)、[src/application/apps/ApplicationApps.ts](../../../src/application/apps/ApplicationApps.ts)、[src/domain/workflow/Workflow.ts](../../../src/domain/workflow/Workflow.ts)、[src/infrastructure/langgraph/Graph.ts](../../../src/infrastructure/langgraph/Graph.ts)。
 
 
 ## 系统上下文
 
 本仓库持有运行代码、Schema、设计与 Console；wpKnowledge 保存经过整理的知识正文及外部证据。用户经 CLI 或 HTTP 调用 Application，Application 组合 Domain 规则和端口，Composition 绑定具体实现。知识内容仓库不运行第二套 Runner。
+
+Domain 按领域功能组织：agents、workflow、evaluation、association、knowledge、sourceScan、workspace、migration 是同层级目录，不设置 services 分组或总导出文件。领域服务类放在所属功能目录；Domain.ts 保留共享实体与不变量。
 
 ## 协作关系
 

@@ -59,14 +59,14 @@ export async function acceptedCandidate(composition: ReturnType<typeof createTes
     description: 'Separate document quality from behavioral verification.',
     category: 'architecture',
     tags: ['flywheel', 'verification'],
-    provenance: [{ path: 'docs/specs/domainFunction/services/Evaluation.md', commit: 'abc123', pinned: true }],
+    provenance: [{ path: 'docs/specs/domainFunction/evaluation/Evaluation.md', commit: 'abc123', pinned: true }],
   });
 }
 
 export const GENERIC_SCENARIO = {
   schemaVersion: '1.0' as const, name: 'cpu-module', moduleId: 'cpu-module', repositoryRoot: process.cwd(),
-  sourcePaths: ['src/domain/services/MarkdownDiff.ts'], publicInterfacePaths: [],
-  allowedGeneratedPaths: ['src/domain/services/MarkdownDiff.ts'], prepareCommands: [],
+  sourcePaths: ['src/domain/knowledge/MarkdownDiff.ts'], publicInterfacePaths: [],
+  allowedGeneratedPaths: ['src/domain/knowledge/MarkdownDiff.ts'], prepareCommands: [],
   referenceCommands: [{ tool: 'node' as const, purpose: 'test' as const, args: ['--test', 'tests/unit/MarkdownDiff.test.ts'] }],
   firstIterationCommands: [{ tool: 'node' as const, purpose: 'test' as const, args: ['--test', 'tests/unit/MarkdownDiff.test.ts'] }],
   finalCommands: [{ tool: 'node' as const, purpose: 'test' as const, args: ['--test', 'tests/unit/MarkdownDiff.test.ts'] }],

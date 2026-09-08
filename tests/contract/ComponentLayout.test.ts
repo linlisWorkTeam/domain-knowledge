@@ -23,6 +23,8 @@ function markdownFiles(root: string): string[] {
 }
 
 test('Knowledge Flywheel implementation owns the domain-knowledge repository root', () => {
+  assert.equal(existsSync('src/domain/services'), false, 'Domain directories must follow business features');
+  assert.equal(existsSync('docs/specs/domainFunction/services'), false, 'Domain designs must follow feature directories');
   assert.equal(existsSync('endlessWpKnowledgeRunner'), false, 'retired wrapper directory must not be reintroduced');
   for (const required of [
     'src/interfaces/runner/Server.ts',
@@ -41,7 +43,10 @@ test('Knowledge Flywheel implementation owns the domain-knowledge repository roo
     'src/application/ports/ApplicationPorts.ts',
     'src/application/apps/ApplicationApps.ts',
     'src/application/services/ApplicationServices.ts',
-    'src/domain/services/DomainServices.ts',
+    'src/domain/workflow/Workflow.ts',
+    'src/domain/evaluation/EvalRunnerDomainService.ts',
+    'src/domain/association/AssociationDomainService.ts',
+    'src/domain/knowledge/MarkdownDiff.ts',
     'src/infrastructure/sqlite/SqliteCas.ts',
     'src/infrastructure/redis/Redis.ts',
     'docs/HistoryEpitaph.md',
