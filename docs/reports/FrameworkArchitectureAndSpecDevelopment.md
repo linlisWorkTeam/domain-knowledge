@@ -206,48 +206,192 @@ Registry 保存业务事实；LangGraph checkpoint 保存引擎恢复状态。�
 
 ## 三、框架开发模式：如何使用和修改 Spec
 
-### 3.1 Spec 驱动的实际含义
+### 3.1 先认识 docs：遇到什么问题，就读什么文件
 
-本仓库将 `docs/specs/` 作为设计入口，用“场景与验收 → 模块设计 → 契约与实现 → 验证证据”的链条约束开发。Markdown Spec 由开发者或开发 AI 阅读并实施；`npm run validate:specs` 校验规范和契约一致性，不会把 Markdown 编译成实现代码。
+新接手项目时，先打开 `docs/README.md`。不需要一次读完所有文档：先把项目跑起来，再按这次要修改的功能查找设计。
 
-| 想改变的行为 | 首先修改的 Spec | 对应代码 |
-| --- | --- | --- |
-| 用户可见需求 | [Requirements](../specs/totalRules/Requirements.md)；UI 涉及 [UiuxDesign](../specs/totalRules/UiuxDesign.md) | 所属用例与接口 |
-| 单个角色输入输出或步骤 | [Agents](../specs/domainFunction/agents/Agents.md) | `src/domain/agents/xxxAgent/` |
-| 并行、汇合、循环、业务分支 | [Workflow](../specs/domainFunction/services/workflow/Workflow.md) | `domain/services/workflow/`、`AutomatedProjectWorkflow.ts` |
-| 知识状态、来源、质量与发布 | [Knowledge](../specs/domainFunction/services/Knowledge.md) | `Domain.ts`、领域服务、应用服务 |
-| 评测与 Gate | [领域 Evaluation](../specs/domainFunction/services/Evaluation.md) | `EvalRunnerDomainService.ts`、`EvalRunnerApp.ts` |
-| 材料加载、用例和端口 | [Application](../specs/application/Application.md) | `application/apps/`、`services/`、`ports/` |
-| 模型或工具接入 | [AgentAdapters](../specs/infrastructure/agentAdapters/AgentAdapters.md) | `infrastructure/agentAdapters/` |
-| 执行引擎、存储、网络 | `specs/infrastructure/` 对应模块 | `infrastructure/` 同名模块 |
-| HTTP 协议 | [HttpApi](../specs/interfaces/HttpApi.md) | `interfaces/runner/Server.ts`、App、`web/` |
-| 验收与需求追踪 | [Verification](../specs/totalRules/Verification.md) | 对应实现和测试路径 |
+```text
+docs/
+├── README.md                  # 文档总入口：不知道读哪份时先看这里
+├── GettingStarted.md          # 怎么安装、启动 Console、运行第一个工作流
+├── Development.md             # 怎么准备环境、修改代码、验证和交付
+├── AgentDevelopment.md        # 怎么修改和单独运行一个 Agent，含 DocGen 示例
+├── Runtime.md                 # 怎么配置 DSH、模型和运行环境
+├── Operations.md              # 怎么初始化数据、执行日常操作和排查运行问题
+├── Status.md                  # 项目做到哪里了，哪些功能还没完成
+├── specs/                     # 功能应该怎样工作：本次开发要遵守和修改的设计
+│   └── README.md              # 从功能或代码目录找到对应 Spec
+├── diagrams/
+│   └── Views4Plus1.md         # 用架构图理解模块关系、运行过程和部署方式
+├── reports/
+│   └── FrameworkArchitectureAndSpecDevelopment.md
+│                              # 本报告：帮助新人认识项目，反映核对时的代码状态
+├── epitaph/                   # 最近三次交接：开始任务前读文件名时间最新的一篇
+├── HistoryEpitaph.md          # 更早的交接摘要和历史记录链接
+└── FileCatalog.json           # JSON、图片等文件的版权和功能登记
+```
 
-### 3.2 一次修改怎样完成
+例如，“服务怎么启动”查 `GettingStarted.md`；“DocGen 应该收到哪些材料”查 `specs/` 下的角色设计；“DocGen 怎么单独跑一次”查 `AgentDevelopment.md`。历史交接用于了解背景，当前需求仍要以本次任务和现有 Spec 为准。
 
-1. 阅读最新 `docs/epitaph/`、当前 Git 状态和所属 Spec，明确本次需求范围。新建工作树后先执行 `npm run bootstrap:worktree`，直到 `status: READY`。
-2. 在现有模块 Spec 中写清触发条件、输入、输出、不变量、正常步骤和失败处理。用可判定行为描述验收，例如“当生成文件路径重复时，拒绝结果且不提交工件”。
-3. 新增或变更需求时同步 Requirements / UiuxDesign 的相关条目及 Verification 的验收场景、追踪行。保持已有编号稳定；新增编号需先检查唯一性。
-4. 公共字段或协议变化时同步 `docs/specs/schemas/`、角色 Contract、生产消费者与合法/非法样例。审查版本兼容性；纯目录调整不要改 Schema 内容和 `$id`。
-5. 按 DDD 所属层实施代码，补充能区分正确行为和回归的测试。新的外部能力先定义最小 Port，再实现 Adapter 并在 Composition 装配。
-6. 按影响范围验证，记录实际结果与未验证部分。有架构变化再更新 `docs/diagrams/Views4Plus1.md`；操作变化更新已有指南。
-7. 检查 Spec、代码和验收是否一致，按本次授权提交交付。通常走 PR；直接推 main 需要本次任务明确授权。本报告的提交由用户明确要求直接推 main。
+### 3.2 再认识 specs：每份设计负责什么
 
-不要把所有规划条目顺手实现。`Implemented`、`Partial`、`Planned` 表达实现覆盖，不是本轮测试报告；只有实际落地并具有相应测试入口后才更新覆盖状态。
+Spec 就是写给开发者看的功能说明：接收什么输入、执行什么步骤、返回什么结果、遇到错误怎么办，以及怎样判断做对了。本仓库把这些说明按代码模块放在下面的目录里。
 
-### 3.3 验证命令与证明范围
+```text
+docs/specs/
+├── README.md                         # 设计导航，列出设计与代码的对应关系
+├── totalRules/                       # 全项目共用的要求
+│   ├── Requirements.md              # 项目需要提供哪些功能；需求编号在这里查
+│   ├── Architecture.md              # 各模块怎样合作、职责怎样分配
+│   ├── DomainDrivenDesign.md        # DDD 分层规则，哪些层能依赖哪些层
+│   ├── CodeTaste.md                 # 文件命名、代码组织、注释和文档约定
+│   ├── UiuxDesign.md                # Console 页面与交互应该怎样表现
+│   └── Verification.md             # 怎样验收；需求对应哪些实现和测试
+├── domainFunction/                   # 业务规则，对应 src/domain/
+│   ├── agents/
+│   │   └── Agents.md                # 七个角色分别做什么、读什么、输出什么
+│   ├── services/
+│   │   ├── Knowledge.md             # 知识版本、来源、状态、关联和发布条件
+│   │   ├── Evaluation.md            # 根据评测事实判断通过、迭代或停止
+│   │   └── workflow/
+│   │       └── Workflow.md          # 角色的先后、并行、汇合和下一轮规则
+│   ├── sourceScan/
+│   │   └── SourceScan.md            # 怎样扫描来源文件
+│   ├── workspace/
+│   │   └── Workspace.md             # Agent 工作区如何准备和限制访问
+│   ├── migration/
+│   │   └── LegacyOkf.md             # 旧知识怎样迁移进来
+│   └── languagePlugins/
+│       └── LanguagePlugins.md       # 语言插件的约定；当前尚无具体插件实现
+├── application/                      # 用例协调，对应 src/application/
+│   └── Application.md               # 怎样加载材料、调用角色、保存结果与协调发布
+├── infrastructure/                   # 外部技术实现，对应 src/infrastructure/
+│   ├── agentAdapters/
+│   │   └── AgentAdapters.md         # 怎样接模型 SDK、公司 CLI 和角色工具
+│   ├── evaluation/
+│   │   └── Evaluation.md            # 怎样实际运行项目命令并收集评测证据
+│   ├── langgraph/
+│   │   └── LangGraph.md             # 图引擎怎样调度、取消和恢复执行
+│   ├── sqlite/
+│   │   └── Sqlite.md                # 业务记录、工件和事务怎样存储
+│   ├── redis/
+│   │   └── Redis.md                 # Redis 运行状态适配的约定
+│   ├── http/
+│   │   └── Http.md                  # 对外 HTTPS 访问的技术约束
+│   └── observability/
+│       └── Observability.md         # 运行指标如何记录、计算和展示
+├── interfaces/                       # 外部调用方式
+│   └── HttpApi.md                   # HTTP 路由、请求、响应和错误
+└── schemas/                          # 程序可检查的数据格式，下面单独展开
+```
+
+两个 `Evaluation.md` 分别回答不同问题：领域设计写“什么结果算通过”，基础设施设计写“怎样运行检查并拿到结果”。同样，`interfaces/HttpApi.md` 写本服务的 API，`infrastructure/http/Http.md` 写对外网络访问约束。
+
+`schemas/` 中的 JSON Schema 会被程序用于检查字段和格式。只有涉及对应数据结构时才需要修改，先看该目录的 `README.md`。
+
+```text
+docs/specs/schemas/
+├── README.md                         # Schema 用法、引用方式和版本兼容规则
+├── AgentCommand.schema.json          # 发给 Agent 的命令和输入数据
+├── AgentResult.schema.json           # Agent 返回结果的统一格式
+├── ArtifactRef.schema.json           # 工件引用：标识、摘要、大小等
+├── Correction.schema.json            # Review 给出的修订意见
+├── EvaluationReport.schema.json      # 一次评测的事实报告
+├── EvaluationSummary.schema.json     # 跨批次评测汇总
+├── EvaluationRule.schema.json        # 评测规则及其版本
+├── Event.schema.json                 # 领域事件
+├── ActionItem.schema.json            # 待处理的治理事项
+├── RunProgress.schema.json           # 批次进度
+├── Activity.schema.json              # 跨批次活动记录
+├── ComponentStatus.schema.json       # 组件健康状态
+├── KnowledgeLineage.schema.json      # 知识版本的来源和关联关系
+├── KnowledgeDiff.schema.json         # 知识正文的结构化差异
+├── KnowledgeHealth.schema.json       # 知识健康度及计算口径
+├── Source.schema.json                # 来源注册信息
+└── LanguagePlugin.schema.json        # 语言插件数据格式，属于规划能力
+```
+
+### 3.3 第一次接任务，按这个顺序读
+
+假设任务是“修改 DocGen 的文档生成规则”，建议按以下顺序开始：
+
+1. **看交接和现状。** 读根目录 `AGENTS.md`、最新 `docs/epitaph/` 记录和 `docs/Status.md`，执行 `git status` 确认是否已有未提交修改。
+2. **准备开发环境。** 按 `docs/Development.md` 操作；新建工作树后执行 `npm run bootstrap:worktree`，得到 `status: READY` 再开始。
+3. **找到本次设计。** 打开 `docs/specs/README.md`，定位 `domainFunction/agents/Agents.md` 的 DocGen 条目。
+4. **找到对应代码。** 读 Spec 中的代码链接，再到 `src/domain/agents/docGenAgent/` 看入口、Contract、Prompt 和测试。
+5. **按需补读。** 如果只是修改 DocGen 内部规则，就围绕该角色工作；如果要给它增加上游材料，再读 `application/Application.md`；如果要改变角色先后顺序，再读 `services/workflow/Workflow.md`。
+
+第一次涉及分层或目录调整时，也要读 `totalRules/Architecture.md`、`DomainDrivenDesign.md` 和 `CodeTaste.md`。每次任务只深入本次影响的模块。
+
+### 3.4 Spec 驱动开发，实际就是先写清楚，再照着实现
+
+一次功能修改按这个顺序完成：
+
+```text
+读当前 Spec 和代码
+        ↓
+在原有 Spec 中写清楚这次要改变的行为
+        ↓
+自己改代码，或让开发 AI 按这段 Spec 改代码
+        ↓
+用测试检查正常情况和失败情况
+        ↓
+一起审查 Spec、代码和测试，再提交
+```
+
+Spec 需要让接手的人回答四个问题：**什么情况下触发？输入是什么？结果是什么？失败时怎么办？** 尽量给出能检查的例子。
+
+例如，假设下一次需求是将 DocGen 的正文最短长度从当前 200 字符提高到 300 字符。下面只是教学示例，本报告没有实施这项变更。
+
+**第一步：改原来的设计。** 打开 `docs/specs/domainFunction/agents/Agents.md`，在 DocGen 条目更新原有长度规则，并在相关输出约束处补清楚：
+
+```text
+DocGen 输出的 body 至少包含 300 个字符，沿用现有字符串长度计数方式。
+不足 300 个字符时，拒绝该角色输出，不提交为成功的知识正文工件。
+长度边界验证：299 个字符应被拒绝；300 个字符且其余字段合法时应通过。
+```
+
+这样下一位开发者知道要改的数值、处理位置和边界结果。不要只写“提高文档质量”，也不要另建一份与 Agents.md 重复的设计。
+
+**第二步：找实现这条规则的地方。** 在 `src/domain/agents/docGenAgent/` 搜索正文长度相关约束，检查 `DocGenAgentContract.ts`、`DocGenAgent.ts`、`DocGenAgentPrompt.ts` 和测试。更新实际负责强制校验的位置；提示词中的描述也要一致。正文规则涉及公共 Schema 或样例时同步修改；若不涉及，就不必改那些文件。
+
+**第三步：验证边界。** 添加或调整 299 与 300 字符的测试，并通过相关提交链路检查确认被拒绝的输出不会当成成功知识正文保存。已有其他规则继续保留，不能为了让新测试通过而删掉旧断言。
+
+**第四步：交付时对照原文检查。** Spec 写了 300，代码是否仍写 200？Prompt 是否还提示旧限制？合法样例是否仍满足约束？测试是否覆盖拒绝和通过两种结果？这些都对上，才算完成这条 Spec。
+
+如果是修复代码，使其符合已经写清楚的 Spec，可以保留原设计，只补必要的澄清和回归测试。Spec 驱动并不要求每次修复都改文档。
+
+### 3.5 哪些情况还需要一起改其他文档
+
+下面按实际影响决定，不需要每次把整个 specs 目录改一遍。
+
+| 本次改动 | 还需要检查什么 |
+| --- | --- |
+| 增加或改变用户能使用的功能 | `Requirements.md`；页面行为还涉及 `UiuxDesign.md` |
+| 增加或改变验收要求 | `Verification.md` 中的场景和需求对应的代码、测试路径；保留已有编号，新增编号先查重 |
+| 增删公共输入输出字段 | `schemas/`、角色 Contract、读写该字段的代码和样例；版本兼容按 schemas/README.md |
+| 改变角色之间的顺序或材料传递 | `Workflow.md`、`Application.md` 及对应实现 |
+| 改变架构关系 | `Architecture.md` 和 `docs/diagrams/Views4Plus1.md` 的相关部分 |
+| 改变启动命令或操作方式 | `GettingStarted.md`、`AgentDevelopment.md` 等已有指南中对应的步骤 |
+
+`Verification.md` 的 `Implemented` 表示已有实现和测试入口，`Partial` 表示只完成一部分，`Planned` 表示还在计划中。不要因为写好了 Spec 就把状态改成已实现，也不要把本次任务之外的计划功能一起开发。
+
+### 3.6 改完后怎样检查
+
+行为修改按开发指南完成以下检查；单角色调试还可先运行第五部分给出的角色命令。
 
 ```bash
-npm run typecheck
-npm run validate:specs
-npm test
-# Console 或交互行为变化时
+npm run typecheck        # 检查 TypeScript 类型是否匹配
+npm run validate:specs   # 检查规范链接、数据格式、需求编号和验收对应关系
+npm test                # 检查代码行为是否符合测试要求
+
+# 改了 Console 页面或交互时，再运行
 npm run test:ui
 ```
 
-`validate:specs` 检查 Spec 内链接、占位符、Schema 正反例、需求和验收编号、追踪关系与实现/测试路径。它不检查所有报告链接，也不能证明模型生成内容语义正确。`npm test` 包含角色及仓库测试；真实模型效果需另行运行并保存模型、配置摘要、Run 与工件证据。
+`validate:specs` 通过，只代表这些规范检查通过。它不会生成代码，也不能证明“文档写得更好”这类内容质量目标已经达到。真实模型效果需要对应的实际运行证据。
 
-纯报告或低影响文案修改可选择链接、路径和 diff 等静态检查。详细约定见[开发指南](../Development.md)，不必为每个任务增加独立的 proposal、plan、tasks、evidence 模板文件。
+提交时把本次 Spec、代码和测试放在一起供审查，说明改了什么、跑了哪些检查、还有什么没验证。纯报告或低影响文案修改按范围选择链接和 diff 等静态检查即可。让 AI 实施时，可以直接使用下一部分的任务指令。
 
 ## 四、修改好 Spec 后，如何让 AI 生成并落实代码
 
@@ -420,6 +564,6 @@ Console/CLI 允许修改 `promptAddon`，最多 4000 字符，只影响新 Run�
 
 ## 六、本报告的核对与验证范围
 
-报告通过当前源码、package.json、工作流实现及所属 Spec 交叉核对。已完成目录树与代码路径核对；报告 27 个链接、文档导航 20 个链接均通过本地目标检查；`git diff --check` 通过；`npm run validate:specs` 返回 `SPEC_VALIDATION_OK schemas=17 commands=7 results=8 p0=51`。
+报告通过当前源码、package.json、工作流实现及所属 Spec 交叉核对。已完成目录树与代码路径核对；报告及文档导航的相对链接均通过本地目标检查；`git diff --check` 通过；`npm run validate:specs` 返回 `SPEC_VALIDATION_OK schemas=17 commands=7 results=8 p0=51`。
 
 本次仅新增报告及文档导航，不修改业务代码，不运行完整测试、UI 测试或真实模型调用。文中的命令是供后续开发使用的操作示例，不表示已在本次报告任务中执行。
