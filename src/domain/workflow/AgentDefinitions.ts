@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：定义业务工作流角色与节点的绑定，复用各角色拥有的职责及提示词。
  */
-import type { AgentId } from '../../agents/AgentContracts.ts';
+import type { AgentId } from '../agents/AgentContracts.ts';
 
 /** 领域工作流使用的角色说明与节点绑定信息。 */
 export interface AgentDefinition {
@@ -28,7 +28,7 @@ export interface AgentDefinition {
 }
 
 
-import { roleDefinitions } from '../../agents/AgentRegistry.ts';
+import { roleDefinitions } from '../agents/AgentRegistry.ts';
 /** 固定角色到业务节点的显式绑定。 */
 export const NODE_BY_AGENT: Record<AgentId, string> = { orchestrator: 'orchestrator', 'doc-worker': 'doc_worker', 'doc-gen': 'doc_gen', 'test-gen': 'test_gen', code: 'code', check: 'check', review: 'review' };
 /** 供运行配置和 Console 使用的七角色目录。 */

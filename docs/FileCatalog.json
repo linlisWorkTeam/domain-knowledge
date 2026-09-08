@@ -142,12 +142,6 @@
       "metadataLocation": "file-header"
     },
     {
-      "path": "docs/epitaph/2026-09-08-1216-specs-consolidation.md",
-      "copyright": "Copyright (c) 2026 linlisWorkTeam",
-      "description": "交接按代码重写的规范结构、历史归档和项目身份规则。",
-      "metadataLocation": "file-header"
-    },
-    {
       "path": "docs/epitaph/2026-09-08-1420-docgen-example-consolidation.md",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "记录取消 DocGen 专用入口并合并角色样例的交接。",
@@ -157,6 +151,12 @@
       "path": "docs/epitaph/2026-09-08-1423-session-identity-scope.md",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "澄清账号选择只属于当前会话，不作为项目协作规则。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "docs/epitaph/2026-09-08-1442-domain-feature-layout.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "Domain 按领域功能平级组织的交接记录。",
       "metadataLocation": "file-header"
     },
     {
@@ -178,6 +178,24 @@
       "metadataLocation": "file-header"
     },
     {
+      "path": "docs/specs/domainFunction/association/Association.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "事实提取与目标关联的领域设计。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "docs/specs/domainFunction/evaluation/Evaluation.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "确定性评测判定设计。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "docs/specs/domainFunction/knowledge/Knowledge.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "知识实体与正文差异设计。",
+      "metadataLocation": "file-header"
+    },
+    {
       "path": "docs/specs/domainFunction/languagePlugins/LanguagePlugins.md",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "语言能力契约与当前支持范围。",
@@ -190,27 +208,15 @@
       "metadataLocation": "file-header"
     },
     {
-      "path": "docs/specs/domainFunction/services/Evaluation.md",
-      "copyright": "Copyright (c) 2026 linlisWorkTeam",
-      "description": "确定性评测判定设计。",
-      "metadataLocation": "file-header"
-    },
-    {
-      "path": "docs/specs/domainFunction/services/Knowledge.md",
-      "copyright": "Copyright (c) 2026 linlisWorkTeam",
-      "description": "知识实体与领域服务设计。",
-      "metadataLocation": "file-header"
-    },
-    {
-      "path": "docs/specs/domainFunction/services/workflow/Workflow.md",
-      "copyright": "Copyright (c) 2026 linlisWorkTeam",
-      "description": "跨角色工作流设计。",
-      "metadataLocation": "file-header"
-    },
-    {
       "path": "docs/specs/domainFunction/sourceScan/SourceScan.md",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "候选文件发现设计。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "docs/specs/domainFunction/workflow/Workflow.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "跨角色工作流设计。",
       "metadataLocation": "file-header"
     },
     {
@@ -916,57 +922,51 @@
       "metadataLocation": "catalog"
     },
     {
+      "path": "src/domain/association/AssociationDomainService.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "定义AssociationDomain服务的领域数据与确定性业务规则。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/domain/evaluation/EvalRunnerDomainService.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "定义EvalRunnerDomain服务的领域数据与确定性业务规则。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/domain/knowledge/MarkdownDiff.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "定义Markdown差异的领域数据与确定性业务规则。",
+      "metadataLocation": "file-header"
+    },
+    {
       "path": "src/domain/migration/LegacyOkf.ts",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "读取旧 OKF 卡片并转换为知识候选，保留来源证据且重新执行质量与行为验收。",
       "metadataLocation": "file-header"
     },
     {
-      "path": "src/domain/services/AssociationDomainService.ts",
+      "path": "src/domain/sourceScan/SourceScan.ts",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
-      "description": "定义AssociationDomain服务的领域数据与确定性业务规则。",
+      "description": "发现待入库知识文件，执行目录范围校验、内容摘要去重和候选排序。",
       "metadataLocation": "file-header"
     },
     {
-      "path": "src/domain/services/DomainServices.ts",
-      "copyright": "Copyright (c) 2026 linlisWorkTeam",
-      "description": "定义DomainServices的领域数据与确定性业务规则。",
-      "metadataLocation": "file-header"
-    },
-    {
-      "path": "src/domain/services/EvalRunnerDomainService.ts",
-      "copyright": "Copyright (c) 2026 linlisWorkTeam",
-      "description": "定义EvalRunnerDomain服务的领域数据与确定性业务规则。",
-      "metadataLocation": "file-header"
-    },
-    {
-      "path": "src/domain/services/FlywheelDomainService.ts",
-      "copyright": "Copyright (c) 2026 linlisWorkTeam",
-      "description": "定义FlywheelDomain服务的领域数据与确定性业务规则。",
-      "metadataLocation": "file-header"
-    },
-    {
-      "path": "src/domain/services/MarkdownDiff.ts",
-      "copyright": "Copyright (c) 2026 linlisWorkTeam",
-      "description": "定义Markdown差异的领域数据与确定性业务规则。",
-      "metadataLocation": "file-header"
-    },
-    {
-      "path": "src/domain/services/workflow/AgentDefinitions.ts",
+      "path": "src/domain/workflow/AgentDefinitions.ts",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "定义业务工作流角色与节点的绑定，复用各角色拥有的职责及提示词。",
       "metadataLocation": "file-header"
     },
     {
-      "path": "src/domain/services/workflow/Workflow.ts",
+      "path": "src/domain/workflow/FlywheelDomainService.ts",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
-      "description": "定义跨角色业务流程、文档任务拆分及质量判定后的流转规则。",
+      "description": "定义FlywheelDomain服务的领域数据与确定性业务规则。",
       "metadataLocation": "file-header"
     },
     {
-      "path": "src/domain/sourceScan/SourceScan.ts",
+      "path": "src/domain/workflow/Workflow.ts",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
-      "description": "发现待入库知识文件，执行目录范围校验、内容摘要去重和候选排序。",
+      "description": "定义跨角色业务流程、文档任务拆分及质量判定后的流转规则。",
       "metadataLocation": "file-header"
     },
     {

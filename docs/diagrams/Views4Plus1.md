@@ -29,7 +29,7 @@ flowchart LR
 ```mermaid
 flowchart TB
   I[interfaces: HTTP / CLI / Composition] --> A[application: apps / services / ports]
-  A --> D[domain: agents / services / sourceScan / workspace / migration]
+  A --> D[domain: agents / workflow / evaluation / association / knowledge / sourceScan / workspace / migration]
   I --> F[infrastructure: agentAdapters / langgraph / sqlite / redis / evaluation]
   F --> A
   F --> D

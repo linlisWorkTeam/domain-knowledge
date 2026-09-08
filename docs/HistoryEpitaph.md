@@ -69,3 +69,7 @@ This document summarizes older handoffs, milestones and architectural decisions 
 删除 AGENTS、贡献指南、开发指南和 CodeTaste 中的固定账号规则，同时移除本次会话写入的仓库级 user.name / user.email。当前会话的 Git 身份通过单次命令配置，GitHub 身份通过单次进程凭据指定；不设跨会话账号约束。历史交接中把账号写成项目规则的表述是当时的误解，不作为后续协作指令。
 
 [2026-09-08-1158 目录审查](https://github.com/linlisWorkTeam/domain-knowledge/blob/260e7f1/docs/epitaph/2026-09-08-1158-agent-directory-review.md)：调整 Domain Workflow、资源模块和 Infrastructure 目录，新增版权与中文说明；当时只做类型与静态检查，未运行测试。
+
+## 设计与命名整理交接归档
+
+[2026-09-08-1216-specs-consolidation.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/1455ba9c6a84797a2ee22e9939f2542cd4dc7ed4/docs/epitaph/2026-09-08-1216-specs-consolidation.md)：设计集中到 docs/specs 并与代码对应，统一目录小驼峰、文件大驼峰，合并 4+1 视图与历史文档。仅做静态验证，未重跑测试。原记录中的项目级账号规则是误解，已纠正为仅当前会话适用。
