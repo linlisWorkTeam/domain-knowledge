@@ -84,7 +84,7 @@
     {
       "path": "docs/AgentDevelopment.md",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
-      "description": "说明教程：基于 DSH 开发一个 Agent 角色。",
+      "description": "说明七角色的独立开发、显式材料样例和 DocGen 固定源码范例。",
       "metadataLocation": "file-header"
     },
     {
