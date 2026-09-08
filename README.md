@@ -18,14 +18,6 @@ domain-knowledge is the executable Knowledge Flywheel repository. It owns orches
 
 SQLite Registry 与 CAS 是运行时事实源，默认写到本仓库 `.workpanel/`。需要扫描 `wpKnowledge` 时，通过 `WP_KNOWLEDGE_REPOSITORY` 指向它的本地检出。当前发布事务不会自动提交或推送 Git；知识文件进入 `wpKnowledge` 仍要走普通 PR 评审。
 
-## 已确认的后续方向
-
-第一版先在外部使用 **LangGraph 编排 → DSH 运行角色 → 业务校验与独立评测** 完成闭环。先交付公共底座和普通 CPU 小模块的真实角色范例，再开发七个角色；不另建 Agent 运行框架。Pi 退出目标底座，固定项目执行器退出公共入口；CodeAgent CLI 仅保留后续适配位置，不阻塞第一版。
-
-R1 已将角色执行收敛到 DSH，通用项目场景从 CLI/API/Console 传入。Pi Agent 运行依赖已移除，旧记录保留可读且拒绝恢复；CodeAgent CLI 适配后置。R2 的真实 CPU DocGen 范例和独立工作区复现已通过本地验收，PR #26 已合入；R3 七角色和 R4 完整闭环尚未验收。详见[开发状态](docs/DEVELOPMENT-STATUS.md)和 [DEV-019](specs/changes/active/DEV-019-dsh-agent-foundation/proposal.md)。
-
-新增 [SearchAgent 设计](specs/06-agents/search-agent.md)：用户通过 Application 的 `KnowledgeSearchApp` 直接调度，只检索飞轮治理后正式发布的 `VERIFIED` 文档，不经过 OrchestratorAgent 或 LangGraph。目标为七个飞轮角色加一个独立检索角色；SearchAgent 当前仅完成文档设计，调用关系见 [Agent 流程图](specs/05-workflows/knowledge-flywheel-workflow.md#agent-治理与检索关系)。
-
 ## 当前已实现
 
 - 七类 Agent 通过 LangGraph 执行，支持并行、循环、取消和 Checkpoint 恢复；
