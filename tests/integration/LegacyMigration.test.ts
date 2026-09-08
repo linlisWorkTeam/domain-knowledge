@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
-import { migrateLegacyOkf, parseLegacyCard } from '../../src/domain/migration/legacyOkf.ts';
+import { migrateLegacyOkf, parseLegacyCard } from '../../src/domain/migration/LegacyOkf.ts';
 import { createTestComposition, GOOD_BODY } from '../helpers/Fixture.ts';
 
 test('legacy verified cards migrate as candidates requiring behavioral verification', async () => {
@@ -15,7 +15,7 @@ test('legacy verified cards migrate as candidates requiring behavioral verificat
   try {
     const directory = join(fixture.runtimeDir, 'legacy', 'concepts');
     mkdirSync(directory, { recursive: true });
-    writeFileSync(join(directory, 'legacy-card.md'), `---\nname: legacy-card\ntitle: Legacy Card\ndescription: Migrated knowledge\nstatus: verified\nverified: true\nversion: 3\nsources:\n  - path: specs/README.md\n    commit: abc123\n    pinned: true\n---\n\n${GOOD_BODY}\n`);
+    writeFileSync(join(directory, 'legacy-card.md'), `---\nname: legacy-card\ntitle: Legacy Card\ndescription: Migrated knowledge\nstatus: verified\nverified: true\nversion: 3\nsources:\n  - path: docs/specs/README.md\n    commit: abc123\n    pinned: true\n---\n\n${GOOD_BODY}\n`);
     const result = await migrateLegacyOkf({ legacyKnowledgeRoot: join(fixture.runtimeDir, 'legacy'), service: fixture.service });
     assert.equal(result.imported, 1);
     assert.equal(result.errors.length, 0);

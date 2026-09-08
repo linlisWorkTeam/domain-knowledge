@@ -43,8 +43,8 @@ const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../web')
 const assets = new Map([
   ['/', 'index.html'],
   ['/index.html', 'index.html'],
-  ['/app.js', 'app.js'],
-  ['/styles.css', 'styles.css'],
+  ['/App.js', 'App.js'],
+  ['/Styles.css', 'Styles.css'],
 ]);
 
 function send(response: ServerResponse, status: number, body: unknown, contentType = 'application/json; charset=utf-8'): void {

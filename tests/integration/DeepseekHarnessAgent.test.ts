@@ -13,7 +13,7 @@ import test from 'node:test';
 import type { spawn } from 'node:child_process';
 import {
   DeepSeekHarnessHeadlessAgent, DeepSeekHarnessSdkAgent, type DeepSeekHarnessAuditRecord,
-} from '../../src/infrastructure/agentAdapters/deepseek-harness/DeepSeekHarnessSdkAgent.ts';
+} from '../../src/infrastructure/agentAdapters/deepSeekHarness/DeepSeekHarnessSdkAgent.ts';
 
 const OUTPUT_SCHEMA = {
   type: 'object', required: ['answer'], additionalProperties: false,

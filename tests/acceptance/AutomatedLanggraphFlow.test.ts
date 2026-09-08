@@ -66,7 +66,7 @@ test('generated result matches contract', () => assert.equal(calculate(), expect
       evalRunner: composition.apps.evalRunner,
       evaluator: new TrustedProjectEvaluator(composition.artifacts),
       assetRoot,
-      contracts: new JsonSchemaAgentContractValidator(join(process.cwd(), 'specs', 'schemas')),
+      contracts: new JsonSchemaAgentContractValidator(join(process.cwd(), 'docs', 'specs', 'schemas')),
     });
     const infrastructure = await createDomainKnowledgeInfrastructure({
       executor,

@@ -29,11 +29,11 @@ import { createDomainKnowledgeInfrastructure } from '../../infrastructure/langgr
 import { TrustedProjectEvaluator } from '../../infrastructure/evaluation/project/TrustedProjectEvaluator.ts';
 import {
   DeepSeekHarnessHeadlessAgent, DeepSeekHarnessSdkAgent,
-} from '../../infrastructure/agentAdapters/deepseek-harness/DeepSeekHarnessSdkAgent.ts';
+} from '../../infrastructure/agentAdapters/deepSeekHarness/DeepSeekHarnessSdkAgent.ts';
 import {
   CompanyCodeAgentCliAdapter, FileCodeAgentSessionStore,
   type CompanyCodeAgentAuditRecord,
-} from '../../infrastructure/agentAdapters/company-codeagent/CompanyCodeAgentCliAdapter.ts';
+} from '../../infrastructure/agentAdapters/companyCodeAgent/CompanyCodeAgentCliAdapter.ts';
 import {
   LocalCasArtifactStore, SQLiteFlywheelRepository,
 } from '../../infrastructure/sqlite/SqliteCas.ts';
@@ -44,12 +44,12 @@ import {
   EncryptedFileProviderSettingsStore, OpenAiCompatibleProviderProbe,
   PublicHttpsEndpointPolicy,
 } from '../../infrastructure/agentAdapters/provider/ProviderSettings.ts';
-import { ConfiguredDshProvider, DSH_DEFAULT_CONTEXT_WINDOW, DSH_DEFAULT_MAX_SCHEMA_ATTEMPTS, DSH_DEFAULT_MAX_TOKENS } from '../../infrastructure/agentAdapters/deepseek-harness/ConfiguredProvider.ts';
+import { ConfiguredDshProvider, DSH_DEFAULT_CONTEXT_WINDOW, DSH_DEFAULT_MAX_SCHEMA_ATTEMPTS, DSH_DEFAULT_MAX_TOKENS } from '../../infrastructure/agentAdapters/deepSeekHarness/ConfiguredProvider.ts';
 import { FixtureProjectWorkflowStages } from '../../infrastructure/agentAdapters/scenario/ProjectWorkflowFixture.ts';
-import { writeOpenCodeGoPatch } from '../../infrastructure/agentAdapters/deepseek-harness/OpencodeGo.ts';
+import { writeOpenCodeGoPatch } from '../../infrastructure/agentAdapters/deepSeekHarness/OpencodeGo.ts';
 import { JsonSchemaAgentContractValidator } from '../../infrastructure/agentAdapters/contracts/JsonSchemaAgentContractValidator.ts';
 import { SQLiteOperationalMetrics } from '../../infrastructure/observability/SqliteOperationalMetrics.ts';
-import { migrateLegacyOkf } from '../../domain/migration/legacyOkf.ts';
+import { migrateLegacyOkf } from '../../domain/migration/LegacyOkf.ts';
 import { ConsoleReadModel } from './ConsoleReadModel.ts';
 import { buildDemoReport } from './DemoReport.ts';
 import { DocgenExampleService } from '../../application/services/DocgenExample.ts';
@@ -89,7 +89,7 @@ export const defaultRepositoryRoot = resolve(
 /** 加载WorkpanelConfig。 */
 export function loadWorkpanelConfig(_repositoryRoot = defaultRepositoryRoot): WorkpanelConfig {
   const configPath = process.env.WP_FLYWHEEL_CONFIG
-    || join(componentRoot, 'runner.config.json');
+    || join(componentRoot, 'Runner.config.json');
   const config = JSON.parse(readFileSync(configPath, 'utf8')) as WorkpanelConfig;
   if (config.schemaVersion !== '1.0') throw new Error(`CONFIG_INVALID: unsupported schemaVersion ${config.schemaVersion}`);
   if (!Number.isFinite(config.qualityGate?.threshold) || config.qualityGate.threshold < 0 || config.qualityGate.threshold > 100) {
@@ -308,12 +308,12 @@ export function createComposition(input: {
   providerOperations.executionParameters.runtimeSha256 = sha256(JSON.stringify({
     profile: 'sdk-minimal', processIsolation, bubblewrapCommand, timeoutMs, maxOutputBytes,
     allowedWorkspaceRoots: [...allowedRoots, agentWorkspaceRoot],
-    toolPolicy: sha256(readFileSync(new URL('../../infrastructure/agentAdapters/deepseek-harness/role-tools.mjs', import.meta.url))),
+    toolPolicy: sha256(readFileSync(new URL('../../infrastructure/agentAdapters/deepSeekHarness/RoleTools.mjs', import.meta.url))),
     runtimeVersion: '0.1.2-alpha.4',
   }));
-  const schemaRoot = join(componentRoot, 'specs', 'schemas');
-  const artifactRefSchemaSha256 = sha256(readFileSync(join(schemaRoot, 'artifact-ref.schema.json')));
-  const correctionSchemaSha256 = sha256(readFileSync(join(schemaRoot, 'correction.schema.json')));
+  const schemaRoot = join(componentRoot, 'docs', 'specs', 'schemas');
+  const artifactRefSchemaSha256 = sha256(readFileSync(join(schemaRoot, 'ArtifactRef.schema.json')));
+  const correctionSchemaSha256 = sha256(readFileSync(join(schemaRoot, 'Correction.schema.json')));
   const fallbackRunProvider = {
     kind: agentProviderMode,
     model: providerModel,
@@ -330,11 +330,11 @@ export function createComposition(input: {
       commandSchema: AGENT_COMMAND_SCHEMA_ID,
       resultSchema: AGENT_RESULT_SCHEMA_ID,
       commandSchemaSha256: sha256(JSON.stringify({
-        command: sha256(readFileSync(join(schemaRoot, 'agent-command.schema.json'))),
+        command: sha256(readFileSync(join(schemaRoot, 'AgentCommand.schema.json'))),
         artifactRef: artifactRefSchemaSha256,
       })),
       resultSchemaSha256: sha256(JSON.stringify({
-        result: sha256(readFileSync(join(schemaRoot, 'agent-result.schema.json'))),
+        result: sha256(readFileSync(join(schemaRoot, 'AgentResult.schema.json'))),
         artifactRef: artifactRefSchemaSha256,
         correction: correctionSchemaSha256,
       })),

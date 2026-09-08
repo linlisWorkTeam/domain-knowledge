@@ -94,7 +94,7 @@ test('HTTP adapter rejects missing credentials and accepts authenticated candida
       body: JSON.stringify({
         moduleId: 'server-card', body: GOOD_BODY, title: 'Server Card',
         description: 'Authenticated candidate ingestion.',
-        provenance: [{ path: 'specs/README.md', commit: 'abc123', pinned: true }],
+        provenance: [{ path: 'docs/specs/README.md', commit: 'abc123', pinned: true }],
       }),
     });
     assert.equal(accepted.status, 201);

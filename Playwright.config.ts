@@ -8,7 +8,7 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: './tests/e2e',
   // 保留既有截图基线目录，避免源文件改名重新生成验收图片。
-  snapshotPathTemplate: '{testDir}/console.spec.ts-snapshots/{arg}{-projectName}{-platform}{ext}',
+  snapshotPathTemplate: '{testDir}/snapshots/{arg}{ext}',
   fullyParallel: false,
   workers: 1,
   retries: process.env.CI ? 1 : 0,

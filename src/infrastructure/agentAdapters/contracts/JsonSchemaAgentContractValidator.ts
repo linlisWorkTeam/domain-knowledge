@@ -38,10 +38,10 @@ export class JsonSchemaAgentContractValidator implements AgentContractValidator 
     this.ajv = new Ajv2020({ allErrors: true, strict: true });
     addFormats(this.ajv);
     const root = resolve(schemaDirectory);
-    this.ajv.addSchema(loadSchema(root, 'artifact-ref.schema.json'));
-    this.ajv.addSchema(loadSchema(root, 'correction.schema.json'));
-    this.validateCommand = this.ajv.compile(loadSchema(root, 'agent-command.schema.json'));
-    this.validateResult = this.ajv.compile(loadSchema(root, 'agent-result.schema.json'));
+    this.ajv.addSchema(loadSchema(root, 'ArtifactRef.schema.json'));
+    this.ajv.addSchema(loadSchema(root, 'Correction.schema.json'));
+    this.validateCommand = this.ajv.compile(loadSchema(root, 'AgentCommand.schema.json'));
+    this.validateResult = this.ajv.compile(loadSchema(root, 'AgentResult.schema.json'));
   }
 
   /** 校验命令。 */

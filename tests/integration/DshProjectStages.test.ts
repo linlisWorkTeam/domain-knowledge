@@ -13,7 +13,7 @@ import { tmpdir } from 'node:os';
 import test from 'node:test';
 import { ProjectWorkflowStages, type AutomatedProjectScenario } from '../../src/application/services/AutomatedProjectWorkflow.ts';
 import type { WorkflowStageInput } from '../../src/application/ports/ApplicationPorts.ts';
-import { DeepSeekHarnessSdkAgent, type DeepSeekHarnessAuditRecord } from '../../src/infrastructure/agentAdapters/deepseek-harness/DeepSeekHarnessSdkAgent.ts';
+import { DeepSeekHarnessSdkAgent, type DeepSeekHarnessAuditRecord } from '../../src/infrastructure/agentAdapters/deepSeekHarness/DeepSeekHarnessSdkAgent.ts';
 import { LocalAgentWorkspace } from '../../src/domain/workspace/LocalAgentWorkspace.ts';
 import { TrustedProjectEvaluator } from '../../src/infrastructure/evaluation/project/TrustedProjectEvaluator.ts';
 import { JsonSchemaAgentContractValidator } from '../../src/infrastructure/agentAdapters/contracts/JsonSchemaAgentContractValidator.ts';
@@ -55,7 +55,7 @@ for (const [moduleId, sourcePath] of [['formatter', 'lib/format.mjs'], ['normali
     nodeByAgent: NODE_BY_AGENT,
         flywheel: composition.service, evalRunner: composition.apps.evalRunner,
         evaluator: new TrustedProjectEvaluator(composition.artifacts),
-        contracts: new JsonSchemaAgentContractValidator(join(process.cwd(), 'specs/schemas')),
+        contracts: new JsonSchemaAgentContractValidator(join(process.cwd(), 'docs/specs/schemas')),
         modelFactory: modelExecutionFactory(new LocalAgentWorkspace({ workspaceRoot: join(root, 'roles'), allowedSourceRoots: [sourceRoot] })),
 
         agent: new DeepSeekHarnessSdkAgent({

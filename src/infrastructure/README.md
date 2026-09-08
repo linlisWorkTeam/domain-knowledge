@@ -17,7 +17,7 @@ SPDX-License-Identifier: MIT
 | `evaluation/` | 独立评测环境与外部进程执行 |
 | `observability/` | 运行指标存储与观测 |
 
-源码候选发现位于 `domain/sourceScan/`；旧 OKF 转换位于 `domain/migration/legacyOkf.ts`；固定提交的角色文件白名单位于 `domain/workspace/`。这些模块拥有各自的最小契约，均不引用 Application 或 Infrastructure。
+源码候选发现位于 `domain/sourceScan/`；旧 OKF 转换位于 `domain/migration/LegacyOkf.ts`；固定提交的角色文件白名单位于 `domain/workspace/`。这些模块拥有各自的最小契约，均不引用 Application 或 Infrastructure。
 
 `security/` 目录已取消。原凭据加密仍由 `agentAdapters/provider/ProviderSettings.ts` 实现，HTTPS 校验仍由 `http/PublicHttps.ts` 提供，供模型和来源读取适配器共同使用。
 

@@ -32,7 +32,7 @@ for (const role of AGENT_IDS) test(`standalone ${role} sample commits through th
 test('standalone invalid output records failure and retains the failed Run for inspection', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'agent-failure-'));
   try {
-    const sample = JSON.parse(readFileSync('src/domain/agents/CodeAgent/examples/CodeAgentSample.json', 'utf8'));
+    const sample = JSON.parse(readFileSync('src/domain/agents/codeAgent/examples/CodeAgentSample.json', 'utf8'));
     sample.modelOutput.files[0].path = 'unauthorized.ts';
     const path = join(directory, 'invalid.json'); writeFileSync(path, JSON.stringify(sample));
     await assert.rejects(main(['--role', 'code', '--input', path, '--output', directory]), /AGENT_OUTPUT_INVALID/);

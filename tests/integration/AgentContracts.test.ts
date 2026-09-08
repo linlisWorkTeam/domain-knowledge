@@ -27,7 +27,7 @@ const artifactRef: ArtifactRef = {
 };
 
 test('versioned AgentCommand schema rejects unknown fields and role payload mismatch', () => {
-  const contracts = new JsonSchemaAgentContractValidator(join(process.cwd(), 'specs', 'schemas'));
+  const contracts = new JsonSchemaAgentContractValidator(join(process.cwd(), 'docs', 'specs', 'schemas'));
   const command: AgentCommand = {
     schemaVersion: '1.0', commandId: 'command-1', runId: 'run-1',
     agentType: 'orchestrator', generationKey: 'generation-key-0001',

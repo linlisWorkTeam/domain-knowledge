@@ -3,10 +3,10 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：加载工作流上下文与历史工件，协调角色执行、独立评测和发布。
  */
-import type { Output as DocumentOutput } from '../../domain/agents/DocGenAgent/DocGenAgentContract.ts';
-import type { Output as CodeOutput } from '../../domain/agents/CodeAgent/CodeAgentContract.ts';
-import type { Output as CheckOutput } from '../../domain/agents/CheckAgent/CheckAgentContract.ts';
-import type { Output as ReviewOutput } from '../../domain/agents/ReviewAgent/ReviewAgentContract.ts';
+import type { Output as DocumentOutput } from '../../domain/agents/docGenAgent/DocGenAgentContract.ts';
+import type { Output as CodeOutput } from '../../domain/agents/codeAgent/CodeAgentContract.ts';
+import type { Output as CheckOutput } from '../../domain/agents/checkAgent/CheckAgentContract.ts';
+import type { Output as ReviewOutput } from '../../domain/agents/reviewAgent/ReviewAgentContract.ts';
 import { RoleExecutionService } from './RoleExecution.ts';
 import type { ModelExecutionPort } from '../../domain/agents/AgentExecution.ts';
 import type {

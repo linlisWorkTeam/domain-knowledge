@@ -1,0 +1,119 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：4+1 架构视图。
+-->
+# 4+1 架构视图
+
+本文件对应 [架构设计](../specs/totalRules/Architecture.md)。五个视角描述同一套当前实现，不另建状态机。虚线表示未默认启用或仍为计划的接入。
+
+## 逻辑视图：业务对象与职责
+
+```mermaid
+flowchart LR
+  User[用户] --> Apps[Application Apps]
+  Apps --> Roles[七角色 Domain Agents]
+  Apps --> Run[FlywheelRun]
+  Roles --> Pending[结构化结果与待保存工件]
+  Pending --> Commit[RoleExecutionService]
+  Commit --> Version[KnowledgeVersion]
+  Apps --> Eval[独立评测事实]
+  Eval --> Gate[Domain GateDecision]
+  Gate --> Publish[原子发布回执]
+  Version --> Publish
+  Apps -. 计划能力 .-> Search[SearchAgent]
+```
+
+## 开发视图：代码与依赖
+
+```mermaid
+flowchart TB
+  I[interfaces: HTTP / CLI / Composition] --> A[application: apps / services / ports]
+  A --> D[domain: agents / services / sourceScan / workspace / migration]
+  I --> F[infrastructure: agentAdapters / langgraph / sqlite / redis / evaluation]
+  F --> A
+  F --> D
+  S[docs/specs: 对应模块设计] -. 对照 .-> D
+  S -. 对照 .-> F
+  T[tests: unit / contract / integration / acceptance / e2e] -. 验证 .-> A
+```
+
+## 进程视图：并行、汇合和迭代
+
+```mermaid
+flowchart TD
+  O[orchestrator] --> W[doc_worker 并行分块]
+  O -->|无分块| D[doc_gen]
+  O --> T[test_gen]
+  W --> D
+  D --> Q[candidate_knowledge]
+  Q -->|可继续| C[code]
+  Q -->|ITERATE 或 STOPPED| R[workflow_router]
+  C --> K[check]
+  T --> V[oracle_validation]
+  K --> B[等待两条链]
+  V --> B
+  B --> E[evaluation]
+  E -->|正常结果| RV[review]
+  E -->|FAILED| F[failed]
+  E -->|STOPPED| R
+  RV --> R
+  R -->|ITERATE| O
+  R -->|PASS| P[publication]
+  R -->|FAILED| F
+  R -->|其他| S[stopped]
+```
+
+## 物理视图：本地运行与外部资源
+
+```mermaid
+flowchart LR
+  Browser[浏览器 Console] --> Server[本地 Node HTTP / Application]
+  CLI[Node CLI] --> Server
+  Server --> Registry[SQLite Registry]
+  Server --> CAS[本地 CAS 正文]
+  Server --> Checkpoint[LangGraph SQLite checkpoint]
+  Server --> Harness[DSH SDK / 隔离工作空间]
+  Harness --> Model[已配置模型 HTTPS API]
+  Server --> Project[固定提交的参考与生成副本]
+  Project --> Processes[node / pnpm / cargo 子进程]
+  Server -. 适配器已提供 .-> Redis[Redis 租约与上下文]
+  Browser --> Static[同源 web 静态资源]
+```
+
+CLI 和 HTTP 是两个可独立启动的入口，上图 Server 框表示共享应用装配，不要求 CLI 经 HTTP 转发。运行数据库、CAS 和项目副本位于运行目录，不提交到 Git；Redis 不成为知识事实源。
+
+## 场景视图（+1）：一次失败后的修订与发布
+
+```mermaid
+sequenceDiagram
+  actor U as 用户
+  participant A as Application
+  participant G as LangGraph
+  participant R as Domain Agents
+  participant E as 独立评测器
+  participant D as Domain Gate
+  participant S as SQLite/CAS
+  U->>A: 提交显式项目场景
+  A->>S: 冻结配置并创建 Run
+  A->>G: 启动固定流程
+  G->>R: 文档、候选测试、代码与检查
+  R-->>A: 业务结果及待保存正文
+  A->>S: 绑定工件和结果信封
+  A->>E: 参考检查与生成实现评测
+  E-->>A: 测试失败证据
+  A->>R: Review 归因
+  R-->>A: 带评测证据的纠正意见
+  A->>D: 报告与策略
+  D-->>A: ITERATE
+  A-->>G: 路由下一轮
+  G->>R: DocGen 修订、Code fresh 生成
+  A->>E: 新一轮独立评测
+  E-->>A: 全部门禁事实
+  A->>D: 重新判定
+  D-->>A: PASS
+  A->>S: 原子发布并去重回执
+  S-->>U: 可查询的 VERIFIED 版本与证据
+```
+
+该场景是已有两轮回归的设计路径。质量不足可在代码生成前进入下一轮；基础设施失败和取消另行记录；有图和受控测试不代表真实模型质量已验收。

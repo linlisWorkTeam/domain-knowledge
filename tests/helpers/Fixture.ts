@@ -59,7 +59,7 @@ export async function acceptedCandidate(composition: ReturnType<typeof createTes
     description: 'Separate document quality from behavioral verification.',
     category: 'architecture',
     tags: ['flywheel', 'verification'],
-    provenance: [{ path: 'specs/08-evaluation/knowledge-publication-gate.md', commit: 'abc123', pinned: true }],
+    provenance: [{ path: 'docs/specs/domainFunction/services/Evaluation.md', commit: 'abc123', pinned: true }],
   });
 }
 

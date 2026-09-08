@@ -495,7 +495,7 @@ export interface OperationalMetricsPort {
   governance(window: '24h' | '7d' | '30d'): Record<string, unknown>;
 }
 
-/** Runtime boundary for the versioned schemas under specs/schemas. */
+/** Runtime boundary for the versioned schemas under docs/specs/schemas. */
 /** 定义角色契约校验器的数据结构与类型约束。 */
 export interface AgentContractValidator {
   /** 校验命令。 */

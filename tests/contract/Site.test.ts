@@ -13,9 +13,9 @@ import YAML from 'yaml';
 const siteRoot = 'site';
 const htmlPath = `${siteRoot}/index.html`;
 const html = readFileSync(htmlPath, 'utf8');
-const css = readFileSync(`${siteRoot}/styles.css`, 'utf8');
-const script = readFileSync(`${siteRoot}/app.js`, 'utf8');
-const release = JSON.parse(readFileSync(`${siteRoot}/release.json`, 'utf8')) as {
+const css = readFileSync(`${siteRoot}/Styles.css`, 'utf8');
+const script = readFileSync(`${siteRoot}/App.js`, 'utf8');
+const release = JSON.parse(readFileSync(`${siteRoot}/Release.json`, 'utf8')) as {
   schemaVersion: number;
   releaseId: string;
   assetVersion: string;
@@ -85,8 +85,8 @@ function assertReadablePalette(
 
 test('GitHub Pages site is self-contained and project-path safe', () => {
   for (const path of [
-    'index.html', 'styles.css', 'app.js', 'mark.svg', 'social-card.svg', '.nojekyll', 'README.md',
-    'release.json', 'console-dev007-dev008.gif', 'console-dev007-dev008-poster.webp',
+    'index.html', 'Styles.css', 'App.js', 'Mark.svg', 'SocialCard.svg', '.nojekyll', 'README.md',
+    'Release.json', 'ConsoleDev007Dev008.gif', 'ConsoleDev007Dev008Poster.webp',
   ]) {
     assert.equal(existsSync(`${siteRoot}/${path}`), true, `missing site asset: ${path}`);
   }
@@ -100,7 +100,7 @@ test('GitHub Pages site is self-contained and project-path safe', () => {
   assert.match(html, /id="release"/);
   assert.match(html, /确定性验收种子/);
   assert.match(html, /不代表外部生产表现/);
-  assert.match(html, /<source media="\(prefers-reduced-motion: reduce\)" srcset="\.\/console-dev007-dev008-poster\.webp\?v=/);
+  assert.match(html, /<source media="\(prefers-reduced-motion: reduce\)" srcset="\.\/ConsoleDev007Dev008Poster\.webp\?v=/);
 
   const ids = new Set([...html.matchAll(/\sid="([^"]+)"/g)].map((match) => match[1]));
   for (const match of html.matchAll(/href="#([^"]+)"/g)) {
@@ -126,11 +126,11 @@ test('public release marker binds the site assets to their migration source and 
   assert.match(release.evidenceRunId, /^[a-f0-9-]{36}$/);
   assert.equal(release.siteRoot, siteRoot);
   assert.ok(html.includes(release.evidenceRunId.slice(0, 8)), 'site must render the evidence Run');
-  for (const asset of ['mark.svg', 'styles.css', 'app.js']) {
+  for (const asset of ['Mark.svg', 'Styles.css', 'App.js']) {
     assert.ok(html.includes(`./${asset}?v=${release.assetVersion}`), `${asset} must use the release asset version`);
   }
   const digest = createHash('sha256');
-  for (const asset of ['app.js', 'index.html', 'mark.svg', 'social-card.svg', 'styles.css']) {
+  for (const asset of ['App.js', 'index.html', 'Mark.svg', 'SocialCard.svg', 'Styles.css']) {
     digest.update(asset).update('\0').update(readFileSync(`${siteRoot}/${asset}`)).update('\0');
   }
   assert.equal(release.contentDigest, `sha256:${digest.digest('hex')}`);
@@ -138,7 +138,7 @@ test('public release marker binds the site assets to their migration source and 
   assert.equal(release.featureRelease.releaseId, 'dev-007-dev-008-2026-09-04');
   assert.deepEqual(release.featureRelease.phases, ['DEV-007', 'DEV-008']);
   const capture = release.featureRelease.capture;
-  assert.equal(capture.script, 'scripts/capture-console-demo.mjs');
+  assert.equal(capture.script, 'scripts/CaptureConsoleDemo.mjs');
   assert.equal(capture.provenance, 'actual-console-persisted-deterministic-acceptance-seed');
   assert.ok(capture.frames >= 6);
   assert.match(capture.evidenceRunId, /^[a-f0-9-]{36}$/);
@@ -154,7 +154,7 @@ test('public release marker binds the site assets to their migration source and 
   assert.equal(posterHeader.subarray(0, 4).toString('ascii'), 'RIFF');
   assert.equal(posterHeader.subarray(8, 12).toString('ascii'), 'WEBP');
 
-  const developmentServer = readFileSync(`${siteRoot}/dev-server.mjs`, 'utf8');
+  const developmentServer = readFileSync(`${siteRoot}/DevServer.mjs`, 'utf8');
   assert.match(developmentServer, /\['\.gif', 'image\/gif'\]/);
   assert.match(developmentServer, /\['\.webp', 'image\/webp'\]/);
 
@@ -169,7 +169,7 @@ test('public release marker binds the site assets to their migration source and 
 });
 
 test('project site exposes human and Agent onboarding without weakening trust gates', () => {
-  const gettingStarted = readFileSync('docs/GETTING_STARTED.md', 'utf8');
+  const gettingStarted = readFileSync('docs/GettingStarted.md', 'utf8');
   assert.match(html, /data-onboarding-tab="human"/);
   assert.match(html, /data-onboarding-tab="agent"/);
   assert.match(html, /id="agent-setup-prompt"/);
@@ -197,8 +197,8 @@ test('project site exposes human and Agent onboarding without weakening trust ga
 
 test('public surfaces use consistent Chinese copy and approved technical identifiers', () => {
   const consoleHtml = readFileSync('web/index.html', 'utf8');
-  const consoleScript = readFileSync('web/app.js', 'utf8');
-  const socialCard = readFileSync('site/social-card.svg', 'utf8');
+  const consoleScript = readFileSync('web/App.js', 'utf8');
+  const socialCard = readFileSync('site/SocialCard.svg', 'utf8');
   assert.match(html, /<html lang="zh-CN">/);
   assert.match(consoleHtml, /<html lang="zh-CN">/);
   assert.match(html, /<meta property="og:locale" content="zh_CN">/);
@@ -214,9 +214,9 @@ test('public surfaces use consistent Chinese copy and approved technical identif
 
 test('UI prototype navigation and frontend spec reflect the reviewed delivery boundary', () => {
   const prototypeHtml = readFileSync('web/prototype/index.html', 'utf8');
-  const prototypeScript = readFileSync('web/prototype/app.js', 'utf8');
-  const frontendSpec = readFileSync('specs/04-product/frontend-product-design.md', 'utf8');
-  const httpApiSpec = readFileSync('specs/10-interfaces/http-api.md', 'utf8');
+  const prototypeScript = readFileSync('web/prototype/App.js', 'utf8');
+  const frontendSpec = readFileSync('docs/specs/totalRules/UiuxDesign.md', 'utf8');
+  const httpApiSpec = readFileSync('docs/specs/interfaces/HttpApi.md', 'utf8');
 
   for (const label of ['工作区', '操作中心', '飞轮运行', '知识', '图谱', '质量', '评测', '来源']) {
     assert.ok(prototypeHtml.includes(`>${label}<`), `prototype navigation misses Chinese label: ${label}`);
@@ -224,14 +224,14 @@ test('UI prototype navigation and frontend spec reflect the reviewed delivery bo
   assert.doesNotMatch(prototypeHtml, /<p>WORKSPACE<\/p>|<p>QUALITY<\/p>|<span>Action center<\/span>|<span>Flywheel runs<\/span>|<small>Workspace owner<\/small>/);
   assert.doesNotMatch(prototypeHtml, /fonts\.googleapis|fonts\.gstatic/);
   assert.match(prototypeScript, /titles=\['操作中心','飞轮运行','知识','图谱探索'\]/);
-  assert.match(frontendSpec, /### 前台交付 F1：/);
-  assert.match(frontendSpec, /### 系统实施 Phase 1：/);
+  assert.match(frontendSpec, /## 用户任务与信息结构/);
+  assert.match(frontendSpec, /## 交互状态/);
   assert.match(frontendSpec, /Preview HTTP API 规范/);
   assert.match(httpApiSpec, /\| `GET \/api\/v1\/system\/status` \| Available \|/);
   assert.match(httpApiSpec, /\| `GET \/api\/v1\/knowledge\/:versionId\/lineage` \| Available \|/);
   assert.match(httpApiSpec, /操作中心只能从 `FAILED`、`LOW_CONFIDENCE`/);
   assert.match(frontendSpec, /生产导航唯一有效版本为“操作中心、飞轮批次、知识、工作流图、评测、来源、Agent 设置”/);
-  assert.match(frontendSpec, /结论：`Accepted`。本次用户确认当前版本为最终 UI\/UX/);
+  assert.match(frontendSpec, /工作流图只读，不能拖拽改连接或逐节点推进/);
   for (const contract of [
     'DEV-006A',
     'DEV-006B',
@@ -248,14 +248,14 @@ test('UI prototype navigation and frontend spec reflect the reviewed delivery bo
 
 test('site and Console expose the embedded workflow boundary and prompt-only Agent customization', () => {
   const consoleHtml = readFileSync('web/index.html', 'utf8');
-  const consoleScript = readFileSync('web/app.js', 'utf8');
-  const frontendSpec = readFileSync('specs/04-product/frontend-product-design.md', 'utf8');
+  const consoleScript = readFileSync('web/App.js', 'utf8');
+  const frontendSpec = readFileSync('docs/specs/totalRules/UiuxDesign.md', 'utf8');
 
   assert.match(html, /基础设施层/);
   assert.match(html, /智能体只能追加提示词/);
   assert.match(html, /id="evidence-demo"/);
   assert.match(html, /官方开发工具包闭环/);
-  assert.match(html, /docs\/guides\/agent-customization\.md/);
+  assert.match(html, /docs\/AgentDevelopment\.md/);
   assert.match(consoleHtml, /data-page="agent-settings"/);
   assert.match(consoleScript, /\/api\/v1\/agents/);
   assert.match(consoleScript, /promptAddon/);
@@ -268,9 +268,9 @@ test('site and Console expose the embedded workflow boundary and prompt-only Age
 
 test('project site and Console implement separate light and dark themes', () => {
   const consoleHtml = readFileSync('web/index.html', 'utf8');
-  const consoleCss = readFileSync('web/styles.css', 'utf8');
-  const consoleScript = readFileSync('web/app.js', 'utf8');
-  const frontendSpec = readFileSync('specs/04-product/frontend-product-design.md', 'utf8');
+  const consoleCss = readFileSync('web/Styles.css', 'utf8');
+  const consoleScript = readFileSync('web/App.js', 'utf8');
+  const frontendSpec = readFileSync('docs/specs/totalRules/UiuxDesign.md', 'utf8');
   const siteDark = themeTokens(css, ':root');
   const siteLight = themeTokens(css, ':root[data-theme="light"]');
   const consoleDark = themeTokens(consoleCss, ':root');
@@ -327,8 +327,8 @@ test('project site and Console implement separate light and dark themes', () => 
 
 test('production Console implements the seven-page navigation and truthful F2-F5 data boundary', () => {
   const consoleHtml = readFileSync('web/index.html', 'utf8');
-  const consoleCss = readFileSync('web/styles.css', 'utf8');
-  const consoleScript = readFileSync('web/app.js', 'utf8');
+  const consoleCss = readFileSync('web/Styles.css', 'utf8');
+  const consoleScript = readFileSync('web/App.js', 'utf8');
 
   for (const label of ['操作中心', '飞轮批次', '知识', '工作流图', '评测', '来源', 'Agent 设置']) {
     assert.ok(consoleHtml.includes(`>${label}<`) || consoleHtml.includes(`${label} <`), `Console navigation misses ${label}`);
@@ -377,7 +377,7 @@ test('production Console implements the seven-page navigation and truthful F2-F5
 });
 
 test('write-token setup is discoverable while local secrets remain ignored', () => {
-  const consoleScript = readFileSync('web/app.js', 'utf8');
+  const consoleScript = readFileSync('web/App.js', 'utf8');
   const envExample = readFileSync('.env.example', 'utf8');
   const gitignore = readFileSync('.gitignore', 'utf8');
   const packageJson = JSON.parse(readFileSync('package.json', 'utf8')) as { scripts: Record<string, string> };
@@ -397,7 +397,7 @@ test('legacy Pages root is a thin adapter over the site directory', () => {
 });
 
 test('Pages workflow deploys the static directory only for an Actions source', () => {
-  const workflow = readFileSync('.github/workflows/pages.yml', 'utf8');
+  const workflow = readFileSync('.github/workflows/Pages.yml', 'utf8');
   const config = YAML.parse(workflow);
   const steps = config.jobs.deploy.steps as Array<{
     name?: string;

@@ -5,7 +5,7 @@ SPDX-License-Identifier: MIT
 -->
 ## 动机与范围
 
-<!-- 为什么需要这项改动？关联 Issue、KF-SYS、UC、ADR 或研究证据。 -->
+<!-- 为什么需要这项改动？关联 Issue、需求编号、所属 docs/specs 设计或研究证据。 -->
 
 ## 实现摘要
 

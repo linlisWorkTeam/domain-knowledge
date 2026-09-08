@@ -9,7 +9,7 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { DeepSeekHarnessSdkAgent, type DeepSeekHarnessAuditRecord } from '../../src/infrastructure/agentAdapters/deepseek-harness/DeepSeekHarnessSdkAgent.ts';
+import { DeepSeekHarnessSdkAgent, type DeepSeekHarnessAuditRecord } from '../../src/infrastructure/agentAdapters/deepSeekHarness/DeepSeekHarnessSdkAgent.ts';
 
 test('native DSH enforces role material reads and refuses sibling, symlink, secret and shell access', async () => {
   const root = mkdtempSync(join(tmpdir(), 'dsh-native-tools-'));

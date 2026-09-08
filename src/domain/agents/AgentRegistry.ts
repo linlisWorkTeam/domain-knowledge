@@ -3,20 +3,20 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：定义角色注册表的领域数据与确定性业务规则。
  */
-import * as Orchestrator from './OrchestratorAgent/OrchestratorAgent.ts';
-import { definition as OrchestratorDefinition } from './OrchestratorAgent/OrchestratorAgentPrompt.ts';
-import * as DocWorker from './DocWorkerAgent/DocWorkerAgent.ts';
-import { definition as DocWorkerDefinition } from './DocWorkerAgent/DocWorkerAgentPrompt.ts';
-import * as DocGen from './DocGenAgent/DocGenAgent.ts';
-import { definition as DocGenDefinition } from './DocGenAgent/DocGenAgentPrompt.ts';
-import * as TestGen from './TestGenAgent/TestGenAgent.ts';
-import { definition as TestGenDefinition } from './TestGenAgent/TestGenAgentPrompt.ts';
-import * as Code from './CodeAgent/CodeAgent.ts';
-import { definition as CodeDefinition } from './CodeAgent/CodeAgentPrompt.ts';
-import * as Check from './CheckAgent/CheckAgent.ts';
-import { definition as CheckDefinition } from './CheckAgent/CheckAgentPrompt.ts';
-import * as Review from './ReviewAgent/ReviewAgent.ts';
-import { definition as ReviewDefinition } from './ReviewAgent/ReviewAgentPrompt.ts';
+import * as Orchestrator from './orchestratorAgent/OrchestratorAgent.ts';
+import { definition as OrchestratorDefinition } from './orchestratorAgent/OrchestratorAgentPrompt.ts';
+import * as DocWorker from './docWorkerAgent/DocWorkerAgent.ts';
+import { definition as DocWorkerDefinition } from './docWorkerAgent/DocWorkerAgentPrompt.ts';
+import * as DocGen from './docGenAgent/DocGenAgent.ts';
+import { definition as DocGenDefinition } from './docGenAgent/DocGenAgentPrompt.ts';
+import * as TestGen from './testGenAgent/TestGenAgent.ts';
+import { definition as TestGenDefinition } from './testGenAgent/TestGenAgentPrompt.ts';
+import * as Code from './codeAgent/CodeAgent.ts';
+import { definition as CodeDefinition } from './codeAgent/CodeAgentPrompt.ts';
+import * as Check from './checkAgent/CheckAgent.ts';
+import { definition as CheckDefinition } from './checkAgent/CheckAgentPrompt.ts';
+import * as Review from './reviewAgent/ReviewAgent.ts';
+import { definition as ReviewDefinition } from './reviewAgent/ReviewAgentPrompt.ts';
 
 // 显式注册便于审查角色接线；角色内部步骤变化不需要修改这里。
 export const agents = {

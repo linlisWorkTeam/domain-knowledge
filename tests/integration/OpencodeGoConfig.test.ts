@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import { DeepSeekHarness } from '@deepseek-ai/dsh-sdk-client';
-import { writeOpenCodeGoPatch } from '../../src/infrastructure/agentAdapters/deepseek-harness/OpencodeGo.ts';
+import { writeOpenCodeGoPatch } from '../../src/infrastructure/agentAdapters/deepSeekHarness/OpencodeGo.ts';
 import { createComposition } from '../../src/interfaces/runner/Composition.ts';
 
 test('OpenCode Go environment configuration works without deployment assets and freezes public parameters', async () => {

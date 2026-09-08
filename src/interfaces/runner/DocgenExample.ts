@@ -105,7 +105,7 @@ export async function main(argv = process.argv.slice(2)) {
     if (settings.verification.status === 'NOT_CONFIGURED' && !process.env.DEEPSEEK_API_KEY) {
       throw new Error('DOCGEN_LIVE_CONFIGURATION_REQUIRED: configure DSH in this runtime or set DEEPSEEK_API_KEY');
     }
-    const prompt = readFileSync(resolve(options.get('--prompt-file') ?? join(componentRoot, 'examples/docgen/prompt.txt')), 'utf8');
+    const prompt = readFileSync(resolve(options.get('--prompt-file') ?? join(componentRoot, 'examples/docGen/Prompt.txt')), 'utf8');
     composition.apps.orchestrator.updatePromptAddon('doc-gen', prompt);
     const scenario: AutomatedProjectScenario = { schemaVersion: '1.0', name: 'markdown-diff-docgen',
       moduleId: 'markdown-diff', repositoryRoot: componentRoot, expectedCommit: DOCGEN_SOURCE_COMMIT,

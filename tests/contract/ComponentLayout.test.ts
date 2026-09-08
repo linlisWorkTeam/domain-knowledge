@@ -26,15 +26,15 @@ test('Knowledge Flywheel implementation owns the domain-knowledge repository roo
   assert.equal(existsSync('endlessWpKnowledgeRunner'), false, 'retired wrapper directory must not be reintroduced');
   for (const required of [
     'src/interfaces/runner/Server.ts',
-    'src/interfaces/ui-api/UiApi.ts',
-    'docs/ARCHITECTURE.md',
-    'docs/guides/agent-customization.md',
-    'docs/DEVELOPMENT.md',
-    'docs/guides/documentation-i18n.md',
-    'docs/GETTING_STARTED.md',
+    'src/interfaces/uiApi/UiApi.ts',
+    'docs/specs/totalRules/Architecture.md',
+    'docs/AgentDevelopment.md',
+    'docs/Development.md',
+    'docs/specs/totalRules/CodeTaste.md',
+    'docs/GettingStarted.md',
     'docs/README.md',
-    'docs/reference/repository-layout.md',
-    'docs/guides/testing.md',
+    'docs/specs/README.md',
+    'docs/diagrams/Views4Plus1.md',
     'src/infrastructure/README.md',
     'src/infrastructure/langgraph/LangGraph.ts',
     'src/domain/Domain.ts',
@@ -44,16 +44,16 @@ test('Knowledge Flywheel implementation owns the domain-knowledge repository roo
     'src/domain/services/DomainServices.ts',
     'src/infrastructure/sqlite/SqliteCas.ts',
     'src/infrastructure/redis/Redis.ts',
-    'specs/README.md',
+    'docs/HistoryEpitaph.md',
     'site/index.html',
     'tests/integration/Server.test.ts',
     'web/index.html',
-    'runner.config.json',
+    'Runner.config.json',
   ]) {
     assert.equal(existsSync(join(componentRoot, required)), true, `missing component path: ${required}`);
   }
   const trackedFiles = execFileSync('git', ['ls-files', '-z'], { encoding: 'utf8' }).split('\0').filter(Boolean);
-  for (const retired of ['apps', 'packages', 'infrastructure']) {
+  for (const retired of ['apps', 'packages', 'infrastructure', 'specs']) {
     assert.equal(
       trackedFiles.some((path) => path.startsWith(`${retired}/`)),
       false,
@@ -84,13 +84,13 @@ test('tracked documentation is Chinese-first and key entries carry English summa
     'README.md',
     'CONTRIBUTING.md',
     'SECURITY.md',
-    join(componentRoot, 'docs/GETTING_STARTED.md'),
-    join(componentRoot, 'docs/ARCHITECTURE.md'),
-    join(componentRoot, 'docs/guides/agent-customization.md'),
-    join(componentRoot, 'docs/OPERATIONS.md'),
-    join(componentRoot, 'docs/migration/runner.md'),
-    join(componentRoot, 'docs/guides/documentation-i18n.md'),
-    join(componentRoot, 'specs/README.md'),
+    join(componentRoot, 'docs/GettingStarted.md'),
+    join(componentRoot, 'docs/specs/totalRules/Architecture.md'),
+    join(componentRoot, 'docs/AgentDevelopment.md'),
+    join(componentRoot, 'docs/Operations.md'),
+    join(componentRoot, 'docs/HistoryEpitaph.md'),
+    join(componentRoot, 'docs/specs/totalRules/CodeTaste.md'),
+    join(componentRoot, 'docs/specs/README.md'),
     join(componentRoot, 'src/infrastructure/README.md'),
     join(componentRoot, 'src/interfaces/dsh/README.md'),
   ]) {
@@ -106,8 +106,8 @@ test('repository onboarding and contribution surfaces remain present', () => {
     'SECURITY.md',
     'LICENSE',
     '.github/pull_request_template.md',
-    '.github/workflows/ci.yml',
-    '.github/workflows/pages.yml',
+    '.github/workflows/Ci.yml',
+    '.github/workflows/Pages.yml',
   ]) {
     assert.equal(existsSync(required), true, `missing repository guidance: ${required}`);
   }
@@ -130,7 +130,6 @@ test('active repository guidance and WorkPanel documents have valid relative lin
     join(componentRoot, 'README.md'),
     join(componentRoot, 'site/README.md'),
     ...markdownFiles(join(componentRoot, 'docs')),
-    ...markdownFiles(join(componentRoot, 'specs')),
   ];
   const linkPattern = /\[[^\]]+\]\(([^)]+)\)/g;
   for (const document of documents) {

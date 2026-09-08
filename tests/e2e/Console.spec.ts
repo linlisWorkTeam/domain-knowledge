@@ -719,7 +719,7 @@ test('Action Center preserves the reference header baseline and information stru
   expect(geometry.title.top).toBeLessThanOrEqual(45);
   expect(geometry.actions.top).toBeGreaterThan(20);
 
-  await expect(page).toHaveScreenshot('action-center-1363x936-light.png', {
+  await expect(page).toHaveScreenshot('ActionCenter1363x936LightLinux.png', {
     animations: 'disabled',
     caret: 'hide',
     mask: [page.locator('time'), page.locator('#runtime-footer')],

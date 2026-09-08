@@ -15,7 +15,7 @@ import type { AgentId, AgentRequest } from '../../src/application/ports/Applicat
 import {
   CompanyCodeAgentCliAdapter, FileCodeAgentSessionStore,
   type CodeAgentSessionStore, type CompanyCodeAgentAuditRecord,
-} from '../../src/infrastructure/agentAdapters/company-codeagent/CompanyCodeAgentCliAdapter.ts';
+} from '../../src/infrastructure/agentAdapters/companyCodeAgent/CompanyCodeAgentCliAdapter.ts';
 
 const OUTPUT_SCHEMA = {
   type: 'object', required: ['answer'], additionalProperties: false,

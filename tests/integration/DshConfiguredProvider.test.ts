@@ -11,7 +11,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import type { ProviderInvocationRecord, ProviderSettingsRecord } from '../../src/application/ports/ApplicationPorts.ts';
-import { ConfiguredDshProvider } from '../../src/infrastructure/agentAdapters/deepseek-harness/ConfiguredProvider.ts';
+import { ConfiguredDshProvider } from '../../src/infrastructure/agentAdapters/deepSeekHarness/ConfiguredProvider.ts';
 
 test('DSH adapter executes through the official native DSH SDK and reports token usage', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'pi-agent-'));

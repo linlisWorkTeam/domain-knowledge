@@ -30,15 +30,15 @@ test('RunConfigurationSnapshot freezes all Agent prompts and safe runtime identi
     assert.equal(snapshot.contracts.resultSchema, 'https://wpknowledge.local/schemas/agent-result/v1');
     assert.match(snapshot.contracts.commandSchemaSha256, /^[a-f0-9]{64}$/);
     assert.match(snapshot.contracts.resultSchemaSha256, /^[a-f0-9]{64}$/);
-    const schemaRoot = join(process.cwd(), 'specs', 'schemas');
-    const artifactRef = sha256(readFileSync(join(schemaRoot, 'artifact-ref.schema.json')));
+    const schemaRoot = join(process.cwd(), 'docs', 'specs', 'schemas');
+    const artifactRef = sha256(readFileSync(join(schemaRoot, 'ArtifactRef.schema.json')));
     assert.equal(snapshot.contracts.commandSchemaSha256, sha256(JSON.stringify({
-      command: sha256(readFileSync(join(schemaRoot, 'agent-command.schema.json'))), artifactRef,
+      command: sha256(readFileSync(join(schemaRoot, 'AgentCommand.schema.json'))), artifactRef,
     })));
     assert.equal(snapshot.contracts.resultSchemaSha256, sha256(JSON.stringify({
-      result: sha256(readFileSync(join(schemaRoot, 'agent-result.schema.json'))),
+      result: sha256(readFileSync(join(schemaRoot, 'AgentResult.schema.json'))),
       artifactRef,
-      correction: sha256(readFileSync(join(schemaRoot, 'correction.schema.json'))),
+      correction: sha256(readFileSync(join(schemaRoot, 'Correction.schema.json'))),
     })));
 
     const docGen = snapshot.agents.find(({ agentId }) => agentId === 'doc-gen');
