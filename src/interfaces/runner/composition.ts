@@ -1,3 +1,6 @@
+import { AgentExampleService } from '../../application/services/agent-example.ts';
+import { NODE_BY_AGENT } from '../../infrastructure/workflow/langgraph/agent-definitions.ts';
+import { assertModelOutput, modelExecutionFactory } from '../../infrastructure/agents/model-execution.ts';
 import { appendFile, mkdir } from 'node:fs/promises';
 import { readFileSync } from 'node:fs';
 import { delimiter, dirname, isAbsolute, join, resolve } from 'node:path';
@@ -393,6 +396,7 @@ export function createComposition(input: {
               })
             : undefined;
       const stageOptions: ConstructorParameters<typeof ProjectWorkflowStages>[0] = {
+        nodeByAgent: NODE_BY_AGENT,
         flywheel: flywheelApp,
         evalRunner: evalRunnerApp,
         evaluator: new TrustedProjectEvaluator(artifacts),
@@ -414,10 +418,10 @@ export function createComposition(input: {
             onInvocation: (record) => metrics.recordProviderInvocation(record),
           });
         },
-        agentWorkspaces: new LocalAgentWorkspace({
+        modelFactory: modelExecutionFactory(new LocalAgentWorkspace({
           workspaceRoot: agentWorkspaceRoot,
           allowedSourceRoots: allowedRoots,
-        }),
+        })),
       };
       const executor = agentProviderMode === 'fixture'
         ? new FixtureProjectWorkflowStages({
@@ -426,6 +430,18 @@ export function createComposition(input: {
         : new ProjectWorkflowStages(stageOptions);
       return executor;
   };
+  const agentExample = new AgentExampleService({
+    flywheel: flywheelApp, runConfiguration, evaluator: new TrustedProjectEvaluator(artifacts),
+    contracts: new JsonSchemaAgentContractValidator(schemaRoot), observer: workflowObserver,
+    nodeByAgent: NODE_BY_AGENT,
+    configurePrompt: (role, addon) => { agents.updatePromptAddon(role, addon); },
+    model: (request) => {
+      const stages = projectStages();
+      const executor = stages instanceof FixtureProjectWorkflowStages ? stages.executor : stages;
+      return executor.modelFactory({ ...request, provider: executor.agentResolver?.(request.command.runId) ?? executor.agent });
+    },
+    fixtureModel: (output) => ({ assertOutput: assertModelOutput, execute: async () => structuredClone(output) }),
+  });
   const docgenExample = new DocgenExampleService({
     flywheel: flywheelApp, runConfiguration, evaluator: new TrustedProjectEvaluator(artifacts),
     execute: (stage) => executeDocgenExample(stage, projectStages(), workflowObserver),
@@ -462,6 +478,7 @@ export function createComposition(input: {
     repository,
     apps: {
       docgenExample,
+      agentExample,
       flywheel: flywheelApp,
       evalRunner: evalRunnerApp,
       knowledgeSearch: knowledgeSearchApp,

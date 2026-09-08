@@ -64,3 +64,5 @@ domain-knowledge 的 SQLite Registry 与 CAS 仍是一次运行中的业务事�
 domain-knowledge owns executable code, specs, tests and product surfaces at the repository root. wpKnowledge is a separate content repository for reviewed knowledge and evidence. Do not reintroduce the retired endlessWpKnowledgeRunner wrapper or a second workflow implementation.
 
 </details>
+
+七角色实现位于 `src/domain/agents/<role>/`；共享提交在 `src/application/services/role-execution.ts`，独立入口在 `src/interfaces/runner/agent-run.ts`。目录职责及显式注册位置见 [Agent 开发指南](../guides/agent-customization.md)。

@@ -1,3 +1,5 @@
+import { NODE_BY_AGENT } from '../../src/infrastructure/workflow/langgraph/agent-definitions.ts';
+import { modelExecutionFactory } from '../../src/infrastructure/agents/model-execution.ts';
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -61,12 +63,14 @@ test('command validation runs before checkpoint dispatch and provider invocation
     prepareCommands: [], referenceCommands: [], firstIterationCommands: [], finalCommands: [],
   };
   const executor = new ProjectWorkflowStages({
+    nodeByAgent: NODE_BY_AGENT,
     flywheel,
     evalRunner: {} as never,
     evaluator: { inspect: async () => snapshot, evaluate: async () => { throw new Error('unused'); } },
     contracts: rejectingContracts,
     agent: provider,
-    agentWorkspaces: { materialize: async () => ({ workspaceRoot: '/tmp/source', readablePaths: [] }) },
+    modelFactory: modelExecutionFactory({ materialize: async () => ({ workspaceRoot: '/tmp/source', readablePaths: [] }) }),
+
   });
   await assert.rejects(executor.execute({
     runId: 'run-1', nodeId: 'orchestrator', agentId: 'orchestrator', iteration: 0,
@@ -117,9 +121,11 @@ test('generic stages require a provider and do not commit results after cancella
       },
     } as unknown as KnowledgeFlywheelService;
     const stages = new ProjectWorkflowStages({
+    nodeByAgent: NODE_BY_AGENT,
       flywheel, evalRunner: {} as never, evaluator: {} as never,
       contracts: { assertCommand: () => undefined, assertResult: () => undefined },
-      agentWorkspaces: { materialize: async () => ({ workspaceRoot: '/tmp/source', readablePaths: [] }) },
+      modelFactory: modelExecutionFactory({ materialize: async () => ({ workspaceRoot: '/tmp/source', readablePaths: [] }) }),
+
       ...(mode === 'cancelled' ? { agent: { run: async () => {
         controller.abort();
         return { strategy: 'late result', iteration: 0, parallel: ['documentation'] };

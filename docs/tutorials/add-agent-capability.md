@@ -66,7 +66,7 @@ npm run example:docgen -- run
 npm run example:docgen -- run --runtime /absolute/path/to/example-runtime
 ```
 
-入口通过一个固定的 LangGraph DocGen 开发节点调用生产 `ProjectWorkflowStages`，复用现有 DSH 适配、配置快照、只读材料、Command/Result Schema、checkpoint 和 CAS。它不新增模型循环或运行框架，也不执行七角色发布图。示范 Run 只用于角色工件关联，业务状态保持 CREATED；节点完成并不代表整个业务 Run 或知识已验证。请使用专属运行目录，不通过生产批次恢复入口恢复这个示范 Run。
+入口通过 Application 的开发执行观察器调用生产 `ProjectWorkflowStages` 和 Domain DocGen，复用现有 DSH 适配、配置快照、只读材料、Command/Result Schema、checkpoint 和 CAS。它与通用 `npm run agent:run -- --role <role> --input <sample.json> --output <directory>` 共用 `RoleExecutionService`，不启动 LangGraph 或七角色发布图。示范 Run 只用于角色工件关联，业务状态保持 CREATED；节点完成并不代表整个业务 Run 或知识已验证。请使用专属运行目录，不通过生产批次恢复入口恢复这个示范 Run。
 
 成功调用后，`examples/<runId>/` 包含：
 

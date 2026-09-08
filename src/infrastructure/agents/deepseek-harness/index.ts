@@ -1,3 +1,4 @@
+import { roleDefinitions } from '../../../domain/agents/index.ts';
 import { spawn } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
@@ -318,7 +319,7 @@ export class DeepSeekHarnessSdkAgent implements AgentProvider {
           maxTokens: this.options.maxTokens }],
       } }] : []),
       ...['persistent-bash', 'persistent-pwsh', 'str-replace-editor'].map((id) => ({ id, disabled: true })),
-      { insert: [{ id: 'workpanel-role-tools', name: policyPath, config: { workspaceRoot, canRead: request.role !== 'orchestrator' } }] },
+      { insert: [{ id: 'workpanel-role-tools', name: policyPath, config: { workspaceRoot, canRead: (request.authorizedTools ?? roleDefinitions.find((definition) => definition.agentId === request.role)?.tools ?? []).includes('read_material') } }] },
     ]), { mode: 0o600 });
     // The final patch and monotonic DSH guard enforce the business role view.
     const patches = [...(this.options.patches ?? []).map((path) => resolve(path)), policyPatch];

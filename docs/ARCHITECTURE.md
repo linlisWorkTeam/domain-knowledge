@@ -82,7 +82,7 @@ flowchart TD
 | 层与代码入口 | 接入时的职责 |
 | --- | --- |
 | [AgentProvider / AgentRequest](../src/application/ports/index.ts) | 保持 `run(request, signal)`：输入角色、Prompt、输出 Schema、幂等键、受信命令、工件引用和工作区；返回原始 JSON，CLI 专有字段留在 Adapter |
-| [ProjectWorkflowStages](../src/application/services/automated-project-workflow.ts) | 复用 `buildAgentCommand()`、`runLiveAgent()`、`normalizeAgentResult()`；准备同样的授权材料，将原始 JSON 转为 CAS 工件与业务 `AgentResult`，继续校验身份与归属 |
+| [ProjectWorkflowStages](../src/application/services/automated-project-workflow.ts) | 加载可信材料、构造命令并调用 `src/domain/agents/<role>/execute`；角色返回业务结果和待保存工件，`RoleExecutionService` 完成 CAS、信封绑定和事务提交，继续校验身份与归属 |
 | [CompanyCodeAgentCliAdapter](../src/infrastructure/agents/company-codeagent/index.ts) | 根据真实 CLI 版本实现认证、stdin、最终事件解析、工具映射、进程隔离、session、取消及脱敏审计 |
 | [createComposition](../src/interfaces/runner/composition.ts) 与 [RegistryRunConfigurationService](../src/application/services/run-configuration.ts) | 装配后端并冻结实际生效配置；核验已有 DSH 设置的优先级、CLI 版本与权限策略摘要及旧 Run 恢复兼容性 |
 
@@ -161,9 +161,15 @@ src/
 
 图中有一个工作流路由 Gate，处理 `ITERATE`、`ROLLBACK`、`PASS` 和 `STOPPED`。`PASS` 只表示向上层请求发布；真正有权决定发布的仍是 Domain/Application 层的确定性知识 Gate。
 
+## 七角色 Domain 执行边界
+
+Domain 代码控制阶段，模型执行 Port 仅表达 Prompt、输出约束、可读材料和授权能力；DSH Adapter 负责工作区、会话、工具、网络与格式修复重试、超时和取消。Domain 不接触数据库、文件路径操作、CAS 或 SDK，也不接收通用 WorkflowStageInput。角色无业务重试循环，保持迁移前的一次模型调用。
+
+`RoleExecutionService` 是生产和独立开发共用的持久化边界；Fixture 注入模型实现，经过同一角色校验。`agent:run` 不启动图、评测或发布。运行配置新增 `roleExecutionVersion`，跨执行版本的恢复明确失败，历史记录仍可读，不迁移旧 checkpoint。开发步骤见 [角色指南](guides/agent-customization.md)。
+
 ## Agent 定制边界
 
-七个图角色是 Orchestrator、DocGen、DocWorker、TestGen、Code、Check 和 Review。它们的标识、职责、输入输出契约、拓扑和工具权限固定在 `src/infrastructure/workflow/langgraph/agent-definitions.ts`。
+七个图角色是 Orchestrator、DocGen、DocWorker、TestGen、Code、Check 和 Review。角色 ID 与业务命令/结果类型由 `src/domain/agents/contracts.ts` 拥有；每个角色目录拥有执行步骤、专属契约、基础提示词和授权能力。显式注册位于 `src/domain/agents/index.ts`，节点映射位于 `src/infrastructure/workflow/langgraph/agent-definitions.ts`，图连接位于 `graph.ts`。
 
 上述清单只描述飞轮图角色。目标中的 SearchAgent 属于 Application 直接调用的检索角色，使用独立请求/结果契约，不加入该清单、治理 Run 配置快照或批次工作流图。
 

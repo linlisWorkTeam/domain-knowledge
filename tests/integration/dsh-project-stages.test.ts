@@ -1,3 +1,5 @@
+import { NODE_BY_AGENT } from '../../src/infrastructure/workflow/langgraph/agent-definitions.ts';
+import { modelExecutionFactory } from '../../src/infrastructure/agents/model-execution.ts';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -45,10 +47,12 @@ for (const [moduleId, sourcePath] of [['formatter', 'lib/format.mjs'], ['normali
     };
     try {
       const stages = new ProjectWorkflowStages({
+    nodeByAgent: NODE_BY_AGENT,
         flywheel: composition.service, evalRunner: composition.apps.evalRunner,
         evaluator: new TrustedProjectEvaluator(composition.artifacts),
         contracts: new JsonSchemaAgentContractValidator(join(process.cwd(), 'specs/schemas')),
-        agentWorkspaces: new LocalAgentWorkspace({ workspaceRoot: join(root, 'roles'), allowedSourceRoots: [sourceRoot] }),
+        modelFactory: modelExecutionFactory(new LocalAgentWorkspace({ workspaceRoot: join(root, 'roles'), allowedSourceRoots: [sourceRoot] })),
+
         agent: new DeepSeekHarnessSdkAgent({
           allowedWorkspaceRoots: [root], maxSchemaAttempts: 1,
           onAudit: (record) => { audits.push(record); },

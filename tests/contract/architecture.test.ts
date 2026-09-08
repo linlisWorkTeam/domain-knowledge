@@ -13,11 +13,23 @@ function files(root: string): string[] {
 }
 
 test('domain core has no SDK, database, language, or adapter dependency', () => {
-  const source = files('src/domain').map((path) => readFileSync(path, 'utf8')).join('\n');
-  for (const forbidden of ['langgraph', 'temporal', 'deepseek', 'dsh', 'sqlite', 'clang', 'gcc', 'src/infrastructure']) {
-    assert.equal(source.toLowerCase().includes(forbidden), false, `domain contains forbidden dependency: ${forbidden}`);
+  for (const path of files('src/domain').filter((path) => path.endsWith('.ts') && !path.endsWith('.test.ts') && !path.includes('/examples/'))) {
+    const source = readFileSync(path, 'utf8');
+    // Tokenize comments and literals as whole tokens so prompt prose cannot become
+    // an apparent dependency. Check static imports, re-exports and dynamic imports.
+    const tokens = [...source.matchAll(/\/\*[\s\S]*?\*\/|\/\/[^\n]*|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`|[A-Za-z_$][\w$]*|[^\s]/g)]
+      .map(([token]) => token).filter((token) => !token.startsWith('//') && !token.startsWith('/*'));
+    for (let i = 0; i < tokens.length; i++) {
+      const token = tokens[i]!;
+      if (!/^['"]/.test(token)) continue;
+      const previous = tokens[i - 1];
+      if (previous !== 'from' && previous !== 'import'
+        && !(previous === '(' && ['import', 'require'].includes(tokens[i - 2] ?? ''))) continue;
+      const dependency = token.slice(1, -1);
+      assert.doesNotMatch(dependency, /(?:application|infrastructure|interfaces|langgraph|temporal|deepseek|dsh|sqlite|clang|gcc)/i, `${path}: forbidden import ${dependency}`);
+      assert.ok(dependency.startsWith('.') || dependency === 'node:crypto', `${path}: concrete SDK dependency ${dependency}`);
+    }
   }
-  assert.doesNotMatch(source, /from\s+['"][^'"]*(?:application|infrastructure|interfaces)[^'"]*['"]/);
 });
 
 test('application depends on ports and domain, never concrete adapters', () => {
@@ -87,4 +99,25 @@ test('UI API and workflow executor use Application boundaries instead of concret
   const executor = readFileSync('src/application/services/automated-project-workflow.ts', 'utf8');
   assert.doesNotMatch(executor, /this\.flywheel\.(?:repository|artifacts|qualityPolicy)\b/);
   assert.match(executor, /this\.evalRunner\.evaluate/);
+});
+
+test('each role owns execution, contract and prompt while application commits without role branches', () => {
+  for (const role of AGENT_IDS) {
+    for (const file of ['agent.ts', 'contract.ts', 'prompt.ts', 'agent.test.ts', 'examples/sample.json']) {
+      assert.ok(statSync(`src/domain/agents/${role}/${file}`).isFile());
+    }
+    const agent = readFileSync(`src/domain/agents/${role}/agent.ts`, 'utf8');
+    assert.match(agent, /export async function execute\(input: Input, context: ExecutionContext\)/);
+    assert.doesNotMatch(agent, /WorkflowStageInput|putArtifact|executeNode|repository\./);
+  }
+  const stages = readFileSync('src/application/services/automated-project-workflow.ts', 'utf8');
+  assert.doesNotMatch(stages, /AGENT_OUTPUT_SCHEMAS|normalizeAgentResult|runLiveAgent/);
+  const commit = readFileSync('src/application/services/role-execution.ts', 'utf8');
+  assert.doesNotMatch(commit, /(?:agentType|agentId)\s*===|switch\s*\(/);
+  const fixture = readFileSync('src/infrastructure/agents/scenario/project-workflow-fixture.ts', 'utf8');
+  assert.doesNotMatch(fixture, /extends ProjectWorkflowStages|override|commitAgentOutput/);
+  assert.match(fixture, /modelFactory/);
+  const development = readFileSync('src/application/services/agent-example.ts', 'utf8');
+  assert.match(development, /RoleExecutionService/);
+  assert.doesNotMatch(development, /workflow\.start|\.evaluate\(|\.publish\(/);
 });

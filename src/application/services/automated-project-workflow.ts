@@ -1,13 +1,16 @@
-import Ajv2020Import from 'ajv/dist/2020.js';
+import type { Output as DocumentOutput } from '../../domain/agents/doc-gen/contract.ts';
+import type { Output as CodeOutput } from '../../domain/agents/code/contract.ts';
+import type { Output as CheckOutput } from '../../domain/agents/check/contract.ts';
+import type { Output as ReviewOutput } from '../../domain/agents/review/contract.ts';
+import { RoleExecutionService } from './role-execution.ts';
+import type { ModelExecutionPort } from '../../domain/agents/execution.ts';
 import type {
   AgentId,
   AgentCommand,
   AgentContractValidator,
   AgentProvider,
   AgentResult,
-  AgentWorkspaceProvider,
   EvalRunnerUseCase,
-  GeneratedProjectFile,
   ProjectEvaluation,
   ProjectEvaluator,
   ProjectSnapshot,
@@ -26,145 +29,7 @@ import {
 import type { KnowledgeFlywheelService } from './index.ts';
 import type { RealSourceScenario } from './project-flow.ts';
 
-const Ajv2020 = Ajv2020Import as unknown as new (options: Record<string, unknown>) => {
-  compile(schema: Record<string, unknown>): {
-    (value: unknown): boolean;
-    errors?: unknown;
-  };
-  errorsText(errors: unknown): string;
-};
-
-const AGENT_OUTPUT_SCHEMAS: Record<AgentId, Record<string, unknown>> = {
-  orchestrator: {
-    type: 'object', required: ['strategy', 'iteration', 'parallel'], additionalProperties: false,
-    properties: {
-      strategy: { type: 'string', minLength: 1 }, iteration: { type: 'integer', minimum: 0 },
-      parallel: { type: 'array', minItems: 1, items: { type: 'string', minLength: 1 } },
-    },
-  },
-  'doc-worker': {
-    type: 'object', required: ['workerId', 'fragment', 'provenance'], additionalProperties: false,
-    properties: {
-      workerId: { type: 'string', minLength: 1 }, fragment: { type: 'string', minLength: 20 },
-      provenance: { type: 'array', minItems: 1, items: { type: 'string', minLength: 1 } },
-    },
-  },
-  'doc-gen': {
-    type: 'object', required: ['body', 'title', 'description'], additionalProperties: false,
-    properties: {
-      body: { type: 'string', minLength: 200 }, title: { type: 'string', minLength: 1 },
-      description: { type: 'string', minLength: 1 },
-    },
-  },
-  'test-gen': {
-    type: 'object', required: ['candidateCommands', 'oracleRequired'], additionalProperties: false,
-    properties: {
-      candidateCommands: { type: 'array', minItems: 1, items: { type: 'object' } },
-      oracleRequired: { type: 'boolean' },
-    },
-  },
-  code: {
-    type: 'object', required: ['files'], additionalProperties: false,
-    properties: {
-      files: {
-        type: 'array', minItems: 1,
-        items: {
-          type: 'object', required: ['path', 'content'], additionalProperties: false,
-          properties: { path: { type: 'string', minLength: 1 }, content: { type: 'string', minLength: 1 } },
-        },
-      },
-    },
-  },
-  check: {
-    type: 'object', required: ['blocking', 'findings', 'scope'], additionalProperties: false,
-    properties: {
-      blocking: { type: 'boolean' }, findings: { type: 'array', items: { type: 'string' } },
-      scope: { type: 'array', items: { type: 'string', minLength: 1 } },
-    },
-  },
-  review: {
-    type: 'object', required: ['blocking', 'recommendation', 'correction'], additionalProperties: false,
-    properties: {
-      blocking: { type: 'boolean' }, recommendation: { enum: ['PASS', 'ITERATE'] },
-      correction: {
-        type: ['object', 'null'],
-        properties: {
-          correctionId: { type: 'string', minLength: 1 }, knowledgePath: { type: 'string', minLength: 1 },
-          criterion: { type: 'string', minLength: 1 }, risk: { type: 'string', minLength: 1 },
-        },
-        required: ['correctionId', 'knowledgePath', 'criterion', 'risk'], additionalProperties: false,
-      },
-    },
-  },
-};
-
-const NODE_BY_AGENT: Record<AgentId, string> = {
-  orchestrator: 'orchestrator',
-  'doc-worker': 'doc_worker',
-  'doc-gen': 'doc_gen',
-  'test-gen': 'test_gen',
-  code: 'code',
-  check: 'check',
-  review: 'review',
-};
-
 export interface AutomatedProjectScenario extends RealSourceScenario {}
-
-interface DocumentOutput {
-  body: string;
-  title: string;
-  description: string;
-}
-
-interface CodeOutput {
-  files: GeneratedProjectFile[];
-}
-
-interface CheckOutput {
-  blocking: boolean;
-  findings: string[];
-}
-
-interface ReviewOutput {
-  blocking: boolean;
-  recommendation: 'PASS' | 'ITERATE';
-  correction: Record<string, unknown> | null;
-}
-
-function outputSchemaFor(
-  agentId: AgentId,
-  scenario: AutomatedProjectScenario,
-): Record<string, unknown> {
-  if (agentId !== 'code') return AGENT_OUTPUT_SCHEMAS[agentId];
-  assertInvariant(scenario.allowedGeneratedPaths.length > 0,
-    'automated scenario must declare at least one allowed generated path');
-  return {
-    type: 'object', required: ['files'], additionalProperties: false,
-    properties: {
-      files: {
-        type: 'array', minItems: 1, maxItems: scenario.allowedGeneratedPaths.length,
-        items: {
-          type: 'object', required: ['path', 'content'], additionalProperties: false,
-          properties: {
-            path: { enum: scenario.allowedGeneratedPaths },
-            content: { type: 'string', minLength: 1 },
-          },
-        },
-      },
-    },
-  };
-}
-
-function assertAllowedGeneratedFiles(output: Record<string, unknown>, allowedPaths: string[]): void {
-  const files = (output as unknown as CodeOutput).files;
-  if (!Array.isArray(files)) throw new Error('AGENT_OUTPUT_INVALID: code.files must be an array');
-  const seen = new Set<string>();
-  for (const file of files) {
-    if (!allowedPaths.includes(file.path)) throw new Error(`PROJECT_PATH_DENIED: ${file.path}`);
-    if (seen.has(file.path)) throw new Error(`PROJECT_PATH_DUPLICATED: ${file.path}`);
-    seen.add(file.path);
-  }
-}
 
 function contextKey(nodeId: string, iteration: number, workerId?: string): string {
   return `${nodeId}:${iteration}${workerId ? `:${workerId}` : ''}`;
@@ -198,25 +63,28 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
   readonly evaluator: ProjectEvaluator;
   readonly agent?: AgentProvider;
   readonly agentResolver?: (runId: string) => AgentProvider | undefined;
-  readonly agentWorkspaces?: AgentWorkspaceProvider;
+  readonly nodeByAgent: Record<AgentId, string>;
   readonly contracts: AgentContractValidator;
+  readonly modelFactory: (input: { provider?: AgentProvider; command: AgentCommand; stage: WorkflowStageInput; scenario: AutomatedProjectScenario }) => ModelExecutionPort;
 
   constructor(input: {
     flywheel: KnowledgeFlywheelService;
     evalRunner: EvalRunnerUseCase;
     evaluator: ProjectEvaluator;
+    nodeByAgent: Record<AgentId, string>;
     contracts: AgentContractValidator;
+    modelFactory: ProjectWorkflowStages['modelFactory'];
     agent?: AgentProvider;
     agentResolver?: (runId: string) => AgentProvider | undefined;
-    agentWorkspaces?: AgentWorkspaceProvider;
   }) {
     this.flywheel = input.flywheel;
     this.evalRunner = input.evalRunner;
     this.evaluator = input.evaluator;
+    this.nodeByAgent = input.nodeByAgent;
     this.contracts = input.contracts;
+    this.modelFactory = input.modelFactory;
     this.agent = input.agent;
     this.agentResolver = input.agentResolver;
-    this.agentWorkspaces = input.agentWorkspaces;
   }
 
   async execute(input: WorkflowStageInput): Promise<WorkflowStageResult> {
@@ -290,102 +158,39 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
   }
 
   /** Business handoff only; sessions and tools belong to the injected provider. */
-  protected async runRole(
+  private async runRole(
     input: WorkflowStageInput,
     scenario: AutomatedProjectScenario,
     agentId: AgentId,
   ): Promise<ArtifactRef> {
-    if (!this.agentForRun(input.runId)) throw new Error('WORKFLOW_LIVE_AGENT_UNAVAILABLE');
     return this.executeAgentCheckpoint(input, scenario, agentId);
-  }
-
-  private async runLiveAgent(
-    input: WorkflowStageInput,
-    scenario: AutomatedProjectScenario,
-    agentId: AgentId,
-    command: AgentCommand,
-  ): Promise<Record<string, unknown>> {
-    const agent = this.agentForRun(input.runId);
-    if (!agent) throw new Error('WORKFLOW_LIVE_AGENT_UNAVAILABLE');
-    if (!this.agentWorkspaces) throw new Error('WORKFLOW_AGENT_WORKSPACE_UNAVAILABLE');
-    const snapshot = input.context.snapshot as ProjectSnapshot | undefined;
-    if (!snapshot) throw new Error('WORKFLOW_PROJECT_SNAPSHOT_MISSING');
-    const readablePaths = agentId === 'doc-worker'
-      ? [...this.assignedSourcePaths(input, scenario), ...scenario.publicInterfacePaths]
-      : agentId === 'doc-gen' || agentId === 'test-gen'
-        ? [...scenario.sourcePaths, ...scenario.publicInterfacePaths]
-      : agentId === 'code' || agentId === 'check' || agentId === 'review'
-        ? scenario.publicInterfacePaths
-        : [];
-    const workspace = await this.agentWorkspaces.materialize({
-      isolationKey: `${input.runId}:${input.nodeId}:${input.iteration}:${input.workerId ?? 'main'}`,
-      role: agentId,
-      sourceRoot: scenario.repositoryRoot,
-      sourceCommit: snapshot.commit,
-      readablePaths,
-    });
-    const materials = await Promise.all(this.artifactRefsIn(command.payload).map(async (ref) => ({
-      ref,
-      content: await this.readArtifact(ref),
-    })));
-    return agent.run({
-      role: agentId,
-      prompt: `${input.prompt}\n\n受信 AgentCommand：\n${JSON.stringify(command)}\n\n命令引用工件（已校验内容摘要）：\n${JSON.stringify(materials)}`,
-      outputSchema: outputSchemaFor(agentId, scenario),
-      idempotencyKey: command.generationKey,
-      command,
-      inputRefs: this.artifactRefsIn(command.payload),
-      workspaceRoot: workspace.workspaceRoot,
-      metadata: {
-        runId: input.runId, nodeId: input.nodeId, iteration: input.iteration,
-        attempt: input.attempt, workerId: input.workerId ?? null,
-        commandId: command.commandId,
-      },
-    }, input.signal);
   }
 
   private async executeAgentCheckpoint(
     input: WorkflowStageInput,
     scenario: AutomatedProjectScenario,
     agentId: AgentId,
-    fixtureOutput?: Record<string, unknown>,
   ): Promise<ArtifactRef> {
-    const outputSchema = outputSchemaFor(agentId, scenario);
     const command = await this.buildAgentCommand(input, scenario, agentId);
     this.contracts.assertCommand(command);
-    const commandRef = await this.flywheel.putArtifact(
-      Buffer.from(JSON.stringify(command, null, 2)), 'application/json',
-    );
-    const inputRefs = this.uniqueRefs([
-      ...this.agentInputRefs(input, agentId),
-      ...this.artifactRefsIn(command.payload),
-      commandRef,
-    ]);
-    const checkpoint = await this.flywheel.executeNode({
-      runId: input.runId,
-      nodeId: input.workerId ? `${input.nodeId}:${input.workerId}` : input.nodeId,
-      generationKey: command.generationKey,
-      inputRefs,
-    }, async () => {
-      if (input.signal?.aborted) throw new Error('AGENT_CANCELLED');
-      const output = fixtureOutput ?? await this.runLiveAgent(input, scenario, agentId, command);
-      if (input.signal?.aborted) throw new Error('AGENT_CANCELLED');
-      this.validateAgentOutput(output, outputSchema);
-      if (agentId === 'code') assertAllowedGeneratedFiles(output, scenario.allowedGeneratedPaths);
-      const rawRef = await this.flywheel.putArtifact(
-        Buffer.from(JSON.stringify(output, null, 2)), 'application/json',
-      );
-      const result = await this.normalizeAgentResult(command, commandRef, input, scenario, output, rawRef);
-      this.contracts.assertResult(result);
-      const resultRef = await this.flywheel.putArtifact(
-        Buffer.from(JSON.stringify(result, null, 2)), 'application/json',
-      );
-      if (input.signal?.aborted) throw new Error('AGENT_CANCELLED');
-      return [resultRef, rawRef];
+    const materials = await Promise.all(this.artifactRefsIn(command.payload).map(async (ref) => ({
+      ref, content: await this.readArtifact(ref),
+    })));
+    const snapshot = input.context.snapshot as ProjectSnapshot;
+    return new RoleExecutionService(this.flywheel, this.contracts, this.nodeByAgent).execute({
+      command, nodeId: input.workerId ? `${input.nodeId}:${input.workerId}` : input.nodeId,
+      inputRefs: this.agentInputRefs(input, agentId),
+      input: {
+        payload: command.payload, materials,
+        sourcePaths: agentId === 'doc-worker' ? this.assignedSourcePaths(input, scenario) : scenario.sourcePaths,
+        publicInterfacePaths: scenario.publicInterfacePaths,
+        provenance: [input.context.scenarioRef as ArtifactRef, snapshot.manifestRef], moduleId: scenario.moduleId,
+      },
+      context: {
+        model: this.modelFactory({ provider: this.agentForRun(input.runId), command, stage: input, scenario }),
+        command, effectivePrompt: input.prompt, iteration: input.iteration, signal: input.signal,
+      },
     });
-    const ref = checkpoint.outputRefs[0];
-    if (!ref) throw new Error(`WORKFLOW_AGENT_OUTPUT_MISSING: ${input.nodeId}`);
-    return ref;
   }
 
   private async commitCandidate(
@@ -654,15 +459,6 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
     };
   }
 
-  protected async commitAgentOutput(
-    input: WorkflowStageInput,
-    scenario: AutomatedProjectScenario,
-    agentId: AgentId,
-    output: Record<string, unknown>,
-  ): Promise<ArtifactRef> {
-    return this.executeAgentCheckpoint(input, scenario, agentId, output);
-  }
-
   private async buildAgentCommand(
     input: WorkflowStageInput,
     scenario: AutomatedProjectScenario,
@@ -785,115 +581,6 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
     };
   }
 
-  private async normalizeAgentResult(
-    command: AgentCommand,
-    commandRef: ArtifactRef,
-    input: WorkflowStageInput,
-    scenario: AutomatedProjectScenario,
-    raw: Record<string, unknown>,
-    rawRef: ArtifactRef,
-  ): Promise<AgentResult> {
-    const scenarioRef = input.context.scenarioRef as ArtifactRef;
-    const snapshot = input.context.snapshot as ProjectSnapshot;
-    let payload: Record<string, unknown>;
-    const outputRefs: ArtifactRef[] = [rawRef];
-    if (command.agentType === 'orchestrator') {
-      const nodes: Array<[string, AgentId, string[], string[], string[]]> = [
-        ['doc_worker', 'doc-worker', [], ['source:read'], ['knowledge-chunk']],
-        ['doc_gen', 'doc-gen', ['doc_worker'], ['source:read', 'cas:write'], ['knowledge-candidate']],
-        ['test_gen', 'test-gen', [], ['source:read', 'cas:write'], ['test-candidates']],
-        ['code', 'code', ['doc_gen'], ['workspace:write', 'cas:write'], ['code-artifact']],
-        ['check', 'check', ['code'], ['workspace:read'], ['findings']],
-        ['review', 'review', ['check'], ['cas:read'], ['attribution']],
-      ];
-      payload = {
-        resultKind: 'plan',
-        nodes: nodes.map(([nodeId, agentType, dependsOn, resourceClaims, artifactExpectations]) => ({
-          nodeId,
-          agentType,
-          dependsOn,
-          generationKey: `${input.runId}:${nodeId}:${input.iteration}:contract-v5`,
-          inputSchema: 'https://wpknowledge.local/schemas/agent-command/v1',
-          outputSchema: 'https://wpknowledge.local/schemas/agent-result/v1',
-          resourceClaims,
-          artifactExpectations,
-        })),
-      };
-    } else if (command.agentType === 'doc-gen') {
-      const document = raw as unknown as DocumentOutput;
-      const bodyRef = await this.flywheel.putArtifact(Buffer.from(document.body), 'text/markdown');
-      outputRefs.push(bodyRef);
-      payload = {
-        resultKind: 'knowledgeCandidate',
-        bodyRef,
-        provenance: [scenarioRef, snapshot.manifestRef],
-        changedPaths: [`knowledge/${scenario.moduleId}.md`],
-        unresolvedRisks: [],
-      };
-    } else if (command.agentType === 'doc-worker') {
-      const fragment = String(raw.fragment);
-      const chunkRef = await this.flywheel.putArtifact(Buffer.from(fragment), 'text/plain');
-      outputRefs.push(chunkRef);
-      payload = {
-        resultKind: 'knowledgeChunk',
-        chunkRef,
-        provenance: [scenarioRef, snapshot.manifestRef],
-        unresolvedRisks: [],
-      };
-    } else if (command.agentType === 'test-gen') {
-      payload = {
-        resultKind: 'testCandidates',
-        candidateSetRef: rawRef,
-        caseManifestRef: rawRef,
-        oracleClaims: [raw.oracleRequired === true
-          ? 'reference oracle must pass before generated tests are trusted'
-          : 'candidate commands require deterministic evaluation'],
-      };
-    } else if (command.agentType === 'code') {
-      payload = { resultKind: 'codeArtifact', codeRef: rawRef, buildManifestRef: rawRef };
-    } else if (command.agentType === 'check') {
-      const check = raw as unknown as { blocking: boolean; findings: string[]; scope: string[] };
-      payload = {
-        resultKind: 'findings',
-        findings: check.findings.map((message, index) => ({
-          findingId: `finding-${index + 1}`,
-          severity: check.blocking ? 'BLOCKER' : 'INFO',
-          criterionId: 'deterministic-check',
-          evidenceLocation: check.scope[0] ?? `workflow:${input.nodeId}`,
-          message,
-        })),
-      };
-    } else {
-      const review = raw as unknown as ReviewOutput;
-      const evaluationRef = input.context[contextKey('evaluationEvidenceRef', input.iteration)] as ArtifactRef;
-      const correction = review.correction;
-      const corrections = correction ? [{
-        correctionId: this.correctionId(correction['correctionId']),
-        knowledgePath: String(correction['knowledgePath']),
-        criterion: String(correction['criterion']),
-        evidenceRefs: [evaluationRef],
-        risk: String(correction['risk']),
-      }] : [];
-      payload = {
-        resultKind: 'attribution',
-        corrections,
-        unresolvedRisks: review.blocking && corrections.length === 0
-          ? ['review reported a blocking condition without a correction']
-          : [],
-      };
-    }
-    return {
-      schemaVersion: '1.0',
-      commandId: command.commandId,
-      commandRef,
-      runId: command.runId,
-      agentType: command.agentType,
-      status: 'SUCCEEDED',
-      outputRefs: this.uniqueRefs(outputRefs),
-      payload,
-    };
-  }
-
   private artifactRefsIn(value: unknown): ArtifactRef[] {
     if (!value || typeof value !== 'object') return [];
     if ('artifactId' in value && 'sha256' in value && 'mediaType' in value && 'size' in value) {
@@ -920,18 +607,6 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
     return scenario.sourcePaths.filter((_, index) =>
       index % Math.max(1, input.workerCount) === workerIndex,
     );
-  }
-
-  private correctionId(value: unknown): string {
-    const candidate = String(value ?? '');
-    if (/^COR-[0-9]{4,}$/.test(candidate)) return candidate;
-    return `COR-${String(parseInt(sha256(candidate).slice(0, 8), 16)).padStart(10, '0')}`;
-  }
-
-  private validateAgentOutput(output: Record<string, unknown>, schema: Record<string, unknown>): void {
-    const ajv = new Ajv2020({ allErrors: true, strict: true });
-    const validate = ajv.compile(schema);
-    if (!validate(output)) throw new Error(`AGENT_OUTPUT_INVALID: ${ajv.errorsText(validate.errors)}`);
   }
 
   private agentGenerationKey(input: WorkflowStageInput, agentId: AgentId): string {
@@ -1015,7 +690,7 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
   ): string {
     return this.agentGenerationKey({
       ...input,
-      nodeId: NODE_BY_AGENT[agentId],
+      nodeId: this.nodeByAgent[agentId],
       agentId,
       iteration,
       ...(workerId ? { workerId } : { workerId: undefined }),
@@ -1027,7 +702,7 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
     return ref.mediaType.includes('json') ? JSON.parse(text) as unknown : text;
   }
 
-  protected agentForRun(runId: string): AgentProvider | undefined {
+  private agentForRun(runId: string): AgentProvider | undefined {
     return this.agentResolver?.(runId) ?? this.agent;
   }
 }

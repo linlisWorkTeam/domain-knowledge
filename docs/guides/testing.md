@@ -68,3 +68,7 @@ node --test tests/acceptance/real-source-flow.test.ts tests/acceptance/automated
 - 失败证据应保留足够诊断信息，同时截断和脱敏敏感输出。
 
 验收场景与需求映射见[验收计划](../../specs/13-verification/acceptance-plan.md)和[追踪矩阵](../../specs/13-verification/traceability-matrix.md)。
+
+## 七角色独立回归
+
+使用 Node 24+。`node --test src/domain/agents/*/agent.test.ts` 覆盖角色业务入口；`tests/integration/agent-examples.test.ts` 覆盖七个独立样例、工件提交和失败记录。`npm test` 包含这些测试。受控原生 DSH 验收仍见 `tests/acceptance/dsh-configured-flow.test.ts`，真实模型冒烟须另行报告，不以固定模型结果代替。

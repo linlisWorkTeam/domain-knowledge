@@ -1,3 +1,5 @@
+import type { AgentId, AgentCommand, AgentResult } from '../../domain/agents/contracts.ts';
+export { AGENT_IDS, type AgentId, type AgentCommand, type AgentResult } from '../../domain/agents/contracts.ts';
 import type {
   ArtifactRef, DomainEvent, EvaluationReport, FlywheelRun, GateDecision, GatePolicy,
   KnowledgeVersion, ProvenanceRef,
@@ -211,6 +213,7 @@ export interface RunningStateStore {
 }
 
 export interface AgentRequest {
+  authorizedTools?: readonly string[];
   role: string;
   prompt: string;
   outputSchema: Record<string, unknown>;
@@ -310,26 +313,6 @@ export interface OperationalMetricsPort {
   recordProviderInvocation(record: ProviderInvocationRecord): void;
   runs(window: '24h' | '7d' | '30d'): Record<string, unknown>;
   governance(window: '24h' | '7d' | '30d'): Record<string, unknown>;
-}
-
-export interface AgentCommand {
-  schemaVersion: '1.0';
-  commandId: string;
-  runId: string;
-  agentType: AgentId;
-  generationKey: string;
-  payload: Record<string, unknown>;
-}
-
-export interface AgentResult {
-  schemaVersion: '1.0';
-  commandId: string;
-  commandRef: ArtifactRef;
-  runId: string;
-  agentType: AgentId;
-  status: 'SUCCEEDED' | 'FAILED';
-  outputRefs: ArtifactRef[];
-  payload: Record<string, unknown>;
 }
 
 /** Runtime boundary for the versioned schemas under specs/schemas. */
@@ -448,12 +431,6 @@ export interface ProjectEvaluator {
   }, signal?: AbortSignal): Promise<ProjectEvaluation>;
 }
 
-export const AGENT_IDS = [
-  'orchestrator', 'doc-gen', 'doc-worker', 'test-gen', 'code', 'check', 'review',
-] as const;
-
-export type AgentId = typeof AGENT_IDS[number];
-
 export interface AgentDefinition {
   agentId: AgentId;
   nodeId: string;
@@ -484,6 +461,7 @@ export interface AgentRunConfiguration {
 }
 
 export interface RunConfigurationSnapshot {
+  roleExecutionVersion?: string;
   schemaVersion: '1.0';
   runId: string;
   provider: {

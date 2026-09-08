@@ -1,3 +1,4 @@
+import { NODE_BY_AGENT } from '../../src/infrastructure/workflow/langgraph/agent-definitions.ts';
 import { FixtureProjectWorkflowStages, type FixtureProjectScenario } from '../../src/infrastructure/agents/scenario/project-workflow-fixture.ts';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -55,6 +56,7 @@ test('generated result matches contract', () => assert.equal(calculate(), expect
   try {
     composition.agents.updatePromptAddon('doc-gen', '先写清行为边界。');
     const executor = new FixtureProjectWorkflowStages({
+      nodeByAgent: NODE_BY_AGENT,
       flywheel: composition.apps.flywheel,
       evalRunner: composition.apps.evalRunner,
       evaluator: new TrustedProjectEvaluator(composition.artifacts),

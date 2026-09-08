@@ -96,7 +96,7 @@ test('DocGen example uses the shared production DSH stages, freezes prompts and 
   }
 });
 
-test('single DocGen graph records failure and cancellation instead of late success', async () => {
+test('single DocGen execution records failure and cancellation instead of late success', async () => {
   const abort = new AbortController();
   const statuses: string[] = [];
   const input: WorkflowStageInput = { runId: 'example-failure', nodeId: 'doc_gen', agentId: 'doc-gen', iteration: 0,

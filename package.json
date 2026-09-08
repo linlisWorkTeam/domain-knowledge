@@ -22,6 +22,7 @@
     "typecheck": "tsc --noEmit",
     "validate:specs": "node specs/13-verification/validate-specs.ts",
     "evaluate:framework": "node scripts/evaluate-framework.mjs",
+    "agent:run": "node --env-file-if-exists=.env.local src/interfaces/runner/agent-run.ts",
     "example:docgen": "node --env-file-if-exists=.env.local src/interfaces/runner/docgen-example.ts"
   },
   "dependencies": {

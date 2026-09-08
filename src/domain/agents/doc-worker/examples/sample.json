@@ -1,0 +1,61 @@
+{
+  "provider": "fixture",
+  "scenario": {
+    "schemaVersion": "1.0",
+    "name": "single-role-development",
+    "moduleId": "markdown-diff",
+    "repositoryRoot": ".",
+    "expectedCommit": "a743ffcb624b1aca47d0f8adb272582ecf0250d6",
+    "sourcePaths": [
+      "src/domain/services/markdown-diff.ts"
+    ],
+    "publicInterfacePaths": [
+      "examples/docgen/markdown-diff.d.ts"
+    ],
+    "allowedGeneratedPaths": [
+      "src/domain/services/markdown-diff.ts"
+    ],
+    "prepareCommands": [],
+    "referenceCommands": [],
+    "firstIterationCommands": [],
+    "finalCommands": []
+  },
+  "iteration": 0,
+  "payload": {
+    "moduleId": "markdown-diff",
+    "sourceRefs": [
+      {
+        "material": "source"
+      }
+    ],
+    "publicInterfaceRefs": [
+      {
+        "material": "interface"
+      }
+    ],
+    "assignedSourcePaths": [
+      "src/domain/services/markdown-diff.ts"
+    ]
+  },
+  "materials": {
+    "source": {
+      "content": {
+        "path": "src/domain/services/markdown-diff.ts",
+        "commit": "a743ffcb624b1aca47d0f8adb272582ecf0250d6",
+        "publicInterface": "structuredMarkdownDiff(before: string, after: string)"
+      },
+      "mediaType": "application/json"
+    },
+    "interface": {
+      "content": "/** Public API of the CPU example pinned in the runner; no implementation or oracle. */\nexport declare function structuredMarkdownDiff(beforeBody: string, afterBody: string): {\n  hunks: Array<{\n    oldStart: number; oldCount: number; newStart: number; newCount: number;\n    lines: Array<{ type: 'CONTEXT' | 'REMOVE' | 'ADD'; oldLine: number | null; newLine: number | null; text: string }>;\n  }>;\n  changedSections: string[];\n  rangeValidation: {\n    status: 'PASS'; scope: 'FULL_DOCUMENT'; oldLines: number; newLines: number;\n    algorithm: 'LCS' | 'BOUNDED_FALLBACK'; validated: true;\n  };\n};\n",
+      "mediaType": "text/plain"
+    }
+  },
+  "modelOutput": {
+    "workerId": "worker-0",
+    "fragment": "CRLF is normalized before comparison; identical documents return no changed sections.",
+    "provenance": [
+      "src/domain/services/markdown-diff.ts"
+    ]
+  }
+}

@@ -1,3 +1,4 @@
+import { ROLE_EXECUTION_VERSION } from '../../domain/agents/execution.ts';
 import {
   assertInvariant, createEvent, sha256,
 } from '../../domain/index.ts';
@@ -87,6 +88,7 @@ export class RegistryRunConfigurationService implements RunConfigurationManager 
     const capturedAt = this.clock();
     const snapshot: RunConfigurationSnapshot = {
       schemaVersion: '1.0',
+      roleExecutionVersion: ROLE_EXECUTION_VERSION,
       runId,
       provider: structuredClone(this.currentProvider()),
       contracts: structuredClone(this.contracts),
@@ -123,6 +125,7 @@ export class RegistryRunConfigurationService implements RunConfigurationManager 
   private async assertSnapshotCompatible(runId: string, checkProvider: boolean): Promise<RunConfigurationSnapshot> {
     const snapshot = this.repository.getRunConfiguration(runId);
     assertInvariant(snapshot !== null, `run configuration not found: ${runId}`);
+    if (snapshot.roleExecutionVersion !== ROLE_EXECUTION_VERSION) throw new Error('RUN_CONFIGURATION_INCOMPATIBLE: role execution version changed; historical Run is read-only');
     if (snapshot.provider.kind === 'pi-agent') throw new Error('RUN_CONFIGURATION_INCOMPATIBLE: legacy Pi Run is read-only');
     if (checkProvider) assertInvariant(JSON.stringify(snapshot.provider) === JSON.stringify(this.currentProvider()),
       `run provider configuration changed: ${runId}`);

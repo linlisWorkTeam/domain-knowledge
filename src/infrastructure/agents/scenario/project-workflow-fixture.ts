@@ -2,6 +2,7 @@ import { readFileSync, realpathSync } from 'node:fs';
 import { isAbsolute, relative, resolve } from 'node:path';
 import type { AgentId, ProjectEvaluation, WorkflowStageInput } from '../../../application/ports/index.ts';
 import { ProjectWorkflowStages, type AutomatedProjectScenario } from '../../../application/services/automated-project-workflow.ts';
+import { assertModelOutput } from '../model-execution.ts';
 import type { ArtifactRef } from '../../../domain/index.ts';
 
 export interface FixtureProjectScenario extends AutomatedProjectScenario {
@@ -18,20 +19,31 @@ export interface FixtureProjectScenario extends AutomatedProjectScenario {
 }
 
 /** Explicit deterministic test adapter. Never selected as a failed-provider fallback. */
-export class FixtureProjectWorkflowStages extends ProjectWorkflowStages {
+export class FixtureProjectWorkflowStages {
   readonly assetRoot: string;
+  readonly executor: ProjectWorkflowStages;
+  readonly flywheel: ConstructorParameters<typeof ProjectWorkflowStages>[0]['flywheel'];
 
-  constructor(input: ConstructorParameters<typeof ProjectWorkflowStages>[0] & { assetRoot: string }) {
-    super(input);
+  constructor(input: Omit<ConstructorParameters<typeof ProjectWorkflowStages>[0], 'modelFactory'> & {
+    assetRoot: string; modelFactory?: ProjectWorkflowStages['modelFactory'];
+  }) {
     this.assetRoot = realpathSync(resolve(input.assetRoot));
+    this.flywheel = input.flywheel;
+    this.executor = new ProjectWorkflowStages({ ...input,
+      modelFactory: (request) => {
+        if (request.provider) {
+          if (!input.modelFactory) throw new Error('WORKFLOW_MODEL_FACTORY_MISSING');
+          return input.modelFactory(request);
+        }
+        return { assertOutput: assertModelOutput,
+          execute: async () => this.output(request.stage, request.scenario, request.command.agentType) };
+      },
+    });
   }
 
-  protected override async runRole(
-    input: WorkflowStageInput,
-    scenario: AutomatedProjectScenario,
-    agentId: AgentId,
-  ): Promise<ArtifactRef> {
-    if (this.agentForRun(input.runId)) return super.runRole(input, scenario, agentId);
+  execute(input: WorkflowStageInput) { return this.executor.execute(input); }
+
+  private async output(input: WorkflowStageInput, scenario: AutomatedProjectScenario, agentId: AgentId): Promise<Record<string, unknown>> {
     const assets = (scenario as FixtureProjectScenario).assets;
     if (!assets) throw new Error('WORKFLOW_FIXTURE_ASSETS_REQUIRED');
     let output: Record<string, unknown>;
@@ -69,7 +81,7 @@ export class FixtureProjectWorkflowStages extends ProjectWorkflowStages {
         parallel: ['documentation', 'test-generation'],
       };
     }
-    return this.commitAgentOutput(input, scenario, agentId, output);
+    return output;
   }
 
   private asset(path: string): string {
