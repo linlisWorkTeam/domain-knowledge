@@ -8,6 +8,8 @@
 
 ## 逻辑视图
 
+新增检索场景（目标设计，待实现）：`用户 → Application / KnowledgeSearchApp → SearchAgent → 受控知识读取 Port → 已发布 VERIFIED 文档`，结果由 Application 返回用户。SearchAgent 不经过 OrchestratorAgent 或 LangGraph，不创建治理 Run；七角色生产治理与独立知识消费共同构成目标 Agent 架构。契约见 [SearchAgent 规范](../06-agents/search-agent.md)。
+
 - **Domain**：Run、Module、Artifact、KnowledgeVersion、EvaluationReport、Correction、GateDecision，以及 Flywheel、EvalRunner、Association 三个纯领域服务。
 - **Application**：`Orchestrator`、`FlywheelApp`、`EvalRunnerApp`、`KnowledgeSearchApp`、`KnowledgeDiscoveryApp`、`ContentGovernanceApp`、`ProviderOperationsApp`、`OperationalMetricsApp` 八个用例入口，以及工作流阶段执行器、权限策略、发布策略和幂等协调器。
 - **Ports**：Agent、Workflow、Artifact、Knowledge、Sandbox、LanguagePlugin。

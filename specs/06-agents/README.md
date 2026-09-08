@@ -2,7 +2,7 @@
 
 > 开发方向：七角色后续直接基于 DSH 开发，先底座与 CPU 范例，再按[公共 SOP](../../docs/guides/agent-customization.md#agent-development-sop)分工。下文的 AgentCommand/AgentResult 是业务输入输出约定，不是需要自建的 Agent 运行框架；具体 DSH 配置留待 [DEV-019](../changes/active/DEV-019-dsh-agent-foundation/proposal.md)实施。
 
-六类规范覆盖七个运行角色：
+目标架构包含七个飞轮运行角色，以及一个由 Application 直接调度的 SearchAgent（设计已确认，待实现）。以下规范分别定义其职责：
 
 1. [编排类](orchestration-agents.md)：OrchestratorAgent
 2. [知识生产类](documentation-agents.md)：DocGenAgent、可选 DocWorkerAgent
@@ -10,6 +10,9 @@
 4. [测试生产类](test-generation-agent.md)：TestGenAgent
 5. [代码与检查类](code-and-check-agents.md)：CodeAgent、CheckAgent
 6. [评审类](review-agent.md)：ReviewAgent
+7. [检索类](search-agent.md)：SearchAgent，只检索治理后已发布的 `VERIFIED` 文档，不经过 OrchestratorAgent 或 LangGraph 调度。
+
+以下统一信封、固定节点和 Run 配置规则适用于七个飞轮角色。SearchAgent 使用独立检索请求/结果契约，不属于当前角色枚举；不得为调用它创建治理 Run。
 
 统一信封、角色枚举和封闭的角色 payload 由 `agent-command.schema.json` 与 `agent-result.schema.json` 定义，Correction 另由 `correction.schema.json` 约束。成功结果的 `resultKind` 必须与 `agentType` 匹配，失败结果统一为 `error` payload；未知字段一律拒绝。所有输入 Artifact 在调用前授权，所有输出先 Schema 校验再提交。Agent 不能直接改变 Run 状态、发布知识或授予权限。
 

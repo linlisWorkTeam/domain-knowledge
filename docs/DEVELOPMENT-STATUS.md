@@ -1,6 +1,6 @@
 # 开发状态
 
-**当前阶段：DEV-019 R2 与角色代码开发指南已合入｜更新时间：2026-09-07｜下一任务：按指南分工，继续 T200 契约对齐及 T210/T211 开发**
+**当前阶段：DEV-019 R2 与角色代码开发指南已合入；新增 SearchAgent 文档设计｜更新时间：2026-09-08｜下一任务：按指南分工，继续 T200 契约对齐及 T210/T211 开发**
 
 本轮验收详见 [DSH Agent 公共底座测试报告](status/report/2026-09-07-DSH-Agent底座测试报告.md)。七角色分工可查[目录、类与功能定位指南](guides/agent-customization.md#角色定位表)；本次补充代码导航和开发步骤，不代表 T200 全部规范交付或 T210/T211 已完成。
 
@@ -39,6 +39,8 @@ This file is the single entry point for project-level development status, curren
 回写时必须更新顶部日期、工作项状态和实际验证证据。没有代码、测试或运行证据的能力不得标记为完成。纯重构只有在改变里程碑或任务顺序时才需要更新本文件。
 
 ## 当前方向与开发顺序（2026-09-07）
+
+2026-09-08 补充：用户要求先明确独立 [SearchAgent](../specs/06-agents/search-agent.md) 的文档与 Mermaid 图。目标调用链为用户 → Application / KnowledgeSearchApp → SearchAgent，只检索已发布的 `VERIFIED` 文档，绕过 OrchestratorAgent 与 LangGraph；七角色飞轮开发范围保持原边界。该角色的代码接线、独立 Schema、工具权限与自动验收尚未实施，后续单独安排，不计为 DEV-019 七角色交付。
 
 R1 已将角色执行收敛到 DSH，通用项目场景从 CLI/API/Console 传入。Pi Agent 运行依赖已移除，旧记录保留可读且拒绝恢复；CodeAgent CLI 适配后置。R2 的真实 CPU DocGen 范例和独立工作区复现已通过本地验收，PR #26 已合入；R3 七角色和 R4 完整闭环尚未验收。 公共接线为 ProjectWorkflowStages，预写输出独立为 Fixture Adapter。
 

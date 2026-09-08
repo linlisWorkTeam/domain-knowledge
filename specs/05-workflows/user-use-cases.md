@@ -12,7 +12,7 @@
 
 | 用例 ID | 主要用户 | 用户目标 | 需求与验收映射 |
 |---|---|---|---|
-| UC-KF-001 | 知识消费者 | 只使用已验证知识并提交反馈 | KF-SYS-006、KF-SYS-016；AC-OBS-001、AC-COMPAT-001 |
+| UC-KF-001 | 知识消费者 | 由 Application 直接调度 SearchAgent 检索已验证知识，反馈单独提交 | KF-SYS-006、KF-SYS-016、KF-SYS-043；AC-OBS-001、AC-COMPAT-001、AC-SEARCH-001 |
 | UC-KF-002 | 知识治理者 | 将有来源的候选知识经独立评测发布为 `VERIFIED` | KF-SYS-005、KF-SYS-006、KF-SYS-009、KF-SYS-015；AC-EVAL-002、AC-PUB-001 |
 | UC-KF-003 | 工程师（启动与异常治理） | 启动由 Workflow Service 自动驱动的失败归因、局部修订与 fresh 再生成 | KF-SYS-001、KF-SYS-007、KF-SYS-008；AC-FLOW-001、AC-FLOW-002、AC-FLOW-003 |
 | UC-KF-004 | 发布验收者 | 对固定 commit 完成可复验的真实源码闭环 | KF-SYS-017、NFR-011；AC-E2E-001 |
@@ -28,6 +28,7 @@
 | 知识治理者 | 提交来源、候选内容、策略和由受信评测器产生的证据；只在 Gate `PASS` 后请求发布。 |
 | 工程师 | 启动 Run、选择策略，并处理 `STOPPED`、`LOW_CONFIDENCE` 或需要批准的异常；不得代替 Gate 判定结果。 |
 | OrchestratorAgent | 生成节点 DAG、资源声明和委派计划；不写知识、实现或测试，也不决定 Gate 结果。 |
+| SearchAgent（待实现） | 由 Application 的 KnowledgeSearchApp 直接调度，只检索治理后已发布的 VERIFIED 文档并返回来源引用；不经过 OrchestratorAgent。 |
 | Workflow Service | 按计划自动推进 Run、调用 Agent、持久化 checkpoint，并根据确定性 Gate 选择下一条状态边。 |
 | DocGen / CodeGen / Review | 分别生成知识、实现和 Correction；职责及可见数据受权限矩阵限制。 |
 | EvalRunner | 独立执行构建与测试，提交不可变执行证据。 |
@@ -59,10 +60,14 @@
 
 ## UC-KF-001：查询已验证知识并反馈
 
+以下时序为新增 SearchAgent 的目标设计，对应 `KF-SYS-043` / `AC-SEARCH-001`；现有查询入口尚未接入该 Agent，普通查询能力不代表本用例的新调用链已经实现。
+
 ### 前置条件与结果
 
-- Registry 已初始化，并且至少存在一个已通过行为门禁的 `VERIFIED` 版本。
-- 未显式指定状态时，查询必须只返回 `VERIFIED` 知识。
+- Registry 已初始化；可检索文档必须经完整飞轮门禁且完成原子发布，当前状态为 `VERIFIED`，具有成功发布回执与有效正文 Artifact。
+- Application 的 `KnowledgeSearchApp` 直接调度 SearchAgent；不得调用 OrchestratorAgent、启动 LangGraph 或创建治理 Run。
+- SearchAgent 的输入材料和结果必须只含已发布的 `VERIFIED` 知识，显式请求其他状态也不得扩大范围；治理目录的普通查询仍遵循 HTTP API 原有状态语义。
+- 无合格命中时返回空列表，不生成文档或自动启动飞轮；存储、权限或完整性错误必须与空结果区分。
 - 反馈必须形成独立记录，不得直接修改知识正文、状态或 GateDecision。
 
 ```mermaid
@@ -70,29 +75,43 @@ sequenceDiagram
     autonumber
     actor User as 知识消费者
     participant Client as Dashboard / CLI / DSH
-    participant Query as Query Service
+    participant App as Application / KnowledgeSearchApp
+    participant Search as SearchAgent（待实现）
+    participant Read as 受控知识读取 Port / 工具
     participant Registry as SQLite Registry
     participant CAS as Artifact Store
+    participant Feedback as Application 反馈入口
 
     User->>Client: 输入查询词
-    Client->>Query: query(q, status=VERIFIED)
-    Query->>Registry: 检索已发布版本及元数据
-    Registry-->>Query: KnowledgeVersion 命中
-    Query->>CAS: 读取并校验正文 Artifact
-    CAS-->>Query: 完整正文
-    Query-->>Client: 排序结果 + provenance + versionId
+    Client->>App: 提交查询及可选过滤条件
+    App->>Search: 直接调用检索（独立请求 ID）
+    Note over App,Search: 不经过 OrchestratorAgent / LangGraph<br/>不创建或推进 FlywheelRun
+    Search->>Read: 检索已发布文档
+    Read->>Registry: 强制 VERIFIED 过滤并核验发布回执
+    Registry-->>Read: 可消费的版本及元数据
+    Read->>CAS: 读取并校验授权正文 Artifact
+    CAS-->>Read: 完整性有效的正文
+    Read-->>Search: 合格文档及不可变引用
+    Search-->>App: 命中片段 + provenance + versionId + ArtifactRef
+    App->>Read: 复核结果引用与当前发布状态
+    Read-->>App: 校验结果（已替代版本剔除或重新检索）
+    App-->>Client: 校验后的检索结果或空列表
     Client-->>User: 展示可使用的知识
 
     opt 用户评价或指出错误
         User->>Client: hit / rate / correct + note
-        Client->>Registry: 保存 Feedback(versionId)
-        Registry-->>Client: accepted
+        Client->>Feedback: 提交 Feedback(versionId)
+        Feedback->>Registry: 保存独立反馈记录
+        Registry-->>Feedback: accepted
+        Feedback-->>Client: 反馈结果
         Note over Registry: Feedback 不直接改变<br/>VERIFIED 权限或正文
         Client-->>User: 反馈已记录
     end
 ```
 
 ### 用户入口
+
+下表为已有的普通查询与反馈入口；SearchAgent 的 Application 接线及版本化检索契约待实现，不新增或宣称已有专属 HTTP 路由。
 
 | 目的 | 入口 |
 |---|---|

@@ -12,7 +12,14 @@ flowchart LR
   F -->|不可变内容| A[Artifact Store]
   F -->|构建/测试作业| S[隔离沙箱]
   F -->|候选/已验证知识| K[Knowledge Store]
+  C[知识消费者] -->|检索请求| Q[Application: KnowledgeSearchApp]
+  Q -->|直接调度| SA[SearchAgent：待实现]
+  SA -->|受控只读：仅已发布 VERIFIED| K
+  SA -->|文档及来源引用| Q
+  Q -->|检索结果| C
 ```
+
+新增检索链路是目标设计：SearchAgent 通过受控 Port 读取已发布文档，用户请求不进入 OrchestratorAgent 或 LangGraph。下方依赖图保留当前代码结构；具体输入输出和实现边界见 [SearchAgent](../06-agents/search-agent.md)。
 
 ## 边界与端口
 
