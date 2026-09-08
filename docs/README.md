@@ -10,6 +10,7 @@ SPDX-License-Identifier: MIT
 | 目的 | 入口 | 对应设计 |
 | --- | --- | --- |
 | 首次运行 | [GettingStarted](GettingStarted.md) | [Requirements](specs/totalRules/Requirements.md)、[UiuxDesign](specs/totalRules/UiuxDesign.md) |
+| 阅读架构与开发报告 | [目录、DDD、Spec 与 Agent 编排报告](reports/FrameworkArchitectureAndSpecDevelopment.md) | 本次代码快照说明，现行设计仍在 specs |
 | 理解架构 | [4+1 视图](diagrams/Views4Plus1.md) | [Architecture](specs/totalRules/Architecture.md)、[DDD](specs/totalRules/DomainDrivenDesign.md) |
 | 修改代码 | [Development](Development.md) | [设计目录](specs/README.md)、[CodeTaste](specs/totalRules/CodeTaste.md) |
 | 修改单个角色 | [AgentDevelopment](AgentDevelopment.md) | [Agents](specs/domainFunction/agents/Agents.md) |
@@ -29,6 +30,7 @@ docs/
 ├── Status.md                # 当前能力与验证范围
 ├── specs/                   # 与代码模块对应的设计和 Schema
 ├── diagrams/Views4Plus1.md   # 逻辑、开发、进程、物理、场景视图
+├── reports/                 # 架构与开发专题报告（快照）
 ├── epitaph/                 # 最近三次交接
 ├── HistoryEpitaph.md         # 归档摘要与历史证据链接
 └── FileCatalog.json         # 文件版权与功能元数据
