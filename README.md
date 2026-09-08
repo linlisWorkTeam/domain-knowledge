@@ -22,7 +22,7 @@ SQLite Registry 与 CAS 是运行时事实源，默认写到本仓库 `.workpane
 
 第一版先在外部使用 **LangGraph 编排 → DSH 运行角色 → 业务校验与独立评测** 完成闭环。先交付公共底座和普通 CPU 小模块的真实角色范例，再开发七个角色；不另建 Agent 运行框架。Pi 退出目标底座，固定项目执行器退出公共入口；CodeAgent CLI 仅保留后续适配位置，不阻塞第一版。
 
-R1 已将角色执行收敛到 DSH，通用项目场景从 CLI/API/Console 传入。Pi Agent 运行依赖已移除，旧记录保留可读且拒绝恢复；CodeAgent CLI 适配后置。R2 的真实 CPU DocGen 范例和独立工作区复现已通过本地验收，PR #26 待审查；R3 七角色和 R4 完整闭环尚未验收。 详见[开发状态](docs/DEVELOPMENT-STATUS.md)和 [DEV-019](specs/changes/active/DEV-019-dsh-agent-foundation/proposal.md)。
+R1 已将角色执行收敛到 DSH，通用项目场景从 CLI/API/Console 传入。Pi Agent 运行依赖已移除，旧记录保留可读且拒绝恢复；CodeAgent CLI 适配后置。R2 的真实 CPU DocGen 范例和独立工作区复现已通过本地验收，PR #26 已合入；R3 七角色和 R4 完整闭环尚未验收。详见[开发状态](docs/DEVELOPMENT-STATUS.md)和 [DEV-019](specs/changes/active/DEV-019-dsh-agent-foundation/proposal.md)。
 
 ## 当前已实现
 
@@ -40,25 +40,26 @@ R1 已将角色执行收敛到 DSH，通用项目场景从 CLI/API/Console 传�
 
 第一次阅读或参与开发，请从[文档中心](docs/README.md)按任务进入；工程治理边界已收敛到[开发指南](docs/DEVELOPMENT.md)和[贡献指南](CONTRIBUTING.md)。
 
-需要 Node.js 24 或更高版本。
+需要 Node.js 24 或更高版本。以下命令启动只读 Console；浏览页面不需要模型凭据或额外的知识仓库。
 
 ```bash
-git clone https://github.com/linlisWorkTeam/domain-knowledge.git
-git clone https://github.com/linlisWorkTeam/wpKnowledge.git
+git clone --branch main https://github.com/linlisWorkTeam/domain-knowledge.git
 cd domain-knowledge
+node --version
 npm ci
-export WP_KNOWLEDGE_REPOSITORY="$(cd ../wpKnowledge && pwd)"
 npm run knowledge -- init
 npm run knowledge -- status
 npm run knowledge:serve
 ```
 
-打开 <http://127.0.0.1:4174>。不需要扫描知识仓库时，可以不设置 `WP_KNOWLEDGE_REPOSITORY`。
+在运行服务的同一台电脑上打开 <http://127.0.0.1:4174>，保持启动终端运行，按 `Ctrl+C` 停止服务。新运行目录没有知识和批次数据是正常现象。
 
-当前固定 ohMyWorkPanel 验收工作流（不是尚未交付的通用 CPU 范例）：
+如果服务运行在远程服务器、容器或云开发环境，浏览器中的 `127.0.0.1` 指向你自己的电脑，需要先转发 4174 端口。已有检出如何更新、SSH 转发、临时 HTTPS 预览和启动排错见[快速上手](docs/GETTING_STARTED.md#remote-console)。需要扫描知识仓库时，再按该指南配置 `WP_KNOWLEDGE_REPOSITORY`。
+
+执行项目工作流还需要有效的 DSH 配置和场景文件；它不属于只读页面预览步骤：
 
 ```bash
-npm run knowledge -- workflow-run --repository /path/to/ohMyWorkPanel
+npm run knowledge -- workflow-run --scenario /path/to/scenario.json --repository /path/to/project
 ```
 
 当前阶段、下一开发任务和后续队列见[开发状态](docs/DEVELOPMENT-STATUS.md)。详细配置见[快速上手](docs/GETTING_STARTED.md)和[运维手册](docs/OPERATIONS.md)。真实运行记录与方案 PPT 保存在 [`wpKnowledge/knowledge`](https://github.com/linlisWorkTeam/wpKnowledge/tree/main/knowledge)。
