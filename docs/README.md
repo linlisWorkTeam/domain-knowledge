@@ -2,6 +2,59 @@
 
 本页是 domain-knowledge 文档的唯一首页。产品行为、权限、状态机和验收条件以 [`../specs/`](../specs/README.md) 为规范性事实源；这里的工程文档说明如何理解、运行、修改和维护当前实现。
 
+## 目录树与用途
+
+以下按当前仓库结构列出目录与文件，行尾注释说明用途；新增、移动或删除文档时同步更新。历史报告和交接记录保留当时背景，当前进度以 `DEVELOPMENT-STATUS.md` 为准。
+
+```text
+docs/                                                                       # 工程文档：理解、运行、开发与维护当前实现
+├── README.md                                                               # 文档首页、阅读入口与维护边界
+├── ARCHITECTURE.md                                                         # 目标架构、当前实现与模块边界
+├── DEVELOPMENT-STATUS.md                                                   # 当前进度、验证基线与后续任务
+├── DEVELOPMENT.md                                                          # 开发流程、工程约束与完成定义
+├── GETTING_STARTED.md                                                      # 快速启动、环境配置与首次运行
+├── OPERATIONS.md                                                           # 运行、评测、发布、配置与排障
+├── diagrams/                                                               # 系统结构与流程图
+│   ├── development-change-flow.md                                          # 规范、实现、测试与验收的变更链路图
+│   ├── knowledge-lifecycle.md                                              # 知识从摄取到发布的生命周期图
+│   └── system-overview.md                                                  # 系统组件与依赖关系图
+├── epitaph/                                                                # 跨会话交接记录；按文件名时间戳读取最新记录
+│   ├── 2026-09-04-0223-dev007-dev008-e2e-acceptance.md                     # 交接：DEV-007 / DEV-008 端到端验收与交接
+│   ├── 2026-09-04-0710-dev006-dev009-complete.md                           # 交接：DEV-006～DEV-009 完成交接
+│   ├── 2026-09-04-0926-dev010-company-cli-blocked.md                       # 交接：DEV-010 公司 CLI 环境阻塞交接
+│   ├── 2026-09-07-1154-dsh-foundation-direction.md                         # 交接：DSH 底座方向与开发指导交接
+│   ├── 2026-09-07-1212-dsh-documentation-audit.md                          # 交接：DSH 方向文档同步复核交接
+│   ├── 2026-09-07-1617-dev019-r1-configuration-review.md                   # 交接：DEV-019 R1 配置迁移待审查
+│   ├── 2026-09-07-1639-dev019-r2-live-configuration.md                     # 交接：DEV-019 R2 入口已实现，live 配置待补
+│   ├── 2026-09-07-1712-dev019-r2-live-acceptance.md                        # 交接：DEV-019 R2 live 通过，等待 PR 审查
+│   ├── 2026-09-07-1737-agent-code-development-guide.md                     # 交接：七角色代码开发指南待审查
+│   ├── 2026-09-08-0953-main-cleanup-startup-docs.md                        # 交接：主目录清理与启动文档补充
+│   ├── 2026-09-08-1015-search-agent-design.md                              # 交接：SearchAgent 文档设计交接
+│   ├── 2026-09-08-1019-search-agent-pr-auth.md                             # 交接：SearchAgent PR 交付与账号边界
+│   ├── 2026-09-08-1041-project-decoupling-opencode-go-env.md               # 交接：项目验收解耦与 OpenCode Go 环境配置
+│   └── 2026-09-08-1043-decoupling-pr-and-branch-cleanup.md                 # 交接：解耦 PR 与合并后的分支清理
+├── guides/                                                                 # 专题开发与配置指南
+│   ├── agent-customization.md                                              # Agent 开发 SOP、角色定位与定制步骤
+│   ├── ai-development-guide.md                                             # AI 协作开发流程与代码修改指南
+│   ├── documentation-i18n.md                                               # 文档语言约定与英文摘要要求
+│   ├── dsh-runtime.md                                                      # DSH 与 OpenCode Go 环境变量配置
+│   └── testing.md                                                          # 测试分层、执行方式与验证策略
+├── migration/                                                              # 历史迁移背景与操作说明
+│   ├── repository-split.md                                                 # 运行仓库与知识仓库拆分说明
+│   └── runner.md                                                           # 旧版 Runner 的迁移与兼容说明
+├── reference/                                                              # 仓库结构等参考资料
+│   └── repository-layout.md                                                # 全仓库目录布局与职责说明
+├── status/                                                                 # 日期化状态快照与测试、测评报告
+│   ├── report/                                                             # DSH Agent 底座测试报告存放处
+│   │   └── 2026-09-07-DSH-Agent底座测试报告.md                             # DSH Agent 公共底座测试报告
+│   └── reports/                                                            # 项目进度快照与框架阶段性测评
+│       ├── 2026-09-04-当前项目进度报告.md                                  # domain-knowledge 项目进度快照
+│       └── 框架阶段性测评.md                                               # LangGraph 多 Agent 框架阶段性测评
+└── tutorials/                                                              # 按步骤完成开发任务的教程
+    ├── add-agent-capability.md                                             # 新增或调整 Agent 能力的操作步骤
+    └── add-http-endpoint.md                                                # 新增 HTTP 接口的操作步骤
+```
+
 ## 这个项目是什么
 
 `domain-knowledge` 是 Knowledge Flywheel 的运行仓库，负责 Agent 编排、知识摄取、评测、发布 Gate、Registry/CAS、HTTP API、CLI 和 Console。知识正文、研究材料和运行证据保存在 `wpKnowledge`。

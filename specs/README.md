@@ -11,6 +11,106 @@ This directory is the normative source for Knowledge Flywheel behavior. Requirem
 
 </details>
 
+## 目录树与用途
+
+以下按当前仓库结构列出目录与文件，行尾注释说明用途；新增、移动或删除文档时同步更新。规范按主题组织，单项功能变更使用 `changes/active/` 下的目录与模板。
+
+```text
+specs/                                                                      # 规范性事实源：需求、行为、契约与验收
+├── README.md                                                               # 规范入口、阅读顺序与规范规则
+├── glossary.md                                                             # 统一领域术语与缩写
+├── 01-requirements/                                                        # 系统功能需求与非功能约束
+│   ├── non-functional-requirements.md                                      # 非功能需求
+│   └── system-requirements.md                                              # 系统需求
+├── 02-architecture/                                                        # 系统边界、外部依赖与架构视图
+│   ├── 4plus1-views.md                                                     # 4+1 架构视图
+│   └── system-context.md                                                   # 系统上下文
+├── 03-domain/                                                              # 领域实体、值对象、状态与规则
+│   └── domain-model.md                                                     # 领域模型
+├── 04-product/                                                             # 前台产品设计、交互与页面验收要求
+│   └── frontend-product-design.md                                          # 知识飞轮前台产品设计
+├── 05-workflows/                                                           # 工作流、用户时序、恢复与真实源码验收
+│   ├── checkpoint-and-recovery.md                                          # Checkpoint 与恢复
+│   ├── knowledge-flywheel-workflow.md                                      # 知识飞轮工作流
+│   ├── real-source-acceptance.md                                           # 真实源码验收工作流
+│   └── user-use-cases.md                                                   # 用户用例与交互时序
+├── 06-agents/                                                              # Agent 职责、输入输出与协作约束
+│   ├── README.md                                                           # Agent 规范索引与固定节点、定制边界
+│   ├── code-and-check-agents.md                                            # CodeAgent 与 CheckAgent 的代码生成、检查职责
+│   ├── documentation-agents.md                                             # DocGenAgent 与 DocWorkerAgent 的知识生产职责
+│   ├── knowledge-writing-style.md                                          # 知识正文写作规则与质量检查要求
+│   ├── orchestration-agents.md                                             # OrchestratorAgent 的编排职责与约束
+│   ├── review-agent.md                                                     # ReviewAgent 的评审与修订指令
+│   ├── search-agent.md                                                     # SearchAgent 的已发布知识检索设计（待实现）
+│   └── test-generation-agent.md                                            # TestGenAgent 的测试生成职责
+├── 07-language-plugins/                                                    # 语言检测、插件契约与 C++ 插件规范
+│   ├── cpp-plugin.md                                                       # C++ 语言插件
+│   ├── language-detection.md                                               # 语言检测
+│   └── language-plugin-contract.md                                         # 语言插件契约
+├── 08-evaluation/                                                          # 确定性评测模型与知识发布门禁
+│   ├── evaluation-model.md                                                 # 评测模型
+│   └── knowledge-publication-gate.md                                       # 知识发布门禁
+├── 09-security/                                                            # 数据安全、信任边界与隔离约束
+│   └── data-boundaries.md                                                  # 数据边界与权限矩阵
+├── 10-interfaces/                                                          # HTTP 接口、路由及实现映射
+│   └── http-api.md                                                         # Preview HTTP API 规范
+├── 13-verification/                                                        # 验收场景、需求追踪与规范校验工具
+│   ├── acceptance-plan.md                                                  # 验收场景、阶段门与评审清单
+│   ├── traceability-matrix.md                                              # 需求到验收、实现、测试的映射与状态
+│   ├── traceability-validator.ts                                           # 检查追踪矩阵的状态、列格式与实现及测试路径
+│   └── validate-specs.ts                                                   # 校验 Schema、契约夹具、文档链接与追踪矩阵
+├── adr/                                                                    # 架构决策及其背景、后果与取代关系
+│   ├── README.md                                                           # 架构决策索引与维护约定
+│   ├── ADR-001-typescript-hexagonal-core.md                                # TypeScript 平台与六边形边界
+│   ├── ADR-002-langgraph-workflow.md                                       # LangGraph V1 编排与可替换端口
+│   ├── ADR-003-artifact-handoffs.md                                        # Artifact 交接与内容寻址
+│   ├── ADR-004-deterministic-gate.md                                       # 确定性评测和发布权分离
+│   ├── ADR-005-standard-protocols.md                                       # 标准协议与 Adapter
+│   ├── ADR-006-embedded-domain-knowledge-infrastructure.md                 # 内嵌 domain-knowledge 基础设施
+│   ├── ADR-007-ddd-layered-source-layout.md                                # 按领域驱动设计收敛源码目录
+│   ├── ADR-008-reserve-rollback-state.md                                   # 回滚能力显式降级
+│   ├── ADR-009-repository-split.md                                         # 运行仓库与知识仓库分离
+│   ├── ADR-010-application-domain-service-boundaries.md                    # Application App 与 Domain Service 边界
+│   └── ADR-011-agent-contract-and-run-configuration-snapshot.md            # Agent 运行契约与 Run 配置快照
+├── changes/                                                                # 功能变更提案、实施计划与验收证据
+│   ├── active/                                                             # 当前变更与新建变更模板
+│   │   ├── DEV-019-dsh-agent-foundation/                                   # DSH 公共底座与角色开发变更
+│   │   │   ├── acceptance.md                                               # 验收场景、步骤与完成判据
+│   │   │   ├── evidence.md                                                 # 验证命令、结果、证据与未验证边界
+│   │   │   ├── plan.md                                                     # 技术实施计划、阶段与退出条件
+│   │   │   ├── proposal.md                                                 # 变更背景、目标、范围与风险
+│   │   │   ├── spec-delta.md                                               # 本次规范增量与受影响边界
+│   │   │   └── tasks.md                                                    # 可执行任务列表与完成状态
+│   │   └── DEV-xxx-feature/                                                # 新功能变更模板，复制后替换编号与主题
+│   │       ├── acceptance.md                                               # 验收场景、步骤与完成判据
+│   │       ├── evidence.md                                                 # 验证命令、结果、证据与未验证边界
+│   │       ├── plan.md                                                     # 技术实施计划、阶段与退出条件
+│   │       ├── proposal.md                                                 # 变更背景、目标、范围与风险
+│   │       ├── spec-delta.md                                               # 本次规范增量与受影响边界
+│   │       └── tasks.md                                                    # 可执行任务列表与完成状态
+│   └── archive/                                                            # 已归档变更存放处（当前仅占位文件）
+│       └── .gitkeep                                                        # 让 Git 保留空的归档目录
+└── schemas/                                                                # 可机器校验的 JSON Schema 数据契约
+    ├── README.md                                                           # Schema 索引、版本规则与校验方式
+    ├── action-item.schema.json                                             # 持久化治理事项
+    ├── activity.schema.json                                                # 跨批次脱敏活动
+    ├── agent-command.schema.json                                           # 全部 Agent 输入信封与角色 payload
+    ├── agent-result.schema.json                                            # 全部 Agent 输出信封
+    ├── artifact-ref.schema.json                                            # 不可变 Artifact 引用
+    ├── component-status.schema.json                                        # 固定组件健康状态
+    ├── correction.schema.json                                              # Review → DocGen 修订指令
+    ├── evaluation-report.schema.json                                       # 确定性评测报告
+    ├── evaluation-rule.schema.json                                         # 不可变评测规则 revision
+    ├── evaluation-summary.schema.json                                      # 跨批次评测读模型
+    ├── event.schema.json                                                   # 领域事件信封
+    ├── knowledge-diff.schema.json                                          # 结构化 Markdown 差异与范围校验
+    ├── knowledge-health.schema.json                                        # 带口径与样本范围的知识健康度
+    ├── knowledge-lineage.schema.json                                       # 知识版本血缘与反向关系
+    ├── language-plugin.schema.json                                         # 插件能力、请求和标准化结果
+    ├── run-progress.schema.json                                            # 可证明批次进度
+    └── source.schema.json                                                  # 持久化来源注册（不含凭据正文）
+```
+
 ## 阅读顺序与目录
 
 1. [术语表](glossary.md)
