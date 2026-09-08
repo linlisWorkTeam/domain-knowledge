@@ -1,7 +1,7 @@
 <!--
 Copyright (c) 2026 linlisWorkTeam
 SPDX-License-Identifier: MIT
-文件功能：说明贡献入口、项目身份和设计到交付的协作约定。
+文件功能：说明贡献入口和设计到交付的协作约定。
 -->
 # 贡献指南
 
@@ -15,13 +15,11 @@ SPDX-License-Identifier: MIT
 4. 执行适当检查并记录未执行项，实际结果进入 PR，不引用旧结果冒充本轮通过。
 5. 提交供审查，不自动合并。重大方向变化更新现有架构设计，历史背景归纳到 historyEpitaph。
 
-本项目 commit author、committer 和 PR 创建账号统一为 `icedblkamericano`，邮箱使用 `46128748+icedblkamericano@users.noreply.github.com`。提交及创建 PR 前核验实际身份；该规则覆盖旧交接中的账号偏好。
-
 设计统一放在 `docs/specs/`，代码仍位于 `src/`，操作文档直接位于 `docs/`。不恢复根级 specs、退役包装工程或重复 Runner。中文命名说明、版权文件头、公开接口注释见 [CodeTaste](docs/specs/totalRules/CodeTaste.md)。
 
 <details lang="en">
 <summary>English summary</summary>
 
-Read the working agreement and the relevant design before editing. Keep implementation, schemas and verification aligned, and report skipped checks honestly. All project commit authors, committers and new pull-request creators use icedblkamericano. Design lives under docs/specs; concise operational guides live directly under docs. Do not merge pull requests automatically.
+Read the working agreement and the relevant design before editing. Keep implementation, schemas and verification aligned, and report skipped checks honestly. Design lives under docs/specs; concise operational guides live directly under docs. Do not merge pull requests automatically.
 
 </details>

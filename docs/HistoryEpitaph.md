@@ -47,7 +47,7 @@ SPDX-License-Identifier: MIT
 
 ## 本轮身份与记录规则
 
-项目后续 commit author、committer 和新建 PR 账号统一为 icedblkamericano。按用户要求，PR #36 相对 main 的两条既有提交已重写身份；业务文件内容未因身份重写改变。旧哈希 20e28e9、7cda52b 分别对应新哈希 7888848、def8dcc，历史验证时间保持原记录。PR 创建者是 GitHub 不可编辑字段，提交作者修改不改变已有 PR 的创建者。
+当时将 icedblkamericano 误写成项目统一账号；用户后续澄清该约定仅适用于当前 session，不应被后续会话继承，相关项目规则已删除。按用户要求，PR #36 相对 main 的两条既有提交已重写身份；业务文件内容未因身份重写改变。旧哈希 20e28e9、7cda52b 分别对应新哈希 7888848、def8dcc，历史验证时间保持原记录。PR 创建者是 GitHub 不可编辑字段，提交作者修改不改变已有 PR 的创建者。
 
 以后每次交接只保留最近三篇，较早记录先补入本汇总并保留固定提交链接，避免把旧文档直接删除而丢失改动说明。
 
@@ -63,3 +63,9 @@ This document summarizes older handoffs, milestones and architectural decisions 
 按用户确认取消旧 prepare/run/check CLI、DocgenExampleService 与 LangGraph 兼容导出。固定材料和追加指令归入 docGenAgent 的 JSON 样例，参考检查和原有测试迁入同一角色目录，通过共同 AgentExample 链路验证。历史专用入口的命令与结果格式不再保留。
 
 [2026-09-08-1130 七角色 PR 准备](https://github.com/linlisWorkTeam/domain-knowledge/blob/5833cf5/docs/epitaph/2026-09-08-1130-seven-role-pr-preparation.md)：在独立工作树准备最初七角色 PR，记录当时 219 项测试与 Console 14 项通过；该历史结果不代表后续清理后的回归状态。
+
+## Session 账号约定纠正
+
+删除 AGENTS、贡献指南、开发指南和 CodeTaste 中的固定账号规则，同时移除本次会话写入的仓库级 user.name / user.email。当前会话的 Git 身份通过单次命令配置，GitHub 身份通过单次进程凭据指定；不设跨会话账号约束。历史交接中把账号写成项目规则的表述是当时的误解，不作为后续协作指令。
+
+[2026-09-08-1158 目录审查](https://github.com/linlisWorkTeam/domain-knowledge/blob/260e7f1/docs/epitaph/2026-09-08-1158-agent-directory-review.md)：调整 Domain Workflow、资源模块和 Infrastructure 目录，新增版权与中文说明；当时只做类型与静态检查，未运行测试。

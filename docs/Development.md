@@ -49,13 +49,13 @@ npm run test:ui
 
 ## Git 与交接
 
-本项目 commit author / committer、创建 PR 的账号统一为 `icedblkamericano`，具体核验命令见 AGENTS.md。PR 围绕最终行为写动机、实现和验证，不自动合并。已存在 PR 的创建作者不可修改，重写 commit 需使用带预期远程值的 force-with-lease。
+PR 围绕最终行为写动机、实现和验证，不自动合并。已存在 PR 的创建作者不可修改，重写 commit 需使用带预期远程值的 force-with-lease。
 
 交接新增时间戳文件；`docs/epitaph/` 保留最近三次，较早记录先总结到 [historyEpitaph](HistoryEpitaph.md)，包含改动、当时验证边界与原记录的 Git 链接，再移除旧文件。当前状态只在 Status 维护，不把旧报告当作新任务授权。
 
 <details lang="en">
 <summary>English summary</summary>
 
-Locate the module design under docs/specs before editing code. Keep contracts, implementation and verification aligned. Use an independently bootstrapped worktree, document skipped checks, and distinguish controlled providers from live model evidence. Project commits and new pull requests use icedblkamericano. Keep the latest three handoffs and summarize older records in HistoryEpitaph.md.
+Locate the module design under docs/specs before editing code. Keep contracts, implementation and verification aligned. Use an independently bootstrapped worktree, document skipped checks, and distinguish controlled providers from live model evidence. Keep the latest three handoffs and summarize older records in HistoryEpitaph.md.
 
 </details>

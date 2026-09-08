@@ -26,9 +26,7 @@ SPDX-License-Identifier: MIT
 
 新增设计先判断能否合入现有主题。需求与验收编号保持稳定，历史状态不可冒充当前实现。`docs/epitaph/` 只保留最近三次交接，其余先归纳到 `docs/HistoryEpitaph.md` 再移除；原记录可从 Git 历史审计。
 
-## 提交身份与验证
-
-本项目后续 commit 的 author、committer 和 PR 创建账号统一为 `icedblkamericano`。提交前核验仓库级 Git 配置，创建 PR 前核验实际 GitHub API login；不能以其他账号代发。历史提交不自动重写，已创建 PR 的作者不能通过编辑正文变更。
+## 验证
 
 正常开发按 Development 中的检查清单验证；用户明确要求跳过测试时必须记录未执行项，不能把旧结果标为本轮通过。禁止删除失败断言来掩盖行为回归。
 
@@ -38,6 +36,6 @@ SPDX-License-Identifier: MIT
 <details lang="en">
 <summary>English summary</summary>
 
-Use lowerCamelCase directories and PascalCase filenames, explicit role registration, Chinese API comments and copyright headers. Keep one design per responsibility under docs/specs. Commit authors, committers and new PR creators use icedblkamericano. Archive older handoffs after preserving the latest three.
+Use lowerCamelCase directories and PascalCase filenames, explicit role registration, Chinese API comments and copyright headers. Keep one design per responsibility under docs/specs. Archive older handoffs after preserving the latest three.
 
 </details>

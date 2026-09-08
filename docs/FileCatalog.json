@@ -48,7 +48,7 @@
     {
       "path": "CONTRIBUTING.md",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
-      "description": "说明贡献入口、项目身份和设计到交付的协作约定。",
+      "description": "说明贡献入口和设计到交付的协作约定。",
       "metadataLocation": "file-header"
     },
     {
@@ -142,12 +142,6 @@
       "metadataLocation": "file-header"
     },
     {
-      "path": "docs/epitaph/2026-09-08-1158-agent-directory-review.md",
-      "copyright": "Copyright (c) 2026 linlisWorkTeam",
-      "description": "记录七角色 PR 的命名、注释和目录审查修改，交代验证范围。",
-      "metadataLocation": "file-header"
-    },
-    {
       "path": "docs/epitaph/2026-09-08-1216-specs-consolidation.md",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "交接按代码重写的规范结构、历史归档和项目身份规则。",
@@ -157,6 +151,12 @@
       "path": "docs/epitaph/2026-09-08-1420-docgen-example-consolidation.md",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "记录取消 DocGen 专用入口并合并角色样例的交接。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "docs/epitaph/2026-09-08-1423-session-identity-scope.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "澄清账号选择只属于当前会话，不作为项目协作规则。",
       "metadataLocation": "file-header"
     },
     {
