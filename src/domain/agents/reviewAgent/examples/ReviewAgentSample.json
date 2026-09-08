@@ -1,0 +1,69 @@
+{
+  "provider": "fixture",
+  "scenario": {
+    "schemaVersion": "1.0",
+    "name": "single-role-development",
+    "moduleId": "markdown-diff",
+    "repositoryRoot": ".",
+    "expectedCommit": "a743ffcb624b1aca47d0f8adb272582ecf0250d6",
+    "sourcePaths": [
+      "src/domain/services/markdown-diff.ts"
+    ],
+    "publicInterfacePaths": [
+      "examples/docgen/markdown-diff.d.ts"
+    ],
+    "allowedGeneratedPaths": [
+      "src/domain/services/markdown-diff.ts"
+    ],
+    "prepareCommands": [],
+    "referenceCommands": [],
+    "firstIterationCommands": [],
+    "finalCommands": []
+  },
+  "iteration": 0,
+  "payload": {
+    "knowledgeRef": {
+      "material": "knowledge"
+    },
+    "evaluationReportRef": {
+      "material": "evaluation"
+    },
+    "criteriaRef": {
+      "material": "policy"
+    }
+  },
+  "materials": {
+    "knowledge": {
+      "content": "# Markdown diff\n\n## Purpose\nCompare two Markdown documents and report changed sections with line ranges.\n\n## Behavior\nIdentical inputs return empty hunks. CRLF is normalized before comparison. Insertions and deletions preserve the old and new line coordinates. The implementation uses bounded processing for large inputs.\n",
+      "mediaType": "text/markdown"
+    },
+    "evaluation": {
+      "content": {
+        "passed": false,
+        "testsPassed": 2,
+        "testsTotal": 3,
+        "failure": "CRLF normalization mismatch"
+      },
+      "mediaType": "application/json"
+    },
+    "policy": {
+      "content": {
+        "policyId": "development",
+        "minimumStability": 1,
+        "requireAllTests": true,
+        "maxIterations": 1
+      },
+      "mediaType": "application/json"
+    }
+  },
+  "modelOutput": {
+    "blocking": false,
+    "recommendation": "ITERATE",
+    "correction": {
+      "correctionId": "COR-0001",
+      "knowledgePath": "knowledge/markdown-diff.md",
+      "criterion": "Document CRLF normalization with an example",
+      "risk": "False change reports for equivalent newlines"
+    }
+  }
+}

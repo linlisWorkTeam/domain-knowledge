@@ -1,0 +1,53 @@
+{
+  "provider": "fixture",
+  "scenario": {
+    "schemaVersion": "1.0",
+    "name": "docgen-fixed-source",
+    "moduleId": "markdown-diff",
+    "repositoryRoot": ".",
+    "expectedCommit": "3f999204f988697cc5bb9473c5a10ad5b4fc1f78",
+    "sourcePaths": [
+      "src/domain/services/markdown-diff.ts"
+    ],
+    "publicInterfacePaths": [
+      "src/domain/services/markdown-diff.ts"
+    ],
+    "allowedGeneratedPaths": [
+      "src/domain/services/markdown-diff.ts"
+    ],
+    "prepareCommands": [],
+    "referenceCommands": [],
+    "firstIterationCommands": [],
+    "finalCommands": []
+  },
+  "iteration": 0,
+  "promptAddon": "为 structuredMarkdownDiff 编写中文开发文档，先用 read_material 阅读可见源码。\n说明函数签名、返回字段、1 起算行号、CRLF 归一化、空输入、LCS 与大输入回退的边界和章节归属。\n以 src/domain/services/markdown-diff.ts:L起始-L结束 格式引用实际源码行号，两个数字前都必须有大写 L（例如 :L1-L7）；不要省略 L，也不要用简写路径。不要宣称候选文档已验证发布。\n正文开头必须有“源码依据”一行，使用完整引用 src/domain/services/markdown-diff.ts:L127-L165，说明该范围包含导出函数及其实现。其他引用也必须重复完整路径并核对实际行号，不允许只写 :L数字。读取材料后按原文件空行也计入行号，不要自行重排行号。\n正文必须包含且只包含一个 json 代码块，其顶层必须是对象 {\"examples\":[...]}，不能直接输出裸数组。examples 每项包含 before、after、expectedHunkCount、expectedChangedSections。before/after 必须是字符串，expectedHunkCount 必须是整数，expectedChangedSections 必须是字符串数组（无变化为 []，有变化如 [\"# 标题\"]），不能把章节数量 0 或 1 当成数组。\n至少提供三种不同的可执行例子：相同内容、仅 CRLF 差异、标题下替换正文。预期须由源码推导，不调用测试文件、不生成脚本。\n最终回答只输出规定的 JSON 对象（body、title、description）。不要在最终回答中输出分析过程、工具操作说明或其他前后缀，不要用 Markdown 代码块包裹整个输出。正文控制在约 1500 中文字以内。\n\n源码复核要求：sectionFor 的返回标题会用单个空格连接井号和标题文本，不是逐字保留标题行；必须明确 ADD 查 after、REMOVE 查 before。LCS 与有界回退只共用章节归属规则，差分操作和变更章节集合不保证相同，不得声称结果一致。复杂度结论须限定到实际分析的函数，不能把回退操作生成的线性复杂度套到整体函数。不要增加这些规则之外的维护者检查清单要求，除非追加指令明确要求。\n",
+  "payload": {
+    "moduleId": "markdown-diff",
+    "sourceRefs": [
+      {
+        "material": "source"
+      }
+    ],
+    "publicInterfaceRefs": [
+      {
+        "material": "interface"
+      }
+    ]
+  },
+  "materials": {
+    "source": {
+      "content": "import { assertInvariant } from '../index.ts';\n\nexport interface MarkdownDiffLine {\n  type: 'CONTEXT' | 'REMOVE' | 'ADD';\n  oldLine: number | null;\n  newLine: number | null;\n  text: string;\n}\n\nexport interface MarkdownDiffHunk {\n  oldStart: number;\n  oldCount: number;\n  newStart: number;\n  newCount: number;\n  lines: MarkdownDiffLine[];\n}\n\nconst MAX_DIFF_CELLS = 4_000_000;\n\nfunction operationsWithLcs(before: string[], after: string[]): MarkdownDiffLine[] {\n  const width = after.length + 1;\n  const matrix = new Uint32Array((before.length + 1) * width);\n  for (let oldIndex = before.length - 1; oldIndex >= 0; oldIndex -= 1) {\n    for (let newIndex = after.length - 1; newIndex >= 0; newIndex -= 1) {\n      const offset = oldIndex * width + newIndex;\n      matrix[offset] = before[oldIndex] === after[newIndex]\n        ? matrix[(oldIndex + 1) * width + newIndex + 1] + 1\n        : Math.max(matrix[(oldIndex + 1) * width + newIndex], matrix[oldIndex * width + newIndex + 1]);\n    }\n  }\n  const result: MarkdownDiffLine[] = [];\n  let oldIndex = 0;\n  let newIndex = 0;\n  while (oldIndex < before.length || newIndex < after.length) {\n    if (oldIndex < before.length && newIndex < after.length && before[oldIndex] === after[newIndex]) {\n      result.push({ type: 'CONTEXT', oldLine: oldIndex + 1, newLine: newIndex + 1, text: before[oldIndex] as string });\n      oldIndex += 1;\n      newIndex += 1;\n    } else if (\n      oldIndex < before.length\n      && (newIndex >= after.length\n        || matrix[(oldIndex + 1) * width + newIndex] >= matrix[oldIndex * width + newIndex + 1])\n    ) {\n      result.push({ type: 'REMOVE', oldLine: oldIndex + 1, newLine: null, text: before[oldIndex] as string });\n      oldIndex += 1;\n    } else {\n      result.push({ type: 'ADD', oldLine: null, newLine: newIndex + 1, text: after[newIndex] as string });\n      newIndex += 1;\n    }\n  }\n  return result;\n}\n\nfunction operationsWithBoundedFallback(before: string[], after: string[]): MarkdownDiffLine[] {\n  let prefix = 0;\n  while (prefix < before.length && prefix < after.length && before[prefix] === after[prefix]) prefix += 1;\n  let suffix = 0;\n  while (\n    suffix < before.length - prefix\n    && suffix < after.length - prefix\n    && before[before.length - suffix - 1] === after[after.length - suffix - 1]\n  ) suffix += 1;\n  const result: MarkdownDiffLine[] = [];\n  for (let index = 0; index < prefix; index += 1) {\n    result.push({ type: 'CONTEXT', oldLine: index + 1, newLine: index + 1, text: before[index] as string });\n  }\n  for (let index = prefix; index < before.length - suffix; index += 1) {\n    result.push({ type: 'REMOVE', oldLine: index + 1, newLine: null, text: before[index] as string });\n  }\n  for (let index = prefix; index < after.length - suffix; index += 1) {\n    result.push({ type: 'ADD', oldLine: null, newLine: index + 1, text: after[index] as string });\n  }\n  for (let index = 0; index < suffix; index += 1) {\n    const oldIndex = before.length - suffix + index;\n    const newIndex = after.length - suffix + index;\n    result.push({ type: 'CONTEXT', oldLine: oldIndex + 1, newLine: newIndex + 1, text: before[oldIndex] as string });\n  }\n  return result;\n}\n\nfunction hunks(operations: MarkdownDiffLine[], context = 3): MarkdownDiffHunk[] {\n  const changes = operations\n    .map((line, index) => ({ line, index }))\n    .filter(({ line }) => line.type !== 'CONTEXT')\n    .map(({ index }) => index);\n  if (!changes.length) return [];\n  const ranges: Array<{ start: number; end: number }> = [];\n  let first = changes[0] as number;\n  let last = first;\n  for (const index of changes.slice(1)) {\n    if (index - last <= context * 2 + 1) {\n      last = index;\n      continue;\n    }\n    ranges.push({ start: Math.max(0, first - context), end: Math.min(operations.length, last + context + 1) });\n    first = index;\n    last = index;\n  }\n  ranges.push({ start: Math.max(0, first - context), end: Math.min(operations.length, last + context + 1) });\n  return ranges.map(({ start, end }) => {\n    const lines = operations.slice(start, end);\n    const firstOld = lines.find((line) => line.oldLine !== null)?.oldLine\n      ?? ((lines.find((line) => line.newLine !== null)?.newLine ?? 1) - 1);\n    const firstNew = lines.find((line) => line.newLine !== null)?.newLine\n      ?? ((lines.find((line) => line.oldLine !== null)?.oldLine ?? 1) - 1);\n    const value = {\n      oldStart: Math.max(0, firstOld ?? 0),\n      oldCount: lines.filter((line) => line.type !== 'ADD').length,\n      newStart: Math.max(0, firstNew ?? 0),\n      newCount: lines.filter((line) => line.type !== 'REMOVE').length,\n      lines,\n    };\n    assertInvariant(value.oldCount === lines.filter((line) => line.oldLine !== null).length, 'diff old range is invalid');\n    assertInvariant(value.newCount === lines.filter((line) => line.newLine !== null).length, 'diff new range is invalid');\n    return value;\n  });\n}\n\nfunction sectionFor(lines: string[], lineNumber: number): string {\n  for (let index = Math.min(lineNumber - 1, lines.length - 1); index >= 0; index -= 1) {\n    const match = /^(#{1,6})\\s+(.+?)\\s*$/.exec(lines[index] ?? '');\n    if (match) return `${match[1]} ${match[2]}`;\n  }\n  return '(document root)';\n}\n\nexport function structuredMarkdownDiff(beforeBody: string, afterBody: string): {\n  hunks: MarkdownDiffHunk[];\n  changedSections: string[];\n  rangeValidation: {\n    status: 'PASS';\n    scope: 'FULL_DOCUMENT';\n    oldLines: number;\n    newLines: number;\n    algorithm: 'LCS' | 'BOUNDED_FALLBACK';\n    validated: true;\n  };\n} {\n  const before = beforeBody.replaceAll('\\r\\n', '\\n').split('\\n');\n  const after = afterBody.replaceAll('\\r\\n', '\\n').split('\\n');\n  const useLcs = (before.length + 1) * (after.length + 1) <= MAX_DIFF_CELLS;\n  const operations = useLcs\n    ? operationsWithLcs(before, after)\n    : operationsWithBoundedFallback(before, after);\n  const resultHunks = hunks(operations);\n  const sections = new Set<string>();\n  for (const hunk of resultHunks) {\n    for (const line of hunk.lines) {\n      if (line.type === 'ADD' && line.newLine !== null) sections.add(sectionFor(after, line.newLine));\n      if (line.type === 'REMOVE' && line.oldLine !== null) sections.add(sectionFor(before, line.oldLine));\n    }\n  }\n  return {\n    hunks: resultHunks,\n    changedSections: [...sections],\n    rangeValidation: {\n      status: 'PASS',\n      scope: 'FULL_DOCUMENT',\n      oldLines: before.length,\n      newLines: after.length,\n      algorithm: useLcs ? 'LCS' : 'BOUNDED_FALLBACK',\n      validated: true,\n    },\n  };\n}\n",
+      "mediaType": "text/plain"
+    },
+    "interface": {
+      "content": "/**\n * Copyright (c) 2026 linlisWorkTeam\n * SPDX-License-Identifier: MIT\n * 文件功能：维护Markdown差异d相关的项目配置与工程说明。\n */\n/** Public API of the CPU example pinned in the runner; no implementation or oracle. */\n/** 提供 structuredMarkdownDiff 对应的structuredMarkdown差异操作。 */\nexport declare function structuredMarkdownDiff(beforeBody: string, afterBody: string): {\n  hunks: Array<{\n    oldStart: number; oldCount: number; newStart: number; newCount: number;\n    lines: Array<{ type: 'CONTEXT' | 'REMOVE' | 'ADD'; oldLine: number | null; newLine: number | null; text: string }>;\n  }>;\n  changedSections: string[];\n  rangeValidation: {\n    status: 'PASS'; scope: 'FULL_DOCUMENT'; oldLines: number; newLines: number;\n    algorithm: 'LCS' | 'BOUNDED_FALLBACK'; validated: true;\n  };\n};\n",
+      "mediaType": "text/plain"
+    }
+  },
+  "modelOutput": {
+    "title": "固定源码 DocGen 样例",
+    "description": "用数据例子核验 Markdown 差异行为",
+    "body": "# structuredMarkdownDiff\n\n证据 src/domain/services/markdown-diff.ts:L142-L150\n\n```json\n{\"examples\":[{\"before\":\"\",\"after\":\"\",\"expectedHunkCount\":0,\"expectedChangedSections\":[]},{\"before\":\"a\\r\\nb\",\"after\":\"a\\nb\",\"expectedHunkCount\":0,\"expectedChangedSections\":[]},{\"before\":\"# A\\nold\",\"after\":\"# A\\nnew\",\"expectedHunkCount\":1,\"expectedChangedSections\":[\"# A\"]}]}\n```"
+  }
+}

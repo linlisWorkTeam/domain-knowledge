@@ -1,0 +1,61 @@
+{
+  "provider": "fixture",
+  "scenario": {
+    "schemaVersion": "1.0",
+    "name": "single-role-development",
+    "moduleId": "markdown-diff",
+    "repositoryRoot": ".",
+    "expectedCommit": "a743ffcb624b1aca47d0f8adb272582ecf0250d6",
+    "sourcePaths": [
+      "src/domain/services/markdown-diff.ts"
+    ],
+    "publicInterfacePaths": [
+      "examples/docgen/markdown-diff.d.ts"
+    ],
+    "allowedGeneratedPaths": [
+      "src/domain/services/markdown-diff.ts"
+    ],
+    "prepareCommands": [],
+    "referenceCommands": [],
+    "firstIterationCommands": [],
+    "finalCommands": []
+  },
+  "iteration": 0,
+  "payload": {
+    "policyRef": {
+      "material": "policy"
+    },
+    "moduleRefs": [
+      {
+        "material": "source"
+      }
+    ]
+  },
+  "materials": {
+    "policy": {
+      "content": {
+        "policyId": "development",
+        "minimumStability": 1,
+        "requireAllTests": true,
+        "maxIterations": 1
+      },
+      "mediaType": "application/json"
+    },
+    "source": {
+      "content": {
+        "path": "src/domain/services/markdown-diff.ts",
+        "commit": "a743ffcb624b1aca47d0f8adb272582ecf0250d6",
+        "publicInterface": "structuredMarkdownDiff(before: string, after: string)"
+      },
+      "mediaType": "application/json"
+    }
+  },
+  "modelOutput": {
+    "strategy": "fixed-knowledge-flywheel-v1",
+    "iteration": 0,
+    "parallel": [
+      "documentation",
+      "test-generation"
+    ]
+  }
+}

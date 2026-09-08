@@ -1,6 +1,11 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明DeepSeek Harness Adapter。
+-->
 # DeepSeek Harness Adapter
 
-这里是“外部 DSH → 知识库 API”的工具插件；目标底座中的“LangGraph → DSH 角色执行”属于 `src/infrastructure/agents/deepseek-harness/`，二者不要混用。职责关系见[目标架构](../../../docs/ARCHITECTURE.md#target-architecture)。
+这里是“外部 DSH → 知识库 API”的工具插件；目标底座中的“LangGraph → DSH 角色执行”属于 `src/infrastructure/agentAdapters/deepSeekHarness/`，二者不要混用。职责关系见[目标架构](../../../docs/specs/totalRules/Architecture.md)。
 
 此 Adapter 把 `wp_knowledge_*` 工具注册到需要鉴权的 Knowledge Flywheel HTTP API。它不启动 Python 或 shell，也不判断知识是否可以发布。
 

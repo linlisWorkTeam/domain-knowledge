@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明domain-knowledge。
+-->
 # domain-knowledge
 
 `domain-knowledge` 是 Knowledge Flywheel 的运行仓库。它负责 Agent 编排、知识摄取、来源追踪、独立评测、确定性 Gate、版本发布、反馈和查询服务。原来放在 `wpKnowledge/endlessWpKnowledgeRunner/` 的 TypeScript 实现已经迁到这里；`wpKnowledge` 从此只保存可评审的知识、研究材料和运行证据。
@@ -32,7 +37,7 @@ SQLite Registry 与 CAS 是运行时事实源，默认写到本仓库 `.workpane
 
 ## 五分钟启动
 
-第一次阅读或参与开发，请从[文档中心](docs/README.md)按任务进入；工程治理边界已收敛到[开发指南](docs/DEVELOPMENT.md)和[贡献指南](CONTRIBUTING.md)。
+第一次阅读或参与开发，请从[文档中心](docs/README.md)按任务进入；工程治理边界已收敛到[开发指南](docs/Development.md)和[贡献指南](CONTRIBUTING.md)。
 
 需要 Node.js 24 或更高版本。以下命令启动只读 Console；浏览页面不需要模型凭据或额外的知识仓库。
 
@@ -48,7 +53,7 @@ npm run knowledge:serve
 
 在运行服务的同一台电脑上打开 <http://127.0.0.1:4174>，保持启动终端运行，按 `Ctrl+C` 停止服务。新运行目录没有知识和批次数据是正常现象。
 
-如果服务运行在远程服务器、容器或云开发环境，浏览器中的 `127.0.0.1` 指向你自己的电脑，需要先转发 4174 端口。已有检出如何更新、SSH 转发、临时 HTTPS 预览和启动排错见[快速上手](docs/GETTING_STARTED.md#remote-console)。需要扫描知识仓库时，再按该指南配置 `WP_KNOWLEDGE_REPOSITORY`。
+如果服务运行在远程服务器、容器或云开发环境，浏览器中的 `127.0.0.1` 指向你自己的电脑，需要先转发 4174 端口。已有检出如何更新、SSH 转发、临时 HTTPS 预览和启动排错见[快速上手](docs/GettingStarted.md)。需要扫描知识仓库时，再按该指南配置 `WP_KNOWLEDGE_REPOSITORY`。
 
 执行项目工作流还需要有效的 DSH 配置和场景文件；它不属于只读页面预览步骤：
 
@@ -56,7 +61,7 @@ npm run knowledge:serve
 npm run knowledge -- workflow-run --scenario /path/to/scenario.json --repository /path/to/project
 ```
 
-当前阶段、下一开发任务和后续队列见[开发状态](docs/DEVELOPMENT-STATUS.md)。详细配置见[快速上手](docs/GETTING_STARTED.md)和[运维手册](docs/OPERATIONS.md)。真实运行记录与方案 PPT 保存在 [`wpKnowledge/knowledge`](https://github.com/linlisWorkTeam/wpKnowledge/tree/main/knowledge)。
+当前阶段、下一开发任务和后续队列见[开发状态](docs/Status.md)。详细配置见[快速上手](docs/GettingStarted.md)和[运维手册](docs/Operations.md)。真实运行记录与方案 PPT 保存在 [`wpKnowledge/knowledge`](https://github.com/linlisWorkTeam/wpKnowledge/tree/main/knowledge)。
 
 ## 目录
 
@@ -64,19 +69,19 @@ npm run knowledge -- workflow-run --scenario /path/to/scenario.json --repository
 domain-knowledge/
 ├── src/
 │   ├── domain/               # 领域模型与确定性规则
-│   │   └── services/         # Flywheel、EvalRunner、Association
+│   │   ├── agents/           # 七角色步骤、契约、提示词
+│   │   └── services/         # 业务流程、生命周期与 Gate
 │   ├── application/          # Apps、Port 与用例协调服务
 │   ├── infrastructure/       # LangGraph、Agent、DB/Redis Adapter 和评测
 │   └── interfaces/           # uiApi、CLI、Runner 与 DSH 接口
-├── docs/                     # 上手、架构、开发和运维说明
-├── specs/                    # 规范性事实源、ADR 与 Schema
+├── docs/                     # 操作指南及按代码模块组织的 specs/ 设计
 ├── tests/                    # 单元、契约、集成、验收和安全测试
 ├── web/                      # 本地 Console
 ├── site/                     # GitHub Pages 静态网站
-└── runner.config.json        # 默认本地配置
+└── Runner.config.json        # 默认本地配置
 ```
 
-旧仓库实现和原开放 PR 的承接关系见[仓库拆分历史](docs/migration/repository-split.md)。
+旧仓库实现和原开放 PR 的承接关系见[仓库拆分历史](docs/HistoryEpitaph.md)。
 
 ## 开发门禁
 
@@ -86,6 +91,6 @@ npm run validate:specs
 npm test
 ```
 
-产品行为以 [Spec 总入口](specs/README.md)为准，项目级开发进度以[开发状态](docs/DEVELOPMENT-STATUS.md)为唯一入口。调整 Agent 提示词前请阅读[Agent 定制指南](docs/guides/agent-customization.md)；职责、输入输出、拓扑、工具权限和发布权不能从前台替换。
+产品行为以 [Spec 总入口](docs/specs/README.md)为准，项目级开发进度以[开发状态](docs/Status.md)为唯一入口。调整 Agent 提示词前请阅读[Agent 定制指南](docs/AgentDevelopment.md)；职责、输入输出、拓扑、工具权限和发布权不能从前台替换。
 
 固定项目评测只面向受信源码。它有临时工作区、环境净化和超时限制，但不是敌对代码沙箱，不应执行陌生仓库代码。

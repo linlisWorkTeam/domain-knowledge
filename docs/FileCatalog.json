@@ -1,0 +1,1519 @@
+{
+  "copyright": "Copyright (c) 2026 linlisWorkTeam",
+  "license": "MIT",
+  "description": "文件元数据清单；不支持注释的格式及二进制资源使用本清单，不修改其数据格式。",
+  "files": [
+    {
+      "path": ".env.example",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "维护env相关的项目配置与工程说明。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": ".github/pull_request_template.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "记录pull_request_template相关的工程说明与交接信息。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": ".github/workflows/Ci.yml",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "维护ci相关的项目配置与工程说明。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": ".github/workflows/Pages.yml",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "维护pages相关的项目配置与工程说明。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": ".gitignore",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "维护gitignore相关的项目配置与工程说明。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": ".npmrc",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "维护npmrc相关的项目配置与工程说明。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "AGENTS.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "说明Agent working agreement。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "CONTRIBUTING.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "说明贡献入口和设计到交付的协作约定。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "LICENSE",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "声明本仓库的 MIT 许可条件与版权归属。",
+      "metadataLocation": "catalog"
+    },
+    {
+      "path": "Playwright.config.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "维护Playwrightconfig相关的项目配置与工程说明。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "README.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "说明domain-knowledge。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "Runner.config.json",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "保存runnerconfig的结构化配置、样例或元数据。",
+      "metadataLocation": "catalog"
+    },
+    {
+      "path": "SECURITY.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "说明安全策略。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "docs/AgentDevelopment.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "说明七角色的独立开发、显式材料样例和 DocGen 固定源码范例。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "docs/Development.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "开发与交付指南。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "docs/FileCatalog.json",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "记录全仓库文件的版权归属、功能说明及元数据存放位置。",
+      "metadataLocation": "catalog"
+    },
+    {
+      "path": "docs/GettingStarted.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "说明快速上手。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "docs/HistoryEpitaph.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "历史交接与设计演进。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "docs/Operations.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "说明Knowledge Flywheel 运维手册。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "docs/README.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "文档中心。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "docs/Runtime.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "说明DeepSeek Harness 运行配置。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "docs/Status.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "当前实现与验证状态。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "docs/diagrams/Views4Plus1.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "4+1 架构视图。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "docs/epitaph/2026-09-08-1216-specs-consolidation.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "交接按代码重写的规范结构、历史归档和项目身份规则。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "docs/epitaph/2026-09-08-1420-docgen-example-consolidation.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "记录取消 DocGen 专用入口并合并角色样例的交接。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "docs/epitaph/2026-09-08-1423-session-identity-scope.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "澄清账号选择只属于当前会话，不作为项目协作规则。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "docs/specs/README.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "设计规范目录。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "docs/specs/application/Application.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "应用用例与提交协调设计。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "docs/specs/domainFunction/agents/Agents.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "七角色执行设计。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "docs/specs/domainFunction/languagePlugins/LanguagePlugins.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "语言能力契约与当前支持范围。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "docs/specs/domainFunction/migration/LegacyOkf.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "旧 OKF 候选迁移设计。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "docs/specs/domainFunction/services/Evaluation.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "确定性评测判定设计。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "docs/specs/domainFunction/services/Knowledge.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "知识实体与领域服务设计。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "docs/specs/domainFunction/services/workflow/Workflow.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "跨角色工作流设计。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "docs/specs/domainFunction/sourceScan/SourceScan.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "候选文件发现设计。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "docs/specs/domainFunction/workspace/Workspace.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "角色材料工作空间设计。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "docs/specs/infrastructure/agentAdapters/AgentAdapters.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "模型与角色运行适配设计。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "docs/specs/infrastructure/evaluation/Evaluation.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "可信项目评测执行设计。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "docs/specs/infrastructure/http/Http.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "公共 HTTPS 访问适配设计。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "docs/specs/infrastructure/langgraph/LangGraph.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "LangGraph 执行适配设计。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "docs/specs/infrastructure/observability/Observability.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "运行指标持久化设计。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "docs/specs/infrastructure/redis/Redis.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "Redis 运行上下文适配设计。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "docs/specs/infrastructure/sqlite/Sqlite.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "SQLite 与本地 CAS 设计。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "docs/specs/interfaces/HttpApi.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "Preview HTTP API 规范。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "docs/specs/schemas/ActionItem.schema.json",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "保存actionitemschema的结构化配置、样例或元数据。",
+      "metadataLocation": "catalog"
+    },
+    {
+      "path": "docs/specs/schemas/Activity.schema.json",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "保存activityschema的结构化配置、样例或元数据。",
+      "metadataLocation": "catalog"
+    },
+    {
+      "path": "docs/specs/schemas/AgentCommand.schema.json",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "保存agentcommandschema的结构化配置、样例或元数据。",
+      "metadataLocation": "catalog"
+    },
+    {
+      "path": "docs/specs/schemas/AgentResult.schema.json",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "保存agentresultschema的结构化配置、样例或元数据。",
+      "metadataLocation": "catalog"
+    },
+    {
+      "path": "docs/specs/schemas/ArtifactRef.schema.json",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "保存artifactrefschema的结构化配置、样例或元数据。",
+      "metadataLocation": "catalog"
+    },
+    {
+      "path": "docs/specs/schemas/ComponentStatus.schema.json",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "保存componentstatusschema的结构化配置、样例或元数据。",
+      "metadataLocation": "catalog"
+    },
+    {
+      "path": "docs/specs/schemas/Correction.schema.json",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "保存correctionschema的结构化配置、样例或元数据。",
+      "metadataLocation": "catalog"
+    },
+    {
+      "path": "docs/specs/schemas/EvaluationReport.schema.json",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "保存evaluationreportschema的结构化配置、样例或元数据。",
+      "metadataLocation": "catalog"
+    },
+    {
+      "path": "docs/specs/schemas/EvaluationRule.schema.json",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "保存evaluationruleschema的结构化配置、样例或元数据。",
+      "metadataLocation": "catalog"
+    },
+    {
+      "path": "docs/specs/schemas/EvaluationSummary.schema.json",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "保存evaluationsummaryschema的结构化配置、样例或元数据。",
+      "metadataLocation": "catalog"
+    },
+    {
+      "path": "docs/specs/schemas/Event.schema.json",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "保存eventschema的结构化配置、样例或元数据。",
+      "metadataLocation": "catalog"
+    },
+    {
+      "path": "docs/specs/schemas/KnowledgeDiff.schema.json",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "保存knowledgediffschema的结构化配置、样例或元数据。",
+      "metadataLocation": "catalog"
+    },
+    {
+      "path": "docs/specs/schemas/KnowledgeHealth.schema.json",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "保存knowledgehealthschema的结构化配置、样例或元数据。",
+      "metadataLocation": "catalog"
+    },
+    {
+      "path": "docs/specs/schemas/KnowledgeLineage.schema.json",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "保存knowledgelineageschema的结构化配置、样例或元数据。",
+      "metadataLocation": "catalog"
+    },
+    {
+      "path": "docs/specs/schemas/LanguagePlugin.schema.json",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "保存languagepluginschema的结构化配置、样例或元数据。",
+      "metadataLocation": "catalog"
+    },
+    {
+      "path": "docs/specs/schemas/README.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "说明JSON Schema。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "docs/specs/schemas/RunProgress.schema.json",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "保存runprogressschema的结构化配置、样例或元数据。",
+      "metadataLocation": "catalog"
+    },
+    {
+      "path": "docs/specs/schemas/Source.schema.json",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "保存sourceschema的结构化配置、样例或元数据。",
+      "metadataLocation": "catalog"
+    },
+    {
+      "path": "docs/specs/totalRules/Architecture.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "系统架构。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "docs/specs/totalRules/CodeTaste.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "代码风格与文档规则。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "docs/specs/totalRules/DomainDrivenDesign.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "领域驱动设计约定。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "docs/specs/totalRules/Requirements.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "总体需求与交付范围。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "docs/specs/totalRules/UiuxDesign.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "Console 与网站交互设计。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "docs/specs/totalRules/Verification.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验收设计与需求追踪。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "fw.mjs",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "维护fw相关的项目配置与工程说明。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "index.html",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "维护index相关的项目配置与工程说明。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "package-lock.json",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "保存packagelock的结构化配置、样例或元数据。",
+      "metadataLocation": "catalog"
+    },
+    {
+      "path": "package.json",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "保存package的结构化配置、样例或元数据。",
+      "metadataLocation": "catalog"
+    },
+    {
+      "path": "scripts/BootstrapWorktree.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "执行BootstrapWorktree相关的开发与工程维护操作。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "scripts/CaptureConsoleDemo.mjs",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "执行captureconsoledemo相关的开发与工程维护操作。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "scripts/EvaluateFramework.mjs",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "执行evaluateframework相关的开发与工程维护操作。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "scripts/TraceabilityValidator.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "维护追踪关系校验器相关的项目配置与工程说明。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "scripts/ValidateSpecs.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "校验 docs/specs 中的 Schema 正反例、设计链接、需求与验收追踪。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "site/.nojekyll",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "提供.nojekyll页面的展示、交互或样式资源。",
+      "metadataLocation": "catalog"
+    },
+    {
+      "path": "site/App.js",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "提供app页面的展示、交互或样式资源。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "site/ConsoleDev007Dev008.gif",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "提供console-dev007-dev008界面展示或验收使用的图像资源。",
+      "metadataLocation": "catalog"
+    },
+    {
+      "path": "site/ConsoleDev007Dev008Poster.webp",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "提供console-dev007-dev008-poster界面展示或验收使用的图像资源。",
+      "metadataLocation": "catalog"
+    },
+    {
+      "path": "site/DevServer.mjs",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "提供dev-server页面的展示、交互或样式资源。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "site/Mark.svg",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "提供mark界面展示或验收使用的图像资源。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "site/README.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "说明项目官网。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "site/Release.json",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "保存release的结构化配置、样例或元数据。",
+      "metadataLocation": "catalog"
+    },
+    {
+      "path": "site/SocialCard.svg",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "提供social-card界面展示或验收使用的图像资源。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "site/Styles.css",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "提供styles页面的展示、交互或样式资源。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "site/index.html",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "提供index页面的展示、交互或样式资源。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/application/apps/ApplicationApps.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "协调ApplicationApps用例及其依赖的领域规则与端口。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/application/apps/ContentGovernanceApp.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "协调内容治理应用用例及其依赖的领域规则与端口。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/application/apps/EvalRunnerApp.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "协调EvalRunner应用用例及其依赖的领域规则与端口。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/application/apps/FlywheelApp.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "协调Flywheel应用用例及其依赖的领域规则与端口。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/application/apps/KnowledgeDiscoveryApp.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "协调知识发现应用用例及其依赖的领域规则与端口。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/application/apps/KnowledgeSearchApp.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "协调知识检索应用用例及其依赖的领域规则与端口。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/application/apps/OperationalMetricsApp.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "协调Operational指标应用用例及其依赖的领域规则与端口。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/application/apps/Orchestrator.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "协调Orchestrator用例及其依赖的领域规则与端口。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/application/apps/ProviderOperationsApp.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "协调提供方Operations应用用例及其依赖的领域规则与端口。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/application/ports/ApplicationPorts.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "定义 Application 与存储、运行时、模型及外部能力之间的端口契约。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/application/services/AgentDevelopmentObserver.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "协调角色Development观察器用例及其依赖的领域规则与端口。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/application/services/AgentExample.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "协调角色样例用例及其依赖的领域规则与端口。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/application/services/ApplicationServices.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "协调ApplicationServices用例及其依赖的领域规则与端口。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/application/services/AutomatedProjectWorkflow.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "加载工作流上下文与历史工件，协调角色执行、独立评测和发布。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/application/services/KnowledgeWritingGuide.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "协调知识WritingGuide用例及其依赖的领域规则与端口。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/application/services/ProjectFlow.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "协调项目Flow用例及其依赖的领域规则与端口。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/application/services/ProjectScenario.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "协调项目Scenario用例及其依赖的领域规则与端口。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/application/services/QualityPolicy.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "协调质量策略用例及其依赖的领域规则与端口。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/application/services/QueryService.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "协调Query服务用例及其依赖的领域规则与端口。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/application/services/RoleExecution.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "为生产与独立开发统一执行角色、保存工件并提交结果信封。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/application/services/RunConfiguration.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "协调运行配置用例及其依赖的领域规则与端口。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/application/services/WorkflowControl.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "协调工作流Control用例及其依赖的领域规则与端口。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/domain/Domain.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "定义Domain的领域数据与确定性业务规则。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/domain/agents/AgentContracts.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "定义domain的输入输出契约、输出 Schema 与材料校验。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/domain/agents/AgentExecution.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "定义角色执行的领域数据与确定性业务规则。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/domain/agents/AgentRegistry.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "定义角色注册表的领域数据与确定性业务规则。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/domain/agents/checkAgent/CheckAgent.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证只读检查角色的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/domain/agents/checkAgent/CheckAgent.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "实现只读检查角色的业务步骤与结构化结果转换。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/domain/agents/checkAgent/CheckAgentContract.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "定义只读检查角色的输入输出契约、输出 Schema 与材料校验。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/domain/agents/checkAgent/CheckAgentPrompt.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "维护只读检查角色的基础指令、职责和可读材料范围。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/domain/agents/checkAgent/examples/CheckAgentSample.json",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "保存Check角色样例的结构化配置、样例或元数据。",
+      "metadataLocation": "catalog"
+    },
+    {
+      "path": "src/domain/agents/codeAgent/CodeAgent.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证代码生成角色的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/domain/agents/codeAgent/CodeAgent.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "实现代码生成角色的业务步骤与结构化结果转换。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/domain/agents/codeAgent/CodeAgentContract.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "定义代码生成角色的输入输出契约、输出 Schema 与材料校验。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/domain/agents/codeAgent/CodeAgentPrompt.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "维护代码生成角色的基础指令、职责和可读材料范围。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/domain/agents/codeAgent/examples/CodeAgentSample.json",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "保存Code角色样例的结构化配置、样例或元数据。",
+      "metadataLocation": "catalog"
+    },
+    {
+      "path": "src/domain/agents/docGenAgent/DocGenAgent.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证文档生成角色的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/domain/agents/docGenAgent/DocGenAgent.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "实现文档生成角色的业务步骤与结构化结果转换。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/domain/agents/docGenAgent/DocGenAgentContract.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "定义文档生成角色的输入输出契约、输出 Schema 与材料校验。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/domain/agents/docGenAgent/DocGenAgentPrompt.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "维护文档生成角色的基础指令、职责和可读材料范围。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/domain/agents/docGenAgent/DocGenExample.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证Docgen样例的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/domain/agents/docGenAgent/examples/DocGenAgentSample.json",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "保存DocGen角色样例的结构化配置、样例或元数据。",
+      "metadataLocation": "catalog"
+    },
+    {
+      "path": "src/domain/agents/docGenAgent/examples/DocGenFixedSourceSample.json",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "保存 DocGen 固定源码材料、公开接口和显式模型样例。",
+      "metadataLocation": "catalog"
+    },
+    {
+      "path": "src/domain/agents/docGenAgent/examples/DocGenReference.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "在 DocGen 样例测试中核验固定源码、七项参考测试和文档数据例子；不提供 CLI。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/domain/agents/docWorkerAgent/DocWorkerAgent.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证文档分块角色的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/domain/agents/docWorkerAgent/DocWorkerAgent.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "实现文档分块角色的业务步骤与结构化结果转换。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/domain/agents/docWorkerAgent/DocWorkerAgentContract.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "定义文档分块角色的输入输出契约、输出 Schema 与材料校验。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/domain/agents/docWorkerAgent/DocWorkerAgentPrompt.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "维护文档分块角色的基础指令、职责和可读材料范围。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/domain/agents/docWorkerAgent/examples/DocWorkerAgentSample.json",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "保存DocWorker角色样例的结构化配置、样例或元数据。",
+      "metadataLocation": "catalog"
+    },
+    {
+      "path": "src/domain/agents/orchestratorAgent/OrchestratorAgent.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证业务计划角色的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/domain/agents/orchestratorAgent/OrchestratorAgent.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "实现业务计划角色的业务步骤与结构化结果转换。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/domain/agents/orchestratorAgent/OrchestratorAgentContract.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "定义业务计划角色的输入输出契约、输出 Schema 与材料校验。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/domain/agents/orchestratorAgent/OrchestratorAgentPrompt.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "维护业务计划角色的基础指令、职责和可读材料范围。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/domain/agents/orchestratorAgent/examples/OrchestratorAgentSample.json",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "保存Orchestrator角色样例的结构化配置、样例或元数据。",
+      "metadataLocation": "catalog"
+    },
+    {
+      "path": "src/domain/agents/reviewAgent/ReviewAgent.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证证据复核角色的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/domain/agents/reviewAgent/ReviewAgent.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "实现证据复核角色的业务步骤与结构化结果转换。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/domain/agents/reviewAgent/ReviewAgentContract.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "定义证据复核角色的输入输出契约、输出 Schema 与材料校验。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/domain/agents/reviewAgent/ReviewAgentPrompt.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "维护证据复核角色的基础指令、职责和可读材料范围。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/domain/agents/reviewAgent/examples/ReviewAgentSample.json",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "保存Review角色样例的结构化配置、样例或元数据。",
+      "metadataLocation": "catalog"
+    },
+    {
+      "path": "src/domain/agents/testGenAgent/TestGenAgent.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证测试生成角色的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/domain/agents/testGenAgent/TestGenAgent.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "实现测试生成角色的业务步骤与结构化结果转换。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/domain/agents/testGenAgent/TestGenAgentContract.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "定义测试生成角色的输入输出契约、输出 Schema 与材料校验。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/domain/agents/testGenAgent/TestGenAgentPrompt.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "维护测试生成角色的基础指令、职责和可读材料范围。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/domain/agents/testGenAgent/examples/TestGenAgentSample.json",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "保存测试Gen角色样例的结构化配置、样例或元数据。",
+      "metadataLocation": "catalog"
+    },
+    {
+      "path": "src/domain/migration/LegacyOkf.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "读取旧 OKF 卡片并转换为知识候选，保留来源证据且重新执行质量与行为验收。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/domain/services/AssociationDomainService.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "定义AssociationDomain服务的领域数据与确定性业务规则。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/domain/services/DomainServices.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "定义DomainServices的领域数据与确定性业务规则。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/domain/services/EvalRunnerDomainService.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "定义EvalRunnerDomain服务的领域数据与确定性业务规则。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/domain/services/FlywheelDomainService.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "定义FlywheelDomain服务的领域数据与确定性业务规则。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/domain/services/MarkdownDiff.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "定义Markdown差异的领域数据与确定性业务规则。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/domain/services/workflow/AgentDefinitions.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "定义业务工作流角色与节点的绑定，复用各角色拥有的职责及提示词。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/domain/services/workflow/Workflow.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "定义跨角色业务流程、文档任务拆分及质量判定后的流转规则。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/domain/sourceScan/SourceScan.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "发现待入库知识文件，执行目录范围校验、内容摘要去重和候选排序。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/domain/workspace/LocalAgentWorkspace.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "根据角色可读路径和固定 Git 提交构建只读工作空间，防止混入未授权源码。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/infrastructure/README.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "说明基础设施适配器目录、领域工作流边界与运行时接入职责。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/infrastructure/agentAdapters/ModelExecution.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "将领域模型请求映射到 Provider、隔离工作区和授权工具。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/infrastructure/agentAdapters/companyCodeAgent/CompanyCodeAgentCliAdapter.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "提供CompanyCode角色Cli适配器的基础设施实现与外部系统接入。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/infrastructure/agentAdapters/contracts/JsonSchemaAgentContractValidator.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "提供JsonSchema角色契约校验器的基础设施实现与外部系统接入。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/infrastructure/agentAdapters/deepSeekHarness/ConfiguredProvider.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "提供Configured提供方的基础设施实现与外部系统接入。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/infrastructure/agentAdapters/deepSeekHarness/DeepSeekHarnessSdkAgent.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "提供DeepSeekHarnessSdk角色的基础设施实现与外部系统接入。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/infrastructure/agentAdapters/deepSeekHarness/IsolationLauncher.mjs",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "在隔离进程中启动 DSH，传递受信配置并约束文件系统可见范围。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/infrastructure/agentAdapters/deepSeekHarness/OpencodeGo.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "提供OpencodeGo的基础设施实现与外部系统接入。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/infrastructure/agentAdapters/deepSeekHarness/RoleTools.mjs",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "为 DSH 注册受限的只读材料工具，按角色权限校验工作区内的文件访问。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/infrastructure/agentAdapters/provider/ProviderSettings.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "提供提供方设置的基础设施实现与外部系统接入。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/infrastructure/agentAdapters/scenario/ProjectWorkflowFixture.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "提供项目工作流夹具的基础设施实现与外部系统接入。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/infrastructure/agentAdapters/scenario/Scenario.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "提供Scenario的基础设施实现与外部系统接入。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/infrastructure/evaluation/project/TrustedProjectEvaluator.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "提供Trusted项目Evaluator的基础设施实现与外部系统接入。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/infrastructure/http/PublicHttps.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "提供PublicHttps的基础设施实现与外部系统接入。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/infrastructure/langgraph/Graph.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "提供图的基础设施实现与外部系统接入。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/infrastructure/langgraph/LangGraph.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "提供Lang图的基础设施实现与外部系统接入。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/infrastructure/langgraph/Runtime.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "提供运行时的基础设施实现与外部系统接入。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/infrastructure/langgraph/State.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "提供状态的基础设施实现与外部系统接入。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/infrastructure/observability/SqliteOperationalMetrics.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "提供SqliteOperational指标的基础设施实现与外部系统接入。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/infrastructure/redis/Redis.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "提供Redis的基础设施实现与外部系统接入。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/infrastructure/sqlite/SqliteActionItems.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "提供SqliteActionItems的基础设施实现与外部系统接入。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/infrastructure/sqlite/SqliteCas.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "提供SqliteCas的基础设施实现与外部系统接入。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/infrastructure/sqlite/SqliteContentGovernance.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "提供Sqlite内容治理的基础设施实现与外部系统接入。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/interfaces/dsh/Dsh.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "提供Dsh的外部入口、参数转换与响应处理。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/interfaces/dsh/README.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "说明DeepSeek Harness Adapter。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/interfaces/runner/AgentRun.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "提供角色运行的外部入口、参数转换与响应处理。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/interfaces/runner/Cli.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "提供Cli的外部入口、参数转换与响应处理。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/interfaces/runner/Compat.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "提供Compat的外部入口、参数转换与响应处理。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/interfaces/runner/Composition.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "提供Composition的外部入口、参数转换与响应处理。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/interfaces/runner/ConsoleReadModel.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "提供ConsoleRead模型的外部入口、参数转换与响应处理。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/interfaces/runner/DemoReport.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "提供Demo报告的外部入口、参数转换与响应处理。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/interfaces/runner/ProjectScenario.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "提供项目Scenario的外部入口、参数转换与响应处理。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/interfaces/runner/Server.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "提供服务端的外部入口、参数转换与响应处理。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/interfaces/uiApi/UiApi.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "提供UiAPI的外部入口、参数转换与响应处理。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/acceptance/AutomatedLanggraphFlow.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证AutomatedLanggraphFlow的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/acceptance/DshConfiguredFlow.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证DshConfiguredFlow的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/acceptance/PublicationFlow.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证发布Flow的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/acceptance/RealSourceFlow.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证Real源码Flow的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/contract/Architecture.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证Architecture的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/contract/ComponentLayout.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证ComponentLayout的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/contract/DependencyLock.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证DependencyLock的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/contract/Site.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证Site的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/contract/SpecValidator.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证Spec校验器的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/e2e/Console.spec.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证Console的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/e2e/snapshots/ActionCenter1363x936LightLinux.png",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "提供action-center-1363x936-light-linux界面展示或验收使用的图像资源。",
+      "metadataLocation": "catalog"
+    },
+    {
+      "path": "tests/helpers/Fixture.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "维护夹具相关的项目配置与工程说明。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/helpers/RoleExample.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "维护Role样例相关的项目配置与工程说明。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/integration/AgentContracts.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证角色契约的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/integration/AgentExamples.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证角色Examples的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/integration/CompanyCodeagentCli.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证CompanyCodeagentCli的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/integration/ContentGovernance.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证内容治理的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/integration/DeepseekHarnessAgent.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证DeepseekHarness角色的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/integration/DemoReport.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证Demo报告的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/integration/DshAdapter.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证Dsh适配器的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/integration/DshConfigurationMigration.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证Dsh配置Migration的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/integration/DshConfiguredProvider.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证DshConfigured提供方的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/integration/DshNativeTools.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证DshNative工具的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/integration/DshProjectStages.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证Dsh项目Stages的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/integration/LanggraphInfrastructure.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证LanggraphInfrastructure的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/integration/LegacyMigration.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证LegacyMigration的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/integration/LegacyRunnerCompat.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证LegacyRunnerCompat的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/integration/OpencodeGoConfig.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证OpencodeGoConfig的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/integration/OperationalMetrics.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证Operational指标的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/integration/ProviderObservability.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证提供方Observability的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/integration/RedisRuntimeState.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证Redis运行时状态的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/integration/RunConfiguration.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证运行配置的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/integration/Server.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证服务端的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/integration/SourceScan.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证源码Scan的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/integration/SqliteCas.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证SqliteCas的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/integration/WorktreeBootstrap.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证WorktreeBootstrap的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/security/AgentWorkspace.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证角色工作区的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/security/ProviderSettings.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证提供方设置的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/unit/DddDomainServices.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证DddDomainServices的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/unit/Domain.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证Domain的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/unit/MarkdownDiff.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证Markdown差异的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/unit/ProjectEvaluatorCounts.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证项目EvaluatorCounts的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/unit/ProjectScenario.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证项目Scenario的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/unit/ProviderOperations.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证提供方Operations的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/unit/QualityPolicy.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证质量策略的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tsconfig.json",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "保存tsconfig的结构化配置、样例或元数据。",
+      "metadataLocation": "catalog"
+    },
+    {
+      "path": "web/App.js",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "提供app页面的展示、交互或样式资源。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "web/Styles.css",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "提供styles页面的展示、交互或样式资源。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "web/index.html",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "提供index页面的展示、交互或样式资源。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "web/prototype/App.js",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "提供app页面的展示、交互或样式资源。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "web/prototype/Light.css",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "提供light页面的展示、交互或样式资源。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "web/prototype/README.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "说明知识控制台 UI/UX 原型。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "web/prototype/Styles.css",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "提供styles页面的展示、交互或样式资源。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "web/prototype/Views.css",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "提供views页面的展示、交互或样式资源。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "web/prototype/Views.html",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "提供views页面的展示、交互或样式资源。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "web/prototype/index.html",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "提供index页面的展示、交互或样式资源。",
+      "metadataLocation": "file-header"
+    }
+  ]
+}

@@ -1,0 +1,94 @@
+{
+  "provider": "fixture",
+  "scenario": {
+    "schemaVersion": "1.0",
+    "name": "single-role-development",
+    "moduleId": "markdown-diff",
+    "repositoryRoot": ".",
+    "expectedCommit": "a743ffcb624b1aca47d0f8adb272582ecf0250d6",
+    "sourcePaths": [
+      "src/domain/services/markdown-diff.ts"
+    ],
+    "publicInterfacePaths": [
+      "examples/docgen/markdown-diff.d.ts"
+    ],
+    "allowedGeneratedPaths": [
+      "src/domain/services/markdown-diff.ts"
+    ],
+    "prepareCommands": [],
+    "referenceCommands": [],
+    "firstIterationCommands": [],
+    "finalCommands": []
+  },
+  "iteration": 1,
+  "payload": {
+    "moduleId": "markdown-diff",
+    "sourceRefs": [
+      {
+        "material": "source"
+      }
+    ],
+    "publicInterfaceRefs": [
+      {
+        "material": "interface"
+      }
+    ],
+    "baseKnowledgeRef": {
+      "material": "knowledge"
+    },
+    "workerFragmentRefs": [
+      {
+        "material": "fragment"
+      }
+    ],
+    "corrections": [
+      {
+        "correctionId": "COR-0001",
+        "knowledgePath": "knowledge/markdown-diff.md",
+        "criterion": "Document CRLF normalization with an example",
+        "evidenceRefs": [
+          {
+            "material": "evaluation"
+          }
+        ],
+        "risk": "False change reports for equivalent newlines"
+      }
+    ]
+  },
+  "materials": {
+    "source": {
+      "content": {
+        "path": "src/domain/services/markdown-diff.ts",
+        "commit": "a743ffcb624b1aca47d0f8adb272582ecf0250d6",
+        "publicInterface": "structuredMarkdownDiff(before: string, after: string)"
+      },
+      "mediaType": "application/json"
+    },
+    "knowledge": {
+      "content": "# Markdown diff\n\n## Purpose\nCompare two Markdown documents and report changed sections with line ranges.\n\n## Behavior\nIdentical inputs return empty hunks. CRLF is normalized before comparison. Insertions and deletions preserve the old and new line coordinates. The implementation uses bounded processing for large inputs.\n",
+      "mediaType": "text/markdown"
+    },
+    "fragment": {
+      "content": "CRLF is normalized before comparison; identical documents return no changed sections.",
+      "mediaType": "text/plain"
+    },
+    "evaluation": {
+      "content": {
+        "passed": false,
+        "testsPassed": 2,
+        "testsTotal": 3,
+        "failure": "CRLF normalization mismatch"
+      },
+      "mediaType": "application/json"
+    },
+    "interface": {
+      "content": "/** Public API of the CPU example pinned in the runner; no implementation or oracle. */\nexport declare function structuredMarkdownDiff(beforeBody: string, afterBody: string): {\n  hunks: Array<{\n    oldStart: number; oldCount: number; newStart: number; newCount: number;\n    lines: Array<{ type: 'CONTEXT' | 'REMOVE' | 'ADD'; oldLine: number | null; newLine: number | null; text: string }>;\n  }>;\n  changedSections: string[];\n  rangeValidation: {\n    status: 'PASS'; scope: 'FULL_DOCUMENT'; oldLines: number; newLines: number;\n    algorithm: 'LCS' | 'BOUNDED_FALLBACK'; validated: true;\n  };\n};\n",
+      "mediaType": "text/plain"
+    }
+  },
+  "modelOutput": {
+    "body": "# Markdown diff\n\n## Purpose\nCompare two Markdown documents and report changed sections with line ranges.\n\n## Behavior\nIdentical inputs return empty hunks. CRLF is normalized before comparison. Insertions and deletions preserve the old and new line coordinates. The implementation uses bounded processing for large inputs.\n",
+    "title": "Markdown diff",
+    "description": "Document comparison semantics"
+  }
+}

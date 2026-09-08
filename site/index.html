@@ -1,4 +1,9 @@
 <!doctype html>
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：提供index页面的展示、交互或样式资源。
+-->
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
@@ -12,13 +17,13 @@
   <meta property="og:title" content="WORKPANEL · KNOWLEDGE FLYWHEEL">
   <meta property="og:description" content="文档写得像答案还不够。让知识跑一次，再决定要不要相信它。">
   <meta property="og:url" content="https://linlisworkteam.github.io/domain-knowledge/">
-  <meta property="og:image" content="https://linlisworkteam.github.io/domain-knowledge/social-card.svg">
+  <meta property="og:image" content="https://linlisworkteam.github.io/domain-knowledge/SocialCard.svg">
   <meta name="twitter:card" content="summary_large_image">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'none'; base-uri 'none'; form-action 'none'">
   <title>WORKPANEL · KNOWLEDGE FLYWHEEL</title>
   <link rel="canonical" href="https://linlisworkteam.github.io/domain-knowledge/">
-  <link rel="icon" href="./mark.svg?v=20260904-4" type="image/svg+xml">
-  <link rel="stylesheet" href="./styles.css?v=20260904-4">
+  <link rel="icon" href="./Mark.svg?v=20260904-4" type="image/svg+xml">
+  <link rel="stylesheet" href="./Styles.css?v=20260904-4">
 </head>
 <body>
   <a class="skip-link" href="#main-content">跳到主要内容</a>
@@ -26,7 +31,7 @@
   <header class="site-header" data-header>
     <div class="nav-shell">
       <a class="brand" href="#top" aria-label="知识飞轮首页">
-        <img src="./mark.svg?v=20260904-4" width="38" height="38" alt="">
+        <img src="./Mark.svg?v=20260904-4" width="38" height="38" alt="">
         <span>
           <strong>知识飞轮</strong>
           <small>可验证的工程知识</small>
@@ -170,8 +175,8 @@
               <em>确定性验收种子</em>
             </div>
             <picture>
-              <source media="(prefers-reduced-motion: reduce)" srcset="./console-dev007-dev008-poster.webp?v=20260904-4" type="image/webp">
-              <img src="./console-dev007-dev008.gif?v=20260904-4" width="960" height="600" loading="lazy" decoding="async" alt="知识飞轮控制台依次展示操作中心、知识血缘与差异、评测、来源、Agent 设置和明暗主题">
+              <source media="(prefers-reduced-motion: reduce)" srcset="./ConsoleDev007Dev008Poster.webp?v=20260904-4" type="image/webp">
+              <img src="./ConsoleDev007Dev008.gif?v=20260904-4" width="960" height="600" loading="lazy" decoding="async" alt="知识飞轮控制台依次展示操作中心、知识血缘与差异、评测、来源、Agent 设置和明暗主题">
             </picture>
             <figcaption>
               <span><i></i> 从实际运行的 Console 录制</span>
@@ -303,7 +308,7 @@
           <p class="eyebrow">使用场景</p>
           <h2>谁在什么时候使用它？</h2>
         </div>
-        <a class="text-link" href="https://github.com/linlisWorkTeam/domain-knowledge/blob/main/specs/05-workflows/user-use-cases.md">查看完整用例与时序图 <span aria-hidden="true">↗</span></a>
+        <a class="text-link" href="https://github.com/linlisWorkTeam/domain-knowledge/blob/main/docs/specs/domainFunction/services/workflow/Workflow.md">查看完整用例与时序图 <span aria-hidden="true">↗</span></a>
       </div>
 
       <div class="use-case-grid">
@@ -381,7 +386,7 @@
           <p class="eyebrow">技术架构</p>
           <h2>一个核心，<br>多种入口。</h2>
           <p>命令行、服务接口、网页控制台和外部适配器都调用同一个应用核心。内嵌的工作流基础设施负责节点、并行、循环和恢复；知识飞轮仍是知识、评测与发布状态的唯一业务依据。</p>
-          <a class="text-link" href="https://github.com/linlisWorkTeam/domain-knowledge/blob/main/docs/ARCHITECTURE.md">阅读架构说明 <span aria-hidden="true">↗</span></a>
+          <a class="text-link" href="https://github.com/linlisWorkTeam/domain-knowledge/blob/main/docs/specs/totalRules/Architecture.md">阅读架构说明 <span aria-hidden="true">↗</span></a>
         </div>
 
         <div class="architecture-map reveal" aria-label="六边形架构依赖方向">
@@ -450,7 +455,7 @@
               <h3>看着每一步跑完</h3>
               <p>需要版本管理工具、24 或更高版本的运行时和包管理器。命令结束后，在浏览器打开本地控制台；新环境还没有已验证知识时，查询为空是正常的。</p>
               <div class="quick-links">
-                <a href="https://github.com/linlisWorkTeam/domain-knowledge/blob/main/docs/GETTING_STARTED.md">完整快速上手 ↗</a>
+                <a href="https://github.com/linlisWorkTeam/domain-knowledge/blob/main/docs/GettingStarted.md">完整快速上手 ↗</a>
                 <a href="https://github.com/linlisWorkTeam/domain-knowledge/blob/main/CONTRIBUTING.md">贡献指南 ↗</a>
               </div>
             </div>
@@ -478,9 +483,9 @@ npm run knowledge:serve</code></pre>
               <h3>复制任务说明，让智能体接手</h3>
               <p>这段任务说明会要求智能体保护现有改动、执行真实门禁、用独立运行目录启动服务，并把失败如实告诉你。</p>
               <div class="quick-links">
-                <a href="https://github.com/linlisWorkTeam/domain-knowledge/blob/main/docs/GETTING_STARTED.md#路径-b交给-agent-配置和启动">阅读任务说明 ↗</a>
-                <a href="https://github.com/linlisWorkTeam/domain-knowledge/blob/main/docs/guides/agent-customization.md">定制单个智能体角色 ↗</a>
-                <a href="https://github.com/linlisWorkTeam/domain-knowledge/blob/main/specs/README.md">规范总入口 ↗</a>
+                <a href="https://github.com/linlisWorkTeam/domain-knowledge/blob/main/docs/GettingStarted.md#路径-b交给-agent-配置和启动">阅读任务说明 ↗</a>
+                <a href="https://github.com/linlisWorkTeam/domain-knowledge/blob/main/docs/AgentDevelopment.md">定制单个智能体角色 ↗</a>
+                <a href="https://github.com/linlisWorkTeam/domain-knowledge/blob/main/docs/specs/README.md">规范总入口 ↗</a>
               </div>
             </div>
             <div class="terminal agent-terminal">
@@ -495,7 +500,7 @@ npm run knowledge:serve</code></pre>
 
 执行要求：
 1. 如果当前目录已经是 domain-knowledge，先检查 git status，保留所有未提交改动；否则克隆仓库并进入目录。不要覆盖用户文件。
-2. 阅读 README.md、CONTRIBUTING.md、docs/GETTING_STARTED.md 和 specs/README.md。
+2. 阅读 README.md、CONTRIBUTING.md、docs/GettingStarted.md 和 docs/specs/README.md。
 3. 检查 Git、Node.js 和 npm。Node.js 必须是 24 或更高版本；版本不满足时，使用机器已有的版本管理器升级，并说明改了什么。
 4. 执行 npm ci、npm run typecheck、npm run validate:specs、npm test。任何门禁失败都要先定位原因；不得跳过测试、降低阈值或伪造通过结果。
 5. 使用独立运行目录初始化：
@@ -528,7 +533,7 @@ npm run knowledge:serve</code></pre>
   <footer class="site-footer">
     <div class="section-shell footer-grid">
       <div class="footer-brand">
-        <img src="./mark.svg?v=20260904-4" width="34" height="34" alt="">
+        <img src="./Mark.svg?v=20260904-4" width="34" height="34" alt="">
         <div><strong>知识飞轮</strong><small>经得起复验的工程知识</small></div>
       </div>
       <div class="footer-links">
@@ -542,6 +547,6 @@ npm run knowledge:serve</code></pre>
   </footer>
 
   <div class="copy-toast" data-toast role="status" aria-live="polite" hidden>命令已复制</div>
-  <script src="./app.js?v=20260904-4" defer></script>
+  <script src="./App.js?v=20260904-4" defer></script>
 </body>
 </html>

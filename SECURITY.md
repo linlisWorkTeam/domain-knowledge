@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：说明安全策略。
+-->
 # 安全策略
 
 <details lang="en">
@@ -36,4 +41,4 @@ Do not disclose exploitable details, credentials or tokens in public issues or p
 - `.workpanel/` 包含本地 Registry 和 CAS 运行数据。应限制文件权限、备份并避免提交到 Git。
 - DSH Adapter 只能访问配置的 HTTP API，不应获得 shell 或直接发布权限。
 
-更详细的数据、执行和发布边界见[数据边界 Spec](specs/09-security/data-boundaries.md)与[架构说明](docs/ARCHITECTURE.md#security-boundary)。
+更详细的数据、执行和发布边界见[数据边界 Spec](docs/specs/domainFunction/workspace/Workspace.md)与[架构说明](docs/specs/totalRules/Architecture.md)。
