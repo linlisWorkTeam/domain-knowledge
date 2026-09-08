@@ -52,8 +52,6 @@ import { SQLiteOperationalMetrics } from '../../infrastructure/observability/Sql
 import { migrateLegacyOkf } from '../../domain/migration/LegacyOkf.ts';
 import { ConsoleReadModel } from './ConsoleReadModel.ts';
 import { buildDemoReport } from './DemoReport.ts';
-import { DocgenExampleService } from '../../application/services/DocgenExample.ts';
-import { executeDocgenExample } from '../../infrastructure/langgraph/DocgenExample.ts';
 
 /** 定义WorkpanelConfig的数据结构与类型约束。 */
 export interface WorkpanelConfig {
@@ -459,10 +457,6 @@ export function createComposition(input: {
     },
     fixtureModel: (output) => ({ assertOutput: assertModelOutput, execute: async () => structuredClone(output) }),
   });
-  const docgenExample = new DocgenExampleService({
-    flywheel: flywheelApp, runConfiguration, evaluator: new TrustedProjectEvaluator(artifacts),
-    execute: (stage) => executeDocgenExample(stage, projectStages(), workflowObserver),
-  });
   let workflowPromise: Promise<AutomatedProjectWorkflowService> | null = null;
   const workflow = () => {
     workflowPromise ??= (async () => {
@@ -494,7 +488,6 @@ export function createComposition(input: {
     artifacts,
     repository,
     apps: {
-      docgenExample,
       agentExample,
       flywheel: flywheelApp,
       evalRunner: evalRunnerApp,

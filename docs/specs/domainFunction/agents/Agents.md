@@ -42,3 +42,5 @@ SearchAgent 不属于七角色枚举。目标是 KnowledgeSearchApp 直接调用
 
 
 文档关系：[设计目录](../../README.md)负责代码与设计定位；[开发指南](../../../Development.md)说明修改和交付步骤。
+
+固定源码 DocGen 样例为 `docGenAgent/examples/DocGenFixedSourceSample.json`，含原始源码、公开接口和追加指令；检查器与四项迁移测试由同一角色目录拥有。统一 agent:run 负责执行和提交，固定参考测试不作为生产角色阶段。

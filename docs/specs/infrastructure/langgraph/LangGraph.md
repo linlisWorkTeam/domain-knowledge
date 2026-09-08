@@ -14,7 +14,7 @@ Graph 将 Domain Workflow 的节点、静态连接和分支目标映射到 State
 
 同版本恢复从持久 checkpoint 继续，Run 配置不兼容由 Application 拒绝。恢复执行不能跳过已提交结果的 generationKey 去重。SDK 类型不进入 Domain，Console 读取 Registry 投影而非 checkpoint SQLite。
 
-独立角色开发直接调用 Application 和 Domain，不启动该图；`DocgenExample.ts` 只保留兼容导出，不能重新建设单角色图执行链。
+独立角色开发直接调用 Application 和 Domain，不启动该图；基础设施不再提供单角色示例的兼容导出。
 
 
 文档关系：[设计目录](../../README.md)负责代码与设计定位；[开发指南](../../../Development.md)说明修改和交付步骤。

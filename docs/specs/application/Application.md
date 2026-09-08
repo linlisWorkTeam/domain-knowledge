@@ -33,7 +33,7 @@ DeterministicQualityPolicy 位于 Application：来源证据 30%、结构 25%、
 
 ## 配置与独立运行
 
-RunConfiguration 冻结 Prompt、Schema、Provider 和 roleExecutionVersion 摘要，配置改变影响新 Run；旧版本拒绝恢复但不阻止查询历史。AgentExample 保存独立开发 Run、配置、工件与脱敏轨迹，不启动 LangGraph、评测或发布。DocgenExample 保留固定源码与独立例子检查接口，委派到共同角色链路。
+RunConfiguration 冻结 Prompt、Schema、Provider 和 roleExecutionVersion 摘要，配置改变影响新 Run；旧版本拒绝恢复但不阻止查询历史。AgentExample 保存独立开发 Run、配置、工件与脱敏轨迹，不启动 LangGraph、评测或发布。所有角色样例均通过 AgentExample 执行，不再为 DocGen 提供专用应用服务。固定源码检查只在 DocGen 自己的样例测试中执行。
 
 
 文档关系：[设计目录](../README.md)负责代码与设计定位；[开发指南](../../Development.md)说明修改和交付步骤。

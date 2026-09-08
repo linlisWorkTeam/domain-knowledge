@@ -142,12 +142,6 @@
       "metadataLocation": "file-header"
     },
     {
-      "path": "docs/epitaph/2026-09-08-1130-seven-role-pr-preparation.md",
-      "copyright": "Copyright (c) 2026 linlisWorkTeam",
-      "description": "说明七角色重构 PR 交付准备。",
-      "metadataLocation": "file-header"
-    },
-    {
       "path": "docs/epitaph/2026-09-08-1158-agent-directory-review.md",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "记录七角色 PR 的命名、注释和目录审查修改，交代验证范围。",
@@ -157,6 +151,12 @@
       "path": "docs/epitaph/2026-09-08-1216-specs-consolidation.md",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "交接按代码重写的规范结构、历史归档和项目身份规则。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "docs/epitaph/2026-09-08-1420-docgen-example-consolidation.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "记录取消 DocGen 专用入口并合并角色样例的交接。",
       "metadataLocation": "file-header"
     },
     {
@@ -412,18 +412,6 @@
       "metadataLocation": "file-header"
     },
     {
-      "path": "examples/docGen/MarkdownDiff.d.ts",
-      "copyright": "Copyright (c) 2026 linlisWorkTeam",
-      "description": "维护Markdown差异d相关的项目配置与工程说明。",
-      "metadataLocation": "file-header"
-    },
-    {
-      "path": "examples/docGen/Prompt.txt",
-      "copyright": "Copyright (c) 2026 linlisWorkTeam",
-      "description": "维护prompt相关的项目配置与工程说明。",
-      "metadataLocation": "catalog"
-    },
-    {
       "path": "fw.mjs",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "维护fw相关的项目配置与工程说明。",
@@ -628,12 +616,6 @@
       "metadataLocation": "file-header"
     },
     {
-      "path": "src/application/services/DocgenExample.ts",
-      "copyright": "Copyright (c) 2026 linlisWorkTeam",
-      "description": "协调Docgen样例用例及其依赖的领域规则与端口。",
-      "metadataLocation": "file-header"
-    },
-    {
       "path": "src/application/services/KnowledgeWritingGuide.ts",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "协调知识WritingGuide用例及其依赖的领域规则与端口。",
@@ -790,10 +772,28 @@
       "metadataLocation": "file-header"
     },
     {
+      "path": "src/domain/agents/docGenAgent/DocGenExample.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证Docgen样例的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
       "path": "src/domain/agents/docGenAgent/examples/DocGenAgentSample.json",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "保存DocGen角色样例的结构化配置、样例或元数据。",
       "metadataLocation": "catalog"
+    },
+    {
+      "path": "src/domain/agents/docGenAgent/examples/DocGenFixedSourceSample.json",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "保存 DocGen 固定源码材料、公开接口和显式模型样例。",
+      "metadataLocation": "catalog"
+    },
+    {
+      "path": "src/domain/agents/docGenAgent/examples/DocGenReference.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "在 DocGen 样例测试中核验固定源码、七项参考测试和文档数据例子；不提供 CLI。",
+      "metadataLocation": "file-header"
     },
     {
       "path": "src/domain/agents/docWorkerAgent/DocWorkerAgent.test.ts",
@@ -1060,12 +1060,6 @@
       "metadataLocation": "file-header"
     },
     {
-      "path": "src/infrastructure/langgraph/DocgenExample.ts",
-      "copyright": "Copyright (c) 2026 linlisWorkTeam",
-      "description": "提供Docgen样例的基础设施实现与外部系统接入。",
-      "metadataLocation": "file-header"
-    },
-    {
       "path": "src/infrastructure/langgraph/Graph.ts",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "提供图的基础设施实现与外部系统接入。",
@@ -1165,12 +1159,6 @@
       "path": "src/interfaces/runner/DemoReport.ts",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "提供Demo报告的外部入口、参数转换与响应处理。",
-      "metadataLocation": "file-header"
-    },
-    {
-      "path": "src/interfaces/runner/DocgenExample.ts",
-      "copyright": "Copyright (c) 2026 linlisWorkTeam",
-      "description": "提供Docgen样例的外部入口、参数转换与响应处理。",
       "metadataLocation": "file-header"
     },
     {
@@ -1303,12 +1291,6 @@
       "path": "tests/integration/DemoReport.test.ts",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "验证Demo报告的行为、约束及失败场景。",
-      "metadataLocation": "file-header"
-    },
-    {
-      "path": "tests/integration/DocgenExample.test.ts",
-      "copyright": "Copyright (c) 2026 linlisWorkTeam",
-      "description": "验证Docgen样例的行为、约束及失败场景。",
       "metadataLocation": "file-header"
     },
     {

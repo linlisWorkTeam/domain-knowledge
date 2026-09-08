@@ -6,15 +6,17 @@
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { createServer } from 'node:http';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { createComposition, componentRoot } from '../../src/interfaces/runner/Composition.ts';
-import { checkDocgenDocument, DOCGEN_SOURCE_COMMIT, DOCGEN_SOURCE_PATH, prepareDocgenReference } from '../../src/interfaces/runner/DocgenExample.ts';
-import { structuredMarkdownDiff } from '../../src/domain/services/MarkdownDiff.ts';
-import { executeDocgenExample } from '../../src/infrastructure/langgraph/DocgenExample.ts';
-import type { WorkflowStageInput } from '../../src/application/ports/ApplicationPorts.ts';
+import { createComposition, componentRoot } from '../../../interfaces/runner/Composition.ts';
+import { checkDocGenDocument, DOCGEN_SOURCE_COMMIT, DOCGEN_SOURCE_SHA256, prepareDocGenReference } from './examples/DocGenReference.ts';
+import { structuredMarkdownDiff } from '../../services/MarkdownDiff.ts';
+import { executeDevelopmentStage } from '../../../application/services/AgentDevelopmentObserver.ts';
+import type { AgentExampleInput } from '../../../application/services/AgentExample.ts';
+import { sha256, type ArtifactRef } from '../../Domain.ts';
+import type { WorkflowStageInput } from '../../../application/ports/ApplicationPorts.ts';
 
 function body() {
   return '# structuredMarkdownDiff\n\n证据 src/domain/services/markdown-diff.ts:L142-L150\n\n```json\n' + JSON.stringify({ examples: [
@@ -25,20 +27,22 @@ function body() {
 }
 
 test('DocGen checker rejects wrong expectations, absent coverage, malformed data and invalid citations', () => {
-  assert.equal(checkDocgenDocument(body(), structuredMarkdownDiff, 200).examples, 3);
-  assert.throws(() => checkDocgenDocument(body().replace('"expectedHunkCount":1', '"expectedHunkCount":0'), structuredMarkdownDiff, 200), /HUNKS_MISMATCH/);
-  assert.throws(() => checkDocgenDocument(body().replace('a\\r\\nb', 'a\\nb'), structuredMarkdownDiff, 200), /COVERAGE_MISSING/);
-  assert.throws(() => checkDocgenDocument(body(), structuredMarkdownDiff, 100), /CITATION_RANGE_INVALID/);
-  assert.throws(() => checkDocgenDocument(body().replace('```json', '```javascript'), structuredMarkdownDiff, 200), /EXAMPLES_REQUIRED/);
+  assert.equal(checkDocGenDocument(body(), structuredMarkdownDiff, 200).examples, 3);
+  assert.throws(() => checkDocGenDocument(body().replace('"expectedHunkCount":1', '"expectedHunkCount":0'), structuredMarkdownDiff, 200), /HUNKS_MISMATCH/);
+  assert.throws(() => checkDocGenDocument(body().replace('a\\r\\nb', 'a\\nb'), structuredMarkdownDiff, 200), /COVERAGE_MISSING/);
+  assert.throws(() => checkDocGenDocument(body(), structuredMarkdownDiff, 100), /CITATION_RANGE_INVALID/);
+  assert.throws(() => checkDocGenDocument(body().replace('```json', '```javascript'), structuredMarkdownDiff, 200), /EXAMPLES_REQUIRED/);
 });
 
 test('DocGen reference preflight checks the pinned source and seven real tests', async () => {
   const root = mkdtempSync(join(tmpdir(), 'docgen-reference-test-'));
   try {
-    const reference = await prepareDocgenReference(componentRoot, root);
+    const reference = await prepareDocGenReference(componentRoot, root);
     assert.equal(reference.evidence.testsPassed, 7);
     assert.equal(reference.evidence.commit, DOCGEN_SOURCE_COMMIT);
-    assert.equal(checkDocgenDocument(body(), reference.diff, reference.sourceLines).status, 'PASS');
+    const sample = JSON.parse(readFileSync(new URL('./examples/DocGenFixedSourceSample.json', import.meta.url), 'utf8'));
+    assert.equal(sha256(sample.materials.source.content), DOCGEN_SOURCE_SHA256);
+    assert.equal(checkDocGenDocument(body(), reference.diff, reference.sourceLines).status, 'PASS');
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -68,21 +72,28 @@ test('DocGen example uses the shared production DSH stages, freezes prompts and 
   try {
     await composition.apps.providerOperations.put({ provider: 'deepseek-harness', apiUrl: 'https://model.invalid/v1/', apiKey: 'controlled-secret', model: 'controlled', expectedRevision: 0 });
     await composition.apps.providerOperations.verify({ expectedRevision: 1 });
-    const scenario = { schemaVersion: '1.0' as const, name: 'docgen', moduleId: 'markdown-diff', repositoryRoot: componentRoot,
-      expectedCommit: DOCGEN_SOURCE_COMMIT, sourcePaths: [DOCGEN_SOURCE_PATH], publicInterfacePaths: [DOCGEN_SOURCE_PATH],
-      allowedGeneratedPaths: [DOCGEN_SOURCE_PATH], prepareCommands: [], referenceCommands: [], firstIterationCommands: [], finalCommands: [] };
+    const sample = JSON.parse(readFileSync(new URL('./examples/DocGenFixedSourceSample.json', import.meta.url), 'utf8')) as AgentExampleInput;
+    sample.provider = 'dsh';
+    sample.scenario.repositoryRoot = componentRoot;
+    // 本用例验证已保存的提示词冻结；专用样例的追加指令不覆盖测试设置。
+    delete sample.promptAddon;
     composition.apps.orchestrator.updatePromptAddon('doc-gen', 'original-example-instruction');
-    const first = await composition.apps.docgenExample.run(scenario);
+    const first = await composition.apps.agentExample.run('doc-gen', sample);
     composition.apps.orchestrator.updatePromptAddon('doc-gen', 'modified-example-instruction');
-    const second = await composition.apps.docgenExample.run(scenario);
+    const second = await composition.apps.agentExample.run('doc-gen', sample);
     assert.notEqual(first.runId, second.runId);
     assert.equal(prompts.length, 2);
     assert.match(prompts[0]!, /original-example-instruction/);
     assert.doesNotMatch(prompts[0]!, /modified-example-instruction/);
     assert.match(prompts[1]!, /modified-example-instruction/);
     assert.match(await composition.runConfiguration.resolvePrompt(first.runId, 'doc-gen'), /original-example-instruction/);
-    assert.equal(first.body, body());
-    assert.equal(first.sourceCommit, DOCGEN_SOURCE_COMMIT);
+    const bodyRef = first.result.payload['bodyRef'] as ArtifactRef;
+    const document = first.outputs.find(({ ref }) => ref.artifactId === bodyRef.artifactId)?.content;
+    assert.equal(document, body());
+    const command = JSON.parse(Buffer.from(await composition.artifacts.get(first.result.commandRef)).toString('utf8'));
+    const sourceBytes = await composition.artifacts.get(command.payload.sourceRefs[0]);
+    assert.equal(sha256(sourceBytes), DOCGEN_SOURCE_SHA256);
+    assert.equal(checkDocGenDocument(document!, structuredMarkdownDiff, String(sample.materials.source!.content).split('\n').length).status, 'PASS');
     assert.equal(first.publication, 'NOT_EVALUATED');
     assert.equal(composition.apps.flywheel.status().publications, 0);
     const report = await composition.apps.orchestrator.buildDemoReport(first.runId);
@@ -92,7 +103,7 @@ test('DocGen example uses the shared production DSH stages, freezes prompts and 
     assert.deepEqual({ input: calls[0]!.tokens.input, output: calls[0]!.tokens.output }, { input: 73, output: 31 });
     assert.doesNotMatch(JSON.stringify(report), /controlled-secret|original-example-instruction/);
     assert.ok(await composition.artifacts.verify(first.resultRef));
-    assert.ok(await composition.artifacts.verify(first.bodyRef));
+    assert.ok(await composition.artifacts.verify(bodyRef));
   } finally {
     composition.close();
     server.close(); await once(server, 'close');
@@ -106,7 +117,7 @@ test('single DocGen execution records failure and cancellation instead of late s
   const statuses: string[] = [];
   const input: WorkflowStageInput = { runId: 'example-failure', nodeId: 'doc_gen', agentId: 'doc-gen', iteration: 0,
     maxIterations: 1, attempt: 1, prompt: '', context: {}, workerCount: 0, signal: abort.signal };
-  await assert.rejects(executeDocgenExample(input, { execute: async () => { throw new Error('AGENT_OUTPUT_INVALID'); } }, { record: (projection) => { statuses.push(projection.status); } }), /AGENT_OUTPUT_INVALID/);
-  await assert.rejects(executeDocgenExample(input, { execute: async () => { abort.abort(); return { detail: 'late' }; } }, { record: (projection) => { statuses.push(projection.status); } }), /AGENT_CANCELLED|Abort/);
+  await assert.rejects(executeDevelopmentStage(input, { execute: async () => { throw new Error('AGENT_OUTPUT_INVALID'); } }, { record: (projection) => { statuses.push(projection.status); } }), /AGENT_OUTPUT_INVALID/);
+  await assert.rejects(executeDevelopmentStage(input, { execute: async () => { abort.abort(); return { detail: 'late' }; } }, { record: (projection) => { statuses.push(projection.status); } }), /AGENT_CANCELLED|Abort/);
   assert.deepEqual(statuses, ['RUNNING', 'FAILED', 'RUNNING', 'CANCELLED']);
 });

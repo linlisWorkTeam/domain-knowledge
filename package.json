@@ -22,8 +22,7 @@
     "typecheck": "tsc --noEmit",
     "validate:specs": "node scripts/ValidateSpecs.ts",
     "evaluate:framework": "node scripts/EvaluateFramework.mjs",
-    "agent:run": "node --env-file-if-exists=.env.local src/interfaces/runner/AgentRun.ts",
-    "example:docgen": "node --env-file-if-exists=.env.local src/interfaces/runner/DocgenExample.ts"
+    "agent:run": "node --env-file-if-exists=.env.local src/interfaces/runner/AgentRun.ts"
   },
   "dependencies": {
     "@deepseek-ai/dsh": "0.1.2-alpha.4",

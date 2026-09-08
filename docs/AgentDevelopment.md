@@ -35,28 +35,23 @@ npm run agent:run -- --role code --input src/domain/agents/codeAgent/examples/Co
 
 修改后按需要验证角色，例如 `node --test src/domain/agents/codeAgent/CodeAgent.test.ts`。公共契约变化同步 `docs/specs/schemas/`、消费者与集成测试。正常交付检查见 [Development](Development.md)；用户要求不跑测试时只记录实际静态检查，不能宣称角色测试通过。
 
-真实模型开发在样例命令追加 `--provider dsh`，环境配置见 [Runtime](Runtime.md)。此时不使用样例 modelOutput，源码按 expectedCommit 物化，scenario.repositoryRoot 相对当前目录解析。每次调用创建独立 runtime；若要复用 Console 已保存配置，使用下方 DocGen 的 runtime 参数。
+真实模型开发在样例命令追加 `--provider dsh`，环境配置见 [Runtime](Runtime.md)。此时不使用样例 modelOutput，源码按 expectedCommit 物化，scenario.repositoryRoot 相对当前目录解析。每次调用创建独立 runtime；独立入口使用 Runtime 中的环境配置方式。
 
-## DocGen 固定源码范例
+## DocGen 固定源码样例
 
-该入口保留旧 prepare/run/check 接口，使用固定提交的 structuredMarkdownDiff 源码和参考测试。范例指令位于 `examples/docGen/Prompt.txt`；公共基础指令仍由 `docGenAgent/DocGenAgentPrompt.ts` 拥有。
-
-```bash
-npm run example:docgen -- prepare
-npm run example:docgen -- run
-npm run example:docgen -- check --document /absolute/path/to/document.md
-```
-
-prepare 准备固定提交并核验参考实现。run 要求有效 DSH 模型配置，默认运行目录 `.workpanel/docgen-example`；缺配置返回 DOCGEN_LIVE_CONFIGURATION_REQUIRED，不回退 Fixture。真实 Linux 执行要求 Bubblewrap 可用。可在相同 runtime 启动 Console 保存并验证模型配置：
+固定样例与其检查器均位于 `src/domain/agents/docGenAgent/`，通过统一入口执行：
 
 ```bash
-WP_FLYWHEEL_HOME="$PWD/.workpanel/docgen-example" npm run knowledge:serve
-npm run example:docgen -- run --runtime /absolute/path/to/example-runtime
+npm run agent:run -- --role doc-gen --input src/domain/agents/docGenAgent/examples/DocGenFixedSourceSample.json --output /tmp/docgen-fixed-source
 ```
 
-check 接收 `--document` 指定候选正文；若使用独立 runtime，prepare、run、check 均需指向同一路径。输出 `examples/<runId>/document.md`、result.json、audit.json 保存候选正文、工件引用和脱敏调用数据。节点完成不代表知识已发布，范例 Run 保持 CREATED，不通过生产恢复接口恢复示范 Run。
+样例 JSON 显式保存固定提交的源码正文、公开接口、promptAddon 和可控 modelOutput。默认 fixture 验证共同角色、Schema 和 CAS 提交链路；追加 `--provider dsh` 使用已配置的真实模型，不采用 modelOutput。配置方式见 [Runtime](Runtime.md)，独立入口每次创建新的运行目录，不复用旧示例的专属 runtime 接口。
 
-DocGen 给出 JSON 数据例子，覆盖相同输入、CRLF 归一化和标题编辑。检查器将数据交给固定可信实现，核对 hunks、changedSections 和引用范围，不执行模型生成脚本。正文仍需人工语义核对，受控输出、独立例子检查和真实模型质量是不同证据。
+产物沿用所有角色共同的 result.json、audit.json 和 runtime。正文通过 result.payload.bodyRef 对应 outputs 中的内容读取，不再另外生成 document.md 或专用报告格式。
+
+`examples/DocGenReference.ts` 只用于样例验证：核对固定源码摘要和七项参考测试，检查文档引用范围，并把 JSON 数据例子交给可信实现验证 hunks 和 changedSections。测试位于 `DocGenExample.test.ts`，保留错误预期、缺少覆盖、非法引用、真实 DSH 受控链路、Prompt 冻结、CAS、失败和取消的断言。检查器不执行模型生成脚本，正文语义仍需人工审阅。
+
+普通 agent:run 不自动执行该参考测试或检查器，也不据此标记知识为 VERIFIED。固定源码检查属于本角色的样例测试，测试执行按 Development 的检查约定选择；本次清理未运行这些测试。
 
 ## 增加角色与配置变更
 
@@ -74,6 +69,6 @@ npm run knowledge -- set-agent-prompt --agent doc-gen --prompt '每个行为结�
 <details lang="en">
 <summary>English summary</summary>
 
-Role directories use lowerCamelCase and files use PascalCase. Each role owns execution, contracts, prompts, tests and explicit examples. Standalone runs share production validation and artifact submission without starting the graph, evaluation or publication. The fixed-source DocGen example retains its prepare/run/check interface. Controlled output, live execution and semantic quality require distinct evidence.
+Role directories use lowerCamelCase and files use PascalCase. Each role owns execution, contracts, prompts, tests and explicit examples. Standalone runs share production validation and artifact submission without starting the graph, evaluation or publication. The fixed-source DocGen materials and checks live beside the role and use the same agent:run entrypoint. Controlled output, live execution and semantic quality require distinct evidence.
 
 </details>

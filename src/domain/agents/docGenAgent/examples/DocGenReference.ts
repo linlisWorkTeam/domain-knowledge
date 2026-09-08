@@ -1,31 +1,28 @@
-#!/usr/bin/env node
 /**
  * Copyright (c) 2026 linlisWorkTeam
  * SPDX-License-Identifier: MIT
- * 文件功能：提供Docgen样例的外部入口、参数转换与响应处理。
+ * 文件功能：在 DocGen 样例测试中核验固定源码、七项参考测试和文档数据例子；不提供 CLI。
  */
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { sha256 } from '../../domain/Domain.ts';
-import type { AutomatedProjectScenario } from '../../application/services/AutomatedProjectWorkflow.ts';
-import { componentRoot, createComposition } from './Composition.ts';
+import { sha256 } from '../../../Domain.ts';
 
-/** 对外提供提交，作为调用方使用的统一约定。 */
+/** 固定参考源码的 Git 提交，不跟随工作树修改。 */
 export const DOCGEN_SOURCE_COMMIT = '3f999204f988697cc5bb9473c5a10ad5b4fc1f78';
 // 固定提交中的路径属于历史证据，不能随当前工作树的文件重命名而改变。
 export const DOCGEN_SOURCE_PATH = 'src/domain/services/markdown-diff.ts';
-/** 对外提供256，作为调用方使用的统一约定。 */
+/** 固定源码的正文摘要，防止材料静默改变。 */
 export const DOCGEN_SOURCE_SHA256 = '58ac3ba8b93fb94fa9c8abedb7c6cb8017b28ccfa4dfec2f9923f767ab52eb80';
 const REFERENCE_TEST_SHA256 = '17ed0b564ffcfc6387ecb57ac1e33d4dd8fb72694b69694eab31ace7b973f199';
 
 type Diff = (before: string, after: string) => { hunks: unknown[]; changedSections: string[] };
 
 /** Deterministic checks execute data examples, never model-generated code. */
-/** 检查DocgenDocument。 */
-export function checkDocgenDocument(body: string, diff: Diff, sourceLines: number) {
+/** 核对文档引用范围和可执行数据例子；正文语义仍需人工审阅。 */
+export function checkDocGenDocument(body: string, diff: Diff, sourceLines: number) {
   const citations = [...body.matchAll(/src\/domain\/services\/markdown-diff\.ts:L(\d+)-L(\d+)/g)];
   assert.ok(citations.length > 0, 'DOCGEN_SOURCE_CITATION_REQUIRED');
   for (const citation of citations) assert.ok(Number(citation[1]) >= 1
@@ -49,8 +46,8 @@ export function checkDocgenDocument(body: string, diff: Diff, sourceLines: numbe
   return { status: 'PASS', examples: examples.length, citations: citations.length, semanticReview: 'REQUIRED', publication: 'NOT_EVALUATED' };
 }
 
-/** 准备DocgenReference。 */
-export async function prepareDocgenReference(repositoryRoot: string, outputRoot: string) {
+/** 仅供样例测试准备固定源码并执行七项参考测试，不属于生产角色阶段。 */
+export async function prepareDocGenReference(repositoryRoot: string, outputRoot: string) {
   mkdirSync(outputRoot, { recursive: true, mode: 0o700 });
   const directory = mkdtempSync(join(outputRoot, 'reference-'));
   try {
@@ -61,7 +58,7 @@ export async function prepareDocgenReference(repositoryRoot: string, outputRoot:
     const source = readFileSync(join(directory, DOCGEN_SOURCE_PATH));
     assert.equal(sha256(source), DOCGEN_SOURCE_SHA256, 'DOCGEN_REFERENCE_SOURCE_CHANGED');
     // 当前测试只改了模块路径；还原为历史导入后校验原摘要，并在固定源码副本中执行。
-    const referenceTest = Buffer.from(readFileSync(join(componentRoot, 'tests/unit/MarkdownDiff.test.ts'), 'utf8')
+    const referenceTest = Buffer.from(readFileSync(join(repositoryRoot, 'tests/unit/MarkdownDiff.test.ts'), 'utf8')
       .replace(/^\/\*\*\n \* Copyright \(c\) 2026 linlisWorkTeam[\s\S]*?\*\/\n/, '')
       .replace('../../src/domain/services/MarkdownDiff.ts', '../../src/domain/services/markdown-diff.ts'));
     assert.equal(sha256(referenceTest), REFERENCE_TEST_SHA256, 'DOCGEN_REFERENCE_TEST_CHANGED');
@@ -77,61 +74,4 @@ export async function prepareDocgenReference(repositoryRoot: string, outputRoot:
     return { directory, diff: structuredMarkdownDiff as Diff, sourceLines: source.toString().split('\n').length,
       evidence: { commit: DOCGEN_SOURCE_COMMIT, sourceSha256: DOCGEN_SOURCE_SHA256, referenceTestSha256: REFERENCE_TEST_SHA256, testsPassed: 7, testsTotal: 7 } };
   } catch (error) { rmSync(directory, { recursive: true, force: true }); throw error; }
-}
-
-/** 执行命令行入口请求。 */
-export async function main(argv = process.argv.slice(2)) {
-  const mode = argv.shift() ?? 'run';
-  if (!['prepare', 'run', 'check'].includes(mode)) throw new Error('ARGUMENT_INVALID: use prepare, run, or check');
-  const options = new Map<string, string>();
-  for (let i = 0; i < argv.length; i += 2) {
-    if (!['--runtime', '--prompt-file', '--document'].includes(argv[i]!) || !argv[i + 1] || argv[i + 1]!.startsWith('--')) throw new Error('ARGUMENT_INVALID');
-    options.set(argv[i]!, argv[i + 1]!);
-  }
-  const runtimeDir = resolve(options.get('--runtime') ?? join(componentRoot, '.workpanel/docgen-example'));
-  const reference = await prepareDocgenReference(componentRoot, join(runtimeDir, 'reference-checks'));
-  if (mode === 'prepare') return reference.evidence;
-  if (mode === 'check') {
-    const path = options.get('--document');
-    if (!path) throw new Error('ARGUMENT_REQUIRED: --document');
-    return { reference: reference.evidence, checks: checkDocgenDocument(readFileSync(resolve(path), 'utf8'), reference.diff, reference.sourceLines) };
-  }
-  const composition = createComposition({ runtimeDir });
-  const abort = new AbortController();
-  const cancel = () => abort.abort();
-  process.once('SIGINT', cancel); process.once('SIGTERM', cancel);
-  try {
-    const settings = composition.apps.providerOperations.getSettings();
-    if (settings.verification.status === 'NOT_CONFIGURED' && !process.env.DEEPSEEK_API_KEY) {
-      throw new Error('DOCGEN_LIVE_CONFIGURATION_REQUIRED: configure DSH in this runtime or set DEEPSEEK_API_KEY');
-    }
-    const prompt = readFileSync(resolve(options.get('--prompt-file') ?? join(componentRoot, 'examples/docGen/Prompt.txt')), 'utf8');
-    composition.apps.orchestrator.updatePromptAddon('doc-gen', prompt);
-    const scenario: AutomatedProjectScenario = { schemaVersion: '1.0', name: 'markdown-diff-docgen',
-      moduleId: 'markdown-diff', repositoryRoot: componentRoot, expectedCommit: DOCGEN_SOURCE_COMMIT,
-      sourcePaths: [DOCGEN_SOURCE_PATH], publicInterfacePaths: [DOCGEN_SOURCE_PATH],
-      allowedGeneratedPaths: [DOCGEN_SOURCE_PATH], prepareCommands: [], referenceCommands: [], firstIterationCommands: [], finalCommands: [] };
-    const result = await composition.apps.docgenExample.run(scenario, abort.signal);
-    const { body, ...metadata } = result;
-    const destination = join(runtimeDir, 'examples', result.runId);
-    mkdirSync(destination, { recursive: true, mode: 0o700 });
-    writeFileSync(join(destination, 'document.md'), body, { flag: 'wx', mode: 0o600 });
-    const audit = await composition.apps.orchestrator.buildDemoReport(result.runId);
-    writeFileSync(join(destination, 'audit.json'), JSON.stringify(audit, null, 2), { mode: 0o600 });
-    const report = { ...metadata, reference: reference.evidence, checks: { status: 'NOT_RUN' } as Record<string, unknown> };
-    try { report.checks = checkDocgenDocument(body, reference.diff, reference.sourceLines); }
-    catch (error) { report.checks = { status: 'FAIL', reason: error instanceof Error ? error.message.split('\n')[0] : 'DOCGEN_CHECK_FAILED' }; throw error; }
-    finally { writeFileSync(join(destination, 'result.json'), JSON.stringify(report, null, 2), { mode: 0o600 }); }
-    return { ...report, outputDirectory: destination };
-  } finally {
-    process.removeListener('SIGINT', cancel); process.removeListener('SIGTERM', cancel);
-    composition.close();
-  }
-}
-
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-  main().then((result) => process.stdout.write(`${JSON.stringify(result, null, 2)}\n`)).catch((error) => {
-    process.stderr.write(`${error instanceof Error ? error.message.split('\n')[0] : 'DOCGEN_EXAMPLE_FAILED'}\n`);
-    process.exitCode = 1;
-  });
 }

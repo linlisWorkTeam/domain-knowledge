@@ -57,3 +57,9 @@ SPDX-License-Identifier: MIT
 This document summarizes older handoffs, milestones and architectural decisions with links to immutable original records. Historical test and live-model results apply only to their original revisions. Current designs and delivery status are maintained separately.
 
 </details>
+
+## DocGen 专用入口清理
+
+按用户确认取消旧 prepare/run/check CLI、DocgenExampleService 与 LangGraph 兼容导出。固定材料和追加指令归入 docGenAgent 的 JSON 样例，参考检查和原有测试迁入同一角色目录，通过共同 AgentExample 链路验证。历史专用入口的命令与结果格式不再保留。
+
+[2026-09-08-1130 七角色 PR 准备](https://github.com/linlisWorkTeam/domain-knowledge/blob/5833cf5/docs/epitaph/2026-09-08-1130-seven-role-pr-preparation.md)：在独立工作树准备最初七角色 PR，记录当时 219 项测试与 Console 14 项通过；该历史结果不代表后续清理后的回归状态。
