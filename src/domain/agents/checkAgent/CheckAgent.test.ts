@@ -38,3 +38,18 @@ test('check: cancellation before and during model execution cannot return succes
   await assert.rejects(execute(during.input, during.context), /AGENT_CANCELLED/);
   assert.deepEqual(during.phases, []);
 });
+
+test('check: blocking findings bind a criterion to a real generated file and line', async () => {
+  const sample = roleExample<Input>('check');
+  const path = sample.output.scope[0];
+  const output = { blocking: true, findings: ['接口输出字段缺失'], scope: [path],
+    evidence: [{ criterionId: 'public-interface', path, line: 1, message: '接口输出字段缺失', severity: 'BLOCKER' }] };
+  sample.context.model.execute = async () => output;
+  const result = await execute(sample.input, sample.context);
+  const finding = (result.payload.findings as { evidenceLocation: string }[])[0]!;
+  assert.equal(finding.evidenceLocation, `${path}:1`);
+  output.evidence[0]!.line = 100;
+  await assert.rejects(execute(sample.input, sample.context), /CHECK_EVIDENCE_LOCATION_INVALID/);
+  output.evidence = [];
+  await assert.rejects(execute(sample.input, sample.context), /CHECK_BLOCKING_EVIDENCE_REQUIRED/);
+});

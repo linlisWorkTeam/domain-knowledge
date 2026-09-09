@@ -47,3 +47,13 @@ test('code: output whitelist and duplicate paths are enforced', async () => {
   sample.context.model.execute = async () => ({ files: [{ path, content: 'a' }, { path, content: 'b' }] });
   await assert.rejects(execute(sample.input, sample.context), /PROJECT_PATH_DUPLICATED/);
 });
+
+test('code: rejects unsafe caller whitelist and hides unrelated source materials', async () => {
+  const sample = roleExample<Input>('code');
+  sample.input.materials.push({ ref: { ...sample.input.materials[0]!.ref, artifactId: 'reference-source' }, content: 'REFERENCE_SOURCE_SECRET' });
+  await execute(sample.input, sample.context);
+  assert.doesNotMatch(sample.requests[0]!.prompt, /REFERENCE_SOURCE_SECRET/);
+  assert.deepEqual(sample.requests[0]!.readablePaths, sample.input.publicInterfacePaths);
+  sample.input.payload.allowedGeneratedPaths = ['../escape.ts'];
+  await assert.rejects(execute(sample.input, sample.context), /PROJECT_PATH_DENIED/);
+});

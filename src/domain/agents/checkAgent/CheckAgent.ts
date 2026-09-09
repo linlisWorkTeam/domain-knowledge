@@ -5,7 +5,7 @@
  */
 import type { ExecutionContext, RoleResult, PendingArtifact } from '../AgentExecution.ts';
 import { assertActive } from '../AgentExecution.ts';
-import { type Input, type Output, schemaFor, validateInput } from './CheckAgentContract.ts';
+import { type Input, type Output, schemaFor, validateInput, validateOutput } from './CheckAgentContract.ts';
 import { definition, buildPrompt, readablePaths } from './CheckAgentPrompt.ts';
 
 /** 只读检查生成文件与确定性判据，将模型发现转换为可定位的检查报告。 */
@@ -17,6 +17,7 @@ export async function execute(input: Input, context: ExecutionContext): Promise<
   // 角色决定本阶段的任务与能力范围；会话、工具执行和格式修复交给模型适配器。
   const raw = await context.model.execute({
     role: definition.agentId,
+    stage: 'constraint-check',
     prompt: buildPrompt(input, context),
     outputSchema: schema,
     tools: definition.tools,
@@ -26,16 +27,17 @@ export async function execute(input: Input, context: ExecutionContext): Promise<
   assertActive(context.signal);
   context.model.assertOutput(raw, schema);
   const output = raw as unknown as Output;
+  validateOutput(output, input);
   const artifacts: PendingArtifact[] = [];
   const check = output;
   const payload = {
     resultKind: 'findings',
-    findings: check.findings.map((message, index) => ({
+    findings: (check.evidence ?? []).map((item, index) => ({
       findingId: `finding-${index + 1}`,
-      severity: check.blocking ? 'BLOCKER' : 'INFO',
-      criterionId: 'deterministic-check',
-      evidenceLocation: check.scope[0] ?? `workflow:${context.command.agentType}`,
-      message,
+      severity: item.severity,
+      criterionId: item.criterionId,
+      evidenceLocation: `${item.path}:${item.line}`,
+      message: item.message,
     })),
   };
   return { output, payload, artifacts };

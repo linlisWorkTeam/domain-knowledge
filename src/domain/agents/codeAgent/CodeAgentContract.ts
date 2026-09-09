@@ -47,6 +47,11 @@ export function schemaFor(input: Input): Record<string, unknown> {
 /** 检查本角色必需字段及所引用材料是否完整。 */
 export function validateInput(input: Input): void {
   requireMaterials(input.payload, input.materials, ['knowledgeRef', 'publicInterfaceRefs', 'languageId', 'buildContractRef', 'allowedGeneratedPaths']);
+  for (const path of input.payload.allowedGeneratedPaths) {
+    if (path.includes('\\') || path.includes('\0') || path.split('/').some((part) => !part || part === '.' || part === '..')) {
+      throw new Error(`PROJECT_PATH_DENIED: ${path}`);
+    }
+  }
 }
 
 /** 检查角色输出是否满足业务约束。 */

@@ -13,6 +13,8 @@ export interface Payload {
   knowledgeRef: ArtifactRef;
   /** 提供评测报告引用信息，供调用方读取或传入。 */
   evaluationReportRef: ArtifactRef;
+  /** 本轮只读检查工件，单角色旧记录可省略。 */
+  checkReportRef?: ArtifactRef;
   /** 提供criteria引用信息，供调用方读取或传入。 */
   criteriaRef: ArtifactRef;
   /** 提供previous纠正意见引用列表信息，供调用方读取或传入。 */
@@ -21,17 +23,23 @@ export interface Payload {
 /** 角色输入。 */
 export type Input = RoleInput<Payload>;
 /** 角色输出。 */
-export interface Output { blocking: boolean; recommendation: 'PASS' | 'ITERATE'; correction: { correctionId: string; knowledgePath: string; criterion: string; risk: string } | null; }
+export interface Output {
+  blocking: boolean; recommendation: 'PASS' | 'ITERATE';
+  correction: { correctionId: string; knowledgePath: string; criterion: string; risk: string; targetHeading?: string; replacementMarkdown?: string } | null;
+  unresolvedRisks?: string[];
+}
 /** 对外提供输出Schema，作为调用方使用的统一约定。 */
 export const outputSchema: Record<string, unknown> = {
   type: 'object', required: ['blocking', 'recommendation', 'correction'], additionalProperties: false,
   properties: {
     blocking: { type: 'boolean' }, recommendation: { enum: ['PASS', 'ITERATE'] },
+    unresolvedRisks: { type: 'array', items: { type: 'string', minLength: 1 } },
     correction: {
       type: ['object', 'null'],
       properties: {
         correctionId: { type: 'string', minLength: 1 }, knowledgePath: { type: 'string', minLength: 1 },
         criterion: { type: 'string', minLength: 1 }, risk: { type: 'string', minLength: 1 },
+        targetHeading: { type: 'string', minLength: 1 }, replacementMarkdown: { type: 'string', minLength: 1 },
       },
       required: ['correctionId', 'knowledgePath', 'criterion', 'risk'], additionalProperties: false,
     },
@@ -46,4 +54,26 @@ export function schemaFor(_input: Input): Record<string, unknown> {
 /** 检查本角色必需字段及所引用材料是否完整。 */
 export function validateInput(input: Input): void {
   requireMaterials(input.payload, input.materials, ['knowledgeRef', 'evaluationReportRef', 'criteriaRef']);
+}
+
+/** 纠正意见必须定位已有 H2；缺乏定位证据时交付未解决问题，不能凭空扩大修订范围。 */
+export function validateOutput(output: Output, input: Input): void {
+  if (output.recommendation === 'PASS' && (output.blocking || output.correction || output.unresolvedRisks?.length)) {
+    throw new Error('REVIEW_PASS_CONTRADICTION');
+  }
+  const correction = output.correction;
+  if (!correction) return;
+  const prefix = `knowledge/${input.moduleId}.md#`;
+  if (!correction.knowledgePath.startsWith(prefix)) throw new Error('REVIEW_CORRECTION_SCOPE_INVALID');
+  const heading = correction.knowledgePath.slice(prefix.length);
+  const content = input.materials.find(({ ref }) => ref.artifactId === input.payload.knowledgeRef.artifactId)?.content;
+  const body = typeof content === 'string' ? content
+    : content && typeof content === 'object' && 'body' in content && typeof content.body === 'string' ? content.body : '';
+  const headings = body.split('\n').filter((line) => /^##\s+/.test(line)).map((line) => line.replace(/^##\s+/, '').trim());
+  if (!heading || headings.filter((item) => item === heading).length !== 1
+    || (correction.targetHeading !== undefined && correction.targetHeading !== heading)) throw new Error('REVIEW_CORRECTION_SCOPE_INVALID');
+  if (correction.replacementMarkdown !== undefined) {
+    const replacements = correction.replacementMarkdown.split('\n').filter((line) => /^#{1,2}\s+/.test(line));
+    if (replacements.length !== 1 || replacements[0] !== `## ${heading}`) throw new Error('REVIEW_CORRECTION_RANGE_INVALID');
+  }
 }

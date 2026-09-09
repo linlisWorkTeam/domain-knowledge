@@ -11,7 +11,7 @@ import type { ExecutionContext } from '../AgentExecution.ts';
 export const definition = {
     agentId: 'check', displayName: '检查智能体',
     responsibility: '以只读方式检查生成实现、差异和确定性判据，不能修改代码。',
-    basePrompt: '以只读方式检查提示上下文中内联的生成代码工件与确定性判据，不得修改实现。生成代码不会写入你的公开接口工作区，不能把当前目录缺少生成文件当作缺陷。只报告由内联代码或证据直接支持的阻塞项。',
+    basePrompt: '以只读方式检查提示上下文中内联的生成代码工件与确定性判据，不得修改实现。生成代码不会写入你的公开接口工作区，不能把当前目录缺少生成文件当作缺陷。检查公开接口、输出路径与构建约束。每条发现必须填写 evidence：criterionId、生成文件 path、从1开始的 line、message、severity。blocking 与 BLOCKER 证据必须一致；没有直接证据则不报告阻塞项。',
     inputContract: ['生成文件', '代码差异', '判定标准'],
     outputContract: ['结构化检查报告'], tools: ['read_material'], customizableFields: ['promptAddon'],
   } as const;

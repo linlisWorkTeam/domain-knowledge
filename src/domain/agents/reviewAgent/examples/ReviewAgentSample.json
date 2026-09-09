@@ -61,7 +61,7 @@
     "recommendation": "ITERATE",
     "correction": {
       "correctionId": "COR-0001",
-      "knowledgePath": "knowledge/markdown-diff.md",
+      "knowledgePath": "knowledge/markdown-diff.md#Behavior",
       "criterion": "Document CRLF normalization with an example",
       "risk": "False change reports for equivalent newlines"
     }
