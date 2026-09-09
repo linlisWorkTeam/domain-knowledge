@@ -28,6 +28,8 @@ interface GraphDependencies {
   executor: WorkflowStageExecutor;
   /** 提供observer信息，供调用方读取或传入。 */
   observer: WorkflowObserver;
+  /** 跟踪完整节点直到审计投影写完，避免图取消先于节点清理结束。 */
+  trackNode(runId: string, execute: () => Promise<InfrastructureStateUpdate>): Promise<InfrastructureStateUpdate>;
   /** 提供prompts信息，供调用方读取或传入。 */
   prompts: AgentPromptResolver;
   /** 提供 取消信号For 对应的取消信号For操作。 */
@@ -64,7 +66,7 @@ function executionNodeId(state: InfrastructureState, nodeId: string): string {
 }
 
 function createNode(deps: GraphDependencies, nodeId: string) {
-  return async (state: InfrastructureState): Promise<InfrastructureStateUpdate> => {
+  return (state: InfrastructureState): Promise<InfrastructureStateUpdate> => deps.trackNode(state.runId, async () => {
     if (state.budgetDeadlineAt && Date.now() >= state.budgetDeadlineAt) {
       throw new Error('WORKFLOW_BUDGET_EXHAUSTED');
     }
@@ -108,6 +110,7 @@ function createNode(deps: GraphDependencies, nodeId: string) {
         ...(state.workerTask ? { workerIndex: state.workerTask.index } : {}),
         ...(deps.signalFor(state.runId) ? { signal: deps.signalFor(state.runId) } : {}),
       });
+      if (deps.signalFor(state.runId)?.aborted) throw deps.signalFor(state.runId)?.reason;
       const completedAt = deps.clock();
       deps.observer.record(projection(
         state, renderedNodeId, agentId, attempt, 'COMPLETED', completedAt, readyAt, result.detail,
@@ -124,11 +127,11 @@ function createNode(deps: GraphDependencies, nodeId: string) {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       deps.observer.record(projection(
-        state, renderedNodeId, agentId, attempt, 'FAILED', deps.clock(), readyAt, '', message,
+        state, renderedNodeId, agentId, attempt, deps.signalFor(state.runId)?.aborted ? 'CANCELLED' : 'FAILED', deps.clock(), readyAt, '', message,
       ));
       throw error;
     }
-  };
+  });
 }
 
 /** 将领域工作流连接和分支规则映射为 LangGraph 节点、消息及检查点。 */

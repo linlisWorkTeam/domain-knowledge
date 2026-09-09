@@ -69,6 +69,7 @@ export async function createDomainKnowledgeInfrastructure(options: DomainKnowled
       return SqliteSaver.fromConnString(checkpoint.filename);
     })();
   const controllers = new Map<string, AbortController>();
+  const activeNodes = new Map<string, Set<Promise<unknown>>>();
   const deadlines = new Map<string, ReturnType<typeof setTimeout>>();
   const resumeReadyAt = new Map<string, string>();
   const readyKey = (runId: string, nodeId: string, iteration: number) => (
@@ -77,6 +78,14 @@ export async function createDomainKnowledgeInfrastructure(options: DomainKnowled
   const graph = buildInfrastructureGraph({
     executor: options.executor,
     observer: options.observer,
+    trackNode: (runId, execute) => {
+      const nodes = activeNodes.get(runId) ?? new Set<Promise<unknown>>();
+      activeNodes.set(runId, nodes);
+      const task = execute();
+      nodes.add(task);
+      void task.finally(() => { nodes.delete(task); if (!nodes.size) activeNodes.delete(runId); }).catch(() => {});
+      return task;
+    },
     prompts: options.prompts,
     signalFor: (runId) => controllers.get(runId)?.signal,
     readyAtFor: (runId, nodeId, iteration, fallback) => {
@@ -240,9 +249,11 @@ export async function createDomainKnowledgeInfrastructure(options: DomainKnowled
             return (await this.graph.getState(graphConfig(runId))).values as InfrastructureState;
           }
           throw error;
-        }).finally(() => {
+        }).finally(async () => {
         // 图失败时并行分支仍可能清理进程；结束前发取消，不能仅删除定时器遗留后台任务。
         controllers.get(runId)?.abort(new Error('WORKFLOW_EXECUTION_ENDED'));
+        // LangGraph 的取消 Promise 可先于执行器 finally 返回；数据库必须等节点审计落盘后才可关闭。
+        while (activeNodes.get(runId)?.size) await Promise.allSettled([...activeNodes.get(runId)!]);
         clearTimeout(deadlines.get(runId));
         deadlines.delete(runId);
         this.running.delete(runId);

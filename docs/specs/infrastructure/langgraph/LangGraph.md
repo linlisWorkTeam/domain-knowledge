@@ -14,6 +14,8 @@ Graph 将 Domain Workflow 的节点、静态连接和分支目标映射到 State
 
 Runtime 在首次运行持久化 `budgetStartedAt` 和 `budgetDeadlineAt`，每次最多 3 轮、1800000ms，包含排队、模型重试和评测。恢复沿用原截止时间，缺少预算信封或执行版本不兼容的旧记录只读。超时产生 `WORKFLOW_BUDGET_EXHAUSTED`，传递同一个 AbortSignal 到角色、模型及评测进程；停止服务也取消活跃任务并等待退出。图节点不另设无法传递到子进程的超时信号。
 
+图的取消 Promise 可能先于节点执行器清理返回。Runtime 额外跟踪完整节点 Promise，在取消、超时或图退出时等待全部节点的清理和审计投影写入完成，再结束 wait/shutdown 或关闭数据库。已取消节点记录 CANCELLED；忽略信号的迟到结果不能记录 COMPLETED。旧取消记录中的陈旧 RUNNING 投影保留为历史证据，不表示仍有进程运行。
+
 同版本恢复从持久 checkpoint 继续，Run 配置不兼容由 Application 拒绝。恢复执行不能跳过已提交结果的 generationKey 去重。SDK 类型不进入 Domain，Console 读取 Registry 投影而非 checkpoint SQLite。
 
 独立角色开发直接调用 Application 和 Domain，不启动该图；基础设施不再提供单角色示例的兼容导出。

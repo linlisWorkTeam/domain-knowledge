@@ -8,6 +8,40 @@ import test from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
 import { createDomainKnowledgeInfrastructure } from '../../src/infrastructure/langgraph/Runtime.ts';
 import { ModelProcessLane } from '../../src/infrastructure/agentAdapters/ModelProcessLane.ts';
+import type { WorkflowNodeProjection } from '../../src/application/ports/ApplicationPorts.ts';
+
+test('cancel waits for executor cleanup and persists cancellation before returning', async () => {
+  let enter!: () => void;
+  const entered = new Promise<void>((resolve) => { enter = resolve; });
+  let finishCleanup!: () => void;
+  const cleanup = new Promise<void>((resolve) => { finishCleanup = resolve; });
+  let cleanupStarted!: () => void;
+  const cleaning = new Promise<void>((resolve) => { cleanupStarted = resolve; });
+  const projections: WorkflowNodeProjection[] = [];
+  let cleaned = false;
+  const infrastructure = await createDomainKnowledgeInfrastructure({
+    checkpoint: { kind: 'memory' }, prompts: { getPromptAddon: () => '' },
+    observer: { record: (projection) => { projections.push(projection); } },
+    executor: { execute: async ({ signal }) => {
+      enter();
+      try { await delay(5_000, undefined, { signal }); }
+      finally { cleanupStarted(); await cleanup; cleaned = true; }
+      return { detail: 'unreachable' };
+    } },
+  });
+  await infrastructure.engine.start({ runId: 'drain-cancel', maxIterations: 1, workerCount: 0 });
+  await entered;
+  let returned = false;
+  const cancelling = infrastructure.engine.cancel('drain-cancel').then(() => { returned = true; });
+  await cleaning;
+  await delay(20);
+  assert.equal(returned, false, 'cancel must not return while cleanup still owns persistence');
+  finishCleanup();
+  await cancelling;
+  assert.equal(cleaned, true);
+  assert.equal(projections.at(-1)?.status, 'CANCELLED');
+  assert.equal((await infrastructure.engine.wait('drain-cancel')).executionStatus, 'CANCELLED');
+});
 
 test('workflow deadline aborts active work and cannot be refreshed by resume', async () => {
   let aborted = false;
