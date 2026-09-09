@@ -7,6 +7,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, lstatSync, readFileSync, readlinkSync, realpathSync } from 'node:fs';
 import { isAbsolute, join, relative, resolve } from 'node:path';
+import { createRequire } from 'node:module';
 
 const root = realpathSync(resolve(process.argv[2] || '.'));
 const manifest = JSON.parse(readFileSync(join(root, 'Manifest.json'), 'utf8'));
@@ -30,4 +31,10 @@ const compiler = join(root, 'app', 'node_modules', '@typescript', 'typescript-li
 execFileSync(compiler, ['--version'], { stdio: 'pipe', timeout: 10_000 });
 const dshPackage = join(root, 'app', 'node_modules', '@deepseek-ai', 'dsh', 'package.json');
 if (!JSON.parse(readFileSync(dshPackage, 'utf8')).version) throw new Error('Missing bundled DSH package');
+// 实际加载原生扩展，版本文件存在不能证明离线运行库完整。
+const requireApp = createRequire(join(root, 'app', 'package.json'));
+requireApp('node-pty');
+const Database = requireApp('better-sqlite3');
+const database = new Database(':memory:');
+try { database.prepare('SELECT 1').get(); } finally { database.close(); }
 console.log(JSON.stringify({ status: 'VERIFIED', schemaVersion: '1.0', symbolicLinks: inventory.links.length, nativeCompiler: relative(root, compiler) }));

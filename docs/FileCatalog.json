@@ -142,24 +142,6 @@
       "metadataLocation": "file-header"
     },
     {
-      "path": "docs/epitaph/2026-09-08-1420-docgen-example-consolidation.md",
-      "copyright": "Copyright (c) 2026 linlisWorkTeam",
-      "description": "记录取消 DocGen 专用入口并合并角色样例的交接。",
-      "metadataLocation": "file-header"
-    },
-    {
-      "path": "docs/epitaph/2026-09-08-1423-session-identity-scope.md",
-      "copyright": "Copyright (c) 2026 linlisWorkTeam",
-      "description": "澄清账号选择只属于当前会话，不作为项目协作规则。",
-      "metadataLocation": "file-header"
-    },
-    {
-      "path": "docs/epitaph/2026-09-08-1442-domain-feature-layout.md",
-      "copyright": "Copyright (c) 2026 linlisWorkTeam",
-      "description": "Domain 按领域功能平级组织的交接记录。",
-      "metadataLocation": "file-header"
-    },
-    {
       "path": "docs/specs/README.md",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "设计规范目录。",

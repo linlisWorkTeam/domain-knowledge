@@ -71,8 +71,23 @@ try {
   const typescriptNative = join(payload, 'app', 'node_modules', '@typescript', 'typescript-linux-x64', 'lib', 'tsc');
   if (!existsSync(typescriptNative)) throw new Error('Missing TypeScript Linux x64 native compiler; offline acceptance cannot build');
   tools.push({ name: 'typescript-native-linux-x64', version: command(typescriptNative, ['--version']), sha256: await hash(typescriptNative) });
+  // Node 的直接依赖不包含延迟加载扩展的库，例如 node-pty 需要 libutil。
+  const nativeAddons = [];
+  function collectNativeAddons(directory) {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const path = join(directory, entry.name);
+      if (entry.isDirectory()) collectNativeAddons(path);
+      else if (entry.isFile() && entry.name.endsWith('.node')) {
+        const header = readFileSync(path).subarray(0, 20);
+        if (header.length === 20 && header.subarray(0, 4).equals(Buffer.from([0x7f, 0x45, 0x4c, 0x46]))
+          && header[4] === 2 && header[5] === 1 && header.readUInt16LE(18) === 62) nativeAddons.push(path);
+      }
+    }
+  }
+  collectNativeAddons(join(root, 'node_modules'));
+  for (const path of nativeAddons) tools.push({ name: relative(root, path), sha256: await hash(path) });
   const dependencies = new Set();
-  for (const binary of [...nativeBinaries, join(gitExecPath, 'git-remote-https')]) {
+  for (const binary of [...nativeBinaries, ...nativeAddons, join(gitExecPath, 'git-remote-https')]) {
     const ldd = command('ldd', [realpathSync(binary)]);
     if (/not found/.test(ldd)) throw new Error(`Missing shared library for ${binary}`);
     for (const match of ldd.matchAll(/(?:=>\s+)?(\/[^\s]+)\s+\(/g)) {

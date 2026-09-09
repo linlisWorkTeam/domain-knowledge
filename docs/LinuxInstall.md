@@ -19,7 +19,7 @@ node scripts/release/BuildLinuxBundle.mjs 0.2.0 /tmp/knowledge-release
 
 构建脚本不下载依赖，并要求工作树无修改。它从 Git 跟踪文件清单提取应用，复制当前已锁定的依赖，串行计算每个文件摘要，以 gzip 低压缩等级限制 ECS 资源占用，并去掉 gzip 时间戳以保持构建可复现。构建还验证 TypeScript 的 Linux x64 原生编译器存在，修复 Git helper 在安装布局中的相对链接，记录全部包内符号链接并拒绝越界。工具清单记录版本、SHA-256、源码提交和 lockfile 摘要。`Manifest.json`、`ThirdParty.json` 和 Node/Git/Bubblewrap 许可证随包提供，依赖自带许可证保留在 node_modules 中。
 
-宿主必须提供 tar、gzip、cp、ldd 和安装工具的许可证路径。当前实现使用匹配系统的动态库；打包机和验收机必须都为 OpenCloudOS 9.4 x86_64。实际打包、干净安装和真实模型验收应顺序执行，不与完整回归或浏览器进程并发。
+宿主必须提供 tar、gzip、cp、ldd 和安装工具的许可证路径。构建同时追踪可执行文件与 Linux x64 Node 原生扩展的动态库，安装时实际加载 node-pty 和 SQLite，避免漏掉延迟加载的库。当前实现使用匹配系统的动态库；打包机和验收机必须都为 OpenCloudOS 9.4 x86_64。实际打包、干净安装和真实模型验收应顺序执行，不与完整回归或浏览器进程并发。
 
 ## 安装与启动
 
@@ -77,6 +77,7 @@ GOMAXPROCS=1 NODE_OPTIONS=--max-old-space-size=384 node scripts/release/RunMvpAc
 acceptance_app=/opt/domain-knowledge/current
 export PATH="$acceptance_app/tools/bin:$acceptance_app/app/node_modules/.bin:$PATH"
 export LD_LIBRARY_PATH="$acceptance_app/tools/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export WP_BUNDLED_LIB_DIR="$acceptance_app/tools/lib"
 export GIT_EXEC_PATH="$acceptance_app/tools/git-core"
 export WP_DSH_BWRAP_BIN="$acceptance_app/tools/bin/bwrap"
 GOMAXPROCS=1 NODE_OPTIONS=--max-old-space-size=384 node \

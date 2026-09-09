@@ -44,6 +44,10 @@ test('product HTTP requires authentication for reads and mutations and persists 
     const directories = await fetch(base + '/api/v1/server-directories', { headers });
     assert.equal(directories.status, 200);
     assert.equal((await directories.json()).path, root);
+    const initial = await (await fetch(base + '/api/v1/publications/settings', { headers })).json();
+    const defaultDirectory = await fetch(base + '/api/v1/server-directories?path=' + encodeURIComponent(initial.directory), { headers });
+    assert.equal(defaultDirectory.status, 200, 'fresh-install knowledge directory must be browsable before first publication');
+    assert.equal((await defaultDirectory.json()).path, initial.directory);
     const outside = await fetch(base + '/api/v1/server-directories?path=%2F', { headers });
     assert.equal(outside.status, 422);
     const settings = { directory: join(root, 'knowledge'), git: { enabled: false, remote: 'https://example.test/knowledge.git', branch: 'main', token: 'private-git-token' } };

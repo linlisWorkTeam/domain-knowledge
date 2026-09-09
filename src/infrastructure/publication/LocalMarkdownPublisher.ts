@@ -60,7 +60,7 @@ export class LocalMarkdownPublisher implements LocalPublicationPort {
         receipt_json TEXT NOT NULL, status TEXT NOT NULL CHECK(status IN ('PENDING','PUBLISHED'))
       );`);
     if (!this.database.prepare('SELECT id FROM publication_settings WHERE id=1').get()) {
-      const directory = resolve(input.defaultDirectory ?? join(this.runtimeDir, 'knowledge'));
+      const directory = this.publicationDirectory(resolve(input.defaultDirectory ?? join(this.runtimeDir, 'knowledge')));
       this.database.prepare('INSERT INTO publication_settings VALUES (1, ?)').run(JSON.stringify({ directory, git: { enabled: false, remote: '', branch: 'main', token: '' } }));
     }
   }

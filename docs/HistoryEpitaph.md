@@ -73,3 +73,13 @@ This document summarizes older handoffs, milestones and architectural decisions 
 ## 设计与命名整理交接归档
 
 [2026-09-08-1216-specs-consolidation.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/1455ba9c6a84797a2ee22e9939f2542cd4dc7ed4/docs/epitaph/2026-09-08-1216-specs-consolidation.md)：设计集中到 docs/specs 并与代码对应，统一目录小驼峰、文件大驼峰，合并 4+1 视图与历史文档。仅做静态验证，未重跑测试。原记录中的项目级账号规则是误解，已纠正为仅当前会话适用。
+
+## MVP 并行实施交接归档
+
+- [2026-09-08-1420-docgen-example-consolidation.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/5190d50170bdbfbd921f6e109dc043ffaa86cc53/docs/epitaph/2026-09-08-1420-docgen-example-consolidation.md)：统一 DocGen 样例和公共角色入口，迁移参考检查；当时只做静态检查，没有七角色 live 验收。
+- [2026-09-08-1423-session-identity-scope.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/5190d50170bdbfbd921f6e109dc043ffaa86cc53/docs/epitaph/2026-09-08-1423-session-identity-scope.md)：纠正账号约定只属于当时会话，移除仓库级身份规则；只修改文档与配置。
+- [2026-09-08-1442-domain-feature-layout.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/5190d50170bdbfbd921f6e109dc043ffaa86cc53/docs/epitaph/2026-09-08-1442-domain-feature-layout.md)：Domain 按功能平级组织，移除 services 总分组；当时仅静态验证，后由 MVP 全量回归覆盖。
+- [2026-09-09-0212-mvp-product-handoff.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/5190d50170bdbfbd921f6e109dc043ffaa86cc53/docs/epitaph/2026-09-09-0212-mvp-product-handoff.md)：实现发布 outbox、目录、Git、Console 和安装脚本；当时仅定向测试，主 Agent 后续完成接线与实际安装验收。
+- [2026-09-09-0219-mvp-product-visual-handoff.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/5190d50170bdbfbd921f6e109dc043ffaa86cc53/docs/epitaph/2026-09-09-0219-mvp-product-visual-handoff.md)：补取消按钮、产品浏览器用例和工具链接校验；交接时未执行视觉、安装或真实模型。
+- [2026-09-09-1009-mvp-knowledge-roles.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/5190d50170bdbfbd921f6e109dc043ffaa86cc53/docs/epitaph/2026-09-09-1009-mvp-knowledge-roles.md)：实现任务依赖、源码事实、DocGen 两阶段和 H2 修订；27 项角色测试通过，语义正确性仍依赖独立门禁。
+- [2026-09-09-1013-mvp-controlled-role-fixtures.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/5190d50170bdbfbd921f6e109dc043ffaa86cc53/docs/epitaph/2026-09-09-1013-mvp-controlled-role-fixtures.md)：适配受控输出、rawOutputRef 和冻结材料；无真实模型调用，模块场景集成由主 Agent 验证。
