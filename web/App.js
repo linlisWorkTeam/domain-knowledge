@@ -490,7 +490,7 @@ function renderRunWorkspace(snapshot) {
       <button class="back-button" data-run-back>← 返回批次列表</button>
       <div class="run-title-row">
         <div><p class="eyebrow">${escapeHtml(shortId(run.runId, 28))}</p><h2>${escapeHtml(run.moduleId)}</h2><p class="subtitle">策略 ${escapeHtml(run.policyId)} · 更新于 ${escapeHtml(formatDate(run.updatedAt))}</p></div>
-        <div class="run-title-actions">${badge(run.state)}<a class="secondary-button" href="/api/v1/runs/${encodeURIComponent(run.runId)}/report" download>导出报告</a><button class="secondary-button" data-refresh-run="${escapeHtml(run.runId)}">刷新</button></div>
+        <div class="run-title-actions">${badge(run.state)}<a class="secondary-button" href="/api/v1/runs/${encodeURIComponent(run.runId)}/report" download>导出报告</a><button class="secondary-button" data-refresh-run="${escapeHtml(run.runId)}">刷新</button>${!TERMINAL.has(run.state) ? `<button class="secondary-button" data-cancel-run="${escapeHtml(run.runId)}" type="button" ${state.operatorMode ? '' : 'disabled'}>取消批次</button>` : ''}</div>
       </div>
       <ol class="run-stepper">${steps}</ol>
       ${progress?.mode === 'DETERMINATE' ? `<div class="state-callout"><b>可证明进度：${escapeHtml(progress.completedUnits)} / ${escapeHtml(progress.totalUnits)}</b><span>当前阶段 ${escapeHtml(displayLabel(progress.currentStage))} · 不提供推测性的预计完成时间</span><progress class="progress" value="${escapeHtml(progress.completedUnits)}" max="${escapeHtml(progress.totalUnits)}"></progress></div>` : '<div class="state-callout"><b>进度暂不可确定</b><span>服务端没有完整冻结工作单元，不显示百分比或预计完成时间。</span></div>'}
@@ -1380,6 +1380,8 @@ content.addEventListener('click', (event) => {
   if (event.target.closest('[data-load-evaluations]')) renderEvidence(true).catch((error) => showToast(userFacingError(error, '无法加载更多评测记录。'), 'danger'))
   if (event.target.closest('[data-load-sources]')) renderDiscovery(false, true).catch((error) => showToast(userFacingError(error, '无法加载更多来源。'), 'danger'))
   if (event.target.closest('[data-verify-provider]')) verifyProviderSettings()
+  const cancelRunButton = event.target.closest('[data-cancel-run]')
+  if (cancelRunButton) cancelWorkflow(cancelRunButton).catch((error) => showToast(userFacingError(error, '无法取消当前批次。'), 'danger'))
   if (event.target.closest('[data-load-publications]')) loadPublications().catch(productError)
   if (event.target.closest('[data-sync-publications]')) syncPublications().catch(productError)
   if (event.target.closest('[data-recover-publications]')) recoverPublications().catch(productError)
@@ -1812,4 +1814,20 @@ async function openPublication(key) {
   const result = await request(`/api/v1/publications/${encodeURIComponent(key)}`)
   const target = document.querySelector('#publication-settings')
   target.innerHTML = `<button class="secondary-button" type="button" data-load-publications>返回发布列表</button><h3>${escapeHtml(result.metadata.title || result.receipt.moduleId)}</h3><p>版本 ${escapeHtml(result.receipt.versionId)} · 来源 ${escapeHtml(result.metadata.sourceCommit)}</p><pre class="publication-markdown">${escapeHtml(result.markdown)}</pre><details><summary>来源与门禁证据</summary><pre class="json-view">${json(result.metadata)}</pre></details>`
+}
+
+
+async function cancelWorkflow(button) {
+  if (!state.operatorMode || !state.token) return
+  button.disabled = true
+  button.textContent = '正在取消…'
+  try {
+    await request(`/api/v1/runs/${encodeURIComponent(button.dataset.cancelRun)}/cancel`, { method: 'POST', body: '{}' })
+    await openRun(button.dataset.cancelRun)
+    showToast('批次已取消。已完成的运行证据仍然保留。', 'success')
+  } catch (error) {
+    button.disabled = false
+    button.textContent = '取消批次'
+    throw error
+  }
 }

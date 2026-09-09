@@ -757,7 +757,7 @@ test('mobile navigation, theme persistence and 200 percent zoom preserve core pa
 });
 
 
-test('项目场景表单拒绝非法输入并通过 API 提交通用场景', async ({ page }) => {
+test('通用场景 API 保留路径校验；浏览器固定模块入口不要求场景 JSON', async ({ page }) => {
   const originalStart = instance.composition.apps.orchestrator.start;
   const starts: unknown[] = [];
   instance.composition.apps.orchestrator.start = async (scenario) => {
@@ -768,17 +768,20 @@ test('项目场景表单拒绝非法输入并通过 API 提交通用场景', asy
     await page.goto(baseUrl);
     await enterGovernance(page);
     await navigateTo(page, '飞轮批次');
-    await page.getByLabel('受信项目路径').fill(repositoryDir);
+    await expect(page.getByLabel('项目场景 JSON')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: '启动知识飞轮' })).toBeVisible();
     const scenario = { ...GENERIC_SCENARIO, moduleId: 'browser-module', repositoryRoot: repositoryDir };
-    await page.getByLabel('项目场景 JSON').fill(JSON.stringify({ ...scenario, sourcePaths: ['../private'] }));
-    const denied = page.waitForResponse((response) => response.url().endsWith('/api/v1/runs') && response.request().method() === 'POST');
-    await page.getByRole('button', { name: '启动项目流程' }).click();
-    expect((await denied).status()).toBe(422);
+    const headers = { authorization: 'Bearer ui-e2e-token', 'Idempotency-Key': 'legacy-invalid-scenario' };
+    const denied = await page.request.post(`${baseUrl}/api/v1/runs`, {
+      headers, data: { repositoryRoot: repositoryDir, scenario: { ...scenario, sourcePaths: ['../private'] } },
+    });
+    expect(denied.status()).toBe(422);
     expect(starts).toHaveLength(0);
-    await page.getByLabel('项目场景 JSON').fill(JSON.stringify(scenario));
-    const accepted = page.waitForResponse((response) => response.url().endsWith('/api/v1/runs') && response.request().method() === 'POST');
-    await page.getByRole('button', { name: '启动项目流程' }).click();
-    expect((await accepted).status()).toBe(202);
+    const accepted = await page.request.post(`${baseUrl}/api/v1/runs`, {
+      headers: { ...headers, 'Idempotency-Key': 'legacy-valid-scenario' },
+      data: { repositoryRoot: repositoryDir, scenario },
+    });
+    expect(accepted.status()).toBe(202);
     expect(starts).toEqual([scenario]);
   } finally { instance.composition.apps.orchestrator.start = originalStart; }
 });

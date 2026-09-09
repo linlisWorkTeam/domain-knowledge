@@ -5,7 +5,7 @@ SPDX-License-Identifier: MIT
 -->
 # Linux 安装与本地发布
 
-本版安装目标为 OpenCloudOS 9.4 x86_64。浏览器访问服务，安装包包含 Node.js、Git、Bubblewrap、Bash、prlimit、DSH、应用依赖和 TypeScript 工具；安装及代表模块构建不运行 npm install。真实模型和手动 Git 同步仍需要网络。Windows 和整个桌面项目构建不在本版范围。
+本版安装目标为 OpenCloudOS 9.4 x86_64。浏览器访问服务，安装包包含 Node.js、Git、Bubblewrap、Bash、prlimit、OpenSSH、DSH、应用依赖和 TypeScript 工具；安装及代表模块构建不运行 npm install。真实模型和手动 Git 同步仍需要网络。Windows 和整个桌面项目构建不在本版范围。
 
 设计参见 [应用层](specs/application/Application.md)、[HTTP API](specs/interfaces/HttpApi.md)、[SQLite 与工件](specs/infrastructure/sqlite/Sqlite.md)。发布验收状态以同版 Release 的证据为准；有构建产物不代表真实模型验收已通过。
 
@@ -17,7 +17,7 @@ SPDX-License-Identifier: MIT
 node scripts/release/BuildLinuxBundle.mjs 0.2.0 /tmp/knowledge-release
 ```
 
-构建脚本不下载依赖，并要求工作树无修改。它从 Git 跟踪文件清单提取应用，复制当前已锁定的依赖，串行计算每个文件摘要，以 gzip 低压缩等级限制 ECS 资源占用。工具清单记录版本、SHA-256、源码提交和 lockfile 摘要。`Manifest.json`、`ThirdParty.json` 和 Node/Git/Bubblewrap 许可证随包提供，依赖自带许可证保留在 node_modules 中。
+构建脚本不下载依赖，并要求工作树无修改。它从 Git 跟踪文件清单提取应用，复制当前已锁定的依赖，串行计算每个文件摘要，以 gzip 低压缩等级限制 ECS 资源占用，并去掉 gzip 时间戳以保持构建可复现。构建还验证 TypeScript 的 Linux x64 原生编译器存在，修复 Git helper 在安装布局中的相对链接，记录全部包内符号链接并拒绝越界。工具清单记录版本、SHA-256、源码提交和 lockfile 摘要。`Manifest.json`、`ThirdParty.json` 和 Node/Git/Bubblewrap 许可证随包提供，依赖自带许可证保留在 node_modules 中。
 
 宿主必须提供 tar、gzip、cp、ldd 和安装工具的许可证路径。当前实现使用匹配系统的动态库；打包机和验收机必须都为 OpenCloudOS 9.4 x86_64。实际打包、干净安装和真实模型验收应顺序执行，不与完整回归或浏览器进程并发。
 
@@ -58,7 +58,7 @@ sh domain-knowledge-0.2.1-linux-x86_64.run --prefix /opt/domain-knowledge
 /opt/domain-knowledge/knowledge uninstall
 ```
 
-版本位于 `versions/<version>`，`current` 原子切换。升级先停止旧服务，并保留 `data/` 中的配置、SQLite、正文工件和运行记录；相同版本重复安装会拒绝覆盖。`WP_FLYWHEEL_HOME` 可指定独立的数据目录。卸载默认只移除应用版本和启动器，保留用户数据与外部知识仓库。恢复旧应用版本不允许跨执行契约版本恢复未完成运行。
+版本位于 `versions/<version>`，`current` 与启动器分别原子切换，临时链接在失败时清理。安装目录和独立数据目录采用 700 权限，配置文件拒绝符号链接。升级先停止旧服务，并保留 `data/` 中的配置、SQLite、正文工件和运行记录；相同版本重复安装会拒绝覆盖。`WP_FLYWHEEL_HOME` 可指定独立的数据目录。卸载默认只移除应用版本和启动器，保留用户数据与外部知识仓库。恢复旧应用版本不允许跨执行契约版本恢复未完成运行。
 
 ## 发行验证
 

@@ -1033,3 +1033,12 @@ time,
 .publication-list code { overflow-wrap: anywhere; white-space: normal; }
 .publication-markdown { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; line-height: 1.8; }
 @media (max-width: 720px) { .publication-form { grid-template-columns: minmax(0, 1fr); } }
+
+.publication-list .reference-doc { grid-template-columns: minmax(0, 1fr) 72px minmax(0, 1.5fr); gap: 12px; padding: 14px; }
+.publication-list .reference-doc > span { min-width: 0; overflow-wrap: anywhere; }
+.publication-panel .section-heading { flex-wrap: wrap; gap: 12px; }
+@media (max-width: 720px) {
+  .publication-list .reference-doc { grid-template-columns: minmax(0, 1fr) 72px; }
+  .publication-list .reference-doc > span:nth-child(2) { display: block; }
+  .publication-list .reference-doc > code { grid-column: 1 / -1; }
+}
