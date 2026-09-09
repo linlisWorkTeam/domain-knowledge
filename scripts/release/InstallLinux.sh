@@ -6,13 +6,15 @@ set -eu
 umask 077
 version='__BUNDLE_VERSION__'
 expected='__PAYLOAD_SHA256__'
-prefix=${WP_INSTALL_PREFIX:-"$HOME/.local/share/domain-knowledge"}
+prefix=${WP_INSTALL_PREFIX:-}
 if [ "${1:-}" = '--help' ]; then
   printf '%s\n' 'Usage: sh domain-knowledge-VERSION-linux-x86_64.run [--prefix ABSOLUTE_PATH]'
   exit 0
 fi
 if [ "${1:-}" = '--prefix' ]; then prefix=${2:?Missing installation prefix}; shift 2; fi
 if [ "$#" -ne 0 ]; then printf '%s\n' 'Unexpected installer argument' >&2; exit 2; fi
+# 显式目录安装与 --help 不依赖登录环境，适用于清空环境变量的离线验收。
+if [ -z "$prefix" ]; then prefix="${HOME:?Set HOME or pass --prefix}/.local/share/domain-knowledge"; fi
 case "$prefix" in /*) ;; *) printf '%s\n' 'Installation prefix must be absolute' >&2; exit 2 ;; esac
 if [ "$(uname -s)" != Linux ] || [ "$(uname -m)" != x86_64 ]; then printf '%s\n' 'Linux x86_64 is required' >&2; exit 1; fi
 if [ ! -r /etc/os-release ] || ! grep -q '^ID="*opencloudos"*' /etc/os-release || ! grep -q '^VERSION_ID="*9.4"*' /etc/os-release; then
