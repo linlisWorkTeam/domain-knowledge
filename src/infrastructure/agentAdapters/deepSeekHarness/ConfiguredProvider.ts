@@ -23,6 +23,10 @@ interface Options extends Partial<DshExecutionParameters> {
   settings: ProviderSettingsRecord;
   /** 提供dshHome信息，供调用方读取或传入。 */
   dshHome: string;
+  /** 显式探针限制上游请求次数，防止原生工具往返产生额外费用。 */
+  maxProviderRequests?: number;
+  /** 限制上游响应字节，包含所有流帧及非内容字段。 */
+  maxProviderResponseBytes?: number;
   /** 提供endpoint策略信息，供调用方读取或传入。 */
   endpointPolicy?: ProviderEndpointPolicy;
   /** 提供runtime信息，供调用方读取或传入。 */
@@ -43,6 +47,9 @@ export class ConfiguredDshProvider implements AgentProvider {
     if (options.settings.provider !== 'deepseek-harness' || !options.settings.model || !options.settings.enabled) {
       throw new Error('DSH_CONFIGURATION_UNAVAILABLE');
     }
+    for (const limit of [options.maxProviderRequests, options.maxProviderResponseBytes]) {
+      if (limit !== undefined && (!Number.isSafeInteger(limit) || limit < 1)) throw new Error('DSH_PROVIDER_LIMIT_INVALID');
+    }
     this.options = structuredClone({ ...options, endpointPolicy: undefined, onInvocation: undefined, onAudit: undefined });
     this.options.endpointPolicy = options.endpointPolicy;
     this.options.onInvocation = options.onInvocation;
@@ -55,11 +62,12 @@ export class ConfiguredDshProvider implements AgentProvider {
     if (!request.workspaceRoot) throw new Error('DSH_AGENT_WORKSPACE_REQUIRED');
     const settings = this.options.settings;
     const endpoint = await (this.options.endpointPolicy ?? new PublicHttpsEndpointPolicy()).validate(settings.apiUrl);
-    const dispatcher = createPinnedHttpsDispatcher(endpoint);
+    const dispatcher = createPinnedHttpsDispatcher(endpoint, this.options.maxProviderResponseBytes);
     const token = randomUUID();
     const abort = new AbortController();
     let transportError: string | null = null;
     let sessionId: string | undefined;
+    let providerRequests = 0;
     let inputTokens: number | null = null;
     let outputTokens: number | null = null;
     // The real upstream credential stays in the parent. DSH receives only an
@@ -80,6 +88,7 @@ export class ConfiguredDshProvider implements AgentProvider {
         }
         const target = new URL('chat/completions', endpoint.url.href.replace(/\/?$/, '/'));
         if (!sessionId) throw new Error('DSH_AGENT_SESSION_MISMATCH');
+        if (++providerRequests > (this.options.maxProviderRequests ?? Infinity)) throw new Error('PROVIDER_REQUEST_LIMIT');
         const response = await fetch(target, {
           method: 'POST', body: Buffer.concat(chunks), dispatcher, redirect: 'manual', signal: abort.signal,
           // 使用本次原生会话的稳定标识，工具往返保持一致，重试和其他角色各自隔离。
@@ -93,8 +102,11 @@ export class ConfiguredDshProvider implements AgentProvider {
         if (!response.ok) { await response.body?.cancel(); throw new Error('DSH_PROVIDER_REQUEST_FAILED'); }
         res.writeHead(200, { 'content-type': 'text/event-stream' });
         let pending = '';
+        let responseBytes = 0;
         const decoder = new TextDecoder();
         for await (const chunk of response.body ?? []) {
+          responseBytes += chunk.byteLength;
+          if (responseBytes > (this.options.maxProviderResponseBytes ?? 2 * 1024 * 1024)) throw new Error('DSH_PROVIDER_OUTPUT_LIMIT');
           if (!res.write(chunk)) await once(res, 'drain', { signal: abort.signal });
           pending += decoder.decode(chunk, { stream: true });
           const lines = pending.split('\n');
