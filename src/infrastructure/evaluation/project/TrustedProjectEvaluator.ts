@@ -18,6 +18,7 @@ import type {
 } from '../../../application/ports/ApplicationPorts.ts';
 import type { ModuleBehaviorSuite } from '../../../domain/agents/testGenAgent/ModuleBehaviorSuite.ts';
 import { evaluateModuleSuite } from './ModuleCaseExecutor.ts';
+import { bundledLibraryEnvironment } from '../../runtime/BundledLibraries.ts';
 
 interface ResolvedTool {
   /** 提供executable信息，供调用方读取或传入。 */
@@ -150,7 +151,7 @@ function executionEnvironment(isolationRoot?: string): NodeJS.ProcessEnv {
     'ProgramFiles', 'ProgramFiles(x86)', 'ProgramData',
     'NUMBER_OF_PROCESSORS', 'PROCESSOR_ARCHITECTURE',
   ]);
-  const env: NodeJS.ProcessEnv = { CI: '1', NO_COLOR: '1', FORCE_COLOR: '0' };
+  const env: NodeJS.ProcessEnv = { CI: '1', NO_COLOR: '1', FORCE_COLOR: '0', ...bundledLibraryEnvironment() };
   for (const [key, value] of Object.entries(process.env)) {
     if (allowed.has(key) && value !== undefined) env[key] = value;
   }

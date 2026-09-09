@@ -13,6 +13,7 @@ import { isDeepStrictEqual } from 'node:util';
 import type { ArtifactStore, GeneratedProjectFile, ProjectCommandResult, ProjectEvaluation, ProjectSnapshot } from '../../../application/ports/ApplicationPorts.ts';
 import { assertModuleBehaviorSuite, type ModuleBehaviorSuite } from '../../../domain/agents/testGenAgent/ModuleBehaviorSuite.ts';
 import { modelProcessLane } from '../../agentAdapters/ModelProcessLane.ts';
+import { bundledLibraryEnvironment, bundledLibrarySandboxArgs } from '../../runtime/BundledLibraries.ts';
 
 interface ModuleEvaluationInput {
   label: string;
@@ -86,13 +87,14 @@ async function captureIsolated(input: {
     ...(input.buildOutput ? ['--bind', input.buildOutput, '/workspace/build'] : []),
     ...(input.compilerRoot ? ['--ro-bind', input.compilerRoot, '/compiler'] : []),
     '--clearenv', '--setenv', 'HOME', '/tmp', '--setenv', 'TMPDIR', '/tmp',
+    ...bundledLibrarySandboxArgs(),
     '--setenv', 'GOMAXPROCS', '1', '--setenv', 'GOMEMLIMIT', '128MiB',
     '--setenv', 'NODE_NO_WARNINGS', '1', '--chdir', '/workspace', '--', ...input.command,
   ];
   const startedAt = Date.now();
   return new Promise((resolve, reject) => {
     const child = spawn(process.env.WP_EVALUATION_PRLIMIT_COMMAND ?? 'prlimit', args, {
-      env: { PATH: process.env.PATH }, detached: true, stdio: ['ignore', 'pipe', 'pipe'], shell: false,
+      env: { PATH: process.env.PATH, ...bundledLibraryEnvironment() }, detached: true, stdio: ['ignore', 'pipe', 'pipe'], shell: false,
     });
     let stdout = Buffer.alloc(0), stderr = Buffer.alloc(0);
     let timedOut = false, outputLimitExceeded = false, cancelled = false;
@@ -135,7 +137,7 @@ async function readReferenceSource(input: ModuleEvaluationInput, signal?: AbortS
   if (signal?.aborted) throw new Error('PROJECT_EVALUATION_CANCELLED');
   return new Promise((resolve, reject) => {
     const child = spawn('git', ['--no-replace-objects', 'show', `${input.snapshot.commit}:${input.moduleSuite.modulePath}`], {
-      cwd: input.snapshot.repositoryRoot, env: { PATH: process.env.PATH }, shell: false,
+      cwd: input.snapshot.repositoryRoot, env: { PATH: process.env.PATH, ...bundledLibraryEnvironment() }, shell: false,
       detached: true, stdio: ['ignore', 'pipe', 'ignore'],
     });
     let stdout: Buffer<ArrayBufferLike> = Buffer.alloc(0);

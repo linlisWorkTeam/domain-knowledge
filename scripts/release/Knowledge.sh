@@ -16,7 +16,8 @@ export WP_FLYWHEEL_HOME="$data"
 export PATH="$app/tools/bin:$app/app/node_modules/.bin:$PATH"
 export WP_DSH_BWRAP_BIN="$app/tools/bin/bwrap"
 export GIT_EXEC_PATH="$app/tools/git-core"
-export LD_LIBRARY_PATH="$app/tools/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export WP_BUNDLED_LIB_DIR="$app/tools/lib"
+export LD_LIBRARY_PATH="$WP_BUNDLED_LIB_DIR"
 export WP_KNOWLEDGE_HOST=${WP_KNOWLEDGE_HOST:-127.0.0.1}
 export WP_KNOWLEDGE_PORT=${WP_KNOWLEDGE_PORT:-4310}
 export NODE_OPTIONS=${NODE_OPTIONS:---max-old-space-size=384}

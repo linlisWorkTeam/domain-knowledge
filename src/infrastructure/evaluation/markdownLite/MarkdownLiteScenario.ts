@@ -8,6 +8,7 @@ import { realpathSync } from 'node:fs';
 import { sha256 } from '../../../domain/Domain.ts';
 import type { AutomatedProjectScenario } from '../../../application/services/AutomatedProjectWorkflow.ts';
 import type { ModuleBehaviorSuite } from '../../../domain/agents/testGenAgent/ModuleBehaviorSuite.ts';
+import { bundledLibraryEnvironment } from '../../runtime/BundledLibraries.ts';
 
 /** 此版本验收范围与源快照固定，更新必须重新执行完整验收。 */
 export const MARKDOWN_LITE_BASELINE = {
@@ -68,7 +69,7 @@ export async function createMarkdownLiteScenario(directory: string): Promise<Aut
     [MARKDOWN_LITE_BASELINE.lockfilePath, MARKDOWN_LITE_BASELINE.lockfileSha256],
   ]) {
     const result = spawnSync('git', ['--no-replace-objects', 'show', `${MARKDOWN_LITE_BASELINE.commit}:${path}`], {
-      cwd: repositoryRoot, env: { PATH: process.env.PATH, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null' },
+      cwd: repositoryRoot, env: { PATH: process.env.PATH, ...bundledLibraryEnvironment(), GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null' },
       maxBuffer: 4 * 1024 * 1024, timeout: 10_000,
     });
     if (result.status !== 0 || sha256(result.stdout) !== expected) throw new Error(`MODULE_BASELINE_MISMATCH: ${path}`);
