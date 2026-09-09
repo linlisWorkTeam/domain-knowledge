@@ -87,9 +87,14 @@
     }
   },
   "modelOutput": {
-    "body": "# Markdown diff\n\n## Purpose\nCompare two Markdown documents and report changed sections with line ranges.\n\n## Behavior\nIdentical inputs return empty hunks. CRLF is normalized before comparison; for example, \"a\\r\\nb\" and \"a\\nb\" produce no changed sections. Insertions and deletions preserve the old and new line coordinates. The implementation uses bounded processing for large inputs.\n",
     "title": "Markdown diff",
-    "description": "Document comparison semantics"
+    "description": "Document comparison semantics",
+    "sections": [
+      {
+        "sectionId": "section-2",
+        "body": "Identical inputs return empty hunks. CRLF is normalized before comparison; for example, \"a\\r\\nb\" and \"a\\nb\" produce no changed sections. Insertions and deletions preserve the old and new line coordinates. The implementation uses bounded processing for large inputs.\n"
+      }
+    ]
   },
   "modelStages": {
     "outline": {
@@ -105,6 +110,25 @@
           "purpose": "Explain comparison and normalization behavior"
         }
       ]
+    },
+    "body": {
+      "title": "Markdown diff",
+      "description": "Document comparison semantics",
+      "sections": [
+        {
+          "sectionId": "section-1",
+          "body": "Compare two Markdown documents and report changed sections with line ranges.\n\n"
+        },
+        {
+          "sectionId": "section-2",
+          "body": "Identical inputs return empty hunks. CRLF is normalized before comparison; for example, \"a\\r\\nb\" and \"a\\nb\" produce no changed sections. Insertions and deletions preserve the old and new line coordinates. The implementation uses bounded processing for large inputs.\n"
+        }
+      ]
     }
+  },
+  "expectedOutput": {
+    "body": "# Markdown diff\n\n## Purpose\nCompare two Markdown documents and report changed sections with line ranges.\n\n## Behavior\nIdentical inputs return empty hunks. CRLF is normalized before comparison; for example, \"a\\r\\nb\" and \"a\\nb\" produce no changed sections. Insertions and deletions preserve the old and new line coordinates. The implementation uses bounded processing for large inputs.\n",
+    "title": "Markdown diff",
+    "description": "Document comparison semantics"
   }
 }

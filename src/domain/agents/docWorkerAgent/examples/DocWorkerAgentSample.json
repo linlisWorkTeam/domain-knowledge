@@ -64,6 +64,39 @@
         "statement": "Exports structuredMarkdownDiff with two string arguments",
         "sourcePath": "src/domain/services/markdown-diff.ts",
         "startLine": 1,
+        "endLine": 1
+      },
+      {
+        "kind": "behavior",
+        "statement": "CRLF is normalized before comparison",
+        "sourcePath": "src/domain/services/markdown-diff.ts",
+        "startLine": 2,
+        "endLine": 2
+      },
+      {
+        "kind": "boundary",
+        "statement": "Equivalent normalized inputs return no changed sections",
+        "sourcePath": "src/domain/services/markdown-diff.ts",
+        "startLine": 3,
+        "endLine": 3
+      }
+    ],
+    "unresolvedRisks": [
+      "The supplied fragment does not prove the non-identical-input return behavior."
+    ]
+  },
+  "expectedOutput": {
+    "workerId": "worker-0",
+    "fragment": "CRLF is normalized before comparison; identical documents return no changed sections.",
+    "provenance": [
+      "src/domain/services/markdown-diff.ts"
+    ],
+    "facts": [
+      {
+        "kind": "interface",
+        "statement": "Exports structuredMarkdownDiff with two string arguments",
+        "sourcePath": "src/domain/services/markdown-diff.ts",
+        "startLine": 1,
         "endLine": 1,
         "quote": "export function structuredMarkdownDiff(before: string, after: string) {"
       },

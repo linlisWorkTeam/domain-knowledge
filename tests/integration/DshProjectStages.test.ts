@@ -18,7 +18,7 @@ import { LocalAgentWorkspace } from '../../src/domain/workspace/LocalAgentWorksp
 import { TrustedProjectEvaluator } from '../../src/infrastructure/evaluation/project/TrustedProjectEvaluator.ts';
 import { JsonSchemaAgentContractValidator } from '../../src/infrastructure/agentAdapters/contracts/JsonSchemaAgentContractValidator.ts';
 import { createComposition } from '../../src/interfaces/runner/Composition.ts';
-import { knowledgeOutline, knowledgePlan } from '../helpers/KnowledgeRoleFixture.ts';
+import { knowledgeOutline, knowledgePlan, knowledgeSections } from '../helpers/KnowledgeRoleFixture.ts';
 import { GOOD_BODY } from '../helpers/Fixture.ts';
 
 function git(root: string, args: string[]): string {
@@ -76,7 +76,7 @@ for (const [moduleId, sourcePath] of [['formatter', 'lib/format.mjs'], ['normali
                   ? knowledgePlan([sourcePath])
                   : outline
                     ? knowledgeOutline({ title: moduleId, description: 'Pinned source documentation.', body: GOOD_BODY })
-                    : { title: moduleId, description: 'Pinned source documentation.', body: GOOD_BODY }),
+                    : knowledgeSections({ title: moduleId, description: 'Pinned source documentation.', body: GOOD_BODY })),
               };
             },
             close: async () => undefined,

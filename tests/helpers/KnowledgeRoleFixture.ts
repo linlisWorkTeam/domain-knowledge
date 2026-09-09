@@ -24,3 +24,12 @@ export function knowledgeOutline(document: { title: string; description: string;
     sections: markdownSections(document.body).map(({ heading }) => ({ heading, purpose: `Explain ${heading}.` })),
   };
 }
+
+/** 模型夹具显式返回章节体，既有正文仍作为独立期望值供断言使用。 */
+export function knowledgeSections(document: { title: string; description: string; body: string }, allowed?: string[]) {
+  return { title: document.title, description: document.description,
+    sections: markdownSections(document.body).map(({ heading, text }, index) => ({
+      sectionId: `section-${index + 1}`, heading, body: text.slice(text.indexOf('\n') + 1),
+    })).filter(({ heading }) => !allowed || allowed.includes(heading)).map(({ heading: _heading, ...section }) => section),
+  };
+}

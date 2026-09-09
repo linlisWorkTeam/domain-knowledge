@@ -6,6 +6,7 @@
 import type { ArtifactRef } from '../../Domain.ts';
 import type { RoleInput } from '../AgentExecution.ts';
 import { requireMaterials } from '../AgentExecution.ts';
+import { StageValidationIssue } from '../StageValidation.ts';
 
 /** 角色业务载荷。 */
 export interface Payload {
@@ -39,6 +40,8 @@ export interface SourceFact {
 }
 /** 有源码依据的事实与尚缺证据的风险分别保留，供汇总时追踪。 */
 export interface Output { workerId: string; fragment: string; provenance: string[]; facts: SourceFact[]; unresolvedRisks: string[]; }
+/** 模型只选择已编号的源码范围，原文由受信材料提取。 */
+export type ModelOutput = Omit<Output, 'facts'> & { facts: Array<Omit<SourceFact, 'quote'>> };
 /** 对外提供输出Schema，作为调用方使用的统一约定。 */
 export const outputSchema: Record<string, unknown> = {
   type: 'object', required: ['workerId', 'fragment', 'provenance', 'facts', 'unresolvedRisks'], additionalProperties: false,
@@ -59,7 +62,37 @@ export const outputSchema: Record<string, unknown> = {
 
 /** 构造本次角色执行使用的输出 Schema。 */
 export function schemaFor(_input: Input): Record<string, unknown> {
-  return outputSchema;
+  const schema = structuredClone(outputSchema) as any;
+  const fact = schema.properties.facts.items;
+  fact.required = fact.required.filter((field: string) => field !== 'quote');
+  delete fact.properties.quote;
+  return schema;
+}
+
+/** 先检查模型选中的授权范围，再生成逐字原文；不修补任何旧的失败工件。 */
+export function resolveFacts(raw: ModelOutput, input: Input): Output {
+  const sources = sourceTexts(input);
+  const allowed = input.payload.assignedSourcePaths ?? input.sourcePaths;
+  if (raw.provenance.some((path) => !allowed.includes(path))) throw new Error('DOC_WORKER_PROVENANCE_DENIED');
+  const facts = raw.facts.map((fact, index) => {
+    if (!allowed.includes(fact.sourcePath) || !raw.provenance.includes(fact.sourcePath)) throw new Error('DOC_WORKER_FACT_SOURCE_DENIED');
+    const source = sources.get(fact.sourcePath);
+    if (source === undefined) throw new Error('DOC_WORKER_SOURCE_TEXT_MISSING');
+    const lines = source.split(/\r?\n/);
+    if (fact.startLine > fact.endLine || fact.endLine > lines.length) {
+      throw new StageValidationIssue('DOC_WORKER_FACT_RANGE_INVALID', `facts[${index}]`,
+        `从已提供的编号源码选择闭区间，必须满足 1 <= startLine <= endLine <= ${lines.length}。`);
+    }
+    const quote = lines.slice(fact.startLine - 1, fact.endLine).join('\n');
+    if (!quote.trim()) throw new StageValidationIssue('DOC_WORKER_FACT_EVIDENCE_EMPTY', `facts[${index}]`, '空白源码不能证明接口或行为；选择有实际源码的范围，证据缺失时记录风险。');
+    return { ...fact, quote };
+  });
+  if (['interface', 'behavior', 'boundary'].some((kind) => !facts.some((fact) => fact.kind === kind)) && raw.unresolvedRisks.length === 0) {
+    throw new StageValidationIssue('DOC_WORKER_MISSING_EVIDENCE_RISK', 'facts/unresolvedRisks', '补充缺失类别的有据事实；无法证明时保留具体证据缺口，不能隐去风险。');
+  }
+  const output = { ...raw, facts };
+  validateFacts(output, input);
+  return output;
 }
 
 /** 检查本角色必需字段及所引用材料是否完整。 */

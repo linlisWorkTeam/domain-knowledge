@@ -34,7 +34,7 @@ function git(root: string, args: string[]): string {
   return result.stdout.trim();
 }
 
-interface Options { defectiveFirst?: boolean; wrongOracle?: boolean; unresolvedSource?: boolean; maxIterations?: number; }
+interface Options { defectiveFirst?: boolean; wrongOracle?: boolean; unresolvedSource?: boolean; maxIterations?: number; stageDefects?: boolean; }
 
 /** 只有参考仓库、模型夹具与门禁数据被构造；编译、进程隔离和宿主比较全部使用生产实现。 */
 async function runModule(options: Options, verify: (context: {
@@ -95,7 +95,14 @@ async function runModule(options: Options, verify: (context: {
       const model = fixture.executor.modelFactory(stage);
       return { assertOutput: model.assertOutput, execute: async (request, signal) => {
         requests.push({ iteration: stage.stage.iteration, request: structuredClone(request) });
-        return model.execute(request, signal);
+        const output = await model.execute(request, signal);
+        if (options.stageDefects && request.role === 'doc-worker' && request.stage === 'extract') {
+          (output as any).facts[0].endLine = 500;
+        }
+        if (options.stageDefects && request.role === 'doc-gen' && request.stage === 'body') {
+          (output as any).sections[0].body = '# 1. Invalid heading\n' + (output as any).sections[0].body;
+        }
+        return output;
       } };
     } });
     const infrastructure = await createDomainKnowledgeInfrastructure({ executor, observer: composition.workflowObserver,
@@ -163,6 +170,21 @@ test('module flywheel: seven roles pass frozen and promoted suites and publish l
     assert.equal(published.metadata.sourceCommit, scenario.expectedCommit);
     assert.equal(published.metadata.evidenceRefs.length, 2);
     assert.equal(readFileSync(receipt.path, 'utf8'), published.markdown);
+  });
+});
+
+test('module flywheel: stage feedback repairs ranges and headings within one round without leaking failed evidence', async () => {
+  await runModule({ stageDefects: true, maxIterations: 1 }, async ({ composition, runId, result, requests }) => {
+    assert.equal(result.executionStatus, 'COMPLETED', result.error ?? '');
+    assert.equal(result.iteration, 0);
+    assert.equal(composition.service.status().publications, 1);
+    assert.deepEqual(requests.filter(({ request }) => request.role === 'doc-worker').map(({ request }) => request.stage), ['extract', 'extract:attempt-2']);
+    assert.deepEqual(requests.filter(({ request }) => request.role === 'doc-gen').map(({ request }) => request.stage), ['outline', 'body', 'body:attempt-2']);
+    const rejected = composition.repository.listEvents(runId).filter(({ payload }) => payload.kind === 'role-stage-attempt' && payload.status === 'REJECTED');
+    assert.equal(rejected.length, 2);
+    for (const { payload } of rejected) assert.equal(await composition.artifacts.verify(payload.artifactRef as ArtifactRef), true);
+    const code = requests.find(({ request }) => request.role === 'code')!.request;
+    assert.doesNotMatch(code.prompt, /Invalid heading|FACT_RANGE_INVALID|role-stage-attempt/);
   });
 });
 

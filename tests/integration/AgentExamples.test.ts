@@ -57,7 +57,7 @@ test('standalone first DocGen generation persists outline and body from distinct
     const saved = JSON.parse(readFileSync(join(result.outputDirectory, 'result.json'), 'utf8'));
     assert.equal(saved.result.status, 'SUCCEEDED');
     assert.equal(saved.publication, 'NOT_EVALUATED');
-    const body = saved.outputs.find((item: { content: string }) => item.content === sample.modelOutput.body);
+    const body = saved.outputs.find((item: { content: string }) => item.content === sample.expectedOutput.body);
     const outline = saved.outputs.find((item: { content: string }) => item.content === JSON.stringify(sample.modelStages.outline));
     assert.ok(body, 'body artifact must be committed');
     assert.ok(outline, 'outline artifact must be committed independently');
@@ -66,7 +66,7 @@ test('standalone first DocGen generation persists outline and body from distinct
     assert.ok(saved.result.rawOutputRef, 'the role output reference must be explicit');
     const raw = saved.outputs.find((item: { ref: { artifactId: string } }) => item.ref.artifactId === saved.result.rawOutputRef.artifactId);
     assert.ok(raw, 'raw output artifact must remain readable');
-    assert.deepEqual(JSON.parse(raw.content), sample.modelOutput);
+    assert.deepEqual(JSON.parse(raw.content), sample.expectedOutput);
     assert.notEqual(raw.ref.artifactId, outline.ref.artifactId);
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });

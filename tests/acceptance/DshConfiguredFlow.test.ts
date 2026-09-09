@@ -16,7 +16,7 @@ import type {
 } from '../../src/application/ports/ApplicationPorts.ts';
 import type { AutomatedProjectScenario } from '../../src/application/services/ApplicationServices.ts';
 import { createComposition } from '../../src/interfaces/runner/Composition.ts';
-import { knowledgeOutline, knowledgePlan } from '../helpers/KnowledgeRoleFixture.ts';
+import { knowledgeOutline, knowledgePlan, knowledgeSections } from '../helpers/KnowledgeRoleFixture.ts';
 import { GOOD_BODY } from '../helpers/Fixture.ts';
 
 class MemorySettings implements ProviderSettingsStore {
@@ -44,7 +44,7 @@ function agentOutput(agentType: string, stage: string): Record<string, unknown> 
           { kind: 'interface', statement: 'Exports calculate without parameters.' },
           { kind: 'behavior', statement: 'calculate returns the number 4.' },
           { kind: 'boundary', statement: 'Every call returns the same constant.' },
-        ].map((fact) => ({ ...fact, sourcePath: 'src/module.js', startLine: 1, endLine: 1, quote: 'export const calculate = () => 4;' })),
+        ].map((fact) => ({ ...fact, sourcePath: 'src/module.js', startLine: 1, endLine: 1 })),
         unresolvedRisks: [],
       };
     case 'doc-gen': {
@@ -53,7 +53,7 @@ function agentOutput(agentType: string, stage: string): Record<string, unknown> 
         title: 'DSH 最小知识批次',
         description: '使用真实 DSH SDK 生成并通过确定性门禁的知识。',
       };
-      return stage === 'outline' ? knowledgeOutline(document) : document;
+      return stage === 'outline' ? knowledgeOutline(document) : knowledgeSections(document);
     }
     case 'test-gen':
       return {

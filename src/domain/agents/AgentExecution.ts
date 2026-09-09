@@ -7,7 +7,7 @@ import type { ArtifactRef } from '../Domain.ts';
 import type { AgentCommand, AgentId } from './AgentContracts.ts';
 
 // 执行语义改变时更新版本，阻止旧 checkpoint 在不同角色实现下继续运行。
-export const ROLE_EXECUTION_VERSION = 'seven-role-mvp-v2';
+export const ROLE_EXECUTION_VERSION = 'seven-role-mvp-v3';
 /** 受信材料。 */
 export interface Material { ref: ArtifactRef; content: unknown }
 /** Application 已加载并校验的角色材料；不包含通用工作流状态或存储实现。 */
@@ -27,6 +27,8 @@ export interface RoleInput<P> {
 }
 /** 模型请求。 */
 export interface ModelRequest {
+  /** 当前阶段的输出上限；只能收紧 Provider 的配置上限。 */
+  maxTokens?: number;
   /** 业务阶段参与会话和幂等键，概要与正文不得共用模型会话。 */
   stage?: string;
   /** 提供role信息，供调用方读取或传入。 */
@@ -40,7 +42,7 @@ export interface ModelRequest {
   /** 提供确定本角色允许读取的文件路径信息，供调用方读取或传入。 */
   readablePaths: string[];
 }
-/** 模型运行 Port：Adapter 负责网络及格式修复重试，角色负责业务阶段，避免两层重复重试。 */
+/** 模型运行 Port：Adapter 负责格式重试；角色只对显式可修正的语义问题反馈，二者共享阶段信号和截止时间。 */
 export interface ModelExecutionPort {
   /** 执行当前角色或业务阶段并返回结构化结果。 */
   execute(request: ModelRequest, signal?: AbortSignal): Promise<Record<string, unknown>>;
@@ -49,6 +51,11 @@ export interface ModelExecutionPort {
 }
 /** 执行上下文。 */
 export interface ExecutionContext {
+  /** Application 保存阶段尝试，包括失败；同版本恢复使用同一记录。 */
+  stageJournal?: {
+    read(stage: string): Promise<StageAttempt[]>;
+    record(attempt: StageAttempt): Promise<void>;
+  };
   /** 提供模型信息，供调用方读取或传入。 */
   model: ModelExecutionPort;
   /** 提供命令信息，供调用方读取或传入。 */
@@ -59,6 +66,16 @@ export interface ExecutionContext {
   iteration: number;
   /** 提供取消信号信息，供调用方读取或传入。 */
   signal?: AbortSignal;
+}
+/** 阶段审计原文只保存在本地工件中，失败记录不能晋升为角色成功结果。 */
+export interface StageAttempt {
+  schemaVersion: 'role-stage-v1';
+  stage: string;
+  attempt: number;
+  startedAt: number;
+  status: 'STARTED' | 'PASSED' | 'REJECTED' | 'FAILED';
+  output?: Record<string, unknown>;
+  issue?: { code: string; field: string; hint: string };
 }
 /** 待保存工件只有内容和逻辑名称，Domain 不创建 CAS 引用或操作文件系统。 */
 export interface PendingArtifact { key: string; content: string; mediaType: string }

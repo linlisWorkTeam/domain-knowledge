@@ -19,11 +19,11 @@ import { sha256, type ArtifactRef } from '../../Domain.ts';
 import type { WorkflowStageInput } from '../../../application/ports/ApplicationPorts.ts';
 
 function body() {
-  return '# structuredMarkdownDiff\n\n证据 src/domain/services/markdown-diff.ts:L142-L150\n\n## Examples\n\n```json\n' + JSON.stringify({ examples: [
+  return '# 受控 DocGen\n\n## Examples\n证据 src/domain/services/markdown-diff.ts:L142-L150\n\n```json\n' + JSON.stringify({ examples: [
     { before: '', after: '', expectedHunkCount: 0, expectedChangedSections: [] },
     { before: 'a\r\nb', after: 'a\nb', expectedHunkCount: 0, expectedChangedSections: [] },
     { before: '# A\nold', after: '# A\nnew', expectedHunkCount: 1, expectedChangedSections: ['# A'] },
-  ] }) + '\n```';
+  ] }) + '\n```\n';
 }
 
 test('DocGen checker rejects wrong expectations, absent coverage, malformed data and invalid citations', () => {
@@ -59,7 +59,7 @@ test('DocGen example uses the shared production DSH stages, freezes prompts and 
     const outline = !payload.includes('当前阶段：body');
     const text = JSON.stringify(outline
       ? { title: '受控 DocGen', description: '机制验证', sections: [{ heading: 'Examples', purpose: '机制验证' }] }
-      : { title: '受控 DocGen', description: '机制验证', body: body() });
+      : { title: '受控 DocGen', description: '机制验证', sections: [{ sectionId: 'section-1', body: body().split('## Examples\n')[1] }] });
     response.writeHead(200, { 'content-type': 'text/event-stream' });
     response.write(`data: ${JSON.stringify({ id: 'example', object: 'chat.completion.chunk', created: 1, model: 'controlled', choices: [{ index: 0, delta: { role: 'assistant', content: text }, finish_reason: null }] })}\n\n`);
     response.write(`data: ${JSON.stringify({ id: 'example', object: 'chat.completion.chunk', created: 1, model: 'controlled', choices: [{ index: 0, delta: {}, finish_reason: 'stop' }], usage: { prompt_tokens: 73, completion_tokens: 31 } })}\n\n`);

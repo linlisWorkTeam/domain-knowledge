@@ -48,7 +48,12 @@
   "modelOutput": {
     "title": "固定源码 DocGen 样例",
     "description": "用数据例子核验 Markdown 差异行为",
-    "body": "# structuredMarkdownDiff\n\n证据 src/domain/services/markdown-diff.ts:L142-L150\n\n## Examples\n\n```json\n{\"examples\":[{\"before\":\"\",\"after\":\"\",\"expectedHunkCount\":0,\"expectedChangedSections\":[]},{\"before\":\"a\\r\\nb\",\"after\":\"a\\nb\",\"expectedHunkCount\":0,\"expectedChangedSections\":[]},{\"before\":\"# A\\nold\",\"after\":\"# A\\nnew\",\"expectedHunkCount\":1,\"expectedChangedSections\":[\"# A\"]}]}\n```"
+    "sections": [
+      {
+        "sectionId": "section-1",
+        "body": "证据 src/domain/services/markdown-diff.ts:L142-L150\n\n```json\n{\"examples\":[{\"before\":\"\",\"after\":\"\",\"expectedHunkCount\":0,\"expectedChangedSections\":[]},{\"before\":\"a\\r\\nb\",\"after\":\"a\\nb\",\"expectedHunkCount\":0,\"expectedChangedSections\":[]},{\"before\":\"# A\\nold\",\"after\":\"# A\\nnew\",\"expectedHunkCount\":1,\"expectedChangedSections\":[\"# A\"]}]}\n```"
+      }
+    ]
   },
   "modelStages": {
     "outline": {
@@ -60,6 +65,21 @@
           "purpose": "Show executable examples derived from the pinned source"
         }
       ]
+    },
+    "body": {
+      "title": "固定源码 DocGen 样例",
+      "description": "用数据例子核验 Markdown 差异行为",
+      "sections": [
+        {
+          "sectionId": "section-1",
+          "body": "证据 src/domain/services/markdown-diff.ts:L142-L150\n\n```json\n{\"examples\":[{\"before\":\"\",\"after\":\"\",\"expectedHunkCount\":0,\"expectedChangedSections\":[]},{\"before\":\"a\\r\\nb\",\"after\":\"a\\nb\",\"expectedHunkCount\":0,\"expectedChangedSections\":[]},{\"before\":\"# A\\nold\",\"after\":\"# A\\nnew\",\"expectedHunkCount\":1,\"expectedChangedSections\":[\"# A\"]}]}\n```"
+        }
+      ]
     }
+  },
+  "expectedOutput": {
+    "title": "固定源码 DocGen 样例",
+    "description": "用数据例子核验 Markdown 差异行为",
+    "body": "# structuredMarkdownDiff\n\n证据 src/domain/services/markdown-diff.ts:L142-L150\n\n## Examples\n\n```json\n{\"examples\":[{\"before\":\"\",\"after\":\"\",\"expectedHunkCount\":0,\"expectedChangedSections\":[]},{\"before\":\"a\\r\\nb\",\"after\":\"a\\nb\",\"expectedHunkCount\":0,\"expectedChangedSections\":[]},{\"before\":\"# A\\nold\",\"after\":\"# A\\nnew\",\"expectedHunkCount\":1,\"expectedChangedSections\":[\"# A\"]}]}\n```"
   }
 }

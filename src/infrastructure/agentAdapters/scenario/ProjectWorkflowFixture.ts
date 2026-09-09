@@ -70,10 +70,14 @@ export class FixtureProjectWorkflowStages {
     let output: Record<string, unknown>;
     if (agentId === 'doc-gen') {
       const body = this.asset(input.iteration === 0 ? assets.knowledgeV1 : assets.knowledgeV2);
-      output = modelRequest.stage === 'outline'
+      output = modelRequest.stage?.split(':')[0] === 'outline'
         ? { title: assets.title, description: assets.description,
           sections: markdownSections(body).map(({ heading }) => ({ heading, purpose: `解释 ${heading} 的受控验收契约` })) }
-        : { body, title: assets.title, description: assets.description };
+        : { title: assets.title, description: assets.description,
+          sections: markdownSections(body).map(({ heading, text }, index) => ({ sectionId: `section-${index + 1}`, heading, body: text.slice(text.indexOf('\n') + 1) }))
+            .filter(({ heading }) => modelRequest.stage?.split(':')[0] !== 'revision' || (command.payload.corrections as Array<{ knowledgePath: string }>).some(({ knowledgePath }) => knowledgePath === `knowledge/${scenario.moduleId}.md#${heading}`))
+            .map(({ heading: _heading, ...section }) => section),
+        };
     } else if (agentId === 'code') {
       output = { files: [{
         path: assets.generatedPath,
@@ -109,7 +113,7 @@ export class FixtureProjectWorkflowStages {
           { kind: 'interface', statement: 'The module exports calculate without parameters.' },
           { kind: 'behavior', statement: 'calculate returns the number 4.' },
           { kind: 'boundary', statement: 'The parameterless function returns 4 on every invocation.' },
-        ].map((fact) => ({ ...fact, sourcePath, startLine: index + 1, endLine: index + 1, quote: lines[index] }));
+        ].map((fact) => ({ ...fact, sourcePath, startLine: index + 1, endLine: index + 1 }));
       });
       if (!sources.size) throw new Error('WORKFLOW_FIXTURE_SOURCE_TEXT_MISSING');
       output = {

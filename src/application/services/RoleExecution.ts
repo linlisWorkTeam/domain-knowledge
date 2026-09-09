@@ -5,9 +5,9 @@
  */
 import { agents } from '../../domain/agents/AgentRegistry.ts';
 import type { AgentCommand, AgentResult, AgentId } from '../../domain/agents/AgentContracts.ts';
-import type { ExecutionContext, RoleInput, RoleResult } from '../../domain/agents/AgentExecution.ts';
+import type { ExecutionContext, RoleInput, RoleResult, StageAttempt } from '../../domain/agents/AgentExecution.ts';
 import { assertActive } from '../../domain/agents/AgentExecution.ts';
-import type { ArtifactRef } from '../../domain/Domain.ts';
+import { createEvent, type ArtifactRef } from '../../domain/Domain.ts';
 import type { AgentContractValidator } from '../ports/ApplicationPorts.ts';
 import type { KnowledgeFlywheelService } from './ApplicationServices.ts';
 
@@ -46,9 +46,30 @@ export class RoleExecutionService {
       const execute = agents[command.agentType].execute as unknown as (
         input: RoleInput<Record<string, unknown>>, context: ExecutionContext,
       ) => Promise<RoleResult<unknown>>;
-      const roleResult = await execute(input, context);
+      const stageJournal: NonNullable<ExecutionContext['stageJournal']> = {
+        read: async (stage) => {
+          const latest = new Map<number, StageAttempt>();
+          for (const event of this.flywheel.repository.listEvents(command.runId)) {
+            const payload = event.payload;
+            if (payload.kind !== 'role-stage-attempt' || payload.generationKey !== command.generationKey || payload.stage !== stage) continue;
+            const bytes = await this.flywheel.getArtifact(payload.artifactRef as ArtifactRef);
+            const attempt = JSON.parse(Buffer.from(bytes).toString('utf8')) as StageAttempt;
+            if (attempt.schemaVersion !== 'role-stage-v1' || attempt.stage !== stage) throw new Error('AGENT_STAGE_JOURNAL_INVALID');
+            latest.set(attempt.attempt, attempt);
+          }
+          return [...latest.values()].sort((a, b) => a.attempt - b.attempt);
+        },
+        record: async (attempt) => {
+          const artifactRef = await this.flywheel.putArtifact(Buffer.from(JSON.stringify(attempt)), 'application/json');
+          this.flywheel.repository.recordOperationalEvent(createEvent(command.runId, 'ArtifactCommitted', {
+            kind: 'role-stage-attempt', generationKey: command.generationKey, agentType: command.agentType,
+            stage: attempt.stage, attempt: attempt.attempt, status: attempt.status, artifactRef,
+          }, this.flywheel.clock()));
+        },
+      };
+      const roleResult = await execute(input, { ...context, stageJournal });
       const rawRef = await this.flywheel.putArtifact(Buffer.from(JSON.stringify(roleResult.output, null, 2)), 'application/json');
-      // 先保存原始输出与角色声明的工件，再将逻辑引用替换成不可变 CAS 引用。
+      // 先保存标准化角色结果与声明工件；阶段模型原文已由 stageJournal 单独留证。
       const refs = new Map<string, ArtifactRef>([['raw', rawRef]]);
       for (const artifact of roleResult.artifacts) {
         if (refs.has(artifact.key)) throw new Error('AGENT_PENDING_ARTIFACT_DUPLICATED');

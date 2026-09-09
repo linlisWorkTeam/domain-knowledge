@@ -32,7 +32,7 @@ Code 的场景工件不包含参考仓库位置、源码、参考测试或固定
 
 ## 恢复和可观察性
 
-Application 冻结配置及 `workflow-policy` 工件，运行途中策略设置的变化只影响新 Run；原有记录保持可读。LangGraph 保存执行 checkpoint，Registry 记录业务提交和节点投影。相同 generationKey 的完成结果可重放；同版本失败节点可恢复，旧 roleExecutionVersion 明确拒绝。最多 3 轮、30 分钟，迭代下标从 0 开始；取消信号传到模型、评测及最终发布检查，迟到角色结果不能提交。
+Application 冻结配置及 `workflow-policy` 工件，运行途中策略设置的变化只影响新 Run；原有记录保持可读。LangGraph 保存执行 checkpoint，Registry 记录业务提交和节点投影。相同 generationKey 的完成结果可重放；同版本失败节点可恢复，旧 roleExecutionVersion 明确拒绝。知识阶段使用持久化尝试审计恢复，已通过阶段不重新调用模型，失败次数和阶段截止时间不重置（见 [角色阶段反馈](../agents/Agents.md#阶段反馈预算与恢复)）。最多 3 轮、30 分钟，迭代下标从 0 开始；取消信号传到模型、评测及最终发布检查，迟到角色结果不能提交。
 
 节点 status、attempt、iteration、readyAt 与开始/完成时间用于观测，不作为发布权威。状态不完整时显示不可用，不能从节点完成比例推断知识可信度。
 

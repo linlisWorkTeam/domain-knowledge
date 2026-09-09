@@ -5,6 +5,7 @@
  */
 import type { ArtifactRef } from '../../Domain.ts';
 import type { Input, Outline } from './DocGenAgentContract.ts';
+import { StageValidationIssue } from '../StageValidation.ts';
 
 interface Section { heading: string; start: number; end: number; text: string; }
 /** 忽略 fenced code 中的伪标题，并保留原始字节边界供修订范围核验。 */
@@ -29,16 +30,18 @@ export function markdownSections(body: string): Section[] {
     if (previous) previous.end = match.index;
     sections.push({ heading: heading[1]!, start: match.index, end: body.length, text: '' });
   }
+  if (fence) throw new Error('DOC_GEN_FENCE_UNCLOSED');
   for (const section of sections) section.text = body.slice(section.start, section.end);
   return sections;
 }
 
 /** 校验概要中每个 H2 唯一且可以无损映射到正文标题。 */
 export function validateOutline(outline: Outline): void {
+  if (/[\r\n]/.test(outline.title)) throw new StageValidationIssue('DOC_GEN_TITLE_INVALID', 'title', '文档标题只能为单行文本。');
   const seen = new Set<string>();
   for (const { heading } of outline.sections) {
     if (heading !== heading.trim() || /[\r\n]/.test(heading) || heading.startsWith('#') || seen.has(heading)) {
-      throw new Error('DOC_GEN_OUTLINE_INVALID');
+      throw new StageValidationIssue('DOC_GEN_OUTLINE_INVALID', 'sections.heading', 'H2 标题必须唯一、单行，不含前后空白或 # 前缀。');
     }
     seen.add(heading);
   }
@@ -61,6 +64,7 @@ export function revisionScope(input: Input): { base: string; headings: Set<strin
   if (!baseRef) throw new Error('DOC_GEN_REVISION_BASE_REQUIRED');
   const base = input.materials.find(({ ref }) => ref.artifactId === baseRef.artifactId)?.content;
   if (typeof base !== 'string') throw new Error('DOC_GEN_REVISION_BASE_INVALID');
+  if (/\r(?!\n)/.test(base)) throw new Error('DOC_GEN_REVISION_LINE_ENDING_UNSUPPORTED');
   const sections = markdownSections(base);
   const headings = new Set<string>();
   for (const value of corrections) {

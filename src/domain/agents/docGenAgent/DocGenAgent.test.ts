@@ -12,7 +12,7 @@ import { roleExample } from '../../../../tests/helpers/RoleExample.ts';
 test('doc-gen: revision output uses one model call and validates before returning artifacts', async () => {
   const sample = roleExample<Input>('doc-gen');
   const result = await execute(sample.input, sample.context);
-  assert.deepEqual(result.output, sample.output);
+  assert.deepEqual(result.output, sample.expectedOutput);
   assert.deepEqual(sample.phases, ['model', 'validate']);
   assert.ok(result.payload.resultKind);
 });
@@ -44,7 +44,7 @@ test('doc-gen: revision includes previous body, worker fragments and correction 
   assert.match(sample.requests[0]!.prompt, /baseKnowledgeRef|workerFragmentRefs/);
   assert.match(sample.requests[0]!.prompt, /CRLF normalization mismatch/);
   assert.match(sample.requests[0]!.prompt, /COR-0001/);
-  assert.equal(result.artifacts[0]!.content, sample.output.body);
+  assert.equal(result.artifacts[0]!.content, sample.expectedOutput.body);
   assert.deepEqual(result.payload.bodyRef, { pendingArtifact: 'body' });
 });
 
@@ -73,13 +73,13 @@ test('doc-gen: invalid outline stops before body; outline cancellation rejects l
 
 test('doc-gen: body cannot omit outline sections or replace accepted metadata', async () => {
   for (const [mutate, expected] of [
-    [(output: any) => { output.body = output.body.replace('## Behavior', '## Changed'); }, /OUTLINE_BODY_MISMATCH/],
+    [(output: any) => { output.sections.pop(); }, /SECTION_SET_MISMATCH/],
     [(output: any) => { output.title = 'another document'; }, /OUTLINE_METADATA_MISMATCH/],
   ] as const) {
     const sample = roleExample<Input>('doc-gen');
     delete sample.input.payload.baseKnowledgeRef;
     delete sample.input.payload.corrections;
-    mutate(sample.output);
+    mutate(sample.modelStages.body);
     await assert.rejects(execute(sample.input, sample.context), expected);
   }
 });
@@ -102,9 +102,54 @@ test('doc-gen: revision rejects missing base, ambiguous scope and evidence befor
 
 test('doc-gen: revision refuses to modify an unnamed section or claim an unchanged correction', async () => {
   const outside = roleExample<Input>('doc-gen');
-  outside.output.body = outside.output.body.replace('Compare two Markdown documents', 'Compare secretly changed documents');
-  await assert.rejects(execute(outside.input, outside.context), /REVISION_OUTSIDE_CORRECTION/);
+  outside.output.sections.push({ sectionId: 'section-1', body: 'Compare secretly changed documents' });
+  await assert.rejects(execute(outside.input, outside.context), /SECTION_DENIED/);
   const noChange = roleExample<Input>('doc-gen');
-  noChange.output.body = noChange.input.materials.find(({ ref }) => ref.artifactId === noChange.input.payload.baseKnowledgeRef!.artifactId)!.content;
+  noChange.output.sections[0].body = String(noChange.input.materials.find(({ ref }) => ref.artifactId === noChange.input.payload.baseKnowledgeRef!.artifactId)!.content).split('## Behavior\n')[1];
   await assert.rejects(execute(noChange.input, noChange.context), /CORRECTION_NOT_APPLIED/);
+});
+
+test('doc-gen: H1 leakage receives a bounded field-specific repair while the outline is reused', async () => {
+  const sample = roleExample<Input>('doc-gen');
+  delete sample.input.payload.baseKnowledgeRef; delete sample.input.payload.corrections;
+  const originalExecute = sample.context.model.execute;
+  sample.context.model.execute = async (request, signal) => {
+    const raw = await originalExecute(request, signal);
+    if (request.stage === 'body') (raw as any).sections[0].body = '# 1. Wrong hierarchy\n' + (raw as any).sections[0].body;
+    return raw;
+  };
+  const result = await execute(sample.input, sample.context);
+  assert.deepEqual(sample.requests.map(({ stage }) => stage), ['outline', 'body', 'body:attempt-2']);
+  assert.match(sample.requests[2]!.prompt, /DOC_GEN_SECTION_HEADING_INVALID/);
+  assert.match(result.output.body, /^# Markdown diff\n\n## Purpose\n/);
+  assert.doesNotMatch(result.output.body, /Wrong hierarchy/);
+});
+
+test('doc-gen: unclosed fences cannot hide later chapters and duplicate section IDs cannot omit content', async () => {
+  for (const bad of ['fence', 'duplicate']) {
+    const sample = roleExample<Input>('doc-gen');
+    delete sample.input.payload.baseKnowledgeRef; delete sample.input.payload.corrections;
+    if (bad === 'fence') sample.modelStages.body.sections[0].body += '\n```ts\nunterminated';
+    else sample.modelStages.body.sections[1].sectionId = sample.modelStages.body.sections[0].sectionId;
+    await assert.rejects(execute(sample.input, sample.context), bad === 'fence' ? /FENCE_UNCLOSED/ : /SECTION_SET_MISMATCH/);
+    assert.equal(sample.requests.length, 3);
+  }
+});
+
+test('doc-gen: lone CR cannot hide headings in generated or revised section content', async () => {
+  for (const revision of [false, true]) {
+    const sample = roleExample<Input>('doc-gen');
+    if (!revision) { delete sample.input.payload.baseKnowledgeRef; delete sample.input.payload.corrections; }
+    const wire = revision ? sample.output : sample.modelStages.body;
+    wire.sections[0].body += '\r# Injected H1\r## Injected H2\rsecret replacement';
+    await assert.rejects(execute(sample.input, sample.context), /SECTION_LINE_ENDING_INVALID/);
+  }
+});
+
+test('doc-gen: multiline outline titles are rejected before entering the body stage', async () => {
+  const sample = roleExample<Input>('doc-gen');
+  delete sample.input.payload.baseKnowledgeRef; delete sample.input.payload.corrections;
+  sample.modelStages.outline.title = 'Module\n# Another title';
+  await assert.rejects(execute(sample.input, sample.context), /DOC_GEN_TITLE_INVALID/);
+  assert.deepEqual(sample.requests.map(({ stage }) => stage), ['outline', 'outline:attempt-2']);
 });
