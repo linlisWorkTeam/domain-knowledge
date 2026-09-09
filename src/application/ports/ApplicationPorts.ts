@@ -377,6 +377,8 @@ export interface ProviderSettingsRecord {
   verificationStatus: ProviderVerificationStatus;
   /** 提供verification原因Code信息，供调用方读取或传入。 */
   verificationReasonCode: string;
+  /** 分别记录模型列表可访问性与生产生成协议；旧记录可缺省。 */
+  verificationChecks?: ProviderProbeChecks;
   /** 提供lastVerified时间信息，供调用方读取或传入。 */
   lastVerifiedAt: string | null;
   /** 提供verified指纹信息，供调用方读取或传入。 */
@@ -430,6 +432,14 @@ export interface ProviderEndpointPolicy {
 }
 
 /** 定义提供方Probe结果的数据结构与类型约束。 */
+export interface ProviderProbeChecks {
+  /** 模型列表预检结论；通过后才允许一次最小生成。 */
+  modelList: 'PASSED' | 'FAILED';
+  /** 实际生产 DSH 生成检查；列表通过本身不能启用模型。 */
+  generation: 'NOT_RUN' | 'PASSED' | 'FAILED';
+}
+
+/** 定义显式模型连接验证的安全结果。 */
 export interface ProviderProbeResult {
   /** 提供状态信息，供调用方读取或传入。 */
   status: 'VERIFIED' | 'FAILED';
@@ -437,6 +447,8 @@ export interface ProviderProbeResult {
   reasonCode: string;
   /** 提供模型信息，供调用方读取或传入。 */
   model: string | null;
+  /** 旧探针可以缺省，但缺少生成通过证据不得启用。 */
+  checks?: ProviderProbeChecks;
 }
 
 /** 定义提供方ConnectionProbe的数据结构与类型约束。 */
@@ -446,7 +458,7 @@ export interface ProviderConnectionProbe {
     endpoint: ProviderEndpoint;
     apiKey: string | null;
     model: string | null;
-  }): Promise<ProviderProbeResult>;
+  }, signal?: AbortSignal): Promise<ProviderProbeResult>;
 }
 
 /** 定义提供方InvocationRecord的数据结构与类型约束。 */
