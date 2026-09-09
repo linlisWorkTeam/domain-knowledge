@@ -16,6 +16,8 @@ import type {
   ArtifactStore, GeneratedProjectFile, ProjectCommand, ProjectCommandResult,
   ProjectEvaluation, ProjectEvaluator, ProjectSnapshot, ProjectTool,
 } from '../../../application/ports/ApplicationPorts.ts';
+import type { ModuleBehaviorSuite } from '../../../domain/agents/testGenAgent/ModuleBehaviorSuite.ts';
+import { evaluateModuleSuite } from './ModuleCaseExecutor.ts';
 
 interface ResolvedTool {
   /** 提供executable信息，供调用方读取或传入。 */
@@ -342,15 +344,24 @@ export class TrustedProjectEvaluator implements ProjectEvaluator {
     }
     const sourcePaths = input.sourcePaths.map(safeRelativePath);
     const publicInterfacePaths = input.publicInterfacePaths.map(safeRelativePath);
-    const files = [...new Set([...sourcePaths, ...publicInterfacePaths])].map((path) => {
+    const sourceContentRefs = [];
+    const publicInterfaceRefs = [];
+    const files = [];
+    for (const path of [...new Set([...sourcePaths, ...publicInterfacePaths])]) {
       const bytes = spawnSync('git', ['show', `${commit}:${path}`], {
         cwd: repositoryRoot, env: executionEnvironment(),
         encoding: null, shell: false, windowsHide: true, maxBuffer: 16 * 1024 * 1024,
       });
       if (bytes.error) throw bytes.error;
       if (bytes.status !== 0 || !bytes.stdout) throw new Error(`PROJECT_SOURCE_MISSING: ${path}`);
-      return { path, sha256: digest(bytes.stdout), size: bytes.stdout.byteLength };
-    });
+      const sha256 = digest(bytes.stdout);
+      const ref = await this.artifacts.put(Buffer.from(JSON.stringify({
+        path, commit, content: bytes.stdout.toString('utf8'), sha256,
+      })), 'application/json');
+      if (sourcePaths.includes(path)) sourceContentRefs.push(ref);
+      if (publicInterfacePaths.includes(path)) publicInterfaceRefs.push(ref);
+      files.push({ path, sha256, size: bytes.stdout.byteLength });
+    }
     const remote = syncText('git', ['config', '--get', 'remote.origin.url'], repositoryRoot, true);
     const dirty = syncText('git', ['status', '--porcelain=v1'], repositoryRoot, true).length > 0;
     const manifest = {
@@ -358,7 +369,8 @@ export class TrustedProjectEvaluator implements ProjectEvaluator {
       sourcePaths, publicInterfacePaths, files,
     };
     const manifestRef = await this.artifacts.put(Buffer.from(JSON.stringify(manifest, null, 2)), 'application/json');
-    return { repositoryRoot, remote, checkoutHead, commit, dirty, sourcePaths, publicInterfacePaths, manifestRef };
+    return { repositoryRoot, remote, checkoutHead, commit, dirty, sourcePaths, publicInterfacePaths,
+      manifestRef, sourceContentRefs, publicInterfaceRefs };
   }
 
   /** 评估请求。 */
@@ -368,7 +380,10 @@ export class TrustedProjectEvaluator implements ProjectEvaluator {
     generatedFiles: GeneratedProjectFile[];
     prepareCommands: ProjectCommand[];
     commands: ProjectCommand[];
+    moduleSuite?: ModuleBehaviorSuite;
+    moduleContract?: { modulePath: string; exportName: string; signature: string };
   }, signal?: AbortSignal): Promise<ProjectEvaluation> {
+    if (input.moduleSuite) return evaluateModuleSuite(this.artifacts, { ...input, moduleSuite: input.moduleSuite }, signal);
     if (input.commands.length === 0) throw new Error('PROJECT_GATE_EMPTY');
     const tempRoot = mkdtempSync(join(tmpdir(), 'wp-project-eval-'));
     const workspace = join(tempRoot, 'workspace');
