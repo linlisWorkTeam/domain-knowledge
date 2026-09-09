@@ -24,6 +24,8 @@ export interface FixtureProjectScenario extends AutomatedProjectScenario {
     codeV1: string;
     codeV2: string;
     correction: string;
+    /** 显式受控候选案例文件；固定隐藏门禁不作为 TestGen 输出来源。 */
+    testSuite?: string;
     generatedPath: string;
     title: string;
     description: string;
@@ -86,7 +88,9 @@ export class FixtureProjectWorkflowStages {
         correction: evaluation.passed ? null : JSON.parse(this.asset(assets.correction)),
       };
     } else if (agentId === 'test-gen') {
-      output = { candidateCommands: scenario.finalCommands, oracleRequired: true };
+      output = assets.testSuite
+        ? { suite: JSON.parse(this.asset(assets.testSuite)), oracleRequired: true }
+        : { candidateCommands: scenario.finalCommands, oracleRequired: true };
     } else if (agentId === 'check') {
       output = { blocking: false, findings: [], scope: scenario.allowedGeneratedPaths };
     } else if (agentId === 'doc-worker') {
