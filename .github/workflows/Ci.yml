@@ -52,7 +52,7 @@ jobs:
         if: steps.changes.outputs.docs-only != 'true'
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends bubblewrap
+          sudo apt-get install -y --no-install-recommends bubblewrap fonts-noto-cjk
           # 仅给临时 CI 机的 bwrap 授予 userns；不关闭全局 AppArmor，也不修改 ECS 内核策略。
           # https://discourse.ubuntu.com/t/ubuntu-24-04-lts-noble-numbat-release-notes/39890
           if [ -f /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
@@ -65,6 +65,7 @@ jobs:
             sudo apparmor_parser -r /etc/apparmor.d/bwrap
           fi
           bwrap --unshare-all --die-with-parent --ro-bind / / --proc /proc --dev /dev /bin/true
+          fc-match 'Noto Sans CJK SC'
 
       - name: Type-check
         if: steps.changes.outputs.docs-only != 'true'
@@ -88,3 +89,12 @@ jobs:
       - name: Run Console browser tests
         if: steps.changes.outputs.docs-only != 'true'
         run: npm run test:ui
+
+      - name: Preserve failed visual comparisons
+        if: failure() && steps.changes.outputs.docs-only != 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: console-visual-comparisons
+          path: test-results/**/*.png
+          if-no-files-found: ignore
+          retention-days: 7
