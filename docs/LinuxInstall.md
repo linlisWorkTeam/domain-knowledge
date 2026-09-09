@@ -60,6 +60,38 @@ sh domain-knowledge-0.2.1-linux-x86_64.run --prefix /opt/domain-knowledge
 
 版本位于 `versions/<version>`，`current` 与启动器分别原子切换，临时链接在失败时清理。安装目录和独立数据目录采用 700 权限，配置文件拒绝符号链接。升级先停止旧服务，并保留 `data/` 中的配置、SQLite、正文工件和运行记录；相同版本重复安装会拒绝覆盖。`WP_FLYWHEEL_HOME` 可指定独立的数据目录。卸载默认只移除应用版本和启动器，保留用户数据与外部知识仓库。恢复旧应用版本不允许跨执行契约版本恢复未完成运行。
 
+## 真实模型验收入口
+
+先在浏览器配置并验证 `deepseek-harness` / `deepseek-v4-flash`，停止网页服务后复用同一数据目录运行验收。入口不接受 API Key 参数，不自动验证模型连接，也不使用环境变量中的未验证凭据作为后备配置。在源码工作树中使用 Node 24：
+
+```sh
+GOMAXPROCS=1 NODE_OPTIONS=--max-old-space-size=384 node scripts/release/RunMvpAcceptance.ts \
+  --source /srv/ohMyWorkPanel \
+  --runtime /srv/domain-knowledge-data \
+  --evidence /srv/domain-knowledge-evidence
+```
+
+安装版使用 `current/tools/bin/node` 和 `current/app/scripts/release/RunMvpAcceptance.ts`，并设置与启动器一致的工具环境：
+
+```sh
+acceptance_app=/opt/domain-knowledge/current
+export PATH="$acceptance_app/tools/bin:$acceptance_app/app/node_modules/.bin:$PATH"
+export LD_LIBRARY_PATH="$acceptance_app/tools/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export GIT_EXEC_PATH="$acceptance_app/tools/git-core"
+export WP_DSH_BWRAP_BIN="$acceptance_app/tools/bin/bwrap"
+GOMAXPROCS=1 NODE_OPTIONS=--max-old-space-size=384 node \
+  --env-file=/opt/domain-knowledge/data/Configuration.env \
+  "$acceptance_app/app/scripts/release/RunMvpAcceptance.ts" \
+  --source /srv/ohMyWorkPanel --runtime /opt/domain-knowledge/data \
+  --evidence /srv/domain-knowledge-evidence
+```
+
+预检核对已有配置验证状态、精确模型名称、固定源码及参考测试摘要、内核隔离、独立发布目录和证据目录可写性。预检不调用模型，失败不消耗启动次数。通过后，在调用生产 `markdownLite.start` 前先持久化 `MvpAcceptanceLedger.json` 占额；此后启动失败、取消、中断都保留已消耗次数，同一运行目录累计最多 3 次。不要删除账本或更换运行目录规避上限。每次仍受最多 3 轮、30 分钟预算约束；不要与打包、浏览器测试或其他飞轮并行运行。
+
+`SIGINT` / `SIGTERM` 会取消飞轮并等待子进程关闭后退出。`SIGKILL` 等非正常终止留下的 STARTING / RUNNING 记录继续计数；下次运行在核对 `/proc` 进程身份后可回收完整的死进程锁。不完整锁或残留清理锁会失败关闭，需要管理员确认进程已退出后只处理锁文件，保留账本。
+
+每次输出 `MvpAcceptance-<次数>.json`，只包含运行编号、固定源码与依赖摘要、门禁计数、工具摘要、证据引用和本地发布路径；不包含模型响应原文、API URL 或密钥。退出码 0 表示七角色完成、确定性门禁通过且本地发布可读取，1 表示预检或验收失败，130 表示取消。失败报告不能作为已验收 MVP 的发布依据。
+
 ## 发行验证
 
 Release 必须来自通过验收的同一提交，核对受测 `.run` SHA-256，再上传安装包、摘要、工具清单、许可证清单和说明。干净环境应验证：断网安装与启动、浏览器配置、隔离探测、代表模块构建、运行取消、自动发布、重启恢复、升级保留、卸载保留数据。真实模型验收另行记录运行编号、固定来源与门禁摘要、结果和本地发布路径；不得将 fixture 回归标注为真实模型通过。
