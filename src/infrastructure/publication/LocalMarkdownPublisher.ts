@@ -38,6 +38,13 @@ export class LocalMarkdownPublisher implements LocalPublicationPort {
   private readonly excludedRoots: string[];
   private readonly allowLocalRemotes: boolean;
   private syncing = false;
+  /** 启动模块任务前登记原项目，防止把发布目录选到源码树中。 */
+  excludeSourceRoot(path: string): void {
+    const source = realpathSync(path);
+    const directory = this.checkedDirectory(this.rawSettings().directory);
+    if (inside(source, directory) || inside(directory, source)) throw new Error('DIRECTORY_DENIED: knowledge must use a separate directory from project sources');
+    if (!this.excludedRoots.includes(source)) this.excludedRoots.push(source);
+  }
   constructor(input: { runtimeDir: string; defaultDirectory?: string; directoryRoots?: string[]; excludedRoots?: string[]; allowLocalRemotes?: boolean }) {
     this.runtimeDir = resolve(input.runtimeDir);
     mkdirSync(this.runtimeDir, { recursive: true, mode: 0o700 });

@@ -4,6 +4,9 @@
  * 文件功能：提供Composition的外部入口、参数转换与响应处理。
  */
 import { AgentExampleService } from '../../application/services/AgentExample.ts';
+import { PublicationOperations } from '../../application/services/PublicationOperations.ts';
+import { LocalMarkdownPublisher } from '../../infrastructure/publication/LocalMarkdownPublisher.ts';
+import { createMarkdownLiteScenario } from '../../infrastructure/evaluation/markdownLite/MarkdownLiteScenario.ts';
 import { NODE_BY_AGENT } from '../../domain/workflow/AgentDefinitions.ts';
 import { assertModelOutput, modelExecutionFactory } from '../../infrastructure/agentAdapters/ModelExecution.ts';
 import { appendFile, mkdir } from 'node:fs/promises';
@@ -132,6 +135,12 @@ export function createComposition(input: {
   const runtimeDir = isAbsolute(configuredRuntime) ? configuredRuntime : join(componentRoot, configuredRuntime);
   const artifacts = new LocalCasArtifactStore(join(runtimeDir, 'cas'));
   const repository = new SQLiteFlywheelRepository(join(runtimeDir, 'registry.sqlite'));
+  const publisher = new LocalMarkdownPublisher({ runtimeDir,
+    directoryRoots: (process.env.WP_KNOWLEDGE_DIRECTORY_ROOTS ?? `${dirname(runtimeDir)}${delimiter}${dirname(repositoryRoot)}`)
+      .split(delimiter).filter(Boolean),
+    defaultDirectory: process.env.WP_KNOWLEDGE_OUTPUT_DIRECTORY ?? join(runtimeDir, 'knowledge'),
+  });
+  const publicationOperations = new PublicationOperations(publisher);
   const runProjections = new ConsoleReadModel(repository.database);
   const flywheelApp = new FlywheelApp({
     artifacts,
@@ -242,6 +251,7 @@ export function createComposition(input: {
   const allowedRoots = (process.env.WP_DSH_ALLOWED_ROOTS?.split(delimiter) ?? [repositoryRoot])
     .map((root) => root.trim()).filter(Boolean).map((root) => resolve(root));
   const agentWorkspaceRoot = join(runtimeDir, 'agent-workspaces');
+  const agentWorkspaces = new LocalAgentWorkspace({ workspaceRoot: agentWorkspaceRoot, allowedSourceRoots: allowedRoots });
   const sdkPatches = process.env.WP_DSH_PATCHES_JSON
     ? JSON.parse(process.env.WP_DSH_PATCHES_JSON) as string[]
     : agentProviderMode === 'deepseek-harness' && sdkProvider === 'opencode-go'
@@ -416,6 +426,7 @@ export function createComposition(input: {
         evalRunner: evalRunnerApp,
         evaluator: new TrustedProjectEvaluator(artifacts),
         contracts: new JsonSchemaAgentContractValidator(schemaRoot),
+        localPublication: publicationOperations,
         ...(agent ? { agent } : {}),
         agentResolver: (runId) => {
           const snapshot = runConfiguration.get(runId);
@@ -433,10 +444,7 @@ export function createComposition(input: {
             onInvocation: (record) => metrics.recordProviderInvocation(record),
           });
         },
-        modelFactory: modelExecutionFactory(new LocalAgentWorkspace({
-          workspaceRoot: agentWorkspaceRoot,
-          allowedSourceRoots: allowedRoots,
-        })),
+        modelFactory: modelExecutionFactory(agentWorkspaces),
       };
       const executor = agentProviderMode === 'fixture'
         ? new FixtureProjectWorkflowStages({
@@ -489,6 +497,20 @@ export function createComposition(input: {
     artifacts,
     repository,
     apps: {
+      publicationOperations,
+      markdownLite: {
+        start: async (directory: string) => {
+          // 固定模块入口只接受服务器目录；源码与模型设置在服务端验证。
+          const scenario = await createMarkdownLiteScenario(directory);
+          if (processIsolation !== 'bubblewrap') throw new Error('MODULE_ISOLATION_REQUIRED');
+          if (!agentWorkspaces.allowedSourceRoots.includes(scenario.repositoryRoot)) {
+            agentWorkspaces.allowedSourceRoots.push(scenario.repositoryRoot);
+          }
+          publisher.excludeSourceRoot(scenario.repositoryRoot);
+          await publicationOperations.recover();
+          return (await workflow()).start(scenario, { ...config.publicationGate, maxIterations: 3, workerCount: 1 });
+        },
+      },
       agentExample,
       flywheel: flywheelApp,
       evalRunner: evalRunnerApp,
@@ -508,6 +530,6 @@ export function createComposition(input: {
     runConfiguration,
     agentProviderMode,
     automatedWorkflow: workflow,
-    close: () => repository.close(),
+    close: () => { publisher.close(); repository.close(); },
   };
 }

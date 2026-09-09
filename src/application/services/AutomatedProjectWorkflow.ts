@@ -35,6 +35,7 @@ import {
 } from '../../domain/Domain.ts';
 import type { KnowledgeFlywheelService } from './ApplicationServices.ts';
 import type { RealSourceScenario } from './ProjectFlow.ts';
+import type { PublicationOperations } from './PublicationOperations.ts';
 
 /** 定义Automated项目Scenario的数据结构与类型约束。 */
 export interface AutomatedProjectScenario extends RealSourceScenario {}
@@ -82,6 +83,7 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
   readonly nodeByAgent: Record<AgentId, string>;
   /** 提供contracts信息，供调用方读取或传入。 */
   readonly contracts: AgentContractValidator;
+  readonly localPublication?: Pick<PublicationOperations, 'publish'>;
   /** 提供 模型Factory 对应的模型工厂操作。 */
   readonly modelFactory: (input: { provider?: AgentProvider; command: AgentCommand; stage: WorkflowStageInput; scenario: AutomatedProjectScenario }) => ModelExecutionPort;
 
@@ -95,6 +97,7 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
     modelFactory: ProjectWorkflowStages['modelFactory'];
     agent?: AgentProvider;
     agentResolver?: (runId: string) => AgentProvider | undefined;
+    localPublication?: Pick<PublicationOperations, 'publish'>;
   }) {
     this.flywheel = input.flywheel;
     this.evalRunner = input.evalRunner;
@@ -104,6 +107,7 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
     this.modelFactory = input.modelFactory;
     this.agent = input.agent;
     this.agentResolver = input.agentResolver;
+    this.localPublication = input.localPublication;
   }
 
   /** 执行当前角色或业务阶段并返回结构化结果。 */
@@ -509,7 +513,7 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
       stability: evaluation.stability,
       infrastructureFailure: evaluation.infrastructureFailure,
       checkBlocking: check.blocking,
-      reviewBlocking: review?.blocking ?? false,
+      reviewBlocking: Boolean(review?.blocking || review?.recommendation === 'ITERATE' || review?.unresolvedRisks?.length),
     }, policy);
     return decision;
   }
@@ -519,9 +523,23 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
     const versionId = input.context[contextKey('candidateVersionId', input.iteration)];
     if (!decision || typeof versionId !== 'string') throw new Error('WORKFLOW_PUBLICATION_INPUT_MISSING');
     const publication = await this.flywheel.publish(input.runId, versionId, decision.decisionId);
+    let localPublication;
+    if (this.localPublication) {
+      const version = this.flywheel.getKnowledgeVersion(versionId);
+      const snapshot = input.context.snapshot as ProjectSnapshot;
+      if (!version || version.status !== 'VERIFIED') throw new Error('PUBLICATION_VERSION_NOT_VERIFIED');
+      localPublication = await this.localPublication.publish({
+        publicationKey: publication.publicationKey, gateDecisionId: decision.decisionId,
+        runId: input.runId, versionId, moduleId: version.moduleId, title: version.title,
+        body: Buffer.from(await this.flywheel.getArtifact(version.bodyRef)).toString('utf8'),
+        sourceCommit: snapshot.commit, sourceDigest: snapshot.manifestRef.sha256,
+        evidenceRefs: [input.context[contextKey('evaluationEvidenceRef', input.iteration)],
+          input.context[contextKey('oracleEvidenceRef', input.iteration)]],
+      });
+    }
     return {
       detail: `Knowledge Flywheel publication ${publication.publicationKey}`,
-      context: { publication },
+      context: { publication, ...(localPublication ? { localPublication } : {}) },
       route: 'PASS',
     };
   }
@@ -554,6 +572,14 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
       };
       if (agentId === 'doc-worker') {
         const assignedSourcePaths = this.assignedSourcePaths(input, scenario);
+        if (snapshot.sourceContentRefs?.length) {
+          const assigned: ArtifactRef[] = [];
+          for (const ref of snapshot.sourceContentRefs) {
+            const source = await this.readArtifact(ref) as { path?: string };
+            if (source.path && assignedSourcePaths.includes(source.path)) assigned.push(ref);
+          }
+          payload.sourceRefs = assigned;
+        }
         if (assignedSourcePaths.length > 0) payload.assignedSourcePaths = assignedSourcePaths;
       } else {
         const workerFragmentRefs: ArtifactRef[] = [];
