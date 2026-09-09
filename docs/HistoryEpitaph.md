@@ -87,3 +87,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 - [2026-09-09-1020-mvp-validation.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/f30f0c5/docs/epitaph/2026-09-09-1020-mvp-validation.md)：验证组完成声明式测试、隔离模块评测、Code/Check/Review 和共享重进程槽，定向 36/36；主 Agent 后续完成 280 项回归、真实 DSH 进程探针及离线安装，真实模型凭据仍阻塞。
 
 - [2026-09-09-1028-product-route-fixtures.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/3efa1c08ea591a1e71651e69aa95bb6a3e474554/docs/epitaph/2026-09-09-1028-product-route-fixtures.md)：产品组修复 Playwright 路由拦截与安装测试配置，当时仅静态复现，后由主 Agent 完成受控视觉和实际安装验收。
+
+- [2026-09-09-1033-bundled-runtime-libraries.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/186702547abadddf18c2cbeda4af4b2ad859f493/docs/epitaph/2026-09-09-1033-bundled-runtime-libraries.md)：增加经过路径校验的包内运行库传递及只读挂载，4 项定向测试通过；主 Agent 后续完成实际离线安装、评测及 DSH 隔离验证。
