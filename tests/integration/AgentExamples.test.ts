@@ -9,6 +9,7 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'n
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import test from 'node:test';
+import { ROLE_EXECUTION_VERSION } from '../../src/domain/agents/AgentExecution.ts';
 import { AGENT_IDS } from '../../src/domain/agents/AgentContracts.ts';
 import { main } from '../../src/interfaces/runner/AgentRun.ts';
 
@@ -20,7 +21,7 @@ for (const role of AGENT_IDS) test(`standalone ${role} sample commits through th
     assert.equal(saved.result.agentType, role);
     assert.equal(saved.result.status, 'SUCCEEDED');
     assert.equal(saved.configuration.provider.kind, 'fixture');
-    assert.equal(saved.configuration.roleExecutionVersion, 'domain-agents-v1');
+    assert.equal(saved.configuration.roleExecutionVersion, ROLE_EXECUTION_VERSION);
     assert.equal(saved.publication, 'NOT_EVALUATED');
     assert.ok(saved.outputs.length >= 1);
     const audit = readFileSync(join(result.outputDirectory, 'audit.json'), 'utf8');
@@ -40,5 +41,32 @@ test('standalone invalid output records failure and retains the failed Run for i
     assert.equal(JSON.parse(readFileSync(join(directory, runDirectory, 'failure.json'), 'utf8')).status, 'FAILED');
     assert.ok(readdirSync(join(directory, runDirectory, 'runtime')).length > 0);
     assert.equal(readdirSync(join(directory, runDirectory)).includes('result.json'), false);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
+test('standalone first DocGen generation persists outline and body from distinct model stages', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'agent-docgen-stages-'));
+  try {
+    const sample = JSON.parse(readFileSync(roleExamplePath('doc-gen'), 'utf8'));
+    delete sample.payload.baseKnowledgeRef;
+    delete sample.payload.corrections;
+    sample.iteration = 0;
+    const path = join(directory, 'initial.json');
+    writeFileSync(path, JSON.stringify(sample));
+    const result = await main(['--role', 'doc-gen', '--input', path, '--output', directory]);
+    const saved = JSON.parse(readFileSync(join(result.outputDirectory, 'result.json'), 'utf8'));
+    assert.equal(saved.result.status, 'SUCCEEDED');
+    assert.equal(saved.publication, 'NOT_EVALUATED');
+    const body = saved.outputs.find((item: { content: string }) => item.content === sample.modelOutput.body);
+    const outline = saved.outputs.find((item: { content: string }) => item.content === JSON.stringify(sample.modelStages.outline));
+    assert.ok(body, 'body artifact must be committed');
+    assert.ok(outline, 'outline artifact must be committed independently');
+    assert.notEqual(body.ref.artifactId, outline.ref.artifactId);
+    assert.equal(saved.result.payload.bodyRef.artifactId, body.ref.artifactId);
+    assert.ok(saved.result.rawOutputRef, 'the role output reference must be explicit');
+    const raw = saved.outputs.find((item: { ref: { artifactId: string } }) => item.ref.artifactId === saved.result.rawOutputRef.artifactId);
+    assert.ok(raw, 'raw output artifact must remain readable');
+    assert.deepEqual(JSON.parse(raw.content), sample.modelOutput);
+    assert.notEqual(raw.ref.artifactId, outline.ref.artifactId);
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
