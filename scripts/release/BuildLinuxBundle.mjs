@@ -36,7 +36,7 @@ const copy = (from, to) => command('cp', ['-a', from, to]);
 try {
   // 只打包 Git 跟踪的允许目录；工作目录中的密钥、运行库和截图不会隐式进入发行物。
   const tracked = command('git', ['ls-files', '-z']).split('\0').filter((path) => path &&
-    (/^(src|web|docs|scripts|tests)\//.test(path) || ['package.json', 'package-lock.json', 'Runner.config.json', 'LICENSE', 'README.md', 'tsconfig.json'].includes(path)) &&
+    (/^(src|web|docs|scripts|tests)\//.test(path) || ['package.json', 'package-lock.json', 'Runner.config.json', 'LICENSE', 'README.md', 'tsconfig.json', 'Playwright.config.ts'].includes(path)) &&
     !/(^|\/)(\.env[^/]*|\.workpanel|secrets|node_modules)(\/|$)/.test(path));
   writeFileSync(join(stage, 'files'), tracked.join('\0') + '\0');
   command('tar', ['--null', '-T', join(stage, 'files'), '-cf', join(stage, 'source.tar')]);

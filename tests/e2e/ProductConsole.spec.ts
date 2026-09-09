@@ -14,6 +14,7 @@ import { createKnowledgeServer } from '../../src/interfaces/runner/Server.ts';
 let instance: ReturnType<typeof createKnowledgeServer>;
 let runtimeDir = '';
 let baseUrl = '';
+let unexpectedProductCalls: string[] = [];
 const token = 'controlled-product-ui-token';
 const gitToken = 'fixture-only-git-token-never-render';
 const projectDirectory = '/srv/projects/ohMyWorkPanel';
@@ -48,7 +49,7 @@ async function controlledProductApi(page: Page) {
   let runId = '';
   let syncFailure: 'GIT_AUTHENTICATION_FAILED' | 'GIT_CONFLICT' | 'GIT_REMOTE_CONTENT_DENIED' | null = null;
   let directoryFailure = false;
-  await page.route('**/api/v1/server-directories**', async (route) => {
+  await page.route((url) => url.pathname === '/api/v1/server-directories', async (route) => {
     expect(route.request().headers().authorization).toBe(`Bearer ${token}`);
     if (directoryFailure) {
       await route.fulfill({ status: 422, json: { error: { code: 'DIRECTORY_DENIED', message: 'outside allowed roots' } } }); return;
@@ -57,7 +58,8 @@ async function controlledProductApi(page: Page) {
     const children: Record<string, string[]> = { '/srv': ['/srv/knowledge', '/srv/projects'], '/srv/projects': [projectDirectory], [projectDirectory]: [], [knowledgeDirectory]: [] };
     await route.fulfill({ json: { path, parent: path === '/srv' ? null : '/srv', directories: children[path] || [] } });
   });
-  await page.route('**/api/v1/publications**', async (route) => {
+  // 使用路径边界匹配子资源；尾部 ** glob 不跨 /，会漏掉 settings、sync 与正文请求。
+  await page.route((url) => url.pathname === '/api/v1/publications' || url.pathname.startsWith('/api/v1/publications/'), async (route) => {
     expect(route.request().headers().authorization).toBe(`Bearer ${token}`);
     const path = new URL(route.request().url()).pathname;
     if (path.endsWith('/settings')) {
@@ -101,12 +103,23 @@ async function controlledProductApi(page: Page) {
 test.beforeAll(async () => {
   runtimeDir = mkdtempSync(join(tmpdir(), 'knowledge-product-ui-'));
   instance = createKnowledgeServer({ runtimeDir, writeToken: token, clock: () => '2026-09-09T00:00:00.000Z' });
+  // 控制数据未拦截时立即失败，避免浏览器 fixture 意外调用真实 Git 或启动模型。
+  const unexpected = (operation: string): never => {
+    unexpectedProductCalls.push(operation);
+    throw new Error(`E2E_PRODUCT_ROUTE_NOT_INTERCEPTED: ${operation}`);
+  };
+  for (const operation of ['getSettings', 'putSettings', 'list', 'get', 'sync', 'recover', 'listDirectories']) {
+    Object.defineProperty(instance.composition.apps.publicationOperations, operation, { value: () => unexpected(operation) });
+  }
+  instance.composition.apps.markdownLite.start = async () => unexpected('markdownLite.start');
   instance.server.listen(0, '127.0.0.1');
   await once(instance.server, 'listening');
   const address = instance.server.address();
   assert.ok(address && typeof address === 'object');
   baseUrl = `http://127.0.0.1:${address.port}`;
 });
+test.beforeEach(() => { unexpectedProductCalls = []; });
+test.afterEach(() => { expect(unexpectedProductCalls, 'Product API fixtures must never fall through to real filesystem, Git or models').toEqual([]); });
 test.afterAll(async () => {
   instance.server.closeAllConnections();
   await new Promise<void>((resolveClose) => instance.server.close(() => resolveClose()));
@@ -142,6 +155,7 @@ test('发布设置默认关闭 Git，选择知识目录并脱敏保存令牌', a
   const control = await controlledProductApi(page);
   await openSettings(page);
   const form = page.locator('#publication-settings-form');
+  await expect(form.getByLabel('服务器知识目录')).toHaveValue(knowledgeDirectory);
   await expect(form.getByLabel('启用手动 Git 同步')).not.toBeChecked();
   await expect(page.getByRole('button', { name: '立即同步 Git' })).toBeDisabled();
   await form.getByRole('button', { name: '浏览服务器目录' }).click();
