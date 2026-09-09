@@ -5,7 +5,7 @@
  */
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -18,7 +18,12 @@ test('DSH adapter executes through the official native DSH SDK and reports token
   let authorization = '';
   let receivedPath = '';
   let receivedBody = '';
+  const sessionHeaders: string[] = [];
+  const auditedSessions: string[] = [];
+  writeFileSync(join(directory, 'source.txt'), 'AUTHORIZED_MATERIAL');
   const upstream = createServer(async (request, response) => {
+    assert.equal(request.headers['user-agent'], 'domain-knowledge/0.2.0');
+    sessionHeaders.push(String(request.headers['x-opencode-session'] ?? ''));
     authorization = request.headers.authorization ?? '';
     receivedPath = request.url ?? '';
     const chunks: Buffer[] = [];
@@ -26,6 +31,14 @@ test('DSH adapter executes through the official native DSH SDK and reports token
     receivedBody = Buffer.concat(chunks).toString('utf8');
     response.writeHead(200, { 'content-type': 'text/event-stream; charset=utf-8' });
     const common = { id: 'chatcmpl-test', object: 'chat.completion.chunk', created: 1, model: 'test-model' };
+    if (sessionHeaders.length === 1) {
+      response.end(`data: ${JSON.stringify({ ...common, choices: [{ index: 0, delta: { tool_calls: [{ index: 0,
+        id: 'read-source', type: 'function', function: { name: 'read_material', arguments: '{"path":"source.txt"}' },
+      }] }, finish_reason: null }] })}\n\n`
+        + `data: ${JSON.stringify({ ...common, choices: [{ index: 0, delta: {}, finish_reason: 'tool_calls' }] })}\n\n`
+        + 'data: [DONE]\n\n');
+      return;
+    }
     response.write(`data: ${JSON.stringify({
       ...common,
       choices: [{ index: 0, delta: { role: 'assistant', content: '{"answer":"ok"}' }, finish_reason: null }],
@@ -56,6 +69,7 @@ test('DSH adapter executes through the official native DSH SDK and reports token
       validate: async (raw) => ({ url: new URL(raw.endsWith('/') ? raw : `${raw}/`), addresses: ['127.0.0.1'] }),
     },
     onInvocation: (record) => { invocations.push(record); },
+    onAudit: (record) => { auditedSessions.push(record.sessionId!); },
   });
   try {
     const result = await provider.run({
@@ -73,6 +87,10 @@ test('DSH adapter executes through the official native DSH SDK and reports token
     assert.equal(receivedPath, '/v1/chat/completions');
     assert.equal(authorization, 'Bearer test-key');
     assert.match(receivedBody, /Return the requested object/);
+    assert.match(receivedBody, /AUTHORIZED_MATERIAL/);
+    assert.equal(sessionHeaders.length, 2);
+    assert.match(sessionHeaders[0]!, /^wp-[a-f0-9]{32}$/);
+    assert.deepEqual(sessionHeaders, [auditedSessions[0], auditedSessions[0]], 'tool requests retain the native conversation ID');
     assert.equal(invocations.length, 1);
     assert.deepEqual({
       runId: invocations[0]?.runId,
@@ -139,7 +157,10 @@ test('DSH adapter does not follow Provider redirects after endpoint approval', a
 test('DSH adapter retries schema-invalid output with a fresh session and audits every attempt', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'pi-agent-schema-retry-'));
   const bodies: string[] = [];
+  const sessions: string[] = [];
+  const auditedSessions: string[] = [];
   const upstream = createServer(async (request, response) => {
+    sessions.push(String(request.headers['x-opencode-session'] ?? ''));
     const chunks: Buffer[] = [];
     for await (const chunk of request) chunks.push(Buffer.from(chunk));
     bodies.push(Buffer.concat(chunks).toString('utf8'));
@@ -186,9 +207,12 @@ test('DSH adapter retries schema-invalid output with a fresh session and audits 
     idempotencyKey: 'same-business-request', metadata: { runId: 'run-schema-retry' },
     workspaceRoot: directory,
   };
+  provider.options.onAudit = (record) => { auditedSessions.push(record.sessionId!); };
   try {
     assert.deepEqual(await provider.run(request), { answer: 'recovered' });
     assert.equal(bodies.length, 2);
+    assert.deepEqual(sessions, auditedSessions);
+    assert.notEqual(sessions[0], sessions[1], 'schema retry must route as a new native conversation');
     const messages = bodies.map((value) => (JSON.parse(value) as { messages: unknown }).messages);
     assert.deepEqual(messages[1], messages[0], 'a retry uses the same request in a new conversation');
     assert.deepEqual(invocations.map((record) => ({

@@ -5,7 +5,7 @@ SPDX-License-Identifier: MIT
 -->
 # 七角色 MVP 实施与验收记录
 
-目标版本为 `0.2.0`，环境限定 OpenCloudOS 9.4 x86_64，代表模块为 ohMyWorkPanel 的 `src/chat/markdownLite.ts`。当前已实现闭环和 Linux 安装候选；真实模型验收尚未执行，不能视为已验收 MVP，也未创建正式 GitHub Release。历史单角色 live 记录不能替代本次七角色验收。
+目标版本为 `0.2.0`，环境限定 OpenCloudOS 9.4 x86_64，代表模块为 ohMyWorkPanel 的 `src/chat/markdownLite.ts`。当前已实现闭环和 Linux 安装候选；真实模型验收已启动但尚未通过，不能视为已验收 MVP，也未创建正式 GitHub Release。历史单角色 live 记录不能替代本次七角色验收。
 
 操作见[Linux 安装指南](LinuxInstall.md)，工作流约定见[Workflow](specs/domainFunction/workflow/Workflow.md)、[LangGraph](specs/infrastructure/langgraph/LangGraph.md)，七角色设计见[Agents](specs/domainFunction/agents/Agents.md)。历史交接见[HistoryEpitaph](HistoryEpitaph.md)。
 
@@ -48,19 +48,19 @@ ECS 约 3.6 GiB 内存、无 swap。模型与模块评测共享一个进程槽�
 | 最终自动化回归 | 280/280；类型检查通过；规范检查通过（17 Schema / 7 Command / 8 Result / 51 P0） | 包含架构、契约、角色、恢复、取消、反越权、Git、发布和安装 CLI 符号链接 |
 | GitHub CI | 280 项测试和 19 项 Console 检查全部通过 | [CI 34306722454](https://github.com/linlisWorkTeam/domain-knowledge/actions/runs/34306722454)，隔离工具与中文字体显式配置 |
 | 离线安装 | 通过；包内参考门禁 140/140，完整飞轮 5/5，原生 DSH 隔离 1/1 | 断网最小系统目录，启动/重启/升级/卸载及数据摘要核对 |
-| 真实模型 | 0/3 次；找到既有 API 地址，但缺少本次可用运行凭据 | 不提供虚构运行 ID、模型门禁或本地发布路径 |
+| 真实模型 | 已使用 1/3 次，Orchestrator 请求被提供方拒绝；尚未通过 | `139790ab-3d41-4ca0-9908-c8183854a4a9`；原适配器缺少 `x-opencode-session`，已补充会话绑定及协议测试 |
 | GitHub Release | 未发布 | 真实完整飞轮至少 1 次通过后才可发布已验收 MVP |
 
 发行物必须来自同一受测提交，包含安装包、SHA-256、工具依赖清单与第三方许可证；安装及模块构建不下载依赖。真实模型和 Git 同步仍需联网。版本标签检查时 `v0.2.0` 未被占用，正式发布前再次核查。Windows、任意项目工具链、多语言及复杂回退均不在本版验收范围。
 
 ## 安装候选与证据边界
 
-最终受测安装候选来自提交 `026326aa56ddc0bf8abe8a49988d6c93dd554c9b`；CI 通过提交 `f30f0c5` 仅补 CI 字体与截图留存，包内应用相同。候选提交、大小与 SHA-256 记录于工具清单、`.sha256` 和证据包 `Acceptance.json`。安装实测修复了 node-pty 延迟动态库遗漏、glibc/musl 区分、显式目录对 HOME 的依赖和 current 符号链接 CLI 入口；原生 DSH 内部探针确认授权文件可见、同级参考文件不可见。没有修改门禁预期或削弱隔离。
+此前受测安装候选来自提交 `026326aa56ddc0bf8abe8a49988d6c93dd554c9b`；CI 通过提交 `f30f0c5` 仅补 CI 字体与截图留存，包内应用相同。候选提交、大小与 SHA-256 记录于工具清单、`.sha256` 和证据包 `Acceptance.json`。安装实测修复了 node-pty 延迟动态库遗漏、glibc/musl 区分、显式目录对 HOME 的依赖和 current 符号链接 CLI 入口；原生 DSH 内部探针确认授权文件可见、同级参考文件不可见。没有修改门禁预期或削弱隔离。
 
 干净环境使用当前 OpenCloudOS 9.4 主机上的最小系统目录，外网关闭，只保留系统 shell、基础文件工具及其运行库，预检确认没有 Node、npm、Git、bwrap、prlimit、编译器或 DSH。受控 HTTP 模型端点仅在隔离回环地址上运行。外层验收环境保留宿主 proc 以支持内层创建用户命名空间；角色与评测仍使用产品自身的完整隔离。这是同内核的干净文件系统验收，未声称在另一台全新虚拟机上验收。
 
 首版没有历史安装包，升级测试把已安装版本移至模拟旧版本目录，再安装同一候选，核对配置和 SQLite 摘要保持不变；重启后 HTTP 检查通过。卸载后再次核对这两类数据保留。修复前的失败证据保留在证据包中，不能用作当前候选的通过记录。
 
-安装候选、工具清单、许可证清单与独立证据包保存在交付目录 `domain-knowledge-releases/v0.2.0-candidate/`。`Acceptance.json` 区分受控回归、安装验收和真实模型；不包含 API Key、访问令牌、数据库或模型响应原文。后续须提供本机凭据配置位置，在浏览器验证连接后执行 [真实验收入口](LinuxInstall.md#真实模型验收入口)，至少一次完整通过才可发布正式 Release。
+安装候选、工具清单、许可证清单与独立证据包保存在交付目录 `domain-knowledge-releases/v0.2.0-candidate/`。`Acceptance.json` 区分受控回归、安装验收和真实模型；不包含 API Key、访问令牌、数据库或模型响应原文。已从用户 9 月 8 日历史消息中找回授权凭据，并通过运行配置验证；此前“缺少凭据”的判断是漏查历史消息。继续执行 [真实验收入口](LinuxInstall.md#真实模型验收入口)，至少一次完整通过才可发布正式 Release。
 
-草稿 [PR #38](https://github.com/linlisWorkTeam/domain-knowledge/pull/38) 已保存实现与文档；未合并，未打版本标签。已安装预览位于 `/root/.local/share/domain-knowledge-mvp`，测试结束后服务已停止以释放 ECS 内存，配置和记录保留。当前真实入口预检返回 `ACCEPTANCE_PROVIDER_REQUIRED`，验收次数账本尚未创建，实际模型调用为 0 次。
+草稿 [PR #38](https://github.com/linlisWorkTeam/domain-knowledge/pull/38) 已保存实现与文档；未合并，未打版本标签。已安装预览位于 `/root/.local/share/domain-knowledge-mvp`，测试结束后服务已停止以释放 ECS 内存，配置和记录保留。运行配置已加密保存并验证。账本保留首次失败，占用 1/3 次；补齐 OpenCode Go 会话头后的单次连接诊断返回 HTTP 200，不能将这次诊断计作完整飞轮通过。后续重试复用同一运行目录和账本。

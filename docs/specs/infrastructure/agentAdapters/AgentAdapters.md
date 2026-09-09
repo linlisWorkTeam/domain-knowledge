@@ -18,6 +18,8 @@ DSH 原生 SDK 是默认接入后端，Adapter 负责输出提取、闭合 Schem
 
 ConfiguredProvider 解析已验证设置或环境配置。Console 已保存但未启用/未验证的配置阻止新 Run，不静默回退；已有 Run 使用冻结配置。OpenCode Go 根据非秘密参数生成运行目录补丁，补丁只记录密钥环境变量名。配置方式见 Runtime 指南。
 
+模型转发请求使用产品 User-Agent，并在 x-opencode-session 头中传递原生 DSH 会话标识。会话启动回调在首次请求前绑定标识，工具往返保持稳定，格式重试使用新会话；不能将整次飞轮或不同角色共用一个会话。该头来自可信适配器，不从模型或转发请求复制。此行为遵循 [OpenCode Go 客户端要求](https://opencode.ai/docs/go/#where-can-i-use-it)，凭据仍只由父进程注入。
+
 ## 凭据与材料
 
 ProviderSettings 加密保存凭据，对外只返回配置状态、脱敏摘要和校验结果；密钥不进入浏览器持久化、Prompt 日志或 Run 摘要。PublicHttps 位于独立 http 适配器，模型探针与来源读取共用。材料插件按角色白名单读取；Bubblewrap 隔离和会话限制由运行时实现，不扩大 Domain 工具权限。

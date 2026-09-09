@@ -59,6 +59,7 @@ export class ConfiguredDshProvider implements AgentProvider {
     const token = randomUUID();
     const abort = new AbortController();
     let transportError: string | null = null;
+    let sessionId: string | undefined;
     let inputTokens: number | null = null;
     let outputTokens: number | null = null;
     // The real upstream credential stays in the parent. DSH receives only an
@@ -76,9 +77,12 @@ export class ConfiguredDshProvider implements AgentProvider {
           chunks.push(Buffer.from(chunk));
         }
         const target = new URL('chat/completions', endpoint.url.href.replace(/\/?$/, '/'));
+        if (!sessionId) throw new Error('DSH_AGENT_SESSION_MISMATCH');
         const response = await fetch(target, {
           method: 'POST', body: Buffer.concat(chunks), dispatcher, redirect: 'manual', signal: abort.signal,
-          headers: { 'content-type': 'application/json', ...(settings.apiKey ? { authorization: `Bearer ${settings.apiKey}` } : {}) },
+          // 使用本次原生会话的稳定标识，工具往返保持一致，重试和其他角色各自隔离。
+          headers: { 'content-type': 'application/json', 'user-agent': 'domain-knowledge/0.2.0',
+            'x-opencode-session': sessionId, ...(settings.apiKey ? { authorization: `Bearer ${settings.apiKey}` } : {}) },
         });
         if (response.status >= 300 && response.status < 400) {
           await response.body?.cancel();
@@ -117,6 +121,7 @@ export class ConfiguredDshProvider implements AgentProvider {
         processIsolation: 'bubblewrap', ...this.options.runtime,
         allowedWorkspaceRoots: this.options.runtime?.allowedWorkspaceRoots ?? [request.workspaceRoot],
         transportFailure: () => transportError,
+        onSessionStarted: (id) => { sessionId = id; },
         dshHome: this.options.dshHome, profile: 'sdk-minimal', provider: 'deepseek-official', model: settings.model!,
         nativeConnection: { baseURL: `http://127.0.0.1:${port}/v1`, contextWindow: this.options.contextWindow ?? DSH_DEFAULT_CONTEXT_WINDOW },
         env: { DEEPSEEK_API_KEY: token },

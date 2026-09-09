@@ -92,6 +92,8 @@ export interface DeepSeekHarnessAgentOptions {
 
 /** 定义DeepSeekHarnessSdk角色选项的数据结构与类型约束。 */
 export interface DeepSeekHarnessSdkAgentOptions {
+  /** 在原生会话发出请求前绑定传输标识；格式重试使用新的会话。 */
+  onSessionStarted?: (sessionId: string) => void;
   /** 提供 transportFailure 对应的transportFailure操作。 */
   transportFailure?: () => string | null;
   /** 提供nativeConnection信息，供调用方读取或传入。 */
@@ -445,6 +447,7 @@ export class DeepSeekHarnessSdkAgent implements AgentProvider {
     // session can settle immediately without producing a new assistant turn.
     const sessionId = `wp-${randomUUID().replaceAll('-', '')}`;
     try {
+      this.options.onSessionStarted?.(sessionId);
       const run = harness.run(prompt, {
         sessionId,
         onNotification: () => { notificationCount += 1; },
