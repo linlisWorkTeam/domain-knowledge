@@ -566,6 +566,9 @@ export interface GeneratedProjectFile {
 
 /** 项目快照。 */
 export interface ProjectSnapshot {
+  /** 只有获准读取源码的角色接收正文引用，公开接口材料单独分发。 */
+  sourceContentRefs?: ArtifactRef[];
+  publicInterfaceRefs?: ArtifactRef[];
   /** 提供仓库根目录信息，供调用方读取或传入。 */
   repositoryRoot: string;
   /** 提供远程信息，供调用方读取或传入。 */
@@ -660,6 +663,9 @@ export interface ProjectEvaluator {
     generatedFiles: GeneratedProjectFile[];
     prepareCommands: ProjectCommand[];
     commands: ProjectCommand[];
+    /** 受信宿主保管预期值，生成实现进程只收到函数调用参数。 */
+    moduleSuite?: import('../../domain/agents/testGenAgent/ModuleBehaviorSuite.ts').ModuleBehaviorSuite;
+    moduleContract?: { modulePath: string; exportName: string; signature: string };
   }, signal?: AbortSignal): Promise<ProjectEvaluation>;
 }
 
