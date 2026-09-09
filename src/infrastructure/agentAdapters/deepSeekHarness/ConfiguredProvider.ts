@@ -134,7 +134,7 @@ export class ConfiguredDshProvider implements AgentProvider {
         dshHome: this.options.dshHome, profile: 'sdk-minimal', provider: 'deepseek-official', model: settings.model!,
         nativeConnection: { baseURL: `http://127.0.0.1:${port}/v1`, contextWindow: this.options.contextWindow ?? DSH_DEFAULT_CONTEXT_WINDOW },
         env: { DEEPSEEK_API_KEY: token },
-        maxTokens: this.options.maxTokens ?? DSH_DEFAULT_MAX_TOKENS,
+        maxTokens: Math.min(request.maxTokens ?? DSH_DEFAULT_MAX_TOKENS, this.options.maxTokens ?? DSH_DEFAULT_MAX_TOKENS),
         maxSchemaAttempts: this.options.maxSchemaAttempts ?? DSH_DEFAULT_MAX_SCHEMA_ATTEMPTS,
         onAudit: async (record) => {
           const errorCode = transportError ?? record.errorCode;

@@ -359,6 +359,9 @@ export class DeepSeekHarnessSdkAgent implements AgentProvider {
     signal: AbortSignal | undefined,
     providerAttempt: number,
   ): Promise<Record<string, unknown>> {
+    const maxTokens = request.maxTokens === undefined ? this.options.maxTokens
+      : Math.min(request.maxTokens, this.options.maxTokens ?? request.maxTokens);
+    if (maxTokens !== undefined && (!Number.isSafeInteger(maxTokens) || maxTokens < 1)) throw new Error('DSH_AGENT_MAX_TOKENS_INVALID');
     if (!request.workspaceRoot) throw new Error('DSH_AGENT_WORKSPACE_REQUIRED');
     if (signal?.aborted) throw new Error('AGENT_CANCELLED');
     const workspaceRoot = canonicalWorkspace(request.workspaceRoot, this.allowedWorkspaceRoots);
@@ -381,9 +384,9 @@ export class DeepSeekHarnessSdkAgent implements AgentProvider {
       ...(this.options.nativeConnection ? [{ id: 'llm-deepseek', config: {
         apiKeyEnv: 'DEEPSEEK_API_KEY', baseURL: this.options.nativeConnection.baseURL,
         thinking: 'disabled', defaultContextWindow: this.options.nativeConnection.contextWindow,
-        maxTokens: this.options.maxTokens, retryPolicy: { mode: 'normal', maxRetries: 0 },
+        maxTokens: maxTokens, retryPolicy: { mode: 'normal', maxRetries: 0 },
         models: [{ id: this.options.model, contextWindow: this.options.nativeConnection.contextWindow,
-          maxTokens: this.options.maxTokens }],
+          maxTokens: maxTokens }],
       } }] : []),
       ...['persistent-bash', 'persistent-pwsh', 'str-replace-editor'].map((id) => ({ id, disabled: true })),
       { insert: [{ id: 'workpanel-role-tools', name: policyPath, config: { workspaceRoot, canRead: (request.authorizedTools ?? roleDefinitions.find((definition) => definition.agentId === request.role)?.tools ?? []).includes('read_material') } }] },
@@ -416,7 +419,7 @@ export class DeepSeekHarnessSdkAgent implements AgentProvider {
       provider: this.options.provider ?? 'deepseek-official',
       model: this.options.model ?? 'deepseek-v4-flash',
       ...this.options.reasoningEffort === undefined ? {} : { reasoningEffort: this.options.reasoningEffort },
-      ...this.options.maxTokens === undefined ? {} : { maxTokens: this.options.maxTokens },
+      ...maxTokens === undefined ? {} : { maxTokens: maxTokens },
       initializeTimeoutMs: this.options.initializeTimeoutMs ?? Math.min(this.timeoutMs, 30_000),
       shutdownTimeoutMs: this.options.shutdownTimeoutMs ?? 1_000,
       disposeEofGraceMs: this.options.disposeEofGraceMs ?? 2_000,

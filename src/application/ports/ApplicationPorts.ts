@@ -325,6 +325,8 @@ export interface RunningStateStore {
 
 /** 定义角色请求的数据结构与类型约束。 */
 export interface AgentRequest {
+  /** 本次角色阶段的输出上限，只能收紧已配置的 Provider 限额。 */
+  maxTokens?: number;
   /** 提供authorized工具信息，供调用方读取或传入。 */
   authorizedTools?: readonly string[];
   /** 提供role信息，供调用方读取或传入。 */
