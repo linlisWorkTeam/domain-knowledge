@@ -40,6 +40,8 @@ sh domain-knowledge-0.2.0-linux-x86_64.run --prefix /opt/domain-knowledge
 
 配置 `WP_KNOWLEDGE_HOST`、`WP_KNOWLEDGE_PORT` 可改变监听地址；远程 API 访问必须提供访问令牌。通过 SSH 端口转发或已有 HTTPS 反向代理访问，可保护传输中的令牌和模型凭据。目录浏览和本地发布设置读取在本机也需要认证。
 
+从自己的电脑连接 ECS 时，可执行 `ssh -N -L 4310:127.0.0.1:4310 <用户>@<ECS地址>`，然后在本机浏览器打开 `http://127.0.0.1:4310`。服务器上的服务必须先启动；测试结束后可用 `knowledge stop` 释放常驻内存。
+
 ## Markdown 发布与 Git
 
 在「Agent 设置 → 本地发布与 Git 同步」读取设置，选择独立的空知识目录。默认目录位于运行数据目录中。工作流取得领域发布凭据后，自动生成每版本 `Knowledge.md` 和 `Provenance.json`，来源提交、摘要、运行、版本和门禁证据可追踪。候选和拒绝知识不会进入此目录。

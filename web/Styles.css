@@ -563,8 +563,9 @@ small, .sidebar-foot small, .topbar .subtitle, .section-heading p:not(.eyebrow),
 .reference-run-detail .done, .reference-run-detail .doing { color: var(--accent); }
 .wide { width: 100%; min-height: 35px; margin-top: 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-2); color: var(--text); font: 8px ui-monospace, monospace; }
 .reference-start-form { margin-top: 14px; padding: 14px; display: grid; grid-template-columns: 1fr 110px auto; gap: 10px; align-items: end; }
-.reference-start-form label { color: var(--muted); font: 8px ui-monospace, monospace; }
-.reference-start-form input { margin-top: 6px; }
+.reference-start-form label { color: var(--muted); font-size: 14px; }
+.reference-start-form input { margin-top: 6px; min-height: 40px; font-size: 14px; }
+.reference-start-form .new { min-height: 42px; font-size: 14px; }
 .reference-knowledge-tools { height: 58px; margin: 20px 0 14px; padding: 0 14px; display: flex; align-items: center; color: var(--muted); font: 9px ui-monospace, monospace; }
 .reference-knowledge-tools label { min-width: 0; flex: 1; display: flex; align-items: center; }
 .reference-knowledge-tools input { border: 0; background: transparent; }
