@@ -5,7 +5,7 @@ SPDX-License-Identifier: MIT
 -->
 # 七角色 MVP 实施与验收记录
 
-目标版本为 `0.2.0`，环境限定 OpenCloudOS 9.4 x86_64，代表模块为 ohMyWorkPanel 的 `src/chat/markdownLite.ts`。当前已实现闭环和 Linux 安装候选；真实模型验收已启动但尚未通过，不能视为已验收 MVP，也未创建正式 GitHub Release。历史单角色 live 记录不能替代本次七角色验收。
+目标版本为 `0.2.0`，环境限定 OpenCloudOS 9.4 x86_64，代表模块为 ohMyWorkPanel 的 `src/chat/markdownLite.ts`。当前已实现闭环和 Linux 安装候选；真实模型验收 3 次启动额度已用完，均未通过，不能视为已验收 MVP，也未创建正式 GitHub Release。历史单角色 live 记录不能替代本次七角色验收。
 
 操作见[Linux 安装指南](LinuxInstall.md)，工作流约定见[Workflow](specs/domainFunction/workflow/Workflow.md)、[LangGraph](specs/infrastructure/langgraph/LangGraph.md)，七角色设计见[Agents](specs/domainFunction/agents/Agents.md)。历史交接见[HistoryEpitaph](HistoryEpitaph.md)。
 
@@ -46,16 +46,16 @@ ECS 约 3.6 GiB 内存、无 swap。模型与模块评测共享一个进程槽�
 | Console | 19/19 通过，已有视觉断言保留 | `tests/e2e/Console.spec.ts`、`ProductConsole.spec.ts` 及 snapshots |
 | 实际安装浏览器 | 配置空态、治理认证、目录浏览、Git 默认关闭、固定入口和 640px 窄屏通过 | 无 API 模拟；截图前隐藏认证框及临时提示；启动表单字号修正为 14px |
 | 最终自动化回归 | 280/280；类型检查通过；规范检查通过（17 Schema / 7 Command / 8 Result / 51 P0） | 包含架构、契约、角色、恢复、取消、反越权、Git、发布和安装 CLI 符号链接 |
-| GitHub CI | 280 项测试和 19 项 Console 检查全部通过 | [CI 34306722454](https://github.com/linlisWorkTeam/domain-knowledge/actions/runs/34306722454)，隔离工具与中文字体显式配置 |
+| GitHub CI | 280 项测试和 19 项 Console 检查全部通过 | [CI 34309090571](https://github.com/linlisWorkTeam/domain-knowledge/actions/runs/34309090571)，隔离工具与中文字体显式配置 |
 | 离线安装 | 通过；包内参考门禁 140/140，完整飞轮 5/5，原生 DSH 隔离 1/1 | 断网最小系统目录，启动/重启/升级/卸载及数据摘要核对 |
-| 真实模型 | 已使用 2/3 次；首次请求缺会话头，第二次候选 oracle 与正文结构失败 | 运行 `139790ab-3d41-4ca0-9908-c8183854a4a9`、`95a61b77-f821-4292-821b-bd438cd5e1e8`；第二次已完成规划、知识提取、候选测试及两阶段正文模型调用 |
+| 真实模型 | 已使用 3/3 次，0 次完整通过，无本地发布 | 首次缺会话头；第二次候选 oracle 与正文结构失败；第三次源码引用范围不匹配后取消剩余调用 |
 | GitHub Release | 未发布 | 真实完整飞轮至少 1 次通过后才可发布已验收 MVP |
 
 发行物必须来自同一受测提交，包含安装包、SHA-256、工具依赖清单与第三方许可证；安装及模块构建不下载依赖。真实模型和 Git 同步仍需联网。版本标签检查时 `v0.2.0` 未被占用，正式发布前再次核查。Windows、任意项目工具链、多语言及复杂回退均不在本版验收范围。
 
 ## 安装候选与证据边界
 
-此前受测安装候选来自提交 `026326aa56ddc0bf8abe8a49988d6c93dd554c9b`；CI 通过提交 `f30f0c5` 仅补 CI 字体与截图留存，包内应用相同。候选提交、大小与 SHA-256 记录于工具清单、`.sha256` 和证据包 `Acceptance.json`。安装实测修复了 node-pty 延迟动态库遗漏、glibc/musl 区分、显式目录对 HOME 的依赖和 current 符号链接 CLI 入口；原生 DSH 内部探针确认授权文件可见、同级参考文件不可见。没有修改门禁预期或削弱隔离。
+初始离线安装候选来自提交 `026326aa56ddc0bf8abe8a49988d6c93dd554c9b`。真实运行依次使用 `026326a`、`7287c7f`、`901ab18` 的安装包；更新安装核对配置、凭据存储、SQLite 和验收账本摘要不变。最终候选另含累计 token 快照统计修复，未再次调用真实模型。候选提交、大小与 SHA-256 记录于工具清单、`.sha256` 和证据包 `Acceptance.json`。安装实测修复了 node-pty 延迟动态库遗漏、glibc/musl 区分、显式目录对 HOME 的依赖和 current 符号链接 CLI 入口；原生 DSH 内部探针确认授权文件可见、同级参考文件不可见。没有修改门禁预期或削弱隔离。
 
 干净环境使用当前 OpenCloudOS 9.4 主机上的最小系统目录，外网关闭，只保留系统 shell、基础文件工具及其运行库，预检确认没有 Node、npm、Git、bwrap、prlimit、编译器或 DSH。受控 HTTP 模型端点仅在隔离回环地址上运行。外层验收环境保留宿主 proc 以支持内层创建用户命名空间；角色与评测仍使用产品自身的完整隔离。这是同内核的干净文件系统验收，未声称在另一台全新虚拟机上验收。
 
@@ -63,4 +63,20 @@ ECS 约 3.6 GiB 内存、无 swap。模型与模块评测共享一个进程槽�
 
 安装候选、工具清单、许可证清单与独立证据包保存在交付目录 `domain-knowledge-releases/v0.2.0-candidate/`。`Acceptance.json` 区分受控回归、安装验收和真实模型；不包含 API Key、访问令牌、数据库或模型响应原文。已从用户 9 月 8 日历史消息中找回授权凭据，并通过运行配置验证；此前“缺少凭据”的判断是漏查历史消息。继续执行 [真实验收入口](LinuxInstall.md#真实模型验收入口)，至少一次完整通过才可发布正式 Release。
 
-草稿 [PR #38](https://github.com/linlisWorkTeam/domain-knowledge/pull/38) 已保存实现与文档；未合并，未打版本标签。已安装预览位于 `/root/.local/share/domain-knowledge-mvp`，测试结束后服务已停止以释放 ECS 内存，配置和记录保留。运行配置已加密保存并验证。账本保留两次失败，占用 2/3 次；补齐 OpenCode Go 会话头后的单次连接诊断返回 HTTP 200，不能将这次诊断计作完整飞轮通过。后续重试复用同一运行目录和账本。
+草稿 [PR #38](https://github.com/linlisWorkTeam/domain-knowledge/pull/38) 已保存实现与文档；未合并，未打版本标签。已安装预览位于 `/root/.local/share/domain-knowledge-mvp`，测试结束后服务已停止以释放 ECS 内存，配置和记录保留。运行配置已加密保存并验证。账本保留 3/3 次启动记录，不得删除或更换运行目录规避次数。模型凭据可用，但未取得真实七角色全链路及本地发布的成功证据。
+
+## 真实运行明细与当前阻塞
+
+用户已于 9 月 8 日提供 OpenCode Go 地址、模型与密钥。此前仅检查运行配置，漏查历史消息，误报“缺少凭据”；本次已找回原配置并通过生产配置接口加密保存、验证，未要求重复提供密钥。
+
+| 次数 | 运行编号 | 实际结果 |
+| --- | --- | --- |
+| 1 | `139790ab-3d41-4ca0-9908-c8183854a4a9` | 提供方拒绝生成请求：缺少 x-opencode-session。已修复原生会话头与产品 User-Agent，并验证工具往返稳定、重试换会话。 |
+| 2 | `95a61b77-f821-4292-821b-bd438cd5e1e8` | 规划、知识提取、候选测试及概要/正文模型调用成功；参考 oracle 在第 25 个实际执行的案例重复遇到错误预期并停止，DocGen 把概要改为编号 H1，结构检查拒绝。未修改候选或固定测试预期。 |
+| 3 | `8d3237f4-de25-423d-8ef4-b0c5228af2d9` | DocWorker 的两条引用标注第 11–19 行，却多引用下一行的换行与闭括号；精确来源校验拒绝。为节约资源，取消仍在生成测试的任务；报告终态为 CANCELLED，失败原因另保存在诊断证据。 |
+
+第三次终止前未到代码重建、Check 或 Review。三次均未产生通过门禁的版本和 Markdown 发布。不得宣称七角色真实闭环已通过，也不创建已验收 MVP Release。继续真实验收需要新的用户授权预算，现有账本与失败工件必须保留。
+
+最后一次还发现提供方在 SSE 中反复发送累计 token 快照，旧中继逐帧相加造成虚高。已改为每个 HTTP 请求取最新快照，工具往返请求相加、重试独立计数；回归覆盖递增和重复快照。旧数据库记录不改写，其用量统计不能作计费依据。该次 DocWorker 的原生最终消息报告输入 2,957、输出 30,731 token；这只是单次调用的记录，不是订阅账单。
+
+独立证据包 real/ 保存三次 MvpAcceptance 报告、运行与安装提交映射、连接诊断及失败定位。引用不匹配使用位置和摘要留证，不保存密钥、完整模型响应或运行数据库。后续应优先改进有预算的阶段语义反馈，再在新授权预算内验证；不得直接修正原失败输出使其变为通过。

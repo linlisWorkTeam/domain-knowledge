@@ -68,6 +68,8 @@ export class ConfiguredDshProvider implements AgentProvider {
       if (req.method !== 'POST' || req.url !== '/v1/chat/completions' || req.headers.authorization !== `Bearer ${token}`) {
         res.writeHead(403); res.end(); return;
       }
+      let requestInputTokens: number | null = null;
+      let requestOutputTokens: number | null = null;
       try {
         const chunks: Buffer[] = [];
         let size = 0;
@@ -102,8 +104,15 @@ export class ConfiguredDshProvider implements AgentProvider {
             if (!line.startsWith('data: ')) continue;
             try {
               const usage = JSON.parse(line.slice(6)).usage;
-              if (Number.isSafeInteger(usage?.prompt_tokens) && usage.prompt_tokens >= 0) inputTokens = (inputTokens ?? 0) + usage.prompt_tokens;
-              if (Number.isSafeInteger(usage?.completion_tokens) && usage.completion_tokens >= 0) outputTokens = (outputTokens ?? 0) + usage.completion_tokens;
+              // 同一 HTTP 流里的 usage 是累计快照；替换该请求旧值，工具往返的独立请求才相加。
+              if (Number.isSafeInteger(usage?.prompt_tokens) && usage.prompt_tokens >= 0) {
+                inputTokens = (inputTokens ?? 0) - (requestInputTokens ?? 0) + usage.prompt_tokens;
+                requestInputTokens = usage.prompt_tokens;
+              }
+              if (Number.isSafeInteger(usage?.completion_tokens) && usage.completion_tokens >= 0) {
+                outputTokens = (outputTokens ?? 0) - (requestOutputTokens ?? 0) + usage.completion_tokens;
+                requestOutputTokens = usage.completion_tokens;
+              }
             } catch { /* content/terminal SSE events are not token usage */ }
           }
         }

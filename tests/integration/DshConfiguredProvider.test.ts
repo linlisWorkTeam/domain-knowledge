@@ -34,14 +34,15 @@ test('DSH adapter executes through the official native DSH SDK and reports token
     if (sessionHeaders.length === 1) {
       response.end(`data: ${JSON.stringify({ ...common, choices: [{ index: 0, delta: { tool_calls: [{ index: 0,
         id: 'read-source', type: 'function', function: { name: 'read_material', arguments: '{"path":"source.txt"}' },
-      }] }, finish_reason: null }] })}\n\n`
-        + `data: ${JSON.stringify({ ...common, choices: [{ index: 0, delta: {}, finish_reason: 'tool_calls' }] })}\n\n`
+      }] }, finish_reason: null }], usage: { prompt_tokens: 7, completion_tokens: 1 } })}\n\n`
+        + `data: ${JSON.stringify({ ...common, choices: [{ index: 0, delta: {}, finish_reason: 'tool_calls' }], usage: { prompt_tokens: 7, completion_tokens: 2 } })}\n\n`
         + 'data: [DONE]\n\n');
       return;
     }
     response.write(`data: ${JSON.stringify({
       ...common,
       choices: [{ index: 0, delta: { role: 'assistant', content: '{"answer":"ok"}' }, finish_reason: null }],
+      usage: { prompt_tokens: 12, completion_tokens: 3 },
     })}\n\n`);
     response.write(`data: ${JSON.stringify({
       ...common,
@@ -102,7 +103,7 @@ test('DSH adapter executes through the official native DSH SDK and reports token
       fixture: invocations[0]?.fixture,
     }, {
       runId: 'run-pi-test', provider: 'deepseek-harness', model: 'test-model', status: 'SUCCEEDED',
-      inputTokens: 12, outputTokens: 5, fixture: false,
+      inputTokens: 19, outputTokens: 7, fixture: false,
     });
   } finally {
     upstream.close();
@@ -221,6 +222,7 @@ test('DSH adapter retries schema-invalid output with a fresh session and audits 
       { status: 'FAILED', errorCode: 'AGENT_OUTPUT_INVALID', retryCount: 0 },
       { status: 'SUCCEEDED', errorCode: null, retryCount: 1 },
     ]);
+    assert.deepEqual(invocations.map((record) => [record.inputTokens, record.outputTokens]), [[3, 2], [3, 2]], 'retry usage is audited separately');
     assert.doesNotMatch(JSON.stringify(invocations), /test-key|Return the same governed business result/);
   } finally {
     upstream.close();
