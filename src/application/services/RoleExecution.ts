@@ -68,6 +68,7 @@ export class RoleExecutionService {
         return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, bind(item)]));
       };
       const result: AgentResult = {
+        rawOutputRef: rawRef,
         schemaVersion: '1.0', commandId: command.commandId, commandRef,
         runId: command.runId, agentType: command.agentType, status: 'SUCCEEDED',
         outputRefs: uniqueRefs([...refs.values()]), payload: bind(roleResult.payload) as Record<string, unknown>,

@@ -7,6 +7,8 @@ import type { Output as DocumentOutput } from '../../domain/agents/docGenAgent/D
 import type { Output as CodeOutput } from '../../domain/agents/codeAgent/CodeAgentContract.ts';
 import type { Output as CheckOutput } from '../../domain/agents/checkAgent/CheckAgentContract.ts';
 import type { Output as ReviewOutput } from '../../domain/agents/reviewAgent/ReviewAgentContract.ts';
+import type { Output as TestOutput } from '../../domain/agents/testGenAgent/TestGenAgentContract.ts';
+import type { ModuleBehaviorSuite } from '../../domain/agents/testGenAgent/ModuleBehaviorSuite.ts';
 import { RoleExecutionService } from './RoleExecution.ts';
 import type { ModelExecutionPort } from '../../domain/agents/AgentExecution.ts';
 import type {
@@ -150,7 +152,19 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
         ...scenario, repositoryRoot: snapshot.repositoryRoot, expectedCommit: snapshot.commit,
       }, null, 2)), 'application/json');
     }
-    const commandInput = { ...input, context: { ...input.context, snapshot, scenarioRef } };
+    // 完整任务只供可信应用审计；模型材料不含门禁、参考测试或机器目录。
+    const roleScenarioRef = input.context.roleScenarioRef as ArtifactRef | undefined ?? await this.flywheel.putArtifact(
+      Buffer.from(JSON.stringify({ moduleId: scenario.moduleId, sourcePaths: scenario.sourcePaths,
+        publicInterfacePaths: scenario.publicInterfacePaths, allowedGeneratedPaths: scenario.allowedGeneratedPaths,
+        moduleContract: scenario.moduleContract,
+        constraints: ['保留全部公开接口', '禁止引入外部依赖', '只输出允许路径', '不得硬编码测试结果'],
+      })), 'application/json');
+    const publicContractRef = scenario.moduleContract
+      ? await this.flywheel.putArtifact(Buffer.from(JSON.stringify(scenario.moduleContract)), 'application/json') : undefined;
+    const frozenSuiteRef = scenario.fixedSuite
+      ? input.context.frozenSuiteRef as ArtifactRef | undefined ?? await this.flywheel.putArtifact(Buffer.from(JSON.stringify(scenario.fixedSuite)), 'application/json')
+      : undefined;
+    const commandInput = { ...input, context: { ...input.context, snapshot, scenarioRef, roleScenarioRef, publicContractRef, frozenSuiteRef } };
     const agent = await this.runRole(commandInput, scenario, 'orchestrator');
     if (input.signal?.aborted) throw new Error('AGENT_CANCELLED');
     await this.flywheel.executeNode({
@@ -159,7 +173,7 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
     }, async () => [scenarioRef!]);
     return {
       detail: `planned iteration ${input.iteration}`,
-      context: { snapshot, scenarioRef, [contextKey(input.nodeId, input.iteration)]: agent },
+      context: { snapshot, scenarioRef, roleScenarioRef, publicContractRef, frozenSuiteRef, [contextKey(input.nodeId, input.iteration)]: agent },
     };
   }
 
@@ -311,11 +325,16 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
   ): Promise<WorkflowStageResult> {
     const snapshot = input.context.snapshot as ProjectSnapshot;
     const scenarioRef = input.context.scenarioRef as ArtifactRef;
+    const candidateRef = input.context[contextKey('test_gen', input.iteration)] as ArtifactRef;
+    const candidate = scenario.moduleContract ? await this.readAgentOutput<TestOutput>(candidateRef, 'test-gen', input) : undefined;
+    if (scenario.moduleContract && !candidate?.suite) throw new Error('TEST_CANDIDATE_EXECUTABLE_SUITE_REQUIRED');
+    const fixedSuite = input.context.frozenSuiteRef
+      ? await this.readJson<ModuleBehaviorSuite>(input.context.frozenSuiteRef as ArtifactRef) : undefined;
     const checkpoint = await this.flywheel.executeNode({
       runId: input.runId,
       nodeId: input.nodeId,
       generationKey: `${input.runId}:${input.nodeId}:${input.iteration}`,
-      inputRefs: [scenarioRef, snapshot.manifestRef],
+      inputRefs: [scenarioRef, snapshot.manifestRef, ...(candidateRef ? [candidateRef] : []), ...(input.context.frozenSuiteRef ? [input.context.frozenSuiteRef as ArtifactRef] : [])],
     }, async () => {
       const evaluation = await this.evaluator.evaluate({
         label: `reference-oracle-${input.iteration}`,
@@ -323,13 +342,22 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
         generatedFiles: [],
         prepareCommands: scenario.prepareCommands,
         commands: scenario.referenceCommands,
+        moduleSuite: fixedSuite,
+        moduleContract: scenario.moduleContract,
       }, input.signal);
       if (!evaluation.passed) throw new Error(`REFERENCE_GATE_FAILED: ${evaluation.evidenceRef.artifactId}`);
+      if (candidate?.suite) {
+        const candidateEvaluation = await this.evaluator.evaluate({ label: 'candidate-reference-oracle', snapshot,
+          generatedFiles: [], prepareCommands: [], commands: [], moduleSuite: candidate.suite, moduleContract: scenario.moduleContract }, input.signal);
+        if (!candidateEvaluation.passed) throw new Error(`TEST_ORACLE_REJECTED: ${candidateEvaluation.evidenceRef.artifactId}`);
+        return [evaluation.evidenceRef, candidateEvaluation.evidenceRef];
+      }
       return [evaluation.evidenceRef];
     });
     return {
       detail: 'reference oracle passed',
-      context: { [contextKey('oracleEvidenceRef', input.iteration)]: checkpoint.outputRefs[0] },
+      context: { [contextKey('oracleEvidenceRef', input.iteration)]: checkpoint.outputRefs[0],
+        [contextKey('candidateOracleRef', input.iteration)]: checkpoint.outputRefs[1] },
     };
   }
 
@@ -357,13 +385,31 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
       generationKey: `${input.runId}:${input.nodeId}:${input.iteration}`,
       inputRefs: [scenarioRef, snapshot.manifestRef, bodyRef, codeRef, oracleRef, checkRef],
     }, async () => {
-      const evaluation = await this.evaluator.evaluate({
+      let evaluation = await this.evaluator.evaluate({
         label: `generated-iteration-${input.iteration}`,
         snapshot,
         generatedFiles: code.files,
         prepareCommands: scenario.prepareCommands,
         commands: input.iteration === 0 ? scenario.firstIterationCommands : scenario.finalCommands,
+        moduleSuite: input.context.frozenSuiteRef ? await this.readJson<ModuleBehaviorSuite>(input.context.frozenSuiteRef as ArtifactRef) : undefined,
+        moduleContract: scenario.moduleContract,
       }, input.signal);
+      if (scenario.moduleContract && evaluation.passed) {
+        const trustedCandidateRef = input.context[contextKey('candidateOracleRef', input.iteration)] as ArtifactRef | undefined;
+        if (!trustedCandidateRef) throw new Error('TEST_CANDIDATE_ORACLE_MISSING');
+        const candidate = await this.readAgentOutput<TestOutput>(input.context[contextKey('test_gen', input.iteration)] as ArtifactRef, 'test-gen', input);
+        if (!candidate.suite) throw new Error('TEST_CANDIDATE_EXECUTABLE_SUITE_REQUIRED');
+        const extra = await this.evaluator.evaluate({ label: `candidate-generated-${input.iteration}`, snapshot,
+          generatedFiles: code.files, prepareCommands: [], commands: [], moduleSuite: candidate.suite,
+          moduleContract: scenario.moduleContract }, input.signal);
+        const combined = { ...evaluation, label: `combined-generated-${input.iteration}`,
+          passed: evaluation.passed && extra.passed, testsPassed: evaluation.testsPassed + extra.testsPassed,
+          testsTotal: evaluation.testsTotal + extra.testsTotal, stability: Math.min(evaluation.stability, extra.stability),
+          infrastructureFailure: evaluation.infrastructureFailure || extra.infrastructureFailure,
+          results: [...evaluation.results, ...extra.results],
+          evidenceRefs: [evaluation.evidenceRef, extra.evidenceRef, trustedCandidateRef] };
+        evaluation = { ...combined, evidenceRef: await this.flywheel.putArtifact(Buffer.from(JSON.stringify(combined)), 'application/json') };
+      }
       return [evaluation.evidenceRef];
     });
     const evidenceRef = checkpoint.outputRefs[0];
@@ -372,7 +418,8 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
     const run = this.flywheel.getRun(input.runId);
     if (run?.state === 'GENERATING') this.flywheel.transition(input.runId, 'EVALUATING');
     if (evaluation.infrastructureFailure) {
-      const decision = await this.recordGateDecision(input, evaluation);
+      const decision = await this.recordGateDecision({ ...input,
+        context: { ...input.context, [contextKey('evaluationEvidenceRef', input.iteration)]: evidenceRef } }, evaluation);
       return {
         detail: `evaluation infrastructure failed; gate ${decision.outcome}`,
         context: {
@@ -488,7 +535,9 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
     const scenarioRef = input.context.scenarioRef as ArtifactRef | undefined;
     const snapshot = input.context.snapshot as ProjectSnapshot | undefined;
     if (!scenarioRef || !snapshot?.manifestRef) throw new Error(`AGENT_COMMAND_INPUT_MISSING: ${agentId}`);
-    const publicInterfaceRefs = [snapshot.manifestRef];
+    const roleScenarioRef = input.context.roleScenarioRef as ArtifactRef | undefined ?? scenarioRef;
+    const publicInterfaceRefs = input.context.publicContractRef ? [input.context.publicContractRef as ArtifactRef]
+      : snapshot.publicInterfaceRefs?.length ? snapshot.publicInterfaceRefs : [snapshot.manifestRef];
     let payload: Record<string, unknown>;
     if (agentId === 'orchestrator') {
       const gatePolicy = input.context.gatePolicy;
@@ -496,11 +545,11 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
       const policyRef = await this.flywheel.putArtifact(
         Buffer.from(JSON.stringify(gatePolicy, null, 2)), 'application/json',
       );
-      payload = { policyRef, moduleRefs: [scenarioRef, snapshot.manifestRef] };
+      payload = { policyRef, moduleRefs: [roleScenarioRef, snapshot.manifestRef] };
     } else if (agentId === 'doc-gen' || agentId === 'doc-worker') {
       payload = {
         moduleId: scenario.moduleId,
-        sourceRefs: [snapshot.manifestRef],
+        sourceRefs: snapshot.sourceContentRefs?.length ? snapshot.sourceContentRefs : [snapshot.manifestRef],
         publicInterfaceRefs,
       };
       if (agentId === 'doc-worker') {
@@ -551,15 +600,18 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
               score: quality.score, signals: quality.signals, weakPoints: quality.weakPoints,
             };
           }
+          if (!payload.corrections) delete payload.baseKnowledgeRef;
         }
       }
     } else if (agentId === 'test-gen') {
       payload = {
         moduleId: scenario.moduleId,
-        sourceSnapshotRef: snapshot.manifestRef,
+        sourceSnapshotRef: snapshot.sourceContentRefs?.length
+          ? await this.flywheel.putArtifact(Buffer.from(JSON.stringify({ files: await Promise.all(snapshot.sourceContentRefs.map((ref) => this.readArtifact(ref))) })), 'application/json')
+          : snapshot.manifestRef,
         publicInterfaceRefs,
         languageId: this.scenarioLanguage(scenario),
-        testPolicyRef: scenarioRef,
+        testPolicyRef: roleScenarioRef,
       };
     } else if (agentId === 'code') {
       const knowledgeRef = input.context[contextKey('candidateBodyRef', input.iteration)] as ArtifactRef | undefined;
@@ -568,7 +620,7 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
         knowledgeRef,
         publicInterfaceRefs,
         languageId: this.scenarioLanguage(scenario),
-        buildContractRef: scenarioRef,
+        buildContractRef: roleScenarioRef,
         allowedGeneratedPaths: scenario.allowedGeneratedPaths,
       };
     } else if (agentId === 'check') {
@@ -582,14 +634,18 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
       );
       const diffRef = codeResult.payload['codeRef'] as ArtifactRef | undefined;
       if (!diffRef) throw new Error('AGENT_COMMAND_INPUT_MISSING: check.diffRef');
-      payload = { diffRef, criteriaRef: scenarioRef, publicInterfaceRefs };
+      payload = { diffRef, criteriaRef: roleScenarioRef, publicInterfaceRefs };
     } else {
       const knowledgeRef = input.context[contextKey('candidateBodyRef', input.iteration)] as ArtifactRef | undefined;
       const evaluationReportRef = input.context[contextKey('evaluationEvidenceRef', input.iteration)] as ArtifactRef | undefined;
       if (!knowledgeRef || !evaluationReportRef) {
         throw new Error('AGENT_COMMAND_INPUT_MISSING: review');
       }
-      payload = { knowledgeRef, evaluationReportRef, criteriaRef: scenarioRef };
+      const checkRef = input.context[contextKey('check', input.iteration)] as ArtifactRef | undefined;
+      const checkResult = checkRef ? await this.readAgentResult(checkRef, 'check', input.runId,
+        this.expectedAgentGenerationKey(input, 'check', input.iteration)) : undefined;
+      payload = { knowledgeRef, evaluationReportRef, criteriaRef: roleScenarioRef,
+        ...(checkResult ? { checkReportRef: checkResult.rawOutputRef ?? checkResult.outputRefs.find((ref) => ref.mediaType === 'application/json') } : {}) };
     }
     const generationKey = this.agentGenerationKey(input, agentId);
     return {
@@ -682,7 +738,7 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
       input.runId,
       this.expectedAgentGenerationKey(input, expectedAgent, input.iteration),
     );
-    const rawRef = result.outputRefs.find((outputRef) => outputRef.mediaType === 'application/json');
+    const rawRef = result.rawOutputRef ?? result.outputRefs.find((outputRef) => outputRef.mediaType === 'application/json');
     if (!rawRef) throw new Error(`AGENT_RESULT_RAW_OUTPUT_MISSING: ${expectedAgent}`);
     return this.readJson<T>(rawRef);
   }
@@ -802,12 +858,16 @@ export class AutomatedProjectWorkflowService {
 
   /** 等待请求。 */
   async wait(runId: string): Promise<WorkflowExecutionView> {
-    return this.workflow.wait(runId);
+    const view = await this.workflow.wait(runId);
+    this.synchronizeTerminalRun(runId, view.executionStatus);
+    return view;
   }
 
   /** 提供 状态 对应的状态操作。 */
-  status(runId: string): Promise<WorkflowExecutionView> {
-    return this.workflow.status(runId);
+  async status(runId: string): Promise<WorkflowExecutionView> {
+    const view = await this.workflow.status(runId);
+    this.synchronizeTerminalRun(runId, view.executionStatus);
+    return view;
   }
 
   /** 恢复请求。 */
@@ -828,7 +888,7 @@ export class AutomatedProjectWorkflowService {
   ): void {
     // Infrastructure failures remain resumable. FlywheelRun only becomes terminal when
     // the knowledge-governance layer makes that decision (or an operator cancels it).
-    const next = status === 'CANCELLED' ? 'CANCELLED' : null;
+    const next = status === 'CANCELLED' ? 'CANCELLED' : status === 'STOPPED' ? 'LOW_CONFIDENCE' : null;
     if (!next) return;
     const run = this.flywheel.getRun(runId);
     if (run && !['VERIFIED', 'LOW_CONFIDENCE', 'FAILED', 'CANCELLED'].includes(run.state)) {

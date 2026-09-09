@@ -536,7 +536,7 @@ export interface LanguagePlugin {
 }
 
 /** 定义项目工具的数据结构与类型约束。 */
-export type ProjectTool = 'node' | 'pnpm' | 'cargo';
+export type ProjectTool = 'node' | 'pnpm' | 'cargo' | 'typescript';
 
 /** 定义项目命令的数据结构与类型约束。 */
 export interface ProjectCommand {
