@@ -142,6 +142,12 @@
       "metadataLocation": "file-header"
     },
     {
+      "path": "docs/epitaph/2026-09-09-1125-seven-role-mvp-candidate.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "交接七角色 MVP 候选、验收证据和真实模型凭据阻塞。",
+      "metadataLocation": "file-header"
+    },
+    {
       "path": "docs/specs/README.md",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "设计规范目录。",
