@@ -44,7 +44,7 @@ mkdir "$stage/payload"
 tar -xzf "$stage/payload.tar.gz" -C "$stage/payload"
 (cd "$stage/payload" && sha256sum --quiet -c Files.sha256)
 chmod +x "$stage/payload/Knowledge.sh"
-LD_LIBRARY_PATH="$stage/payload/tools/lib" "$stage/payload/tools/bin/node" "$stage/payload/app/scripts/release/VerifyBundle.mjs" "$stage/payload"
+LD_LIBRARY_PATH="$stage/payload/tools/lib" "$stage/payload/tools/bin/node" "$stage/payload/app/scripts/release/VerifyBundle.mjs" "$stage/payload" "$version"
 if [ -x "$prefix/knowledge" ]; then "$prefix/knowledge" stop; fi
 mv "$stage/payload" "$prefix/versions/$version"
 ln -s "versions/$version" "$prefix/.current-new-$$"

@@ -16,6 +16,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const version = process.argv[2];
 const output = resolve(process.argv[3] || join(root, 'dist'));
 if (!/^0\.2\.\d+$/.test(version || '')) throw new Error('Usage: node scripts/release/BuildLinuxBundle.mjs 0.2.0 /absolute/output');
+if (JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version !== version) throw new Error('Bundle version must match package.json');
 if (!process.version.startsWith('v24.')) throw new Error('Node.js 24 build runtime required');
 if (process.platform !== 'linux' || process.arch !== 'x64') throw new Error('Linux x86_64 build host required');
 const hostRelease = readFileSync('/etc/os-release', 'utf8');

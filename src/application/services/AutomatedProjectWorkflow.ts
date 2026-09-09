@@ -867,8 +867,10 @@ export class AutomatedProjectWorkflowService {
       'workflow maxIterations must be 1..3');
     assertInvariant(Number.isSafeInteger(input.workerCount ?? 1) && (input.workerCount ?? 1) >= 0 && (input.workerCount ?? 1) <= 5,
       'workflow workerCount must be an integer from 0 to 5');
-    const resolved = this.flywheel.resolveEvaluationPolicy(input);
-    const gatePolicy = { ...resolved, maxIterations: Math.min(input.maxIterations, resolved.maxIterations, 3) };
+    const resolved = this.flywheel.resolveEvaluationPolicy({ policyId: input.policyId,
+      minimumStability: input.minimumStability, requireAllTests: input.requireAllTests, maxIterations: input.maxIterations });
+    const gatePolicy = { policyId: resolved.policyId, minimumStability: resolved.minimumStability,
+      requireAllTests: resolved.requireAllTests, maxIterations: Math.min(input.maxIterations, resolved.maxIterations, 3) };
     assertInvariant(gatePolicy.maxIterations >= 1, 'workflow maxIterations must be 1..3');
     const run = this.flywheel.createRun(scenario.moduleId, input.policyId);
     const configurationSnapshot = await this.runConfiguration.capture(run.runId, input.governanceTrigger);

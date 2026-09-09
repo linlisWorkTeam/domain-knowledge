@@ -9,6 +9,9 @@ import { existsSync, lstatSync, readFileSync, readlinkSync, realpathSync } from 
 import { isAbsolute, join, relative, resolve } from 'node:path';
 
 const root = realpathSync(resolve(process.argv[2] || '.'));
+const manifest = JSON.parse(readFileSync(join(root, 'Manifest.json'), 'utf8'));
+const packageVersion = JSON.parse(readFileSync(join(root, 'app', 'package.json'), 'utf8')).version;
+if (manifest.version !== packageVersion || (process.argv[3] && manifest.version !== process.argv[3])) throw new Error('Bundle version does not match the installation target');
 const inventory = JSON.parse(readFileSync(join(root, 'Links.json'), 'utf8'));
 if (inventory.schemaVersion !== '1.0' || !Array.isArray(inventory.links)) throw new Error('Unsupported bundle link manifest');
 for (const entry of inventory.links) {
