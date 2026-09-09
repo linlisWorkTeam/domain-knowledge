@@ -110,3 +110,37 @@ test('models-only probe result cannot enable settings and an aborted request nev
   await assert.rejects(app.verify({ expectedRevision: 2 }, AbortSignal.abort(new Error('CLIENT_DISCONNECTED'))), /CLIENT_DISCONNECTED/);
   assert.equal(probes, 1);
 });
+
+test('cancelling a queued verification returns promptly while preserving later revision ordering', async () => {
+  const store = new Store();
+  const base = createApp(store, () => '2026-09-04T00:00:00.000Z');
+  let release!: () => void;
+  let probes = 0;
+  const app = new ProviderOperationsApp({ store, endpointPolicy: base.endpointPolicy,
+    executionParameters: base.executionParameters, clock: base.clock,
+    probe: { verify: async ({ model }) => {
+      probes += 1;
+      await new Promise<void>((resolve) => { release = resolve; });
+      return { status: 'VERIFIED', reasonCode: 'GENERATION_READY', model,
+        checks: { modelList: 'PASSED', generation: 'PASSED' } };
+    } } });
+  await app.put({ provider: 'deepseek-harness', apiUrl: 'https://provider.example/v1',
+    model: 'model-a', expectedRevision: 0 });
+  const first = app.verify({ expectedRevision: 1 });
+  await new Promise((resolve) => setImmediate(resolve));
+  const abort = new AbortController();
+  const cancelled = app.verify({ expectedRevision: 1 }, abort.signal);
+  const rejected = assert.rejects(cancelled, /CLIENT_DISCONNECTED/);
+  abort.abort(new Error('CLIENT_DISCONNECTED'));
+  await rejected;
+  const next = app.put({ provider: 'deepseek-harness', apiUrl: 'https://provider.example/v1',
+    model: 'next-model', expectedRevision: 2 });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(store.value!.revision, 1, 'cancelled queue entry must not release the still-active mutation');
+  assert.equal(probes, 1);
+  release();
+  await first;
+  await next;
+  assert.equal(store.value!.revision, 3);
+  assert.equal(store.value!.model, 'next-model');
+});

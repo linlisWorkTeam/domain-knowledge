@@ -74,6 +74,19 @@ function generationVerified(record: ProviderSettingsRecord): boolean {
     && record.verificationChecks.generation === 'PASSED';
 }
 
+async function waitWithAbort<T>(pending: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (!signal) return pending;
+  signal.throwIfAborted();
+  let onAbort!: () => void;
+  try {
+    return await Promise.race([pending, new Promise<never>((_, reject) => {
+      onAbort = () => reject(signal.reason ?? new Error('PROVIDER_CANCELLED'));
+      signal.addEventListener('abort', onAbort, { once: true });
+      if (signal.aborted) onAbort();
+    })]);
+  } finally { signal.removeEventListener('abort', onAbort); }
+}
+
 function runtimeDigest(
   record: ProviderSettingsRecord,
   execution: DshExecutionParameters,
@@ -287,7 +300,11 @@ export class ProviderOperationsApp {
   /** 验证请求。 */
   async verify(input: { expectedRevision: unknown; enable?: unknown }, signal?: AbortSignal): Promise<Record<string, unknown>> {
     signal?.throwIfAborted();
-    return this.serialized(() => this.verifyUnlocked(input, signal));
+    const timeout = new AbortController();
+    const timer = setTimeout(() => timeout.abort(new Error('PROVIDER_TIMEOUT')), 30_000);
+    const bounded = AbortSignal.any([timeout.signal, ...signal ? [signal] : []]);
+    try { return await this.serialized(() => this.verifyUnlocked(input, bounded), bounded); }
+    finally { clearTimeout(timer); }
   }
 
   private async verifyUnlocked(input: {
@@ -305,7 +322,7 @@ export class ProviderOperationsApp {
     assertInvariant(current.revision === Number(input.expectedRevision),
       'REVISION_CONFLICT: Provider settings changed');
     // Resolve again immediately before probing. This closes the save/verify DNS rebinding gap.
-    const endpoint = await this.endpointPolicy.validate(current.apiUrl);
+    const endpoint = await waitWithAbort(this.endpointPolicy.validate(current.apiUrl), signal);
     signal?.throwIfAborted();
     const result = await this.probe.verify({
       endpoint,
@@ -447,12 +464,15 @@ export class ProviderOperationsApp {
     };
   }
 
-  private async serialized<T>(operation: () => Promise<T>): Promise<T> {
+  private async serialized<T>(operation: () => Promise<T>, signal?: AbortSignal): Promise<T> {
     const previous = this.mutationTail;
     let release!: () => void;
-    this.mutationTail = new Promise<void>((resolve) => { release = resolve; });
-    await previous;
+    const completed = new Promise<void>((resolve) => { release = resolve; });
+    // 已取消的排队操作可以提前返回，但后续修改仍必须等待真正的前序操作。
+    this.mutationTail = previous.then(() => completed);
     try {
+      await waitWithAbort(previous, signal);
+      signal?.throwIfAborted();
       return await operation();
     } finally {
       release();

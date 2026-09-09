@@ -35,7 +35,7 @@ DeterministicQualityPolicy 位于 Application：来源证据 30%、结构 25%、
 
 RunConfiguration 冻结 Prompt、Schema、Provider 和 roleExecutionVersion 摘要，配置改变影响新 Run；旧版本拒绝恢复但不阻止查询历史。AgentExample 保存独立开发 Run、配置、工件与脱敏轨迹，不启动 LangGraph、评测或发布。所有角色样例均通过 AgentExample 执行，不再为 DocGen 提供专用应用服务。固定源码检查只在 DocGen 自己的样例测试中执行。
 
-ProviderOperationsApp 只在用户显式验证时调用 ProviderConnectionProbe，并贯穿 HTTP 取消信号。模型列表与最小生成均 PASSED、reasonCode 为 GENERATION_READY 才保存已验证指纹并启用；两阶段证据保存在设置和脱敏审计中。旧版 READY 记录可读，但对外显示 UNVERIFIED / GENERATION_VERIFICATION_REQUIRED，不能成为新 Run 的默认配置，读取时不触发生成或修改旧记录。配置修订号和 HTTP 幂等约束继续阻止重复操作产生额外调用。技术预算和临时空间见[模型适配设计](../infrastructure/agentAdapters/AgentAdapters.md#显式连接验证)。
+ProviderOperationsApp 只在用户显式验证时调用 ProviderConnectionProbe，并贯穿 HTTP 取消信号。30 秒总期限从应用入口开始，覆盖配置修订队列和 DNS 校验；取消的队列项提前返回，但不能放行仍在前序操作后的其他配置修改。模型列表与最小生成均 PASSED、reasonCode 为 GENERATION_READY 才保存已验证指纹并启用；两阶段证据保存在设置和脱敏审计中。旧版 READY 记录可读，但对外显示 UNVERIFIED / GENERATION_VERIFICATION_REQUIRED，不能成为新 Run 的默认配置，读取时不触发生成或修改旧记录。配置修订号和 HTTP 幂等约束继续阻止重复操作产生额外调用。技术预算和临时空间见[模型适配设计](../infrastructure/agentAdapters/AgentAdapters.md#显式连接验证)。
 
 
 文档关系：[设计目录](../README.md)负责代码与设计定位；[开发指南](../../Development.md)说明修改和交付步骤。
