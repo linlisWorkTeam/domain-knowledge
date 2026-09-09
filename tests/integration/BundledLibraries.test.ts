@@ -8,7 +8,7 @@ import test from 'node:test';
 import { spawnSync } from 'node:child_process';
 import { copyFileSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { bundledLibraryDirectory, bundledLibraryEnvironment, bundledLibrarySandboxArgs } from '../../src/infrastructure/runtime/BundledLibraries.ts';
 
 function fixture(t: { after(fn: () => void): void }) {
@@ -53,7 +53,10 @@ test('bundled libraries: links, subdirectories and non-library files cannot expa
 test('bundled libraries: Linux sandbox loads the copied exact library and keeps it read-only', (t) => {
   const { root, library, runtime, environment } = fixture(t);
   // 复制当前受测系统的精确 C++ 运行库，不下载、编译或复制开发工具。
-  copyFileSync(realpathSync('/usr/lib64/libstdc++.so.6'), join(library, 'libstdc++.so.6'));
+  const loaded = (process.report.getReport() as { sharedObjects: string[] }).sharedObjects;
+  const cppLibrary = loaded.find((path) => basename(path) === 'libstdc++.so.6');
+  assert.ok(cppLibrary, 'the tested Node runtime must load a C++ system library');
+  copyFileSync(realpathSync(cppLibrary), join(library, 'libstdc++.so.6'));
   const secret = join(root, 'host-secret'); writeFileSync(secret, 'host-secret');
   const script = `const fs = require('node:fs'); let denied = false; try { fs.writeFileSync('/runtime-libs/write-probe', 'x'); } catch (error) { denied = error.code === 'EROFS'; }
 process.stdout.write(JSON.stringify({ path: process.env.LD_LIBRARY_PATH, denied, hidden: !fs.existsSync(${JSON.stringify(secret)}),

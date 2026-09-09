@@ -4,10 +4,12 @@
  * 文件功能：用无模型端口验证真实验收入口的持久次数、互斥、预检与取消。
  */
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { acceptanceReason, parseAcceptanceArguments, runMvpAcceptance, type AcceptanceBackend, type AcceptanceOptions } from './RunMvpAcceptance.ts';
 
 function options() {
@@ -23,6 +25,18 @@ function backend(overrides: Partial<AcceptanceBackend> = {}): AcceptanceBackend 
 }
 function ledger(paths: AcceptanceOptions) { return JSON.parse(readFileSync(join(paths.runtime, 'MvpAcceptanceLedger.json'), 'utf8')); }
 function deferred() { let resolve!: () => void; const promise = new Promise<void>((done) => { resolve = done; }); return { promise, resolve }; }
+
+test('real acceptance: installed current symlink enters the CLI and fails missing arguments', () => {
+  const fixture = options();
+  try {
+    const entry = join(fixture.paths.source, 'Acceptance.ts');
+    symlinkSync(fileURLToPath(new URL('./RunMvpAcceptance.ts', import.meta.url)), entry);
+    const result = spawnSync(process.execPath, [entry], { encoding: 'utf8', timeout: 10_000 });
+    assert.equal(result.status, 1, 'a symlink invocation must execute the CLI instead of silently returning success');
+    assert.match(result.stderr, /ACCEPTANCE_ARGUMENT_INVALID/);
+    assert.equal(existsSync(fixture.paths.runtime), false);
+  } finally { fixture.close(); }
+});
 
 test('real acceptance: preflight failures consume no attempt and never start the model port', async () => {
   const fixture = options(); let starts = 0;

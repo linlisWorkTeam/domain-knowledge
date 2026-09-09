@@ -260,7 +260,7 @@ export function parseAcceptanceArguments(args: string[]): AcceptanceOptions {
   return { source: values['--source'], runtime: values['--runtime'], evidence: values['--evidence'] };
 }
 
-const direct = process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url;
+const direct = process.argv[1] && pathToFileURL(realpathSync(process.argv[1])).href === import.meta.url;
 if (direct) {
   const controller = new AbortController();
   const stop = () => controller.abort();

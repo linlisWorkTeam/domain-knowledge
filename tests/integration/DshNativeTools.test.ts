@@ -27,9 +27,13 @@ test('native DSH enforces role material reads and refuses sibling, symlink, secr
     { name: 'bash', arguments: { command: 'cat ../private.txt' } },
   ];
   const bodies: any[] = [];
+  let visibility: { authorized: boolean; reference: boolean } | undefined;
   const server = createServer(async (req, res) => {
     let body = '';
     for await (const chunk of req) body += chunk;
+    if (req.url === '/isolation-probe') {
+      visibility = JSON.parse(body); res.writeHead(204); res.end(); return;
+    }
     bodies.push(JSON.parse(body));
     const call = calls[bodies.length - 1];
     res.writeHead(200, { 'content-type': 'text/event-stream' });
@@ -44,10 +48,19 @@ test('native DSH enforces role material reads and refuses sibling, symlink, secr
   });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const address = server.address() as { port: number };
+  // 由真实 DSH 进程中的受控插件探测挂载范围，独立于 read_material 的路径拒绝逻辑。
+  const probe = join(workspace, 'VisibilityProbe.mjs');
+  writeFileSync(probe, `import { existsSync } from 'node:fs';
+export async function apply() { await fetch('http://127.0.0.1:${address.port}/isolation-probe', { method: 'POST',
+  body: JSON.stringify({ authorized: existsSync(${JSON.stringify(join(workspace, 'source.txt'))}), reference: existsSync(${JSON.stringify(join(root, 'private.txt'))}) }) }); }`);
+  const patch = join(root, 'VisibilityPatch.json');
+  writeFileSync(patch, JSON.stringify([{ insert: [{ id: 'visibility-probe', name: probe }] }]));
   const audits: DeepSeekHarnessAuditRecord[] = [];
   try {
     const agent = new DeepSeekHarnessSdkAgent({
       allowedWorkspaceRoots: [workspace], dshHome: join(root, 'home'), timeoutMs: 20_000,
+      processIsolation: 'bubblewrap',
+      patches: [patch],
       env: { DEEPSEEK_BASE_URL: `http://127.0.0.1:${address.port}/v1`, DEEPSEEK_API_KEY: 'local-test-key' },
       onAudit: (record) => { audits.push(record); },
     });
@@ -57,6 +70,7 @@ test('native DSH enforces role material reads and refuses sibling, symlink, secr
         properties: { answer: { type: 'string' } } },
       idempotencyKey: 'native-tools:doc-gen:0', metadata: { runId: 'native-tools' },
     }), { answer: 'done' });
+    assert.deepEqual(visibility, { authorized: true, reference: false }, 'the DSH process itself must not see sibling reference material');
     assert.equal(bodies.length, 6);
     for (const body of bodies) assert.deepEqual(body.tools.map((tool: any) => tool.function.name), ['read_material']);
     assert.equal(bodies[1].messages.at(-1).content, 'AUTHORIZED_MATERIAL');

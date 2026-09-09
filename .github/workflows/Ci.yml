@@ -48,6 +48,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install and verify Linux isolation
+        if: steps.changes.outputs.docs-only != 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends bubblewrap
+          bwrap --unshare-all --die-with-parent --ro-bind / / --proc /proc --dev /dev /bin/true
+
       - name: Type-check
         if: steps.changes.outputs.docs-only != 'true'
         run: npm run typecheck
