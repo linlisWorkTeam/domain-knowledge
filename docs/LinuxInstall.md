@@ -38,6 +38,8 @@ sh domain-knowledge-0.2.0-linux-x86_64.run --prefix /opt/domain-knowledge
 
 浏览器「批次」页选择的是服务器上的项目仓库目录。目录必须属于服务器允许范围。点击「启动知识飞轮」运行固定 markdownLite 场景，最多 3 轮、30 分钟，角色串行，复用批次进度、取消与评测证据。机器不支持隔离时，启动明确失败并记录 `data/isolation-check.log`。
 
+目录浏览默认限于安装数据与仓库的父目录。项目位于其他位置时，管理员可在 `data/Configuration.env` 设置 `WP_KNOWLEDGE_DIRECTORY_ROOTS`，用冒号分隔已有的允许根目录，并保留数据目录所在根，例如 `WP_KNOWLEDGE_DIRECTORY_ROOTS=/srv/projects:/opt/domain-knowledge`。重启服务后即可从浏览器选择这些目录；这项设置不扩大角色沙箱的材料范围。
+
 配置 `WP_KNOWLEDGE_HOST`、`WP_KNOWLEDGE_PORT` 可改变监听地址；远程 API 访问必须提供访问令牌。通过 SSH 端口转发或已有 HTTPS 反向代理访问，可保护传输中的令牌和模型凭据。目录浏览和本地发布设置读取在本机也需要认证。
 
 从自己的电脑连接 ECS 时，可执行 `ssh -N -L 4310:127.0.0.1:4310 <用户>@<ECS地址>`，然后在本机浏览器打开 `http://127.0.0.1:4310`。服务器上的服务必须先启动；测试结束后可用 `knowledge stop` 释放常驻内存。
