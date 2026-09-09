@@ -137,7 +137,7 @@ test('generated behavior', () => assert.equal(calculate(), expected));
     operationalMetrics: { recordProviderInvocation: (record) => { invocations.push(record); }, runs: () => ({}), governance: () => ({}) },
     providerSettingsStore: store,
     providerEndpointPolicy: endpointPolicy,
-    providerProbe: { verify: async ({ model }) => ({ status: 'VERIFIED', reasonCode: 'READY', model }) },
+    providerProbe: { verify: async ({ model }) => ({ status: 'VERIFIED', reasonCode: 'GENERATION_READY', checks: { modelList: 'PASSED' as const, generation: 'PASSED' as const }, model }) },
   });
   try {
     await composition.apps.providerOperations.put({

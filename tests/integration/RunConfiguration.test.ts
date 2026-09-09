@@ -222,7 +222,7 @@ test('DSH RunConfigurationSnapshot freezes every non-secret execution parameter'
         }),
       },
       providerProbe: {
-        verify: async ({ model }) => ({ status: 'VERIFIED', reasonCode: 'READY', model }),
+        verify: async ({ model }) => ({ status: 'VERIFIED', reasonCode: 'GENERATION_READY', checks: { modelList: 'PASSED' as const, generation: 'PASSED' as const }, model }),
       },
     });
     compositions.push(composition);

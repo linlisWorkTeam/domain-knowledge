@@ -92,6 +92,7 @@ test('models success never masks generation rejection, malformed JSON, redirects
         assert.equal(result.status, 'FAILED');
         assert.deepEqual(result.checks, { modelList: 'PASSED', generation: 'FAILED' });
         assert.match(result.reasonCode, /^GENERATION_/);
+        if (mode === 'rejected') assert.equal(result.reasonCode, 'GENERATION_AUTH_DENIED');
         assert.equal(generations, 1, 'no retry, redirect follow or second billable tool request');
         assert.doesNotMatch(JSON.stringify(result), /secret response|controlled-private-test-key|private-target/);
         assert.deepEqual(await readdir(fixture.directory), []);

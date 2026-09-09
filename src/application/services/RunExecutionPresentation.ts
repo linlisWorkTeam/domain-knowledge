@@ -4,6 +4,21 @@
  * 文件功能：合并业务阶段与工作流执行事实，形成不会误报运行中的只读展示。
  */
 import type { WorkflowExecutionView } from '../ports/ApplicationPorts.ts';
+import type { DomainEvent } from '../../domain/Domain.ts';
+
+/** 用已持久化的阶段元数据展示剩余额度，不加载模型原文到列表。 */
+export function stageRecoveryBlock(events: DomainEvent[], now = Date.now()): string | undefined {
+  const latest = new Map<string, Record<string, unknown>>();
+  for (const { payload } of events) if (payload.kind === 'role-stage-attempt') {
+    latest.set(`${payload.generationKey}:${payload.stage}`, payload);
+  }
+  for (const stage of latest.values()) {
+    if (stage.status === 'PASSED') continue;
+    if (typeof stage.attempt === 'number' && stage.attempt >= 2) return 'STAGE_ATTEMPTS_EXHAUSTED';
+    if (typeof stage.deadlineAt === 'number' && stage.deadlineAt <= now) return 'STAGE_BUDGET_EXHAUSTED';
+  }
+  return undefined;
+}
 
 /** 执行事实与业务 state 分离；未知记录不得推断为正在运行。 */
 export interface RunExecutionPresentation {
@@ -24,6 +39,7 @@ export function presentRunExecution(
   businessState: string,
   view: WorkflowExecutionView | 'NOT_TRACKED' | 'UNAVAILABLE',
   configurationCompatible = false,
+  stageBlock?: string,
 ): RunExecutionPresentation {
   if (typeof view === 'string') return {
     executionStatus: view, executionFailure: null,
@@ -39,6 +55,7 @@ export function presentRunExecution(
     : !Number.isFinite(view.budget.remainingMs) || view.budget.remainingMs <= 0 ? 'BUDGET_EXHAUSTED'
     : !nodeId ? 'FAILED_NODE_UNAVAILABLE'
     : !configurationCompatible ? 'RUN_CONFIGURATION_INCOMPATIBLE'
+    : stageBlock ? stageBlock
     : 'RECOVERABLE';
   return {
     executionStatus: view.executionStatus,

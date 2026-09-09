@@ -23,7 +23,7 @@ SPDX-License-Identifier: MIT
 
 ## 角色提交链
 
-RoleExecutionService 为生产、Fixture 和 agent:run 共用生成键、命令工件、RoleResult 和结果信封。先验证可信材料，执行显式注册角色，写入原始输出及待保存正文，将 pending/角色节点/生成键符号绑定为实际引用，校验结果信封后提交 checkpoint、结果与事件。失败和取消保留失败记录，不能提交半份成功结果。
+RoleExecutionService 为生产、Fixture 和 agent:run 共用生成键、命令工件、RoleResult 和结果信封。先验证可信材料，执行显式注册角色，写入标准化角色结果及待保存正文，将 pending/角色节点/生成键符号绑定为实际引用，校验结果信封后提交 checkpoint、结果与事件。失败和取消保留失败记录，不能提交半份成功结果。DocWorker/DocGen 阶段 journal 在模型调用前保存占额，调用后把原始模型输出、字段定位和 PASSED/REJECTED/FAILED 单独写入不可变 CAS；事件只携带引用、次数与截止时间。恢复复用已通过阶段，不能重置次数或截止时间。失败阶段原文不进入下游成功结果信封。
 
 ProjectWorkflowStages 负责解析场景上下文、读取历史工件、构造各角色 Input，再调用公共角色服务。评测、候选保存和发布继续由应用服务协调，不能把 WorkflowStageInput 透传给 Domain 角色。
 
@@ -53,3 +53,5 @@ ProviderOperationsApp 只在用户显式验证时调用 ProviderConnectionProbe�
 Console 通过应用边界读取发布设置、枚举服务器授权目录、读取正文与来源、恢复待完成发布及手动同步 Git。Git 默认关闭。模型配置和服务器目录操作不要求用户编辑场景 JSON。代表模块场景由受信工厂构建，并通过 `apps.markdownLite.start(repositoryRoot)` 启动。
 
 应用数据与安装版本分离；详见 [Linux 安装与本地发布](../../LinuxInstall.md)。
+
+失败执行的恢复展示同时检查阶段 journal：两次尝试耗尽或阶段截止时间已过时，不展示恢复按钮。此展示不代替阶段执行器、运行总预算和执行版本的最终校验。

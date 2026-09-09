@@ -63,7 +63,7 @@ export class RoleExecutionService {
           const artifactRef = await this.flywheel.putArtifact(Buffer.from(JSON.stringify(attempt)), 'application/json');
           this.flywheel.repository.recordOperationalEvent(createEvent(command.runId, 'ArtifactCommitted', {
             kind: 'role-stage-attempt', generationKey: command.generationKey, agentType: command.agentType,
-            stage: attempt.stage, attempt: attempt.attempt, status: attempt.status, artifactRef,
+            stage: attempt.stage, attempt: attempt.attempt, status: attempt.status, deadlineAt: attempt.deadlineAt, artifactRef,
           }, this.flywheel.clock()));
         },
       };

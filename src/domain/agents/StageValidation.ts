@@ -41,7 +41,7 @@ export async function validatedStage<T>(context: ExecutionContext, request: Mode
   try {
     for (let attempt = used + 1; attempt <= 2; attempt++) {
       active();
-      const entry: StageAttempt = { schemaVersion: 'role-stage-v1', stage: request.stage, attempt, startedAt, status: 'STARTED' };
+      const entry: StageAttempt = { schemaVersion: 'role-stage-v1', stage: request.stage, attempt, startedAt, deadlineAt: startedAt + timeoutMs, status: 'STARTED' };
       // 先持久化占用次数，崩溃或取消后不能免费获得新尝试。
       await context.stageJournal?.record(entry);
       active();

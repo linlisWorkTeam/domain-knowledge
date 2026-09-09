@@ -34,7 +34,7 @@ sh domain-knowledge-0.2.0-linux-x86_64.run --prefix /opt/domain-knowledge
 
 无权限写 `/opt` 时选择当前账户可写的绝对目录；默认路径为 `$HOME/.local/share/domain-knowledge`。不需要预装 Node、Git、DSH、TypeScript 或 npm。系统基础 shell、tar、gzip、sha256sum 和支持用户/进程/网络命名空间的内核仍是操作系统要求。
 
-默认地址为 `http://127.0.0.1:4310`。首次启动生成 `data/Configuration.env`，权限为 600，包含随机访问令牌。将令牌值输入浏览器的治理模式认证框。模型 API 地址、`deepseek-v4-flash` 与 API Key 在「Agent 设置」页面配置并验证。密钥不应写入源码、截图或发布证据。
+默认地址为 `http://127.0.0.1:4310`。首次启动生成 `data/Configuration.env`，权限为 600，包含随机访问令牌。将令牌值输入浏览器的治理模式认证框。模型 API 地址、`deepseek-v4-flash` 与 API Key 在「Agent 设置」页面配置并验证。点击连接验证会先读取模型列表，再发送一次最多 64 输出 token 的实际生成请求，可能消耗少量订阅额度；30 秒总期限包含排队。保存和读取设置不会调用模型。旧版只有列表验证的记录需要手动重新验证。密钥不应写入源码、截图或发布证据。
 
 浏览器「批次」页选择的是服务器上的项目仓库目录。目录必须属于服务器允许范围。点击「启动知识飞轮」运行固定 markdownLite 场景，最多 3 轮、30 分钟，角色串行，复用批次进度、取消与评测证据。机器不支持隔离时，启动明确失败并记录 `data/isolation-check.log`。
 

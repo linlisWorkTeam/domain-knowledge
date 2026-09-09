@@ -70,7 +70,7 @@ test('DocGen example uses the shared production DSH stages, freezes prompts and 
   const port = (server.address() as { port: number }).port;
   const composition = createComposition({ runtimeDir,
     providerEndpointPolicy: { validate: async () => ({ url: new URL(`http://local.invalid:${port}/v1/`), addresses: ['127.0.0.1'] }) },
-    providerProbe: { verify: async ({ model }) => ({ status: 'VERIFIED', reasonCode: 'READY', model }) },
+    providerProbe: { verify: async ({ model }) => ({ status: 'VERIFIED', reasonCode: 'GENERATION_READY', checks: { modelList: 'PASSED' as const, generation: 'PASSED' as const }, model }) },
   });
   try {
     await composition.apps.providerOperations.put({ provider: 'deepseek-harness', apiUrl: 'https://model.invalid/v1/', apiKey: 'controlled-secret', model: 'controlled', expectedRevision: 0 });

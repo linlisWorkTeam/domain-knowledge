@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：协调Orchestrator用例及其依赖的领域规则与端口。
  */
-import { presentRunExecution } from '../services/RunExecutionPresentation.ts';
+import { presentRunExecution, stageRecoveryBlock } from '../services/RunExecutionPresentation.ts';
 import type { AgentId, DemoReportBuilder, RunConfigurationManager } from '../ports/ApplicationPorts.ts';
 import type {
   AgentCatalogService, AutomatedProjectWorkflowService,
@@ -71,7 +71,8 @@ export class Orchestrator {
       try { await this.runConfiguration.assertCompatible(run.runId); compatible = true; }
       catch { /* 旧执行版本或已变更配置仍可阅读，但不可声明可恢复。 */ }
     }
-    return presentRunExecution(run.state, view, compatible);
+    const stageBlock = compatible ? stageRecoveryBlock((await this.workflow()).flywheel.repository.listEvents(run.runId)) : undefined;
+    return presentRunExecution(run.state, view, compatible, stageBlock);
   }
 
   /** 恢复请求。 */

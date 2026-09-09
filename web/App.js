@@ -258,6 +258,7 @@ function runStatusBadge(run) {
 function recoveryLabel(run) {
   if (run.recovery?.canResume) return '可恢复；仍使用原有预算'
   return ({ BUDGET_EXHAUSTED: '预算已耗尽，不能恢复', BUDGET_UNAVAILABLE: '缺少原始预算，不能恢复',
+    STAGE_ATTEMPTS_EXHAUSTED: '当前阶段修正次数已耗尽，不能恢复', STAGE_BUDGET_EXHAUSTED: '当前阶段时间预算已耗尽，不能恢复',
     RUN_CONFIGURATION_INCOMPATIBLE: '执行版本或配置已变更，不能恢复', FAILED_NODE_UNAVAILABLE: '没有可恢复的失败节点',
     BUSINESS_TERMINAL: '业务流程已结束，不能恢复', EXECUTION_UNAVAILABLE: '执行状态暂不可读取',
     EXECUTION_NOT_TRACKED: '没有关联的工作流执行记录' })[run.recovery?.reasonCode] ?? '当前不可恢复'

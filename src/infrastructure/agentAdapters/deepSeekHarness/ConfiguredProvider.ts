@@ -99,7 +99,12 @@ export class ConfiguredDshProvider implements AgentProvider {
           await response.body?.cancel();
           throw new Error('PROVIDER_REDIRECT_DENIED');
         }
-        if (!response.ok) { await response.body?.cancel(); throw new Error('DSH_PROVIDER_REQUEST_FAILED'); }
+        if (!response.ok) {
+          await response.body?.cancel();
+          const codes: Record<number, string> = { 401: 'PROVIDER_AUTH_INVALID', 403: 'PROVIDER_AUTH_DENIED',
+            404: 'PROVIDER_ENDPOINT_UNSUPPORTED', 429: 'PROVIDER_RATE_LIMITED' };
+          throw new Error(codes[response.status] ?? 'DSH_PROVIDER_REQUEST_FAILED');
+        }
         res.writeHead(200, { 'content-type': 'text/event-stream' });
         let pending = '';
         let responseBytes = 0;

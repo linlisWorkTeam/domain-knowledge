@@ -5,7 +5,8 @@
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { presentRunExecution } from '../../src/application/services/RunExecutionPresentation.ts';
+import { presentRunExecution, stageRecoveryBlock } from '../../src/application/services/RunExecutionPresentation.ts';
+import { createEvent } from '../../src/domain/Domain.ts';
 import type { WorkflowExecutionView } from '../../src/application/ports/ApplicationPorts.ts';
 
 const failed: WorkflowExecutionView = {
@@ -13,6 +14,17 @@ const failed: WorkflowExecutionView = {
   route: 'FAILED', error: 'DOC_WORKER_SOURCE_EVIDENCE_INVALID: secret-provider-response',
   budget: { startedAt: '2026-09-09T00:00:00.000Z', deadlineAt: '2026-09-09T00:30:00.000Z', maxDurationMs: 1_800_000, remainingMs: 900_000 },
 };
+
+test('stage attempts and deadlines prevent a misleading resume action while accepted attempts remain reusable', () => {
+  const event = (attempt: number, status: string, deadlineAt = 200) => createEvent('run-failed', 'ArtifactCommitted', {
+    kind: 'role-stage-attempt', generationKey: 'worker', stage: 'extract', attempt, status, deadlineAt,
+  }, '2026-09-09T00:00:00.000Z');
+  const rejected = [event(1, 'REJECTED'), event(2, 'REJECTED')];
+  assert.equal(stageRecoveryBlock(rejected, 100), 'STAGE_ATTEMPTS_EXHAUSTED');
+  assert.equal(presentRunExecution('GENERATING', failed, true, stageRecoveryBlock(rejected, 100)).recovery.canResume, false);
+  assert.equal(stageRecoveryBlock([event(1, 'FAILED', 90)], 100), 'STAGE_BUDGET_EXHAUSTED');
+  assert.equal(stageRecoveryBlock([event(1, 'STARTED'), event(1, 'PASSED')], 300), undefined);
+});
 
 test('recoverable execution failure remains distinct from business GENERATING and leaks no raw error', () => {
   const input = structuredClone(failed);

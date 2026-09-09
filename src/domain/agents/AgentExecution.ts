@@ -73,6 +73,7 @@ export interface StageAttempt {
   stage: string;
   attempt: number;
   startedAt: number;
+  deadlineAt: number;
   status: 'STARTED' | 'PASSED' | 'REJECTED' | 'FAILED';
   output?: Record<string, unknown>;
   issue?: { code: string; field: string; hint: string };
