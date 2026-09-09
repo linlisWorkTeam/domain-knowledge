@@ -455,7 +455,8 @@ export function createComposition(input: {
       const executor = stages instanceof FixtureProjectWorkflowStages ? stages.executor : stages;
       return executor.modelFactory({ ...request, provider: executor.agentResolver?.(request.command.runId) ?? executor.agent });
     },
-    fixtureModel: (output) => ({ assertOutput: assertModelOutput, execute: async () => structuredClone(output) }),
+    fixtureModel: (output, stages) => ({ assertOutput: assertModelOutput,
+      execute: async (request) => structuredClone(stages?.[request.stage ?? 'execute'] ?? output) }),
   });
   let workflowPromise: Promise<AutomatedProjectWorkflowService> | null = null;
   const workflow = () => {

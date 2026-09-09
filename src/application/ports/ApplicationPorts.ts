@@ -779,6 +779,8 @@ export interface WorkflowNodeProjection {
 
 /** 定义Start工作流命令的数据结构与类型约束。 */
 export interface StartWorkflowCommand {
+  /** 全运行墙钟预算，包含排队、重试和评测；恢复使用原截止时间。 */
+  maxDurationMs?: number;
   /** 提供运行标识信息，供调用方读取或传入。 */
   runId: string;
   /** 提供最大Iterations信息，供调用方读取或传入。 */
@@ -799,6 +801,8 @@ export interface WorkflowHandle {
 
 /** 定义工作流执行视图的数据结构与类型约束。 */
 export interface WorkflowExecutionView extends WorkflowHandle {
+  /** 已持久化的预算，不随重启或手动恢复重置。 */
+  budget?: { startedAt: string; deadlineAt: string; maxDurationMs: number; remainingMs: number };
   /** 提供current节点信息，供调用方读取或传入。 */
   currentNode: string | null;
   /** 提供轮次信息，供调用方读取或传入。 */

@@ -65,6 +65,10 @@ function executionNodeId(state: InfrastructureState, nodeId: string): string {
 
 function createNode(deps: GraphDependencies, nodeId: string) {
   return async (state: InfrastructureState): Promise<InfrastructureStateUpdate> => {
+    if (state.budgetDeadlineAt && Date.now() >= state.budgetDeadlineAt) {
+      throw new Error('WORKFLOW_BUDGET_EXHAUSTED');
+    }
+    if (deps.signalFor(state.runId)?.aborted) throw deps.signalFor(state.runId)?.reason;
     const renderedNodeId = executionNodeId(state, nodeId);
     const attemptKey = `${renderedNodeId}:${state.iteration}`;
     const stateAttempt = (state.attempts[attemptKey] ?? 0) + 1;

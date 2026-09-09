@@ -767,8 +767,8 @@ export class AutomatedProjectWorkflowService {
       && input.minimumStability >= 0 && input.minimumStability <= 1,
     'workflow minimumStability must be between zero and one');
     assertInvariant(typeof input.requireAllTests === 'boolean', 'workflow requireAllTests must be boolean');
-    assertInvariant(Number.isSafeInteger(input.maxIterations) && input.maxIterations >= 1,
-      'workflow maxIterations must be a positive integer');
+    assertInvariant(Number.isSafeInteger(input.maxIterations) && input.maxIterations >= 1 && input.maxIterations <= 3,
+      'workflow maxIterations must be 1..3');
     assertInvariant(Number.isSafeInteger(input.workerCount ?? 1) && (input.workerCount ?? 1) >= 0 && (input.workerCount ?? 1) <= 5,
       'workflow workerCount must be an integer from 0 to 5');
     const run = this.flywheel.createRun(scenario.moduleId, input.policyId);

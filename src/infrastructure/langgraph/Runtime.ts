@@ -69,6 +69,7 @@ export async function createDomainKnowledgeInfrastructure(options: DomainKnowled
       return SqliteSaver.fromConnString(checkpoint.filename);
     })();
   const controllers = new Map<string, AbortController>();
+  const deadlines = new Map<string, ReturnType<typeof setTimeout>>();
   const resumeReadyAt = new Map<string, string>();
   const readyKey = (runId: string, nodeId: string, iteration: number) => (
     `${runId}\0${nodeId}\0${iteration}`
@@ -100,8 +101,12 @@ export async function createDomainKnowledgeInfrastructure(options: DomainKnowled
     /** 启动请求。 */
     async start(command: StartWorkflowCommand): Promise<WorkflowHandle> {
       const runId = command.runId || randomUUID();
-      if (!Number.isSafeInteger(command.maxIterations) || command.maxIterations < 1) {
-        throw new Error('WORKFLOW_ARGUMENT_INVALID: maxIterations must be a positive integer');
+      if (!Number.isSafeInteger(command.maxIterations) || command.maxIterations < 1 || command.maxIterations > 3) {
+        throw new Error('WORKFLOW_ARGUMENT_INVALID: maxIterations must be 1..3');
+      }
+      const duration = command.maxDurationMs ?? 1_800_000;
+      if (!Number.isSafeInteger(duration) || duration < 1 || duration > 1_800_000) {
+        throw new Error('WORKFLOW_ARGUMENT_INVALID: maxDurationMs must be 1..1800000');
       }
       if (!Number.isSafeInteger(command.workerCount) || command.workerCount < 0 || command.workerCount > 5) {
         throw new Error('WORKFLOW_ARGUMENT_INVALID: workerCount must be an integer from 0 to 5');
@@ -109,11 +114,15 @@ export async function createDomainKnowledgeInfrastructure(options: DomainKnowled
       if (this.running.has(runId)) throw new Error(`WORKFLOW_ALREADY_RUNNING: ${runId}`);
       const controller = new AbortController();
       controllers.set(runId, controller);
+      const startedAt = Date.now();
+      this.armDeadline(runId, startedAt + duration, controller);
       const promise = this.graph.invoke({
         runId,
         executionStatus: 'PENDING',
         iteration: 0,
         maxIterations: command.maxIterations,
+        budgetStartedAt: startedAt,
+        budgetDeadlineAt: startedAt + duration,
         workerCount: command.workerCount,
         context: command.context ?? {},
         readyAt: clock(),
@@ -127,8 +136,14 @@ export async function createDomainKnowledgeInfrastructure(options: DomainKnowled
       if (this.running.has(runId)) return { runId, executionStatus: 'RUNNING' };
       const current = await this.status(runId);
       if (['COMPLETED', 'STOPPED', 'CANCELLED'].includes(current.executionStatus)) return current;
+      if (!current.budget) throw new Error('RUN_CONFIGURATION_INCOMPATIBLE: missing persisted execution budget');
+      if (current.budget.remainingMs <= 0) {
+        await this.stopForBudget(runId);
+        return this.status(runId);
+      }
       const controller = new AbortController();
       controllers.set(runId, controller);
+      this.armDeadline(runId, Date.parse(current.budget.deadlineAt), controller);
       const recursionLimit = Math.max(100, current.maxIterations * 30);
       let config = graphConfig(runId, recursionLimit, controller.signal);
       if (current.executionStatus === 'FAILED' || (current.route === 'FAILED' && current.error)) {
@@ -188,11 +203,41 @@ export async function createDomainKnowledgeInfrastructure(options: DomainKnowled
         maxIterations: state.maxIterations,
         route: state.route,
         error: state.error,
+        ...(state.budgetDeadlineAt ? { budget: {
+          startedAt: new Date(state.budgetStartedAt).toISOString(),
+          deadlineAt: new Date(state.budgetDeadlineAt).toISOString(),
+          maxDurationMs: state.budgetDeadlineAt - state.budgetStartedAt,
+          remainingMs: Math.max(0, state.budgetDeadlineAt - Date.now()),
+        } } : {}),
       };
     }
 
+    private armDeadline(runId: string, deadline: number, controller: AbortController): void {
+      const timer = setTimeout(() => controller.abort(new Error('WORKFLOW_BUDGET_EXHAUSTED')), Math.max(1, deadline - Date.now()));
+      timer.unref();
+      deadlines.set(runId, timer);
+    }
+
+    private async stopForBudget(runId: string): Promise<InfrastructureState> {
+      await this.graph.updateState(graphConfig(runId), {
+        executionStatus: 'STOPPED', route: 'STOPPED', error: 'WORKFLOW_BUDGET_EXHAUSTED',
+      });
+      return (await this.graph.getState(graphConfig(runId))).values as InfrastructureState;
+    }
+
     private track(runId: string, promise: Promise<InfrastructureState>): void {
-      const tracked = promise.finally(() => {
+      const budgetExpired = () => controllers.get(runId)?.signal.reason?.message === 'WORKFLOW_BUDGET_EXHAUSTED';
+      const tracked = promise.then(async (state) => budgetExpired() ? this.stopForBudget(runId) : state,
+        async (error) => {
+          if (budgetExpired()) return this.stopForBudget(runId);
+          if (controllers.get(runId)?.signal.aborted) {
+            await this.graph.updateState(graphConfig(runId), { executionStatus: 'CANCELLED', route: null });
+            return (await this.graph.getState(graphConfig(runId))).values as InfrastructureState;
+          }
+          throw error;
+        }).finally(() => {
+        clearTimeout(deadlines.get(runId));
+        deadlines.delete(runId);
         this.running.delete(runId);
         controllers.delete(runId);
         for (const key of resumeReadyAt.keys()) {
@@ -200,6 +245,8 @@ export async function createDomainKnowledgeInfrastructure(options: DomainKnowled
         }
       });
       this.running.set(runId, tracked);
+      // start 返回句柄后调用方可能只轮询状态；不让未订阅 wait 的失败成为进程异常。
+      void tracked.catch(() => {});
     }
 
     private async failedCheckpoint(runId: string): Promise<Record<string, unknown>> {

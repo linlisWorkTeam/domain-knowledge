@@ -38,7 +38,7 @@ export function roleExample<I>(role: AgentId) {
   const controller = new AbortController();
   const context: ExecutionContext = {
     command: { schemaVersion: '1.0', commandId: 'command', runId: 'run', agentType: role, generationKey: 'development-command-0', payload },
-    model: { execute: async (request) => { phases.push('model'); requests.push(request); return structuredClone(sample.modelOutput); },
+    model: { execute: async (request) => { phases.push('model'); requests.push(request); return structuredClone(sample.modelStages?.[request.stage ?? 'execute'] ?? sample.modelOutput); },
       assertOutput: (output, schema) => { phases.push('validate'); assertModelOutput(output, schema); } },
     effectivePrompt: roleDefinitions.find((definition) => definition.agentId === role)!.basePrompt,
     iteration: sample.iteration, signal: controller.signal,

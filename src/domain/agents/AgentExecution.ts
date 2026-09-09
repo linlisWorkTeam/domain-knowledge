@@ -7,7 +7,7 @@ import type { ArtifactRef } from '../Domain.ts';
 import type { AgentCommand, AgentId } from './AgentContracts.ts';
 
 // 执行语义改变时更新版本，阻止旧 checkpoint 在不同角色实现下继续运行。
-export const ROLE_EXECUTION_VERSION = 'domain-agents-v1';
+export const ROLE_EXECUTION_VERSION = 'seven-role-mvp-v2';
 /** 受信材料。 */
 export interface Material { ref: ArtifactRef; content: unknown }
 /** Application 已加载并校验的角色材料；不包含通用工作流状态或存储实现。 */
@@ -27,6 +27,8 @@ export interface RoleInput<P> {
 }
 /** 模型请求。 */
 export interface ModelRequest {
+  /** 业务阶段参与会话和幂等键，概要与正文不得共用模型会话。 */
+  stage?: string;
   /** 提供role信息，供调用方读取或传入。 */
   role: AgentId;
   /** 提供提示词信息，供调用方读取或传入。 */

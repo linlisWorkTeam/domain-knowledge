@@ -144,7 +144,7 @@ test('public release marker binds the site assets to their migration source and 
   assert.match(capture.evidenceRunId, /^[a-f0-9-]{36}$/);
   assert.equal(capture.secretRendered, false);
   for (const asset of [capture.gif, capture.poster]) {
-    assert.match(asset.path, /^site\/[a-z0-9-]+\.(?:gif|webp)$/);
+    assert.match(asset.path, /^site\/[A-Z][A-Za-z0-9]*\.(?:gif|webp)$/);
     assert.equal(existsSync(asset.path), true, `missing captured asset: ${asset.path}`);
     assert.equal(asset.sha256, sha256(asset.path), `capture digest mismatch: ${asset.path}`);
     assert.ok(html.includes(`./${asset.path.slice('site/'.length)}?v=${release.assetVersion}`));
