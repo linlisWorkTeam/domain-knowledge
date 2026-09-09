@@ -35,7 +35,7 @@ export async function execute(input: Input, context: ExecutionContext): Promise<
     role: definition.agentId, stage: revision ? 'revision' : 'body',
     prompt: `${buildPrompt(input, context)}\n\n${revision
       ? `当前阶段：revision。只修改这些精确 H2 内的正文：${JSON.stringify([...revision.headings])}。H2 标题本身、所有未指名区域、空白及章节顺序必须逐字保持不变。每个指名章节必须实际落实 Correction。返回完整修订正文 body、title、description。`
-      : `当前阶段：body。根据已确认概要生成完整正文：${JSON.stringify(outline)}。H2 必须按概要顺序逐项落实，title/description 与概要相同。保留源码引用、明确未解决问题，不宣称已通过发布门禁。`}`,
+      : `当前阶段：body。根据已确认概要生成完整正文：${JSON.stringify(outline)}。title/description 与概要逐字相同。正文各节必须使用以下精确标题行，保持顺序，不加编号、不改写文字：\n${outline!.sections.map(({ heading }) => `## ${heading}`).join('\n')}\n每个标题下面填写完整正文。正文不使用 # 一级标题；子主题使用 ### 或更深层级，不能新增 ## 标题。代码示例须放在完整围栏内，避免示例标题成为文档标题。提交前逐行检查 H2 列表是否与上述列表完全一致。保留源码引用、明确未解决问题，不宣称已通过发布门禁。`}`,
     outputSchema: schema, tools: definition.tools, readablePaths: readablePaths(input),
   }, context.signal);
   assertActive(context.signal);
