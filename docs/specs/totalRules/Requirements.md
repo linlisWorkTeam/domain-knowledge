@@ -61,7 +61,7 @@ SPDX-License-Identifier: MIT
 | KF-SYS-038 | P1 | 系统必须提供持久化 Source Registry，管理来源身份、固定版本、同步状态、漂移、刷新任务、访问边界及其与知识的关联。 | AC-API-007 |
 | KF-SYS-039 | P1 | Console 必须为选定 Run 提供只读 Agent 工作流执行图，使用 Knowledge Registry 中的固定拓扑、WorkflowNodeProjection、Run snapshot 与事件展示节点状态、轮次、尝试和时间；不得读取 graph checkpoint、修改拓扑或人工推进节点。 | AC-API-008 |
 | KF-SYS-040 | P1 | Agent Settings 必须能够读取 Provider 可用性、认证状态、模型标识和受控错误摘要，但不得返回凭据或允许修改固定 Agent 契约。 | AC-API-009 |
-| KF-SYS-041 | P1 | 本地管理员必须能通过服务端安全配置、脱敏读取并无副作用验证模型 API URL 与 API Key；启用后新批次默认使用 DSH 原生 SDK；运行中配置冻结，旧 Pi Run 可读但不跨后端恢复，完整凭据不得进入浏览器持久化、URL、日志或运行快照。 | AC-API-010 |
+| KF-SYS-041 | P1 | 本地管理员必须能通过服务端安全配置、脱敏读取模型 API URL 与 API Key，并在明确获知可能费用后显式验证模型列表及一次最多 64 输出 token 的生产 DSH 最小生成；不自动重试，只有两阶段通过才启用。旧版仅列表验证需用户重新验证；保存、读取和启动服务不调用模型。启用后新批次默认使用 DSH 原生 SDK；运行中配置冻结，旧 Pi Run 可读但不跨后端恢复，完整凭据不得进入浏览器持久化、URL、日志或运行快照。 | AC-API-010 |
 | KF-SYS-042 | P1 | 系统必须按批次、节点、Provider 和模型记录排队与执行耗时、调用与重试、Token、可空估算成本、自动修订收敛和人工治理处理数据，并提供 P50/P95 聚合；缺少可信定价源时成本必须为 `null`，指标不得包含凭据、Prompt、模型正文或未脱敏上游错误。 | AC-OBS-004 |
 | KF-SYS-043 | P1 | 用户检索必须由 Application 的 KnowledgeSearchApp 直接调度 SearchAgent，不经过 OrchestratorAgent 或 LangGraph，不创建或推进 FlywheelRun。Agent 只能读取和返回经飞轮治理、原子发布、当前状态为 VERIFIED 且正文完整性有效的文档及授权元数据；结果包含版本、来源和 Artifact 引用，无命中不得自动生成知识或启动治理。 | AC-SEARCH-001 |
 

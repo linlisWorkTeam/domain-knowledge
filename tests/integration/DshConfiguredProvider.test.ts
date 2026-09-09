@@ -64,6 +64,7 @@ test('DSH adapter executes through the official native DSH SDK and reports token
   const invocations: ProviderInvocationRecord[] = [];
   const provider = new ConfiguredDshProvider({
     settings,
+    maxTokens: 256,
     runtime: { processIsolation: 'none', allowedWorkspaceRoots: [directory] },
     dshHome: join(directory, 'agent'),
     endpointPolicy: {
@@ -75,6 +76,7 @@ test('DSH adapter executes through the official native DSH SDK and reports token
   try {
     const result = await provider.run({
       role: 'doc-gen',
+      maxTokens: 64,
       prompt: 'Return the requested object.',
       outputSchema: {
         type: 'object', additionalProperties: false, required: ['answer'],
@@ -89,6 +91,7 @@ test('DSH adapter executes through the official native DSH SDK and reports token
     assert.equal(authorization, 'Bearer test-key');
     assert.match(receivedBody, /Return the requested object/);
     assert.match(receivedBody, /AUTHORIZED_MATERIAL/);
+    assert.equal(JSON.parse(receivedBody).max_tokens, 64, 'request ceiling reaches the actual tool-roundtrip HTTP request');
     assert.equal(sessionHeaders.length, 2);
     assert.match(sessionHeaders[0]!, /^wp-[a-f0-9]{32}$/);
     assert.deepEqual(sessionHeaders, [auditedSessions[0], auditedSessions[0]], 'tool requests retain the native conversation ID');
@@ -186,6 +189,7 @@ test('DSH adapter retries schema-invalid output with a fresh session and audits 
   const apiUrl = `http://provider.invalid:${address.port}/v1`;
   const invocations: ProviderInvocationRecord[] = [];
   const provider = new ConfiguredDshProvider({
+    maxTokens: 128,
     settings: {
       provider: 'deepseek-harness', apiUrl, apiKey: 'test-key', model: 'test-model', enabled: true,
       revision: 2, verificationStatus: 'VERIFIED', verificationReasonCode: 'READY',
@@ -201,6 +205,7 @@ test('DSH adapter retries schema-invalid output with a fresh session and audits 
   });
   const request = {
     role: 'doc-gen', prompt: 'Return the same governed business result.',
+    maxTokens: 512,
     outputSchema: {
       type: 'object', additionalProperties: false, required: ['answer'],
       properties: { answer: { type: 'string' } },
@@ -212,6 +217,8 @@ test('DSH adapter retries schema-invalid output with a fresh session and audits 
   try {
     assert.deepEqual(await provider.run(request), { answer: 'recovered' });
     assert.equal(bodies.length, 2);
+    assert.deepEqual(bodies.map((value) => JSON.parse(value).max_tokens), [128, 128],
+      'a request cannot raise the configured ceiling, including schema retries');
     assert.deepEqual(sessions, auditedSessions);
     assert.notEqual(sessions[0], sessions[1], 'schema retry must route as a new native conversation');
     const messages = bodies.map((value) => (JSON.parse(value) as { messages: unknown }).messages);
