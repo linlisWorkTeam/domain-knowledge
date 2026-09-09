@@ -56,6 +56,58 @@
     "parallel": [
       "documentation",
       "test-generation"
+    ],
+    "tasks": [
+      {
+        "role": "doc-worker",
+        "objective": "Extract source facts with line evidence",
+        "sourcePaths": [
+          "src/domain/services/markdown-diff.ts"
+        ],
+        "dependsOn": []
+      },
+      {
+        "role": "doc-gen",
+        "objective": "Document the public contract and boundary behavior",
+        "sourcePaths": [
+          "src/domain/services/markdown-diff.ts"
+        ],
+        "dependsOn": [
+          "doc-worker"
+        ]
+      },
+      {
+        "role": "test-gen",
+        "objective": "Generate independent behavioral tests",
+        "sourcePaths": [
+          "src/domain/services/markdown-diff.ts"
+        ],
+        "dependsOn": []
+      },
+      {
+        "role": "code",
+        "objective": "Rebuild the documented public contract",
+        "sourcePaths": [],
+        "dependsOn": [
+          "doc-gen"
+        ]
+      },
+      {
+        "role": "check",
+        "objective": "Check generated paths and interface",
+        "sourcePaths": [],
+        "dependsOn": [
+          "code"
+        ]
+      },
+      {
+        "role": "review",
+        "objective": "Attribute failures to specific knowledge sections",
+        "sourcePaths": [],
+        "dependsOn": [
+          "check"
+        ]
+      }
     ]
   }
 }

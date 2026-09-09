@@ -5,8 +5,9 @@
  */
 import type { ExecutionContext, RoleResult, PendingArtifact } from '../AgentExecution.ts';
 import { assertActive, pending } from '../AgentExecution.ts';
-import { type Input, type Output, schemaFor, validateInput } from './DocGenAgentContract.ts';
+import { type Input, type Output, type Outline, outlineSchema, schemaFor, validateInput } from './DocGenAgentContract.ts';
 import { definition, buildPrompt, readablePaths } from './DocGenAgentPrompt.ts';
+import { revisionScope, validateOutline, validateOutlineBody, validateRevision } from './DocGenRevision.ts';
 
 /** 结合源码、分块片段以及已有修订材料生成正文；正文的质量与发布资格由后续服务判断。 */
 export async function execute(input: Input, context: ExecutionContext): Promise<RoleResult<Output>> {
@@ -14,19 +15,39 @@ export async function execute(input: Input, context: ExecutionContext): Promise<
   // 缺失材料应在调用模型之前失败，避免模型用猜测填补业务证据。
   validateInput(input);
   const schema = schemaFor(input);
-  // 角色决定本阶段的任务与能力范围；会话、工具执行和格式修复交给模型适配器。
+  const revision = revisionScope(input);
+  if (input.payload.baseKnowledgeRef && !revision) throw new Error('DOC_GEN_REVISION_CORRECTIONS_REQUIRED');
+  let outline: Outline | undefined;
+  if (!revision) {
+    const rawOutline = await context.model.execute({
+      role: definition.agentId, stage: 'outline',
+      prompt: `${buildPrompt(input, context)}\n\n当前阶段：outline。只输出概要 title、description、sections[{heading,purpose}]。heading 是不含 ## 的唯一 H2 标题，规划接口、行为、边界、依据及缺证据内容。整合 workerFragmentRefs 的事实，不把片段自评当成门禁。此阶段不输出 body。`,
+      outputSchema: outlineSchema, tools: definition.tools, readablePaths: readablePaths(input),
+    }, context.signal);
+    assertActive(context.signal);
+    context.model.assertOutput(rawOutline, outlineSchema);
+    outline = rawOutline as unknown as Outline;
+    validateOutline(outline);
+  }
+  // 只有概要验证通过后才生成正文；修订直接使用冻结的原文和明确章节范围。
+  assertActive(context.signal);
   const raw = await context.model.execute({
-    role: definition.agentId,
-    prompt: buildPrompt(input, context),
-    outputSchema: schema,
-    tools: definition.tools,
-    readablePaths: readablePaths(input),
+    role: definition.agentId, stage: revision ? 'revision' : 'body',
+    prompt: `${buildPrompt(input, context)}\n\n${revision
+      ? `当前阶段：revision。只修改这些精确 H2 内的正文：${JSON.stringify([...revision.headings])}。H2 标题本身、所有未指名区域、空白及章节顺序必须逐字保持不变。每个指名章节必须实际落实 Correction。返回完整修订正文 body、title、description。`
+      : `当前阶段：body。根据已确认概要生成完整正文：${JSON.stringify(outline)}。H2 必须按概要顺序逐项落实，title/description 与概要相同。保留源码引用、明确未解决问题，不宣称已通过发布门禁。`}`,
+    outputSchema: schema, tools: definition.tools, readablePaths: readablePaths(input),
   }, context.signal);
-  // 模型返回后仍需检查取消状态，迟到结果不能被当作成功输出。
   assertActive(context.signal);
   context.model.assertOutput(raw, schema);
   const output = raw as unknown as Output;
+  if (revision) validateRevision(revision.base, output.body, revision.headings);
+  else if (outline) {
+    validateOutlineBody(outline, output.body);
+    if (output.title !== outline.title || output.description !== outline.description) throw new Error('DOC_GEN_OUTLINE_METADATA_MISMATCH');
+  }
   const artifacts: PendingArtifact[] = [];
+  if (outline) artifacts.push({ key: 'outline', content: JSON.stringify(outline), mediaType: 'application/json' });
   const document = output;
   // 这里只声明正文工件；实际 CAS 引用由 Application 保存后回填。
   const bodyRef = pending('body');
@@ -34,9 +55,11 @@ export async function execute(input: Input, context: ExecutionContext): Promise<
   const payload = {
     resultKind: 'knowledgeCandidate',
     bodyRef,
-    provenance: input.provenance,
+    provenance: input.payload.sourceRefs,
     changedPaths: [`knowledge/${input.moduleId}.md`],
-    unresolvedRisks: [],
+    unresolvedRisks: input.materials.filter(({ ref }) => input.payload.workerFragmentRefs?.some((item) => item.artifactId === ref.artifactId))
+      .flatMap(({ content }) => content && typeof content === 'object' && 'unresolvedRisks' in content && Array.isArray(content.unresolvedRisks)
+        ? content.unresolvedRisks.filter((risk): risk is string => typeof risk === 'string') : []),
   };
   return { output, payload, artifacts };
 }

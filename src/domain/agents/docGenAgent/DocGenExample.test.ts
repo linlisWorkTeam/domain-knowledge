@@ -19,7 +19,7 @@ import { sha256, type ArtifactRef } from '../../Domain.ts';
 import type { WorkflowStageInput } from '../../../application/ports/ApplicationPorts.ts';
 
 function body() {
-  return '# structuredMarkdownDiff\n\n证据 src/domain/services/markdown-diff.ts:L142-L150\n\n```json\n' + JSON.stringify({ examples: [
+  return '# structuredMarkdownDiff\n\n证据 src/domain/services/markdown-diff.ts:L142-L150\n\n## Examples\n\n```json\n' + JSON.stringify({ examples: [
     { before: '', after: '', expectedHunkCount: 0, expectedChangedSections: [] },
     { before: 'a\r\nb', after: 'a\nb', expectedHunkCount: 0, expectedChangedSections: [] },
     { before: '# A\nold', after: '# A\nnew', expectedHunkCount: 1, expectedChangedSections: ['# A'] },
@@ -56,7 +56,10 @@ test('DocGen example uses the shared production DSH stages, freezes prompts and 
     for await (const chunk of request) chunks.push(Buffer.from(chunk));
     const payload = Buffer.concat(chunks).toString('utf8');
     prompts.push(payload);
-    const text = JSON.stringify({ title: '受控 DocGen', description: '机制验证', body: body() });
+    const outline = !payload.includes('当前阶段：body');
+    const text = JSON.stringify(outline
+      ? { title: '受控 DocGen', description: '机制验证', sections: [{ heading: 'Examples', purpose: '机制验证' }] }
+      : { title: '受控 DocGen', description: '机制验证', body: body() });
     response.writeHead(200, { 'content-type': 'text/event-stream' });
     response.write(`data: ${JSON.stringify({ id: 'example', object: 'chat.completion.chunk', created: 1, model: 'controlled', choices: [{ index: 0, delta: { role: 'assistant', content: text }, finish_reason: null }] })}\n\n`);
     response.write(`data: ${JSON.stringify({ id: 'example', object: 'chat.completion.chunk', created: 1, model: 'controlled', choices: [{ index: 0, delta: {}, finish_reason: 'stop' }], usage: { prompt_tokens: 73, completion_tokens: 31 } })}\n\n`);
@@ -82,10 +85,11 @@ test('DocGen example uses the shared production DSH stages, freezes prompts and 
     composition.apps.orchestrator.updatePromptAddon('doc-gen', 'modified-example-instruction');
     const second = await composition.apps.agentExample.run('doc-gen', sample);
     assert.notEqual(first.runId, second.runId);
-    assert.equal(prompts.length, 2);
+    assert.equal(prompts.length, 4);
     assert.match(prompts[0]!, /original-example-instruction/);
     assert.doesNotMatch(prompts[0]!, /modified-example-instruction/);
-    assert.match(prompts[1]!, /modified-example-instruction/);
+    assert.match(prompts[2]!, /modified-example-instruction/);
+    assert.match(prompts[3]!, /modified-example-instruction/);
     assert.match(await composition.runConfiguration.resolvePrompt(first.runId, 'doc-gen'), /original-example-instruction/);
     const bodyRef = first.result.payload['bodyRef'] as ArtifactRef;
     const document = first.outputs.find(({ ref }) => ref.artifactId === bodyRef.artifactId)?.content;
@@ -98,7 +102,7 @@ test('DocGen example uses the shared production DSH stages, freezes prompts and 
     assert.equal(composition.apps.flywheel.status().publications, 0);
     const report = await composition.apps.orchestrator.buildDemoReport(first.runId);
     const calls = report.agentCalls as Array<{ correlation: { sessionId: string }; tokens: { input: number; output: number } }>;
-    assert.equal(calls.length, 1);
+    assert.equal(calls.length, 2);
     assert.equal(typeof calls[0]!.correlation.sessionId, 'string');
     assert.deepEqual({ input: calls[0]!.tokens.input, output: calls[0]!.tokens.output }, { input: 73, output: 31 });
     assert.doesNotMatch(JSON.stringify(report), /controlled-secret|original-example-instruction/);
