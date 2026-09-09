@@ -29,6 +29,12 @@ test('可恢复失败不会计入运行中，业务阶段、失败节点和预�
   await expect(page.locator('#runs-list .reference-run-item')).toHaveCount(1);
   await expect(page.locator('#runs-list')).toContainText('execution-active');
   await page.getByRole('button', { name: '全部', exact: true }).click();
+  await page.setViewportSize({ width: 640, height: 900 });
+  await expect(page.locator(`.reference-run-item[data-run-id="${fixture.ids.failed}"] em`)).toBeVisible();
+  await expect(page.locator(`.reference-run-item[data-run-id="${fixture.ids.failed}"] em`)).toHaveText('执行失败');
+  await expect(page.locator(`.reference-run-item[data-run-id="${fixture.ids.cancelled}"] em`)).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.setViewportSize({ width: 1280, height: 720 });
   await page.locator(`.reference-run-item[data-run-id="${fixture.ids.failed}"]`).click();
   await expect(page.locator('.run-title-actions .badge')).toHaveText('执行失败');
   await expect(page.locator('[data-execution-state]')).toContainText('业务阶段保留：生成中');

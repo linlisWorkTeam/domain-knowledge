@@ -644,8 +644,9 @@ small, .sidebar-foot small, .topbar .subtitle, .section-heading p:not(.eyebrow),
 }
 @media (max-width: 680px) {
   .reference-metrics { grid-template-columns: repeat(2, 1fr); }
-  .reference-run-item { grid-template-columns: 20px 1fr 55px; }
-  .reference-run-item em, .reference-run-item > span:nth-of-type(2), .reference-run-item strong { display: none; }
+  .reference-run-item { grid-template-columns: 20px minmax(0, 1fr) 85px; }
+  .reference-run-item em { font-size: 12px; }
+  .reference-run-item time, .reference-run-item > span:nth-of-type(2), .reference-run-item strong { display: none; }
   .reference-start-form { grid-template-columns: 1fr; }
   .reference-docs > header, .reference-doc { grid-template-columns: 1fr 60px; }
   .reference-docs > header span:nth-child(2), .reference-docs > header span:nth-child(3), .reference-doc > span:nth-child(2), .reference-doc > strong { display: none; }
