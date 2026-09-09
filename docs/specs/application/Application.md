@@ -27,6 +27,12 @@ RoleExecutionService 为生产、Fixture 和 agent:run 共用生成键、命令�
 
 ProjectWorkflowStages 负责解析场景上下文、读取历史工件、构造各角色 Input，再调用公共角色服务。评测、候选保存和发布继续由应用服务协调，不能把 WorkflowStageInput 透传给 Domain 角色。
 
+## 执行状态展示
+
+Orchestrator.executionForRun 组合工作流执行事实和 RunConfiguration 兼容检查，RunExecutionPresentation 形成只读展示。业务 state 和执行 executionStatus 分开保留；可恢复失败不重写业务阶段。无执行记录或读取失败返回明确不可用状态，只有 RUNNING 执行计入活动并提供取消。恢复要求原有预算尚存、失败节点可定位和当前冻结配置兼容；命令仍由工作流执行最终预算与授权检查。展示仅输出安全错误码和节点，不输出模型原始异常。
+
+纯规则、真实注册表 API 与受控浏览器分别由 RunExecutionPresentation、RunExecutionHttp 和 RunExecutionConsole 测试覆盖；受控执行视图不声明真实模型验收。
+
 ## 当前内容质量策略
 
 DeterministicQualityPolicy 位于 Application：来源证据 30%、结构 25%、可验证性 20%、正文量 15%、可读性 10%，默认阈值 70。KnowledgeWritingGuide 报告模板化表达和超长段落；弱项形成反馈送回 DocGen。质量拒绝跳过 Code，质量通过不等于行为 Gate PASS。

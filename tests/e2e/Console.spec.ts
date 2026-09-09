@@ -116,8 +116,8 @@ test.beforeAll(async () => {
     providerProbe: {
       async verify({ model }: { model: string | null }) {
         return providerVerification === 'VERIFIED'
-          ? { status: 'VERIFIED' as const, reasonCode: 'READY', model: model ?? 'pi-e2e-model' }
-          : { status: 'FAILED' as const, reasonCode: 'PROVIDER_AUTH_INVALID', model };
+          ? { status: 'VERIFIED' as const, reasonCode: 'GENERATION_READY', model: model ?? 'pi-e2e-model', checks: { modelList: 'PASSED' as const, generation: 'PASSED' as const } }
+          : { status: 'FAILED' as const, reasonCode: 'PROVIDER_AUTH_INVALID', model, checks: { modelList: 'FAILED' as const, generation: 'NOT_RUN' as const } };
       },
     },
     operationalMetrics,
@@ -330,6 +330,8 @@ test('Provider 配置与验证通过真实 API fail closed，且密钥不回填�
   await expect(page.getByRole('heading', { name: 'Agent 可以调整表达，不能改变职责' })).toBeVisible();
   await expect(page.locator('.settings-list')).toContainText('DeepSeek Harness');
 
+  await expect(page.locator('.provider-card .form-note')).toContainText('一次最小生成请求');
+  await expect(page.locator('.provider-card .form-note')).toContainText('不会自动重试');
   const form = page.locator('#provider-settings-form');
   await form.getByLabel('API 地址').fill('https://denied.example.test/v1');
   await form.getByLabel('API Key', { exact: true }).fill(PROVIDER_SECRET);
@@ -393,6 +395,9 @@ test('Provider 配置与验证通过真实 API fail closed，且密钥不回填�
   const successfulPayload = await successfulVerification.json();
   assert.equal(successfulPayload.status, 'VERIFIED');
   assert.equal(successfulPayload.enabled, true);
+  assert.deepEqual(successfulPayload.checks, { modelList: 'PASSED', generation: 'PASSED' });
+  await expect(page.locator('.provider-checks')).toContainText('最小生成');
+  await expect(page.locator('.provider-checks dd').last()).toHaveText('已通过');
   await expect(page.locator('#toast')).toHaveText('连接验证成功，新批次将默认使用 DSH。');
   await expect(page.locator('.settings-list')).toContainText('DeepSeek Harness');
   await expect(page.locator('.reference-metrics').getByText('已作为新批次默认方式')).toBeVisible();

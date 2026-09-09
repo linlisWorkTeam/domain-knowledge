@@ -1043,3 +1043,14 @@ time,
   .publication-list .reference-doc > span:nth-child(2) { display: block; }
   .publication-list .reference-doc > code { grid-column: 1 / -1; }
 }
+
+/* 执行事实与历史业务阶段分别展示；两阶段连接验证结果独立可读。 */
+.run-hero .state-callout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; font-size: 12px; }
+.run-hero .state-callout .progress { width: 100%; }
+[data-execution-state].failed { border-left-color: var(--danger); }
+.run-title-actions button:disabled { opacity: .58; cursor: not-allowed; }
+[data-execution-state] code { overflow-wrap: anywhere; }
+.provider-checks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 16px 0; }
+.provider-checks > div { border: 1px solid var(--border); border-radius: 8px; padding: 10px; }
+.provider-checks dt { color: var(--muted); font-size: 12px; }
+.provider-checks dd { margin: 6px 0 0; font-weight: 600; }

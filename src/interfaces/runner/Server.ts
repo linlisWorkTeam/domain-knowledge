@@ -244,6 +244,10 @@ export function mapHttpError(error: unknown, id = 'req_unknown'): { status: numb
   if (code === 'MODULE_BASELINE_MISMATCH') return { status: 422, body: errorBody(code, '所选仓库不包含本版固定的 markdownLite 源码、参考测试或依赖快照。', id) };
   if (code === 'MODULE_ISOLATION_UNAVAILABLE' || code === 'MODULE_ISOLATION_REQUIRED') return { status: 503, body: errorBody(code, '服务器的 Linux 隔离能力不可用，任务未启动。请检查 Bubblewrap 和内核命名空间配置。', id) };
   if (code === 'RUN_CONFIGURATION_INCOMPATIBLE' || code === 'PROVIDER_MIGRATION_REQUIRED' || code === 'DSH_CONFIGURATION_UNAVAILABLE') return { status: 409, body: errorBody(code, message, id) };
+  if (['ACCEPTANCE_LIMIT_REACHED', 'WORKFLOW_BUDGET_EXHAUSTED', 'WORKFLOW_NOT_RECOVERABLE'].includes(code)) {
+    const messages: Record<string, string> = { ACCEPTANCE_LIMIT_REACHED: 'Real acceptance budget is exhausted; new authorization is required.', WORKFLOW_BUDGET_EXHAUSTED: 'The original execution budget is exhausted.', WORKFLOW_NOT_RECOVERABLE: 'No recoverable failed node is available.' };
+    return { status: 409, body: errorBody(code, messages[code]!, id) };
+  }
   if (code === 'INVALID_EVENT_CURSOR') return { status: 400, body: errorBody(code, message, id) };
   if (code === 'PAYLOAD_TOO_LARGE') return { status: 413, body: errorBody(code, 'Request payload is too large.', id) };
   if (code === 'METHOD_NOT_ALLOWED') return { status: 405, body: errorBody(code, 'Method not allowed.', id) };
@@ -579,8 +583,15 @@ export function createKnowledgeServer(input: {
       // GET /api/v1/runs：读取运行记录和节点状态。
       if (request.method === 'GET' && url.pathname === '/api/v1/runs') {
         const states = (url.searchParams.get('status') ?? '').split(',').filter(Boolean);
-        const runs = composition.apps.flywheel.listRunSummaries(states.length ? states : undefined)
+        const summaries = composition.apps.flywheel.listRunSummaries(states.length ? states : undefined)
           .sort((left, right) => String(right.updatedAt ?? right.createdAt ?? '').localeCompare(String(left.updatedAt ?? left.createdAt ?? '')));
+        const executionStatuses = (url.searchParams.get('executionStatus') ?? '').split(',').filter(Boolean);
+        const runs: Record<string, unknown>[] = [];
+        // 顺序读取复用单个工作流实例，避免列表并发创建重运行时。
+        for (const run of summaries) {
+          const execution = await composition.apps.orchestrator.executionForRun({ runId: String(run.runId), state: String(run.state) });
+          if (!executionStatuses.length || executionStatuses.includes(execution.executionStatus)) runs.push({ ...run, ...execution });
+        }
         send(response, 200, page(runs, url));
         return;
       }
@@ -659,7 +670,9 @@ export function createKnowledgeServer(input: {
           send(response, 404, errorBody('NOT_FOUND', 'Resource not found.', currentRequestId));
           return;
         }
-        send(response, 200, snapshot);
+        const run = snapshot.run as { runId: string; state: string };
+        const execution = await composition.apps.orchestrator.executionForRun(run);
+        send(response, 200, { ...snapshot, run: { ...run, ...execution } });
         return;
       }
       // GET /api/v1/knowledge/health：读取知识健康度。
@@ -918,19 +931,23 @@ export function createKnowledgeServer(input: {
             send(response, previous.status, previous.value);
             return;
           }
-          const value = scope === 'provider-settings.verify'
-            ? await composition.apps.providerOperations.verify({
-                expectedRevision: payload.expectedRevision,
-                enable: payload.enable,
-              })
-            : await composition.apps.providerOperations.put({
-                provider: payload.provider,
-                apiUrl: payload.apiUrl,
-                apiKey: payload.apiKey,
-                clearApiKey: payload.clearApiKey,
-                model: payload.model,
-                expectedRevision: payload.expectedRevision,
-              });
+          let value;
+          if (scope === 'provider-settings.verify') {
+            const controller = new AbortController();
+            const disconnected = () => { if (!response.writableEnded) controller.abort(); };
+            response.once('close', disconnected);
+            if (response.destroyed) controller.abort();
+            try {
+              value = await composition.apps.providerOperations.verify({
+                expectedRevision: payload.expectedRevision, enable: payload.enable,
+              }, controller.signal);
+            } finally { response.off('close', disconnected); }
+          } else {
+            value = await composition.apps.providerOperations.put({
+              provider: payload.provider, apiUrl: payload.apiUrl, apiKey: payload.apiKey,
+              clearApiKey: payload.clearApiKey, model: payload.model, expectedRevision: payload.expectedRevision,
+            });
+          }
           composition.apps.flywheel.saveCommandReceipt({
             scope, idempotencyKey: normalizedKey, fingerprint, status: 200, value,
           });

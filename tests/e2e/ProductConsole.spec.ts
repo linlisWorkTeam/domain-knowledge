@@ -9,12 +9,14 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
+import type { WorkflowExecutionView } from '../../src/application/ports/ApplicationPorts.ts';
 import { createKnowledgeServer } from '../../src/interfaces/runner/Server.ts';
 
 let instance: ReturnType<typeof createKnowledgeServer>;
 let runtimeDir = '';
 let baseUrl = '';
 let unexpectedProductCalls: string[] = [];
+const controlledExecutions = new Map<string, WorkflowExecutionView>();
 const token = 'controlled-product-ui-token';
 const gitToken = 'fixture-only-git-token-never-render';
 const projectDirectory = '/srv/projects/ohMyWorkPanel';
@@ -90,11 +92,13 @@ async function controlledProductApi(page: Page) {
     let run = instance.composition.apps.flywheel.createRun('markdown-lite-controlled', 'local-v1');
     for (const state of ['PLANNED', 'GENERATING'] as const) run = instance.composition.apps.flywheel.transition(run.runId, state);
     runId = run.runId;
+    controlledExecutions.set(runId, { runId, executionStatus: 'RUNNING', currentNode: 'doc_worker', iteration: 0, maxIterations: 3, route: null, error: null });
     await route.fulfill({ status: 202, json: { runId, executionStatus: 'RUNNING' } });
   });
   await page.route('**/api/v1/runs/*/cancel', async (route) => {
     expect(route.request().headers().authorization).toBe(`Bearer ${token}`);
     expect(new URL(route.request().url()).pathname).toBe(`/api/v1/runs/${runId}/cancel`);
+    controlledExecutions.set(runId, { ...controlledExecutions.get(runId)!, executionStatus: 'CANCELLED' });
     instance.composition.apps.flywheel.transition(runId, 'CANCELLED');
     await route.fulfill({ json: { runId, executionStatus: 'CANCELLED' } });
   });
@@ -113,6 +117,11 @@ test.beforeAll(async () => {
     Object.defineProperty(instance.composition.apps.publicationOperations, operation, { value: () => unexpected(operation) });
   }
   instance.composition.apps.markdownLite.start = async () => unexpected('markdownLite.start');
+  instance.composition.apps.orchestrator.status = async (runId) => {
+    const view = controlledExecutions.get(runId);
+    if (!view) throw new Error(`WORKFLOW_NOT_FOUND: ${runId}`);
+    return structuredClone(view);
+  };
   instance.server.listen(0, '127.0.0.1');
   await once(instance.server, 'listening');
   const address = instance.server.address();

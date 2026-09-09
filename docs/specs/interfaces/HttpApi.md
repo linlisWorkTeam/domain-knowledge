@@ -73,9 +73,19 @@ Available 是已接线路由；Planned 路由不作为当前能力。Available /
 | `GET /api/v1/agents/providers/status` | Available | 返回当前 Provider 的可用性、认证状态、模型、检查时间和受控 reasonCode，不返回凭据。 |
 | `GET /api/v1/provider-settings` | Available | 返回 DSH 类型（旧 Pi 只读）、脱敏 API URL、API Key 是否已配置、revision 与验证状态，不返回完整凭据。 |
 | `PUT /api/v1/provider-settings` | Available | 管理员保存 API URL、模型与可选 API Key，要求鉴权、revision、幂等、地址安全校验和脱敏审计；保存后默认未启用。 |
-| `POST /api/v1/provider-settings/verify` | Available | 使用服务端持有凭据执行无生成副作用的模型列表探测；成功后按请求启用，失败则保持关闭。 |
+| `POST /api/v1/provider-settings/verify` | Available | 用户主动验证时使用服务端凭据读取模型列表，再通过生产 DSH 执行一次最多 64 输出 token 的最小生成；返回两阶段 checks。成功 reasonCode 为 GENERATION_READY，失败保持关闭；HTTP 断连传递取消，无后台验证或自动重试。 |
 | `GET /api/v1/metrics/runs?window=<window>` | Available | 返回批次、节点与排队耗时 P50/P95、调用、`providerCalls.retries`、`workflowNodeRetries`、Token、可空估算成本、Provider/节点分组和样本量；当前内置 Adapter 没有可信定价源，因此成本保持 `null`。 |
 | `GET /api/v1/metrics/governance?window=<window>` | Available | 返回首次自动修订通过率、三轮收敛率、人工介入比例、平均处理时间与七日复发率。 |
+
+## 批次业务阶段与执行状态
+
+Run 列表及详情的 `run` 保留领域 `state`，额外返回 `executionStatus`、`executionFailure: {code,nodeId} | null`、`recovery: {canResume,reasonCode}`、`isActive` 和 `canCancel`。失败节点可恢复时，执行状态可以为 `FAILED` 而业务阶段仍为 `GENERATING`；读接口不将业务状态改为 FAILED。仅执行状态 RUNNING 且业务未终结时计入活动数量并允许取消。
+
+`status` 查询参数继续筛选业务状态；新增 `executionStatus` 单独筛选执行状态，均允许逗号分隔。没有 checkpoint 时返回 NOT_TRACKED；读取执行事实失败时返回 UNAVAILABLE，两者都不能推测正在运行或可恢复。失败摘要只含受控错误码和节点，不透传模型/连接原始错误。
+
+恢复展示检查原有剩余预算、失败节点和 RunConfiguration 当前执行版本及冻结配置；旧版本、缺预算或预算耗尽分别给出不可恢复原因。恢复命令仍执行最终授权和账本检查，ACCEPTANCE_LIMIT_REACHED、WORKFLOW_BUDGET_EXHAUSTED、WORKFLOW_NOT_RECOVERABLE 返回 409，不能通过手动恢复重置预算。历史节点 RUNNING 投影继续可读，不作为活动执行证据。
+
+验证见 `tests/integration/RunExecutionHttp.test.ts`、`tests/integration/ProviderVerificationAbort.test.ts`。
 
 ## 命令、并发和实时读取
 
