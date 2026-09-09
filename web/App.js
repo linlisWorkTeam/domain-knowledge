@@ -1774,6 +1774,7 @@ function productError(error) {
     GIT_DISABLED: '请先启用 Git 同步并保存配置。',
     GIT_CONFLICT: '远端分支已发生变化。请在独立知识仓库处理冲突后重试；本地发布仍然保留。',
     GIT_AUTHENTICATION_FAILED: 'Git 认证失败，请检查仓库地址与令牌。',
+    GIT_REMOTE_CONTENT_DENIED: '远端包含已发布知识的修改或无关文件，已停止同步。本地知识保持原样，请检查远端后重试。',
     GIT_SYNC_FAILED: 'Git 同步失败，请检查网络和仓库地址后重试。本地发布仍然保留。',
     DIRECTORY_DENIED: '此目录不在授权范围内，或不是独立的空知识目录。',
     PUBLICATION_CONFLICT: '发布正文与审计摘要不一致，请检查发布目录。',

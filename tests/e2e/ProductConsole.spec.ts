@@ -46,7 +46,7 @@ async function controlledProductApi(page: Page) {
   const starts: unknown[] = [];
   const saved: unknown[] = [];
   let runId = '';
-  let syncFailure: 'GIT_AUTHENTICATION_FAILED' | 'GIT_CONFLICT' | null = null;
+  let syncFailure: 'GIT_AUTHENTICATION_FAILED' | 'GIT_CONFLICT' | 'GIT_REMOTE_CONTENT_DENIED' | null = null;
   let directoryFailure = false;
   await page.route('**/api/v1/server-directories**', async (route) => {
     expect(route.request().headers().authorization).toBe(`Bearer ${token}`);
@@ -180,6 +180,9 @@ test('目录拒绝与 Git 认证、冲突失败保留本地知识和重试入口
   control.setSyncFailure('GIT_CONFLICT');
   await page.getByRole('button', { name: '立即同步 Git' }).click();
   await expect(page.locator('#toast')).toContainText('本地发布仍然保留');
+  control.setSyncFailure('GIT_REMOTE_CONTENT_DENIED');
+  await page.getByRole('button', { name: '立即同步 Git' }).click();
+  await expect(page.locator('#toast')).toContainText('本地知识保持原样');
   await expect(page.locator('.publication-list')).toContainText('已发布');
   await page.locator(`[data-publication-key="${publicationKey}"]`).click();
   await expect(page.locator('.publication-markdown')).toContainText('原始 HTML 需要转义');

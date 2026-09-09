@@ -24,3 +24,5 @@ SqliteContentGovernance 提供来源、规则修订、血缘、Diff 和评测读
 `LocalMarkdownPublisher` 使用独立 `publications.sqlite`，表名 `local_publications_v1` 与输出信封 `schemaVersion: 1.0` 显式版本化。先将内容指纹、原始授权材料和 PENDING 收据以 SQLite FULL 同步持久化，再将 Markdown 与来源 JSON 写入同目录临时版本目录，fsync 后原子 rename，最后将收据改为 PUBLISHED。重试沿用原路径、时间、输入指纹与正文摘要；已存在的不同内容拒绝覆盖。
 
 恢复只处理已有授权的 PENDING 日志，不推断候选状态。知识目录只接受授权服务器根下独立的空目录，拒绝源码目录交叠和符号链接越界。Git 仓库必须属于该知识目录，仅精确 add 已发布文件，忽略无关未跟踪文件，拒绝包含无关跟踪文件的仓库。默认不同步，手动同步限制时长并禁止强推；冲突和认证失败不回滚本地发布。Git 令牌不出现在设置读取模型、日志或发行物中。
+
+Git fetch 后、任何 merge 前读取远端完整树，拒绝非允许路径和非普通文件模式，逐字节比较所有远端已发布正文/来源与本地已核验工件；共同祖先已有的发布文件不得在远端删除。本地新增发布尚未出现在远端可以继续同步。远端内容污染返回 `GIT_REMOTE_CONTENT_DENIED`，不快进、不覆盖本地文件，SQLite 发布状态保留；操作者恢复远端后可以重试。

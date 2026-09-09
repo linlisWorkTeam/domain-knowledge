@@ -191,7 +191,7 @@ export class LocalMarkdownPublisher implements LocalPublicationPort {
       directories: readdirSync(directory, { withFileTypes: true }).filter((entry) => entry.isDirectory() && !entry.name.startsWith('.'))
         .map((entry) => join(directory, entry.name)).sort().slice(0, 200) };
   }
-  private git(args: string[], cwd: string, token: string, acceptFailure = false): Promise<string> {
+  private git(args: string[], cwd: string, token: string, acceptFailure = false, preserveOutput = false): Promise<string> {
     return new Promise((resolveResult, reject) => {
       const child = spawn('git', ['-c', 'core.hooksPath=/dev/null', '-c', 'protocol.file.allow=' + (this.allowLocalRemotes ? 'always' : 'never'), ...args], {
         cwd, env: { ...process.env, GIT_TERMINAL_PROMPT: '0', GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null',
@@ -207,7 +207,7 @@ export class LocalMarkdownPublisher implements LocalPublicationPort {
       child.once('error', () => { clearTimeout(timer); clearTimeout(hardTimer); reject(new Error('GIT_UNAVAILABLE: bundled Git could not start')); });
       child.once('close', (code) => {
         clearTimeout(timer); clearTimeout(hardTimer);
-        if (code === 0 || (acceptFailure && !timedOut)) resolveResult(output.trim());
+        if (code === 0 || (acceptFailure && !timedOut)) resolveResult(preserveOutput ? output : output.trim());
         else reject(new Error(timedOut ? 'GIT_TIMEOUT: synchronization exceeded 60 seconds'
           : /Authentication|Permission denied|could not read Username|403|401/i.test(error)
             ? 'GIT_AUTHENTICATION_FAILED: check repository access and credentials'
@@ -227,7 +227,7 @@ export class LocalMarkdownPublisher implements LocalPublicationPort {
       const directory = this.publicationDirectory(settings.directory);
       const askpass = join(this.runtimeDir, 'GitAskpass.sh');
       if (!existsSync(askpass)) { durable(askpass, '#!/bin/sh\ncase "$1" in *Username*) printf "%s\\n" "oauth2" ;; *) printf "%s\\n" "$WP_PUBLICATION_GIT_TOKEN" ;; esac\n'); chmodSync(askpass, 0o700); }
-      const git = (args: string[], soft = false) => this.git(args, directory, settings.git.token, soft);
+      const git = (args: string[], soft = false, raw = false) => this.git(args, directory, settings.git.token, soft, raw);
       if (!existsSync(join(directory, '.git'))) await git(['init', '-b', settings.git.branch]);
       if (lstatSync(join(directory, '.git')).isSymbolicLink() || !lstatSync(join(directory, '.git')).isDirectory()) throw new Error('DIRECTORY_DENIED: Git metadata must belong to the knowledge directory');
       if (await git(['rev-parse', '--show-toplevel']) !== realpathSync(directory)) throw new Error('DIRECTORY_DENIED: not an independent knowledge repository');
@@ -243,6 +243,27 @@ export class LocalMarkdownPublisher implements LocalPublicationPort {
       const remoteHead = await git(['ls-remote', '--heads', 'origin', `refs/heads/${settings.git.branch}`]);
       if (remoteHead) {
         await git(['fetch', '--no-tags', 'origin', settings.git.branch]);
+        // 远端树也必须属于已发布清单；在任何工作树变动之前逐字节核对内容与文件模式。
+        const remoteEntries = (await git(['ls-tree', '-rz', '--full-tree', 'FETCH_HEAD'], false, true)).split('\0').filter(Boolean);
+        const remotePaths = new Set<string>();
+        for (const entry of remoteEntries) {
+          const parsed = /^100644 blob [0-9a-f]{40,64}\t([\s\S]+)$/.exec(entry);
+          const path = parsed?.[1];
+          if (!path || !allowed.has(path)) throw new Error('GIT_REMOTE_CONTENT_DENIED: remote contains unrelated paths or non-regular publication files');
+          remotePaths.add(path);
+          const remoteContent = await git(['show', `FETCH_HEAD:${path}`], false, true);
+          if (remoteContent !== readFileSync(join(directory, path), 'utf8')) {
+            throw new Error('GIT_REMOTE_CONTENT_DENIED: remote changed immutable published knowledge or provenance');
+          }
+        }
+        // 本地新发布可以尚未出现在远端；共同祖先已发布的文件则不允许在远端删除。
+        const ancestor = await git(['merge-base', 'HEAD', 'FETCH_HEAD'], true);
+        if (ancestor) {
+          const ancestorPaths = (await git(['ls-tree', '-rz', '--name-only', ancestor], false, true)).split('\0').filter(Boolean);
+          if (ancestorPaths.some((path) => allowed.has(path) && !remotePaths.has(path))) {
+            throw new Error('GIT_REMOTE_CONTENT_DENIED: remote deleted previously published knowledge');
+          }
+        }
         await git(['merge', '--ff-only', 'FETCH_HEAD']);
       }
       await git(['push', 'origin', `HEAD:refs/heads/${settings.git.branch}`]);

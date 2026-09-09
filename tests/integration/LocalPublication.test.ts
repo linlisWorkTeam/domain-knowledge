@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
@@ -112,9 +112,8 @@ test('divergent remote rejects synchronization without forcing or rolling back l
   await app.publish(material());
   await app.sync();
   git(['clone', '--branch', 'main', remote, other]);
-  writeFileSync(join(other, 'remote-change.md'), 'remote change');
-  git(['add', '.'], other);
-  git(['-c', 'user.name=Test', '-c', 'user.email=test@localhost', 'commit', '-m', 'remote change'], other);
+  // 保持可信发布树不变，用独立提交制造真正分叉，内容污染由后续用例单独覆盖。
+  git(['-c', 'user.name=Test', '-c', 'user.email=test@localhost', 'commit', '--allow-empty', '-m', 'remote change'], other);
   git(['push'], other);
   const remoteBefore = git(['rev-parse', 'HEAD'], other);
   const next = await app.publish(material('publication_2'));
@@ -123,4 +122,56 @@ test('divergent remote rejects synchronization without forcing or rolling back l
   assert.equal(app.get(next.publicationKey).receipt.status, 'PUBLISHED');
   assert.match(readFileSync(next.path, 'utf8'), /Validated knowledge/);
   assert.equal(dirname(dirname(next.path)), directory);
+});
+
+test('remote ahead cannot replace published content, modes or insert unrelated files before fast forward', async (t) => {
+  const { app, root, directory } = fixture(t);
+  const remote = join(root, 'remote.git');
+  const other = join(root, 'other');
+  const git = (args: string[], cwd?: string) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  git(['init', '--bare', remote]);
+  app.putSettings({ git: { enabled: true, remote, branch: 'main' } });
+  const receipt = await app.publish(material());
+  await app.sync();
+  git(['clone', '--branch', 'main', remote, other]);
+  const localHead = git(['rev-parse', 'HEAD'], directory);
+  const markdownBefore = readFileSync(receipt.path, 'utf8');
+  const provenanceBefore = readFileSync(join(dirname(receipt.path), 'Provenance.json'), 'utf8');
+  const remoteDocument = join(other, dirname(receipt.path).split('/').at(-1)!, 'Knowledge.md');
+  // 只改变尾部空白也必须拒绝，不能在 Git 输出 trim 后误判为相同正文。
+  writeFileSync(remoteDocument, markdownBefore + '\n');
+  git(['add', '.'], other);
+  git(['-c', 'user.name=Test', '-c', 'user.email=test@localhost', 'commit', '-m', 'change immutable publication'], other);
+  git(['push'], other);
+  await assert.rejects(app.sync(), /GIT_REMOTE_CONTENT_DENIED/);
+  assert.equal(git(['rev-parse', 'HEAD'], directory), localHead);
+  assert.equal(readFileSync(receipt.path, 'utf8'), markdownBefore);
+  assert.equal(readFileSync(join(dirname(receipt.path), 'Provenance.json'), 'utf8'), provenanceBefore);
+  assert.equal(app.get(receipt.publicationKey).receipt.status, 'PUBLISHED');
+  // 恢复正文后添加无关文件，仍不得将远端快进合并到本地目录。
+  writeFileSync(remoteDocument, markdownBefore);
+  writeFileSync(join(other, 'unrelated.md'), 'remote-only unrelated file');
+  git(['add', '.'], other);
+  git(['-c', 'user.name=Test', '-c', 'user.email=test@localhost', 'commit', '-m', 'insert unrelated file'], other);
+  git(['push'], other);
+  await assert.rejects(app.sync(), /GIT_REMOTE_CONTENT_DENIED/);
+  assert.equal(git(['rev-parse', 'HEAD'], directory), localHead);
+  assert.equal(readFileSync(receipt.path, 'utf8'), markdownBefore);
+  assert.equal(app.get(receipt.publicationKey).receipt.status, 'PUBLISHED');
+  // 内容相同但文件模式改变也必须拒绝，避免链接或可执行文件替代知识。
+  rmSync(join(other, 'unrelated.md'));
+  chmodSync(remoteDocument, 0o755);
+  git(['add', '.'], other);
+  git(['-c', 'user.name=Test', '-c', 'user.email=test@localhost', 'commit', '-m', 'change publication mode'], other);
+  git(['push'], other);
+  await assert.rejects(app.sync(), /GIT_REMOTE_CONTENT_DENIED/);
+  assert.equal(git(['rev-parse', 'HEAD'], directory), localHead);
+  // 操作者撤销所有无关改动后重试允许安全快进，保留原发布收据。
+  chmodSync(remoteDocument, 0o644);
+  git(['add', '.'], other);
+  git(['-c', 'user.name=Test', '-c', 'user.email=test@localhost', 'commit', '-m', 'restore publication tree'], other);
+  git(['push'], other);
+  assert.equal((await app.sync()).status, 'SYNCED');
+  assert.equal(readFileSync(receipt.path, 'utf8'), markdownBefore);
+  assert.equal(app.get(receipt.publicationKey).receipt.status, 'PUBLISHED');
 });
