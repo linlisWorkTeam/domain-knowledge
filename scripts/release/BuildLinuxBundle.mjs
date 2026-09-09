@@ -85,18 +85,31 @@ try {
     }
   }
   collectNativeAddons(join(root, 'node_modules'));
-  for (const path of nativeAddons) tools.push({ name: relative(root, path), sha256: await hash(path) });
   const dependencies = new Set();
+  const packageLibraries = new Set();
+  const excludedNativeAddons = [];
   for (const binary of [...nativeBinaries, ...nativeAddons, join(gitExecPath, 'git-remote-https')]) {
     const ldd = command('ldd', [realpathSync(binary)]);
+    // 同一 npm 包可能携带 glibc 与 musl 两套 ELF；目标 OpenCloudOS 只加载 glibc。
+    if (nativeAddons.includes(binary) && /^\s*libc\.musl-x86_64\.so\.1\s+=>/m.test(ldd)) {
+      excludedNativeAddons.push({ path: relative(root, binary), reason: 'musl variant; target libc is glibc' });
+      continue;
+    }
     if (/not found/.test(ldd)) throw new Error(`Missing shared library for ${binary}`);
+    if (nativeAddons.includes(binary)) tools.push({ name: relative(root, binary), sha256: await hash(binary) });
     for (const match of ldd.matchAll(/(?:=>\s+)?(\/[^\s]+)\s+\(/g)) {
       // 宿主监控预加载库不是产品依赖，不将宿主代理打包。
       if (match[1].includes('libonion')) continue;
+      // npm 自带动态库保留其 RPATH 布局与包许可证，不能当作 RPM 系统库查询。
+      if (realpathSync(match[1]).startsWith(join(root, 'node_modules') + '/')) {
+        packageLibraries.add(realpathSync(match[1]));
+        continue;
+      }
       dependencies.add(realpathSync(match[1]));
       copy(realpathSync(match[1]), join(payload, 'tools', 'lib', basename(match[1])));
     }
   }
+  for (const path of packageLibraries) tools.push({ name: relative(root, path), sha256: await hash(path) });
   for (const path of dependencies) tools.push({ name: basename(path), sha256: await hash(path) });
   const nodeLicense = join(dirname(dirname(process.execPath)), 'LICENSE');
   for (const [name, path] of [['Node-LICENSE', nodeLicense], ['Git-COPYING', '/usr/share/licenses/git-core/COPYING'], ['Bubblewrap-COPYING', '/usr/share/licenses/bubblewrap/COPYING']]) {
@@ -127,7 +140,7 @@ try {
   }
   const packages = Object.entries(lock.packages).filter(([path]) => path).map(([path, item]) => ({ path, name: item.name || path.split('node_modules/').at(-1), version: item.version, integrity: item.integrity, license: item.license || 'SEE PACKAGE LICENSE' }));
   writeFileSync(join(payload, 'licenses', 'ThirdParty.json'), JSON.stringify({ schemaVersion: '1.0', packages, systemPackages, systemTools: tools, systemSource: 'https://mirrors.opencloudos.tech/opencloudos/9.4/' }, null, 2) + '\n');
-  writeFileSync(join(payload, 'Manifest.json'), JSON.stringify({ schemaVersion: '1.0', version, commit: command('git', ['rev-parse', 'HEAD']), target: 'OpenCloudOS 9.4 x86_64', lockfileSha256: await hash(join(root, 'package-lock.json')), tools, dependencies: packages }, null, 2) + '\n');
+  writeFileSync(join(payload, 'Manifest.json'), JSON.stringify({ schemaVersion: '1.0', version, commit: command('git', ['rev-parse', 'HEAD']), target: 'OpenCloudOS 9.4 x86_64', lockfileSha256: await hash(join(root, 'package-lock.json')), tools, excludedNativeAddons, dependencies: packages }, null, 2) + '\n');
   copy(join(root, 'scripts/release/Knowledge.sh'), join(payload, 'Knowledge.sh'));
   // 为每个普通文件记录摘要；按文件逐个流式哈希，避免 ECS 内存峰值。
   const allFiles = [];
