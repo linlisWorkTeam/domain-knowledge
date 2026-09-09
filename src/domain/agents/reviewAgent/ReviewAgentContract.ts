@@ -6,6 +6,7 @@
 import type { ArtifactRef } from '../../Domain.ts';
 import type { RoleInput } from '../AgentExecution.ts';
 import { requireMaterials } from '../AgentExecution.ts';
+import { markdownSections } from '../docGenAgent/DocGenRevision.ts';
 
 /** 角色业务载荷。 */
 export interface Payload {
@@ -69,11 +70,13 @@ export function validateOutput(output: Output, input: Input): void {
   const content = input.materials.find(({ ref }) => ref.artifactId === input.payload.knowledgeRef.artifactId)?.content;
   const body = typeof content === 'string' ? content
     : content && typeof content === 'object' && 'body' in content && typeof content.body === 'string' ? content.body : '';
-  const headings = body.split('\n').filter((line) => /^##\s+/.test(line)).map((line) => line.replace(/^##\s+/, '').trim());
+  const headings = markdownSections(body).map((section) => section.heading);
   if (!heading || headings.filter((item) => item === heading).length !== 1
     || (correction.targetHeading !== undefined && correction.targetHeading !== heading)) throw new Error('REVIEW_CORRECTION_SCOPE_INVALID');
   if (correction.replacementMarkdown !== undefined) {
-    const replacements = correction.replacementMarkdown.split('\n').filter((line) => /^#{1,2}\s+/.test(line));
-    if (replacements.length !== 1 || replacements[0] !== `## ${heading}`) throw new Error('REVIEW_CORRECTION_RANGE_INVALID');
+    const replacements = markdownSections(correction.replacementMarkdown);
+    if (replacements.length !== 1 || replacements[0]!.heading !== heading || replacements[0]!.start !== 0) {
+      throw new Error('REVIEW_CORRECTION_RANGE_INVALID');
+    }
   }
 }

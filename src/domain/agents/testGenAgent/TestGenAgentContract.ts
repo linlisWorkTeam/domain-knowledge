@@ -43,7 +43,19 @@ export const outputSchema: Record<string, unknown> = {
 };
 
 /** 构造本次角色执行使用的输出 Schema。 */
-export function schemaFor(_input: Input): Record<string, unknown> {
+export function schemaFor(input: Input): Record<string, unknown> {
+  const policy = input.materials.find(({ ref }) => ref.artifactId === input.payload.testPolicyRef.artifactId)?.content;
+  if (policy && typeof policy === 'object' && 'moduleContract' in policy) {
+    const contract = policy.moduleContract;
+    if (!contract || typeof contract !== 'object' || !('modulePath' in contract) || !('exportName' in contract)
+      || typeof contract.modulePath !== 'string' || !input.sourcePaths.includes(contract.modulePath)
+      || typeof contract.exportName !== 'string') throw new Error('TEST_MODULE_CONTRACT_INVALID');
+    return { type: 'object', additionalProperties: false, required: ['suite', 'oracleRequired'],
+      properties: { suite: { ...moduleBehaviorSuiteSchema, properties: {
+        ...(moduleBehaviorSuiteSchema.properties as Record<string, unknown>),
+        modulePath: { const: contract.modulePath }, exportName: { const: contract.exportName },
+      } }, oracleRequired: { const: true } } };
+  }
   return outputSchema;
 }
 

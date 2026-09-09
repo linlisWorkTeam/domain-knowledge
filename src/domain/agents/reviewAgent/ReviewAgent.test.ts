@@ -69,3 +69,13 @@ test('review: replacement cannot introduce another H2 and PASS cannot hide unres
   sample.output.unresolvedRisks = ['missing evidence'];
   await assert.rejects(execute(sample.input, sample.context), /REVIEW_PASS_CONTRADICTION/);
 });
+
+test('review: fenced example headings cannot authorize a correction', async () => {
+  const sample = roleExample<Input>('review');
+  const knowledge = sample.input.materials.find(({ ref }) => ref.artifactId === sample.input.payload.knowledgeRef.artifactId)!;
+  knowledge.content = '# Knowledge\n\n## Behavior\nReal section\n\n```markdown\n## Example only\n```\n';
+  sample.output.correction.knowledgePath = 'knowledge/markdown-diff.md#Example only';
+  await assert.rejects(execute(sample.input, sample.context), /REVIEW_CORRECTION_SCOPE_INVALID/);
+  sample.output.correction.knowledgePath = 'knowledge/markdown-diff.md#Behavior';
+  await execute(sample.input, sample.context);
+});

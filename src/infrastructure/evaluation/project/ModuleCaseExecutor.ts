@@ -4,7 +4,7 @@
  * 文件功能：在 Linux 隔离进程内构建独立模块，由宿主执行不可伪造计数的行为门禁。
  */
 import { createHash } from 'node:crypto';
-import { spawn, spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { createReadStream, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
 import type { ArtifactStore, GeneratedProjectFile, ProjectCommandResult, ProjectEvaluation, ProjectSnapshot } from '../../../application/ports/ApplicationPorts.ts';
 import { assertModuleBehaviorSuite, type ModuleBehaviorSuite } from '../../../domain/agents/testGenAgent/ModuleBehaviorSuite.ts';
+import { modelProcessLane } from '../../agentAdapters/ModelProcessLane.ts';
 
 interface ModuleEvaluationInput {
   label: string;
@@ -124,13 +125,45 @@ async function captureIsolated(input: {
 function commandResult(result: ProcessResult, input: {
   purpose: 'check' | 'test'; args: string[]; attempt: number; passed?: boolean;
 }): ProjectCommandResult {
-  return { ...result, phase: 'gate', tool: 'node', purpose: input.purpose, args: input.args,
+  return { ...result, phase: 'gate', tool: input.purpose === 'check' ? 'typescript' : 'node', purpose: input.purpose, args: input.args,
     attempt: input.attempt, cwd: '.', testCountsParsed: input.purpose === 'test',
     testsPassed: input.passed ? 1 : 0, testsTotal: input.purpose === 'test' ? 1 : 0 };
 }
 
+/** 读取固定 Git 对象同样响应取消，不能让同步子进程拖延整次飞轮预算。 */
+async function readReferenceSource(input: ModuleEvaluationInput, signal?: AbortSignal): Promise<string> {
+  if (signal?.aborted) throw new Error('PROJECT_EVALUATION_CANCELLED');
+  return new Promise((resolve, reject) => {
+    const child = spawn('git', ['--no-replace-objects', 'show', `${input.snapshot.commit}:${input.moduleSuite.modulePath}`], {
+      cwd: input.snapshot.repositoryRoot, env: { PATH: process.env.PATH }, shell: false,
+      detached: true, stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    let stdout: Buffer<ArrayBufferLike> = Buffer.alloc(0);
+    let cancelled = false, failed = false;
+    const kill = () => { if (child.pid) { try { process.kill(-child.pid, 'SIGKILL'); } catch { /* already exited */ } } };
+    child.stdout.on('data', (chunk: Buffer) => {
+      if (stdout.length + chunk.length > 1_048_576) { failed = true; kill(); return; }
+      stdout = Buffer.concat([stdout, chunk]);
+    });
+    const timer = setTimeout(() => { failed = true; kill(); }, 10_000);
+    const abort = () => { cancelled = true; kill(); };
+    signal?.addEventListener('abort', abort, { once: true });
+    if (signal?.aborted) abort();
+    child.once('error', () => {
+      clearTimeout(timer); signal?.removeEventListener('abort', abort);
+      reject(new Error('PROJECT_SOURCE_MISSING'));
+    });
+    child.once('close', (code) => {
+      clearTimeout(timer); signal?.removeEventListener('abort', abort);
+      if (cancelled) reject(new Error('PROJECT_EVALUATION_CANCELLED'));
+      else if (failed || code !== 0) reject(new Error('PROJECT_SOURCE_MISSING'));
+      else resolve(stdout.toString('utf8'));
+    });
+  });
+}
+
 /** 固定提交只读取授权单文件；参考实现永远不会进入生成实现的进程视野。 */
-async function moduleSource(artifacts: ArtifactStore, input: ModuleEvaluationInput): Promise<string> {
+async function moduleSource(artifacts: ArtifactStore, input: ModuleEvaluationInput, signal?: AbortSignal): Promise<string> {
   if (!await artifacts.verify(input.snapshot.manifestRef)) throw new Error('PROJECT_SNAPSHOT_INVALID');
   const manifest = JSON.parse(Buffer.from(await artifacts.get(input.snapshot.manifestRef)).toString('utf8'));
   const expected = manifest.files?.find((file: { path: string }) => file.path === input.moduleSuite.modulePath);
@@ -142,17 +175,25 @@ async function moduleSource(artifacts: ArtifactStore, input: ModuleEvaluationInp
     return input.generatedFiles[0].content;
   }
   if (!/^[0-9a-f]{40}$/i.test(input.snapshot.commit)) throw new Error('PROJECT_COMMIT_INVALID');
-  const result = spawnSync('git', ['show', `${input.snapshot.commit}:${input.moduleSuite.modulePath}`], {
-    cwd: input.snapshot.repositoryRoot, encoding: 'utf8', env: { PATH: process.env.PATH },
-    shell: false, timeout: 10_000, maxBuffer: 1_048_576,
-  });
-  if (result.error || result.status !== 0) throw new Error('PROJECT_SOURCE_MISSING');
-  if (expected.sha256 !== hash(result.stdout)) throw new Error('PROJECT_SNAPSHOT_MISMATCH');
-  return result.stdout;
+  const source = await readReferenceSource(input, signal);
+  if (expected.sha256 !== hash(source)) throw new Error('PROJECT_SNAPSHOT_MISMATCH');
+  return source;
 }
 
 /** 独立模块的确定性评测：受信编译，五次重复，宿主比较结果并持久化完整失败证据。 */
 export async function evaluateModuleSuite(artifacts: ArtifactStore, input: ModuleEvaluationInput, signal?: AbortSignal): Promise<ProjectEvaluation> {
+  if (signal?.aborted) throw new Error('PROJECT_EVALUATION_CANCELLED');
+  // 排队前冻结参数，等待外部进程槽期间也不能被调用方换掉预期值或公开签名。
+  const request = structuredClone(input);
+  // 所有飞轮共享外部重进程槽，编译、案例执行与模型进程不能在小内存 ECS 上互相叠加。
+  try { return await modelProcessLane.execute(() => evaluateInProcessLane(artifacts, request, signal), signal); }
+  catch (error) {
+    if (signal?.aborted) throw new Error('PROJECT_EVALUATION_CANCELLED');
+    throw error;
+  }
+}
+
+async function evaluateInProcessLane(artifacts: ArtifactStore, input: ModuleEvaluationInput, signal?: AbortSignal): Promise<ProjectEvaluation> {
   assertModuleBehaviorSuite(input.moduleSuite, input.snapshot.sourcePaths);
   const suite = structuredClone(input.moduleSuite);
   input = { ...input, moduleSuite: suite, generatedFiles: structuredClone(input.generatedFiles) };
@@ -161,7 +202,7 @@ export async function evaluateModuleSuite(artifacts: ArtifactStore, input: Modul
     throw new Error('PROJECT_MODULE_CONTRACT_INVALID');
   }
   if (signal?.aborted) throw new Error('PROJECT_EVALUATION_CANCELLED');
-  const source = await moduleSource(artifacts, input);
+  const source = await moduleSource(artifacts, input, signal);
   if (Buffer.byteLength(source) > 262_144) throw new Error('PROJECT_SOURCE_TOO_LARGE');
   const temporary = mkdtempSync(join(tmpdir(), 'wp-module-eval-'));
   const workspace = join(temporary, 'workspace');
@@ -242,6 +283,7 @@ export async function evaluateModuleSuite(artifacts: ArtifactStore, input: Modul
       mode: input.generatedFiles.length ? 'generated' : 'reference',
       toolchain, toolchainFingerprint: `sha256:${hash(JSON.stringify(toolchain))}`,
       generatedFileDigests, passed, testsPassed, testsTotal, stability, infrastructureFailure, results, caseResults };
+    if (signal?.aborted) throw new Error('PROJECT_EVALUATION_CANCELLED');
     const evidenceRef = await artifacts.put(Buffer.from(JSON.stringify(evidence, null, 2)), 'application/json');
     return { label: input.label, commit: input.snapshot.commit, passed, testsPassed, testsTotal, stability,
       infrastructureFailure, toolchainFingerprint: evidence.toolchainFingerprint, generatedFileDigests, results, evidenceRef };

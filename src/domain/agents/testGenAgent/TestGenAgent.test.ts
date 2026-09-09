@@ -70,3 +70,10 @@ test('test-gen: rejects duplicate cases, traversal, code claims and oversized JS
   assert.throws(() => assertModuleBehaviorSuite({ ...suite, cases: [{ ...suite.cases[0], expected: () => true }] }), /SUITE_INVALID/);
   assert.throws(() => assertModuleBehaviorSuite({ ...suite, cases: [{ ...suite.cases[0], expected: 'a'.repeat(65_537) }] }), /SUITE_INVALID/);
 });
+
+test('test-gen: module policy requires behavior cases instead of legacy commands', async () => {
+  const sample = roleExample<Input>('test-gen');
+  const policy = sample.input.materials.find(({ ref }) => ref.artifactId === sample.input.payload.testPolicyRef.artifactId)!;
+  policy.content = { moduleContract: { modulePath: sample.input.sourcePaths[0], exportName: 'structuredMarkdownDiff' } };
+  await assert.rejects(execute(sample.input, sample.context), /AGENT_OUTPUT_INVALID/);
+});

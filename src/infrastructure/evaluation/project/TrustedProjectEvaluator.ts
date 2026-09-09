@@ -348,7 +348,7 @@ export class TrustedProjectEvaluator implements ProjectEvaluator {
     const publicInterfaceRefs = [];
     const files = [];
     for (const path of [...new Set([...sourcePaths, ...publicInterfacePaths])]) {
-      const bytes = spawnSync('git', ['show', `${commit}:${path}`], {
+      const bytes = spawnSync('git', ['--no-replace-objects', 'show', `${commit}:${path}`], {
         cwd: repositoryRoot, env: executionEnvironment(),
         encoding: null, shell: false, windowsHide: true, maxBuffer: 16 * 1024 * 1024,
       });
