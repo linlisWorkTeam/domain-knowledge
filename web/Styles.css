@@ -1021,3 +1021,15 @@ time,
 .current-run-card > p {
   font-family: var(--font-code);
 }
+
+/* 本地发布操作与服务器目录浏览适配窄屏。 */
+.publication-panel { margin-bottom: 24px; }
+.publication-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.publication-form label { display: flex; flex-direction: column; gap: 8px; }
+.publication-form .inline-check { flex-direction: row; align-items: center; }
+.publication-form input { min-width: 0; }
+.directory-browser { grid-column: 1 / -1; overflow-wrap: anywhere; }
+.directory-options, .publication-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.publication-list code { overflow-wrap: anywhere; white-space: normal; }
+.publication-markdown { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; line-height: 1.8; }
+@media (max-width: 720px) { .publication-form { grid-template-columns: minmax(0, 1fr); } }

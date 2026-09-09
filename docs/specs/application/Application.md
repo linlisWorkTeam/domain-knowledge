@@ -37,3 +37,11 @@ RunConfiguration 冻结 Prompt、Schema、Provider 和 roleExecutionVersion 摘�
 
 
 文档关系：[设计目录](../README.md)负责代码与设计定位；[开发指南](../../Development.md)说明修改和交付步骤。
+
+## 本地发布应用边界
+
+`PublicationOperations` 通过 `LocalPublicationPort` 承接已取得领域发布凭据的 Markdown 发布。输入必须包含 publicationKey、gateDecisionId、运行/版本标识、源码提交与摘要以及 evidenceRefs；HTTP 不提供绕过门禁的 publish 命令。工作流先完成确定性门禁和领域发布，再调用本地发布，失败保留待恢复日志。
+
+Console 通过应用边界读取发布设置、枚举服务器授权目录、读取正文与来源、恢复待完成发布及手动同步 Git。Git 默认关闭。模型配置和服务器目录操作不要求用户编辑场景 JSON。代表模块场景由受信工厂构建，并通过 `apps.markdownLite.start(repositoryRoot)` 启动。
+
+应用数据与安装版本分离；详见 [Linux 安装与本地发布](../../LinuxInstall.md)。

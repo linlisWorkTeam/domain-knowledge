@@ -467,7 +467,7 @@ function renderRuns() {
     <section class="reference-metrics"><article><small>运行中</small><b class="mint">${active.length}</b><p>来自注册当前状态</p></article><article><small>已验证</small><b>${verified.length}</b><p>${state.runs.length} 个批次</p></article><article><small>需要处理</small><b>${state.runs.filter(needsAttention).length}</b><p>失败、低置信或已停止</p></article><article><small>知识版本</small><b>${state.runs.reduce((sum, run) => sum + (run.knowledgeVersionIds?.length ?? 0), 0)}</b><p>由批次事实汇总</p></article></section>
     <div class="reference-runs-grid"><section class="reference-run-history"><header><h3>批次记录</h3><button class="on" data-run-filter="">全部</button><button data-run-filter="active">运行中</button><button data-run-filter="attention">需处理</button></header><div id="runs-list">${rows || emptyState('没有批次记录', '当前注册中还没有批次记录。')}</div></section>
     <aside class="reference-run-detail">${latest ? `<header><small>最新批次</small><b>${escapeHtml(shortId(latest.runId, 18))}</b></header><div class="orbit-mini"><span>${escapeHtml(displayLabel(latest.state))}<small>批次状态</small></span></div><p class="done">✓ <b>批次事实</b><small>${escapeHtml(latest.moduleId)}</small></p><p class="doing">⌁ <b>Agent 工作流图</b><small>查看真实节点投影</small></p><p>3 <b>评测</b><small>${escapeHtml(latest.latestDecision?.outcome ? displayLabel(latest.latestDecision.outcome) : '等待门禁')}</small></p><button class="wide" data-run-id="${escapeHtml(latest.runId)}">打开批次详情 →</button>` : emptyState('暂无批次', '创建批次后在这里查看。')}</aside></div>
-    <form id="workflow-start-form" class="reference-start-form"><label>受信项目路径<input name="repositoryRoot" placeholder="请输入项目仓库的绝对路径" required></label><label>项目场景 JSON<textarea name="scenario" placeholder="粘贴场景：模块、材料路径、允许生成路径及测试命令" required></textarea></label><label>并行任务数<input name="workerCount" type="number" min="0" max="5" value="1"></label><button class="new" type="submit" ${state.operatorMode ? '' : 'disabled'}>启动项目流程</button></form>`
+    <form id="workflow-start-form" class="reference-start-form"><label>服务器项目目录<input name="repositoryRoot" placeholder="选择 ohMyWorkPanel 仓库的绝对路径" required></label><button class="secondary-button" data-browse-directory="repositoryRoot" type="button" ${state.operatorMode ? '' : 'disabled'}>浏览目录</button><p class="muted">代表模块 markdownLite · 七角色顺序执行 · 最多 3 轮 / 30 分钟</p><button class="new" type="submit" ${state.operatorMode ? '' : 'disabled'}>启动知识飞轮</button><div id="directory-browser" class="directory-browser"></div></form>`
 }
 
 function referenceRunRow(run, selected = false) {
@@ -1028,6 +1028,7 @@ function renderAgents() {
   content.innerHTML = `
     ${operationErrorKeys.length ? partialNotice(`${operationErrorLabels}暂不可用；其他已读取数据仍可查看。`) : ''}
     <section class="reference-metrics"><article><small>Agent 数量</small><b class="mint">${state.agents.length}</b><p>固定角色定义</p></article><article><small>服务提供方</small><b>${escapeHtml(providerLabel)}</b><p>${escapeHtml(provider?.model ?? '未选择模型')}</p></article><article><small>配置状态</small><b>${escapeHtml(settings?.verification?.status ? displayLabel(settings.verification.status) : '未读取')}</b><p>${settings?.enabled ? '已作为新批次默认方式' : '尚未启用'}</p></article><article><small>观测样本</small><b>${formatNumber(runSamples)}</b><p>${escapeHtml(displayLabel(runs?.cohort?.kind ?? 'EMPTY'))}</p></article></section>
+    <section class="panel publication-panel"><div class="section-heading"><h2>本地发布与 Git 同步</h2><button class="secondary-button" data-load-publications type="button" ${canEdit ? '' : 'disabled'}>读取发布设置</button></div><p>知识通过确定性门禁后自动写入 Markdown。Git 同步默认关闭，由你手动发起。</p><div id="publication-settings"></div></section>
     <div class="provider-layout">
       <section class="panel provider-card"><div class="section-heading"><h2>模型服务配置</h2>${provider?.availability ? badge(provider.availability) : badge('UNKNOWN')}</div>
         ${state.capabilities?.writeEnabled ? '' : '<div class="notice"><b>服务端写入尚未启用。</b><p>复制仓库根目录的 <code>.env.example</code> 为 <code>.env.local</code>，设置 <code>WP_KNOWLEDGE_WRITE_TOKEN=请替换为随机长令牌</code>，然后重启服务。配置文件不会提交到版本库。</p></div>'}
@@ -1327,12 +1328,10 @@ async function startWorkflow(form) {
     return
   }
   const data = new FormData(form)
-  const handle = await request('/api/v1/runs', {
+  const handle = await request('/api/v1/runs/markdown-lite', {
     method: 'POST',
     body: JSON.stringify({
-      scenario: JSON.parse(String(data.get('scenario') || '{}')),
       repositoryRoot: String(data.get('repositoryRoot') || ''),
-      workerCount: Number(data.get('workerCount') || 1),
     }),
   })
   state.runs = collection(await request('/api/v1/runs'), 'runs')
@@ -1381,6 +1380,15 @@ content.addEventListener('click', (event) => {
   if (event.target.closest('[data-load-evaluations]')) renderEvidence(true).catch((error) => showToast(userFacingError(error, '无法加载更多评测记录。'), 'danger'))
   if (event.target.closest('[data-load-sources]')) renderDiscovery(false, true).catch((error) => showToast(userFacingError(error, '无法加载更多来源。'), 'danger'))
   if (event.target.closest('[data-verify-provider]')) verifyProviderSettings()
+  if (event.target.closest('[data-load-publications]')) loadPublications().catch(productError)
+  if (event.target.closest('[data-sync-publications]')) syncPublications().catch(productError)
+  if (event.target.closest('[data-recover-publications]')) recoverPublications().catch(productError)
+  const browseDirectory = event.target.closest('[data-browse-directory]')
+  if (browseDirectory) browseServerDirectory(browseDirectory.dataset.browseDirectory, browseDirectory.dataset.path).catch(productError)
+  const selectDirectory = event.target.closest('[data-select-directory]')
+  if (selectDirectory) { document.querySelector(`[name="${selectDirectory.dataset.field}"]`).value = selectDirectory.dataset.selectDirectory; document.querySelector('#directory-browser').innerHTML = '' }
+  const publication = event.target.closest('[data-publication-key]')
+  if (publication) openPublication(publication.dataset.publicationKey).catch(productError)
   const lineageRun = event.target.closest('[data-lineage-run]')
   if (lineageRun) navigate('runs').then(() => openRun(lineageRun.dataset.lineageRun)).catch(showFatal)
   const knowledgeModule = event.target.closest('[data-knowledge-module]')
@@ -1456,6 +1464,10 @@ content.addEventListener('submit', (event) => {
   if (event.target.id === 'workflow-start-form') {
     event.preventDefault()
     startWorkflow(event.target).catch((error) => showToast(userFacingError(error, '无法创建新批次。'), 'danger'))
+  }
+  if (event.target.id === 'publication-settings-form') {
+    event.preventDefault()
+    savePublicationSettings(event.target).catch(productError)
   }
   if (event.target.id === 'provider-settings-form') {
     event.preventDefault()
@@ -1752,3 +1764,52 @@ function connectActivityStreamFrom(after) {
 }
 
 boot().catch(showFatal)
+
+
+// 本地发布操作使用认证 API；目录内容属于服务器文件系统。
+function productError(error) {
+  const messages = {
+    GIT_DISABLED: '请先启用 Git 同步并保存配置。',
+    GIT_CONFLICT: '远端分支已发生变化。请在独立知识仓库处理冲突后重试；本地发布仍然保留。',
+    GIT_AUTHENTICATION_FAILED: 'Git 认证失败，请检查仓库地址与令牌。',
+    GIT_SYNC_FAILED: 'Git 同步失败，请检查网络和仓库地址后重试。本地发布仍然保留。',
+    DIRECTORY_DENIED: '此目录不在授权范围内，或不是独立的空知识目录。',
+    PUBLICATION_CONFLICT: '发布正文与审计摘要不一致，请检查发布目录。',
+    PUBLICATION_PENDING: '发布尚待恢复，请点击恢复待完成发布。',
+  }
+  showToast(messages[error.code] ?? userFacingError(error, '操作失败，请检查配置后重试。'), 'danger')
+}
+async function browseServerDirectory(field, path) {
+  const input = document.querySelector(`[name="${field}"]`)
+  const listing = await request(`/api/v1/server-directories${path || input?.value ? `?path=${encodeURIComponent(path || input.value)}` : ''}`)
+  const container = document.querySelector('#directory-browser')
+  container.innerHTML = `<p>服务器目录：<code>${escapeHtml(listing.path)}</code></p><div class="directory-options">${listing.parent ? `<button type="button" class="secondary-button" data-browse-directory="${escapeHtml(field)}" data-path="${escapeHtml(listing.parent)}">上一级</button>` : ''}<button type="button" class="primary-button" data-select-directory="${escapeHtml(listing.path)}" data-field="${escapeHtml(field)}">选择当前目录</button>${listing.directories.map((directory) => `<button type="button" class="secondary-button" data-browse-directory="${escapeHtml(field)}" data-path="${escapeHtml(directory)}">${escapeHtml(directory.split('/').at(-1))}/</button>`).join('')}</div>`
+}
+async function loadPublications() {
+  const settings = await request('/api/v1/publications/settings')
+  const publications = await request('/api/v1/publications')
+  document.querySelector('#publication-settings').innerHTML = `<form id="publication-settings-form" class="publication-form"><label>服务器知识目录<input name="directory" value="${escapeHtml(settings.directory)}" required></label><button class="secondary-button" data-browse-directory="directory" type="button">浏览服务器目录</button><div id="directory-browser" class="directory-browser"></div><label class="inline-check"><input type="checkbox" name="gitEnabled" ${settings.git.enabled ? 'checked' : ''}> 启用手动 Git 同步</label><label>目标仓库<input name="remote" value="${escapeHtml(settings.git.remote)}" placeholder="https://git.example/team/knowledge.git"></label><label>分支<input name="branch" value="${escapeHtml(settings.git.branch)}" required></label><label>HTTPS 访问令牌<input name="gitToken" type="password" autocomplete="new-password" placeholder="${settings.git.tokenConfigured ? '已配置；留空保留' : 'SSH 可使用服务器已有身份'}"></label><label class="inline-check"><input type="checkbox" name="clearToken"> 清除保存的 Git 令牌</label><button class="primary-button" type="submit">保存发布设置</button></form><div class="publication-actions"><button type="button" class="secondary-button" data-sync-publications ${settings.git.enabled ? '' : 'disabled'}>立即同步 Git</button><button type="button" class="secondary-button" data-recover-publications>恢复待完成发布</button></div><div class="publication-list">${publications.items.length ? publications.items.map((item) => `<button type="button" class="reference-doc" data-publication-key="${escapeHtml(item.publicationKey)}"><span><b>${escapeHtml(item.moduleId)}</b><small>${escapeHtml(item.versionId)}</small></span><span>${item.status === 'PUBLISHED' ? '已发布' : '待恢复'}</span><code>${escapeHtml(item.path)}</code></button>`).join('') : '<p>暂无通过门禁的本地发布。</p>'}</div>`
+}
+async function savePublicationSettings(form) {
+  const data = new FormData(form)
+  await request('/api/v1/publications/settings', { method: 'PUT', body: JSON.stringify({ directory: String(data.get('directory')), git: { enabled: data.get('gitEnabled') === 'on', remote: String(data.get('remote') || ''), branch: String(data.get('branch')), token: String(data.get('gitToken') || ''), clearToken: data.get('clearToken') === 'on' } }) })
+  form.reset()
+  await loadPublications()
+  showToast('发布设置已保存。', 'success')
+}
+async function syncPublications() {
+  const button = document.querySelector('[data-sync-publications]')
+  button.disabled = true
+  try { const result = await request('/api/v1/publications/sync', { method: 'POST', body: '{}' }); showToast(`已同步 ${result.publishedCount} 个本地发布。`, 'success') }
+  finally { button.disabled = false }
+}
+async function recoverPublications() {
+  await request('/api/v1/publications/recover', { method: 'POST', body: '{}' })
+  await loadPublications()
+  showToast('待完成发布已恢复。', 'success')
+}
+async function openPublication(key) {
+  const result = await request(`/api/v1/publications/${encodeURIComponent(key)}`)
+  const target = document.querySelector('#publication-settings')
+  target.innerHTML = `<button class="secondary-button" type="button" data-load-publications>返回发布列表</button><h3>${escapeHtml(result.metadata.title || result.receipt.moduleId)}</h3><p>版本 ${escapeHtml(result.receipt.versionId)} · 来源 ${escapeHtml(result.metadata.sourceCommit)}</p><pre class="publication-markdown">${escapeHtml(result.markdown)}</pre><details><summary>来源与门禁证据</summary><pre class="json-view">${json(result.metadata)}</pre></details>`
+}

@@ -11,6 +11,7 @@ import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
 import { createComposition } from './Composition.ts';
+import type { PublicationOperations } from '../../application/services/PublicationOperations.ts';
 import { parseProjectScenario } from '../../application/services/ProjectScenario.ts';
 import type {
   OperationalMetricsPort, ProviderConnectionProbe, ProviderEndpointPolicy, ProviderSettingsStore,
@@ -245,6 +246,8 @@ export function mapHttpError(error: unknown, id = 'req_unknown'): { status: numb
   if (code === 'PAYLOAD_TOO_LARGE') return { status: 413, body: errorBody(code, 'Request payload is too large.', id) };
   if (code === 'METHOD_NOT_ALLOWED') return { status: 405, body: errorBody(code, 'Method not allowed.', id) };
   if (code.endsWith('_NOT_FOUND')) return { status: 404, body: errorBody(code, 'Resource not found.', id) };
+  if (code === 'PUBLICATION_NOT_FOUND') return { status: 404, body: errorBody(code, message, id) };
+  if (code.startsWith('GIT_') || code.startsWith('PUBLICATION_') || code === 'SYNC_IN_PROGRESS') return { status: 409, body: errorBody(code, message, id, true) };
   if (code === 'SOURCE_ACCESS_DENIED') return { status: 403, body: errorBody(code, 'Source access is outside the configured boundary.', id) };
   if (code === 'SOURCE_ALREADY_EXISTS' || code === 'SOURCE_DELETED') {
     return { status: 409, body: errorBody(code, message, id) };
@@ -283,6 +286,10 @@ export function createKnowledgeServer(input: {
 } = {}) {
   const composition = createComposition(input);
   const writeToken = input.writeToken ?? process.env.WP_KNOWLEDGE_WRITE_TOKEN;
+  const productApps = composition.apps as typeof composition.apps & {
+    publicationOperations: PublicationOperations;
+    markdownLite: { start(repositoryRoot: string): Promise<unknown> };
+  };
   const idempotencyResults = new Map<string, { fingerprint: string; status: number; value: unknown }>();
   const server = createHttpServer(async (request, response) => {
     const url = new URL(request.url ?? '/', 'http://127.0.0.1');
@@ -306,6 +313,67 @@ export function createKnowledgeServer(input: {
       if (request.method === 'GET' && url.pathname === '/health') {
         send(response, 200, { ok: true });
         return;
+      }
+      // 远程 API 统一校验访问令牌；目录与发布设置即使在本机也必须认证。
+      const localClient = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(request.socket.remoteAddress ?? '');
+      const productRoute = url.pathname.startsWith('/api/v1/publications')
+        || url.pathname === '/api/v1/server-directories' || url.pathname === '/api/v1/runs/markdown-lite';
+      if (url.pathname.startsWith('/api/') && (!localClient || productRoute) && !authorized(request, writeToken)) {
+        send(response, writeToken ? 401 : 503, errorBody(writeToken ? 'UNAUTHORIZED' : 'WRITE_API_DISABLED',
+          'A valid Bearer token is required for remote access and server directory operations.', currentRequestId));
+        return;
+      }
+      if (productRoute) {
+        if (!productApps.publicationOperations) throw new Error('PRODUCT_UNAVAILABLE: publication service is unavailable');
+        const app = productApps.publicationOperations;
+        if (request.method === 'GET' && url.pathname === '/api/v1/server-directories') {
+          send(response, 200, app.listDirectories(url.searchParams.get('path') ?? undefined)); return;
+        }
+        if (request.method === 'GET' && url.pathname === '/api/v1/publications/settings') {
+          send(response, 200, app.getSettings()); return;
+        }
+        if (request.method === 'GET' && url.pathname === '/api/v1/publications') {
+          send(response, 200, { items: app.list() }); return;
+        }
+        if (request.method === 'GET' && /^\/api\/v1\/publications\/[^/]+$/.test(url.pathname)) {
+          send(response, 200, app.get(decodeURIComponent(url.pathname.split('/').at(-1)!))); return;
+        }
+        if (request.method === 'POST' || request.method === 'PUT') {
+          const payload = await body(request);
+          const key = request.headers['idempotency-key'];
+          if (typeof key !== 'string' || !key.trim() || key.length > 256) throw new Error('IDEMPOTENCY_KEY_REQUIRED');
+          const scope = `product:${url.pathname}`;
+          const fingerprint = payloadFingerprint(payload);
+          const previous = composition.apps.flywheel.getCommandReceipt(scope, key);
+          if (previous && previous.fingerprint !== fingerprint) throw new Error('IDEMPOTENCY_CONFLICT');
+          if (previous) { send(response, previous.status, previous.value); return; }
+          let value: unknown;
+          let status = 200;
+          if (request.method === 'PUT' && url.pathname === '/api/v1/publications/settings') {
+            requireOnlyKeys(payload, ['directory', 'git']);
+            if (payload.directory !== undefined && typeof payload.directory !== 'string') throw new Error('DIRECTORY_INVALID');
+            if (payload.git !== undefined) {
+              if (!payload.git || typeof payload.git !== 'object' || Array.isArray(payload.git)) throw new Error('GIT_SETTINGS_INVALID');
+              const git = payload.git as Record<string, unknown>;
+              requireOnlyKeys(git, ['enabled', 'remote', 'branch', 'token', 'clearToken']);
+              if (typeof git.enabled !== 'boolean' || typeof git.remote !== 'string' || typeof git.branch !== 'string'
+                || (git.token !== undefined && typeof git.token !== 'string')
+                || (git.clearToken !== undefined && typeof git.clearToken !== 'boolean')) throw new Error('GIT_SETTINGS_INVALID');
+            }
+            value = app.putSettings(payload as Parameters<PublicationOperations['putSettings']>[0]);
+          } else if (request.method === 'POST' && url.pathname === '/api/v1/publications/sync') {
+            requireOnlyKeys(payload, []); value = await app.sync();
+          } else if (request.method === 'POST' && url.pathname === '/api/v1/publications/recover') {
+            requireOnlyKeys(payload, []); value = { items: await app.recover() };
+          } else if (request.method === 'POST' && url.pathname === '/api/v1/runs/markdown-lite') {
+            requireOnlyKeys(payload, ['repositoryRoot']);
+            if (typeof payload.repositoryRoot !== 'string' || !payload.repositoryRoot.trim()) throw new Error('ARGUMENT_REQUIRED: repositoryRoot');
+            value = await productApps.markdownLite.start(payload.repositoryRoot); status = 202;
+          } else { throw new Error('METHOD_NOT_ALLOWED'); }
+          composition.apps.flywheel.saveCommandReceipt({ scope, idempotencyKey: key, fingerprint, status, value });
+          send(response, status, value); return;
+        }
+        throw new Error('METHOD_NOT_ALLOWED');
       }
       // GET /api/v1/system/status：读取系统运行状态。
       if (request.method === 'GET' && url.pathname === '/api/v1/system/status') {

@@ -1,0 +1,101 @@
+#!/usr/bin/env node
+/**
+ * Copyright (c) 2026 linlisWorkTeam
+ * SPDX-License-Identifier: MIT
+ * 文件功能：串行构建带锁定工具与依赖的 Linux 自解压安装包，不下载任何依赖。
+ */
+import { createHash } from 'node:crypto';
+import { execFileSync, spawn } from 'node:child_process';
+import { createReadStream, createWriteStream, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { basename, dirname, join, resolve } from 'node:path';
+import { tmpdir } from 'node:os';
+import { pipeline } from 'node:stream/promises';
+import { fileURLToPath } from 'node:url';
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+const version = process.argv[2];
+const output = resolve(process.argv[3] || join(root, 'dist'));
+if (!/^0\.2\.\d+$/.test(version || '')) throw new Error('Usage: node scripts/release/BuildLinuxBundle.mjs 0.2.0 /absolute/output');
+if (!process.version.startsWith('v24.')) throw new Error('Node.js 24 build runtime required');
+if (process.platform !== 'linux' || process.arch !== 'x64') throw new Error('Linux x86_64 build host required');
+const command = (name, args, options = {}) => execFileSync(name, args, { cwd: root, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024, ...options }).trim();
+if (command('git', ['status', '--porcelain'])) throw new Error('Build requires a clean committed worktree');
+command(process.execPath, ['scripts/BootstrapWorktree.ts', '--check']);
+const stage = join(tmpdir(), `knowledge-bundle-${process.pid}`);
+const payload = join(stage, 'payload');
+mkdirSync(join(payload, 'app'), { recursive: true });
+mkdirSync(join(payload, 'tools', 'bin'), { recursive: true });
+mkdirSync(join(payload, 'tools', 'lib'), { recursive: true });
+mkdirSync(join(payload, 'licenses'), { recursive: true });
+mkdirSync(output, { recursive: true });
+const tools = [];
+const hash = async (path) => { const h = createHash('sha256'); for await (const chunk of createReadStream(path)) h.update(chunk); return h.digest('hex'); };
+const copy = (from, to) => command('cp', ['-a', from, to]);
+try {
+  // 只打包 Git 跟踪的允许目录；工作目录中的密钥、运行库和截图不会隐式进入发行物。
+  const tracked = command('git', ['ls-files', '-z']).split('\0').filter((path) => path &&
+    (/^(src|web|docs|scripts|tests)\//.test(path) || ['package.json', 'package-lock.json', 'Runner.config.json', 'LICENSE', 'README.md', 'tsconfig.json'].includes(path)) &&
+    !/(^|\/)(\.env[^/]*|\.workpanel|secrets|node_modules)(\/|$)/.test(path));
+  writeFileSync(join(stage, 'files'), tracked.join('\0') + '\0');
+  command('tar', ['--null', '-T', join(stage, 'files'), '-cf', join(stage, 'source.tar')]);
+  command('tar', ['-xf', join(stage, 'source.tar'), '-C', join(payload, 'app')]);
+  copy(join(root, 'node_modules'), join(payload, 'app', 'node_modules'));
+  const nativeBinaries = [process.execPath, '/usr/bin/git', '/usr/bin/bwrap', '/usr/bin/bash', '/usr/bin/prlimit'];
+  for (const binary of nativeBinaries) {
+    const destination = join(payload, 'tools', 'bin', basename(binary));
+    copy(realpathSync(binary), destination);
+    tools.push({ name: basename(binary), version: command(binary, [basename(binary) === 'bash' ? '--version' : '--version']).split('\n')[0], sha256: await hash(destination) });
+  }
+  const gitExecPath = command('/usr/bin/git', ['--exec-path']);
+  copy(gitExecPath, join(payload, 'tools', 'git-core'));
+  const dependencies = new Set();
+  for (const binary of [...nativeBinaries, join(gitExecPath, 'git-remote-https')]) {
+    const ldd = command('ldd', [realpathSync(binary)]);
+    if (/not found/.test(ldd)) throw new Error(`Missing shared library for ${binary}`);
+    for (const match of ldd.matchAll(/(?:=>\s+)?(\/[^\s]+)\s+\(/g)) {
+      // 宿主监控预加载库不是产品依赖，不将宿主代理打包。
+      if (match[1].includes('libonion')) continue;
+      dependencies.add(realpathSync(match[1]));
+      copy(realpathSync(match[1]), join(payload, 'tools', 'lib', basename(match[1])));
+    }
+  }
+  for (const path of dependencies) tools.push({ name: basename(path), sha256: await hash(path) });
+  const nodeLicense = join(dirname(dirname(process.execPath)), 'LICENSE');
+  for (const [name, path] of [['Node-LICENSE', nodeLicense], ['Git-COPYING', '/usr/share/licenses/git-core/COPYING'], ['Bubblewrap-COPYING', '/usr/share/licenses/bubblewrap/COPYING']]) {
+    if (!existsSync(path)) throw new Error(`Missing required license: ${path}`);
+    copy(path, join(payload, 'licenses', name));
+  }
+  copy('/usr/share/licenses/bash', join(payload, 'licenses', 'Bash'));
+  copy('/usr/share/licenses/util-linux', join(payload, 'licenses', 'UtilLinux'));
+  const lock = JSON.parse(readFileSync(join(root, 'package-lock.json'), 'utf8'));
+  for (const name of ['@deepseek-ai/dsh', 'typescript']) {
+    const packagePath = join(payload, 'app', 'node_modules', name, 'package.json');
+    tools.push({ name, version: JSON.parse(readFileSync(packagePath, 'utf8')).version, sha256: await hash(packagePath) });
+  }
+  const packages = Object.entries(lock.packages).filter(([path]) => path).map(([path, item]) => ({ path, name: item.name || path.split('node_modules/').at(-1), version: item.version, integrity: item.integrity, license: item.license || 'SEE PACKAGE LICENSE' }));
+  writeFileSync(join(payload, 'licenses', 'ThirdParty.json'), JSON.stringify({ schemaVersion: '1.0', packages, systemTools: tools, systemSource: 'https://mirrors.opencloudos.tech/opencloudos/9.4/' }, null, 2) + '\n');
+  writeFileSync(join(payload, 'Manifest.json'), JSON.stringify({ schemaVersion: '1.0', version, commit: command('git', ['rev-parse', 'HEAD']), target: 'OpenCloudOS 9.4 x86_64', lockfileSha256: await hash(join(root, 'package-lock.json')), tools, dependencies: packages }, null, 2) + '\n');
+  copy(join(root, 'scripts/release/Knowledge.sh'), join(payload, 'Knowledge.sh'));
+  // 为每个普通文件记录摘要；按文件逐个流式哈希，避免 ECS 内存峰值。
+  const allFiles = [];
+  function visit(directory, prefix = '') { for (const entry of readdirSync(directory, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) { const path = join(directory, entry.name); const relative = prefix + entry.name; if (entry.isDirectory()) visit(path, relative + '/'); else if (entry.isFile()) allFiles.push({ path, relative }); } }
+  visit(payload);
+  const checksums = [];
+  for (const file of allFiles) checksums.push(`${await hash(file.path)}  ${file.relative}`);
+  writeFileSync(join(payload, 'Files.sha256'), checksums.join('\n') + '\n');
+  const archive = join(stage, 'payload.tar.gz');
+  command('tar', ['--sort=name', '--mtime=@0', '--owner=0', '--group=0', '--numeric-owner', '-cf', join(stage, 'payload.tar'), '-C', payload, '.']);
+  const gzip = spawn('gzip', ['-1', '-c', join(stage, 'payload.tar')], { stdio: ['ignore', 'pipe', 'inherit'] });
+  await pipeline(gzip.stdout, createWriteStream(archive));
+  const gzipCode = await new Promise((resolveCode) => gzip.on('close', resolveCode));
+  if (gzipCode) throw new Error('Archive compression failed');
+  const target = join(output, `domain-knowledge-${version}-linux-x86_64.run`);
+  const header = readFileSync(join(root, 'scripts/release/InstallLinux.sh'), 'utf8')
+    .replaceAll('__BUNDLE_VERSION__', version).replaceAll('__PAYLOAD_SHA256__', await hash(archive));
+  writeFileSync(target, header, { mode: 0o755 });
+  await pipeline(createReadStream(archive), createWriteStream(target, { flags: 'a' }));
+  writeFileSync(`${target}.sha256`, `${await hash(target)}  ${basename(target)}\n`);
+  copy(join(payload, 'Manifest.json'), join(output, `domain-knowledge-${version}-Manifest.json`));
+  copy(join(payload, 'licenses', 'ThirdParty.json'), join(output, `domain-knowledge-${version}-ThirdParty.json`));
+  console.log(JSON.stringify({ status: 'BUILT', version, artifact: target, bytes: statSync(target).size, commit: command('git', ['rev-parse', 'HEAD']) }, null, 2));
+} finally { rmSync(stage, { recursive: true, force: true }); }

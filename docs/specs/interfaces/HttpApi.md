@@ -91,3 +91,20 @@ Available 是已接线路由；Planned 路由不作为当前能力。Available /
 
 
 文档关系：[设计目录](../README.md)负责代码与设计定位；[开发指南](../../Development.md)说明修改和交付步骤。
+
+## 本地发布与固定模块启动
+
+远程 `/api/` 请求统一要求 Bearer 访问令牌；以下产品路由即使从回环地址调用也要求认证。静态 Console 与 `/health` 可公开读取。所有写操作要求 `Idempotency-Key`，持久收据仅保存命令摘要和脱敏结果。
+
+| 方法和路由 | 输入与结果 |
+| --- | --- |
+| `GET /api/v1/server-directories?path=...` | 返回授权服务器目录、上级和最多 200 个可见子目录；拒绝越界与符号链接逃逸 |
+| `POST /api/v1/runs/markdown-lite` | `{repositoryRoot}`；服务端固定场景启动，202 返回运行句柄 |
+| `GET /api/v1/publications/settings` | 知识目录、Git 开关/仓库/分支及 tokenConfigured；无明文令牌 |
+| `PUT /api/v1/publications/settings` | `{directory?, git?: {enabled,remote,branch,token?,clearToken?}}` |
+| `GET /api/v1/publications` | 返回已授权发布收据，区分 PENDING / PUBLISHED |
+| `GET /api/v1/publications/:publicationKey` | 返回正文、来源材料与收据 |
+| `POST /api/v1/publications/recover` | 空对象；恢复已有 PENDING 发布 |
+| `POST /api/v1/publications/sync` | 空对象；手动同步已发布知识，失败保留本地版本 |
+
+PENDING、Git 关闭、Git 冲突及认证失败使用可定位的错误码。API 不暴露手工将候选升级为本地发布的入口。操作说明见 [Linux 安装与本地发布](../../LinuxInstall.md)。
