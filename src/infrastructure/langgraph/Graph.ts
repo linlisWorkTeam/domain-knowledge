@@ -149,6 +149,9 @@ export function buildInfrastructureGraph(deps: GraphDependencies, checkpointer: 
     .addNode('review', node('review'))
     .addNode('workflow_router', async (state: InfrastructureState): Promise<InfrastructureStateUpdate> => {
       const update = await node('workflow_router')(state);
+      if (update.route === 'ITERATE' && state.iteration + 1 >= state.maxIterations) {
+        return { ...update, route: 'STOPPED', error: 'WORKFLOW_ITERATION_BUDGET_EXHAUSTED' };
+      }
       return { ...update, iteration: nextIteration(state.iteration, typeof update.route === 'string' ? update.route : null) };
     })
     .addNode('publication', async (state: InfrastructureState): Promise<InfrastructureStateUpdate> => ({
@@ -170,7 +173,7 @@ export function buildInfrastructureGraph(deps: GraphDependencies, checkpointer: 
     .addConditionalEdges('workflow_router', (state: InfrastructureState) =>
       workflowDestination(state.route), ['publication', 'orchestrator', 'failed', 'stopped'])
     .setNodeDefaults({
-      timeout: 600_000,
+      // 全局持久预算及各适配器超时均传递到子进程；不使用无法传递的图节点超时。
       errorHandler: (rawState: unknown, nodeError: NodeError) => {
         const state = rawState as InfrastructureState;
         return new Command({

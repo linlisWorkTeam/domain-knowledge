@@ -27,6 +27,9 @@ export function modelExecutionFactory(workspaces: AgentWorkspaceProvider): Proje
     async execute(request: ModelRequest, signal?: AbortSignal) {
       if (!provider) throw new Error('WORKFLOW_LIVE_AGENT_UNAVAILABLE');
       if (request.role !== command.agentType) throw new Error('AGENT_RESULT_ROLE_MISMATCH');
+      if (request.role === 'code' && request.readablePaths.some((path) => scenario.sourcePaths.includes(path))) {
+        throw new Error('AGENT_SOURCE_ACCESS_DENIED');
+      }
       if (request.tools.some((tool) => tool !== 'read_material')) throw new Error('AGENT_CAPABILITY_DENIED');
       const snapshot = stage.context.snapshot as ProjectSnapshot | undefined;
       if (!snapshot) throw new Error('WORKFLOW_PROJECT_SNAPSHOT_MISSING');

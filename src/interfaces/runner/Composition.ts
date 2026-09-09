@@ -530,6 +530,7 @@ export function createComposition(input: {
     runConfiguration,
     agentProviderMode,
     automatedWorkflow: workflow,
+    shutdown: async () => { if (workflowPromise) await (await workflowPromise).shutdown(); },
     close: () => { publisher.close(); repository.close(); },
   };
 }

@@ -238,6 +238,11 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
     const documentRef = input.context[contextKey('doc_gen', input.iteration)] as ArtifactRef | undefined;
     if (!documentRef) throw new Error('WORKFLOW_DOC_OUTPUT_MISSING');
     const document = await this.readAgentOutput<DocumentOutput>(documentRef, 'doc-gen', input);
+    const documentResult = await this.readAgentResult(documentRef, 'doc-gen', input.runId,
+      this.expectedAgentGenerationKey(input, 'doc-gen', input.iteration));
+    const unresolvedRisks = Array.isArray(documentResult.payload.unresolvedRisks)
+      ? documentResult.payload.unresolvedRisks.filter((risk): risk is string => typeof risk === 'string') : [];
+    if (document.body.includes('[NEEDS CLARIFICATION]')) unresolvedRisks.push('正文仍有待澄清声明');
     const previousReviewRef = input.iteration > 0
       ? input.context[contextKey('review', input.iteration - 1)] as ArtifactRef | undefined
       : undefined;
@@ -286,6 +291,7 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
         metadata: {
           workflow: 'embedded-domain-knowledge',
           iteration: input.iteration,
+          unresolvedRisks,
           ...(correctionIds.length > 0 ? { correctionIds } : {}),
           ...(correctionEvidenceRefs.length > 0
             ? { correctionEvidenceRefs: this.uniqueRefs(correctionEvidenceRefs) }
@@ -444,7 +450,7 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
     if (quality?.outcome === 'REJECTED') {
       const run = this.flywheel.getRun(input.runId);
       if (!run) throw new Error(`WORKFLOW_RUN_NOT_FOUND: ${input.runId}`);
-      const exhausted = run.iteration >= input.maxIterations;
+      const exhausted = run.iteration + 1 >= input.maxIterations;
       if (exhausted && run.state === 'GENERATING') {
         this.flywheel.transition(input.runId, 'LOW_CONFIDENCE');
       } else if (!exhausted && run.state === 'GENERATING') {
@@ -512,7 +518,7 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
       testsTotal: evaluation.testsTotal,
       stability: evaluation.stability,
       infrastructureFailure: evaluation.infrastructureFailure,
-      checkBlocking: check.blocking,
+      checkBlocking: check.blocking || Boolean((this.flywheel.getKnowledgeVersion(versionId)?.metadata.unresolvedRisks as unknown[] | undefined)?.length),
       reviewBlocking: Boolean(review?.blocking || review?.recommendation === 'ITERATE' || review?.unresolvedRisks?.length),
     }, policy);
     return decision;
@@ -522,12 +528,14 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
     const decision = input.context[contextKey('gateDecision', input.iteration)] as GateDecision | undefined;
     const versionId = input.context[contextKey('candidateVersionId', input.iteration)];
     if (!decision || typeof versionId !== 'string') throw new Error('WORKFLOW_PUBLICATION_INPUT_MISSING');
-    const publication = await this.flywheel.publish(input.runId, versionId, decision.decisionId);
+    input.signal?.throwIfAborted();
+    const publication = await this.flywheel.publish(input.runId, versionId, decision.decisionId, input.signal);
     let localPublication;
     if (this.localPublication) {
       const version = this.flywheel.getKnowledgeVersion(versionId);
       const snapshot = input.context.snapshot as ProjectSnapshot;
       if (!version || version.status !== 'VERIFIED') throw new Error('PUBLICATION_VERSION_NOT_VERIFIED');
+      input.signal?.throwIfAborted();
       localPublication = await this.localPublication.publish({
         publicationKey: publication.publicationKey, gateDecisionId: decision.decisionId,
         runId: input.runId, versionId, moduleId: version.moduleId, title: version.title,
@@ -670,7 +678,13 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
       const checkRef = input.context[contextKey('check', input.iteration)] as ArtifactRef | undefined;
       const checkResult = checkRef ? await this.readAgentResult(checkRef, 'check', input.runId,
         this.expectedAgentGenerationKey(input, 'check', input.iteration)) : undefined;
-      payload = { knowledgeRef, evaluationReportRef, criteriaRef: roleScenarioRef,
+      const documentResultRef = input.context[contextKey('doc_gen', input.iteration)] as ArtifactRef;
+      const documentResult = await this.readAgentResult(documentResultRef, 'doc-gen', input.runId,
+        this.expectedAgentGenerationKey(input, 'doc-gen', input.iteration));
+      const criteriaRef = await this.flywheel.putArtifact(Buffer.from(JSON.stringify({
+        ...(await this.readArtifact(roleScenarioRef) as object), unresolvedRisks: documentResult.payload.unresolvedRisks ?? [],
+      })), 'application/json');
+      payload = { knowledgeRef, evaluationReportRef, criteriaRef,
         ...(checkResult ? { checkReportRef: checkResult.rawOutputRef ?? checkResult.outputRefs.find((ref) => ref.mediaType === 'application/json') } : {}) };
     }
     const generationKey = this.agentGenerationKey(input, agentId);
@@ -853,22 +867,23 @@ export class AutomatedProjectWorkflowService {
       'workflow maxIterations must be 1..3');
     assertInvariant(Number.isSafeInteger(input.workerCount ?? 1) && (input.workerCount ?? 1) >= 0 && (input.workerCount ?? 1) <= 5,
       'workflow workerCount must be an integer from 0 to 5');
+    const resolved = this.flywheel.resolveEvaluationPolicy(input);
+    const gatePolicy = { ...resolved, maxIterations: Math.min(input.maxIterations, resolved.maxIterations, 3) };
+    assertInvariant(gatePolicy.maxIterations >= 1, 'workflow maxIterations must be 1..3');
     const run = this.flywheel.createRun(scenario.moduleId, input.policyId);
     const configurationSnapshot = await this.runConfiguration.capture(run.runId, input.governanceTrigger);
+    const policyRef = await this.flywheel.putArtifact(Buffer.from(JSON.stringify(gatePolicy)), 'application/json');
+    await this.flywheel.executeNode({ runId: run.runId, nodeId: 'workflow-policy',
+      generationKey: `${run.runId}:workflow-policy`, inputRefs: [policyRef] }, async () => [policyRef]);
     this.flywheel.transition(run.runId, 'PLANNED');
     return this.workflow.start({
       runId: run.runId,
-      maxIterations: input.maxIterations,
+      maxIterations: gatePolicy.maxIterations,
       workerCount: input.workerCount ?? 1,
       context: {
         scenario,
         configurationSnapshot,
-        gatePolicy: {
-          policyId: input.policyId,
-          minimumStability: input.minimumStability,
-          requireAllTests: input.requireAllTests,
-          maxIterations: input.maxIterations,
-        },
+        gatePolicy,
       },
     });
   }
@@ -881,6 +896,9 @@ export class AutomatedProjectWorkflowService {
     if (!ref) throw new Error('WORKFLOW_SCENARIO_UNAVAILABLE');
     return JSON.parse(Buffer.from(await this.flywheel.getArtifact(ref)).toString('utf8'));
   }
+
+  /** 等待请求。 */
+  async shutdown(): Promise<void> { await this.workflow.shutdown?.(); }
 
   /** 等待请求。 */
   async wait(runId: string): Promise<WorkflowExecutionView> {

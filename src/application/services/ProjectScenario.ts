@@ -33,8 +33,10 @@ export function parseProjectScenario(value: unknown, repositoryRoot?: string): R
     if (!Array.isArray(paths) || !paths.every(path) || (key !== 'publicInterfacePaths' && !paths.length)) return fail();
     result[key] = [...paths];
   }
+  if ((result.publicInterfacePaths as string[]).some((path) => (result.sourcePaths as string[]).includes(path))) return fail();
   if (item.moduleContract !== undefined || item.fixedSuite !== undefined) {
     const contract = item.moduleContract as RealSourceScenario['moduleContract'];
+    if ((result.publicInterfacePaths as string[]).length) return fail();
     if (!contract || Object.keys(contract).length !== 3 || !path(contract.modulePath)
       || !(result.allowedGeneratedPaths as string[]).includes(contract.modulePath)
       || typeof contract.exportName !== 'string' || !/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(contract.exportName)

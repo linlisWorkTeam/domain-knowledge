@@ -823,6 +823,8 @@ export interface WorkflowExecutionView extends WorkflowHandle {
 
 /** 定义工作流Engine的数据结构与类型约束。 */
 export interface WorkflowEngine {
+  /** 服务停止时取消活动执行，等待进程清理后再关闭持久化连接。 */
+  shutdown?(): Promise<void>;
   /** 启动请求。 */
   start(command: StartWorkflowCommand): Promise<WorkflowHandle>;
   /** 恢复请求。 */

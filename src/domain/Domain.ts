@@ -271,23 +271,23 @@ export function decideGate(
     reasons.push('INFRASTRUCTURE_FAILURE');
   }
   if (report.checkBlocking) {
-    if (outcome !== 'STOPPED') outcome = run.iteration >= policy.maxIterations ? 'STOPPED' : 'ITERATE';
+    if (outcome !== 'STOPPED') outcome = run.iteration + 1 >= policy.maxIterations ? 'STOPPED' : 'ITERATE';
     reasons.push('CHECK_BLOCKING');
   }
   if (report.reviewBlocking) {
-    if (outcome !== 'STOPPED') outcome = run.iteration >= policy.maxIterations ? 'STOPPED' : 'ITERATE';
+    if (outcome !== 'STOPPED') outcome = run.iteration + 1 >= policy.maxIterations ? 'STOPPED' : 'ITERATE';
     reasons.push('REVIEW_BLOCKING');
   }
   if (report.criticalFailures > 0) {
-    if (outcome !== 'STOPPED') outcome = run.iteration >= policy.maxIterations ? 'STOPPED' : 'ITERATE';
+    if (outcome !== 'STOPPED') outcome = run.iteration + 1 >= policy.maxIterations ? 'STOPPED' : 'ITERATE';
     reasons.push('CRITICAL_TEST_FAILURE');
   }
   if (policy.requireAllTests && report.testsPassed !== report.testsTotal) {
-    if (outcome !== 'STOPPED') outcome = run.iteration >= policy.maxIterations ? 'STOPPED' : 'ITERATE';
+    if (outcome !== 'STOPPED') outcome = run.iteration + 1 >= policy.maxIterations ? 'STOPPED' : 'ITERATE';
     reasons.push('TESTS_INCOMPLETE');
   }
   if (report.stability < policy.minimumStability) {
-    if (outcome !== 'STOPPED') outcome = run.iteration >= policy.maxIterations ? 'STOPPED' : 'ITERATE';
+    if (outcome !== 'STOPPED') outcome = run.iteration + 1 >= policy.maxIterations ? 'STOPPED' : 'ITERATE';
     reasons.push('STABILITY_BELOW_THRESHOLD');
   }
   if (outcome === 'PASS') reasons.push('ALL_DETERMINISTIC_GATES_PASSED');

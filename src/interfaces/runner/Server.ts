@@ -1130,6 +1130,16 @@ export function startKnowledgeServer() {
   instance.server.listen(binding.port, binding.host, () => {
     process.stdout.write(`domain-knowledge dashboard: http://${binding.host}:${binding.port}\n`);
   });
+  let stopping = false;
+  const stop = async () => {
+    if (stopping) return;
+    stopping = true;
+    await instance.composition.shutdown();
+    instance.server.closeAllConnections();
+    instance.server.close();
+  };
+  process.once('SIGTERM', () => { void stop(); });
+  process.once('SIGINT', () => { void stop(); });
   return instance;
 }
 

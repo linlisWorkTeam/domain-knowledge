@@ -99,6 +99,11 @@ export async function createDomainKnowledgeInfrastructure(options: DomainKnowled
     }
 
     /** 启动请求。 */
+    async shutdown(): Promise<void> {
+      await Promise.allSettled([...this.running.keys()].map((runId) => this.cancel(runId)));
+    }
+
+    /** 启动请求。 */
     async start(command: StartWorkflowCommand): Promise<WorkflowHandle> {
       const runId = command.runId || randomUUID();
       if (!Number.isSafeInteger(command.maxIterations) || command.maxIterations < 1 || command.maxIterations > 3) {
@@ -236,6 +241,8 @@ export async function createDomainKnowledgeInfrastructure(options: DomainKnowled
           }
           throw error;
         }).finally(() => {
+        // 图失败时并行分支仍可能清理进程；结束前发取消，不能仅删除定时器遗留后台任务。
+        controllers.get(runId)?.abort(new Error('WORKFLOW_EXECUTION_ENDED'));
         clearTimeout(deadlines.get(runId));
         deadlines.delete(runId);
         this.running.delete(runId);

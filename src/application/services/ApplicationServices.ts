@@ -193,7 +193,11 @@ export class KnowledgeFlywheelService {
       return existing;
     }
     assertInvariant(run.state === 'EVALUATING', 'run must be EVALUATING before recording a behavioral evaluation');
-    const effectivePolicy = this.repository.resolveEvaluationPolicy?.(policy) ?? policy;
+    const frozenRef = this.getCommittedNodeOutputs({ runId: run.runId, nodeId: 'workflow-policy',
+      generationKey: `${run.runId}:workflow-policy` })?.[0];
+    const effectivePolicy: GatePolicy = frozenRef
+      ? JSON.parse(Buffer.from(await this.getArtifact(frozenRef)).toString('utf8'))
+      : this.resolveEvaluationPolicy(policy);
     const now = this.clock();
     const report: EvaluationReport = {
       reportId: randomUUID(), runId: run.runId, versionId: version.versionId,
@@ -221,12 +225,18 @@ export class KnowledgeFlywheelService {
   }
 
   /** 依据确定性门禁结果发布知识。 */
-  async publish(runId: string, versionId: string, decisionId: string): Promise<{
+  resolveEvaluationPolicy(policy: GatePolicy): GatePolicy {
+    return this.repository.resolveEvaluationPolicy?.(policy) ?? policy;
+  }
+
+  /** 依据确定性门禁结果发布知识。 */
+  async publish(runId: string, versionId: string, decisionId: string, signal?: AbortSignal): Promise<{
     publicationKey: string;
     versionId: string;
     publishedAt: string;
     replayed: boolean;
   }> {
+    signal?.throwIfAborted();
     const run = this.requireRun(runId);
     const version = this.requireVersion(versionId);
     const decision = this.repository.getGateDecision(decisionId);
@@ -241,6 +251,8 @@ export class KnowledgeFlywheelService {
     const publicationKey = `${version.moduleId}:${version.versionId}:${run.policyId}`;
     const existing = this.repository.getPublication(publicationKey);
     if (existing) return { ...existing, replayed: true };
+    // 最后的异步证据校验之后、同步发布事务之前检查取消，迟到结果不得发布。
+    signal?.throwIfAborted();
     const now = this.clock();
     const publishing = run.state === 'PUBLISHING'
       ? run
