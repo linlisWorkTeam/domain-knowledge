@@ -224,7 +224,7 @@ export class KnowledgeFlywheelService {
     return { report, decision };
   }
 
-  /** 依据确定性门禁结果发布知识。 */
+  /** 在创建运行时读取当前受管策略，工作流随后固定该值。 */
   resolveEvaluationPolicy(policy: GatePolicy): GatePolicy {
     return this.repository.resolveEvaluationPolicy?.(policy) ?? policy;
   }

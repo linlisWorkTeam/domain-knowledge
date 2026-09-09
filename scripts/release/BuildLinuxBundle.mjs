@@ -93,9 +93,16 @@ try {
   const systemFiles = [...new Set([...nativeBinaries.filter((path) => path.startsWith('/usr/')), ...dependencies])];
   const systemPackages = [...new Map(command('rpm', ['-qf', '--qf', '%{NAME}\t%{VERSION}-%{RELEASE}\t%{LICENSE}\t%{SOURCERPM}\n', ...systemFiles])
     .split('\n').map((line) => { const [name, version, license, sourceRpm] = line.split('\t'); return [name, { name, version, license, sourceRpm }]; })).values()];
+  // OpenCloudOS 将部分运行库的许可证放在同源子包；缺失时阻止构建。
+  const licensePackages = { 'cyrus-sasl-lib': 'cyrus-sasl', 'libstdc++': 'libgcc', 'ncurses-libs': 'ncurses-base', 'openssh-clients': 'openssh', 'pcre2': 'pcre2-doc' };
   for (const packageInfo of systemPackages) {
-    const directory = join('/usr/share/licenses', packageInfo.name);
-    if (existsSync(directory)) copy(directory, join(payload, 'licenses', `System-${packageInfo.name}`));
+    const owner = licensePackages[packageInfo.name] || packageInfo.name;
+    const licenseFiles = command('rpm', ['-q', '--licensefiles', owner]).split('\n').filter((path) => path && existsSync(path) && statSync(path).isFile());
+    if (!licenseFiles.length) throw new Error(`Missing required system package license: ${packageInfo.name} (${owner})`);
+    const directory = join(payload, 'licenses', `System-${packageInfo.name}`);
+    mkdirSync(directory, { recursive: true });
+    for (const path of licenseFiles) copy(path, join(directory, basename(path)));
+    packageInfo.licenseFiles = licenseFiles.map((path) => `licenses/System-${packageInfo.name}/${basename(path)}`);
   }
   const lock = JSON.parse(readFileSync(join(root, 'package-lock.json'), 'utf8'));
   for (const name of ['@deepseek-ai/dsh', 'typescript']) {

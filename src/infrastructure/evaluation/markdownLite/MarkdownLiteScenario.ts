@@ -59,13 +59,15 @@ export function markdownLiteFixedSuite(): ModuleBehaviorSuite {
 
 /** 从用户选择的服务器目录构造固定验收任务，无安装、构建全仓库或写原项目动作。 */
 export async function createMarkdownLiteScenario(directory: string): Promise<AutomatedProjectScenario> {
-  const repositoryRoot = realpathSync(directory);
+  let repositoryRoot: string;
+  try { repositoryRoot = realpathSync(directory); }
+  catch { throw new Error('SOURCE_DIRECTORY_INVALID: 服务器项目目录不存在或不可访问。'); }
   for (const [path, expected] of [
     [MARKDOWN_LITE_BASELINE.sourcePath, MARKDOWN_LITE_BASELINE.sourceSha256],
     [MARKDOWN_LITE_BASELINE.referencePath, MARKDOWN_LITE_BASELINE.referenceSha256],
     [MARKDOWN_LITE_BASELINE.lockfilePath, MARKDOWN_LITE_BASELINE.lockfileSha256],
   ]) {
-    const result = spawnSync('git', ['show', `${MARKDOWN_LITE_BASELINE.commit}:${path}`], {
+    const result = spawnSync('git', ['--no-replace-objects', 'show', `${MARKDOWN_LITE_BASELINE.commit}:${path}`], {
       cwd: repositoryRoot, env: { PATH: process.env.PATH, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null' },
       maxBuffer: 4 * 1024 * 1024, timeout: 10_000,
     });

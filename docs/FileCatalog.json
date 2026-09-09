@@ -1246,6 +1246,18 @@
       "metadataLocation": "catalog"
     },
     {
+      "path": "tests/e2e/snapshots/PublicationSettings1363LightLinux.png",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "本地发布与 Git 设置的受控浏览器视觉基线。",
+      "metadataLocation": "catalog"
+    },
+    {
+      "path": "tests/e2e/snapshots/PublishedKnowledge1363LightLinux.png",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "已发布知识正文及来源证据的受控浏览器视觉基线。",
+      "metadataLocation": "catalog"
+    },
+    {
       "path": "tests/helpers/Fixture.ts",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "维护夹具相关的项目配置与工程说明。",

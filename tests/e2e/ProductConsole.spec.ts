@@ -39,6 +39,7 @@ async function openSettings(page: Page) {
   await page.getByRole('button', { name: /^Agent 设置$/ }).click();
   await page.getByRole('button', { name: '读取发布设置' }).click();
   await expect(page.locator('#publication-settings-form')).toBeVisible();
+  await expect(page.getByLabel('服务器知识目录')).toHaveValue(knowledgeDirectory);
 }
 
 /** 只替换新增产品 API 的响应；服务自身、批次状态和详情继续使用真实 HTTP。 */
@@ -211,6 +212,7 @@ test('新增发布设置视觉基线保持可读且没有水平溢出', async ({
   await openSettings(page);
   const panel = page.locator('.publication-panel');
   await panel.scrollIntoViewIfNeeded();
+  await expect(page.locator('#toast')).toBeHidden();
   await expect(panel).toHaveScreenshot('PublicationSettings1363LightLinux.png', { animations: 'disabled', caret: 'hide', maxDiffPixelRatio: 0.01 });
   await testInfo.attach('publication-settings', { body: await panel.screenshot(), contentType: 'image/png' });
   await page.setViewportSize({ width: 640, height: 900 });
@@ -226,6 +228,7 @@ test('新增发布知识阅读视觉基线展示来源与确定性门禁', async
   await expect(page.locator('.publication-markdown')).toHaveText(markdown);
   const panel = page.locator('.publication-panel');
   await panel.scrollIntoViewIfNeeded();
+  await expect(page.locator('#toast')).toBeHidden();
   await expect(panel).toHaveScreenshot('PublishedKnowledge1363LightLinux.png', { animations: 'disabled', caret: 'hide', maxDiffPixelRatio: 0.01 });
   await testInfo.attach('published-knowledge', { body: await panel.screenshot(), contentType: 'image/png' });
 });

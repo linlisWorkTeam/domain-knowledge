@@ -22,7 +22,9 @@ SPDX-License-Identifier: MIT
 | review | 输出纠正意见交 Application 保存和判定 | workflow_router |
 | workflow_router | PASS 发布；ITERATE 加一轮；FAILED 失败；其余停止 | publication / orchestrator / failed / stopped |
 
-`ProjectWorkflowStages` 加载历史知识、纠正意见、质量反馈和可信工件，调用 RoleExecutionService；角色不查询历史数据库。质量拒绝反馈进入下一轮 DocGen，预算用尽停止。评测由独立执行器完成，候选命令不直接成为门禁。
+`ProjectWorkflowStages` 加载历史知识、纠正意见、质量反馈和可信工件，调用 RoleExecutionService；角色不查询历史数据库。质量拒绝反馈进入下一轮 DocGen，预算用尽停止。独立模块的固定门禁在第一个角色开始前冻结；TestGen 的声明式案例先在参考实现全部通过才晋升为可信候选测试。生成实现必须同时通过固定门禁与可信候选案例，模型不能控制执行器、计数或比较预期。
+
+Code 的场景工件不包含参考仓库位置、源码、参考测试或固定案例；DocWorker 按任务白名单接收源码引用，TestGen 独立于生成知识和实现。DocGen 的证据风险向 Review 传递，未解决风险、检查阻塞或缺少证据均不能发布。Review 的 Correction 绑定评测/Check 证据和精确 H2；DocGen 验证未指定章节字节不变。
 
 ## 运行生命周期
 
@@ -30,7 +32,7 @@ SPDX-License-Identifier: MIT
 
 ## 恢复和可观察性
 
-Application 冻结配置，LangGraph 保存执行 checkpoint，Registry 记录业务提交和节点投影。相同 generationKey 的完成结果可重放；同版本失败节点可恢复，旧 roleExecutionVersion 明确拒绝。取消信号传到模型和外部执行，迟到角色结果不能提交。
+Application 冻结配置及 `workflow-policy` 工件，运行途中策略设置的变化只影响新 Run；原有记录保持可读。LangGraph 保存执行 checkpoint，Registry 记录业务提交和节点投影。相同 generationKey 的完成结果可重放；同版本失败节点可恢复，旧 roleExecutionVersion 明确拒绝。最多 3 轮、30 分钟，迭代下标从 0 开始；取消信号传到模型、评测及最终发布检查，迟到角色结果不能提交。
 
 节点 status、attempt、iteration、readyAt 与开始/完成时间用于观测，不作为发布权威。状态不完整时显示不可用，不能从节点完成比例推断知识可信度。
 

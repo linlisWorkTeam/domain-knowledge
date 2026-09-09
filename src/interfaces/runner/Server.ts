@@ -241,6 +241,8 @@ function requireOnlyKeys(payload: Record<string, unknown>, allowed: readonly str
 export function mapHttpError(error: unknown, id = 'req_unknown'): { status: number; body: ApiErrorBody } {
   const message = error instanceof Error ? error.message : String(error);
   const code = message.split(':', 1)[0] || 'INTERNAL_ERROR';
+  if (code === 'MODULE_BASELINE_MISMATCH') return { status: 422, body: errorBody(code, '所选仓库不包含本版固定的 markdownLite 源码、参考测试或依赖快照。', id) };
+  if (code === 'MODULE_ISOLATION_UNAVAILABLE' || code === 'MODULE_ISOLATION_REQUIRED') return { status: 503, body: errorBody(code, '服务器的 Linux 隔离能力不可用，任务未启动。请检查 Bubblewrap 和内核命名空间配置。', id) };
   if (code === 'RUN_CONFIGURATION_INCOMPATIBLE' || code === 'PROVIDER_MIGRATION_REQUIRED' || code === 'DSH_CONFIGURATION_UNAVAILABLE') return { status: 409, body: errorBody(code, message, id) };
   if (code === 'INVALID_EVENT_CURSOR') return { status: 400, body: errorBody(code, message, id) };
   if (code === 'PAYLOAD_TOO_LARGE') return { status: 413, body: errorBody(code, 'Request payload is too large.', id) };

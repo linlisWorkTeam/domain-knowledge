@@ -9,9 +9,18 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { createKnowledgeServer } from '../../src/interfaces/runner/Server.ts';
+import { createKnowledgeServer, mapHttpError } from '../../src/interfaces/runner/Server.ts';
 import { LocalMarkdownPublisher } from '../../src/infrastructure/publication/LocalMarkdownPublisher.ts';
 import { PublicationOperations } from '../../src/application/services/PublicationOperations.ts';
+
+test('fixed module preflight failures retain actionable error codes without exposing server paths', () => {
+  for (const [code, status] of [['MODULE_BASELINE_MISMATCH', 422], ['MODULE_ISOLATION_UNAVAILABLE', 503], ['MODULE_ISOLATION_REQUIRED', 503]] as const) {
+    const result = mapHttpError(new Error(`${code}: /private/server/path`));
+    assert.equal(result.status, status);
+    assert.equal(result.body.error.code, code);
+    assert.equal(JSON.stringify(result).includes('/private/server/path'), false);
+  }
+});
 
 test('product HTTP requires authentication for reads and mutations and persists redacted receipts', async () => {
   const root = mkdtempSync(join(tmpdir(), 'knowledge-publication-http-'));
