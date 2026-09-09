@@ -8,6 +8,7 @@ import { assertInvariant, sha256 } from '../../domain/Domain.ts';
 import type {
   ProviderConnectionProbe,
   ProviderEndpointPolicy,
+  ProviderProbeChecks,
   DshExecutionParameters,
   DshRuntimeConfiguration,
   ProviderSettingsRecord,
@@ -34,6 +35,8 @@ export interface ProviderSettingsView {
     status: ProviderSettingsRecord['verificationStatus'];
     reasonCode: string;
     checkedAt: string | null;
+    /** 模型列表和最小生成分别显示，旧记录可缺省。 */
+    checks?: ProviderProbeChecks;
   };
   /** 提供更新时间信息，供调用方读取或传入。 */
   updatedAt: string | null;
@@ -63,6 +66,12 @@ function settingsFingerprint(record: Pick<ProviderSettingsRecord, 'provider' | '
     apiKeySha256: record.apiKey === null ? null : sha256(record.apiKey),
     model: record.model,
   }));
+}
+
+function generationVerified(record: ProviderSettingsRecord): boolean {
+  return record.verificationReasonCode === 'GENERATION_READY'
+    && record.verificationChecks?.modelList === 'PASSED'
+    && record.verificationChecks.generation === 'PASSED';
 }
 
 function runtimeDigest(
@@ -167,6 +176,7 @@ export class ProviderOperationsApp {
     }
     if (record.provider === 'pi-agent') return { provider: record.provider, availability: 'UNAVAILABLE', authentication: 'UNVERIFIED', model: record.model, configured: true, enabled: false, checkedAt, reasonCode: 'PROVIDER_MIGRATION_REQUIRED' };
     const verified = record.verificationStatus === 'VERIFIED'
+      && generationVerified(record)
       && record.verifiedFingerprint === settingsFingerprint(record);
     const fresh = verified && this.verificationIsFresh(record, checkedAt);
     return {
@@ -181,7 +191,8 @@ export class ProviderOperationsApp {
       checkedAt,
       reasonCode: verified && !fresh ? 'VERIFICATION_EXPIRED' : verified
         ? record.enabled ? 'READY' : 'VERIFIED_DISABLED'
-        : record.verificationReasonCode,
+        : record.verificationStatus === 'VERIFIED' && !generationVerified(record)
+          ? 'GENERATION_VERIFICATION_REQUIRED' : record.verificationReasonCode,
     };
   }
 
@@ -274,14 +285,16 @@ export class ProviderOperationsApp {
   }
 
   /** 验证请求。 */
-  async verify(input: { expectedRevision: unknown; enable?: unknown }): Promise<Record<string, unknown>> {
-    return this.serialized(() => this.verifyUnlocked(input));
+  async verify(input: { expectedRevision: unknown; enable?: unknown }, signal?: AbortSignal): Promise<Record<string, unknown>> {
+    signal?.throwIfAborted();
+    return this.serialized(() => this.verifyUnlocked(input, signal));
   }
 
   private async verifyUnlocked(input: {
     expectedRevision: unknown;
     enable?: unknown;
-  }): Promise<Record<string, unknown>> {
+  }, signal?: AbortSignal): Promise<Record<string, unknown>> {
+    signal?.throwIfAborted();
     assertInvariant(Number.isSafeInteger(input.expectedRevision) && Number(input.expectedRevision) > 0,
       'REVISION_INVALID: expectedRevision must be a positive integer');
     assertInvariant(input.enable === undefined || typeof input.enable === 'boolean',
@@ -293,20 +306,23 @@ export class ProviderOperationsApp {
       'REVISION_CONFLICT: Provider settings changed');
     // Resolve again immediately before probing. This closes the save/verify DNS rebinding gap.
     const endpoint = await this.endpointPolicy.validate(current.apiUrl);
+    signal?.throwIfAborted();
     const result = await this.probe.verify({
       endpoint,
       apiKey: current.apiKey,
       model: current.model,
-    });
+    }, signal);
     const now = this.clock();
-    const succeeded = result.status === 'VERIFIED';
+    const succeeded = result.status === 'VERIFIED' && result.reasonCode === 'GENERATION_READY'
+      && result.checks?.modelList === 'PASSED' && result.checks.generation === 'PASSED';
     const next: ProviderSettingsRecord = {
       ...current,
       model: succeeded ? result.model : current.model,
       enabled: succeeded && input.enable !== false,
       revision: current.revision + 1,
-      verificationStatus: result.status,
-      verificationReasonCode: result.reasonCode,
+      verificationStatus: succeeded ? 'VERIFIED' : 'FAILED',
+      verificationReasonCode: !succeeded && result.status === 'VERIFIED' ? 'GENERATION_VERIFICATION_REQUIRED' : result.reasonCode,
+      verificationChecks: result.checks,
       lastVerifiedAt: now,
       verifiedFingerprint: succeeded ? settingsFingerprint({ ...current, model: result.model }) : null,
       updatedAt: now,
@@ -324,6 +340,7 @@ export class ProviderOperationsApp {
         model: next.model,
         status: next.verificationStatus,
         reasonCode: next.verificationReasonCode,
+        checks: next.verificationChecks,
         enabled: next.enabled,
         revision: next.revision,
       },
@@ -335,6 +352,7 @@ export class ProviderOperationsApp {
       acceptedAt: now,
       status: next.verificationStatus,
       reasonCode: next.verificationReasonCode,
+      checks: next.verificationChecks,
       model: next.model,
       checkedAt: now,
       enabled: next.enabled,
@@ -380,6 +398,7 @@ export class ProviderOperationsApp {
       && record.enabled
       && record.model !== null
       && record.verificationStatus === 'VERIFIED'
+      && generationVerified(record)
       && record.verifiedFingerprint === settingsFingerprint(record)
       && this.verificationIsFresh(record);
   }
@@ -406,8 +425,10 @@ export class ProviderOperationsApp {
       };
     }
     const fingerprintVerified = record.verificationStatus === 'VERIFIED'
+      && generationVerified(record)
       && record.verifiedFingerprint === settingsFingerprint(record);
     const expired = fingerprintVerified && !this.verificationIsFresh(record);
+    const generationRequired = record.verificationStatus === 'VERIFIED' && !generationVerified(record);
     return {
       provider: record.provider,
       apiUrlMasked: maskApiUrl(record.apiUrl),
@@ -416,9 +437,11 @@ export class ProviderOperationsApp {
       enabled: this.isEnabledAndVerified(record),
       revision: record.revision,
       verification: {
-        status: record.provider === 'pi-agent' || expired ? 'UNVERIFIED' : record.verificationStatus,
-        reasonCode: record.provider === 'pi-agent' ? 'PROVIDER_MIGRATION_REQUIRED' : expired ? 'VERIFICATION_EXPIRED' : record.verificationReasonCode,
+        status: record.provider === 'pi-agent' || expired || generationRequired ? 'UNVERIFIED' : record.verificationStatus,
+        reasonCode: record.provider === 'pi-agent' ? 'PROVIDER_MIGRATION_REQUIRED' : generationRequired ? 'GENERATION_VERIFICATION_REQUIRED'
+          : expired ? 'VERIFICATION_EXPIRED' : record.verificationReasonCode,
         checkedAt: record.lastVerifiedAt,
+        checks: record.verificationChecks,
       },
       updatedAt: record.updatedAt,
     };
