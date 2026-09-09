@@ -91,3 +91,8 @@ This document summarizes older handoffs, milestones and architectural decisions 
 - [2026-09-09-1033-bundled-runtime-libraries.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/186702547abadddf18c2cbeda4af4b2ad859f493/docs/epitaph/2026-09-09-1033-bundled-runtime-libraries.md)：增加经过路径校验的包内运行库传递及只读挂载，4 项定向测试通过；主 Agent 后续完成实际离线安装、评测及 DSH 隔离验证。
 
 - [2026-09-09-1125-seven-role-mvp-candidate.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/cff8fc1/docs/epitaph/2026-09-09-1125-seven-role-mvp-candidate.md)：交接七角色、Linux 离线安装与浏览器候选，当时 280 项回归和 Console 19 项通过，真实模型尚为 0/3 且凭据阻塞；后续 1225 记录已覆盖真实验收 3/3 失败，不能将旧候选记录作为发布授权或最新验收结果。
+
+## 真实验收失败与阶段修复交接归档
+
+- [2026-09-09-1219-mvp-real-acceptance-budget-exhausted.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/cff8fc14a75b556dfce84598842caa7d2f895868/docs/epitaph/2026-09-09-1219-mvp-real-acceptance-budget-exhausted.md)：纠正遗漏历史凭据的判断，记录三次真实启动失败及 3/3 额度耗尽；当时 281 项回归通过，未有完整真实发布。后续仍需新预算，不改写原失败证据。
+- [2026-09-09-1225-mvp-live-final-evidence.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/cff8fc14a75b556dfce84598842caa7d2f895868/docs/epitaph/2026-09-09-1225-mvp-live-final-evidence.md)：1867025 安装包、281 项回归和 19 项 Console 通过；实际失败列表误显示 GENERATING 是当时未解决问题，现由阶段修复候选覆盖。真实预算仍耗尽，原取消节点和用量证据保持历史原样。
