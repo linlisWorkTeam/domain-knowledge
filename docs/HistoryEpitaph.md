@@ -162,3 +162,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 ## 修订依据归档
 
 [2026-09-11-0326-revision-evidence.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/6d3d24098ec2bb4c45ede8e0b78af599db0a1fcf/docs/epitaph/2026-09-11-0326-revision-evidence.md) 将可信失败绑定到固定版本 H2，区分候选归因与已证明知识错误。已通过当时契约和受控测试；真实修订、最终发布门禁尚未通过，不能将归因候选当作纠正事实。
+
+[2026-09-11-0346-knowledge-revision.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/7afb0d9cfa6e99b631e55ebd611f9aeb0bf00223/docs/epitaph/2026-09-11-0346-knowledge-revision.md) 接通独立 Review/DocGen 定点修订、原卡片身份、尾注保护及索引恢复；当时仅受控验证，真实修订与最终发布门禁未完成。自动迭代及修订后源码复核后来另行交付。

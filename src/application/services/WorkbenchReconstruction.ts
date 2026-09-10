@@ -28,6 +28,10 @@ export class WorkbenchReconstruction {
     const { stages, artifacts } = this.dependencies;
     const task = stages.get(taskId);
     const refs = [...(task.result?.artifactRefs ?? []), ...stages.store.checkpoints(taskId).flatMap((item) => item.result.artifactRefs)];
+    for (const event of stages.store.events(taskId)) {
+      const detail = event.detail as Record<string, unknown>;
+      if (detail?.phase === 'role-stage-attempt' && detail.artifactRef) refs.push(detail.artifactRef as ArtifactRef);
+    }
     const ref = refs.find((item) => item.sha256 === digest);
     if (!ref) return null;
     if (!await artifacts.verify(ref)) throw new Error('STAGE_ARTIFACT_CORRUPT');

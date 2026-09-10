@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { once } from 'node:events';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
@@ -988,6 +988,7 @@ test('操作中心从固定 Git 版本分析仓库，显示模块和环境且窄
     await expect(page.locator('[data-generation-task]').getByRole('button', { name: 'Parser generated card', exact: true })).toBeVisible();
     reconstruction.snapshot = async (language, build) => ({ schemaVersion: 'native-toolchain-v1', language, build, architecture: 'test', files: [], digest: 'a'.repeat(64) });
     reconstruction.native = instance.composition.apps.workbenchGeneration.dependencies.native;
+    let docGenAttempts = 0;
     reconstruction.roles.dependencies.model = (command) => ({ assertOutput: assertModelOutput, execute: async (request) => {
       expect(request.readablePaths).toEqual([]);
       if (['code', 'test-gen'].includes(request.role)) expect(request.prompt).not.toContain('return 1;');
@@ -998,6 +999,7 @@ test('操作中心从固定 Git 版本分析仓库，显示模块和环境且窄
         const card = instance.composition.repository.getKnowledgeVersion(criteria.candidate.versionId)!;
         return { blocking: true, recommendation: 'ITERATE', correction: { correctionId: 'COR-0001', knowledgePath: `knowledge/${card.moduleId}.md#Behavior`, criterion: 'Clarify the fixed integer return value.', risk: 'Unclear reconstruction guidance' }, unresolvedRisks: [] };
       }
+      if (request.role === 'doc-gen' && ++docGenAttempts === 1) return { title: 'Parser generated card', description: 'The fixed parser interface.', sections: [{ sectionId: 'section-1', body: '## Invalid nested title' }] };
       if (request.role === 'doc-gen') return { title: 'Parser generated card', description: 'The fixed parser interface.', sections: [{ sectionId: 'section-1', body: 'The parse function takes no arguments and always returns the integer one. Its public interface is int parse(void). The return value is exactly 1, not 0. The fixed source has no external dependencies or mutable state. This describes only the provided function; unsupported inputs and unrelated parsers are outside the scope. Behavioral verification of reconstructed code is still required.\n\nThis boundary matters because a generated implementation may compile with the correct signature while returning a different value. Callers should compare the returned integer with one; the presence of a callable function alone is insufficient. No allocation, callback, error code, or global configuration is part of this interface. These statements apply to the pinned source version and do not describe a general JSON parser.' }] };
       if (request.role === 'test-gen') {
         const ref = command.payload.testPolicyRef as Parameters<typeof instance.composition.artifacts.get>[0];
@@ -1077,6 +1079,13 @@ test('操作中心从固定 Git 版本分析仓库，显示模块和环境且窄
     await page.getByRole('button', { name: '查看修订依据', exact: true }).click();
     await page.getByRole('button', { name: '执行知识修订', exact: true }).click();
     await expect(page.locator('[data-knowledge-revision-panel]')).toContainText('受影响索引已刷新');
+    await expect(page.locator('[data-knowledge-revision-panel]')).toContainText('章节标题由系统生成');
+    const auditDownload = page.waitForEvent('download');
+    await page.getByRole('button', { name: '下载失败尝试及校验反馈', exact: true }).click();
+    const auditFile = await (await auditDownload).path(); expect(auditFile).not.toBeNull();
+    const auditRecord = JSON.parse(readFileSync(auditFile!, 'utf8'));
+    expect(auditRecord.issue.code).toBe('DOC_GEN_SECTION_HEADING_INVALID');
+    expect(auditRecord.output.sections[0].body).toBe('## Invalid nested title');
     await page.getByRole('button', { name: '查看修订前后正文', exact: true }).click();
     await expect(page.locator('[data-knowledge-revision-panel]')).toContainText('exactly 1, not 0');
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);

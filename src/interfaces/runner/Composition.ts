@@ -414,7 +414,7 @@ export function createComposition(input: {
   });
   workbenchReconstruction = new WorkbenchReconstruction({ projects: projectStore, repository, artifacts, native: new NativeToolchain(),
     snapshot: nativeFingerprint, configuration: runConfiguration, stages: workbenchStages,
-    roles: new WorkbenchRoleExecution({ artifacts, contracts: new JsonSchemaAgentContractValidator(schemaRoot), model: workbenchGeneration.dependencies.model }) });
+    roles: new WorkbenchRoleExecution({ artifacts, events: (taskId, after) => workbenchStages.store.events(taskId, after), contracts: new JsonSchemaAgentContractValidator(schemaRoot), model: workbenchGeneration.dependencies.model }) });
   workbenchEvaluation = new WorkbenchEvaluation({ projects: projectStore, repository, artifacts, native: new NativeToolchain(),
     configuration: runConfiguration, stages: workbenchStages, roles: workbenchReconstruction.dependencies.roles, evaluation: nativeEvaluation });
   workbenchKnowledgeRevision = new WorkbenchKnowledgeRevision(workbenchEvaluation, flywheelApp, knowledgeIndex);

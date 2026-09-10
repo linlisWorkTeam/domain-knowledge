@@ -5,14 +5,15 @@
  */
 import { sha256, type ArtifactRef } from '../../domain/Domain.ts';
 import type { AgentCommand, AgentId } from '../../domain/agents/AgentContracts.ts';
-import type { RoleInput } from '../../domain/agents/AgentExecution.ts';
+import type { StageAttempt, RoleInput } from '../../domain/agents/AgentExecution.ts';
 import { executeAgent } from '../../domain/services/workflow/AgentExecutionService.ts';
 import type { ArtifactStore, AgentContractValidator } from '../ports/ApplicationPorts.ts';
 import type { StageModelConfiguration, StageModelFactory } from '../ports/WorkbenchGenerationPorts.ts';
 import type { StageExecutionContext } from './WorkbenchStages.ts';
 import { commitRoleArtifacts } from './RoleArtifacts.ts';
+import type { StageTaskStore } from '../ports/StageTaskPorts.ts';
 export class WorkbenchRoleExecution {
-  readonly dependencies: { artifacts: ArtifactStore; contracts: AgentContractValidator; model: StageModelFactory };
+  readonly dependencies: { artifacts: ArtifactStore; contracts: AgentContractValidator; model: StageModelFactory; events: StageTaskStore['events'] };
   constructor(dependencies: WorkbenchRoleExecution['dependencies']) { this.dependencies = dependencies; }
   async execute(context: StageExecutionContext, configuration: StageModelConfiguration, role: AgentId,
     key: string, input: RoleInput<Record<string, unknown>>) {
@@ -35,6 +36,24 @@ export class WorkbenchRoleExecution {
       });
       const started = performance.now();
       const output = await executeAgent(input, { command, effectivePrompt, iteration: 0, signal: context.signal,
+        stageJournal: {
+          read: async (stage) => {
+            const entries: StageAttempt[] = [];
+            for (const event of this.dependencies.events(context.task.taskId)) {
+              const detail = event.detail as Record<string, unknown>;
+              if (detail?.phase !== 'role-stage-attempt' || detail.role !== role || detail.key !== key || detail.taskAttempt !== context.task.attempt || detail.stage !== stage) continue;
+              const ref = detail.artifactRef as ArtifactRef;
+              if (!await artifacts.verify(ref)) throw new Error('STAGE_ARTIFACT_CORRUPT');
+              entries.push(JSON.parse(Buffer.from(await artifacts.get(ref)).toString('utf8')) as StageAttempt);
+            }
+            return entries;
+          },
+          record: async (entry) => {
+            const ref = await artifacts.put(Buffer.from(JSON.stringify(entry)), 'application/json');
+            context.progress({ phase: 'role-stage-attempt', role, key, taskAttempt: context.task.attempt,
+              stage: entry.stage, attempt: entry.attempt, status: entry.status, issueCode: entry.issue?.code ?? null, issueHint: entry.issue?.hint ?? null, artifactRef: JSON.parse(JSON.stringify(ref)) });
+          },
+        },
         now: () => context.task.usage.elapsedMs + Math.floor(performance.now() - started),
         model: { assertOutput: (value, schema) => underlying.assertOutput(value, schema), execute: async (request, signal) => {
           context.account(`${role}:${key}:${request.stage}`, { modelCalls: 1, reservedTokens: Buffer.byteLength(request.prompt) + (request.maxTokens ?? 32768) + 4096 });

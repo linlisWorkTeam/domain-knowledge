@@ -167,3 +167,5 @@ v5 在已有生成结果存在时，冻结同源码快照内当前后代卡片�
 当前修订执行使用 knowledge-revision-v4，流程使用 knowledge-pipeline-v8；v3及更早修订、v7及更早流程只读。Review 材料包含固定参考和生成代码，DocGen 只接收已标准化且绑定当前任务/原输出的纠正意见。前端风险状态仍不允许以未知归因或质量拒绝推进。
 
 修订源码复核拒绝以 `UNRESOLVED` 结果保留 `REVISION_SOURCE_REVIEW_REJECTED` 和 `draftRef`；不产生新版本，不刷新该草稿索引。成功版本 metadata 绑定 `sourceReviewResultRef`，仍不表示发布门禁已通过。
+
+阶段详情 `events` 的 `role-stage-attempt` 记录绑定角色、任务尝试和语义阶段，`artifactRef` 可经同任务 evidence 下载端点读取原输出/校验反馈；别的任务不能仅凭摘要访问。此审计记录不代表角色通过，也不改变旧任务的成功检查点或累计用量。
