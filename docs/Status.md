@@ -108,6 +108,10 @@ S2-03 补充确认 [DocGen IO-22](specs/domainFunction/agents/docGenAgent/DocGen
 
 ## 当前实现与能力边界
 
+### CI 文档改动触发范围
+
+基于 `f11362f` 在 `chore/ci-trigger-policy` 调整 CI：只修改根目录 Markdown 或 `docs/` 下 Markdown 的 PR 跳过自动运行；代码、配置、Schema 和混合改动继续触发，保留手动运行入口。Node 24.13.0 工作树 bootstrap 为 READY；YAML 解析与路径场景检查通过（3 个纯文档场景跳过，6 个代码/配置/Schema/混合场景保留），相关文档契约测试 5 项通过，`npm run validate:specs` 与 `git diff --check` 通过。未重跑完整业务及浏览器测试，GitHub 事件过滤的线上验证待配置合入后的新 PR；下方已知 Site 基线失败未在本任务修复。
+
 ### DocGen 最小链路验证与暂定方案
 
 2026-09-10，用户要求 DocGen 汇总的上下文控制先保留暂定设计、保证最小链路可运行，待论文调研后再定。[IO-10](specs/domainFunction/agents/docGenAgent/DocGenAgent.md) 保留分批汇总和按需补充方向，不标记最终确认；IO-07～09 已确认归属、拆分原则及 Worker 输出内容，目标实现仍待推进。

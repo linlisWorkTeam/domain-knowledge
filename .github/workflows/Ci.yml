@@ -5,6 +5,10 @@ name: CI
 
 on:
   pull_request:
+    # Skip prose-only PRs; schemas, code and configuration still trigger CI.
+    paths-ignore:
+      - '*.md'
+      - 'docs/**/*.md'
   workflow_dispatch:
 
 permissions:
