@@ -255,7 +255,8 @@ function providerPrompt(request: AgentRequest): string {
     const rules: string[] = [];
     if (properties && typeof properties === 'object' && !Array.isArray(properties)) {
       const entries = Object.entries(properties as Record<string, unknown>);
-      rules.push(`${path} 对象键必须恰好是：${entries.map(([key]) => key).join('、')}。`);
+      const required = Array.isArray(schema.required) ? schema.required.filter((key): key is string => typeof key === 'string') : [];
+      rules.push(`${path} 声明的字段：${entries.map(([key]) => key).join('、')}；必填字段：${required.length ? required.join('、') : '无'}。其他声明字段可省略，具体约束以 Schema 为准。`);
       for (const [key, child] of entries) {
         if (!child || typeof child !== 'object' || Array.isArray(child)) continue;
         const childSchema = child as Record<string, unknown>;

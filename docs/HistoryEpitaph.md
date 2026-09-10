@@ -134,3 +134,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 - [2026-09-10-1645-native-toolchain.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/b290752057f1a841f090887f1e8a1df0bc757d47/docs/epitaph/2026-09-10-1645-native-toolchain.md)：新增C/C++隔离构建和公开声明投影，固定jsmn/TinyXML2参考观察；当时并未接模型重建或可信用例晋升，参考stdout不算行为门禁证据。后续接线见最新交接。
 
 - [2026-09-10-1732-workbench-generation.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/89cb273bc87db3f0d035efad88010f198b8bcd14/docs/epitaph/2026-09-10-1732-workbench-generation.md)：接通C/C++多卡片生成、冻结配置、逐卡恢复与索引；当时integration181和Console29通过，未实现重建/评测或真实模型验收。后续阶段能力见当前交接，原证据仍在releases/generation。
+
+- [2026-09-10-1822-native-trusted-tests.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/42f6e74aebc26c3212aa1bf886303a7cf42f53e2/docs/epitaph/2026-09-10-1822-native-trusted-tests.md)：原生候选用例协议与缓存接线，参考门禁拒绝错误候选，详细验证和未完成边界保留于固定提交；最新真实模型结果见1908交接。
