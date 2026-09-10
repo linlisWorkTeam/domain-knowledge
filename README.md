@@ -70,7 +70,13 @@ domain-knowledge/
 ├── src/
 │   ├── domain/               # 领域模型与确定性规则
 │   │   ├── agents/           # 七角色步骤、契约、提示词
-│   │   └── services/         # 业务流程、生命周期与 Gate
+│   │   ├── workflow/         # 业务流程与生命周期
+│   │   ├── evaluation/       # 评测判定
+│   │   ├── association/      # 事实关联
+│   │   ├── knowledge/        # 知识正文差异
+│   │   ├── sourceScan/       # 来源扫描
+│   │   ├── workspace/        # 工作空间
+│   │   └── migration/        # 历史数据迁移
 │   ├── application/          # Apps、Port 与用例协调服务
 │   ├── infrastructure/       # LangGraph、Agent、DB/Redis Adapter 和评测
 │   └── interfaces/           # uiApi、CLI、Runner 与 DSH 接口

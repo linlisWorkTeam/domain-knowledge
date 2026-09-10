@@ -5,7 +5,7 @@ SPDX-License-Identifier: MIT
 -->
 # 项目架构与 Spec 驱动开发报告
 
-> 本文为 main@96d277b 的架构快照。后续 DocWorker 已调整为 DocGen 内部 subAgent；当前调用关系以 [Agent 设计](../specs/domainFunction/agents/Agents.md) 与 [工作流设计](../specs/domainFunction/services/workflow/Workflow.md) 为准。
+> 本文为 main@96d277b 的架构快照。后续 DocWorker 已调整为 DocGen 内部 subAgent；当前调用关系以 [Agent 设计](../specs/domainFunction/agents/Agents.md) 与 [工作流设计](../specs/domainFunction/workflow/Workflow.md) 为准。
 
 
 报告日期：2026-09-08。核对基线：[`a1453e066602c76ccfea9a875f39ca1ce265e495`](https://github.com/linlisWorkTeam/domain-knowledge/tree/a1453e066602c76ccfea9a875f39ca1ce265e495)。
@@ -488,7 +488,7 @@ flowchart TD
     X --> Z
 ```
 
-业务节点和路由由 [Workflow.ts](../../src/domain/services/workflow/Workflow.ts)定义，角色映射由 [AgentDefinitions.ts](../../src/domain/services/workflow/AgentDefinitions.ts)定义，执行图由 [Graph.ts](../../src/infrastructure/langgraph/Graph.ts)承接。图中的汇合菱形用于说明等待关系，不是新增运行节点。节点异常由引擎错误处理进入失败路径，取消由运行控制传递。
+业务节点和路由由 [Workflow.ts](../../src/domain/workflow/Workflow.ts)定义，角色映射由 [AgentDefinitions.ts](../../src/domain/workflow/AgentDefinitions.ts)定义，执行图由 [Graph.ts](../../src/infrastructure/langgraph/Graph.ts)承接。图中的汇合菱形用于说明等待关系，不是新增运行节点。节点异常由引擎错误处理进入失败路径，取消由运行控制传递。
 
 `candidate_knowledge`、`oracle_validation`、`evaluation`、`workflow_router`、`publication` 是业务阶段，不是新增模型角色。OrchestratorAgent 输出计划工件，但没有动态改写图拓扑的权限。
 

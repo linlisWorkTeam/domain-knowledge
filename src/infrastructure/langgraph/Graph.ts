@@ -10,7 +10,7 @@ import type {
   AgentId, AgentPromptResolver, WorkflowNodeProjection, WorkflowObserver,
   WorkflowStageExecutor,
 } from '../../application/ports/ApplicationPorts.ts';
-import { agentDefinition } from '../../domain/services/workflow/AgentDefinitions.ts';
+import { agentDefinition } from '../../domain/workflow/AgentDefinitions.ts';
 import {
   InfrastructureStateAnnotation, type InfrastructureState, type InfrastructureStateUpdate,
 } from './State.ts';
@@ -18,7 +18,7 @@ import {
 import {
   AGENT_BY_NODE, WORKFLOW_NODES, WORKFLOW_EDGES, orchestratorTasks,
   candidateDestination, evaluationDestination, workflowDestination, nextIteration,
-} from '../../domain/services/workflow/Workflow.ts';
+} from '../../domain/workflow/Workflow.ts';
 
 /** 保留既有运行时节点清单接口，节点集合由领域工作流定义。 */
 export const INFRASTRUCTURE_GRAPH_NODES = WORKFLOW_NODES;

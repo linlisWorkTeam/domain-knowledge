@@ -9,7 +9,7 @@ import test from 'node:test';
 import { createTestComposition } from '../helpers/Fixture.ts';
 import { DocWorkerExecutionService } from '../../src/application/services/DocWorkerExecution.ts';
 import type { AgentExampleInput } from '../../src/application/services/AgentExample.ts';
-import { NODE_BY_AGENT } from '../../src/domain/services/workflow/AgentDefinitions.ts';
+import { NODE_BY_AGENT } from '../../src/domain/workflow/AgentDefinitions.ts';
 import { ConcurrentTasks } from '../../src/infrastructure/agentAdapters/ConcurrentTasks.ts';
 import { assertModelOutput } from '../../src/infrastructure/agentAdapters/ModelExecution.ts';
 import { JsonSchemaAgentContractValidator } from '../../src/infrastructure/agentAdapters/contracts/JsonSchemaAgentContractValidator.ts';

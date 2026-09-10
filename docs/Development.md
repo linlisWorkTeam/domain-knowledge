@@ -12,8 +12,10 @@ SPDX-License-Identifier: MIT
 | 改动 | 设计 | 实现 |
 | --- | --- | --- |
 | 角色内部步骤 | domainFunction/agents | src/domain/agents/xxxAgent |
-| 跨角色流程 | domainFunction/services/workflow | src/domain/services/workflow |
-| 领域状态与 Gate | domainFunction/services | src/domain/Domain.ts、services |
+| 跨角色流程 | domainFunction/workflow | src/domain/workflow |
+| 生命周期与业务流转 | domainFunction/workflow | src/domain/workflow、Domain.ts |
+| 评测判定 | domainFunction/evaluation | src/domain/evaluation |
+| 事实关联与正文差异 | domainFunction/association、knowledge | src/domain/association、knowledge |
 | 用例、材料加载和事务协调 | application | src/application/apps、services、ports |
 | SDK、图、存储、评测接入 | infrastructure 的同名模块 | src/infrastructure 的同名目录 |
 | HTTP / Console | interfaces、totalRules/UiuxDesign | src/interfaces、web |

@@ -4,7 +4,7 @@
  * 文件功能：验证AutomatedLanggraphFlow的行为、约束及失败场景。
  */
 import { ConcurrentTasks } from '../../src/infrastructure/agentAdapters/ConcurrentTasks.ts';
-import { NODE_BY_AGENT } from '../../src/domain/services/workflow/AgentDefinitions.ts';
+import { NODE_BY_AGENT } from '../../src/domain/workflow/AgentDefinitions.ts';
 import { FixtureProjectWorkflowStages, type FixtureProjectScenario } from '../../src/infrastructure/agentAdapters/scenario/ProjectWorkflowFixture.ts';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';

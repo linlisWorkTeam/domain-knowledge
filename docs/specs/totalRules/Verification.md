@@ -89,7 +89,7 @@ SPDX-License-Identifier: MIT
 | KF-SYS-018 | AC-DOC-001 | Implemented | `src/application/services/KnowledgeWritingGuide.ts` + `src/application/services/QualityPolicy.ts` + `src/application/services/ProjectFlow.ts` | `tests/unit/QualityPolicy.test.ts` + `tests/acceptance/RealSourceFlow.test.ts` |
 | KF-SYS-019 | AC-ARCH-002 | Implemented | `src/infrastructure/langgraph` + `src/interfaces/runner/Composition.ts` | `tests/contract/Architecture.test.ts` + `tests/integration/LanggraphInfrastructure.test.ts` |
 | KF-SYS-020 | AC-OBS-002 | Implemented | `src/application/services/WorkflowControl.ts` + `src/interfaces/runner/ConsoleReadModel.ts` | `tests/integration/LanggraphInfrastructure.test.ts` + `tests/acceptance/AutomatedLanggraphFlow.test.ts` |
-| KF-SYS-021 | AC-AGENT-003 | Implemented | `src/domain/services/workflow/AgentDefinitions.ts` + `src/application/services/WorkflowControl.ts` + `web/App.js` | `tests/integration/Server.test.ts` + `tests/contract/Site.test.ts` |
+| KF-SYS-021 | AC-AGENT-003 | Implemented | `src/domain/workflow/AgentDefinitions.ts` + `src/application/services/WorkflowControl.ts` + `web/App.js` | `tests/integration/Server.test.ts` + `tests/contract/Site.test.ts` |
 | KF-SYS-022 | AC-E2E-002 | Implemented | `src/application/services/AutomatedProjectWorkflow.ts` + `src/infrastructure/langgraph/Graph.ts` | `tests/acceptance/AutomatedLanggraphFlow.test.ts` |
 | KF-SYS-023 | AC-DOC-002 | Implemented | `web` + `site` + `docs` + `docs/specs` | `tests/contract/Site.test.ts` + `tests/contract/ComponentLayout.test.ts` |
 | KF-SYS-024 | AC-DOC-003 | Implemented | `docs/specs/totalRules/CodeTaste.md` + `README.md` + `CONTRIBUTING.md` | `tests/contract/ComponentLayout.test.ts` + `tests/contract/Site.test.ts` |
@@ -99,12 +99,12 @@ SPDX-License-Identifier: MIT
 | KF-SYS-028 | AC-DOC-004 | Implemented | `site/index.html` + `site/App.js` + `web/index.html` + `web/App.js` | `tests/contract/Site.test.ts` |
 | KF-SYS-029 | AC-SEC-004 | Implemented | `.env.example` + `package.json` + `web/App.js` | `tests/contract/Site.test.ts` + `tests/integration/Server.test.ts` |
 | KF-SYS-030 | AC-ARCH-003 | Implemented | `docs/HistoryEpitaph.md` + `docs/specs/totalRules/Architecture.md` | `tests/contract/ComponentLayout.test.ts` |
-| KF-SYS-031 | AC-ARCH-004 | Implemented | `src/domain/services` + `src/application/apps` + `src/interfaces/uiApi` + `src/infrastructure/redis` | `tests/contract/Architecture.test.ts` + `tests/unit/DddDomainServices.test.ts` + `tests/integration/RedisRuntimeState.test.ts` |
+| KF-SYS-031 | AC-ARCH-004 | Implemented | `src/domain` + `src/application/apps` + `src/interfaces/uiApi` + `src/infrastructure/redis` | `tests/contract/Architecture.test.ts` + `tests/unit/DddDomainServices.test.ts` + `tests/integration/RedisRuntimeState.test.ts` |
 | KF-SYS-032 | AC-API-001 | Implemented | `src/interfaces/runner/Server.ts` + `src/interfaces/dsh/Dsh.ts` + `web/App.js` | `tests/integration/Server.test.ts` + `tests/integration/DshAdapter.test.ts` + `tests/e2e/Console.spec.ts` |
 | KF-SYS-033 | AC-API-002 | Partial | `src/application/services/ApplicationServices.ts` + `src/infrastructure/sqlite/SqliteActionItems.ts` + `src/infrastructure/sqlite/SqliteCas.ts` + `src/infrastructure/sqlite/SqliteContentGovernance.ts` + `src/interfaces/runner/Server.ts` + `web/App.js` | `tests/integration/Server.test.ts` + `tests/integration/ContentGovernance.test.ts` + `tests/e2e/Console.spec.ts` |
 | KF-SYS-034 | AC-API-003 | Implemented | `src/interfaces/runner/ConsoleReadModel.ts` + `src/interfaces/runner/Server.ts` + `web/App.js` | `tests/integration/Server.test.ts` + `tests/e2e/Console.spec.ts` |
 | KF-SYS-035 | AC-API-004 | Implemented | `src/interfaces/runner/ConsoleReadModel.ts` + `src/infrastructure/sqlite/SqliteContentGovernance.ts` + `src/interfaces/runner/Server.ts` + `web/App.js` | `tests/integration/Server.test.ts` + `tests/integration/ContentGovernance.test.ts` + `tests/e2e/Console.spec.ts` |
-| KF-SYS-036 | AC-API-005 | Implemented | `src/domain/services/MarkdownDiff.ts` + `src/infrastructure/sqlite/SqliteContentGovernance.ts` + `src/interfaces/runner/Server.ts` + `web/App.js` | `tests/integration/ContentGovernance.test.ts` + `tests/e2e/Console.spec.ts` |
+| KF-SYS-036 | AC-API-005 | Implemented | `src/domain/knowledge/MarkdownDiff.ts` + `src/infrastructure/sqlite/SqliteContentGovernance.ts` + `src/interfaces/runner/Server.ts` + `web/App.js` | `tests/integration/ContentGovernance.test.ts` + `tests/e2e/Console.spec.ts` |
 | KF-SYS-037 | AC-API-006 | Implemented | `src/application/apps/ContentGovernanceApp.ts` + `src/infrastructure/sqlite/SqliteContentGovernance.ts` + `src/interfaces/runner/Server.ts` + `web/App.js` | `tests/integration/ContentGovernance.test.ts` + `tests/e2e/Console.spec.ts` |
 | KF-SYS-038 | AC-API-007 | Implemented | `src/infrastructure/sqlite/SqliteContentGovernance.ts` + `src/interfaces/runner/Server.ts` + `web/App.js` | `tests/integration/ContentGovernance.test.ts` + `tests/e2e/Console.spec.ts` |
 | KF-SYS-039 | AC-API-008 | Implemented | `src/application/services/WorkflowControl.ts` + `src/interfaces/runner/ConsoleReadModel.ts` + `web/App.js` | `tests/integration/Server.test.ts` + `tests/acceptance/AutomatedLanggraphFlow.test.ts` + `tests/e2e/Console.spec.ts` |
@@ -120,12 +120,12 @@ SPDX-License-Identifier: MIT
 | KF-UI-006 | AC-UI-006 | Implemented | `web/App.js` + `src/infrastructure/sqlite/SqliteCas.ts` | `tests/integration/Server.test.ts` + `tests/e2e/Console.spec.ts` |
 | KF-UI-007 | AC-UI-007 | Implemented | `web/App.js` + `src/interfaces/runner/Server.ts` | `tests/contract/Site.test.ts` + `tests/integration/Server.test.ts` |
 | KF-UI-008 | AC-UI-008 | Partial | `web/App.js` + `src/interfaces/runner/Server.ts` | `tests/contract/Site.test.ts` + `tests/integration/Server.test.ts` |
-| KF-UI-009 | AC-UI-009 | Implemented | `src/domain/services/MarkdownDiff.ts` + `web/App.js` | `tests/integration/ContentGovernance.test.ts` + `tests/e2e/Console.spec.ts` |
+| KF-UI-009 | AC-UI-009 | Implemented | `src/domain/knowledge/MarkdownDiff.ts` + `web/App.js` | `tests/integration/ContentGovernance.test.ts` + `tests/e2e/Console.spec.ts` |
 | KF-UI-010 | AC-UI-010 | Implemented | `web/App.js` + `src/interfaces/runner/Server.ts` | `tests/integration/Server.test.ts` + `tests/e2e/Console.spec.ts` |
 | KF-UI-011 | AC-UI-011 | Implemented | `web/App.js` + `src/application/apps/KnowledgeSearchApp.ts` | `tests/contract/Site.test.ts` + `tests/integration/Server.test.ts` |
 | KF-UI-012 | AC-UI-012 | Implemented | `web/index.html` + `web/Styles.css` + `web/App.js` | `tests/contract/Site.test.ts` + `tests/e2e/Console.spec.ts` |
 | KF-UI-013 | AC-UI-013 | Implemented | `web/App.js` + `web/Styles.css` + `site/App.js` | `tests/contract/Site.test.ts` |
-| KF-UI-014 | AC-UI-014 | Implemented | `web/App.js` + `src/domain/services/workflow/AgentDefinitions.ts` | `tests/contract/Site.test.ts` + `tests/integration/Server.test.ts` |
+| KF-UI-014 | AC-UI-014 | Implemented | `web/App.js` + `src/domain/workflow/AgentDefinitions.ts` | `tests/contract/Site.test.ts` + `tests/integration/Server.test.ts` |
 | KF-UI-015 | AC-UI-015 | Implemented | `web/App.js` + `src/interfaces/runner/Server.ts` | `tests/contract/Site.test.ts` + `tests/integration/Server.test.ts` |
 | KF-UI-016 | AC-UI-016 | Implemented | `web/App.js` + `src/interfaces/runner/ConsoleReadModel.ts` | `tests/contract/Site.test.ts` + `tests/acceptance/AutomatedLanggraphFlow.test.ts` |
 | KF-UI-017 | AC-UI-017 | Implemented | `web/index.html` + `web/App.js` + `site/index.html` + `site/App.js` | `tests/contract/Site.test.ts` |

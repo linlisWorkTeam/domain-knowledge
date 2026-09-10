@@ -4,7 +4,7 @@
  * 文件功能：提供Composition的外部入口、参数转换与响应处理。
  */
 import { AgentExampleService } from '../../application/services/AgentExample.ts';
-import { NODE_BY_AGENT } from '../../domain/services/workflow/AgentDefinitions.ts';
+import { NODE_BY_AGENT } from '../../domain/workflow/AgentDefinitions.ts';
 import { assertModelOutput, modelExecutionFactory } from '../../infrastructure/agentAdapters/ModelExecution.ts';
 import { appendFile, mkdir } from 'node:fs/promises';
 import { readFileSync } from 'node:fs';

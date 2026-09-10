@@ -6,12 +6,12 @@
     "moduleId": "markdown-diff",
     "repositoryRoot": ".",
     "sourcePaths": [
-      "src/domain/services/MarkdownDiff.ts",
+      "src/domain/knowledge/MarkdownDiff.ts",
       "src/domain/Domain.ts"
     ],
     "publicInterfacePaths": [],
     "allowedGeneratedPaths": [
-      "src/domain/services/markdown-diff.ts"
+      "src/domain/knowledge/MarkdownDiff.ts"
     ],
     "prepareCommands": [],
     "referenceCommands": [],
@@ -38,7 +38,7 @@
       "content": {
         "description": "Fixture-only source manifest for subAgent composition",
         "sourcePaths": [
-          "src/domain/services/MarkdownDiff.ts",
+          "src/domain/knowledge/MarkdownDiff.ts",
           "src/domain/Domain.ts"
         ]
       },
@@ -57,9 +57,9 @@
   "workerModelOutputs": {
     "worker-1": {
       "workerId": "worker-1",
-      "fragment": "Fixture source analysis of src/domain/services/MarkdownDiff.ts; independent evidence for DocGen synthesis.",
+      "fragment": "Fixture source analysis of src/domain/knowledge/MarkdownDiff.ts; independent evidence for DocGen synthesis.",
       "provenance": [
-        "src/domain/services/MarkdownDiff.ts"
+        "src/domain/knowledge/MarkdownDiff.ts"
       ]
     },
     "worker-2": {
