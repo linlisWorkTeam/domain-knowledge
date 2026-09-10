@@ -48,7 +48,7 @@ export class FixtureProjectWorkflowStages {
           return input.modelFactory(request);
         }
         return { assertOutput: assertModelOutput,
-          execute: async () => this.output(request.stage, request.scenario, request.command.agentType) };
+          execute: async () => this.output(request.stage, request.scenario, request.command.agentType, request.command.payload) };
       },
     });
   }
@@ -56,14 +56,14 @@ export class FixtureProjectWorkflowStages {
   /** 执行当前角色或业务阶段并返回结构化结果。 */
   execute(input: WorkflowStageInput) { return this.executor.execute(input); }
 
-  private async output(input: WorkflowStageInput, scenario: AutomatedProjectScenario, agentId: AgentId): Promise<Record<string, unknown>> {
+  private async output(input: WorkflowStageInput, scenario: AutomatedProjectScenario, agentId: AgentId, payload: Record<string, unknown>): Promise<Record<string, unknown>> {
     const assets = (scenario as FixtureProjectScenario).assets;
     if (!assets) throw new Error('WORKFLOW_FIXTURE_ASSETS_REQUIRED');
     let output: Record<string, unknown>;
     if (agentId === 'doc-gen') {
       output = {
         body: this.asset(input.iteration === 0 ? assets.knowledgeV1 : assets.knowledgeV2),
-        title: assets.title, description: assets.description,
+        title: assets.title, description: assets.description, keywords: [scenario.moduleId],
       };
     } else if (agentId === 'code') {
       output = { files: [{
@@ -86,7 +86,10 @@ export class FixtureProjectWorkflowStages {
       output = {
         workerId: input.workerId,
         fragment: `Source partition ${input.workerId ?? 'default'} prepared for DocGen.`,
-        provenance: scenario.sourcePaths,
+        provenance: payload['assignedSourcePaths'],
+        analysisScope: { moduleId: scenario.moduleId, files: payload['assignedSourcePaths'], symbols: [] },
+        sourceEvidence: (payload['assignedSourcePaths'] as string[]).map((path) => ({ claim: 'Fixture source analysis', path })),
+        unresolvedQuestions: [],
       };
     } else {
       output = {

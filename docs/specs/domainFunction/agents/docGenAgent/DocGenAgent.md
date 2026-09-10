@@ -27,7 +27,7 @@ IO-09 已确认 Worker 输出分析范围、知识正文、源码依据和未解
 
 本节的最小链路只指知识生成内部协作，不代表知识飞轮的相似度检查、测试评测、修订及发布闭环已验收。
 
-## 单文档汇总与飞轮修订范围（已确认，待落实）
+## 单文档汇总与飞轮修订范围（已实现最小链路）
 
 | 编号 | 议题 | 状态 | 记录 |
 | --- | --- | --- | --- |
@@ -37,29 +37,29 @@ DocWorker 的多份产出是 DocGen 的内部汇总材料，不直接作为多�
 
 修订输入是本轮选定的单份知识文档及其纠正材料；DocGen 在该文档基础上定向修改，输出同一文档的修订结果，不自动扩大到其他文档。源代码和测试等材料仍按各角色既定权限提供，“单文档输入”不改变 TestGen 读取源代码或 CodeAgent 的读取边界。
 
-IO-10 的内部汇总算法继续保持暂定；“内容过大”的判断标准、向用户沟通及恢复任务的机制仍待细化。飞轮结束后的版本与过程资料保留已由 [Knowledge IO-19](../../knowledge/Knowledge.md) 确认：运行期间保留，达标后保留最终文档与验收记录，需人工治理时暂存相关证据；达标且最终文档及验收记录保存成功后立即清理中间资料，不设额外保留期；父版本选择的评分及可比性细节仍待细化；达标自动交付、耗尽轮次或预算转人工治理、保留历史最佳及关键回归回滚已有设计，参见 [Evaluation IO-20](../../evaluation/Evaluation.md)，相应实现缺口不等于业务原则未定。
+IO-10 的内部汇总算法继续保持暂定；“内容过大”的自动阈值仍待细化；当前模型可提出建议，调用方展示提案并在用户答复后准备新任务。飞轮结束后的版本与过程资料保留已由 [Knowledge IO-19](../../knowledge/Knowledge.md) 确认：运行期间保留，达标后保留最终文档与验收记录，需人工治理时暂存相关证据；达标且最终文档及验收记录保存成功后立即清理中间资料，不设额外保留期；父版本选择的评分及可比性细节仍待细化；达标自动交付、耗尽轮次或预算转人工治理、保留历史最佳及关键回归回滚已有设计，参见 [Evaluation IO-20](../../evaluation/Evaluation.md)，相应实现缺口不等于业务原则未定。
 
-## 知识索引分工（已确认，待实现）
+## 知识索引分工（已实现）
 
 | 编号 | 议题 | 状态 | 记录 |
 | --- | --- | --- | --- |
-| IO-22 | 文档描述与索引生成职责 | 已确认（待实现） | 用户确认 DocGen 生成文档标题、摘要和关键词，框架负责写入 YAML 头并建立支持渐进式加载的索引，不新增 Agent。 |
+| IO-22 | 文档描述与索引生成职责 | 本轮实现，真实模型待验收 | 用户确认 DocGen 生成文档标题、摘要和关键词，框架负责写入 YAML 头并建立支持渐进式加载的索引，不新增 Agent。 |
 
 DocGen 在生成或修订单份知识文档时提供与正文一致的标题、摘要和关键词。框架校验这些描述，写入 YAML 头并更新索引；序列化、工件保存及索引维护不交给模型自行操作。渐进式加载先读取索引中的描述，再按任务需要加载对应正文，继续遵守角色既有的材料授权范围；索引不扩大 CodeAgent 可读取的文档范围。
 
-当前输出已有 body、title、description，关键词输出及完整的 YAML 写入、索引更新和渐进加载链路仍待实现。具体字段、索引格式、更新与读取接口由实现细化，不把标题和摘要字段已经存在当作索引能力已验收。框架侧知识管理规则见 [Knowledge](../../knowledge/Knowledge.md)。
+当前输出为 body、title、description、keywords；框架生成 YAML 头，生产入库将关键词写入版本 tags，渐进读取接口见本轮实现约定。具体字段、索引格式、更新与读取接口由实现细化，不把标题和摘要字段已经存在当作索引能力已验收。框架侧知识管理规则见 [Knowledge](../../knowledge/Knowledge.md)。
 
 ## 职责与当前输入输出
 
-结合源码及分块片段生成知识正文，也可根据旧正文和纠正材料定向修订。以下描述当前实现：一次返回一篇正文，与 IO-18 的默认输出范围一致；内容过大时的用户沟通及单文档飞轮边界仍需落实和验收。内部 Worker 组织方式已随 main 实现。
+结合源码及分块片段生成知识正文，也可根据旧正文和纠正材料定向修订。以下描述当前实现：一次返回一篇正文，与 IO-18 的默认输出范围一致；拆分建议通过 userDecisionRequired 交接，生产沿 STOPPED 路由停止；单文档修订由输入与正文范围校验约束。内部 Worker 组织方式已随 main 实现。
 
 | 边界 | 当前实现 |
 | --- | --- |
 | 输入 | 模块标识 `moduleId`、源码 `sourceRefs`、公开接口 `publicInterfaceRefs` |
 | 内部执行参数 | `workerCount` 默认 1，允许 0～5；通过 DocGenContext.docWorkers 执行内部批次，非法数量在调用模型前失败 |
 | 可选修订材料 | Worker 片段 `workerFragmentRefs`、上一版 `baseKnowledgeRef`、纠正意见 `corrections`、质量反馈 `qualityFeedback` |
-| 模型输出 | `body`、`title`、`description`；正文至少 200 字符，标题与描述非空 |
-| 交接输出 | `resultKind: knowledgeCandidate`，Markdown 正文工件 `bodyRef`、来源 `provenance`、变更路径、内部子任务 `workerResultRefs` 与未解决风险 |
+| 模型输出 | `body`、`title`、`description`、`keywords`；正文至少 200 字符，描述与关键词禁止纯空白 |
+| 交接输出 | `resultKind: knowledgeCandidate`，Markdown 正文工件 `bodyRef`、来源 `provenance`、变更路径、内部子任务 `workerResultRefs` 与未解决风险；修订携带 baseKnowledgeRef、appliedCorrectionIds；待决分支返回 userDecisionRequired 与 proposalRef |
 | 权限与限制 | 修订所需旧正文和纠正材料必须由 Application 显式提供；角色声明待保存工件，Application 保存并回填引用，角色不直接发布 |
 
 ## 内部 Worker 调用与复用（当前实现）
@@ -74,8 +74,32 @@ Worker 的提交键绑定 Run、内部任务身份、源码输入和冻结提示
 
 ## 待确认与验收重点
 
-对应 S2-03：按 IO-18 验证 Worker 产出默认合成一份文档、建议拆分时先征求用户意见、每次飞轮只修订输入的单份文档；继续细化内容结构、标识与路径、来源、旧版与纠正输入、质量反馈及定向修订规则。[Review IO-16](../reviewAgent/ReviewAgent.md) 已确认由 Review 提供修订位置、问题说明、依据和建议，DocGen 执行知识文档修改；具体修订输入契约及处理机制待落实。正文长度检查只证明结构下限，不证明业务质量。
+对应 S2-03：按 IO-18 验证 Worker 产出默认合成一份文档、建议拆分时先征求用户意见、每次飞轮只修订输入的单份文档；继续细化内容结构、标识与路径、来源、旧版与纠正输入、质量反馈及定向修订规则。[Review IO-16](../reviewAgent/ReviewAgent.md) 已确认由 Review 提供修订位置、问题说明、依据和建议，DocGen 执行知识文档修改；DocGen 已按既有 Correction 的 knowledgePath/criterion/risk/evidenceRefs 消费定位、建议、问题与依据；Review 自身的 IO-16 输出升级仍由其角色负责。正文长度检查只证明结构下限，不证明业务质量。
 
 固定源码样例为 [DocGenFixedSourceSample.json](../../../../../src/domain/agents/docGenAgent/examples/DocGenFixedSourceSample.json)，包含原始源码、公开接口和追加指令；[样例检查器](../../../../../src/domain/agents/docGenAgent/examples/DocGenReference.ts) 与 [样例测试](../../../../../src/domain/agents/docGenAgent/DocGenExample.test.ts) 由本角色目录维护。统一 agent:run 负责执行和提交，固定参考测试不作为生产角色阶段；操作方法见 [AgentDevelopment](../../../../AgentDevelopment.md)。
 
 开发步骤与证据统一记录在 [Status](../../../../Status.md)，独立运行方法见 [AgentDevelopment](../../../../AgentDevelopment.md)。
+
+## 本轮实现约定（2026-09-10）
+
+IO-22 输出增加必需 `keywords: string[]`（非空、不重复、元素去除首尾空白）；title、description 禁止纯空白。模型只生成正文和描述，框架使用固定字段的 YAML 1.2 序列化写入单份 Markdown 工件，拒绝模型自行提供 YAML 头，防止出现双重元数据。原始输出保留审计，知识候选保存同一份带 YAML 的文档，关键词写入版本 tags，标题及摘要写入既有版本索引。
+
+渐进式读取通过 KnowledgeSearchApp 的 `describe(allowedVersionIds)` 只读取授权版本描述及 bodyRef，`loadDocument(versionId, allowedVersionIds)` 才读取该份正文；每次调用显式携带授权版本列表，未授权请求在读取工件前失败。不改变既有全文检索，不新增 SearchAgent，也不把索引当作发布门禁。
+
+### DocGen 收尾范围与契约（2026-09-10）
+
+本轮完成 S2-03 的最小生成与修订链路。IO-08 的业务分组、容量预算和 IO-10 的分批摘要/补充分析继续按原记录细化，不在本轮凭空确定默认预算或引入语言分析器。内部 Worker 执行端沿用已实现接口。
+
+- 模块标识须与受信输入一致且为稳定 slug。有 corrections 或 qualityFeedback 时必须提供一份非空 baseKnowledgeRef；生产后续轮次缺失上一版结果直接失败，不能退化为初次生成。
+- 纠正意见沿用 Correction 契约。knowledgePath 可以是当前 `knowledge/<moduleId>.md`（整篇）、该路径加 `#章节标题`，或已有 Review 使用的章节标题。拒绝另一文档路径；章节定位须唯一。只有章节纠正且没有整体质量反馈时，DocGen 只能修改这些章节，其余内容须逐字保留。框架 YAML 头不作为正文比较范围。整篇纠正和质量反馈可调整本篇结构。
+- 模型正常输出仍为 body/title/description/keywords；可附 unresolvedRisks，连同 Worker 问题交接。结果携带 baseKnowledgeRef 及 appliedCorrectionIds，绑定本轮修订依据；这里表示该次修订接收的意见，不替 Review 判定语义修复成功。
+- 模型认为不宜合为一份时输出独立的 `splitProposal: { reason, suggestedDocuments: string[] }`，不能混入 body。Domain 返回 `userDecisionRequired` 和 proposalRef，不生成正文。Application 在 candidate_knowledge 识别该结果，保存可读原因与建议，沿既有 STOPPED 路由停止；不进入 Code 或创建候选。
+- 独立入口在 result.json 和终端结果展示待决事项。决定继续合成一份时，调用方显式提供 `documentDecision: { action: 'keep-single', proposalRef }` 及该提案工件；如果用户选择拆分，调用方先按用户选择准备单份范围再启动新任务。本轮不新增 Console 决策按钮或自动多文档任务。没有答复不会恢复或默认拆分。
+
+### 收尾验收记录
+
+DocGen 正常输出、章节修订、输入错配拒绝、Worker 组合与风险交接、取消/恢复、拆分提案与显式 keep-single、描述索引和 YAML 入库均有角色/集成测试；固定源码、组合、修订、提案及答复后生成五个 agent:run 场景已执行。统一提交和既有多 Agent 测评编排保持接通；生成能力本身由 S2 验证，服务器真实模型调用按 S3 继续。当前最小链路开发完成。
+
+暂缓项保持原 Spec 决策：IO-08 的业务分组与具体上下文预算、IO-10 的分批摘要及补充分析循环，不将均分文件称为容量预算算法。文档范围的选择由调用方展示提案并收集用户答复；专用 Console 决策界面不在本轮角色收尾范围。知识版本清理/历史最佳回退仍属于 Knowledge 与 Evaluation 的后续实现。
+
+2026-09-10 用户确认：本次保留现有最小链路，IO-08 的业务模块/调用关系分组、上下文预算和跨模块依赖处理，以及 IO-10 的分批汇总等未定项留待下个版本确定，不作为本次 PR 的完成条件。

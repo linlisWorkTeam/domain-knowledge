@@ -21,7 +21,7 @@
     "finalCommands": []
   },
   "iteration": 0,
-  "promptAddon": "为 structuredMarkdownDiff 编写中文开发文档，先用 read_material 阅读可见源码。\n说明函数签名、返回字段、1 起算行号、CRLF 归一化、空输入、LCS 与大输入回退的边界和章节归属。\n以 src/domain/services/markdown-diff.ts:L起始-L结束 格式引用实际源码行号，两个数字前都必须有大写 L（例如 :L1-L7）；不要省略 L，也不要用简写路径。不要宣称候选文档已验证发布。\n正文开头必须有“源码依据”一行，使用完整引用 src/domain/services/markdown-diff.ts:L127-L165，说明该范围包含导出函数及其实现。其他引用也必须重复完整路径并核对实际行号，不允许只写 :L数字。读取材料后按原文件空行也计入行号，不要自行重排行号。\n正文必须包含且只包含一个 json 代码块，其顶层必须是对象 {\"examples\":[...]}，不能直接输出裸数组。examples 每项包含 before、after、expectedHunkCount、expectedChangedSections。before/after 必须是字符串，expectedHunkCount 必须是整数，expectedChangedSections 必须是字符串数组（无变化为 []，有变化如 [\"# 标题\"]），不能把章节数量 0 或 1 当成数组。\n至少提供三种不同的可执行例子：相同内容、仅 CRLF 差异、标题下替换正文。预期须由源码推导，不调用测试文件、不生成脚本。\n最终回答只输出规定的 JSON 对象（body、title、description）。不要在最终回答中输出分析过程、工具操作说明或其他前后缀，不要用 Markdown 代码块包裹整个输出。正文控制在约 1500 中文字以内。\n\n源码复核要求：sectionFor 的返回标题会用单个空格连接井号和标题文本，不是逐字保留标题行；必须明确 ADD 查 after、REMOVE 查 before。LCS 与有界回退只共用章节归属规则，差分操作和变更章节集合不保证相同，不得声称结果一致。复杂度结论须限定到实际分析的函数，不能把回退操作生成的线性复杂度套到整体函数。不要增加这些规则之外的维护者检查清单要求，除非追加指令明确要求。\n",
+  "promptAddon": "为 structuredMarkdownDiff 编写中文开发文档，先用 read_material 阅读可见源码。\n说明函数签名、返回字段、1 起算行号、CRLF 归一化、空输入、LCS 与大输入回退的边界和章节归属。\n以 src/domain/services/markdown-diff.ts:L起始-L结束 格式引用实际源码行号，两个数字前都必须有大写 L（例如 :L1-L7）；不要省略 L，也不要用简写路径。不要宣称候选文档已验证发布。\n正文开头必须有“源码依据”一行，使用完整引用 src/domain/services/markdown-diff.ts:L127-L165，说明该范围包含导出函数及其实现。其他引用也必须重复完整路径并核对实际行号，不允许只写 :L数字。读取材料后按原文件空行也计入行号，不要自行重排行号。\n正文必须包含且只包含一个 json 代码块，其顶层必须是对象 {\"examples\":[...]}，不能直接输出裸数组。examples 每项包含 before、after、expectedHunkCount、expectedChangedSections。before/after 必须是字符串，expectedHunkCount 必须是整数，expectedChangedSections 必须是字符串数组（无变化为 []，有变化如 [\"# 标题\"]），不能把章节数量 0 或 1 当成数组。\n至少提供三种不同的可执行例子：相同内容、仅 CRLF 差异、标题下替换正文。预期须由源码推导，不调用测试文件、不生成脚本。\n最终回答只输出规定的 JSON 对象（body、title、description、keywords）。不要在最终回答中输出分析过程、工具操作说明或其他前后缀，不要用 Markdown 代码块包裹整个输出。正文控制在约 1500 中文字以内。\n\n源码复核要求：sectionFor 的返回标题会用单个空格连接井号和标题文本，不是逐字保留标题行；必须明确 ADD 查 after、REMOVE 查 before。LCS 与有界回退只共用章节归属规则，差分操作和变更章节集合不保证相同，不得声称结果一致。复杂度结论须限定到实际分析的函数，不能把回退操作生成的线性复杂度套到整体函数。不要增加这些规则之外的维护者检查清单要求，除非追加指令明确要求。\n",
   "payload": {
     "moduleId": "markdown-diff",
     "sourceRefs": [
@@ -49,6 +49,10 @@
   "modelOutput": {
     "title": "固定源码 DocGen 样例",
     "description": "用数据例子核验 Markdown 差异行为",
-    "body": "# structuredMarkdownDiff\n\n证据 src/domain/services/markdown-diff.ts:L142-L150\n\n```json\n{\"examples\":[{\"before\":\"\",\"after\":\"\",\"expectedHunkCount\":0,\"expectedChangedSections\":[]},{\"before\":\"a\\r\\nb\",\"after\":\"a\\nb\",\"expectedHunkCount\":0,\"expectedChangedSections\":[]},{\"before\":\"# A\\nold\",\"after\":\"# A\\nnew\",\"expectedHunkCount\":1,\"expectedChangedSections\":[\"# A\"]}]}\n```"
+    "body": "# structuredMarkdownDiff\n\n证据 src/domain/services/markdown-diff.ts:L142-L150\n\n```json\n{\"examples\":[{\"before\":\"\",\"after\":\"\",\"expectedHunkCount\":0,\"expectedChangedSections\":[]},{\"before\":\"a\\r\\nb\",\"after\":\"a\\nb\",\"expectedHunkCount\":0,\"expectedChangedSections\":[]},{\"before\":\"# A\\nold\",\"after\":\"# A\\nnew\",\"expectedHunkCount\":1,\"expectedChangedSections\":[\"# A\"]}]}\n```",
+    "keywords": [
+      "Markdown",
+      "diff"
+    ]
   }
 }

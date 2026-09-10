@@ -34,7 +34,8 @@ export async function main(argv = process.argv.slice(2)) {
     writeFileSync(join(directory, 'result.json'), JSON.stringify(result, null, 2), { mode: 0o600 });
     const audit = await composition.apps.orchestrator.buildDemoReport(result.runId);
     writeFileSync(join(directory, 'audit.json'), JSON.stringify(audit, null, 2), { mode: 0o600 });
-    return { runId: result.runId, role, provider: sample.provider, outputDirectory: directory, publication: result.publication };
+    return { runId: result.runId, role, provider: sample.provider, outputDirectory: directory, publication: result.publication,
+      ...(result.decisionRequired ? { decisionRequired: result.decisionRequired } : {}) };
   } catch (error) {
     writeFileSync(join(directory, 'failure.json'), JSON.stringify({ role, status: abort.signal.aborted ? 'CANCELLED' : 'FAILED', error: error instanceof Error ? error.message.split('\n')[0] : 'AGENT_EXAMPLE_FAILED' }), { mode: 0o600 });
     throw error;

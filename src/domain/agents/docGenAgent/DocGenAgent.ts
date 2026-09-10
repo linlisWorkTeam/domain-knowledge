@@ -3,16 +3,19 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：实现文档生成角色的业务步骤与结构化结果转换。
  */
+import { validateRevisionOutput } from './DocGenRevision.ts';
+import { renderKnowledgeDocument } from '../../knowledge/KnowledgeDocument.ts';
 import type { RoleResult, PendingArtifact } from '../AgentExecution.ts';
 import { assertActive, pending } from '../AgentExecution.ts';
-import { type Input, type Output, type DocGenContext, type DocWorkerTask, schemaFor, validateInput } from './DocGenAgentContract.ts';
+import { type Input, type Output, type SplitProposal, type DocGenContext, type DocWorkerTask, schemaFor, validateInput } from './DocGenAgentContract.ts';
 import { definition, buildPrompt, readablePaths } from './DocGenAgentPrompt.ts';
 
 /** 结合源码、分块片段以及已有修订材料生成正文；正文的质量与发布资格由后续服务判断。 */
-export async function execute(input: Input, context: DocGenContext): Promise<RoleResult<Output>> {
+export async function execute(input: Input, context: DocGenContext): Promise<RoleResult<Output | SplitProposal>> {
   assertActive(context.signal);
   // 缺失材料应在调用模型之前失败，避免模型用猜测填补业务证据。
   validateInput(input);
+  if (context.iteration > 0 && !input.payload.baseKnowledgeRef) throw new Error('DOCGEN_REVISION_BASE_REQUIRED');
   const tasks = planWorkers(input);
   if (tasks.length && !context.docWorkers) throw new Error('DOCGEN_WORKER_EXECUTOR_MISSING');
   const fragments = tasks.length ? await context.docWorkers!.run(tasks, context.signal) : [];
@@ -41,19 +44,31 @@ export async function execute(input: Input, context: DocGenContext): Promise<Rol
   // 模型返回后仍需检查取消状态，迟到结果不能被当作成功输出。
   assertActive(context.signal);
   context.model.assertOutput(raw, schema);
+  if ('splitProposal' in raw) {
+    const output = raw as unknown as SplitProposal;
+    const proposal = { moduleId: input.moduleId,
+      sourceArtifactIds: input.payload.sourceRefs.map((ref) => ref.artifactId).sort(), ...output.splitProposal };
+    return { output, payload: { resultKind: 'userDecisionRequired', proposalRef: pending('proposal'),
+      reason: proposal.reason, suggestedDocuments: proposal.suggestedDocuments, provenance: input.provenance,
+      ...(ordered.length ? { workerResultRefs: ordered.map((item) => item.resultRef) } : {}) },
+      artifacts: [{ key: 'proposal', content: JSON.stringify(proposal, null, 2), mediaType: 'application/json' }] };
+  }
   const output = raw as unknown as Output;
+  validateRevisionOutput(input, output.body);
   const artifacts: PendingArtifact[] = [];
   const document = output;
   // 这里只声明正文工件；实际 CAS 引用由 Application 保存后回填。
   const bodyRef = pending('body');
-  artifacts.push({ key: 'body', content: document.body, mediaType: 'text/markdown' });
+  artifacts.push({ key: 'body', content: renderKnowledgeDocument(document), mediaType: 'text/markdown' });
   const payload = {
     resultKind: 'knowledgeCandidate',
     bodyRef,
+    ...(input.payload.baseKnowledgeRef ? { baseKnowledgeRef: input.payload.baseKnowledgeRef } : {}),
+    ...(input.payload.corrections?.length ? { appliedCorrectionIds: input.payload.corrections.map((item) => item.correctionId) } : {}),
     ...(ordered.length ? { workerResultRefs: ordered.map(({ resultRef }) => resultRef) } : {}),
     provenance: input.provenance,
     changedPaths: [`knowledge/${input.moduleId}.md`],
-    unresolvedRisks: [],
+    unresolvedRisks: [...new Set([...ordered.flatMap((item) => item.unresolvedRisks ?? []), ...(output.unresolvedRisks ?? [])])],
   };
   return { output, payload, artifacts };
 }

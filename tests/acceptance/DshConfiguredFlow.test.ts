@@ -39,11 +39,14 @@ function agentOutput(agentType: string): Record<string, unknown> {
         workerId: 'worker-1',
         fragment: 'The public contract returns the fixed value four and is covered by a behavior test.',
         provenance: ['src/module.js', 'src/module.test.js'],
+        analysisScope: { moduleId: 'dsh-module', files: ['src/module.js', 'src/module.test.js'], symbols: [] },
+        sourceEvidence: ['src/module.js', 'src/module.test.js'].map((path) => ({ claim: 'Returns four', path })),
+        unresolvedQuestions: [],
       };
     case 'doc-gen':
       return {
         body: `${GOOD_BODY}\n\n## 行为契约\n\n公开函数必须返回固定数值 4，且由隔离行为测试验证。`,
-        title: 'DSH 最小知识批次',
+        title: 'DSH 最小知识批次', keywords: ['DSH'],
         description: '使用真实 DSH SDK 生成并通过确定性门禁的知识。',
       };
     case 'test-gen':

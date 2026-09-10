@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：加载工作流上下文与历史工件，协调角色执行、独立评测和发布。
  */
+import { renderKnowledgeDocument } from '../../domain/knowledge/KnowledgeDocument.ts';
 import type { Output as DocumentOutput } from '../../domain/agents/docGenAgent/DocGenAgentContract.ts';
 import type { Output as CodeOutput } from '../../domain/agents/codeAgent/CodeAgentContract.ts';
 import type { Output as CheckOutput } from '../../domain/agents/checkAgent/CheckAgentContract.ts';
@@ -37,7 +38,10 @@ import type { KnowledgeFlywheelService } from './ApplicationServices.ts';
 import type { RealSourceScenario } from './ProjectFlow.ts';
 
 /** 定义Automated项目Scenario的数据结构与类型约束。 */
-export interface AutomatedProjectScenario extends RealSourceScenario {}
+export interface AutomatedProjectScenario extends RealSourceScenario {
+  /** 用户对 DocGen 提案的显式答复，在新任务中继续生成单文档。 */
+  docGenDecision?: DocGenInput['payload']['documentDecision'];
+}
 
 function contextKey(nodeId: string, iteration: number, workerId?: string): string {
   return `${nodeId}:${iteration}${workerId ? `:${workerId}` : ''}`;
@@ -230,6 +234,12 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
   ): Promise<WorkflowStageResult> {
     const documentRef = input.context[contextKey('doc_gen', input.iteration)] as ArtifactRef | undefined;
     if (!documentRef) throw new Error('WORKFLOW_DOC_OUTPUT_MISSING');
+    const documentResult = await this.readAgentResult(documentRef, 'doc-gen', input.runId,
+      this.expectedAgentGenerationKey(input, 'doc-gen', input.iteration));
+    if (documentResult.payload['resultKind'] === 'userDecisionRequired') {
+      return { route: 'STOPPED', detail: `DocGen 等待用户决定文档范围：${documentResult.payload['reason']}；建议：${(documentResult.payload['suggestedDocuments'] as string[]).join('；')}`,
+        context: { docGenDecisionRequired: documentResult.payload } };
+    }
     const document = await this.readAgentOutput<DocumentOutput>(documentRef, 'doc-gen', input);
     const previousReviewRef = input.iteration > 0
       ? input.context[contextKey('review', input.iteration - 1)] as ArtifactRef | undefined
@@ -266,11 +276,11 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
     }, async () => {
       const candidate = await this.flywheel.ingestCandidate({
         moduleId: scenario.moduleId,
-        body: document.body,
+        body: renderKnowledgeDocument(document),
         title: document.title,
         description: document.description,
         category: 'automated-project',
-        tags: ['langgraph'],
+        tags: document.keywords,
         provenance: scenario.sourcePaths.map((path) => ({
           path,
           commit: (input.context.snapshot as ProjectSnapshot).commit,
@@ -291,7 +301,7 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
     if (!bodyRef) throw new Error('WORKFLOW_CANDIDATE_CHECKPOINT_EMPTY');
     const version = this.flywheel.findKnowledgeVersionByBody(scenario.moduleId, bodyRef.artifactId);
     if (!version) throw new Error('WORKFLOW_CANDIDATE_VERSION_MISSING');
-    const quality = this.flywheel.evaluateQuality(document.body, {
+    const quality = this.flywheel.evaluateQuality(renderKnowledgeDocument(document), {
       title: document.title,
       description: document.description,
       provenance: version.provenance,
@@ -400,6 +410,12 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
   }
 
   private async route(input: WorkflowStageInput): Promise<WorkflowStageResult> {
+    if (input.context.docGenDecisionRequired) {
+      const run = this.flywheel.getRun(input.runId);
+      if (run?.state === 'GENERATING') this.flywheel.transition(input.runId, 'LOW_CONFIDENCE');
+      return { route: 'STOPPED', detail: 'DocGen 等待用户决定文档范围',
+        context: { docGenDecisionRequired: input.context.docGenDecisionRequired } };
+    }
     const quality = input.context[contextKey('qualityReport', input.iteration)] as QualityReport | undefined;
     if (quality?.outcome === 'REJECTED') {
       const run = this.flywheel.getRun(input.runId);
@@ -512,6 +528,7 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
       payload = {
         moduleId: scenario.moduleId,
         workerCount: input.workerCount,
+        ...(scenario.docGenDecision ? { documentDecision: scenario.docGenDecision } : {}),
         sourceRefs: [snapshot.manifestRef],
         publicInterfaceRefs,
       };
@@ -527,6 +544,7 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
           const baseKnowledgeRef = previousResult.payload['bodyRef'] as ArtifactRef | undefined;
           if (baseKnowledgeRef) payload.baseKnowledgeRef = baseKnowledgeRef;
         }
+        if (!payload.baseKnowledgeRef) throw new Error('DOCGEN_REVISION_BASE_REQUIRED');
         const previousReviewRef = input.context[contextKey('review', input.iteration - 1)] as ArtifactRef | undefined;
         if (previousReviewRef) {
           const previousReview = await this.readAgentResult(

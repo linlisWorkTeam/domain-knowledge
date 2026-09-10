@@ -120,3 +120,16 @@ sequenceDiagram
 ```
 
 该场景是已有两轮回归的设计路径。质量不足可在代码生成前进入下一轮；基础设施失败和取消另行记录；有图和受控测试不代表真实模型质量已验收。
+
+### DocGen 单文档与待决结果
+
+```mermaid
+flowchart LR
+  W[内部 Worker 片段] --> D[DocGen 汇总或修订单文档]
+  B[上一版文档与纠正材料] --> D
+  D -->|正文| C[candidate_knowledge]
+  C --> N[既有 Code / Check / evaluation / Review / Gate]
+  D -->|拆分建议| P[candidate_knowledge 保存待决事项]
+  P --> R[workflow_router STOPPED]
+  R --> U[用户决定后准备单文档任务]
+```

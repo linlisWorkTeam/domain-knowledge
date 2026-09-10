@@ -75,7 +75,8 @@ test('internal retries reuse committed workers with frozen prompts and scoped ma
     const requests: import('../../src/domain/agents/AgentExecution.ts').ModelRequest[] = [];
     const service = new DocWorkerExecutionService({
       parent: { moduleId: run.moduleId, payload: { moduleId: run.moduleId, sourceRefs: [source], publicInterfaceRefs: [source],
-        corrections: [{ evidenceRefs: [correction] }] }, sourcePaths: ['a.ts', 'b.ts'], publicInterfacePaths: ['public.d.ts'],
+        corrections: [{ correctionId: 'COR-0001', knowledgePath: 'knowledge/subagent-recovery.md',
+          criterion: 'Private correction', risk: 'Fixture only', evidenceRefs: [correction] }] }, sourcePaths: ['a.ts', 'b.ts'], publicInterfacePaths: ['public.d.ts'],
         materials: [{ ref: source, content: { commit: 'fixed' } }, { ref: correction, content: 'PRIVATE_CORRECTION' }], provenance: [source] },
       stage: { runId: run.runId, nodeId: 'doc_gen', agentId: 'doc-gen', iteration: 0, attempt: 1,
         maxIterations: 3, workerCount: 2, prompt: 'parent prompt', context: {} },
@@ -86,13 +87,17 @@ test('internal retries reuse committed workers with frozen prompts and scoped ma
         requests.push(request);
         const id = stage.workerId!; calls[id] = (calls[id] ?? 0) + 1;
         if (id === 'worker-2' && calls[id] === 1) throw new Error('temporary extraction failure');
-        return { workerId: id, fragment: `A complete source fragment for ${id}.`, provenance: request.readablePaths };
+        return { workerId: id, fragment: `A complete source fragment for ${id}.`, provenance: request.readablePaths,
+          analysisScope: { moduleId: run.moduleId, files: _command.payload['assignedSourcePaths'], symbols: [] },
+          sourceEvidence: request.readablePaths.map((path) => ({ claim: 'Fixture source evidence', path })),
+          unresolvedQuestions: ['Dependency behavior needs follow-up'] };
       } }),
     });
     const tasks = [{ workerId: 'worker-1', sourcePaths: ['a.ts'] }, { workerId: 'worker-2', sourcePaths: ['b.ts'] }];
     await assert.rejects(service.run(tasks), /temporary extraction failure/);
     const fragments = await service.run(tasks);
     assert.equal(fragments.length, 2);
+    assert.deepEqual(fragments[0]!.unresolvedRisks, ['Dependency behavior needs follow-up']);
     assert.deepEqual(calls, { 'worker-1': 1, 'worker-2': 2 });
     service.dependencies.stage.iteration = 1;
     assert.deepEqual(await service.run(tasks), fragments);

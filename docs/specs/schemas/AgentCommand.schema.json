@@ -68,6 +68,10 @@
         "publicInterfaceRefs": {"$ref": "#/$defs/artifactRefArray"},
         "baseKnowledgeRef": {"$ref": "#/$defs/artifactRef"},
         "workerCount": {"type": "integer", "minimum": 0, "maximum": 5},
+        "documentDecision": {
+          "type": "object", "required": ["action", "proposalRef"], "additionalProperties": false,
+          "properties": {"action": {"const": "keep-single"}, "proposalRef": {"$ref": "#/$defs/artifactRef"}}
+        },
         "workerFragmentRefs": {"$ref": "#/$defs/artifactRefArray"},
         "qualityFeedback": {
           "type": "object",

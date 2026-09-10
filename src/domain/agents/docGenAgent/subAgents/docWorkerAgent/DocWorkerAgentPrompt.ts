@@ -11,7 +11,7 @@ import type { ExecutionContext } from '../../../AgentExecution.ts';
 export const definition = {
     agentId: 'doc-worker', parentAgentId: 'doc-gen', displayName: '文档分块智能体',
     responsibility: '按固定分块任务并行提取知识片段，不能发布或决定门禁。',
-    basePrompt: '从可见的源码证据中提取指定知识片段，并保留来源记录。',
+    basePrompt: '只分析分配的源码，输出 analysisScope（模块、文件、符号）、fragment（业务规则、接口、流程和边界）、sourceEvidence（结论与路径及可选符号）、unresolvedQuestions。必须覆盖每个分配文件并提供依据；缺失依赖或无法确定的行为明确列入问题，不猜测。provenance 只填写授权路径。',
     inputContract: ['源码分块', '公开接口'],
     outputContract: ['知识片段'], tools: ['read_material'], customizableFields: ['promptAddon'],
   } as const;

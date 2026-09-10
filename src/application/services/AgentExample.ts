@@ -119,7 +119,8 @@ export class AgentExampleService {
       const result = JSON.parse(Buffer.from(await flywheel.getArtifact(resultRef!)).toString('utf8')) as AgentResult;
       const outputs = await Promise.all(result.outputRefs.map(async (ref) => ({ ref, content: Buffer.from(await flywheel.getArtifact(ref)).toString('utf8') })));
       return { schemaVersion: '1.0', kind: 'agent-development-example', runId: run.runId, role,
-        provider: sample.provider, publication: 'NOT_EVALUATED', configuration, resultRef: resultRef!, result, outputs };
+        provider: sample.provider, publication: 'NOT_EVALUATED',
+        ...(result.payload['resultKind'] === 'userDecisionRequired' ? { decisionRequired: result.payload } : {}), configuration, resultRef: resultRef!, result, outputs };
     } catch (error) {
       flywheel.transition(run.runId, signal?.aborted ? 'CANCELLED' : 'FAILED');
       throw error;

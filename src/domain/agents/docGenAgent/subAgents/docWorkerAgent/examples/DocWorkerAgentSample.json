@@ -56,6 +56,20 @@
     "fragment": "CRLF is normalized before comparison; identical documents return no changed sections.",
     "provenance": [
       "src/domain/services/markdown-diff.ts"
-    ]
+    ],
+    "analysisScope": {
+      "moduleId": "markdown-diff",
+      "files": [
+        "src/domain/services/markdown-diff.ts"
+      ],
+      "symbols": []
+    },
+    "sourceEvidence": [
+      {
+        "claim": "CRLF is normalized before comparison; identical documents return no changed sections.",
+        "path": "src/domain/services/markdown-diff.ts"
+      }
+    ],
+    "unresolvedQuestions": []
   }
 }

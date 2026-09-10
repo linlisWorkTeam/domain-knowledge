@@ -38,3 +38,25 @@ test('doc-worker: cancellation before and during model execution cannot return s
   await assert.rejects(execute(during.input, during.context), /AGENT_CANCELLED/);
   assert.deepEqual(during.phases, []);
 });
+
+test('doc-worker preserves structured evidence and unresolved questions in its handoff', async () => {
+  const sample = roleExample<Input>('doc-worker');
+  sample.output.unresolvedQuestions = ['Missing dependency implementation'];
+  sample.context.model.execute = async () => sample.output;
+  const result = await execute(sample.input, sample.context);
+  assert.deepEqual(JSON.parse(result.artifacts[0]!.content), sample.output);
+  assert.deepEqual(result.payload.unresolvedRisks, sample.output.unresolvedQuestions);
+  assert.deepEqual(result.payload.provenance, sample.input.provenance);
+});
+
+test('doc-worker rejects invented coverage, unauthorized evidence and unsupported files', async () => {
+  for (const mode of ['module', 'coverage', 'evidence', 'missing-evidence'] as const) {
+    const sample = roleExample<Input>('doc-worker');
+    if (mode === 'module') sample.output.analysisScope.moduleId = 'another-module';
+    if (mode === 'coverage') sample.output.analysisScope.files = ['private.ts'];
+    if (mode === 'evidence') sample.output.sourceEvidence[0].path = 'private.ts';
+    if (mode === 'missing-evidence') sample.output.sourceEvidence[0].path = sample.input.publicInterfacePaths[0];
+    sample.context.model.execute = async () => sample.output;
+    await assert.rejects(execute(sample.input, sample.context), /DOCWORKER_(COVERAGE|EVIDENCE)/);
+  }
+});

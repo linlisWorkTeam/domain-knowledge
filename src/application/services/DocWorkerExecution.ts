@@ -59,7 +59,8 @@ export class DocWorkerExecutionService implements DocWorkerExecutionPort {
       const ref = result.payload['chunkRef'] as ArtifactRef;
       if (!ref || !result.outputRefs.some((output) => output.artifactId === ref.artifactId)) throw new Error('SUBAGENT_CHUNK_MISSING');
       const content = Buffer.from(await flywheel.getArtifact(ref)).toString('utf8');
-      return { workerId: task.workerId, resultRef, material: { ref, content } };
+      return { workerId: task.workerId, resultRef, material: { ref, content },
+        unresolvedRisks: result.payload['unresolvedRisks'] as string[] ?? [] };
     }), signal);
   }
 }

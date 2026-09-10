@@ -72,7 +72,7 @@ for (const [moduleId, sourcePath] of [['formatter', 'lib/format.mjs'], ['normali
                 sessionId: runOptions!.sessionId!, events: [], notifications: [],
                 finalResponse: JSON.stringify(planning
                   ? { strategy: 'document the selected module', iteration: 0, parallel: ['documentation'] }
-                  : { title: moduleId, description: 'Pinned source documentation.', body: GOOD_BODY }),
+                  : { title: moduleId, description: 'Pinned source documentation.', keywords: [moduleId], body: GOOD_BODY }),
               };
             },
             close: async () => undefined,

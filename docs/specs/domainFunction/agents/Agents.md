@@ -31,7 +31,7 @@ SPDX-License-Identifier: MIT
 
 TestGen 的业务输入已明确为源代码，不接收或读取知识卡片；[IO-11～13、IO-21](testGenAgent/TestGenAgent.md) 中输出 C/C++ 测试源码和用例清单已确认，由后续执行器运行；先在原始源码上校验测试的流程暂时保留。已有用例在输入源代码不变时保持不变，不因知识卡片、生成代码或配置变化重新生成。首次候选校验失败时交 TestGen 有限修复，仍失败转人工，仅作为异常兜底；具体重试配置与源码变化识别待落实。
 
-[DocWorker IO-07～09](docGenAgent/subAgents/docWorkerAgent/DocWorkerAgent.md) 已确认内部子 Agent 归属、上下文控制目的、任务拆分原则及片段输出内容；DocGen 负责汇总、去重、处理矛盾并组织知识卡片。具体预算、跨模块依赖、机器字段和汇总机制继续确认。
+[DocWorker IO-07～09](docGenAgent/subAgents/docWorkerAgent/DocWorkerAgent.md) 已确认内部子 Agent 归属、上下文控制目的、任务拆分原则及片段输出内容；DocGen 负责汇总、去重、处理矛盾并组织知识卡片。Worker 机器片段字段与范围校验已实现；具体预算、跨模块依赖和分批汇总机制继续确认。
 
 [DocGen IO-10](docGenAgent/DocGenAgent.md) 的分批汇总与按需补充方案暂定保留，先保持最小知识生成链路可运行，待用户论文调研后再确认；不作为最终设计或已实现能力。
 
@@ -41,11 +41,11 @@ TestGen 的业务输入已明确为源代码，不接收或读取知识卡片；
 
 [Orchestrator IO-17](orchestratorAgent/OrchestratorAgent.md) 已确认输入业务目标、模块概况、项目配置及任务进度，输出本轮模块、承接 Agent 和输入材料的任务计划；执行顺序、内部 Worker 拆分及测试复用由各自既定规则负责。
 
-[DocGen IO-18](docGenAgent/DocGenAgent.md) 已修正为：DocWorker 产出默认由 DocGen 合成一份知识文档；内容过大而建议拆分时先与用户沟通，以用户意见为准。每次飞轮只输入并修订一份文档，不自动批量修改多份文档；用户沟通机制与边界验收待落实。版本保留与清理按 IO-19，结束行为按 IO-20；历史最佳与关键回归回滚已有目标要求，具体实现待落实。
+[DocGen IO-18](docGenAgent/DocGenAgent.md) 已修正为：DocWorker 产出默认由 DocGen 合成一份知识文档；内容过大而建议拆分时先与用户沟通，以用户意见为准。每次飞轮只输入并修订一份文档，不自动批量修改多份文档；DocGen 已通过 userDecisionRequired 提案与 STOPPED 路由交接用户决策，并校验单文档修订范围。版本保留与清理按 IO-19，结束行为按 IO-20；历史最佳与关键回归回滚已有目标要求，具体实现待落实。
 
 [Knowledge IO-19](../knowledge/Knowledge.md) 补充确认过程资料保留与治理范围：运行期间保留，达标后保留最终文档与简短验收记录，需要人工治理时提供精简问题清单并暂存相关证据。达标且最终文档及验收记录保存成功后立即清理中间资料，不设额外保留期，规则尚未实现；达标自动结束并交付、轮次或预算耗尽转人工治理沿用 [Evaluation IO-20](../evaluation/Evaluation.md)，不新增人工确认。
 
-[DocGen IO-22](docGenAgent/DocGenAgent.md) 已确认知识索引分工：DocGen 生成标题、摘要和关键词，框架写入 YAML 头并建立支持渐进式加载的索引，不新增 Agent。相关机器契约及索引链路待实现，不改变单文档飞轮及各角色读取边界。
+[DocGen IO-22](docGenAgent/DocGenAgent.md) 已确认知识索引分工：DocGen 生成标题、摘要和关键词，框架写入 YAML 头并建立支持渐进式加载的索引，不新增 Agent。DocGen 已输出 keywords 并生成带 YAML 描述的文档，生产版本索引与显式授权的 describe/loadDocument 已接通，细节见角色设计。
 
 [Association IO-23](../association/Association.md) 已明确外部知识关联当前阶段不实现，来源约定仅保留供后续参考，角色分工不再作为当前待确认项。此前建议由 DocGen 判断关联未获确认，不扩展其当前职责；IO-22 的文档描述与渐进加载索引仍在当前范围内。
 

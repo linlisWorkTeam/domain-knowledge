@@ -44,7 +44,8 @@ test('doc-gen: revision includes previous body, worker fragments and correction 
   assert.match(sample.requests[0]!.prompt, /baseKnowledgeRef|workerFragmentRefs/);
   assert.match(sample.requests[0]!.prompt, /CRLF normalization mismatch/);
   assert.match(sample.requests[0]!.prompt, /COR-0001/);
-  assert.equal(result.artifacts[0]!.content, sample.output.body);
+  assert.ok(result.artifacts[0]!.content.endsWith(sample.output.body));
+  assert.match(result.artifacts[0]!.content, /^---\ntitle:/);
   assert.deepEqual(result.payload.bodyRef, { pendingArtifact: 'body' });
 });
 
@@ -58,10 +59,12 @@ test('doc-gen owns nonempty source partitions and waits for all fragments before
     assert.deepEqual(tasks.map((task) => task.workerId), ['worker-1', 'worker-2']);
     seen.push(...tasks.map((task) => task.sourcePaths));
     return tasks.map((task) => ({ workerId: task.workerId, resultRef: sample.input.provenance[0]!,
+      unresolvedRisks: ['Missing dependency'],
       material: { ref: sample.input.provenance[0]!, content: `extracted ${task.sourcePaths[0]}` } })).reverse();
   } } };
   const result = await execute(sample.input, context);
   assert.deepEqual(seen, [['a.ts'], ['b.ts']]);
+  assert.deepEqual(result.payload.unresolvedRisks, ['Missing dependency']);
   assert.deepEqual(sample.phases, ['model', 'validate']);
   assert.match(sample.requests[0]!.prompt, /extracted a.ts/);
   assert.match(sample.requests[0]!.prompt, /extracted b.ts/);
@@ -92,4 +95,75 @@ test('doc-gen validates worker count and defaults to one internal task', async (
     await assert.rejects(execute(sample.input, sample.context), /WORKER_COUNT_INVALID/);
   }
   assert.deepEqual(sample.phases, []);
+});
+
+test('doc-gen requires the selected document for revision and rejects another module or document', async () => {
+  for (const mode of ['missing-base', 'empty-base', 'module', 'other-document', 'later-round'] as const) {
+    const sample = roleExample<Input>('doc-gen');
+    if (mode === 'missing-base' || mode === 'later-round') delete sample.input.payload.baseKnowledgeRef;
+    if (mode === 'empty-base') sample.input.materials.find((item) => item.ref.artifactId === sample.input.payload.baseKnowledgeRef!.artifactId)!.content = '';
+    if (mode === 'module') sample.input.moduleId = 'different';
+    if (mode === 'other-document') sample.input.payload.corrections![0]!.knowledgePath = 'knowledge/different.md';
+    if (mode === 'later-round') { sample.context.iteration = 1; delete sample.input.payload.corrections; }
+    await assert.rejects(execute(sample.input, sample.context), /DOCGEN_(REVISION_BASE_REQUIRED|BASE_DOCUMENT_INVALID|MODULE_INVALID|CORRECTION_DOCUMENT_MISMATCH)/);
+    assert.deepEqual(sample.phases, []);
+  }
+});
+
+test('doc-gen applies section revisions to the selected YAML document and preserves unrelated text', async () => {
+  const sample = roleExample<Input>('doc-gen');
+  const base = '# Document\n\n## Behavior\nOld behavior.\n\n## Stable\n' + 'Unchanged contract. '.repeat(15);
+  const ref = sample.input.payload.baseKnowledgeRef!;
+  sample.input.materials.find((item) => item.ref.artifactId === ref.artifactId)!.content = '---\ntitle: Old\n---\n\n' + base;
+  sample.input.payload.corrections![0]!.knowledgePath = 'knowledge/markdown-diff.md#Behavior';
+  sample.output.body = base.replace('Old behavior.', 'Corrected behavior.');
+  sample.context.model.execute = async () => sample.output;
+  const result = await execute(sample.input, sample.context);
+  assert.deepEqual(result.payload.baseKnowledgeRef, ref);
+  assert.deepEqual(result.payload.appliedCorrectionIds, ['COR-0001']);
+  sample.output.body = sample.output.body.replace('Unchanged contract.', 'Unrequested change.');
+  await assert.rejects(execute(sample.input, sample.context), /REVISION_OUTSIDE_CORRECTIONS/);
+});
+
+test('doc-gen rejects ambiguous sections and ignores code-fenced headings when locating corrections', async () => {
+  const sample = roleExample<Input>('doc-gen');
+  const material = sample.input.materials.find((item) => item.ref.artifactId === sample.input.payload.baseKnowledgeRef!.artifactId)!;
+  sample.input.payload.corrections![0]!.knowledgePath = 'Behavior';
+  material.content = '# Document\n\n```md\n## Behavior\n```\n\n## Behavior\n' + 'Original explanation. '.repeat(15);
+  sample.output.body = String(material.content).replace('Original explanation.', 'Revised explanation.');
+  sample.context.model.execute = async () => sample.output;
+  await execute(sample.input, sample.context);
+  material.content += '\n## Behavior\nDuplicate';
+  await assert.rejects(execute(sample.input, sample.context), /CORRECTION_SECTION_INVALID/);
+});
+
+test('doc-gen returns a proposal without a candidate, then respects an explicit single-document decision', async () => {
+  const sample = roleExample<Input>('doc-gen');
+  const proposal = { splitProposal: { reason: 'Two large independent topics', suggestedDocuments: ['API contract', 'Internal flow'] } };
+  sample.context.model.execute = async () => proposal;
+  const result = await execute(sample.input, sample.context);
+  assert.equal(result.payload.resultKind, 'userDecisionRequired');
+  assert.equal(result.payload.bodyRef, undefined);
+  assert.deepEqual(result.artifacts.map((item) => item.key), ['proposal']);
+  const ref = { ...sample.input.provenance[0]!, artifactId: 'proposal' };
+  sample.input.materials.push({ ref, content: JSON.parse(result.artifacts[0]!.content) });
+  sample.input.payload.documentDecision = { action: 'keep-single', proposalRef: ref };
+  await assert.rejects(execute(sample.input, sample.context), /AGENT_OUTPUT_INVALID/);
+  sample.context.model.execute = async () => sample.output;
+  const accepted = await execute(sample.input, sample.context);
+  assert.equal(accepted.payload.resultKind, 'knowledgeCandidate');
+  const material = sample.input.materials.at(-1)!;
+  (material.content as Record<string, unknown>).moduleId = 'different';
+  await assert.rejects(execute(sample.input, sample.context), /DECISION_PROPOSAL_INVALID/);
+});
+
+test('doc-gen rejects mixed proposal/document output and retains synthesis risks', async () => {
+  const sample = roleExample<Input>('doc-gen');
+  sample.context.model.execute = async () => ({ ...sample.output,
+    splitProposal: { reason: 'Large', suggestedDocuments: ['A', 'B'] } });
+  await assert.rejects(execute(sample.input, sample.context), /AGENT_OUTPUT_INVALID/);
+  sample.output.unresolvedRisks = ['The worker conclusions disagree'];
+  sample.context.model.execute = async () => sample.output;
+  const result = await execute(sample.input, sample.context);
+  assert.deepEqual(result.payload.unresolvedRisks, sample.output.unresolvedRisks);
 });

@@ -52,7 +52,11 @@
   "modelOutput": {
     "body": "# Markdown diff\n\n## Purpose\nCompare two Markdown documents and report changed sections with line ranges.\n\n## Behavior\nIdentical inputs return empty hunks. CRLF is normalized before comparison. Insertions and deletions preserve the old and new line coordinates. The implementation uses bounded processing for large inputs.\n",
     "title": "Markdown diff",
-    "description": "Document comparison semantics"
+    "description": "Document comparison semantics",
+    "keywords": [
+      "Markdown",
+      "diff"
+    ]
   },
   "workerModelOutputs": {
     "worker-1": {
@@ -60,14 +64,42 @@
       "fragment": "Fixture source analysis of src/domain/knowledge/MarkdownDiff.ts; independent evidence for DocGen synthesis.",
       "provenance": [
         "src/domain/knowledge/MarkdownDiff.ts"
-      ]
+      ],
+      "analysisScope": {
+        "moduleId": "markdown-diff",
+        "files": [
+          "src/domain/knowledge/MarkdownDiff.ts"
+        ],
+        "symbols": []
+      },
+      "sourceEvidence": [
+        {
+          "claim": "Fixture source analysis of src/domain/knowledge/MarkdownDiff.ts; independent evidence for DocGen synthesis.",
+          "path": "src/domain/knowledge/MarkdownDiff.ts"
+        }
+      ],
+      "unresolvedQuestions": []
     },
     "worker-2": {
       "workerId": "worker-2",
       "fragment": "Fixture source analysis of src/domain/Domain.ts; independent evidence for DocGen synthesis.",
       "provenance": [
         "src/domain/Domain.ts"
-      ]
+      ],
+      "analysisScope": {
+        "moduleId": "markdown-diff",
+        "files": [
+          "src/domain/Domain.ts"
+        ],
+        "symbols": []
+      },
+      "sourceEvidence": [
+        {
+          "claim": "Fixture source analysis of src/domain/Domain.ts; independent evidence for DocGen synthesis.",
+          "path": "src/domain/Domain.ts"
+        }
+      ],
+      "unresolvedQuestions": []
     }
   }
 }
