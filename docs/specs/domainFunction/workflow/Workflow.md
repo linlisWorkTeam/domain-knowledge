@@ -10,7 +10,11 @@ SPDX-License-Identifier: MIT
 
 ## 输入、阶段和输出
 
+当前阶段不实现外部知识关联，见 [Association IO-23](../association/Association.md)；不为该功能新增节点或阻塞单文档飞轮交付。该延期不影响 IO-22 已确认的文档描述和渐进加载索引。
+
 输入是 Application 解析并固定的项目场景、材料引用、策略和 workerCount（传给 DocGen 的内部任务数量）。AgentDefinitions 显式绑定业务角色与节点；Workflow 给出固定连接及纯路由函数。角色自己的计划输出不驱动动态建图。
+
+[Orchestrator IO-17](../agents/orchestratorAgent/OrchestratorAgent.md) 已确认的目标是根据业务目标、模块概况、项目配置及任务进度，输出本轮模块、承接 Agent 与输入材料的任务计划。该计划的执行接线待实现，实际执行顺序继续由工作流负责；DocGen 自行拆分内部 Worker，测试复用按源代码变化规则处理。
 
 | 阶段 | 规则 | 下游 |
 | --- | --- | --- |
@@ -24,11 +28,27 @@ SPDX-License-Identifier: MIT
 
 `ProjectWorkflowStages` 加载历史知识、纠正意见、质量反馈和可信工件，调用 RoleExecutionService；角色不查询历史数据库。质量拒绝反馈进入下一轮 DocGen，预算用尽停止。评测由独立执行器完成，候选命令不直接成为门禁。
 
+## Check、评测与 Review 的证据传递（已确认，待实现）
+
+[TestGen IO-21](../agents/testGenAgent/TestGenAgent.md) 已确认首次候选测试校验失败的兜底：Application 将失败证据交回 TestGen，有限修复后由执行器重新校验，仍失败则转人工处理；正常校验通过直接固定测试集，不进入修复分支。该流程不改变已校验测试的源码不变则复用规则，具体接线与重试配置待实现。
+
+[DocGen IO-18](../agents/docGenAgent/DocGenAgent.md) 明确每次飞轮以一份知识文档为修订对象，后续轮次在这份文档基础上修改，不将多份 Worker 产出直接作为多文档输入。初次生成时由 DocGen 将 Worker 产出合成一份文档；内容过大而建议拆分时先与用户沟通，以用户意见为准。即使用户同意拆分，每次飞轮仍只选择一份文档。单文档约束针对知识输入范围，不移除 Check 的源代码输入、测试材料或项目配置。相关边界与用户沟通机制待实现及验收；资料保留与清理按 IO-19，达标结束按 IO-20；历史最佳与关键回归回滚已有目标要求，评分可比性和回退实现细节待落实。
+
+2026-09-10 确认的 [IO-15](../agents/checkAgent/CheckAgent.md) 保持现有顺序：Check 与 oracle_validation 均完成后进入 evaluation，正常评测结果再进入 Review。Check 生成比较结果及差异依据，评测执行器生成测试结果；Application 将两类证据交给 Review，用于分析知识卡片的修订位置。差异结果不用于决定测试如何执行，Check 不直接跳到 Review。
+
+当前 evaluate 保存 checkRef 作为依赖，但调用 ProjectEvaluator 时未读取差异明细；最终 recordGateDecision 读取 check.blocking 参与确定性判定。Review 的 Payload 目前只有知识、评测报告和判据，尚未绑定 Check 明细。后续需同时调整 Review 契约、可信材料加载和证据引用；不能把已有节点连接等同于完整证据交接。本次确认不改变 Gate 的现有判定规则。
+
+[Review IO-16](../agents/reviewAgent/ReviewAgent.md) 已确认修订意见列表包含卡片及段落位置、问题说明、代码差异或失败测试依据、修订建议；Application 将意见与原知识卡片交给 DocGen 执行修改。无修订意见时返回空列表，仍按既有确定性 Gate 和路由决定后续流转，不新增 Review 直接修改知识的能力。
+
 ## 运行生命周期
+
+[Evaluation IO-20](../evaluation/Evaluation.md) 已确认文档达到验收标准后立即结束本次飞轮，不再为提高分数追加轮次。沿用既有自动通过路径，结束并交付达标文档；达到最大轮次仍未达标或预算耗尽时停止并转人工治理，不再作为待确认问题。候选结构检查通过不代表飞轮验收通过。后续验收需覆盖达标后不派发新一轮任务。
 
 [FlywheelDomainService](../../../../src/domain/workflow/FlywheelDomainService.ts) 封装创建 Run、状态迁移和生成能力声明，调用 Domain.ts 中的共享实体规则拒绝非法状态变化。Application 决定何时调用并保存结果；本模块不执行模型调用或数据库写入。业务连接与生命周期同属 workflow，LangGraph 引擎接线保留在 Infrastructure。
 
 ## 恢复和可观察性
+
+飞轮结束后的资料处理遵守 [Knowledge IO-19](../knowledge/Knowledge.md)：运行期间保留过程资料，达标后保留最终文档与验收记录；需要人工治理时提供精简问题清单并暂存相关证据，治理完成后再按结果清理。Application 协调材料交接与保留，Agent 不直接删除工件。达标且最终文档及验收记录保存成功后立即清理中间资料，不设额外保留期；清理机制待实现。未完成、失败或中断的运行不能仅凭停止状态套用达标清理规则。
 
 Application 冻结配置，LangGraph 保存执行 checkpoint，Registry 记录业务提交和节点投影。相同 generationKey 的完成结果可重放；同版本失败节点可恢复，旧 roleExecutionVersion 明确拒绝。取消信号传到模型和外部执行，迟到角色结果不能提交。内部 Worker 使用 doc_gen/doc_worker:worker-N 投影与独立 Registry checkpoint；片段复用不依赖外层 LangGraph Worker 节点。DocGen 结果的 workerResultRefs 保留子任务血缘。
 
