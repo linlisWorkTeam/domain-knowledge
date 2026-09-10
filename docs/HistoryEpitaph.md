@@ -136,3 +136,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 - [2026-09-10-1732-workbench-generation.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/89cb273bc87db3f0d035efad88010f198b8bcd14/docs/epitaph/2026-09-10-1732-workbench-generation.md)：接通C/C++多卡片生成、冻结配置、逐卡恢复与索引；当时integration181和Console29通过，未实现重建/评测或真实模型验收。后续阶段能力见当前交接，原证据仍在releases/generation。
 
 - [2026-09-10-1822-native-trusted-tests.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/42f6e74aebc26c3212aa1bf886303a7cf42f53e2/docs/epitaph/2026-09-10-1822-native-trusted-tests.md)：原生候选用例协议与缓存接线，参考门禁拒绝错误候选，详细验证和未完成边界保留于固定提交；最新真实模型结果见1908交接。
+
+- [2026-09-10-1833-workbench-reconstruction.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/ab46aa5a0f51fc4b23b808a662cf1cf5c45f6f58/docs/epitaph/2026-09-10-1833-workbench-reconstruction.md)：接通原生重建、隔离接口比较与恢复，尚未通过真实模型验收；后续真实jsmn结果见1913交接。

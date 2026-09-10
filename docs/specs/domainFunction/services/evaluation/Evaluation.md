@@ -57,3 +57,7 @@ C/C++ 使用版本化 native-cases-v1：有限变量、公开函数调用序列�
 NativeInterfaceComparison 对 native-interface-v1 声明进行确定性比较：忽略函数参数名字与类型多余空白，保留返回类型、参数类型、公开字段/枚举值及类成员。ratio 为匹配的唯一参考声明数除以参考声明总数，空参考不通过；此数值不是行为相似度。输出缺失/变化声明和 method 标识，behaviorVerified=false。当前不计算实现结构或规范化源码相似度，调用方必须将其保留为未解决项。
 
 真实TestGen运行暴露重复的顶层JSON括号错误。原生提示明确oracleRequired先于nativeSuite输出，且结构体/数组沿受信harness默认零初始化，字符串参数直接使用string参数而不声明不支持的指针变量。这是对现有native-cases-v1能力的说明，不放宽Schema、oracle或变量类型规则；恢复仍使用原任务累计用量。
+
+原生 TestGen 的 Schema 按 oracleRequired、nativeSuite 顺序序列化，与提示词保持一致；仅调整字段展示次序，必填与参考验证规则不变。真实第四次仍出现顶层闭合错误，未晋升候选。
+
+候选参考拒绝后的恢复，将同阶段、同模块最近一次拒绝的输入、预期与结构化参考观察作为 rejectedCandidate 提供给 TestGen。只传用例数据，不传参考正文、编译日志或生成实现。该材料明确为未可信，重新提出的候选仍须独立参考验证；已有可信测试及预期不可改写。

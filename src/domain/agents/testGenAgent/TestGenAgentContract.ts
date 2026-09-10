@@ -48,8 +48,8 @@ export const outputSchema: Record<string, unknown> = {
 /** 构造本次角色执行使用的输出 Schema。 */
 export function schemaFor(input: Input): Record<string, unknown> {
   const native = nativeContract(input);
-  if (native) return { type: 'object', additionalProperties: false, required: ['nativeSuite', 'oracleRequired'],
-    properties: { nativeSuite: nativeBehaviorSuiteSchema(native), oracleRequired: { const: true } } };
+  if (native) return { type: 'object', additionalProperties: false, required: ['oracleRequired', 'nativeSuite'],
+    properties: { oracleRequired: { const: true }, nativeSuite: nativeBehaviorSuiteSchema(native) } };
   const policy = input.materials.find(({ ref }) => ref.artifactId === input.payload.testPolicyRef.artifactId)?.content;
   if (policy && typeof policy === 'object' && 'moduleContract' in policy) {
     const contract = policy.moduleContract;

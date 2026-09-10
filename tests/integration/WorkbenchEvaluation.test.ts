@@ -39,6 +39,7 @@ test('native stage rejects bad candidates, resumes trusted cases after restart a
         return { files: [{ path: 'math.h', content: 'int add(int a,int b);' }, { path: 'math.c', content: `#include "math.h"\nint add(int a,int b){return a${wrongCode ? '-' : '+'}b;}` }] }; }
       assert.equal(request.role, 'test-gen'); testCalls++; usage(`test-${testCalls}`, 5);
       assert.match(request.prompt, /card-add#Behavior/);
+      if (testCalls === 2) { assert.match(request.prompt, /NATIVE_BEHAVIOR_MISMATCH/); assert.match(request.prompt, /rejectedCandidate/); }
       return { oracleRequired: true, nativeSuite: { schemaVersion: 'native-cases-v1', cases: [{ caseId: 'sum', description: 'Sum from fixed inputs',
         sections: ['card-add#Behavior'], variables: [], calls: [{ function: 'add', arguments: [{ integer: '3' }, { integer: '4' }], result: 'sum' }],
         observations: [{ name: 'sum', kind: 'integer', read: { variable: 'sum' } }], expected: { sum: wrongCandidate ? '9' : '7' } }] } };

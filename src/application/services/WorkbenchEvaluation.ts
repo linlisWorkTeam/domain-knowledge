@@ -96,7 +96,18 @@ export class WorkbenchEvaluation {
         knowledge.push({ cardId: String(card!.metadata.cardId), versionId: card!.versionId, body,
           sections: markdownSections(body).map((section) => `${card!.metadata.cardId}#${section.heading}`) });
       }
-      const policy = { schemaVersion: 'native-test-policy-v1', nativeContract: contract, knowledge,
+      // 只反馈本阶段、本模块已经拒绝的候选观察；不暴露参考正文或生成实现。
+      const rejection = stages.store.checkpoints(context.task.taskId)
+        .filter((item) => item.key.startsWith(`candidate-rejection:${module.moduleId}:`))
+        .sort((a, b) => Number(a.key.split(':').at(-1)) - Number(b.key.split(':').at(-1))).at(-1);
+      let rejectedCandidate: unknown = null;
+      if (rejection) {
+        const report = await this.load<{ moduleId: string; status: string; cases: Array<{ input: NativeBehaviorSuite['cases'][number]; observation?: { status: string; reasonCode: string | null; actual: unknown; mismatches: string[] } }> }>(rejection.result.artifactRefs[0]!);
+        if (report.moduleId !== module.moduleId || report.status !== 'CANDIDATE_REJECTED') throw new Error('STAGE_ARTIFACT_CORRUPT');
+        rejectedCandidate = { trusted: false, cases: report.cases.map(({ input, observation }) => ({ input,
+          observation: observation ? { status: observation.status, reasonCode: observation.reasonCode, actual: observation.actual, mismatches: observation.mismatches } : null })) };
+      }
+      const policy = { schemaVersion: 'native-test-policy-v1', nativeContract: contract, knowledge, rejectedCandidate,
         sourceVisibility: 'metadata-only', oracleRequired: true, immutableTrustedExpectations: true,
         sectionRule: 'Each case.sections must use exact cardId#H2 identifiers from knowledge.sections.' };
       const testPolicyRef = await artifacts.put(Buffer.from(JSON.stringify(policy)), 'application/json');
