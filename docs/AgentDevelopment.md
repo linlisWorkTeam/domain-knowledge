@@ -86,3 +86,9 @@ npm run agent:run -- --role doc-gen --input src/domain/agents/docGenAgent/exampl
 ```
 
 这是 fixture 组合验证：运行两个内部 Worker，再运行 DocGen 汇总并保存子任务引用，不代表真实模型质量验收。`workerModelOutputs` 按 Worker 身份提供模拟输出；真实 DSH 模式忽略该字段。原汇总样例显式设置 `payload.workerCount=0`。生产默认一个 Worker，最大五个任务，执行器默认最多三个并发；修改并发配置定位 Composition 中的 ConcurrentTasks。
+
+## DocGen 拆分建议与继续单文档任务
+
+DocGen 输出 splitProposal 时，统一入口的终端 JSON 增加 decisionRequired，完整提案保存在 result.json 的 outputs 中；不产生 bodyRef。生产工作流在 candidate_knowledge 展示原因和建议后 STOPPED，用户答复前不会继续生成。
+
+若用户选择继续合成一份，将提案工件内容作为新样例的 `materials.proposal`（application/json），在 payload 传入 `documentDecision: { "action": "keep-single", "proposalRef": { "material": "proposal" } }`。保持 moduleId 与 sourceRefs 对应的源码工件不变；框架校验提案绑定后只接受一份文档。若用户选择拆分，先按用户选定的一份范围准备新任务，每次只处理一份。生产调用方也可在新场景 docGenDecision 传入相同结构，proposalRef 必须已存在于该运行环境的工件库。恢复同一已提交提案不会自动推定用户选择。

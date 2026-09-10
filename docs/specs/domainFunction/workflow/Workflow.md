@@ -60,3 +60,7 @@ Application 冻结配置，LangGraph 保存执行 checkpoint，Registry 记录�
 
 
 文档关系：[设计目录](../../README.md)负责代码与设计定位；[开发指南](../../../Development.md)说明修改和交付步骤。
+
+### DocGen 待决结果接线
+
+DocGen 可返回 userDecisionRequired（拆分原因与建议），candidate_knowledge 将提案引用和内容放入 docGenDecisionRequired，并沿现有 workflow_router → stopped 停止；不创建候选、不进入 code。该结果只用于 IO-18 的文档范围沟通，不改变正常测评、Review、Gate 与发布顺序。用户答复后由调用方准备显式单文档任务。

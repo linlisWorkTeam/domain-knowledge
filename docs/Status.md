@@ -168,3 +168,5 @@ Track four stages here: DDD layout, individual Agent development, end-to-end ver
 - 功能 2：DocGen 必需关键词契约、框架 YAML 头、生产候选同文档入库与版本描述索引已实现；KnowledgeSearchApp 提供显式授权的描述/正文两阶段读取。Node 24 下 typecheck、validate:specs 通过，角色、DSH 受控传输、组合、索引及飞轮 Fixture 回归共 21 项通过；不代表真实供应商业务质量验收。
 
 - 功能 3（DocGen 收尾）：强制绑定本轮单文档修订，拒绝模块/文档错配及缺失旧版；章节纠正保护范围外正文，结果携带基础引用和纠正编号，并保留汇总风险。Node 24 下 typecheck、validate:specs 通过，角色/内部 Worker/两轮飞轮修订定向测试 16 项通过。拆分提案为下一分项，暂定汇总算法继续按 Spec 保留。
+
+- 功能 4：DocGen 拆分建议使用 userDecisionRequired/proposalRef 保存，candidate_knowledge 不创建候选并沿既有 STOPPED 路由停止；独立入口展示原因与建议。显式 keep-single 答复绑定原模块与源码工件，后续任务只接受一份文档。角色与两轮飞轮原有测试 18 项通过，新增待决生产交接/独立入口测试 2 项通过；完整回归正在核对。

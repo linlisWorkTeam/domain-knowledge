@@ -14,6 +14,8 @@ export interface Payload {
   moduleId: string;
   /** 内部 Worker 数量，默认 1；0 表示直接汇总。 */
   workerCount?: number;
+  /** 用户针对已保存提案明确选择继续合成一份；调用方负责收集答复。 */
+  documentDecision?: { action: 'keep-single'; proposalRef: ArtifactRef };
   /** 提供源码引用列表信息，供调用方读取或传入。 */
   sourceRefs: ArtifactRef[];
   /** 提供publicInterface引用列表信息，供调用方读取或传入。 */
@@ -41,6 +43,16 @@ export interface DocWorkerExecutionPort {
 export interface DocGenContext extends ExecutionContext { docWorkers?: DocWorkerExecutionPort }
 /** 角色输出。 */
 export interface Output { body: string; title: string; description: string; keywords: string[]; unresolvedRisks?: string[]; }
+/** 只返回拆分建议，等待用户决定，不同时生成正文。 */
+export interface SplitProposal { splitProposal: { reason: string; suggestedDocuments: string[] } }
+export const splitProposalSchema: Record<string, unknown> = {
+  type: 'object', required: ['splitProposal'], additionalProperties: false,
+  properties: { splitProposal: {
+    type: 'object', required: ['reason', 'suggestedDocuments'], additionalProperties: false,
+    properties: { reason: { type: 'string', pattern: '\\S' },
+      suggestedDocuments: { type: 'array', minItems: 2, uniqueItems: true, items: { type: 'string', pattern: '\\S' } } },
+  } },
+};
 /** 对外提供输出Schema，作为调用方使用的统一约定。 */
 export const outputSchema: Record<string, unknown> = {
   type: 'object', required: ['body', 'title', 'description', 'keywords'], additionalProperties: false,
@@ -53,8 +65,8 @@ export const outputSchema: Record<string, unknown> = {
 };
 
 /** 构造本次角色执行使用的输出 Schema。 */
-export function schemaFor(_input: Input): Record<string, unknown> {
-  return outputSchema;
+export function schemaFor(input: Input): Record<string, unknown> {
+  return input.payload.documentDecision ? outputSchema : { oneOf: [outputSchema, splitProposalSchema] };
 }
 
 /** 检查本角色必需字段及所引用材料是否完整。 */
@@ -64,4 +76,16 @@ export function validateInput(input: Input): void {
   requireMaterials(input.payload, input.materials, ['moduleId', 'sourceRefs', 'publicInterfaceRefs']);
   if (input.moduleId !== input.payload.moduleId || !/^[a-z0-9][a-z0-9_-]{0,127}$/.test(input.moduleId)) throw new Error('DOCGEN_MODULE_INVALID');
   validateRevision(input);
+  const decision = input.payload.documentDecision;
+  if (decision) {
+    const content = input.materials.find((item) => item.ref.artifactId === decision.proposalRef.artifactId)?.content;
+    let proposal: Record<string, unknown>;
+    try { proposal = (typeof content === 'string' ? JSON.parse(content) : content) as Record<string, unknown>; }
+    catch { throw new Error('DOCGEN_DECISION_PROPOSAL_INVALID'); }
+    if (decision.action !== 'keep-single' || !proposal || proposal['moduleId'] !== input.moduleId
+      || JSON.stringify(proposal['sourceArtifactIds']) !== JSON.stringify(input.payload.sourceRefs.map((ref) => ref.artifactId).sort())
+      || typeof proposal['reason'] !== 'string' || !Array.isArray(proposal['suggestedDocuments'])) {
+      throw new Error('DOCGEN_DECISION_PROPOSAL_INVALID');
+    }
+  }
 }

@@ -27,7 +27,7 @@ IO-09 已确认 Worker 输出分析范围、知识正文、源码依据和未解
 
 本节的最小链路只指知识生成内部协作，不代表知识飞轮的相似度检查、测试评测、修订及发布闭环已验收。
 
-## 单文档汇总与飞轮修订范围（已确认，待落实）
+## 单文档汇总与飞轮修订范围（已实现最小链路）
 
 | 编号 | 议题 | 状态 | 记录 |
 | --- | --- | --- | --- |
@@ -37,9 +37,9 @@ DocWorker 的多份产出是 DocGen 的内部汇总材料，不直接作为多�
 
 修订输入是本轮选定的单份知识文档及其纠正材料；DocGen 在该文档基础上定向修改，输出同一文档的修订结果，不自动扩大到其他文档。源代码和测试等材料仍按各角色既定权限提供，“单文档输入”不改变 TestGen 读取源代码或 CodeAgent 的读取边界。
 
-IO-10 的内部汇总算法继续保持暂定；“内容过大”的判断标准、向用户沟通及恢复任务的机制仍待细化。飞轮结束后的版本与过程资料保留已由 [Knowledge IO-19](../../knowledge/Knowledge.md) 确认：运行期间保留，达标后保留最终文档与验收记录，需人工治理时暂存相关证据；达标且最终文档及验收记录保存成功后立即清理中间资料，不设额外保留期；父版本选择的评分及可比性细节仍待细化；达标自动交付、耗尽轮次或预算转人工治理、保留历史最佳及关键回归回滚已有设计，参见 [Evaluation IO-20](../../evaluation/Evaluation.md)，相应实现缺口不等于业务原则未定。
+IO-10 的内部汇总算法继续保持暂定；“内容过大”的自动阈值仍待细化；当前模型可提出建议，调用方展示提案并在用户答复后准备新任务。飞轮结束后的版本与过程资料保留已由 [Knowledge IO-19](../../knowledge/Knowledge.md) 确认：运行期间保留，达标后保留最终文档与验收记录，需人工治理时暂存相关证据；达标且最终文档及验收记录保存成功后立即清理中间资料，不设额外保留期；父版本选择的评分及可比性细节仍待细化；达标自动交付、耗尽轮次或预算转人工治理、保留历史最佳及关键回归回滚已有设计，参见 [Evaluation IO-20](../../evaluation/Evaluation.md)，相应实现缺口不等于业务原则未定。
 
-## 知识索引分工（已确认，待实现）
+## 知识索引分工（已实现）
 
 | 编号 | 议题 | 状态 | 记录 |
 | --- | --- | --- | --- |
@@ -51,7 +51,7 @@ DocGen 在生成或修订单份知识文档时提供与正文一致的标题、�
 
 ## 职责与当前输入输出
 
-结合源码及分块片段生成知识正文，也可根据旧正文和纠正材料定向修订。以下描述当前实现：一次返回一篇正文，与 IO-18 的默认输出范围一致；内容过大时的用户沟通及单文档飞轮边界仍需落实和验收。内部 Worker 组织方式已随 main 实现。
+结合源码及分块片段生成知识正文，也可根据旧正文和纠正材料定向修订。以下描述当前实现：一次返回一篇正文，与 IO-18 的默认输出范围一致；拆分建议通过 userDecisionRequired 交接，生产沿 STOPPED 路由停止；单文档修订由输入与正文范围校验约束。内部 Worker 组织方式已随 main 实现。
 
 | 边界 | 当前实现 |
 | --- | --- |
@@ -59,7 +59,7 @@ DocGen 在生成或修订单份知识文档时提供与正文一致的标题、�
 | 内部执行参数 | `workerCount` 默认 1，允许 0～5；通过 DocGenContext.docWorkers 执行内部批次，非法数量在调用模型前失败 |
 | 可选修订材料 | Worker 片段 `workerFragmentRefs`、上一版 `baseKnowledgeRef`、纠正意见 `corrections`、质量反馈 `qualityFeedback` |
 | 模型输出 | `body`、`title`、`description`、`keywords`；正文至少 200 字符，描述与关键词禁止纯空白 |
-| 交接输出 | `resultKind: knowledgeCandidate`，Markdown 正文工件 `bodyRef`、来源 `provenance`、变更路径、内部子任务 `workerResultRefs` 与未解决风险 |
+| 交接输出 | `resultKind: knowledgeCandidate`，Markdown 正文工件 `bodyRef`、来源 `provenance`、变更路径、内部子任务 `workerResultRefs` 与未解决风险；修订携带 baseKnowledgeRef、appliedCorrectionIds；待决分支返回 userDecisionRequired 与 proposalRef |
 | 权限与限制 | 修订所需旧正文和纠正材料必须由 Application 显式提供；角色声明待保存工件，Application 保存并回填引用，角色不直接发布 |
 
 ## 内部 Worker 调用与复用（当前实现）
@@ -74,7 +74,7 @@ Worker 的提交键绑定 Run、内部任务身份、源码输入和冻结提示
 
 ## 待确认与验收重点
 
-对应 S2-03：按 IO-18 验证 Worker 产出默认合成一份文档、建议拆分时先征求用户意见、每次飞轮只修订输入的单份文档；继续细化内容结构、标识与路径、来源、旧版与纠正输入、质量反馈及定向修订规则。[Review IO-16](../reviewAgent/ReviewAgent.md) 已确认由 Review 提供修订位置、问题说明、依据和建议，DocGen 执行知识文档修改；具体修订输入契约及处理机制待落实。正文长度检查只证明结构下限，不证明业务质量。
+对应 S2-03：按 IO-18 验证 Worker 产出默认合成一份文档、建议拆分时先征求用户意见、每次飞轮只修订输入的单份文档；继续细化内容结构、标识与路径、来源、旧版与纠正输入、质量反馈及定向修订规则。[Review IO-16](../reviewAgent/ReviewAgent.md) 已确认由 Review 提供修订位置、问题说明、依据和建议，DocGen 执行知识文档修改；DocGen 已按既有 Correction 的 knowledgePath/criterion/risk/evidenceRefs 消费定位、建议、问题与依据；Review 自身的 IO-16 输出升级仍由其角色负责。正文长度检查只证明结构下限，不证明业务质量。
 
 固定源码样例为 [DocGenFixedSourceSample.json](../../../../../src/domain/agents/docGenAgent/examples/DocGenFixedSourceSample.json)，包含原始源码、公开接口和追加指令；[样例检查器](../../../../../src/domain/agents/docGenAgent/examples/DocGenReference.ts) 与 [样例测试](../../../../../src/domain/agents/docGenAgent/DocGenExample.test.ts) 由本角色目录维护。统一 agent:run 负责执行和提交，固定参考测试不作为生产角色阶段；操作方法见 [AgentDevelopment](../../../../AgentDevelopment.md)。
 

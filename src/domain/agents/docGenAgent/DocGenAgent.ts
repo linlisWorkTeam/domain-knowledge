@@ -7,11 +7,11 @@ import { validateRevisionOutput } from './DocGenRevision.ts';
 import { renderKnowledgeDocument } from '../../knowledge/KnowledgeDocument.ts';
 import type { RoleResult, PendingArtifact } from '../AgentExecution.ts';
 import { assertActive, pending } from '../AgentExecution.ts';
-import { type Input, type Output, type DocGenContext, type DocWorkerTask, schemaFor, validateInput } from './DocGenAgentContract.ts';
+import { type Input, type Output, type SplitProposal, type DocGenContext, type DocWorkerTask, schemaFor, validateInput } from './DocGenAgentContract.ts';
 import { definition, buildPrompt, readablePaths } from './DocGenAgentPrompt.ts';
 
 /** 结合源码、分块片段以及已有修订材料生成正文；正文的质量与发布资格由后续服务判断。 */
-export async function execute(input: Input, context: DocGenContext): Promise<RoleResult<Output>> {
+export async function execute(input: Input, context: DocGenContext): Promise<RoleResult<Output | SplitProposal>> {
   assertActive(context.signal);
   // 缺失材料应在调用模型之前失败，避免模型用猜测填补业务证据。
   validateInput(input);
@@ -44,6 +44,15 @@ export async function execute(input: Input, context: DocGenContext): Promise<Rol
   // 模型返回后仍需检查取消状态，迟到结果不能被当作成功输出。
   assertActive(context.signal);
   context.model.assertOutput(raw, schema);
+  if ('splitProposal' in raw) {
+    const output = raw as unknown as SplitProposal;
+    const proposal = { moduleId: input.moduleId,
+      sourceArtifactIds: input.payload.sourceRefs.map((ref) => ref.artifactId).sort(), ...output.splitProposal };
+    return { output, payload: { resultKind: 'userDecisionRequired', proposalRef: pending('proposal'),
+      reason: proposal.reason, suggestedDocuments: proposal.suggestedDocuments, provenance: input.provenance,
+      ...(ordered.length ? { workerResultRefs: ordered.map((item) => item.resultRef) } : {}) },
+      artifacts: [{ key: 'proposal', content: JSON.stringify(proposal, null, 2), mediaType: 'application/json' }] };
+  }
   const output = raw as unknown as Output;
   validateRevisionOutput(input, output.body);
   const artifacts: PendingArtifact[] = [];

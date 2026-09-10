@@ -136,3 +136,34 @@ test('doc-gen rejects ambiguous sections and ignores code-fenced headings when l
   material.content += '\n## Behavior\nDuplicate';
   await assert.rejects(execute(sample.input, sample.context), /CORRECTION_SECTION_INVALID/);
 });
+
+test('doc-gen returns a proposal without a candidate, then respects an explicit single-document decision', async () => {
+  const sample = roleExample<Input>('doc-gen');
+  const proposal = { splitProposal: { reason: 'Two large independent topics', suggestedDocuments: ['API contract', 'Internal flow'] } };
+  sample.context.model.execute = async () => proposal;
+  const result = await execute(sample.input, sample.context);
+  assert.equal(result.payload.resultKind, 'userDecisionRequired');
+  assert.equal(result.payload.bodyRef, undefined);
+  assert.deepEqual(result.artifacts.map((item) => item.key), ['proposal']);
+  const ref = { ...sample.input.provenance[0]!, artifactId: 'proposal' };
+  sample.input.materials.push({ ref, content: JSON.parse(result.artifacts[0]!.content) });
+  sample.input.payload.documentDecision = { action: 'keep-single', proposalRef: ref };
+  await assert.rejects(execute(sample.input, sample.context), /AGENT_OUTPUT_INVALID/);
+  sample.context.model.execute = async () => sample.output;
+  const accepted = await execute(sample.input, sample.context);
+  assert.equal(accepted.payload.resultKind, 'knowledgeCandidate');
+  const material = sample.input.materials.at(-1)!;
+  (material.content as Record<string, unknown>).moduleId = 'different';
+  await assert.rejects(execute(sample.input, sample.context), /DECISION_PROPOSAL_INVALID/);
+});
+
+test('doc-gen rejects mixed proposal/document output and retains synthesis risks', async () => {
+  const sample = roleExample<Input>('doc-gen');
+  sample.context.model.execute = async () => ({ ...sample.output,
+    splitProposal: { reason: 'Large', suggestedDocuments: ['A', 'B'] } });
+  await assert.rejects(execute(sample.input, sample.context), /AGENT_OUTPUT_INVALID/);
+  sample.output.unresolvedRisks = ['The worker conclusions disagree'];
+  sample.context.model.execute = async () => sample.output;
+  const result = await execute(sample.input, sample.context);
+  assert.deepEqual(result.payload.unresolvedRisks, sample.output.unresolvedRisks);
+});
