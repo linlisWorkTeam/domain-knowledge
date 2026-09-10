@@ -172,3 +172,15 @@ test('committed node output lookup refuses cross-run and uncommitted scenario ch
     assert.throws(() => composition.service.getCommittedNodeOutputs({ ...input, nodeId: 'another-node' }), /scope mismatch/);
   } finally { composition.dispose(); }
 });
+
+
+test('orchestrator plans cannot promote the internal DocWorker to an outer role', () => {
+  const contracts = new JsonSchemaAgentContractValidator(join(process.cwd(), 'docs', 'specs', 'schemas'));
+  const result: AgentResult = { schemaVersion: '1.0', commandId: 'plan', commandRef: artifactRef,
+    runId: 'run', agentType: 'orchestrator', status: 'SUCCEEDED', outputRefs: [], payload: {
+      resultKind: 'plan', nodes: [{ nodeId: 'doc_worker', agentType: 'doc-worker', dependsOn: [],
+        generationKey: 'invalid-outer-worker', inputSchema: 'https://example.com/input',
+        outputSchema: 'https://example.com/output', resourceClaims: ['source:read'], artifactExpectations: ['knowledge-chunk'] }],
+    } };
+  assert.throws(() => contracts.assertResult(result), /AGENT_RESULT_INVALID/);
+});

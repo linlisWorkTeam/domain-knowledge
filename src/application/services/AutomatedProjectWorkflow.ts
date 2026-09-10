@@ -7,6 +7,8 @@ import type { Output as DocumentOutput } from '../../domain/agents/docGenAgent/D
 import type { Output as CodeOutput } from '../../domain/agents/codeAgent/CodeAgentContract.ts';
 import type { Output as CheckOutput } from '../../domain/agents/checkAgent/CheckAgentContract.ts';
 import type { Output as ReviewOutput } from '../../domain/agents/reviewAgent/ReviewAgentContract.ts';
+import { DocWorkerExecutionService } from './DocWorkerExecution.ts';
+import type { Input as DocGenInput } from '../../domain/agents/docGenAgent/DocGenAgentContract.ts';
 import { RoleExecutionService } from './RoleExecution.ts';
 import type { ModelExecutionPort } from '../../domain/agents/AgentExecution.ts';
 import type {
@@ -66,7 +68,8 @@ export function assertAgentResultBinding(
 
 /** 应用接线：解析工作流上下文、加载历史证据，再交给角色及统一提交服务。 */
 export class ProjectWorkflowStages implements WorkflowStageExecutor {
-  /** 提供flywheel信息，供调用方读取或传入。 */
+  /** 内部 Worker 的冻结配置、观察器及技术任务执行器。 */
+  readonly workerRuntime?: Pick<DocWorkerExecutionService['dependencies'], 'prompts' | 'observer' | 'tasks'>;
   readonly flywheel: KnowledgeFlywheelService;
   /** 提供evalRunner信息，供调用方读取或传入。 */
   readonly evalRunner: EvalRunnerUseCase;
@@ -85,6 +88,7 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
 
   /** 注入协作依赖并初始化实例状态。 */
   constructor(input: {
+    workerRuntime?: ProjectWorkflowStages['workerRuntime'];
     flywheel: KnowledgeFlywheelService;
     evalRunner: EvalRunnerUseCase;
     evaluator: ProjectEvaluator;
@@ -94,6 +98,7 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
     agent?: AgentProvider;
     agentResolver?: (runId: string) => AgentProvider | undefined;
   }) {
+    this.workerRuntime = input.workerRuntime;
     this.flywheel = input.flywheel;
     this.evalRunner = input.evalRunner;
     this.evaluator = input.evaluator;
@@ -110,7 +115,6 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
     if (!scenario || scenario.schemaVersion !== '1.0') throw new Error('WORKFLOW_SCENARIO_INVALID');
     switch (input.nodeId) {
       case 'orchestrator': return this.orchestrate(input, scenario);
-      case 'doc_worker':
       case 'doc_gen':
       case 'test_gen':
       case 'code':
@@ -201,13 +205,20 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
       inputRefs: this.agentInputRefs(input, agentId),
       input: {
         payload: command.payload, materials,
-        sourcePaths: agentId === 'doc-worker' ? this.assignedSourcePaths(input, scenario) : scenario.sourcePaths,
+        sourcePaths: scenario.sourcePaths,
         publicInterfacePaths: scenario.publicInterfacePaths,
         provenance: [input.context.scenarioRef as ArtifactRef, snapshot.manifestRef], moduleId: scenario.moduleId,
       },
       context: {
         model: this.modelFactory({ provider: this.agentForRun(input.runId), command, stage: input, scenario }),
         command, effectivePrompt: input.prompt, iteration: input.iteration, signal: input.signal,
+        ...(agentId === 'doc-gen' && this.workerRuntime ? { docWorkers: new DocWorkerExecutionService({
+          ...this.workerRuntime, stage: input, flywheel: this.flywheel, contracts: this.contracts, nodeByAgent: this.nodeByAgent,
+          parent: { payload: command.payload as unknown as DocGenInput['payload'], materials,
+            sourcePaths: scenario.sourcePaths, publicInterfacePaths: scenario.publicInterfacePaths,
+            provenance: [input.context.scenarioRef as ArtifactRef, snapshot.manifestRef], moduleId: scenario.moduleId },
+          model: (command, stage) => this.modelFactory({ provider: this.agentForRun(input.runId), command, stage, scenario }),
+        }) } : {}),
       },
     });
   }
@@ -497,60 +508,41 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
         Buffer.from(JSON.stringify(gatePolicy, null, 2)), 'application/json',
       );
       payload = { policyRef, moduleRefs: [scenarioRef, snapshot.manifestRef] };
-    } else if (agentId === 'doc-gen' || agentId === 'doc-worker') {
+    } else if (agentId === 'doc-gen') {
       payload = {
         moduleId: scenario.moduleId,
+        workerCount: input.workerCount,
         sourceRefs: [snapshot.manifestRef],
         publicInterfaceRefs,
       };
-      if (agentId === 'doc-worker') {
-        const assignedSourcePaths = this.assignedSourcePaths(input, scenario);
-        if (assignedSourcePaths.length > 0) payload.assignedSourcePaths = assignedSourcePaths;
-      } else {
-        const workerFragmentRefs: ArtifactRef[] = [];
-        for (const [key, value] of Object.entries(input.context)) {
-          if (!key.startsWith(`doc_worker:${input.iteration}:`)
-            || !value || typeof value !== 'object' || !('artifactId' in value)) continue;
-          const workerId = key.split(':')[2];
-          const workerResult = await this.readAgentResult(
-            value as ArtifactRef,
-            'doc-worker',
+      if (input.iteration > 0) {
+        const previousResultRef = input.context[contextKey('doc_gen', input.iteration - 1)] as ArtifactRef | undefined;
+        if (previousResultRef) {
+          const previousResult = await this.readAgentResult(
+            previousResultRef,
+            'doc-gen',
             input.runId,
-            this.expectedAgentGenerationKey(input, 'doc-worker', input.iteration, workerId),
+            this.expectedAgentGenerationKey(input, 'doc-gen', input.iteration - 1),
           );
-          const chunkRef = workerResult.payload['chunkRef'] as ArtifactRef | undefined;
-          if (chunkRef) workerFragmentRefs.push(chunkRef);
+          const baseKnowledgeRef = previousResult.payload['bodyRef'] as ArtifactRef | undefined;
+          if (baseKnowledgeRef) payload.baseKnowledgeRef = baseKnowledgeRef;
         }
-        if (workerFragmentRefs.length > 0) payload.workerFragmentRefs = this.uniqueRefs(workerFragmentRefs);
-        if (input.iteration > 0) {
-          const previousResultRef = input.context[contextKey('doc_gen', input.iteration - 1)] as ArtifactRef | undefined;
-          if (previousResultRef) {
-            const previousResult = await this.readAgentResult(
-              previousResultRef,
-              'doc-gen',
-              input.runId,
-              this.expectedAgentGenerationKey(input, 'doc-gen', input.iteration - 1),
-            );
-            const baseKnowledgeRef = previousResult.payload['bodyRef'] as ArtifactRef | undefined;
-            if (baseKnowledgeRef) payload.baseKnowledgeRef = baseKnowledgeRef;
-          }
-          const previousReviewRef = input.context[contextKey('review', input.iteration - 1)] as ArtifactRef | undefined;
-          if (previousReviewRef) {
-            const previousReview = await this.readAgentResult(
-              previousReviewRef,
-              'review',
-              input.runId,
-              this.expectedAgentGenerationKey(input, 'review', input.iteration - 1),
-            );
-            const corrections = previousReview.payload['corrections'];
-            if (Array.isArray(corrections) && corrections.length > 0) payload.corrections = corrections;
-          }
-          const quality = input.context[contextKey('qualityReport', input.iteration - 1)] as QualityReport | undefined;
-          if (quality) {
-            payload.qualityFeedback = {
-              score: quality.score, signals: quality.signals, weakPoints: quality.weakPoints,
-            };
-          }
+        const previousReviewRef = input.context[contextKey('review', input.iteration - 1)] as ArtifactRef | undefined;
+        if (previousReviewRef) {
+          const previousReview = await this.readAgentResult(
+            previousReviewRef,
+            'review',
+            input.runId,
+            this.expectedAgentGenerationKey(input, 'review', input.iteration - 1),
+          );
+          const corrections = previousReview.payload['corrections'];
+          if (Array.isArray(corrections) && corrections.length > 0) payload.corrections = corrections;
+        }
+        const quality = input.context[contextKey('qualityReport', input.iteration - 1)] as QualityReport | undefined;
+        if (quality) {
+          payload.qualityFeedback = {
+            score: quality.score, signals: quality.signals, weakPoints: quality.weakPoints,
+          };
         }
       }
     } else if (agentId === 'test-gen') {
@@ -620,21 +612,8 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
     return tool === 'cargo' ? 'rust' : 'typescript';
   }
 
-  private assignedSourcePaths(
-    input: WorkflowStageInput,
-    scenario: AutomatedProjectScenario,
-  ): string[] {
-    const workerIndex = input.workerIndex ?? 0;
-    return scenario.sourcePaths.filter((_, index) =>
-      index % Math.max(1, input.workerCount) === workerIndex,
-    );
-  }
-
   private agentGenerationKey(input: WorkflowStageInput, agentId: AgentId): string {
     if (agentId === 'test-gen') return `${input.runId}:test_gen:stable-source:contract-v5`;
-    if (agentId === 'doc-worker') {
-      return `${input.runId}:doc_worker:${input.workerId ?? 'main'}:stable-source:contract-v5`;
-    }
     return `${input.runId}:${input.nodeId}:${input.iteration}:${input.workerId ?? 'main'}:contract-v5`;
   }
 
@@ -642,7 +621,6 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
     const keys: string[] = [];
     if (agentId !== 'orchestrator') keys.push('scenarioRef', 'snapshot.manifestRef');
     if (agentId === 'doc-gen') {
-      keys.push(...Object.keys(input.context).filter((key) => key.startsWith(`doc_worker:${input.iteration}:`)));
       if (input.iteration > 0) keys.push(
         contextKey('doc_gen', input.iteration - 1),
         contextKey('review', input.iteration - 1),

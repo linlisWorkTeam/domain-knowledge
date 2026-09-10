@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：验证AutomatedLanggraphFlow的行为、约束及失败场景。
  */
+import { ConcurrentTasks } from '../../src/infrastructure/agentAdapters/ConcurrentTasks.ts';
 import { NODE_BY_AGENT } from '../../src/domain/services/workflow/AgentDefinitions.ts';
 import { FixtureProjectWorkflowStages, type FixtureProjectScenario } from '../../src/infrastructure/agentAdapters/scenario/ProjectWorkflowFixture.ts';
 import assert from 'node:assert/strict';
@@ -61,6 +62,7 @@ test('generated result matches contract', () => assert.equal(calculate(), expect
   try {
     composition.agents.updatePromptAddon('doc-gen', '先写清行为边界。');
     const executor = new FixtureProjectWorkflowStages({
+      workerRuntime: { prompts: composition.runConfiguration, observer: composition.workflowObserver, tasks: new ConcurrentTasks() },
       nodeByAgent: NODE_BY_AGENT,
       flywheel: composition.apps.flywheel,
       evalRunner: composition.apps.evalRunner,
@@ -128,7 +130,6 @@ test('generated result matches contract', () => assert.equal(calculate(), expect
     assert.equal(composition.repository.listEvents(handle.runId).at(-1)?.eventType, 'WorkflowNodeStateChanged');
     const resultCheckpoints = [
       [`${handle.runId}:orchestrator:1:main:contract-v5`, 'orchestrator'],
-      [`${handle.runId}:doc_worker:worker-1:stable-source:contract-v5`, 'doc-worker'],
       [`${handle.runId}:doc_gen:1:main:contract-v5`, 'doc-gen'],
       [`${handle.runId}:test_gen:stable-source:contract-v5`, 'test-gen'],
       [`${handle.runId}:code:1:main:contract-v5`, 'code'],
@@ -146,6 +147,15 @@ test('generated result matches contract', () => assert.equal(calculate(), expect
       assert.equal(envelope.agentType, agentType);
       assert.equal(envelope.status, 'SUCCEEDED');
     }
+    const docRef = composition.repository.getCheckpoint(`${handle.runId}:doc_gen:1:main:contract-v5`)!.outputRefs[0]!;
+    const docResult = JSON.parse(Buffer.from(await composition.artifacts.get(docRef)).toString('utf8'));
+    assert.equal(docResult.payload.workerResultRefs.length, 1);
+    const workerResult = JSON.parse(Buffer.from(await composition.artifacts.get(docResult.payload.workerResultRefs[0])).toString('utf8'));
+    assert.equal(workerResult.agentType, 'doc-worker');
+    const firstDocRef = composition.repository.getCheckpoint(`${handle.runId}:doc_gen:0:main:contract-v5`)!.outputRefs[0]!;
+    const firstDocResult = JSON.parse(Buffer.from(await composition.artifacts.get(firstDocRef)).toString('utf8'));
+    assert.deepEqual(docResult.payload.workerResultRefs, firstDocResult.payload.workerResultRefs, 'revision reuses committed source fragments');
+    assert.ok(projections.some((projection) => projection.nodeId === 'doc_gen/doc_worker:worker-1'));
     const versions = composition.service.listKnowledgeVersions();
     const moduleVersions = versions.filter((version) => version.moduleId === scenario.moduleId);
     assert.equal(moduleVersions.length, 2);

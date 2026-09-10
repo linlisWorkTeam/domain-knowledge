@@ -28,10 +28,9 @@ export async function execute(input: Input, context: ExecutionContext): Promise<
   context.model.assertOutput(raw, schema);
   const output = raw as unknown as Output;
   const artifacts: PendingArtifact[] = [];
-  // 保持迁移前的固定业务计划；符号化节点由接线层绑定，不在领域层写死图节点名称。
+  // 固定外层业务计划，DocWorker 由 DocGen 内部调度；符号化节点由接线层绑定，不在领域层写死图节点名称。
   const nodes: Array<[AgentId, AgentId[], string[], string[]]> = [
-    ['doc-worker', [], ['source:read'], ['knowledge-chunk']],
-    ['doc-gen', ['doc-worker'], ['source:read', 'cas:write'], ['knowledge-candidate']],
+    ['doc-gen', [], ['source:read', 'cas:write'], ['knowledge-candidate']],
     ['test-gen', [], ['source:read', 'cas:write'], ['test-candidates']],
     ['code', ['doc-gen'], ['workspace:write', 'cas:write'], ['code-artifact']],
     ['check', ['code'], ['workspace:read'], ['findings']],

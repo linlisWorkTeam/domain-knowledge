@@ -3,9 +3,9 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：定义文档分块角色的输入输出契约、输出 Schema 与材料校验。
  */
-import type { ArtifactRef } from '../../Domain.ts';
-import type { RoleInput } from '../AgentExecution.ts';
-import { requireMaterials } from '../AgentExecution.ts';
+import type { ArtifactRef } from '../../../../Domain.ts';
+import type { RoleInput } from '../../../AgentExecution.ts';
+import { requireMaterials } from '../../../AgentExecution.ts';
 
 /** 角色业务载荷。 */
 export interface Payload {

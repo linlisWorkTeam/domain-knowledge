@@ -9,8 +9,8 @@ SPDX-License-Identifier: MIT
 
 | 范围 | 当前事实 | 未完成或未验证部分 |
 | --- | --- | --- |
-| 七角色结构 | Domain 独立目录、专属契约、显式注册和公共提交链已实现；固定 DocGen 示例已合入角色样例 | 结构迁移不等于七角色真实效果验收 |
-| 跨角色流程 | Domain 定义业务连接，LangGraph 负责执行与 checkpoint | 不开放动态拓扑编辑 |
+| Agent 结构 | 六个外层 Agent；DocWorker 位于 DocGen/subAgents，保留独立执行身份、契约、提示词与提交记录；DocGen 组织源码拆分与汇总 | 本次结构与流程回归不代表真实模型生成质量验收 |
+| 跨角色流程 | Domain 定义业务连接，LangGraph 只调度外层角色；DocGen 内部 Worker 使用独立 Registry 提交与有界并发 | 旧 roleExecutionVersion 拒绝恢复；不开放动态拓扑编辑 |
 | 模型接入 | DSH 原生 SDK、受控 Fixture、OpenCode Go 环境配置已实现 | 公司 CLI 真实协议未验收 |
 | 评测与发布 | 可信场景执行、确定性 Gate、幂等发布和审计已实现 | TestGen 候选 oracle 晋升、C++ 插件和敌对代码沙箱未实现 |
 | 查询与关联 | 现有查询、血缘、Diff、来源和关联领域能力 | SearchAgent 直接检索链仍为 Planned |
@@ -19,6 +19,8 @@ SPDX-License-Identifier: MIT
 
 ## 本次验证口径
 
-本轮按用户要求不重新运行测试。只进行类型、路径、文档结构、Schema 字节一致性与 diff 静态检查。初版七角色提交曾通过 219 项测试和 14 项 Console 测试；结果属于该历史提交，不能作为当前文档及目录变更后的测试结论。
+2026-09-10，feat/knowledge-generation-agent 基于 main@96d277b 完成 DocGen 内部 Worker 重构。Node 24.13.0 下 typecheck、validate:specs、git diff --check 通过；定向验证 35 项通过。全量 npm test 为 229 项，227 通过、2 失败。
 
-DSH 单 DocGen 范例的历史 live 验证见历史汇总；本轮没有真实模型调用。后续按 PR 审查意见确定回归范围，不自动展开未实现能力。
+两项失败均已在未修改的 96d277b 独立源码快照中复现：Site 发布资产测试仍要求小写文件名，但资产为 ConsoleDev007Dev008.gif；主题测试要求 UiuxDesign.md 包含 #080b10 等颜色值，现有文档缺失。它们不是本次重构引入的问题，本分支未修改站点资源、主题规范或对应测试。
+
+新增 DocGenWithWorkersSample CLI 组合样例通过：fixture 模式下两个 Worker 提交片段后 DocGen 汇总成功，publication=NOT_EVALUATED。本轮未调用真实模型、未做浏览器验收。验证细节与后续边界见 [本次交接](epitaph/2026-09-10-1046-docgen-internal-workers.md)。

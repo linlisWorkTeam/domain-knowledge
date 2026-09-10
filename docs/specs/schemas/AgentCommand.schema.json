@@ -67,6 +67,7 @@
         "sourceRefs": {"$ref": "#/$defs/artifactRefArray"},
         "publicInterfaceRefs": {"$ref": "#/$defs/artifactRefArray"},
         "baseKnowledgeRef": {"$ref": "#/$defs/artifactRef"},
+        "workerCount": {"type": "integer", "minimum": 0, "maximum": 5},
         "workerFragmentRefs": {"$ref": "#/$defs/artifactRefArray"},
         "qualityFeedback": {
           "type": "object",

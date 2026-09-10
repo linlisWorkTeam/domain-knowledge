@@ -3,14 +3,22 @@ Copyright (c) 2026 linlisWorkTeam
 SPDX-License-Identifier: MIT
 文件功能：七角色执行设计。
 -->
-# 七角色执行设计
+# Agent 与内部 subAgent 执行设计
 
 代码位置：[src/domain/agents/AgentRegistry.ts](../../../../src/domain/agents/AgentRegistry.ts)、[src/domain/agents/AgentExecution.ts](../../../../src/domain/agents/AgentExecution.ts)、[src/domain/agents/AgentContracts.ts](../../../../src/domain/agents/AgentContracts.ts)。
 
 
+## DocGen 与 DocWorker 的归属
+
+DocGen 是外层知识生成 Agent，docWorkerAgent 位于 docGenAgent/subAgents/ 下，作为其内部源码分析 subAgent。外层 LangGraph 只调度 DocGen，不再调度 DocWorker；执行身份仍保留七种，供提示词配置、审计和独立开发使用。
+
+DocGen 按源码路径均匀拆分任务，默认一个 Worker，最多五个；重复路径去重，不派发空任务，workerCount=0 时直接汇总。执行端负责有界并发、取消、冻结提示词、独立模型会话和工件提交。全部 Worker 成功后 DocGen 才汇总正文；失败不能产生部分候选。DocGen 结果保存 workerResultRefs，追溯每个子任务的命令、输出与片段。候选知识入库、质量检查、评测与发布仍由 Application 协调。
+
+Worker 的提交键绑定 Run、内部任务身份、源码输入和冻结提示词；同一输入在正文修订和恢复时复用已提交片段。调整执行版本拒绝旧 Run 恢复，不提供新旧拓扑兼容分支。
+
 ## 共同协议
 
-每个 XxxAgent 目录有入口、Contract、Prompt、测试和显式样例。`execute(input, context)` 的 input 使用角色专属 Payload 与已加载材料；context 注入模型 Port、promptAddon 与取消信号。入口依次检查取消和材料、构建 Prompt / Schema、调用一次模型、再次检查取消、校验输出、返回 output / payload / artifacts。格式及网络重试由 Adapter 负责，本轮角色不新增业务修订循环。
+每个 XxxAgent 目录有入口、Contract、Prompt、测试和显式样例；DocWorker 目录嵌套在 DocGen 内。`execute(input, context)` 的 input 使用角色专属 Payload 与已加载材料；context 注入模型 Port、promptAddon 与取消信号。入口依次检查取消和材料、构建 Prompt / Schema、调用一次模型、再次检查取消、校验输出、返回 output / payload / artifacts。格式及网络重试由 Adapter 负责，DocGen 在汇总模型调用前先完成内部 Worker 批次；其他角色仍为一次业务调用。
 
 `RoleResult` 中 pending 引用由 Application 保存正文后绑定，Domain 不操作 CAS 路径或信封事务。材料的可见范围由角色 Prompt 定义与载荷引用共同限制，不能把完整工作流上下文交给所有角色。
 
@@ -18,8 +26,8 @@ SPDX-License-Identifier: MIT
 
 | 目录 / 角色 | 输入材料 | 返回结果与约束 |
 | --- | --- | --- |
-| orchestratorAgent / orchestrator | 策略、模块材料 | 校验模型输出后生成固定六类任务计划；计划不改变跨角色连接 |
-| docWorkerAgent / doc-worker | 模块源码、公开接口、分块身份 | 文档片段和来源引用，交 DocGen 汇总 |
+| orchestratorAgent / orchestrator | 策略、模块材料 | 校验模型输出后生成固定五类外层任务计划；计划不改变跨角色连接 |
+| docGenAgent/subAgents/docWorkerAgent / doc-worker | 模块源码、公开接口、分块身份 | 文档片段和来源引用，交 DocGen 汇总 |
 | docGenAgent / doc-gen | 源码、接口；可选片段、上一版、corrections、质量反馈 | body、title、description；正文至少 200 字符，待保存知识正文及来源 |
 | testGenAgent / test-gen | 固定源码、接口、语言、测试策略 | 测试候选与 oracle 声明；不接收候选知识，候选命令当前不进入门禁 |
 | codeAgent / code | 知识、接口、构建契约、允许生成路径 | files；动态 Schema 限定白名单，语义校验拒绝重复路径，不读取参考源码和门禁测试 |

@@ -5,6 +5,9 @@ SPDX-License-Identifier: MIT
 -->
 # 项目架构与 Spec 驱动开发报告
 
+> 本文为 main@96d277b 的架构快照。后续 DocWorker 已调整为 DocGen 内部 subAgent；当前调用关系以 [Agent 设计](../specs/domainFunction/agents/Agents.md) 与 [工作流设计](../specs/domainFunction/services/workflow/Workflow.md) 为准。
+
+
 报告日期：2026-09-08。核对基线：[`a1453e066602c76ccfea9a875f39ca1ce265e495`](https://github.com/linlisWorkTeam/domain-knowledge/tree/a1453e066602c76ccfea9a875f39ca1ce265e495)。
 
 本报告先整理目录与 DDD 结构，再依次补充框架功能、Spec 开发模式、AI 实施方法和 Agent 编排。它是本次代码快照的阅读报告；后续行为约定以 [Spec 目录](../specs/README.md)为准，操作以[开发指南](../Development.md)和 [Agent 开发指南](../AgentDevelopment.md)为准。

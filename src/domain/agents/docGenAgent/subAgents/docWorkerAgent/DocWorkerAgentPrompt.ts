@@ -3,13 +3,13 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：维护文档分块角色的基础指令、职责和可读材料范围。
  */
-import { materialsFor } from '../AgentExecution.ts';
+import { materialsFor } from '../../../AgentExecution.ts';
 import type { Input } from './DocWorkerAgentContract.ts';
-import type { ExecutionContext } from '../AgentExecution.ts';
+import type { ExecutionContext } from '../../../AgentExecution.ts';
 
 /** 对外提供definition，作为调用方使用的统一约定。 */
 export const definition = {
-    agentId: 'doc-worker', displayName: '文档分块智能体',
+    agentId: 'doc-worker', parentAgentId: 'doc-gen', displayName: '文档分块智能体',
     responsibility: '按固定分块任务并行提取知识片段，不能发布或决定门禁。',
     basePrompt: '从可见的源码证据中提取指定知识片段，并保留来源记录。',
     inputContract: ['源码分块', '公开接口'],

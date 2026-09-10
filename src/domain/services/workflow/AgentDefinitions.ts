@@ -9,6 +9,8 @@ import type { AgentId } from '../../agents/AgentContracts.ts';
 export interface AgentDefinition {
   /** 提供角色标识信息，供调用方读取或传入。 */
   agentId: AgentId;
+  /** 内部角色的业务所有者；未设置时为外层角色。 */
+  parentAgentId?: AgentId;
   /** 提供节点标识信息，供调用方读取或传入。 */
   nodeId: string;
   /** 角色在 Console 展示的名称。 */
@@ -30,7 +32,7 @@ export interface AgentDefinition {
 
 import { roleDefinitions } from '../../agents/AgentRegistry.ts';
 /** 固定角色到业务节点的显式绑定。 */
-export const NODE_BY_AGENT: Record<AgentId, string> = { orchestrator: 'orchestrator', 'doc-worker': 'doc_worker', 'doc-gen': 'doc_gen', 'test-gen': 'test_gen', code: 'code', check: 'check', review: 'review' };
+export const NODE_BY_AGENT: Record<AgentId, string> = { orchestrator: 'orchestrator', 'doc-worker': 'doc_gen/doc_worker', 'doc-gen': 'doc_gen', 'test-gen': 'test_gen', code: 'code', check: 'check', review: 'review' };
 /** 供运行配置和 Console 使用的七角色目录。 */
 export const DOMAIN_KNOWLEDGE_AGENT_DEFINITIONS: AgentDefinition[] = roleDefinitions.map((definition) => ({ ...definition, tools: [...definition.tools], inputContract: [...definition.inputContract], outputContract: [...definition.outputContract], nodeId: NODE_BY_AGENT[definition.agentId] }));
 /** 按固定角色标识读取业务定义，未知角色立即报错。 */
