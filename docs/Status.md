@@ -135,3 +135,16 @@ ECS 约 3.6 GiB 内存、无 swap。模型与模块评测共享一个进程槽�
 验证：`51c2972` 的 [CI 34428524075](https://github.com/linlisWorkTeam/domain-knowledge/actions/runs/34428524075) 类型、Spec、324/324 回归及 Console 21/21 全通过。新增定向授权、传输限制与 Review 目标测试通过。一次误用 Node 22 启动的本地完整回归已中止，不计入通过证据；ECS 同时有其他任务，未重复争抢资源。原 ohMyWorkPanel 仓库仍干净。
 
 完整脱敏记录保存在 `/root/projects/domain-knowledge-releases/2026-09-10-additional-acceptance/Acceptance.json` 及同目录初始失败、两次恢复、调用统计与 CI 日志。七角色真实执行和反馈修订已有证据，但本地发布未通过。现有 `v0.2.0-stage-repair-candidate` 安装包仍来自 `854ac9c`，不包含本次两项应用修复；没有新安装包验收或正式 Release。PR #38 保持草稿。4/4 启动额度已用完，不自动发起第五次。
+
+
+## 风险复核修复（2026-09-10，受控验证）
+
+用户同意修复后，新增 Domain `knowledgeRisks/KnowledgeRisks.ts`。风险记录绑定来源工件、稳定编号和原始声明；每轮形成独立的 OPEN / VERIFIED / OUT_OF_SCOPE 审计，绑定当前 run、知识版本和评测证据。原风险不删除，上一轮通过不会自动传递给下一轮。
+
+DocWorker 可使用三个明确的 verificationNeeds：固定/晋升模块案例待验证、系统集成范围限制、公开类型外范围限制。声明文本由程序生成，不接受模型自定义“已解决”的内容。模块案例待验证仅在冻结模块契约内、当前可信评测非空且全部通过、稳定性 1 时成为 VERIFIED；两类范围限制按冻结模块契约记为 OUT_OF_SCOPE，不声称已验证。普通 unresolvedRisks 仍按缺证据阻塞，不通过自然语言分类或模型自评清除；需补齐材料后重新提取。
+
+Application 保存初始风险元数据及每轮审计 CAS 工件，门禁 evidenceRefs 保留复核依据。knowledgeRiskBlocking 与 Check / Review 分开，页面展示独立的“知识风险尚未解决”。执行版本升为 seven-role-mvp-v4，旧 v3 与缺失版本均只读不可恢复，原第四次 STOPPED 记录不改判。
+
+受控验证：本地完整回归 330/330 通过；随后增加非有限计数防护并保留旧缺失版本断言，最终定向 12/12 通过。独立模块隔离验收覆盖首轮失败、修订后通过并自动发布，同时保留两轮风险审计；原“行为测试全过但真实缺证据仍拒绝”断言保留并细分门禁原因。类型及 Spec 通过。Console 22/22 通过，新风险原因截图已审阅；最终提交 CI 状态见此次交接与证据索引。
+
+本次没有调用真实模型，没有改账本；SHA-256 仍为 f52cc9087ceee9638cb90e62bc05403b8bd85dac9febbaf19e04ddb183c76081。原 4/4 次启动保持不变。修复验证是受控模型数据，不证明 deepseek-v4-flash 已在 v4 完整通过；未打新安装包或发布正式 Release。历史854ac9c安装候选继续保留，不能冒充本次修复的安装验收。

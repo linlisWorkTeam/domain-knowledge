@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：加载工作流上下文与历史工件，协调角色执行、独立评测和发布。
  */
+import { assessRisks, collectRisks, type KnowledgeRisk } from '../../domain/knowledgeRisks/KnowledgeRisks.ts';
 import type { Output as DocumentOutput } from '../../domain/agents/docGenAgent/DocGenAgentContract.ts';
 import type { Output as CodeOutput } from '../../domain/agents/codeAgent/CodeAgentContract.ts';
 import type { Output as CheckOutput } from '../../domain/agents/checkAgent/CheckAgentContract.ts';
@@ -292,6 +293,7 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
           workflow: 'embedded-domain-knowledge',
           iteration: input.iteration,
           unresolvedRisks,
+          knowledgeRisks: documentResult.payload.knowledgeRisks ?? [],
           ...(correctionIds.length > 0 ? { correctionIds } : {}),
           ...(correctionEvidenceRefs.length > 0
             ? { correctionEvidenceRefs: this.uniqueRefs(correctionEvidenceRefs) }
@@ -507,18 +509,32 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
     if (!evaluationRef) throw new Error('WORKFLOW_EVALUATION_EVIDENCE_MISSING');
     const inputRefs = [scenarioRef, snapshot.manifestRef, bodyRef, codeRef, oracleRef, checkRef];
     if (reviewRef) inputRefs.push(reviewRef);
+    const version = this.flywheel.getKnowledgeVersion(versionId);
+    const declaredRisks = (version?.metadata.knowledgeRisks ?? []) as KnowledgeRisk[];
+    const remaining = ((version?.metadata.unresolvedRisks ?? []) as string[])
+      .filter(statement => !declaredRisks.some(risk => risk.statement === statement));
+    const risks = [...declaredRisks, ...collectRisks([{ ref: bodyRef, content: { unresolvedRisks: remaining } }])];
+    const frozenScenario = await this.readArtifact(scenarioRef) as AutomatedProjectScenario;
+    const assessments = assessRisks(risks, { moduleScope: Boolean(frozenScenario.moduleContract),
+      scopeRef: scenarioRef, evaluationRef, ...evaluation });
+    const riskAuditRef = await this.flywheel.putArtifact(Buffer.from(JSON.stringify({
+      schemaVersion: 'knowledge-risk-assessment-v1', runId: input.runId, versionId,
+      iteration: input.iteration, assessments,
+    })), 'application/json');
     const { decision } = await this.evalRunner.evaluate({
       runId: input.runId,
       versionId,
       inputRefs,
-      evidenceRefs: [evaluationRef],
+      evidenceRefs: [evaluationRef, riskAuditRef],
       toolchainFingerprint: evaluation.toolchainFingerprint,
       criticalFailures: evaluation.passed ? 0 : 1,
       testsPassed: evaluation.testsPassed,
       testsTotal: evaluation.testsTotal,
       stability: evaluation.stability,
       infrastructureFailure: evaluation.infrastructureFailure,
-      checkBlocking: check.blocking || Boolean((this.flywheel.getKnowledgeVersion(versionId)?.metadata.unresolvedRisks as unknown[] | undefined)?.length),
+      checkBlocking: check.blocking,
+      knowledgeRiskBlocking: assessments.some(risk => risk.status === 'OPEN')
+        || Boolean((version?.metadata.unresolvedRisks as unknown[] | undefined)?.length),
       reviewBlocking: Boolean(review?.blocking || review?.recommendation === 'ITERATE' || review?.unresolvedRisks?.length),
     }, policy);
     return decision;
@@ -683,6 +699,7 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
         this.expectedAgentGenerationKey(input, 'doc-gen', input.iteration));
       const criteriaRef = await this.flywheel.putArtifact(Buffer.from(JSON.stringify({
         ...(await this.readArtifact(roleScenarioRef) as object), unresolvedRisks: documentResult.payload.unresolvedRisks ?? [],
+        knowledgeRisks: documentResult.payload.knowledgeRisks ?? [],
       })), 'application/json');
       payload = { knowledgeRef, evaluationReportRef, criteriaRef,
         ...(checkResult ? { checkReportRef: checkResult.rawOutputRef ?? checkResult.outputRefs.find((ref) => ref.mediaType === 'application/json') } : {}) };

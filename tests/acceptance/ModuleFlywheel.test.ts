@@ -34,7 +34,7 @@ function git(root: string, args: string[]): string {
   return result.stdout.trim();
 }
 
-interface Options { defectiveFirst?: boolean; wrongOracle?: boolean; unresolvedSource?: boolean; maxIterations?: number; stageDefects?: boolean; }
+interface Options { verificationNeeds?: boolean; defectiveFirst?: boolean; wrongOracle?: boolean; unresolvedSource?: boolean; maxIterations?: number; stageDefects?: boolean; }
 
 /** 只有参考仓库、模型夹具与门禁数据被构造；编译、进程隔离和宿主比较全部使用生产实现。 */
 async function runModule(options: Options, verify: (context: {
@@ -101,6 +101,9 @@ async function runModule(options: Options, verify: (context: {
         }
         if (options.stageDefects && request.role === 'doc-gen' && request.stage === 'body') {
           (output as any).sections[0].body = '# 1. Invalid heading\n' + (output as any).sections[0].body;
+        }
+        if (options.verificationNeeds && request.role === 'doc-worker') {
+          output.verificationNeeds = ['MODULE_BEHAVIOR_TESTS', 'SYSTEM_INTEGRATION', 'OUTSIDE_PUBLIC_TYPES'];
         }
         return output;
       } };
@@ -245,10 +248,37 @@ test('module flywheel: unresolved source evidence blocks publication even when a
     assert.ok(Array.isArray(version.metadata.unresolvedRisks) && version.metadata.unresolvedRisks.length > 0);
     const gate = composition.repository.getEvaluationAndDecision(runId, version.versionId);
     assert.equal(gate?.decision.outcome, 'STOPPED');
-    assert.equal(gate?.report.checkBlocking, true);
+    assert.equal(gate?.report.checkBlocking, false);
+    assert.equal(gate?.report.knowledgeRiskBlocking, true);
+    assert.ok(gate?.decision.reasonCodes.includes('KNOWLEDGE_RISK_UNRESOLVED'));
     const review = requests.find(({ request }) => request.role === 'review');
     assert.ok(review);
     assert.match(review.request.prompt, /no semantic assertions/);
     noPublication(composition);
+  });
+});
+
+
+test('module flywheel: pending verification is audited across failed and corrected versions before publication', async () => {
+  await runModule({ verificationNeeds: true, defectiveFirst: true }, async ({ composition, result, runId }) => {
+    assert.equal(result.route, 'PASS');
+    assert.equal(composition.apps.publicationOperations.list().length, 1);
+    const audits: any[] = [];
+    for (const version of composition.service.listKnowledgeVersions()) {
+      const gate = composition.repository.getEvaluationAndDecision(runId, version.versionId);
+      assert.ok(gate);
+      const ref = gate.report.evidenceRefs[1]; assert.ok(ref);
+      const audit = JSON.parse(Buffer.from(await composition.artifacts.get(ref)).toString('utf8'));
+      assert.equal(audit.versionId, version.versionId);
+      assert.equal(audit.runId, runId);
+      assert.equal(audit.schemaVersion, 'knowledge-risk-assessment-v1');
+      assert.equal(audit.assessments.length, 3);
+      assert.deepEqual(audit.assessments.slice(1).map((item: any) => item.status), ['OUT_OF_SCOPE', 'OUT_OF_SCOPE']);
+      audits.push(audit);
+    }
+    audits.sort((a, b) => a.iteration - b.iteration);
+    assert.deepEqual(audits.map(a => a.assessments[0].status), ['OPEN', 'VERIFIED']);
+    assert.equal(audits[0].assessments[0].riskId, audits[1].assessments[0].riskId);
+    assert.equal(audits[1].assessments[0].evidenceRefs.length, 3);
   });
 });

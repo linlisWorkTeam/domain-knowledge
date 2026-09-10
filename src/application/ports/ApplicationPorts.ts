@@ -252,6 +252,8 @@ export interface EvaluationSubmission {
   infrastructureFailure?: boolean;
   /** 提供check阻塞信息，供调用方读取或传入。 */
   checkBlocking?: boolean;
+  /** 知识风险独立于代码检查；旧记录缺失时按 false 读取。 */
+  knowledgeRiskBlocking?: boolean;
   /** 提供review阻塞信息，供调用方读取或传入。 */
   reviewBlocking?: boolean;
 }

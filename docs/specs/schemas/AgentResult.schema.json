@@ -285,6 +285,44 @@
         },
         "unresolvedRisks": {
           "$ref": "#/$defs/riskArray"
+        },
+        "knowledgeRisks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "schemaVersion",
+              "riskId",
+              "kind",
+              "statement",
+              "sourceRef"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "schemaVersion": {
+                "const": "knowledge-risk-v1"
+              },
+              "riskId": {
+                "type": "string",
+                "pattern": "^risk:[a-f0-9]{64}$"
+              },
+              "kind": {
+                "enum": [
+                  "MISSING_EVIDENCE",
+                  "MODULE_BEHAVIOR_TESTS",
+                  "SYSTEM_INTEGRATION",
+                  "OUTSIDE_PUBLIC_TYPES"
+                ]
+              },
+              "statement": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sourceRef": {
+                "$ref": "#/$defs/artifactRef"
+              }
+            }
+          }
         }
       },
       "additionalProperties": false

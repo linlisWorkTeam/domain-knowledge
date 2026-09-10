@@ -187,6 +187,7 @@ export class KnowledgeFlywheelService {
         && existing.report.stability === input.stability
         && existing.report.infrastructureFailure === (input.infrastructureFailure ?? false)
         && (existing.report.checkBlocking ?? false) === (input.checkBlocking ?? false)
+        && (existing.report.knowledgeRiskBlocking ?? false) === (input.knowledgeRiskBlocking ?? false)
         && (existing.report.reviewBlocking ?? false) === (input.reviewBlocking ?? false),
         'evaluation replay input collision',
       );
@@ -209,6 +210,7 @@ export class KnowledgeFlywheelService {
       stability: input.stability,
       infrastructureFailure: input.infrastructureFailure ?? false,
       checkBlocking: input.checkBlocking ?? false,
+      knowledgeRiskBlocking: input.knowledgeRiskBlocking ?? false,
       reviewBlocking: input.reviewBlocking ?? false,
       createdAt: now,
     };

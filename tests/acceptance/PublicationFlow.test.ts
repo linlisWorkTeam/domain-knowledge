@@ -38,6 +38,10 @@ test('candidate becomes VERIFIED only after integrity-checked evidence and deter
       fixture.service.recordEvaluation({ ...evaluationInput, testsPassed: 11 }, fixture.config.publicationGate),
       /evaluation replay input collision/,
     );
+    await assert.rejects(
+      fixture.service.recordEvaluation({ ...evaluationInput, knowledgeRiskBlocking: true }, fixture.config.publicationGate),
+      /evaluation replay input collision/,
+    );
     // 取消发生在异步证据读取期间，也必须阻止最后的发布事务。
     const controller = new AbortController();
     const verify = fixture.artifacts.verify.bind(fixture.artifacts);

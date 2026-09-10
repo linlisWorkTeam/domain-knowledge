@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：定义文档分块角色的输入输出契约、输出 Schema 与材料校验。
  */
+import { VERIFICATION_NEEDS, type VerificationNeed } from '../../knowledgeRisks/KnowledgeRisks.ts';
 import type { ArtifactRef } from '../../Domain.ts';
 import type { RoleInput } from '../AgentExecution.ts';
 import { requireMaterials } from '../AgentExecution.ts';
@@ -39,7 +40,7 @@ export interface SourceFact {
   quote: string;
 }
 /** 有源码依据的事实与尚缺证据的风险分别保留，供汇总时追踪。 */
-export interface Output { workerId: string; fragment: string; provenance: string[]; facts: SourceFact[]; unresolvedRisks: string[]; }
+export interface Output { workerId: string; fragment: string; provenance: string[]; facts: SourceFact[]; unresolvedRisks: string[]; verificationNeeds?: VerificationNeed[]; }
 /** 模型只选择已编号的源码范围，原文由受信材料提取。 */
 export type ModelOutput = Omit<Output, 'facts'> & { facts: Array<Omit<SourceFact, 'quote'>> };
 /** 对外提供输出Schema，作为调用方使用的统一约定。 */
@@ -56,6 +57,7 @@ export const outputSchema: Record<string, unknown> = {
         endLine: { type: 'integer', minimum: 1 }, quote: { type: 'string', minLength: 1 },
       },
     } },
+    verificationNeeds: { type: 'array', uniqueItems: true, items: { enum: Object.keys(VERIFICATION_NEEDS) } },
     unresolvedRisks: { type: 'array', uniqueItems: true, items: { type: 'string', minLength: 1 } },
   },
 };

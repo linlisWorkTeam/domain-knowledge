@@ -790,3 +790,20 @@ test('通用场景 API 保留路径校验；浏览器固定模块入口不要求
     expect(starts).toEqual([scenario]);
   } finally { instance.composition.apps.orchestrator.start = originalStart; }
 });
+
+
+test('evaluation explains knowledge risk separately from code check failure', async ({ page }) => {
+  await page.route(`**/api/v1/evaluations/${lineageEvaluationId}`, async route => {
+    const response = await route.fetch();
+    const detail = await response.json();
+    detail.decision = { ...(detail.decision ?? {}), outcome: 'STOPPED', reasonCodes: ['KNOWLEDGE_RISK_UNRESOLVED'] };
+    await route.fulfill({ response, json: detail });
+  });
+  await page.goto(baseUrl);
+  await navigateTo(page, '知识');
+  await page.locator(`#knowledge-list [data-version-id="${latestVersionId}"]`).click();
+  await page.getByRole('dialog').getByRole('button', { name: new RegExp(`查看评测 ${lineageEvaluationId.slice(0, 8)}`) }).click();
+  await expect(page.getByRole('dialog').getByText('知识风险尚未解决', { exact: true })).toBeVisible();
+  await expect(page.getByRole('dialog').getByText('代码检查存在阻塞', { exact: true })).toHaveCount(0);
+  await page.screenshot({ path: test.info().outputPath('knowledge-risk.png'), fullPage: true });
+});

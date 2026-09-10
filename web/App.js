@@ -60,6 +60,9 @@ const PAGE_META = {
 }
 
 const UI_LABELS = {
+  KNOWLEDGE_RISK_UNRESOLVED: '知识风险尚未解决',
+  CHECK_BLOCKING: '代码检查存在阻塞',
+  REVIEW_BLOCKING: '复核要求继续修订',
   CREATED: '已创建', PLANNED: '已计划', GENERATING: '生成中', EVALUATING: '评测中',
   REVIEWING: '复核中', ITERATING: '迭代中', ROLLING_BACK: '回滚中', PUBLISHING: '发布中',
   VERIFIED: '已验证', LOW_CONFIDENCE: '低置信', FAILED: '失败', CANCELLED: '已取消',
@@ -555,7 +558,7 @@ function renderRunWorkspace(snapshot) {
           <div><dt>评测次数</dt><dd>${escapeHtml(evaluations.length)}</dd></div>
           <div><dt>最佳版本</dt><dd title="${escapeHtml(run.bestVersionId)}">${escapeHtml(shortId(run.bestVersionId || '—'))}</dd></div>
         </dl>
-        ${latestDecision ? `<h3>判定原因</h3><div class="reason-list">${latestDecision.reasonCodes.map((reason) => `<code>${escapeHtml(reason)}</code>`).join('')}</div>` : ''}
+        ${latestDecision ? `<h3>判定原因</h3><div class="reason-list">${latestDecision.reasonCodes.map((reason) => `<code>${escapeHtml(displayLabel(reason))}</code>`).join('')}</div>` : ''}
       </aside>
     </div>
     <div class="run-workspace-grid lower">
@@ -876,7 +879,7 @@ async function openEvaluation(evaluationId, returnFocus) {
   drawerContent.innerHTML = `<div class="drawer-badges">${badge(decision.outcome ?? detail.status)}</div>
     <dl class="fact-grid"><div><dt>批次</dt><dd>${escapeHtml(detail.runId ?? report.runId)}</dd></div><div><dt>知识版本</dt><dd>${escapeHtml(detail.versionId ?? report.versionId)}</dd></div><div><dt>规则修订</dt><dd>${escapeHtml(detail.ruleRef?.ruleId ?? '—')} · ${escapeHtml(detail.ruleRef?.revision ?? '—')}</dd></div><div><dt>记录时间</dt><dd>${escapeHtml(formatDate(detail.createdAt ?? report.createdAt))}</dd></div></dl>
     <section class="drawer-section"><h3>不可变报告</h3><pre class="json-view">${json(report)}</pre></section>
-    <section class="drawer-section"><h3>门禁判定</h3><pre class="json-view">${json(decision)}</pre></section>
+    <section class="drawer-section"><h3>门禁判定</h3><div class="reason-list">${(decision.reasonCodes ?? []).map(reason => `<code>${escapeHtml(displayLabel(reason))}</code>`).join('')}</div><pre class="json-view">${json(decision)}</pre></section>
     <section class="drawer-section"><h3>证据工件</h3>${artifacts.error ? partialNotice('证据元数据暂不可用。') : artifacts.items?.length ? `<ul class="artifact-list">${artifacts.items.map((item) => `<li><span><b>${escapeHtml(displayLabel(item.relation))}</b><code>${escapeHtml(item.ref?.artifactId ?? item.artifactId ?? '—')}</code><small>${item.contentAddressed ? '内容地址完整' : '完整性未确认'}</small></span>${item.downloadUrl ? `<button class="secondary-button" data-download-artifact="${escapeHtml(item.downloadUrl)}" type="button">下载</button>` : `<em>${state.token ? '无下载权限' : '进入治理模式后可下载'}</em>`}</li>`).join('')}</ul>` : emptyState('没有证据工件', '这条评测没有可见的证据引用。')}</section>`
   openDrawer(returnFocus)
 }
@@ -1264,7 +1267,7 @@ function openEvidence(encoded, returnFocus) {
   drawerTitle.textContent = '评测证据'
   drawerContent.innerHTML = `<div class="drawer-badges">${badge(record.decision.outcome)}</div>
     <section class="drawer-section"><h3>评测报告</h3><pre class="json-view">${json(record.report)}</pre></section>
-    <section class="drawer-section"><h3>门禁判定</h3><pre class="json-view">${json(record.decision)}</pre></section>`
+    <section class="drawer-section"><h3>门禁判定</h3><div class="reason-list">${(decision.reasonCodes ?? []).map(reason => `<code>${escapeHtml(displayLabel(reason))}</code>`).join('')}</div><pre class="json-view">${json(record.decision)}</pre></section>`
   openDrawer(returnFocus)
 }
 
