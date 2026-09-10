@@ -5,7 +5,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { knowledgeRevisionDecision, knowledgeRevisionOutcome, finalizeKnowledgeRevision } from '../../src/domain/services/knowledge/KnowledgeRevision.ts';
+import { knowledgeRevisionDecision, knowledgeRevisionOutcome, finalizeKnowledgeRevision, sourceReviewObservations } from '../../src/domain/services/knowledge/KnowledgeRevision.ts';
 import type { Output } from '../../src/domain/agents/reviewAgent/ReviewAgentContract.ts';
 test('revision only accepts an explicit correction within the evidence-bound headings', () => {
   const review: Output = { blocking: true, recommendation: 'ITERATE', correction: { correctionId: 'COR-0001', knowledgePath: 'knowledge/card.md#Behavior', criterion: 'Explain missing behavior', risk: 'Wrong result' } };
@@ -29,4 +29,17 @@ test('revision keeps the fixed source footer and rejects a change that only remo
   const base = '# Card\n## Behavior\nBefore.' + footer;
   assert.equal(finalizeKnowledgeRevision(base, '# Card\n## Behavior\nAfter.\n', 'Behavior', { commit: 'commit', symbol: 'parse' }), '# Card\n## Behavior\nAfter.' + footer);
   assert.throws(() => finalizeKnowledgeRevision(base, '# Card\n## Behavior\nBefore.\n', 'Behavior', { commit: 'commit', symbol: 'parse' }), /KNOWLEDGE_CORRECTION_NOT_APPLIED/);
+});
+
+test('source review projects actual trusted reference observations and rejects generated failures', () => {
+  const suite = { schemaVersion: 'native-cases-v1' as const, cases: [{ caseId: 'init', description: 'Reference initializes position', sections: ['card#Behavior'], variables: [], calls: [], observations: [{ name: 'pos', kind: 'integer' as const, read: { variable: 'pos' } }], expected: { pos: '0' } }] };
+  const oracle = [{ caseId: 'init', status: 'PASSED' as const, actual: { pos: '0' }, unrelated: 'not forwarded' }];
+  const report = sourceReviewObservations(suite, oracle, ['init']);
+  assert.equal(report.observedImplementation, 'PINNED_REFERENCE');
+  assert.deepEqual(report.cases[0]!.observation, { caseId: 'init', status: 'PASSED', actual: { pos: '0' } });
+  assert.deepEqual(report.cases[0]!.input, suite.cases[0]);
+  assert.throws(() => sourceReviewObservations(suite, [{ caseId: 'init', status: 'FAILED', actual: { pos: '1' } }], ['init']), /REVISION_REFERENCE_NOT_TRUSTED/);
+  assert.throws(() => sourceReviewObservations(suite, [{ caseId: 'init', status: 'PASSED', actual: { pos: '1' } }], ['init']), /REVISION_REFERENCE_NOT_TRUSTED/);
+  assert.throws(() => sourceReviewObservations(suite, oracle, ['unknown']), /REVISION_SOURCE_CASE_BINDING_INVALID/);
+  assert.throws(() => sourceReviewObservations(suite, oracle, []), /REVISION_SOURCE_CASE_BINDING_INVALID/);
 });

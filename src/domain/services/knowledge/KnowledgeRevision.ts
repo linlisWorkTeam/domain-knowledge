@@ -5,7 +5,17 @@
  */
 import { validateRevision } from '../../agents/docGenAgent/DocGenRevision.ts';
 import type { Output } from '../../agents/reviewAgent/ReviewAgentContract.ts';
-export const KNOWLEDGE_REVISION_CONTRACT = 'knowledge-revision-v4';
+import { nativeOracleTrusted } from '../evaluation/NativeTestCache.ts';
+import type { NativeBehaviorSuite, NativeScalar } from '../evaluation/NativeBehaviorSuite.ts';
+export const KNOWLEDGE_REVISION_CONTRACT = 'knowledge-revision-v5';
+
+/** 源码一致性只读取已验证参考实现的观察，不能把旧生成代码失败移作参考事实。 */
+export function sourceReviewObservations(suite: NativeBehaviorSuite, oracle: Array<{ caseId: string; status: 'PASSED' | 'FAILED'; actual: Record<string, NativeScalar> | null }>, caseIds: string[]) {
+  if (!nativeOracleTrusted(suite, oracle)) throw new Error('REVISION_REFERENCE_NOT_TRUSTED');
+  const selected = new Set(caseIds);
+  if (!selected.size || [...selected].some(id => !suite.cases.some(test => test.caseId === id))) throw new Error('REVISION_SOURCE_CASE_BINDING_INVALID');
+  return { observedImplementation: 'PINNED_REFERENCE' as const, cases: suite.cases.filter(test => selected.has(test.caseId)).map(test => { const { caseId, status, actual } = oracle.find(item => item.caseId === test.caseId)!; return { input: test, observation: { caseId, status, actual } }; }) };
+}
 export function knowledgeRevisionDecision(review: Output, moduleId: string, headings: string[]) {
   if (!review.correction && review.recommendation === 'PASS' && !review.blocking && !review.unresolvedRisks?.length) return { heading: null, unresolved: [] };
   if (!review.correction || review.unresolvedRisks?.length) return { heading: null, unresolved: review.unresolvedRisks?.length ? review.unresolvedRisks : ['REVIEW_NO_KNOWLEDGE_CORRECTION'] };

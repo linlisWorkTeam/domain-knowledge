@@ -5,7 +5,7 @@
  */
 import { sha256 } from '../../Domain.ts';
 import { canonicalJson, createStageTask, type StageInput, type StageTask, type StageStatus, type WorkbenchStage } from './StageTask.ts';
-export const PIPELINE_CONTRACT = 'knowledge-pipeline-v8';
+export const PIPELINE_CONTRACT = 'knowledge-pipeline-v9';
 export interface IterationProgress { failed: string[]; total: number; passed: number }
 export interface PipelineIteration { number: number; versionIds: string[]; reconstruction?: StageTask; evaluation?: StageTask; revision?: StageTask; progress?: IterationProgress }
 export interface WorkbenchPipeline {

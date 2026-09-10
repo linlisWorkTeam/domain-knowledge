@@ -6,7 +6,8 @@
 import type { AgentResult } from '../../domain/agents/AgentContracts.ts';
 import { sha256, type ArtifactRef } from '../../domain/Domain.ts';
 import { canonicalJson, type JsonValue, type StageInput, type StageResult } from '../../domain/services/workbench/StageTask.ts';
-import { KNOWLEDGE_REVISION_CONTRACT, knowledgeRevisionDecision, knowledgeRevisionOutcome, finalizeKnowledgeRevision } from '../../domain/services/knowledge/KnowledgeRevision.ts';
+import { KNOWLEDGE_REVISION_CONTRACT, knowledgeRevisionDecision, knowledgeRevisionOutcome, finalizeKnowledgeRevision, sourceReviewObservations } from '../../domain/services/knowledge/KnowledgeRevision.ts';
+import type { NativeBehaviorSuite } from '../../domain/services/evaluation/NativeBehaviorSuite.ts';
 import type { Output as ReviewOutput } from '../../domain/agents/reviewAgent/ReviewAgentContract.ts';
 import type { StageModelConfiguration } from '../ports/WorkbenchGenerationPorts.ts';
 import type { WorkbenchEvaluation } from './WorkbenchEvaluation.ts';
@@ -109,19 +110,25 @@ export class WorkbenchKnowledgeRevision {
         const draftRef = await artifacts.put(Buffer.from(document.body), 'text/markdown');
         const sourceReference = { schemaVersion: KNOWLEDGE_REVISION_CONTRACT, sourceRevision: project.commit, files };
         const sourceReferenceRef = await artifacts.put(Buffer.from(JSON.stringify(sourceReference)), 'application/json');
+        const sourceEvaluation = { schemaVersion: 'native-source-review-evidence-v1', sourceRevision: project.commit,
+          sourceDigest: project.sourceDigest, moduleId: module.moduleId, suiteRef: module.suiteRef, oracleRef: module.oracleRef,
+          ...sourceReviewObservations(await this.load<NativeBehaviorSuite>(module.suiteRef),
+            await this.load<Parameters<typeof sourceReviewObservations>[1]>(module.oracleRef), candidate.sections.filter(section => section.heading === decision.heading).flatMap(section => section.caseIds)) };
+        const sourceEvaluationRef = await artifacts.put(Buffer.from(JSON.stringify(sourceEvaluation)), 'application/json');
         const sourceCriteria = { schemaVersion: KNOWLEDGE_REVISION_CONTRACT, phase: 'REVISION_SOURCE_REVIEW',
           allowedKnowledgePaths: [`knowledge/${card.moduleId}.md#${decision.heading}`],
-          instruction: '独立复核最终正文的授权章节是否准确描述固定参考源码。上游模型的修订并非事实。逐项核对索引、边界、返回值及示例；有矛盾必须指出，不得因为文字流畅或旧评测通过而放行。评测报告针对修订前的生成代码，后续重建复测是正常下一步。只有正文与参考一致且无未解决风险才返回 PASS、blocking=false、correction=null。' };
+          instruction: '独立复核最终正文的授权章节是否准确描述固定参考源码。上游模型的修订并非事实。逐项核对索引、边界、返回值及示例；有矛盾必须指出，不得因为文字流畅或旧评测通过而放行。评测材料只包含已验证的固定参考实现观察，observedImplementation=PINNED_REFERENCE；不能把旧生成代码的失败当成参考实现结果。本次只判断授权正文与固定源码一致性，后续生成代码重建及行为复测由独立阶段处理。只有正文与参考一致且无未解决风险才返回 PASS、blocking=false、correction=null。' };
         const sourceCriteriaRef = await artifacts.put(Buffer.from(JSON.stringify(sourceCriteria)), 'application/json');
+        await context.step(`revision-source-materials:${card.versionId}`, async () => ({ artifactRefs: [draftRef, sourceReferenceRef, sourceEvaluationRef, sourceCriteriaRef, module.suiteRef, module.oracleRef], summary: { versionId: card.versionId, heading: decision.heading!, evaluationReportRef: json(sourceEvaluationRef) } }));
         const sourceReview = await roles.execute(context, frozen, 'review', `${card.versionId}:source-review`, {
           moduleId: card.moduleId, sourcePaths: [], publicInterfacePaths: [], provenance: [draftRef, sourceReferenceRef],
-          payload: { knowledgeRef: draftRef, evaluationReportRef: module.reportRef, checkReportRef: sourceReferenceRef, criteriaRef: sourceCriteriaRef },
-          materials: [{ ref: draftRef, content: document.body }, { ref: module.reportRef, content: report },
+          payload: { knowledgeRef: draftRef, evaluationReportRef: sourceEvaluationRef, checkReportRef: sourceReferenceRef, criteriaRef: sourceCriteriaRef },
+          materials: [{ ref: draftRef, content: document.body }, { ref: sourceEvaluationRef, content: sourceEvaluation },
             { ref: sourceReferenceRef, content: sourceReference }, { ref: sourceCriteriaRef, content: sourceCriteria }] });
         const sourceOpinion = sourceReview.output as unknown as ReviewOutput;
         const sourceDecision = knowledgeRevisionDecision(sourceOpinion, card.moduleId, [decision.heading]);
         if (sourceDecision.heading || sourceDecision.unresolved.length) return {
-          artifactRefs: [draftRef, sourceReferenceRef, sourceCriteriaRef, review.resultRef, review.rawRef, revised.resultRef, revised.rawRef, sourceReview.resultRef, sourceReview.rawRef],
+          artifactRefs: [draftRef, sourceReferenceRef, sourceCriteriaRef, sourceEvaluationRef, module.suiteRef, module.oracleRef, review.resultRef, review.rawRef, revised.resultRef, revised.rawRef, sourceReview.resultRef, sourceReview.rawRef],
           summary: { cardId: candidate.cardId, baseVersionId: card.versionId, outcome: 'UNRESOLVED',
             heading: decision.heading, unresolved: ['REVISION_SOURCE_REVIEW_REJECTED', ...(sourceOpinion.correction ? [sourceOpinion.correction.criterion, sourceOpinion.correction.risk] : []), ...sourceDecision.unresolved], draftRef: json(draftRef), sourceReviewRef: json(sourceReview.rawRef), verified: false } };
         const latest = repository.latestKnowledgeVersion(card.moduleId);
@@ -132,7 +139,7 @@ export class WorkbenchKnowledgeRevision {
         const committed = await this.flywheel.ingestCandidate({ expectedParentVersionId: card.versionId, moduleId: card.moduleId, body: document.body, title: card.title, description: card.description,
           category: card.category, tags: card.tags, provenance: card.provenance, metadata: { ...card.metadata, stageTaskId: context.task.taskId, revisionTaskId: context.task.taskId,
             baseVersionId: card.versionId, evaluationTaskId: taskId, reviewResultRef: review.resultRef, sourceReviewResultRef: sourceReview.resultRef, roleResultRef: revised.resultRef } });
-        return { artifactRefs: [draftRef, sourceReferenceRef, sourceCriteriaRef, sourceReview.resultRef, sourceReview.rawRef, referenceRef, generatedModule.codeRef, ...sourceFiles.map(file => file.ref), card.bodyRef, review.resultRef, review.rawRef, revised.resultRef, revised.rawRef, committed.version.bodyRef], summary: {
+        return { artifactRefs: [draftRef, sourceReferenceRef, sourceCriteriaRef, sourceEvaluationRef, module.suiteRef, module.oracleRef, sourceReview.resultRef, sourceReview.rawRef, referenceRef, generatedModule.codeRef, ...sourceFiles.map(file => file.ref), card.bodyRef, review.resultRef, review.rawRef, revised.resultRef, revised.rawRef, committed.version.bodyRef], summary: {
           cardId: candidate.cardId, baseVersionId: card.versionId, versionId: committed.version.versionId, heading: decision.heading, criterion: correction.criterion,
           beforeRef: json(card.bodyRef), afterRef: json(committed.version.bodyRef), quality: committed.quality.outcome, qualityScore: committed.quality.score, qualityWeakPoints: committed.quality.weakPoints, outcome: 'REVISED', verified: false } };
       });

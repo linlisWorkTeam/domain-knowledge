@@ -7,7 +7,7 @@ export function createKnowledgeRevisionPanel({ root, request, escapeHtml: escape
   let task = null, checkpoints = [], events = [], loadedFor = null, timer = null, busy = false, notice = ''
   const bodies = new Map()
   const host = () => root.querySelector('[data-knowledge-revision-panel]')
-  const current = () => task?.contractVersion === 'knowledge-workbench-v1' && task?.input.parameters.revisionContract === 'knowledge-revision-v4'
+  const current = () => task?.contractVersion === 'knowledge-workbench-v1' && task?.input.parameters.revisionContract === 'knowledge-revision-v5'
   const active = () => current() && ['PENDING', 'RUNNING'].includes(task.status)
   const reasons = { AGENT_STAGE_TIMEOUT: '角色阶段达到时间限制；已完成结果和累计用量保留，可检查现有证据后恢复。', REVISION_SOURCE_REVIEW_REJECTED: '修订正文未通过独立源码复核；草稿已保留，未建立新版本或更新索引。', AGENT_OUTPUT_INVALID: '模型输出未符合当前角色协议，已完成卡片保留；可查看证据后恢复。', REVIEW_CORRECTION_OUTSIDE_EVIDENCE: '复核意见超出了失败证据授权的章节，未接受该意见。', REVISION_REVIEW_BINDING_INVALID: '复核意见与原始角色证据不匹配，未交给 DocGen。', CANDIDATE_PARENT_CHANGED: '卡片已被其他任务修改，未覆盖新版本。', REVISION_SOURCE_LIMIT: '固定参考材料缺失或超出修订容量，请调整模块范围。', INDEX_BUILD_PARTIAL: '卡片已保存，部分索引未完成；恢复会继续索引。', REVISION_CARD_CHANGED: '卡片已有其他修改，请使用新版本重新评测。', REVISION_CORRECTION_OUTSIDE_EVIDENCE: 'Review 意见超出可信章节范围，未授权修改。', REVISION_NO_PROGRESS: '修订回到了已有正文，暂停以避免反复改写。', REVISION_QUALITY_REJECTED: '修订候选未通过质量检查，不能推进。', REVIEW_NO_KNOWLEDGE_CORRECTION: 'Review 没有给出知识修订意见，保留原卡片并继续诊断。' }
   const download = (ref, label) => ref ? `<button class="secondary-button" type="button" data-download-artifact="/api/v1/stage-tasks/${escape(task.taskId)}/artifacts/${escape(ref.sha256)}">${label}</button>` : ''

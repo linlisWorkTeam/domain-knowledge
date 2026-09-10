@@ -164,3 +164,9 @@ This document summarizes older handoffs, milestones and architectural decisions 
 [2026-09-11-0326-revision-evidence.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/6d3d24098ec2bb4c45ede8e0b78af599db0a1fcf/docs/epitaph/2026-09-11-0326-revision-evidence.md) 将可信失败绑定到固定版本 H2，区分候选归因与已证明知识错误。已通过当时契约和受控测试；真实修订、最终发布门禁尚未通过，不能将归因候选当作纠正事实。
 
 [2026-09-11-0346-knowledge-revision.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/7afb0d9cfa6e99b631e55ebd611f9aeb0bf00223/docs/epitaph/2026-09-11-0346-knowledge-revision.md) 接通独立 Review/DocGen 定点修订、原卡片身份、尾注保护及索引恢复；当时仅受控验证，真实修订与最终发布门禁未完成。自动迭代及修订后源码复核后来另行交付。
+
+## 真实修订阶段判断更正
+
+0509交接把第一次真实超时归于DocGen语义重试，这是错误判断。完整检查点和Provider审计表明：DocGen一次成功（约66秒），随后源码Review在约180秒超时；无证据证明该次DocGen输出被拒绝。恢复后仍是源码Review，它误将旧生成实现pos=1观察用于拒绝pos=0正确草稿。原记录保留供审计，更正证据见真实验收目录source-review-v4/Attempt1StageCorrection.json及SourceReviewSubjectMixing.json。
+
+[2026-09-11-0409-automatic-iterations.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/e3b09c1fd26e94f54a9cdc9e6f57075abe4b8ea9/docs/epitaph/2026-09-11-0409-automatic-iterations.md) 接通多轮协调、原失败绑定重试及累计用量，受控六轮和真实旧产物重放通过；当时没有新真实模型修订，最终发布和完整部署未完成。
