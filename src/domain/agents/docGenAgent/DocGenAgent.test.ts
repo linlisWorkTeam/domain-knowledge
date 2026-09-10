@@ -96,3 +96,43 @@ test('doc-gen validates worker count and defaults to one internal task', async (
   }
   assert.deepEqual(sample.phases, []);
 });
+
+test('doc-gen requires the selected document for revision and rejects another module or document', async () => {
+  for (const mode of ['missing-base', 'empty-base', 'module', 'other-document', 'later-round'] as const) {
+    const sample = roleExample<Input>('doc-gen');
+    if (mode === 'missing-base' || mode === 'later-round') delete sample.input.payload.baseKnowledgeRef;
+    if (mode === 'empty-base') sample.input.materials.find((item) => item.ref.artifactId === sample.input.payload.baseKnowledgeRef!.artifactId)!.content = '';
+    if (mode === 'module') sample.input.moduleId = 'different';
+    if (mode === 'other-document') sample.input.payload.corrections![0]!.knowledgePath = 'knowledge/different.md';
+    if (mode === 'later-round') { sample.context.iteration = 1; delete sample.input.payload.corrections; }
+    await assert.rejects(execute(sample.input, sample.context), /DOCGEN_(REVISION_BASE_REQUIRED|BASE_DOCUMENT_INVALID|MODULE_INVALID|CORRECTION_DOCUMENT_MISMATCH)/);
+    assert.deepEqual(sample.phases, []);
+  }
+});
+
+test('doc-gen applies section revisions to the selected YAML document and preserves unrelated text', async () => {
+  const sample = roleExample<Input>('doc-gen');
+  const base = '# Document\n\n## Behavior\nOld behavior.\n\n## Stable\n' + 'Unchanged contract. '.repeat(15);
+  const ref = sample.input.payload.baseKnowledgeRef!;
+  sample.input.materials.find((item) => item.ref.artifactId === ref.artifactId)!.content = '---\ntitle: Old\n---\n\n' + base;
+  sample.input.payload.corrections![0]!.knowledgePath = 'knowledge/markdown-diff.md#Behavior';
+  sample.output.body = base.replace('Old behavior.', 'Corrected behavior.');
+  sample.context.model.execute = async () => sample.output;
+  const result = await execute(sample.input, sample.context);
+  assert.deepEqual(result.payload.baseKnowledgeRef, ref);
+  assert.deepEqual(result.payload.appliedCorrectionIds, ['COR-0001']);
+  sample.output.body = sample.output.body.replace('Unchanged contract.', 'Unrequested change.');
+  await assert.rejects(execute(sample.input, sample.context), /REVISION_OUTSIDE_CORRECTIONS/);
+});
+
+test('doc-gen rejects ambiguous sections and ignores code-fenced headings when locating corrections', async () => {
+  const sample = roleExample<Input>('doc-gen');
+  const material = sample.input.materials.find((item) => item.ref.artifactId === sample.input.payload.baseKnowledgeRef!.artifactId)!;
+  sample.input.payload.corrections![0]!.knowledgePath = 'Behavior';
+  material.content = '# Document\n\n```md\n## Behavior\n```\n\n## Behavior\n' + 'Original explanation. '.repeat(15);
+  sample.output.body = String(material.content).replace('Original explanation.', 'Revised explanation.');
+  sample.context.model.execute = async () => sample.output;
+  await execute(sample.input, sample.context);
+  material.content += '\n## Behavior\nDuplicate';
+  await assert.rejects(execute(sample.input, sample.context), /CORRECTION_SECTION_INVALID/);
+});

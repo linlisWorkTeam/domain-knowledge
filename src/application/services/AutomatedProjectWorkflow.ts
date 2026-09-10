@@ -528,6 +528,7 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
           const baseKnowledgeRef = previousResult.payload['bodyRef'] as ArtifactRef | undefined;
           if (baseKnowledgeRef) payload.baseKnowledgeRef = baseKnowledgeRef;
         }
+        if (!payload.baseKnowledgeRef) throw new Error('DOCGEN_REVISION_BASE_REQUIRED');
         const previousReviewRef = input.context[contextKey('review', input.iteration - 1)] as ArtifactRef | undefined;
         if (previousReviewRef) {
           const previousReview = await this.readAgentResult(

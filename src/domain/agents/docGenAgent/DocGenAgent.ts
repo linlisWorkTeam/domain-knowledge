@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：实现文档生成角色的业务步骤与结构化结果转换。
  */
+import { validateRevisionOutput } from './DocGenRevision.ts';
 import { renderKnowledgeDocument } from '../../knowledge/KnowledgeDocument.ts';
 import type { RoleResult, PendingArtifact } from '../AgentExecution.ts';
 import { assertActive, pending } from '../AgentExecution.ts';
@@ -14,6 +15,7 @@ export async function execute(input: Input, context: DocGenContext): Promise<Rol
   assertActive(context.signal);
   // 缺失材料应在调用模型之前失败，避免模型用猜测填补业务证据。
   validateInput(input);
+  if (context.iteration > 0 && !input.payload.baseKnowledgeRef) throw new Error('DOCGEN_REVISION_BASE_REQUIRED');
   const tasks = planWorkers(input);
   if (tasks.length && !context.docWorkers) throw new Error('DOCGEN_WORKER_EXECUTOR_MISSING');
   const fragments = tasks.length ? await context.docWorkers!.run(tasks, context.signal) : [];
@@ -43,6 +45,7 @@ export async function execute(input: Input, context: DocGenContext): Promise<Rol
   assertActive(context.signal);
   context.model.assertOutput(raw, schema);
   const output = raw as unknown as Output;
+  validateRevisionOutput(input, output.body);
   const artifacts: PendingArtifact[] = [];
   const document = output;
   // 这里只声明正文工件；实际 CAS 引用由 Application 保存后回填。
@@ -51,10 +54,12 @@ export async function execute(input: Input, context: DocGenContext): Promise<Rol
   const payload = {
     resultKind: 'knowledgeCandidate',
     bodyRef,
+    ...(input.payload.baseKnowledgeRef ? { baseKnowledgeRef: input.payload.baseKnowledgeRef } : {}),
+    ...(input.payload.corrections?.length ? { appliedCorrectionIds: input.payload.corrections.map((item) => item.correctionId) } : {}),
     ...(ordered.length ? { workerResultRefs: ordered.map(({ resultRef }) => resultRef) } : {}),
     provenance: input.provenance,
     changedPaths: [`knowledge/${input.moduleId}.md`],
-    unresolvedRisks: [...new Set(ordered.flatMap((item) => item.unresolvedRisks ?? []))],
+    unresolvedRisks: [...new Set([...ordered.flatMap((item) => item.unresolvedRisks ?? []), ...(output.unresolvedRisks ?? [])])],
   };
   return { output, payload, artifacts };
 }

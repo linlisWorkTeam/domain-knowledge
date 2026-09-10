@@ -85,3 +85,13 @@ Worker 的提交键绑定 Run、内部任务身份、源码输入和冻结提示
 IO-22 输出增加必需 `keywords: string[]`（非空、不重复、元素去除首尾空白）；title、description 禁止纯空白。模型只生成正文和描述，框架使用 YAML 序列化器写入单份 Markdown 工件，拒绝模型自行提供 YAML 头，防止出现双重元数据。原始输出保留审计，知识候选保存同一份带 YAML 的文档，关键词写入版本 tags，标题及摘要写入既有版本索引。
 
 渐进式读取通过 KnowledgeSearchApp 的 `describe(allowedVersionIds)` 只读取授权版本描述及 bodyRef，`loadDocument(versionId, allowedVersionIds)` 才读取该份正文；每次调用显式携带授权版本列表，未授权请求在读取工件前失败。不改变既有全文检索，不新增 SearchAgent，也不把索引当作发布门禁。
+
+### DocGen 收尾范围与契约（2026-09-10）
+
+本轮完成 S2-03 的最小生成与修订链路。IO-08 的业务分组、容量预算和 IO-10 的分批摘要/补充分析继续按原记录细化，不在本轮凭空确定默认预算或引入语言分析器。内部 Worker 执行端沿用已实现接口。
+
+- 模块标识须与受信输入一致且为稳定 slug。有 corrections 或 qualityFeedback 时必须提供一份非空 baseKnowledgeRef；生产后续轮次缺失上一版结果直接失败，不能退化为初次生成。
+- 纠正意见沿用 Correction 契约。knowledgePath 可以是当前 `knowledge/<moduleId>.md`（整篇）、该路径加 `#章节标题`，或已有 Review 使用的章节标题。拒绝另一文档路径；章节定位须唯一。只有章节纠正且没有整体质量反馈时，DocGen 只能修改这些章节，其余内容须逐字保留。框架 YAML 头不作为正文比较范围。整篇纠正和质量反馈可调整本篇结构。
+- 模型正常输出仍为 body/title/description/keywords；可附 unresolvedRisks，连同 Worker 问题交接。结果携带 baseKnowledgeRef 及 appliedCorrectionIds，绑定本轮修订依据；这里表示该次修订接收的意见，不替 Review 判定语义修复成功。
+- 模型认为不宜合为一份时输出独立的 `splitProposal: { reason, suggestedDocuments: string[] }`，不能混入 body。Domain 返回 `userDecisionRequired` 和 proposalRef，不生成正文。Application 在 candidate_knowledge 识别该结果，保存可读原因与建议，沿既有 STOPPED 路由停止；不进入 Code 或创建候选。
+- 独立入口在 result.json 和终端结果展示待决事项。决定继续合成一份时，调用方显式提供 `documentDecision: { action: 'keep-single', proposalRef }` 及该提案工件；如果用户选择拆分，调用方先按用户选择准备单份范围再启动新任务。本轮不新增 Console 决策按钮或自动多文档任务。没有答复不会恢复或默认拆分。

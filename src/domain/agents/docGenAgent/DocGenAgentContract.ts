@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：定义文档生成角色的输入输出契约、输出 Schema 与材料校验。
  */
+import { validateRevision, type Correction } from './DocGenRevision.ts';
 import type { ArtifactRef } from '../../Domain.ts';
 import type { RoleInput, ExecutionContext, Material } from '../AgentExecution.ts';
 import { requireMaterials } from '../AgentExecution.ts';
@@ -22,7 +23,7 @@ export interface Payload {
   /** 提供基础知识引用信息，供调用方读取或传入。 */
   baseKnowledgeRef?: ArtifactRef;
   /** 提供corrections信息，供调用方读取或传入。 */
-  corrections?: unknown[];
+  corrections?: Correction[];
   /** 提供质量反馈信息，供调用方读取或传入。 */
   qualityFeedback?: unknown;
 }
@@ -39,11 +40,12 @@ export interface DocWorkerExecutionPort {
 /** 只有 DocGen 使用内部 Worker 执行能力。 */
 export interface DocGenContext extends ExecutionContext { docWorkers?: DocWorkerExecutionPort }
 /** 角色输出。 */
-export interface Output { body: string; title: string; description: string; keywords: string[]; }
+export interface Output { body: string; title: string; description: string; keywords: string[]; unresolvedRisks?: string[]; }
 /** 对外提供输出Schema，作为调用方使用的统一约定。 */
 export const outputSchema: Record<string, unknown> = {
   type: 'object', required: ['body', 'title', 'description', 'keywords'], additionalProperties: false,
   properties: {
+    unresolvedRisks: { type: 'array', uniqueItems: true, items: { type: 'string', pattern: '\\S' } },
     body: { type: 'string', minLength: 200 }, title: { type: 'string', pattern: '\\S' },
     description: { type: 'string', pattern: '\\S' },
     keywords: { type: 'array', minItems: 1, uniqueItems: true, items: { type: 'string', pattern: '\\S' } },
@@ -60,4 +62,6 @@ export function validateInput(input: Input): void {
   const count = input.payload.workerCount ?? 1;
   if (!Number.isSafeInteger(count) || count < 0 || count > 5) throw new Error('DOCGEN_WORKER_COUNT_INVALID');
   requireMaterials(input.payload, input.materials, ['moduleId', 'sourceRefs', 'publicInterfaceRefs']);
+  if (input.moduleId !== input.payload.moduleId || !/^[a-z0-9][a-z0-9_-]{0,127}$/.test(input.moduleId)) throw new Error('DOCGEN_MODULE_INVALID');
+  validateRevision(input);
 }
