@@ -162,7 +162,7 @@ Agent 元数据来自 `GET /api/v1/agents`。浏览器默认只读，操作员 t
 
 #### 现有实现与待补差异
 
-源码见 [Adapter](../src/infrastructure/agentAdapters/companyCodeAgent/CompanyCodeAgentCliAdapter.ts)、[工作区](../src/domain/workspace/LocalAgentWorkspace.ts)和[组合根](../src/interfaces/runner/Composition.ts)。
+源码见 [Adapter](../src/infrastructure/agentAdapters/companyCodeAgent/CompanyCodeAgentCliAdapter.ts)、[工作区](../src/domain/services/workspace/LocalAgentWorkspace.ts)和[组合根](../src/interfaces/runner/Composition.ts)。
 
 | 环节 | 当前代码事实 | 真实接入要补什么 |
 | --- | --- | --- |

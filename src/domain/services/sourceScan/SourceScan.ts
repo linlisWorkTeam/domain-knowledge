@@ -7,7 +7,7 @@ import {
   lstatSync, readFileSync, readdirSync, realpathSync, statSync,
 } from 'node:fs';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
-import { artifactIdFor, sha256 } from '../Domain.ts';
+import { artifactIdFor, sha256 } from '../../Domain.ts';
 
 const ignoredDirectories = new Set(['.git', '.dsh', '.workpanel', '__pycache__', 'node_modules', 'dist', 'build', 'runtime', 'history']);
 const ignoredFiles = new Set(['README.md', 'index.md', 'log.md']);

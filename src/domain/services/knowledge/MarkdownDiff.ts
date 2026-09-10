@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：定义Markdown差异的领域数据与确定性业务规则。
  */
-import { assertInvariant } from '../Domain.ts';
+import { assertInvariant } from '../../Domain.ts';
 
 /** 定义Markdown差异Line的数据结构与类型约束。 */
 export interface MarkdownDiffLine {

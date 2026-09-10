@@ -8,7 +8,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 import { AGENT_IDS } from '../../src/application/ports/ApplicationPorts.ts';
-import { DOMAIN_KNOWLEDGE_AGENT_DEFINITIONS } from '../../src/domain/workflow/AgentDefinitions.ts';
+import { DOMAIN_KNOWLEDGE_AGENT_DEFINITIONS } from '../../src/domain/services/workflow/AgentDefinitions.ts';
 
 function files(root: string): string[] {
   return readdirSync(root).flatMap((name) => {
@@ -34,9 +34,9 @@ test('domain core has no SDK, database, language, or adapter dependency', () => 
       assert.doesNotMatch(dependency, /(?:application|infrastructure|interfaces|langgraph|temporal|deepseek|dsh|sqlite|clang|gcc)/i, `${path}: forbidden import ${dependency}`);
       // 三个资源模块按目录约定归入 Domain；仅允许它们既有的资源访问依赖。
       const resourceImports: Record<string, readonly string[]> = {
-        'src/domain/sourceScan/SourceScan.ts': ['node:fs', 'node:path'],
-        'src/domain/workspace/LocalAgentWorkspace.ts': ['node:child_process', 'node:fs/promises', 'node:path'],
-        'src/domain/migration/LegacyOkf.ts': ['node:fs', 'node:path', 'yaml'],
+        'src/domain/services/sourceScan/SourceScan.ts': ['node:fs', 'node:path'],
+        'src/domain/services/workspace/LocalAgentWorkspace.ts': ['node:child_process', 'node:fs/promises', 'node:path'],
+        'src/domain/services/migration/LegacyOkf.ts': ['node:fs', 'node:path', 'yaml'],
       };
       assert.ok(dependency.startsWith('.') || dependency === 'node:crypto' || resourceImports[path]?.includes(dependency), `${path}: concrete SDK dependency ${dependency}`);
     }
@@ -69,9 +69,9 @@ test('DDD application and domain-service boundaries are explicit without changin
   for (const path of [
     'src/interfaces/uiApi/UiApi.ts',
     'src/application/apps/ApplicationApps.ts',
-    'src/domain/workflow/FlywheelDomainService.ts',
-    'src/domain/evaluation/EvalRunnerDomainService.ts',
-    'src/domain/association/AssociationDomainService.ts',
+    'src/domain/services/workflow/FlywheelDomainService.ts',
+    'src/domain/services/evaluation/EvalRunnerDomainService.ts',
+    'src/domain/services/association/AssociationDomainService.ts',
     'src/infrastructure/redis/Redis.ts',
   ]) assert.equal(statSync(path).isFile(), true, `missing DDD boundary: ${path}`);
 
@@ -133,4 +133,20 @@ test('each role owns execution, contract and prompt while application commits wi
   const development = readFileSync('src/application/services/AgentExample.ts', 'utf8');
   assert.match(development, /RoleExecutionService/);
   assert.doesNotMatch(development, /workflow\.start|\.evaluate\(|\.publish\(/);
+});
+
+
+test('external layers enter internal role execution through domain services', () => {
+  for (const root of ['src/application', 'src/infrastructure', 'src/interfaces']) {
+    for (const path of files(root).filter((path) => path.endsWith('.ts'))) {
+      const source = readFileSync(path, 'utf8');
+      assert.doesNotMatch(source, /(?:from\s*|import\s*\(|require\s*\()\s*['"][^'"]*domain\/agents\/(?:AgentRegistry|[^/]+\/[^/]+Agent)\.ts['"]/, `${path}: internal role execution must remain in Domain`);
+    }
+  }
+  const application = readFileSync('src/application/services/RoleExecution.ts', 'utf8');
+  assert.match(application, /domain\/services\/workflow\/AgentExecutionService\.ts/);
+  for (const path of ['src/domain/services/association/AssociationDomainService.ts', 'src/domain/services/evaluation/EvalRunnerDomainService.ts']) {
+    const source = readFileSync(path, 'utf8');
+    assert.doesNotMatch(source, /from\s*['"][^'"]*agents\//, `${path}: deterministic service must not invoke a generative role`);
+  }
 });

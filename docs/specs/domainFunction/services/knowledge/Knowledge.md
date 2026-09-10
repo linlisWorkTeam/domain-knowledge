@@ -5,7 +5,7 @@ SPDX-License-Identifier: MIT
 -->
 # 知识实体与正文差异设计
 
-代码位置：[src/domain/Domain.ts](../../../../src/domain/Domain.ts)、[src/domain/knowledge/MarkdownDiff.ts](../../../../src/domain/knowledge/MarkdownDiff.ts)。
+代码位置：[src/domain/Domain.ts](../../../../../src/domain/Domain.ts)、[src/domain/services/knowledge/MarkdownDiff.ts](../../../../../src/domain/services/knowledge/MarkdownDiff.ts)。
 
 
 ## 实体与不变量
@@ -25,4 +25,4 @@ MarkdownDiff 对正文做结构化行差异，给出段落与范围校验信息�
 Domain 产生状态、事件、工件描述和 Gate 判定；Application 协调写入，SQLite 实现事务、幂等和约束。领域代码不直接更新数据库。内容评分的现有实现位于 Application QualityPolicy，所属设计在 Application 文档中说明。
 
 
-文档关系：[设计目录](../../README.md)负责代码与设计定位；[开发指南](../../../Development.md)说明修改和交付步骤。
+文档关系：[设计目录](../../../README.md)负责代码与设计定位；[开发指南](../../../../Development.md)说明修改和交付步骤。

@@ -51,7 +51,7 @@ SPDX-License-Identifier: MIT
 | KF-SYS-028 | P1 | 官网和控制台的用户可见文案必须使用自然、统一的中文；除固定标题 `WORKPANEL · KNOWLEDGE FLYWHEEL` 外，不得使用中英文拼接的栏目名、状态名或说明句。源码标识符、项目名、命令和环境变量作为技术值原样保留。 | AC-DOC-004 |
 | KF-SYS-029 | P0 | 本地服务必须提供可提交的写入令牌配置样例、默认忽略的本地配置文件和页面内配置说明；未配置时继续默认拒绝写入，但必须告诉用户如何启用并重启服务。 | AC-SEC-004 |
 | KF-SYS-030 | P0 | 运行代码、Spec、测试和前台必须只在 domain-knowledge 演进；wpKnowledge 只能保存知识正文、研究、设计、证据与索引，不得保留可运行副本。 | AC-ARCH-003 |
-| KF-SYS-031 | P0 | UI/API 必须只通过 Orchestrator、Flywheel、EvalRunner、KnowledgeSearch、KnowledgeDiscovery、ContentGovernance、ProviderOperations 和 OperationalMetrics Application App 进入系统；领域规则由 Flywheel、EvalRunner 和 Association Domain Service 持有，LangGraph、Provider SDK、秘密持有、数据库与 Redis 实现只能位于 Infrastructure。 | AC-ARCH-004 |
+| KF-SYS-031 | P0 | UI/API 必须只通过 Orchestrator、Flywheel、EvalRunner、KnowledgeSearch、KnowledgeDiscovery、ContentGovernance、ProviderOperations 和 OperationalMetrics Application App 进入系统；agents 与 services 在 Domain 平级，内部角色实现由 services 的执行入口调用；领域规则由 services 内的 Flywheel、EvalRunner 和 Association Domain Service 持有，LangGraph、Provider SDK、秘密持有、数据库与 Redis 实现只能位于 Infrastructure。 | AC-ARCH-004 |
 | KF-SYS-032 | P1 | Preview HTTP API 必须按 system、runs、knowledge、evaluations、sources、graph、agents 资源分组；迁移必须原子更新 Server、Console、DSH Adapter、测试和文档，首个 Release 前不得保留旧路由别名。 | AC-API-001 |
 | KF-SYS-033 | P1 | 系统必须提供持久化 Action Item 治理能力，能够从运行、评测、来源和安全事实确定性地产生、去重、处理和审计事项；治理动作不得改写既有 GateDecision 或 publication。 | AC-API-002 |
 | KF-SYS-034 | P1 | Run 必须提供可证明的进度、合法重试和可断线续传的实时事件；无法从固定工作单元计算时不得输出百分比或 ETA。 | AC-API-003 |
@@ -83,5 +83,6 @@ SPDX-License-Identifier: MIT
 | NFR-010 | P0 | 本地 V1 在 5 个并行 worker 上限内不得因并发产生同路径写冲突；冲突必须在调度前拒绝。 | AC-FLOW-004 |
 | NFR-011 | P0 | 真实源码验收必须记录仓库 URL、本地路径、commit、脏状态、运行时版本、逐条 argv、退出码、截断后的 stdout/stderr 摘要与完整证据 Artifact 摘要；验收不得依赖修改原工作区。 | AC-E2E-001 |
 | NFR-012 | P1 | 控制台必须支持键盘导航、可见焦点、语义名称、非纯颜色状态表达、WCAG AA 文字对比度和 200% 缩放下的核心读取路径；默认页面资源必须同源提供。 | AC-UI-012 |
+| NFR-013 | P1 | 易用性：开发过程中支持主 Agent 调度 subagent 并行完成独立任务，明确任务与写入边界、独立 worktree、READY、资源上限、失败回报和集成验证；宿主不支持时明确回退串行。 | AC-DEV-001 |
 
 需求变化需要同时更新模块设计、对应实现和验收追踪，不能只修改本表。运行及接入方式见 [快速开始](../../GettingStarted.md)。

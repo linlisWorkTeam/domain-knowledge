@@ -9,7 +9,7 @@ import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { LocalAgentWorkspace } from '../../src/domain/workspace/LocalAgentWorkspace.ts';
+import { LocalAgentWorkspace } from '../../src/domain/services/workspace/LocalAgentWorkspace.ts';
 
 function git(root: string, args: string[]): string {
   const result = spawnSync('git', args, { cwd: root, encoding: 'utf8', shell: false });

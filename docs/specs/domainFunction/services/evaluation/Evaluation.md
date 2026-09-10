@@ -5,8 +5,10 @@ SPDX-License-Identifier: MIT
 -->
 # 确定性评测判定设计
 
-代码位置：[src/domain/evaluation/EvalRunnerDomainService.ts](../../../../src/domain/evaluation/EvalRunnerDomainService.ts)、[src/domain/Domain.ts](../../../../src/domain/Domain.ts)。
+代码位置：[src/domain/services/evaluation/EvalRunnerDomainService.ts](../../../../../src/domain/services/evaluation/EvalRunnerDomainService.ts)、[src/domain/Domain.ts](../../../../../src/domain/Domain.ts)。
 
+
+本服务位于 `services/evaluation`，对外契约为 EvaluationService。既有 `evaluation-agent` 能力 ID 保持不变，但没有对应的生成 Agent。TestGen、Check、Review 提供候选或意见，最终门禁仍由本服务调用共享不变量决定。
 
 ## 输入与判定顺序
 
@@ -32,4 +34,4 @@ Domain 不编译、不运行子进程。Application 请求 ProjectEvaluator，�
 Check 阻塞必须带判据编号、生成文件路径和合法行号证据；Review 将纠正意见绑定本轮评测与 Check 工件，定位 `knowledge/<moduleId>.md#<已有H2>`。无法定位的原因保留为 unresolvedRisks，不猜测修订范围。PASS 不能同时带阻塞、纠正意见或未解决风险。
 
 
-文档关系：[设计目录](../../README.md)负责代码与设计定位；[开发指南](../../../Development.md)说明修改和交付步骤。
+文档关系：[设计目录](../../../README.md)负责代码与设计定位；[开发指南](../../../../Development.md)说明修改和交付步骤。

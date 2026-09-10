@@ -5,7 +5,7 @@ SPDX-License-Identifier: MIT
 -->
 # 候选文件发现设计
 
-代码位置：[src/domain/sourceScan/SourceScan.ts](../../../../src/domain/sourceScan/SourceScan.ts)、[src/application/apps/KnowledgeDiscoveryApp.ts](../../../../src/application/apps/KnowledgeDiscoveryApp.ts)。
+代码位置：[src/domain/services/sourceScan/SourceScan.ts](../../../../../src/domain/services/sourceScan/SourceScan.ts)、[src/application/apps/KnowledgeDiscoveryApp.ts](../../../../../src/application/apps/KnowledgeDiscoveryApp.ts)。
 
 
 SourceScanner 实现 KnowledgeDiscoveryPort，只依赖最小 SourceKnowledgeReader 提供已入库正文摘要。scan 接收配置的扫描根和返回上限，输出 candidates、total、truncated；候选包含相对路径、SHA256、大小与修改时间。
@@ -15,4 +15,4 @@ SourceScanner 实现 KnowledgeDiscoveryPort，只依赖最小 SourceKnowledgeRea
 本模块是文件候选发现，不是语言分析、远程爬虫或 SearchAgent。发现不自动入库、评测或发布；Application 决定后续用例。文件系统读取在本次目录迁移中保留，接口不引用完整仓库实现。
 
 
-文档关系：[设计目录](../../README.md)负责代码与设计定位；[开发指南](../../../Development.md)说明修改和交付步骤。
+文档关系：[设计目录](../../../README.md)负责代码与设计定位；[开发指南](../../../../Development.md)说明修改和交付步骤。

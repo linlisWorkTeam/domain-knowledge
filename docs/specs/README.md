@@ -10,14 +10,14 @@ SPDX-License-Identifier: MIT
 | 分类 | 对应代码 | 设计入口 |
 | --- | --- | --- |
 | totalRules | 仓库整体 | [Requirements](totalRules/Requirements.md)、[Architecture](totalRules/Architecture.md)、[DomainDrivenDesign](totalRules/DomainDrivenDesign.md)、[CodeTaste](totalRules/CodeTaste.md)、[UiuxDesign](totalRules/UiuxDesign.md)、[Verification](totalRules/Verification.md) |
-| domainFunction | src/domain | [Agents](domainFunction/agents/Agents.md)、[Workflow](domainFunction/workflow/Workflow.md)、[Knowledge](domainFunction/knowledge/Knowledge.md)、[Association](domainFunction/association/Association.md)、[Evaluation](domainFunction/evaluation/Evaluation.md)、[SourceScan](domainFunction/sourceScan/SourceScan.md)、[Workspace](domainFunction/workspace/Workspace.md)、[legacyOkf](domainFunction/migration/LegacyOkf.md) |
+| domainFunction | src/domain | [Agents](domainFunction/agents/Agents.md)、[Workflow](domainFunction/services/workflow/Workflow.md)、[Knowledge](domainFunction/services/knowledge/Knowledge.md)、[Association](domainFunction/services/association/Association.md)、[Evaluation](domainFunction/services/evaluation/Evaluation.md)、[SourceScan](domainFunction/services/sourceScan/SourceScan.md)、[Workspace](domainFunction/services/workspace/Workspace.md)、[legacyOkf](domainFunction/services/migration/LegacyOkf.md) |
 | languagePlugins | 当前只有 application/ports 契约 | [LanguagePlugins](domainFunction/languagePlugins/LanguagePlugins.md)，未创建具体插件 |
 | application | src/application | [Application](application/Application.md) |
 | infrastructure | src/infrastructure 的同名目录 | [sqlite](infrastructure/sqlite/Sqlite.md)、[redis](infrastructure/redis/Redis.md)、[langgraph](infrastructure/langgraph/LangGraph.md)、[agentAdapters](infrastructure/agentAdapters/AgentAdapters.md)、[evaluation](infrastructure/evaluation/Evaluation.md)、[http](infrastructure/http/Http.md)、[observability](infrastructure/observability/Observability.md) |
 | interfaces | src/interfaces、web | [HttpApi](interfaces/HttpApi.md)、[UiuxDesign](totalRules/UiuxDesign.md) |
 | schemas | 跨层版本化机器契约 | [Schema 目录](schemas/README.md)，保持 $id 和字节兼容 |
 
-Domain 按领域功能组织：agents、workflow、evaluation、association、knowledge、sourceScan、workspace、migration 是同层级目录，不设置 services 分组或总导出文件。领域服务类放在所属功能目录；Domain.ts 保留共享实体与不变量。
+Domain 中 `agents` 与 `services` 平级：`agents/<role>` 保存领域内部角色实现；`services/<feature>` 按 association、evaluation、knowledge、workflow、sourceScan、workspace、migration 组织领域对外服务及所属规则。`Domain.ts` 保留共享实体与不变量。领域服务封装业务能力，不复制 Agent 的生成步骤，也不承担 Application 的持久化事务。
 
 ## Spec 与操作文档的对应关系
 
