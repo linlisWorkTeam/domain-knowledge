@@ -6,8 +6,7 @@
 import { sha256, type ArtifactRef } from '../../domain/Domain.ts';
 import { canonicalJson, type JsonValue, type StageInput } from '../../domain/services/workbench/StageTask.ts';
 import { markdownSections } from '../../domain/services/knowledge/KnowledgeSections.ts';
-import { sourceReviewObservations } from '../../domain/services/knowledge/KnowledgeRevision.ts';
-import { SOURCE_VERIFICATION_CONTRACT, sourceSectionDecision, sourceSectionsOutcome, sourceVerificationOutcome, type SourceCardBinding, type SourceCardResult } from '../../domain/services/knowledge/KnowledgeSourceVerification.ts';
+import { SOURCE_VERIFICATION_CONTRACT, sourceSectionObservations, sourceSectionDecision, sourceSectionsOutcome, sourceVerificationOutcome, type SourceCardBinding, type SourceCardResult } from '../../domain/services/knowledge/KnowledgeSourceVerification.ts';
 import type { NativeBehaviorSuite } from '../../domain/services/evaluation/NativeBehaviorSuite.ts';
 import type { Output as ReviewOutput } from '../../domain/agents/reviewAgent/ReviewAgentContract.ts';
 import type { StageModelConfiguration } from '../ports/WorkbenchGenerationPorts.ts';
@@ -76,19 +75,20 @@ export class WorkbenchSourceVerification {
         const reference = { schemaVersion: SOURCE_VERIFICATION_CONTRACT, sourceRevision: project.commit, sourceDigest: project.sourceDigest, files };
         const referenceRef = await artifacts.put(Buffer.from(JSON.stringify(reference)), 'application/json');
         const suite = await this.load<NativeBehaviorSuite>(moduleEvidence.suiteRef);
-        const report = { schemaVersion: 'native-source-review-evidence-v1', sourceRevision: project.commit, sourceDigest: project.sourceDigest,
-          suiteRef: moduleEvidence.suiteRef, oracleRef: moduleEvidence.oracleRef,
-          ...sourceReviewObservations(suite, await this.load<Parameters<typeof sourceReviewObservations>[1]>(moduleEvidence.oracleRef), suite.cases.map(item => item.caseId)) };
-        const reportRef = await artifacts.put(Buffer.from(JSON.stringify(report)), 'application/json');
+        const oracle = await this.load<Parameters<typeof sourceSectionObservations>[1]>(moduleEvidence.oracleRef);
         const sections: Array<SourceCardResult & { section: string; unresolved: string[] } & Record<string, unknown>> = [];
         const sectionRefs: ArtifactRef[] = [];
         for (const [sectionIndex, heading] of headings.entries()) {
           context.progress({ phase: 'source-section', versionId, heading, completed: sectionIndex, total: headings.length });
           const sectionKey = sha256(heading).slice(0, 24);
           const section = await context.step(`source-section:${versionId}:${sectionKey}`, async () => {
+            const report = { schemaVersion: 'native-source-review-evidence-v2', sourceRevision: project.commit, sourceDigest: project.sourceDigest,
+              suiteRef: moduleEvidence.suiteRef, oracleRef: moduleEvidence.oracleRef,
+              ...sourceSectionObservations(suite, oracle, binding.cardId, heading) };
+            const reportRef = await artifacts.put(Buffer.from(JSON.stringify(report)), 'application/json');
             const criteria = { schemaVersion: SOURCE_VERIFICATION_CONTRACT, phase: 'FINAL_SOURCE_REVIEW', binding,
-              section: heading, verifyPreamble: sectionIndex === 0, allowedKnowledgePaths: [`knowledge/${card.moduleId}.md#${heading}`],
-              instruction: '本次只独立核对 section 指定的 H2 与固定源码的一致性。完整正文提供上下文，其他 H2 由独立调用复核，不属于本次纠正范围或未知风险。必须核对该节全部事实、边界和例子。verifyPreamble为true时也须核对标题及首个H2之前的文本；若该区域有无法在授权H2修正的矛盾，保留未解决风险，不能放行或修改其他区域。参考观察明确标记PINNED_REFERENCE，只证明对应参考用例；不能推断所有可能输入都已验证。逐项核对边界、状态、接口及示例。与固定源码直接矛盾的事实必须指出，即使重建代码通过了行为测试。上游失败归因PASS不代表正文正确。发现明确错误时指向已有H2；缺少证据则保留风险。仅在当前 H2 无矛盾、无未知风险时PASS；这不是发布授权。' };
+              applicationVerified: { artifactDigests: true, frozenVersionBindings: true }, section: heading, verifyPreamble: sectionIndex === 0, allowedKnowledgePaths: [`knowledge/${card.moduleId}.md#${heading}`],
+              instruction: '本次只独立核对 section 指定的 H2 与固定源码的一致性。完整正文提供上下文，其他 H2 由独立调用复核，不属于本次纠正范围或未知风险。必须核对该节全部事实、边界和例子。verifyPreamble为true时也须核对标题及首个H2之前的文本；若该区域有无法在授权H2修正的矛盾，保留未解决风险，不能放行或修改其他区域。应用已验证提供工件的摘要和冻结来源绑定；无需重新计算摘要或联网审计。仍须检查正文对来源和版本的文字断言是否与提供的绑定相符。参考观察仅包含精确绑定当前卡片章节的用例；NO_DIRECT_BEHAVIOR_EVIDENCE 表示没有直接行为用例，不能虚构覆盖，也不自动否定可由固定源码证明的事实。参考观察明确标记PINNED_REFERENCE，只证明对应参考用例；不能推断所有可能输入都已验证。逐项核对边界、状态、接口及示例。与固定源码直接矛盾的事实必须指出，即使重建代码通过了行为测试。上游失败归因PASS不代表正文正确。发现明确错误时指向已有H2；缺少证据则保留风险。仅在当前 H2 无矛盾、无未知风险时PASS；这不是发布授权。' };
             const criteriaRef = await artifacts.put(Buffer.from(JSON.stringify(criteria)), 'application/json');
             const inputRefs = [card.bodyRef, referenceRef, reportRef, criteriaRef, moduleEvidence.suiteRef, moduleEvidence.oracleRef];
             await context.step(`source-materials:${versionId}:${sectionKey}`, async () => ({ artifactRefs: inputRefs, summary: { versionId, heading } }));

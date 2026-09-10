@@ -307,7 +307,7 @@ flowchart LR
   Reindex --> Rebuild[新版本重建与再评测]
 ```
 
-一键 pipeline-v10 接通来源门禁：
+一键 pipeline-v11 接通来源门禁：
 
 ```mermaid
 flowchart LR
@@ -322,4 +322,20 @@ flowchart LR
   Associate -.待实现.-> Publish[固定测试及独立发布事务]
 ```
 
-来源章节检查点、来源修订与行为子任务统一纳入轮次历史；通过行为评测结束该连续失败阶段，来源进展另按新完成的章节复核计数。旧 v9 不跨版本恢复。
+来源章节检查点、来源修订与行为子任务统一纳入轮次历史；通过行为评测结束该连续失败阶段，来源进展另按新完成的章节复核计数。旧 v10 及更早流程不跨版本恢复。
+
+来源材料 v3 的逐章边界与独立固定评测：
+
+```mermaid
+flowchart LR
+  Oracle[完整可信参考观察] --> Validate[Domain 校验完整覆盖与实际值]
+  Validate --> Project[精确 cardId 与 H2 投影]
+  Project --> Review[Review 语义核验]
+  Source[完整固定源码与正文 CAS] --> Review
+  Project --> Empty[无直接行为证据时明确标注]
+  FrozenCode[成功重建与冻结卡片版本] --> Fixed[独立固定用例评测]
+  Fixed --> Reference[参考实现验证]
+  Reference -->|通过| Generated[隔离执行生成实现]
+  Generated --> Detail[逐案预期与实际 取消恢复与下载]
+  Detail -.尚未接通.-> Publication[一键联合门禁与发布事务]
+```

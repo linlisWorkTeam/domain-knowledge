@@ -41,11 +41,15 @@ for (const rejectSourceReview of [false, true]) test(`native stage rejects bad c
       if (request.role === 'review' && request.prompt.includes('FINAL_SOURCE_REVIEW')) {
         assert.ok(composition.apps.workbenchStages.store.checkpoints(_command.runId).some(row => row.key.startsWith('source-materials:')));
         const sourceReport = JSON.parse(Buffer.from(await composition.artifacts.get(_command.payload.evaluationReportRef as any)).toString('utf8'));
-        assert.equal(sourceReport.observedImplementation, 'PINNED_REFERENCE'); assert.equal(sourceReport.cases[0].observation.actual.sum, '7');
+        assert.equal(sourceReport.observedImplementation, 'PINNED_REFERENCE'); assert.equal(sourceReport.scope, 'EXACT_CARD_SECTION');
         const body = Buffer.from(await composition.artifacts.get(_command.payload.knowledgeRef as any)).toString('utf8');
         usage(`whole-source-${_command.commandId}`, 3);
         const criteria = JSON.parse(Buffer.from(await composition.artifacts.get(_command.payload.criteriaRef as any)).toString('utf8'));
         assert.equal(criteria.verifyPreamble, criteria.section === 'Behavior');
+        assert.equal(sourceReport.sectionId, `card-add#${criteria.section}`);
+        assert.deepEqual(criteria.applicationVerified, { artifactDigests: true, frozenVersionBindings: true });
+        if (criteria.section === 'Behavior') { assert.equal(sourceReport.cases[0].observation.actual.sum, '7'); assert.equal(sourceReport.coverage, 'DIRECT_BEHAVIOR_EVIDENCE'); }
+        else { assert.deepEqual(sourceReport.cases, []); assert.equal(sourceReport.coverage, 'NO_DIRECT_BEHAVIOR_EVIDENCE'); }
         const sectionKey = `${_command.runId}:${criteria.section}`;
         sectionCalls.set(sectionKey, (sectionCalls.get(sectionKey) ?? 0) + 1);
         if (criteria.section === 'Limits' && interruptSourceSection) { interruptSourceSection = false; throw new Error('TEST_SOURCE_SECTION_INTERRUPTION'); }

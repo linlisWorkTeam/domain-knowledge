@@ -184,3 +184,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 [2026-09-11-0624-source-gated-pipeline.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/39f766e9295986913df43d1b72fe0ae955c6a03a/docs/epitaph/2026-09-11-0624-source-gated-pipeline.md) 交付pipeline-v10来源门禁与source-v2逐章恢复，集成212/单元75/架构8/Console31/受控验收19通过。真实旧source-v1两次超时，不再跨版本恢复。固定测试与最终发布当时未完成。
 
 [2026-09-11-0629-fixed-native-acceptance.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/5f9843c61b2a1b629cef94645e765c7f70d1f489/docs/epitaph/2026-09-11-0629-fixed-native-acceptance.md) 固定参考用例完成 C 11/11、C++ 40/40，未把参考通过当作知识发布。后来生成实现和独立工作台固定评测分别通过同一用例；来源复核仍未完成，最终发布门禁未接通。
+
+[2026-09-11-0635-language-case-boundary.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/6cba6d3374cce85a13a0450a46c8484da138d86e/docs/epitaph/2026-09-11-0635-language-case-boundary.md) 共享语言案例端口接通原生和既有 TS 执行，3单元/8架构/17集成通过。来源 v2 后续仍超时，最终发布与双目标完整链路未完成。

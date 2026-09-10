@@ -5,7 +5,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { sourceCardDecision, sourceVerificationOutcome, sourceSectionDecision, sourceSectionsOutcome, type SourceCardBinding } from '../../src/domain/services/knowledge/KnowledgeSourceVerification.ts';
+import { sourceSectionObservations, sourceCardDecision, sourceVerificationOutcome, sourceSectionDecision, sourceSectionsOutcome, type SourceCardBinding } from '../../src/domain/services/knowledge/KnowledgeSourceVerification.ts';
 const body = '# Parser\n## Behavior\nEnd is one past the closing quote.\n## Limits\nPinned source only.\n';
 const correction = { correctionId: 'COR-1', knowledgePath: 'knowledge/parser.md#Behavior', criterion: 'End is the closing quote index in the fixed source.', risk: 'Incorrect token boundary.' };
 test('source contradictions remain actionable without a generated behavior failure; unknown risks cannot become PASS', () => {
@@ -31,4 +31,17 @@ test('section-by-section checks require complete H2 coverage and prohibit a corr
   assert.throws(() => sourceSectionsOutcome(body, [{ section: 'Behavior', outcome: 'SOURCE_MATCHED' }]), /SOURCE_VERIFICATION_SECTION_INVALID/);
   assert.equal(sourceSectionsOutcome(body, [{ section: 'Behavior', outcome: 'SOURCE_MATCHED' }, { section: 'Limits', outcome: 'SOURCE_MISMATCH' }]), 'SOURCE_MISMATCH');
   assert.equal(sourceSectionsOutcome(body, [{ section: 'Behavior', outcome: 'SOURCE_MATCHED' }, { section: 'Limits', outcome: 'UNRESOLVED' }]), 'UNRESOLVED');
+});
+
+test('section evidence filters exact card bindings only after validating the complete oracle', () => {
+  const make = (caseId: string, section: string) => ({ caseId, description: caseId, sections: [section], variables: [], calls: [], observations: [{ name: 'value', kind: 'integer' as const, read: { variable: 'value' } }], expected: { value: '7' } });
+  const suite = { schemaVersion: 'native-cases-v1' as const, cases: [make('one', 'card#Behavior'), make('other', 'other#Behavior')] };
+  const oracle = suite.cases.map(test => ({ caseId: test.caseId, status: 'PASSED' as const, actual: { value: '7' } }));
+  const selected = sourceSectionObservations(suite, oracle, 'card', 'Behavior');
+  assert.deepEqual(selected.cases.map(item => item.input.caseId), ['one']);
+  assert.equal(selected.coverage, 'DIRECT_BEHAVIOR_EVIDENCE');
+  const empty = sourceSectionObservations(suite, oracle, 'card', 'Sources');
+  assert.deepEqual(empty.cases, []); assert.equal(empty.coverage, 'NO_DIRECT_BEHAVIOR_EVIDENCE');
+  assert.throws(() => sourceSectionObservations(suite, [oracle[0]!], 'card', 'Sources'), /REVISION_REFERENCE_NOT_TRUSTED/);
+  assert.throws(() => sourceSectionObservations(suite, [oracle[0]!, { ...oracle[1]!, actual: { value: '9' } }], 'card', 'Behavior'), /REVISION_REFERENCE_NOT_TRUSTED/);
 });

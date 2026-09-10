@@ -5,8 +5,10 @@
  */
 import type { Output as ReviewOutput } from '../../agents/reviewAgent/ReviewAgentContract.ts';
 import { markdownSections } from './KnowledgeSections.ts';
+import type { NativeBehaviorSuite, NativeScalar } from '../evaluation/NativeBehaviorSuite.ts';
+import { nativeOracleTrusted } from '../evaluation/NativeTestCache.ts';
 import { knowledgeRevisionDecision } from './KnowledgeRevision.ts';
-export const SOURCE_VERIFICATION_CONTRACT = 'knowledge-source-verification-v2';
+export const SOURCE_VERIFICATION_CONTRACT = 'knowledge-source-verification-v3';
 export interface SourceCardBinding { cardId: string; versionId: string; moduleId: string; bodyDigest: string }
 export type SourceCardOutcome = 'SOURCE_MATCHED' | 'SOURCE_MISMATCH' | 'UNRESOLVED';
 export interface SourceCardResult extends SourceCardBinding { outcome: SourceCardOutcome }
@@ -49,4 +51,17 @@ export function sourceSectionsOutcome(body: string, results: Array<{ section: st
     || results.some(result => !headings.includes(result.section) || !['SOURCE_MATCHED', 'SOURCE_MISMATCH', 'UNRESOLVED'].includes(result.outcome))) throw new Error('SOURCE_VERIFICATION_SECTION_INVALID');
   return results.some(result => result.outcome === 'UNRESOLVED') ? 'UNRESOLVED'
     : results.some(result => result.outcome === 'SOURCE_MISMATCH') ? 'SOURCE_MISMATCH' : 'SOURCE_MATCHED';
+}
+
+/** 先验证整套参考证据，再按精确卡片和章节投影；无行为证据不等于来源通过。 */
+export function sourceSectionObservations(suite: NativeBehaviorSuite, oracle: Array<{ caseId: string; status: 'PASSED' | 'FAILED'; actual: Record<string, NativeScalar> | null }>, cardId: string, heading: string) {
+  if (!nativeOracleTrusted(suite, oracle)) throw new Error('REVISION_REFERENCE_NOT_TRUSTED');
+  if (!cardId || !heading || cardId.includes('#')) throw new Error('SOURCE_VERIFICATION_SECTION_INVALID');
+  const sectionId = `${cardId}#${heading}`;
+  const cases = suite.cases.filter(test => test.sections.includes(sectionId)).map(test => {
+    const { caseId, status, actual } = oracle.find(item => item.caseId === test.caseId)!;
+    return { input: test, observation: { caseId, status, actual } };
+  });
+  return { observedImplementation: 'PINNED_REFERENCE' as const, scope: 'EXACT_CARD_SECTION' as const, sectionId,
+    coverage: cases.length ? 'DIRECT_BEHAVIOR_EVIDENCE' as const : 'NO_DIRECT_BEHAVIOR_EVIDENCE' as const, cases };
 }

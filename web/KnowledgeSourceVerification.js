@@ -8,7 +8,7 @@ export function createSourceVerificationPanel({ root, request, escapeHtml: escap
   let task = null, checkpoints = [], events = [], loadedFor = null, timer = null, busy = false, notice = ''
   const revision = createKnowledgeRevisionPanel({ root, request, escapeHtml: escape, isEditable, source: true, selection: () => task?.status === 'SUCCEEDED' ? task.taskId : null, evidence: () => task?.result?.summary })
   const host = () => root.querySelector('[data-source-verification-panel]')
-  const current = () => task?.contractVersion === 'knowledge-workbench-v1' && task?.input.parameters.verificationContract === 'knowledge-source-verification-v2'
+  const current = () => task?.contractVersion === 'knowledge-workbench-v1' && task?.input.parameters.verificationContract === 'knowledge-source-verification-v3'
   const active = () => current() && ['PENDING', 'RUNNING'].includes(task.status)
   const reasons = { AGENT_STAGE_TIMEOUT: '来源复核超时，已完成章节和输入材料保留。', DSH_AGENT_OUTPUT_NOT_JSON: '模型输出格式错误，前序结果保留，可恢复原任务。', STAGE_PROCESS_EXITED: '上次进程退出，可恢复原任务。', PROVIDER_QUOTA_EXHAUSTED: '供应商额度不足，累计用量和已完成结果保留。' }
   const outcomes = { SOURCE_MATCHED: '来源复核匹配', SOURCE_MISMATCH: '正文与源码存在矛盾', UNRESOLVED: '仍有未解决问题' }
