@@ -38,6 +38,8 @@ SPDX-License-Identifier: MIT
 
 ## 验证清单
 
+GitHub CI 自动检查代码、配置、Schema 及混合改动的 PR。仅修改仓库根目录 Markdown 或 `docs/` 下 Markdown 的 PR 不自动触发 CI；本地仍按改动范围执行文档检查。需要时可在 Actions 中手动运行 CI，手动运行不受文档路径过滤影响。网站部署使用独立工作流，不随本规则变更。
+
 ```bash
 npm run typecheck
 npm run validate:specs
@@ -59,5 +61,7 @@ PR 围绕最终行为写动机、实现和验证，不自动合并。已存在 P
 <summary>English summary</summary>
 
 Locate the module design under docs/specs before editing code. Keep contracts, implementation and verification aligned. Use an independently bootstrapped worktree, document skipped checks, and distinguish controlled providers from live model evidence. Keep the latest three handoffs and summarize older records in HistoryEpitaph.md.
+
+CI skips PRs changing only root Markdown or Markdown under docs/. Code, configuration, schemas and mixed changes still trigger CI; manual CI remains available.
 
 </details>
