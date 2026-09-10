@@ -24,10 +24,11 @@ export function createRepositoryAnalysisPanel({ root, request, escapeHtml: escap
       ${report.warnings.length ? `<ul>${report.warnings.map((warning) => `<li>${escape(warning)}</li>`).join('')}</ul>` : ''}
       <h3>模块候选</h3><ul>${report.modules.slice(0, 200).map((module) => `<li><label><input type="checkbox" data-project-module value="${escape(module.moduleId)}" ${selected.has(module.moduleId) ? 'checked' : ''} ${!module.selectedByDefault || saving ? 'disabled' : ''}> <b>${escape(module.moduleId)}</b> · ${escape(language[module.language])}</label><small>${escape(module.sourcePaths.join('、'))}${module.reasons.length ? ` · ${escape(module.reasons.map((reason) => reasons[reason] ?? reason).join('、'))}` : ''}</small></li>`).join('')}</ul>
       ${report.modules.length > 200 ? '<p>页面展示前 200 个模块；保存只包含当前页面中勾选的范围。</p>' : ''}
+      ${report.buildCandidates?.length ? `<details data-build-candidates><summary>编译数据库候选（${report.buildCandidates.length}）</summary><p>选择一条候选填入下方公共构建参数；保存前请确认适用于当前所选模块。</p><ul>${report.buildCandidates.slice(0, 200).map((candidate, index) => `<li><b>${escape(candidate.sourcePath ?? '未识别源码')}</b> · ${escape(candidate.origin)} #${candidate.record}<pre>${escape(JSON.stringify(candidate.build, null, 2))}</pre>${candidate.issues.length ? `<ul>${candidate.issues.map(issue => `<li>${escape(issue)}</li>`).join('')}</ul>` : ''}<button type="button" data-build-candidate="${index}" ${candidate.issues.length || saving || !isEditable() ? 'disabled' : ''}>应用到构建参数</button></li>`).join('')}</ul>${report.buildCandidates.length > 200 ? '<p>仅展示前 200 条候选。</p>' : ''}</details>` : ''}
       <form data-project-form><h3>构建参数</h3><div class="project-build-fields">
       ${[['cCompiler', 'C 编译器', ['gcc', 'clang']], ['cppCompiler', 'C++ 编译器', ['g++', 'clang++']], ['cStandard', 'C 标准', ['c99', 'c11', 'c17']], ['cppStandard', 'C++ 标准', ['c++11', 'c++14', 'c++17', 'c++20']]].map(([key, label, values]) => `<label>${label}<select name="${key}" ${saving ? 'disabled' : ''}>${values.map((value) => `<option ${build[key] === value ? 'selected' : ''}>${value}</option>`).join('')}</select></label>`).join('')}
-      <label>包含目录（每行一个，相对仓库）<textarea name="includeDirectories" ${saving ? 'disabled' : ''}>${escape(build.includeDirectories)}</textarea></label>
-      <label>预处理定义（每行一个）<textarea name="definitions" ${saving ? 'disabled' : ''}>${escape(build.definitions)}</textarea></label></div>
+      <label>包含目录（每行一个，相对仓库）<textarea aria-label="包含目录（每行一个，相对仓库）" name="includeDirectories" ${saving ? 'disabled' : ''}>${escape(build.includeDirectories)}</textarea></label>
+      <label>预处理定义（每行一个）<textarea aria-label="预处理定义（每行一个）" name="definitions" ${saving ? 'disabled' : ''}>${escape(build.definitions)}</textarea></label></div>
       <button class="secondary-button" type="submit" ${saving || !isEditable() ? 'disabled' : ''}>${saving ? '保存中…' : '保存项目输入'}</button></form>
       <p data-project-summary>${project ? `已保存 ${escape(project.modules.length)} 个模块，输入版本 <code>${escape(project.snapshotId)}</code>。` : '保存会固定所选模块、源码正文和构建参数。'}</p>`
   }
@@ -42,6 +43,15 @@ export function createRepositoryAnalysisPanel({ root, request, escapeHtml: escap
     if (event.target.matches('[data-project-module]') || event.target.closest('[data-project-form]')) {
       project = null; generation.setProject(null); root.querySelector('[data-project-summary]').textContent = '选择或参数已修改，请重新保存项目输入。'
     }
+  })
+  root.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-build-candidate]')
+    if (!button || busy || saving || !isEditable()) return
+    const candidate = report?.buildCandidates?.[Number(button.dataset.buildCandidate)]
+    if (!candidate || candidate.issues.length) return
+    for (const [key, value] of Object.entries(candidate.build)) if (Object.hasOwn(build, key)) build[key] = Array.isArray(value) ? value.join('\n') : value
+    project = null; generation.setProject(null)
+    root.querySelector('[data-repository-result]').innerHTML = result()
   })
   root.addEventListener('submit', (event) => {
     if (!event.target.matches('[data-project-form]')) return

@@ -955,6 +955,7 @@ test('操作中心从固定 Git 版本分析仓库，显示模块和环境且窄
   }).trim();
   try {
     git(['init', '-q']); writeFileSync(join(directory, 'parser.c'), 'int parse(void) { return 1; }');
+    writeFileSync(join(directory, 'compile_commands.json'), JSON.stringify([{ directory, file: 'parser.c', arguments: ['gcc', '-std=c99', '-DFEATURE=1', '-c', 'parser.c'] }, { directory, file: 'parser.c', arguments: ['gcc', '-pthread', '-c', 'parser.c'] }]));
     git(['add', '.']); git(['commit', '-qm', 'Fixed source']); const commit = git(['rev-parse', 'HEAD']);
     await page.goto(baseUrl); await enterGovernance(page);
     await page.getByLabel('服务器仓库目录', { exact: true }).fill(directory);
@@ -964,12 +965,18 @@ test('操作中心从固定 Git 版本分析仓库，显示模块和环境且窄
     await expect(page.locator('[data-repository-result]')).toContainText('parser');
     await expect(page.locator('[data-repository-result]')).toContainText('gcc');
     await expect(page.getByRole('heading', { name: '模块候选' })).toBeVisible();
+    await page.locator('[data-build-candidates] > summary').click();
+    await expect(page.locator('[data-build-candidates]')).toContainText('参数尚未支持：-pthread');
+    await expect(page.locator('[data-build-candidate="1"]')).toBeDisabled();
+    await page.locator('[data-build-candidate="0"]').click();
+    await expect(page.getByRole('combobox', { name: 'C 标准', exact: true })).toHaveValue('c99');
+    await expect(page.getByLabel('预处理定义（每行一个）', { exact: true })).toHaveValue('FEATURE=1');
     await page.getByRole('combobox', { name: 'C 标准', exact: true }).selectOption('c17');
     const savedResponse = page.waitForResponse((response) => response.url().endsWith('/api/v1/projects') && response.request().method() === 'POST');
     await page.getByRole('button', { name: '保存项目输入', exact: true }).click();
     await expect(page.locator('[data-project-summary]')).toContainText('已保存 1 个模块');
     const saved = await (await savedResponse).json();
-    expect(saved.commit).toBe(commit); expect(saved.build.cStandard).toBe('c17');
+    expect(saved.commit).toBe(commit); expect(saved.build.cStandard).toBe('c17'); expect(saved.build.definitions).toEqual(['FEATURE=1']);
     // UI测试固定接口投影；真实编译、资源预检查及角色恢复由integration串行覆盖。
     instance.composition.apps.workbenchGeneration.dependencies.native = { ...originalNative,
       compileAndRun: (...args) => originalNative.compileAndRun(...args), publicInterface: async () => ({

@@ -161,3 +161,7 @@ revision-v5 的修订后源码复核使用 `native-source-review-evidence-v1`：
 `fixed-native-evaluation-v1` 是 EVALUATE 的独立操作，冻结重建任务、完整模块范围、卡片版本、用户提供的声明式固定用例与当前工具链。每个重建模块必须有且仅有一套合法用例；内容以CAS固定，传给Code的材料不增加隐藏测试。先逐案执行固定参考，实现或预期不匹配时返回REFERENCE_REJECTED并保留观察，不运行生成分支、不晋升测试、不归咎知识。参考全部通过后，在不同隔离目录执行生成文件，以同一用例比较实际值。逐案检查点支持同版本取消/恢复和结果复用。成功仍需可信测试及完整来源门禁，不直接发布；外部验收JSON的自报状态不能替代本阶段执行。
 
 来源材料 v3：先验证完整参考 oracle 的用例覆盖和实际观察值，再仅向当前 H2 提供精确 cardId#heading 绑定的参考观察。没有绑定用例时记录 NO_DIRECT_BEHAVIOR_EVIDENCE，不补造测试或推断行为覆盖；固定源码仍是语义核验依据。完整正文与源码 CAS 引用不裁剪、不冒用摘要。应用负责验证已提供工件的摘要、冻结版本与来源绑定，Review 负责检查文字事实；不能把没有独立网络审计当作摘要未验证，也不能据此忽略正文中的来源矛盾。source-verification-v3 / source-revision-v3 / pipeline-v11 使用新输入身份；v2/v10 及更早执行只读，既有审计和累计用量保留，不迁移成功章节到不同材料契约。
+
+## 编译数据库构建候选
+
+仓库分析只读取固定 Git 对象中的 compile_commands.json，不运行其中的命令。按 Clang JSON Compilation Database 的 directory/file/arguments 或 command 结构提取逐编译单元候选；arguments 优先，command 仅词法解码，不进行 shell 展开。候选记录来源文件、记录序号、源码路径、可表达的编译器/标准/包含目录/定义及未支持项。绝对路径仅在固定仓库内转换为相对路径，仓库外依赖明确列为问题；不映射到任意宿主路径或自动下载。候选不自动覆盖现有构建参数：前台查看并应用到构建表单，再保存冻结项目输入。存在未支持参数时不提供一键应用，不能将部分解析称作完整构建配置。Make/CMake 的动态配置执行、生成依赖和逐模块不同参数仍需要后续实现。格式依据：https://clang.llvm.org/docs/JSONCompilationDatabase.html 。

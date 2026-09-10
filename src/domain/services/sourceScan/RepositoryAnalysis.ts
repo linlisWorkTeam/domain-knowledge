@@ -12,6 +12,11 @@ export interface RepositoryModule {
   moduleId: string; language: SourceLanguage; sourcePaths: string[]; testPaths: string[];
   selectedByDefault: boolean; reasons: string[];
 }
+export interface RepositoryBuildCandidate {
+  origin: string; record: number; sourcePath: string | null;
+  build: Partial<import('../workbench/WorkbenchProject.ts').BuildConstraints>;
+  issues: string[];
+}
 export interface RepositoryAnalysis {
   schemaVersion: 'repository-analysis-v1'; repositoryId: string; directory: string;
   requestedRevision: string; commit: string; sourceDigest: string;
@@ -19,6 +24,7 @@ export interface RepositoryAnalysis {
   tools: Array<{ name: string; available: boolean; version: string | null }>;
   resources: { availableMemoryBytes: number; availableDiskBytes: number };
   warnings: string[];
+  buildCandidates?: RepositoryBuildCandidate[];
 }
 
 /** 同名源码和声明组成候选单元；该启发式不宣称已经完成 AST 或公开接口提取。 */

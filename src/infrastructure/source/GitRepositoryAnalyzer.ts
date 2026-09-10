@@ -8,6 +8,7 @@ import { realpathSync, readFileSync, statfsSync } from 'node:fs';
 import { freemem } from 'node:os';
 import { relative, isAbsolute, basename, extname } from 'node:path';
 import { groupRepositoryModules } from '../../domain/services/sourceScan/RepositoryAnalysis.ts';
+import { compilationCandidates } from './CompilationDatabase.ts';
 import { sha256 } from '../../domain/Domain.ts';
 import type { RepositoryAnalyzer, RepositorySourceReader, RepositoryAnalysis, RepositoryFile, SourceLanguage } from '../../application/ports/RepositoryAnalysisPorts.ts';
 
@@ -119,10 +120,21 @@ export class GitRepositoryAnalyzer implements RepositoryAnalyzer, RepositorySour
       catch (error) { if (signal?.aborted) throw error; tools.push({ name, available: false, version: null }); }
     }
     const buildSystems = [...new Set(files.map((file) => buildSystem(file.path)).filter((name): name is string => !!name))];
+    const buildCandidates: ReturnType<typeof compilationCandidates> = [];
+    for (const file of files.filter(file => basename(file.path) === 'compile_commands.json')) {
+      if (file.size > 1_048_576 || buildCandidates.length >= 1000) { warnings.push(`编译数据库超出分析限额：${file.path}`); continue; }
+      const content = await readCommand('git', ['--no-replace-objects', 'cat-file', 'blob', file.objectId], root, signal, 1_048_576);
+      const candidates = compilationCandidates(content, file.path, root);
+      for (const item of candidates) {
+        if (item.sourcePath && !files.some(source => source.path === item.sourcePath && source.kind === 'source')) item.issues.push('编译单元不在当前固定源码范围内');
+        if (buildCandidates.length < 1000) buildCandidates.push(item);
+        else { warnings.push('编译候选超过 1000 条，剩余记录未解析。'); break; }
+      }
+    }
     if (buildSystems.includes('cmake') && !tools.find((tool) => tool.name === 'cmake')?.available) warnings.push('检测到 CMake 配置，但服务器没有可用的 cmake。');
     if (!sources.length) warnings.push('固定提交中没有可分析的源码。');
     return { schemaVersion: 'repository-analysis-v1', repositoryId: `repository-${sha256(root).slice(0, 32)}`, directory: root,
-      requestedRevision: revision, commit, sourceDigest: sha256(JSON.stringify(files)), files, modules, buildSystems, tools,
+      requestedRevision: revision, commit, sourceDigest: sha256(JSON.stringify(files)), files, modules, buildSystems, tools, buildCandidates,
       resources: { availableMemoryBytes, availableDiskBytes }, warnings };
   }
 }

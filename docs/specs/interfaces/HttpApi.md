@@ -181,3 +181,5 @@ v5 在已有生成结果存在时，冻结同源码快照内当前后代卡片�
 `POST /api/v1/fixed-evaluations` 接收 reconstructionTaskId 与 suites（每项moduleId/suite），创建 fixed-native-evaluation-v1 独立评测任务。由现有stage-tasks接口读取进度/取消/同版本恢复，覆盖必须等于重建模块全集；参考失败返回质量拒绝，不授予知识或发布结论。免登录规则与其他工作台接口一致。
 
 来源材料 v3 与流程 v11 不跨版本恢复；v2/v10 及更早记录只读。逐章参考报告标明 EXACT_CARD_SECTION 和 DIRECT_BEHAVIOR_EVIDENCE / NO_DIRECT_BEHAVIOR_EVIDENCE，后者不代表该章节已通过源码核验。
+
+仓库分析响应可包含 `buildCandidates[]`：`origin`、`record`、`sourcePath`、`build`、`issues`，来自固定提交编译数据库。它是可审核候选，不自动改变项目快照；项目创建仍校验声明式 `build`。

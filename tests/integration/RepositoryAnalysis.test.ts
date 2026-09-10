@@ -26,6 +26,7 @@ function repository() {
   writeFileSync(join(root, 'convert.cpp'), 'int convert() { return 2; }\n');
   writeFileSync(join(root, 'other.py'), 'print("unsupported")\n');
   writeFileSync(join(root, 'Makefile'), 'all:\n\tcc -c parser.c\n');
+  writeFileSync(join(root, 'compile_commands.json'), JSON.stringify([{ directory: root, file: 'parser.c', arguments: ['gcc', '-std=c17', '-I.', '-DFEATURE=1', '-c', 'parser.c'] }]));
   symlinkSync('/etc/passwd', join(root, 'outside.h'));
   git(['add', '.']); git(['commit', '-qm', 'Pinned input']);
   return { root, commit: git(['rev-parse', 'HEAD']), git };
@@ -36,6 +37,7 @@ test('analysis pins Git objects and does not read dirty source, test bodies or s
   try {
     const first = await analyzer.analyze(fixture.root);
     writeFileSync(join(fixture.root, 'parser.c'), 'DIRTY_IMPLEMENTATION_MUST_NOT_APPEAR');
+    writeFileSync(join(fixture.root, 'compile_commands.json'), 'DIRTY_DATABASE_MUST_NOT_APPEAR');
     const second = await analyzer.analyze(fixture.root, fixture.commit);
     assert.equal(first.commit, fixture.commit); assert.equal(first.sourceDigest, second.sourceDigest);
     assert.ok(first.files.find((file) => file.path === 'tests/parser_test.c' && file.kind === 'test'));
@@ -47,6 +49,9 @@ test('analysis pins Git objects and does not read dirty source, test bodies or s
     assert.ok(!first.files.some((file) => file.path === 'outside.h'));
     assert.ok(first.warnings.some((warning) => warning.includes('outside.h')));
     assert.ok(first.buildSystems.includes('make'));
+    assert.equal(first.buildCandidates?.[0]?.build.cStandard, 'c17');
+    assert.deepEqual(first.buildCandidates, second.buildCandidates);
+    assert.deepEqual(first.buildCandidates?.[0]?.issues, []);
     assert.ok(first.resources.availableMemoryBytes > 0 && first.resources.availableDiskBytes > 0);
     assert.ok(first.tools.some((tool) => tool.name === 'gcc'));
     assert.doesNotMatch(JSON.stringify(second), /DIRTY_IMPLEMENTATION_MUST_NOT_APPEAR|root:x:|return 1/);
@@ -75,7 +80,7 @@ test('project inputs survive restart, freeze source bodies and isolate changed b
     const input = { directory: fixture.root, revision: fixture.commit, moduleIds: ['parser'], build: { includeDirectories: ['.'], definitions: ['FEATURE=1'] } };
     const first = await composition.apps.workbenchProjects.create(input);
     assert.equal(first.modules.length, 1);
-    assert.deepEqual(first.sourceFiles.map((file) => file.path), ['Makefile', 'parser.c', 'parser.h']);
+    assert.deepEqual(first.sourceFiles.map((file) => file.path), ['Makefile', 'compile_commands.json', 'parser.c', 'parser.h']);
     writeFileSync(join(fixture.root, 'parser.c'), 'int parse(void) { return 9; }\n');
     const repeated = await composition.apps.workbenchProjects.create(input);
     assert.deepEqual(repeated, first);
