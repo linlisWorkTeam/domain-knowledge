@@ -189,3 +189,7 @@ Track four stages here: DDD layout, individual Agent development, end-to-end ver
 S2-03 当前最小链路开发完成。IO-08 的分组预算、IO-10 的分批汇总仍按原 Spec 待细化；后续不将文件均分称为上下文预算方案。专用 Console 决策按钮、知识清理与历史最佳回退不计入本轮 DocGen 角色交付。
 
 2026-09-10 PR 范围确认：用户同意将业务分组、上下文预算、跨模块依赖及分批汇总等未定项留待下个版本确定，本次提交已完成的 DocGen/DocWorker 最小链路供审阅。
+
+### 站点失效断言清理（2026-09-10）
+
+按用户要求移除 Site.test.ts 中资源文件名必须全小写、设计文档必须包含全部主题十六进制色值的断言。继续保留资源存在性/摘要/格式、实际主题色、切换行为、可读性及其他站点检查。CI 工作流未关闭。Node 24.13.0 下 site:check 12 项通过、validate:specs 通过，完整 npm test 241 项全部通过，消除了此前记录的两项站点失败。
