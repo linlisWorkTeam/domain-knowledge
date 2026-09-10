@@ -7,6 +7,8 @@ import type { ArtifactRef } from '../../Domain.ts';
 import type { RoleInput } from '../AgentExecution.ts';
 import { requireMaterials } from '../AgentExecution.ts';
 import { assertModuleBehaviorSuite, moduleBehaviorSuiteSchema, type ModuleBehaviorSuite } from './ModuleBehaviorSuite.ts';
+import { assertNativeBehaviorSuite, assertNativeContract, type NativeContract, type NativeBehaviorSuite } from '../../services/evaluation/NativeBehaviorSuite.ts';
+import { nativeBehaviorSuiteSchema } from '../../services/evaluation/NativeBehaviorSchema.ts';
 
 /** 角色业务载荷。 */
 export interface Payload {
@@ -28,6 +30,7 @@ export interface Output {
   /** 旧记录只保留为未评测候选，不执行模型提供的命令。 */
   candidateCommands?: Record<string, unknown>[];
   suite?: ModuleBehaviorSuite;
+  nativeSuite?: NativeBehaviorSuite;
   oracleRequired: boolean;
 }
 /** 对外提供输出Schema，作为调用方使用的统一约定。 */
@@ -44,6 +47,9 @@ export const outputSchema: Record<string, unknown> = {
 
 /** 构造本次角色执行使用的输出 Schema。 */
 export function schemaFor(input: Input): Record<string, unknown> {
+  const native = nativeContract(input);
+  if (native) return { type: 'object', additionalProperties: false, required: ['nativeSuite', 'oracleRequired'],
+    properties: { nativeSuite: nativeBehaviorSuiteSchema(native), oracleRequired: { const: true } } };
   const policy = input.materials.find(({ ref }) => ref.artifactId === input.payload.testPolicyRef.artifactId)?.content;
   if (policy && typeof policy === 'object' && 'moduleContract' in policy) {
     const contract = policy.moduleContract;
@@ -61,10 +67,25 @@ export function schemaFor(input: Input): Record<string, unknown> {
 
 /** 候选数据必须使用授权模块，且绝不能跳过参考实现验证。 */
 export function validateOutput(output: Output, input: Input): void {
+  const native = nativeContract(input);
+  if (native) {
+    if (output.oracleRequired !== true || output.suite || output.candidateCommands) throw new Error('TEST_ORACLE_REQUIRED');
+    assertNativeBehaviorSuite(output.nativeSuite, native); return;
+  }
+  if (output.nativeSuite) throw new Error('TEST_NATIVE_CONTRACT_REQUIRED');
   if (output.suite) {
     assertModuleBehaviorSuite(output.suite, input.sourcePaths);
     if (output.oracleRequired !== true) throw new Error('TEST_ORACLE_REQUIRED');
   }
+}
+
+/** 原生策略可绑定知识正文，参考源码仍留在独立oracle侧。 */
+export function nativeContract(input: Input): NativeContract | null {
+  const policy = input.materials.find(({ ref }) => ref.artifactId === input.payload.testPolicyRef.artifactId)?.content;
+  if (!policy || typeof policy !== 'object' || !('nativeContract' in policy)) return null;
+  const contract = policy.nativeContract as NativeContract; assertNativeContract(contract);
+  if (contract.language !== input.payload.languageId) throw new Error('TEST_NATIVE_CONTRACT_INVALID');
+  return contract;
 }
 
 /** 检查本角色必需字段及所引用材料是否完整。 */

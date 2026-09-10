@@ -42,3 +42,9 @@ publicInterface输入明确入口和符号选择，可用astFilter限制类范�
 原生任务先检查可用内存至少576MiB、磁盘至少32MiB。源码单文件1MiB、总8MiB；编译整组内存512MiB、进程32、墙钟30秒，运行128MiB、进程16、墙钟3秒。Clang AST输出最多8MiB，其余128KiB。文件大小、CPU、描述符及取消边界由共享执行器执行。参考与生成源码必须使用不同调用和独立临时目录；最终源码/失败证据由应用层存CAS，临时构建退出后清理。
 
 固定jsmn四种配置均已执行上游参考测试，TinyXML2已执行三个基本类型转换参考观察；记录位于workbench-progress/native-toolchain。这些不是模型Run或发布门禁，不据此把待验证候选测试晋升为可信测试。
+
+原生行为执行器（接入中）仅生成受信harness，不执行模型测试源码；模型提供的数据经Domain校验后才能插入固定语法位置。所有变量名、类型、函数名、字段和头文件路径受白名单约束，字符串按字节转义。expected从不写入构建目录或程序参数。每次参考/生成构建使用NativeToolchain独立目录，保留资源隔离、超时与整进程树取消；stdout只能携带逐字段观察，不接受自报通过数。编译或协议失败不能被相似度覆盖。
+
+原生行为harness强制AddressSanitizer与UndefinedBehaviorSanitizer，并在首个错误停止，以拒绝参考端越界或未定义行为的候选。ASan需要巨大虚拟影子地址，原生案例运行显式允许128TiB虚拟地址空间，但128MiB真实内存和16进程仍由强制cgroup控制；只有存在该资源组时才能使用虚拟地址覆盖。普通原生调用与TypeScript原有RLIMIT_AS不变。关闭LeakSanitizer（这里检查行为/越界，不用泄漏判定知识），不移除地址/UB检查；编译、超时、输出与namespace边界保持。
+
+虚拟地址限制依据[Clang AddressSanitizer官方限制说明](https://clang.llvm.org/docs/AddressSanitizer.html#limitations)：64位ASan映射超过16TB影子地址，普通ulimit语义不能代替真实内存限制。这里的隔离仍由namespace和cgroup承担，sanitizer只是测试中的缺陷检测器。

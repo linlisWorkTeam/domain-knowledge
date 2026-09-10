@@ -23,7 +23,7 @@ SPDX-License-Identifier: MIT
 | orchestratorAgent / orchestrator | 策略、模块材料 | 模型返回固定六类 tasks（role、objective、sourcePaths、dependsOn）；确定性检查完备性、当前轮次、授权源码范围和固定依赖，计划不改变跨角色连接 |
 | docWorkerAgent / doc-worker | 模块源码、公开接口、分块身份 | fragment、facts、provenance、unresolvedRisks；facts 区分接口/行为/边界，路径与闭区间行号 quote 必须逐行匹配授权源码工件，JSON 片段交 DocGen 汇总 |
 | docGenAgent / doc-gen | 源码、接口；可选片段、上一版、corrections、质量反馈 | 首次 outline → body；修订 revision。正文至少 200 字符，标题顺序和元数据须落实概要，保留概要工件、正文和来源 |
-| testGenAgent / test-gen | 固定源码、接口、语言、测试策略 | 测试候选与 oracle 声明；不接收候选知识，候选命令当前不进入门禁 |
+| testGenAgent / test-gen | 固定源码身份、接口、语言、测试策略授权材料 | TS沿用源码推导；原生策略从知识提出native-cases-v1候选，参考实现正文留在oracle侧。均需参考验证，命令和自报计数不进入门禁 |
 | codeAgent / code | 知识、接口、构建契约、允许生成路径 | files；动态 Schema 限定白名单，语义校验拒绝重复路径，不读取参考源码和门禁测试 |
 | checkAgent / check | Diff、判据、公开接口 | blocking、字符串 findings；只返回检查意见，不修代码 |
 | reviewAgent / review | 知识、评测报告、判据 | correction 为一项或 null，标准化编号并绑定可信评测证据；结果信封使用 corrections 数组 |

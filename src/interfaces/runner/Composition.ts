@@ -4,6 +4,10 @@
  * 文件功能：提供Composition的外部入口、参数转换与响应处理。
  */
 import { RepositoryAnalysisService } from '../../application/services/RepositoryAnalysis.ts';
+import { NativeSuiteEvaluation } from '../../application/services/NativeSuiteEvaluation.ts';
+import { NativeCaseExecutor } from '../../infrastructure/evaluation/project/NativeCaseExecutor.ts';
+import { nativeFingerprint } from '../../infrastructure/evaluation/project/NativeFingerprint.ts';
+import { SqliteNativeTests } from '../../infrastructure/sqlite/SqliteNativeTests.ts';
 import { WorkbenchProjects } from '../../application/services/WorkbenchProjects.ts';
 import { WorkbenchGeneration } from '../../application/services/WorkbenchGeneration.ts';
 import { NativeToolchain } from '../../infrastructure/evaluation/project/NativeToolchain.ts';
@@ -166,6 +170,8 @@ export function createComposition(input: {
   const evalRunnerApp = new EvalRunnerApp(flywheelApp);
   const knowledgeSearchApp = new KnowledgeSearchApp(artifacts, repository);
   const stageStore = new SqliteStageTasks(join(runtimeDir, 'workbench.sqlite'));
+  const nativeTestStore = new SqliteNativeTests(join(runtimeDir, 'workbench.sqlite'));
+  const nativeEvaluation = new NativeSuiteEvaluation({ artifacts, runner: new NativeCaseExecutor(new NativeToolchain()), snapshot: nativeFingerprint, store: nativeTestStore });
   const indexStore = new SqliteKnowledgeIndex(join(runtimeDir, 'workbench.sqlite'), join(runtimeDir, 'card-index'));
   const knowledgeIndex = new KnowledgeIndexService(repository, artifacts, indexStore);
   let workbenchGeneration!: WorkbenchGeneration;
@@ -539,6 +545,7 @@ export function createComposition(input: {
       repositoryAnalysis,
       workbenchProjects,
       workbenchGeneration,
+      nativeEvaluation,
       markdownLite: {
         start: async (directory: string, budgetMode?: 'provider-quota') => {
           // 固定模块入口只接受服务器目录；源码与模型设置在服务端验证。
@@ -573,7 +580,7 @@ export function createComposition(input: {
     automatedWorkflow: workflow,
     shutdown: async () => { await workbenchStages.shutdown(); if (workflowPromise) await (await workflowPromise).shutdown(); },
     close: () => {
-      const release = () => { projectStore.close(); indexStore.close(); stageStore.close(); publisher.close(); repository.close(); };
+      const release = () => { nativeTestStore.close(); projectStore.close(); indexStore.close(); stageStore.close(); publisher.close(); repository.close(); };
       if (workbenchStages.idle) { void workbenchStages.shutdown(); release(); }
       else return workbenchStages.shutdown().then(release);
     },

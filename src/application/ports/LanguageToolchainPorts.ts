@@ -12,7 +12,7 @@ export interface ToolchainCommandReport {
   durationMs: number; stdout: string; stderr: string;
 }
 export interface NativeToolchainInput {
-  language: 'c' | 'cpp'; files: ToolchainFile[]; build: BuildConstraints;
+  language: 'c' | 'cpp'; files: ToolchainFile[]; build: BuildConstraints; sanitizers?: boolean;
 }
 /** stdout和退出码是原始观察，不是可信用例数或发布门禁。 */
 export interface NativeLanguageToolchain {
