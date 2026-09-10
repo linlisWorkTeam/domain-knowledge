@@ -61,6 +61,7 @@ try {
   await wait(composition.apps.workbenchStages.start(composition.apps.knowledgeIndex.prepare(versionIds)));
   const reconstructed = await wait(await composition.apps.workbenchReconstruction.start(project.snapshotId, versionIds));
   const evaluated = await wait(await composition.apps.workbenchEvaluation.start(reconstructed.taskId));
+  await wait(composition.apps.workbenchStages.start(composition.apps.workbenchAssociations.prepare(versionIds)));
   const modules = evaluated.result!.summary.modules as Array<{ status: string }>;
   report.outcome = modules.every((module) => module.status === 'BEHAVIOR_PASSED') && modules.length === project.modules.length ? 'BEHAVIOR_PASSED_PUBLICATION_PENDING' : 'BEHAVIOR_FAILED';
 } catch (error) {

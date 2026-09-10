@@ -10,6 +10,8 @@ export function createKnowledgeEvaluationPanel({ root, request, escapeHtml: esca
   const active = () => task && ['PENDING', 'RUNNING'].includes(task.status)
   const labels = { PENDING: '排队中', RUNNING: '评测中', SUCCEEDED: '评测执行完成', FAILED: '执行失败', PAUSED: '已暂停', CANCELLED: '已取消' }
   const reasons = {
+    AGENT_OUTPUT_INVALID: '模型返回的候选测试缺少必填字段或不符合协议。前序结果已保留，可恢复原任务重新提出。',
+    DSH_AGENT_OUTPUT_NOT_JSON: '模型返回内容不完整或格式错误。前序结果已保留，可恢复原任务。',
     TEST_CANDIDATE_REJECTED: '候选用例未通过参考实现，不能用于评测生成代码，也不能据此判定知识错误。可重新生成候选，累计用量保留。',
     NATIVE_REFERENCE_BASELINE_FAILED: '参考实现基础构建或启动失败，请下载报告并检查构建参数和依赖。候选测试尚未生成。',
     NATIVE_TEST_TOOLCHAIN_CHANGED: '工具链已变化，请按当前环境重新重建代码，再启动评测。',
@@ -22,10 +24,13 @@ export function createKnowledgeEvaluationPanel({ root, request, escapeHtml: esca
   function caseHtml(item) {
     const input = item.input ?? {}, actual = item.actual ?? item.observation?.actual
     const expected = item.expected ?? input.expected ?? {}
+    const diagnostic = item.report ?? item.observation?.report
+    const stderr = [diagnostic?.build?.stderr, diagnostic?.execution?.stderr].filter(Boolean).join("\n").slice(0, 8192)
     return `<details><summary>${escape(input.caseId ?? item.caseId)} · ${escape(input.description ?? '')} · ${escape(item.status ?? item.observation?.status ?? '候选')}</summary>
       <p>输入调用：${(input.calls ?? []).map((call) => `<code>${escape(call.function)}(${escape(call.arguments.map((arg) => value(arg.integer ?? arg.number ?? arg.boolean ?? arg.string ?? arg)).join(', '))})</code>`).join('；')}</p>
       <table><thead><tr><th>观察项</th><th>预期</th><th>实际</th></tr></thead><tbody>${Object.entries(expected).map(([name, result]) => `<tr><td>${escape(name)}</td><td>${escape(value(result))}</td><td>${escape(value(actual?.[name]))}</td></tr>`).join('')}</tbody></table>
       <p>${escape(item.reasonCode ?? item.observation?.reasonCode ?? '')}</p>
+      ${stderr ? `<details><summary>编译或运行诊断（完整内容见下载报告）</summary><pre>${escape(stderr)}</pre></details>` : ''}
       ${(item.sectionBindings ?? []).map((binding) => `<button class="text-button" type="button" data-version-id="${escape(binding.versionId)}">${escape(binding.sectionId)}${binding.matchesInput ? '' : '（历史章节）'}</button>`).join(' ')}
       <details><summary>完整用例输入</summary><pre>${escape(JSON.stringify(input, null, 2))}</pre></details></details>`
   }

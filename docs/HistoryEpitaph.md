@@ -140,3 +140,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 - [2026-09-10-1833-workbench-reconstruction.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/ab46aa5a0f51fc4b23b808a662cf1cf5c45f6f58/docs/epitaph/2026-09-10-1833-workbench-reconstruction.md)：接通原生重建、隔离接口比较与恢复，尚未通过真实模型验收；后续真实jsmn结果见1913交接。
 
 - [2026-09-10-1850-workbench-evaluation.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/bdc8b1dc63aab1706cbb93add422d296e1d58e6c/docs/epitaph/2026-09-10-1850-workbench-evaluation.md)：接通原生评测和失败用例界面，原验证integration189/Console29；完整目标尚缺自动修订、关联、固定门禁和真实双目标验收。后续真实jsmn与关联结果见1913和1931交接。
+
+- [2026-09-10-1908-native-live.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/a9556351702cac6b3f6b2d70e348a85dee19a705/docs/epitaph/2026-09-10-1908-native-live.md)：真实jsmn多卡片/重建及早期TestGen JSON失败，新增验收脚本并修正provider必填字段提示；当时未通过行为门禁。后续真实双目标当前工具链结果与恢复修复见最新交接，发布仍未完成。

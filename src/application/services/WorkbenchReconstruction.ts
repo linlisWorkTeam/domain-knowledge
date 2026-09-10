@@ -5,6 +5,7 @@
  */
 import { sha256, type ArtifactRef, type KnowledgeVersion } from '../../domain/Domain.ts';
 import { canonicalJson, type JsonValue } from '../../domain/services/workbench/StageTask.ts';
+import { canRepairNativeCode } from '../../domain/services/evaluation/NativeCodeRepair.ts';
 import { compareNativeInterfaces } from '../../domain/services/evaluation/NativeInterfaceComparison.ts';
 import type { ArtifactStore, FlywheelRepository } from '../ports/ApplicationPorts.ts';
 import type { WorkbenchProjectStore } from '../ports/WorkbenchProjectPorts.ts';
@@ -64,7 +65,7 @@ export class WorkbenchReconstruction {
       parameters: { snapshotId, selectionDigest: this.selectionDigest(versions), configurationRef: json(configurationRef), fingerprints: json(fingerprints) } });
   }
   async reconstruct(context: StageExecutionContext) {
-    const { artifacts, configuration, native, snapshot, roles } = this.dependencies;
+    const { artifacts, configuration, native, snapshot, roles, stages } = this.dependencies;
     const { project, versions } = this.selection(String(context.task.input.parameters.snapshotId), context.task.input.cardVersionIds);
     if (this.selectionDigest(versions) !== context.task.input.parameters.selectionDigest || project.sourceDigest !== context.task.input.sourceDigest || project.commit !== context.task.input.sourceRevision) throw new Error('STAGE_INPUT_CHANGED');
     const configurationRef = context.task.input.parameters.configurationRef as unknown as ArtifactRef;
@@ -82,21 +83,43 @@ export class WorkbenchReconstruction {
       if (interfaceRefs.length !== 1) throw new Error('RECONSTRUCTION_INTERFACE_CONFLICT');
       const api = JSON.parse(await this.load(interfaceRefs[0]!)) as PublicInterface;
       if (api.schemaVersion !== 'native-interface-v1' || api.language !== language || !module.sourcePaths.includes(api.sourcePath)) throw new Error('RECONSTRUCTION_INTERFACE_INVALID');
-      // Code的所有材料在这里显式构造。不可读项目sourceFiles、参考实现、诊断或测试预期。
+      const rejectionPrefix = `code-rejection:${module.moduleId}:`;
+      // 旧版已保存的生成编译诊断可转为拒绝检查点，不重写原审计或代码。
+      if (!stages.store.checkpoints(context.task.taskId).some((item) => item.key.startsWith(rejectionPrefix))) {
+        const priorCode = stages.store.checkpoints(context.task.taskId).find((item) => item.key === `role:code:${module.moduleId}`);
+        const priorFailure = [...stages.store.events(context.task.taskId)].reverse().find((event) => {
+          const value = event.detail; return value && !Array.isArray(value) && typeof value === 'object'
+            && value.phase === 'generated-interface-failed' && value.module === module.moduleId && value.diagnosticRef;
+        });
+        if (priorCode && priorFailure) {
+          const diagnosticRef = (priorFailure.detail as { diagnosticRef: unknown }).diagnosticRef as ArtifactRef;
+          const diagnostic = JSON.parse(await this.load(diagnosticRef));
+          if (canRepairNativeCode('NATIVE_INTERFACE_COMPILE_FAILED', diagnostic)) await context.step(`${rejectionPrefix}0`, async () => ({
+            artifactRefs: [priorCode.result.artifactRefs[1]!, diagnosticRef], summary: { moduleId: module.moduleId, repairable: true, reasonCode: 'NATIVE_INTERFACE_COMPILE_FAILED' },
+          }));
+        }
+      }
+      const rejections = stages.store.checkpoints(context.task.taskId).filter((item) => item.key.startsWith(rejectionPrefix))
+        .sort((a, b) => Number(a.key.slice(rejectionPrefix.length)) - Number(b.key.slice(rejectionPrefix.length)));
+      const revision = rejections.length;
+      const latest = rejections.at(-1);
+      const previousGeneratedAttempt = latest ? { files: JSON.parse(await this.load(latest.result.artifactRefs[0]!)).files,
+        diagnostic: JSON.parse(await this.load(latest.result.artifactRefs[1]!)), knowledgeErrorProven: false } : null;
+      // Code只获取知识、公开接口、构建约束及自身上次生成代码的编译诊断，不读参考源码或测试预期。
       const knowledge = [];
       for (const card of cards) knowledge.push({ cardId: card.metadata.cardId, versionId: card.versionId, body: await this.load(card.bodyRef) });
       const knowledgeRef = await artifacts.put(Buffer.from(JSON.stringify(knowledge)), 'application/json');
       const buildContract = { schemaVersion: 'native-build-v1', language, build: project.build, includePath: api.sourcePath,
-        allowedGeneratedPaths: module.sourcePaths, scope: api.astFilter, behaviorVerified: false };
+        allowedGeneratedPaths: module.sourcePaths, scope: api.astFilter, behaviorVerified: false, previousGeneratedAttempt };
       const buildContractRef = await artifacts.put(Buffer.from(JSON.stringify(buildContract)), 'application/json');
       const payload = { knowledgeRef, publicInterfaceRefs: interfaceRefs, languageId: language, buildContractRef, allowedGeneratedPaths: module.sourcePaths };
       context.progress({ phase: 'reconstruction', module: module.moduleId, versions: cards.map((card) => card.versionId) });
-      const generated = await roles.execute(context, frozen, 'code', module.moduleId, { payload,
+      const generated = await roles.execute(context, frozen, 'code', revision ? `${module.moduleId}:repair:${revision}` : module.moduleId, { payload,
         materials: [{ ref: knowledgeRef, content: knowledge }, { ref: interfaceRefs[0]!, content: api }, { ref: buildContractRef, content: buildContract }],
         sourcePaths: [], publicInterfacePaths: [], provenance: cards.map((card) => card.bodyRef), moduleId: module.moduleId });
       const files = generated.output.files as ToolchainFile[];
       if (!Array.isArray(files) || files.reduce((sum, file) => sum + Buffer.byteLength(file.content), 0) > 2_097_152) throw new Error('RECONSTRUCTION_OUTPUT_TOO_LARGE');
-      const checked = await context.step(`generated-interface:${module.moduleId}`, async () => {
+      const checked = await context.step(`generated-interface:${module.moduleId}${revision ? `:repair:${revision}` : ''}`, async () => {
         try {
           const projected = await native.publicInterface({ language, files, build: project.build, entryPath: api.sourcePath,
             ...(api.astFilter ? { astFilter: api.astFilter } : {}), symbols: [...new Set(api.declarations.map((item) => item.name))] }, context.signal);
@@ -107,7 +130,12 @@ export class WorkbenchReconstruction {
           context.signal.throwIfAborted();
           if (error instanceof Error && error.cause) {
             const ref = await artifacts.put(Buffer.from(JSON.stringify(error.cause)), 'application/json');
-            context.progress({ phase: 'generated-interface-failed', module: module.moduleId, diagnosticRef: json(ref) });
+            const reasonCode = error.message.split(':')[0]!;
+            const repairable = canRepairNativeCode(reasonCode, error.cause);
+            await context.step(repairable ? `${rejectionPrefix}${revision}` : `generated-diagnostic:${module.moduleId}:${context.task.attempt}`, async () => ({
+              artifactRefs: [generated.rawRef, ref], summary: { moduleId: module.moduleId, repairable, reasonCode },
+            }));
+            context.progress({ phase: 'generated-interface-failed', module: module.moduleId, diagnosticRef: json(ref), repairable });
           }
           throw error;
         }

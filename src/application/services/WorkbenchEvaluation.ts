@@ -6,6 +6,7 @@
 import { sha256, type ArtifactRef } from '../../domain/Domain.ts';
 import { canonicalJson, type JsonValue } from '../../domain/services/workbench/StageTask.ts';
 import { nativeFunctions, assertNativeContract, type NativeContract, type NativeBehaviorSuite } from '../../domain/services/evaluation/NativeBehaviorSuite.ts';
+import { nativeCandidateHints } from '../../domain/services/evaluation/NativeCandidateFeedback.ts';
 import { markdownSections } from '../../domain/services/knowledge/KnowledgeSections.ts';
 import type { ArtifactStore, FlywheelRepository } from '../ports/ApplicationPorts.ts';
 import type { WorkbenchProjectStore } from '../ports/WorkbenchProjectPorts.ts';
@@ -104,7 +105,7 @@ export class WorkbenchEvaluation {
       if (rejection) {
         const report = await this.load<{ moduleId: string; status: string; cases: Array<{ input: NativeBehaviorSuite['cases'][number]; observation?: { status: string; reasonCode: string | null; actual: unknown; mismatches: string[] } }> }>(rejection.result.artifactRefs[0]!);
         if (report.moduleId !== module.moduleId || report.status !== 'CANDIDATE_REJECTED') throw new Error('STAGE_ARTIFACT_CORRUPT');
-        rejectedCandidate = { trusted: false, cases: report.cases.map(({ input, observation }) => ({ input,
+        rejectedCandidate = { trusted: false, cases: report.cases.map(({ input, observation }) => ({ input, constructionHints: nativeCandidateHints(input, observation?.reasonCode ?? null),
           observation: observation ? { status: observation.status, reasonCode: observation.reasonCode, actual: observation.actual, mismatches: observation.mismatches } : null })) };
       }
       const policy = { schemaVersion: 'native-test-policy-v1', nativeContract: contract, knowledge, rejectedCandidate,

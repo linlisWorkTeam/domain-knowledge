@@ -10,7 +10,9 @@ export function createKnowledgeReconstructionPanel({ root, request, escapeHtml: 
   const active = () => task && ['PENDING', 'RUNNING'].includes(task.status)
   const host = () => root.querySelector('[data-reconstruction-panel]')
   const reasons = {
-    NATIVE_INTERFACE_COMPILE_FAILED: '生成代码的接口检查失败。代码已保留，可下载检查点代码；修订输入后重新生成。',
+    AGENT_OUTPUT_INVALID: '模型返回的代码文件缺少必填字段或不符合协议。前序结果已保留，可恢复原任务重新提出。',
+    DSH_AGENT_OUTPUT_NOT_JSON: '模型返回内容不完整或格式错误。前序结果已保留，可恢复原任务。',
+    NATIVE_INTERFACE_COMPILE_FAILED: '生成接口未通过编译检查。代码和诊断已保留，请查看诊断后恢复。',
     NATIVE_TEST_TOOLCHAIN_CHANGED: '工具链已变化，请按当前环境启动新重建；旧任务保留原输入。',
     DSH_CONFIGURATION_UNAVAILABLE: '请先在 Agent 设置中保存并验证模型。',
     RUN_CONFIGURATION_INCOMPATIBLE: '模型或执行配置与冻结输入不一致，请按当前配置启动新任务。',
@@ -33,7 +35,9 @@ export function createKnowledgeReconstructionPanel({ root, request, escapeHtml: 
       <p role="status">${escape(notice)}</p>${task ? `<p><b>${escape(task.cancelRequested && active() ? '正在取消' : labels[task.status] ?? '未知')}</b> · 重建结果不代表行为验证或发布</p>
       <p>任务 ${escape(task.taskId)} · 累计模型请求 ${escape(task.usage.modelCalls)} 次</p>
       ${task.reasonCode ? `<p>${escape(reasons[task.reasonCode] ?? task.reasonCode)}</p>` : ''}
+      ${task.status === 'FAILED' && checkpoints.some((item) => item.key.startsWith('code-rejection:')) ? '<p>恢复将在原任务中修复生成代码，累计用量不重置。</p>' : ''}
       ${modules.length ? `<ul>${modules.map((item) => `<li>${escape(item.moduleId)} · ${item.interfaceComparison.compatible ? '公开接口匹配' : '公开接口存在差异'}${download(item.codeRef, '下载生成代码')}${download(item.comparisonRef, '下载接口比较')}</li>`).join('')}</ul>` : generated.map((item) => `<p>已保存生成代码 ${download(item.result.artifactRefs[1], '下载生成代码')}</p>`).join('')}
+      ${checkpoints.filter((item) => item.key.startsWith('code-rejection:') || item.key.startsWith('generated-diagnostic:')).map((item) => download(item.result.artifactRefs[1], '下载生成代码诊断')).join('')}
       ${active() ? `<button class="secondary-button" type="button" data-reconstruction-action="cancel" ${busy || task.cancelRequested || !isEditable() ? 'disabled' : ''}>取消重建</button>` : ''}
       ${resume ? `<button class="secondary-button" type="button" data-reconstruction-action="resume" ${busy || !isEditable() ? 'disabled' : ''}>恢复重建</button>` : ''}` : ''}<section data-native-evaluation-panel></section>`
     evaluation.refresh()

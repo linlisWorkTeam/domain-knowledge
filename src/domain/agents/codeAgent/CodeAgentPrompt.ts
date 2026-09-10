@@ -19,7 +19,7 @@ export const definition = {
 /** 组合基础提示词和本角色可见的受信材料。 */
 export function buildPrompt(input: Input, context: ExecutionContext): string {
   const scoped = ['c', 'cpp'].includes(input.payload.languageId)
-    ? '\n原生重建范围以公开接口材料中的 declarations 和知识卡片为准。只实现这些声明及其必要内部辅助逻辑，保留命名空间和调用签名；不要凭库名扩展为整库重建。allowedGeneratedPaths 仅限定可输出的位置，并不要求复制原文件或实现未列出的接口。使用系统标准库满足构建约束；输出完整但限于所选模块的文件，不为未选模块补写 DOM、打印器、文档节点等无关功能。' : '';
+    ? '\n原生重建范围以公开接口材料中的 declarations 和知识卡片为准。只实现这些声明及其必要内部辅助逻辑，保留命名空间和调用签名；不要凭库名扩展为整库重建。allowedGeneratedPaths 仅限定可输出的位置，并不要求复制原文件或实现未列出的接口。使用系统标准库满足构建约束；输出完整但限于所选模块的文件，不为未选模块补写 DOM、打印器、文档节点等无关功能。previousGeneratedAttempt若存在，是你上次生成的文件及其编译诊断；修复该代码，使其满足同一公开接口与构建约束，不扩大功能范围。未在构建约束中定义的导出宏需要自行正确声明或移除其非必要使用，不能假设原库环境已提供。' : '';
   return `${context.effectivePrompt}${scoped}\n\n受信 AgentCommand：\n${JSON.stringify(context.command)}\n\n命令引用工件（已校验内容摘要）：\n${JSON.stringify(materialsFor(input.payload, input.materials))}`;
 }
 

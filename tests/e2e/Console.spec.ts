@@ -988,7 +988,7 @@ test('操作中心从固定 Git 版本分析仓库，显示模块和环境且窄
     nativeEvaluation.runner = { execute: async (input, _contract, sample) => {
       const generated = input.files.some((file) => file.content.includes('generated marker'));
       return { caseId: sample.caseId, status: generated ? 'FAILED' : 'PASSED', reasonCode: generated ? 'NATIVE_BEHAVIOR_MISMATCH' : null,
-        actual: { result: generated ? '0' : '1' }, mismatches: generated ? ['result'] : [], report: { build: commandReport, execution: commandReport } };
+        actual: { result: generated ? '0' : '1' }, mismatches: generated ? ['result'] : [], report: { build: commandReport, execution: { ...commandReport, stderr: generated ? '<script>diagnosticText()</script>' : '' } } };
     } };
     await page.getByRole('button', { name: '执行代码重建', exact: true }).click();
     await expect(page.locator('[data-reconstruction-panel]')).toContainText('重建及接口检查完成');
@@ -1004,6 +1004,9 @@ test('操作中心从固定 Git 版本分析仓库，显示模块和环境且窄
     await expect(page.locator('[data-native-evaluation-panel] table')).toContainText('预期');
     await expect(page.locator('[data-native-evaluation-panel] table')).toContainText('实际');
     await expect(page.locator('[data-native-evaluation-panel] table tbody')).toContainText('result10');
+    await page.getByText('编译或运行诊断（完整内容见下载报告）', { exact: true }).click();
+    await expect(page.locator('[data-native-evaluation-panel] pre').filter({ hasText: '<script>diagnosticText()</script>' })).toBeVisible();
+    await expect(page.locator('[data-native-evaluation-panel] script')).toHaveCount(0);
     await expect(page.locator('[data-native-evaluation-panel] [data-version-id]')).toBeVisible();
     await page.screenshot({ path: test.info().outputPath('repository-analysis-desktop.png'), fullPage: true });
     await page.setViewportSize({ width: 390, height: 844 });
