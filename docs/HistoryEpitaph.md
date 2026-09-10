@@ -101,3 +101,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 ## 开发并行规范与领域服务整理前的交接归档
 
 - [2026-09-09-1640-provider-generation-probe.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/51c2972e914c81bbeaf3577aa79b27e563f18ca0/docs/epitaph/2026-09-09-1640-provider-generation-probe.md)：将模型连接验证改为列表检查后执行生产 DSH 的一次 64 token 最小生成，30 秒总期限，保留隔离、失败关闭、取消清理与旧配置降级。当时受控探针 15 项、配置安全 7 项、挂起超时 1 项、token 上限 2 项及类型检查通过；不是外网模型或完整 MVP 验收。后续集成结果见保留的阶段修复交接，历史失败与已耗尽真实预算仍有效。
+
+- [2026-09-09-1640-provider-generation-probe.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/27ec9dfb3472f8a07327271470d8767efcebd4c7/docs/epitaph/2026-09-09-1640-provider-generation-probe.md)：生产 DSH 的一次 64 token 生成探针与受控取消/排队/输出限制验证；当时未调用真实提供方。后续第四次授权前已成功完成真实探针，完整飞轮仍受独立门禁约束。

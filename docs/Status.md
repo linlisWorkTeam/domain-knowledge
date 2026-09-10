@@ -5,7 +5,7 @@ SPDX-License-Identifier: MIT
 -->
 # 七角色 MVP 实施与验收记录
 
-目标版本为 `0.2.0`，环境限定 OpenCloudOS 9.4 x86_64，代表模块为 ohMyWorkPanel 的 `src/chat/markdownLite.ts`。当前已实现闭环及真实失败后的修复候选，最新结果见文末；真实模型验收 3 次启动额度已用完，均未通过，不能视为已验收 MVP，也未创建正式 GitHub Release。历史单角色 live 记录不能替代本次七角色验收。
+目标版本为 `0.2.0`，环境限定 OpenCloudOS 9.4 x86_64，代表模块为 ohMyWorkPanel 的 `src/chat/markdownLite.ts`。当前已实现闭环及真实失败后的修复候选，最新结果见文末；用户追加一次授权后共使用 4/4 次真实启动，第四次完成七角色及三轮反馈修订，最终行为评测 315/315，但遗留知识风险阻止发布，不能视为已验收 MVP，也未创建正式 GitHub Release。历史单角色 live 记录不能替代本次七角色验收。
 
 操作见[Linux 安装指南](LinuxInstall.md)，工作流约定见[Workflow](specs/domainFunction/services/workflow/Workflow.md)、[LangGraph](specs/infrastructure/langgraph/LangGraph.md)，七角色设计见[Agents](specs/domainFunction/agents/Agents.md)。历史交接见[HistoryEpitaph](HistoryEpitaph.md)。
 
@@ -118,3 +118,26 @@ ECS 约 3.6 GiB 内存、无 swap。模型与模块评测共享一个进程槽�
 `agents` 与 `services` 在 Domain 平级；角色选择通过 AgentExecutionService 封装，association/evaluation 等服务持有各自确定性规则。Spec、目录契约和调用方已同步，详见 [领域边界](specs/totalRules/DomainDrivenDesign.md)。开发 subagent 并行规范见 [CodeTaste](specs/totalRules/CodeTaste.md#开发过程中的-subagent-并行协作)，NFR-013 的实际双任务宿主验收尚未执行。
 
 本次类型、Spec、架构与目录契约通过；完整回归 325 项中 324 通过，唯一站点资产摘要失配已修复并通过站点 12/12 定向复测。未重复执行完整回归，也未运行浏览器、外网模型或重新构建安装包；前述真实 MVP 验收结论保持原有边界。具体交接见 [本次墓志铭](epitaph/2026-09-10-1017-domain-services-subagents.md)。
+
+
+## 第四次真实验收（2026-09-10，最终 STOPPED）
+
+用户明确追加一次真实飞轮，之前的三条账本记录保持原样。授权文件绑定旧账本 SHA-256；入口升级为 `mvp-real-attempts-v2`，最多四次，重复授权不增加容量。先使用原加密配置完成一次 64 token 最小真实生成验证，再启动 `731a6a13-0226-4f21-aedb-71251d3d1222`。总预算仍为 3 轮、30 分钟：北京时间 09:51:02 开始，固定截止 10:21:02；10:15:39 因三轮耗尽停止。两次手动恢复属于同一运行，未重置预算或增加启动数。
+
+| 阶段 | 实际结果与处理 |
+| --- | --- |
+| 初始执行 | TestGen 的长推理流触发旧 2 MiB SSE 累计字节限制，候选测试未完成。原始失败保留。 |
+| 第一次恢复 | 修复传输限制后 TestGen 成功，候选案例通过参考实现；生成实现暴露段落空行错误。Review 使用 H3 作为修订目标，被原 H2 范围校验拒绝。 |
+| 第二次恢复，第 1 轮 | 明确提供现有 H2 目标列表，Review 成功产生合法 Correction；4/140，发现 `alpha\n\nbeta` 多输出 `<br/>`，门禁 ITERATE。 |
+| 第 2 轮 | 定点修订、重建后 315/315，通过固定 28 案及候选 35 案各 5 次；知识仍把已修复行为写成当前失败，Review 要求纠正。 |
+| 第 3 轮 | 再次修订后 315/315、稳定性 1、关键失败 0；Check 无阻塞、Review PASS。知识中三条原始风险仍在，门禁以 CHECK_BLOCKING 停止，0 次本地发布。 |
+
+最后的 `CHECK_BLOCKING` 不是 Check 角色发现了问题：当前门禁将知识 `unresolvedRisks` 非空也合并为该原因。DocWorker 把未运行测试、未提供系统集成信息、公开类型外输入列为风险；其中后两项属于本次验收范围以外，前者后来已有评测证据。DocGen 每轮从原 worker 工件照搬三条字符串，现有结构没有风险标识、范围处置或绑定评测证据的复核状态。因此 Review 即使 PASS，也不能消除旧风险。当前门禁保持拒绝，没有直接删除风险、改写失败输出或降低测试要求。
+
+后续修复应在 Domain 中建立显式风险记录及证据绑定的处置流程，区分本次范围内缺证据、已授权范围限制和后续评测可验证事项；真正的未解决风险继续阻止发布。Application 负责传递、持久化和审计，展示单独的知识风险原因。涉及新持久化语义时版本化；现有第四次 STOPPED 记录及三轮预算不可重开。上述风险处置尚未实现，不能把改 Prompt 或 Review 自评当成解决方案。
+
+本次应用修复提交 `4a8fffc` 将累计 SSE 传输预算与缓冲上限分开：默认传输 16 MiB、单帧待解析缓冲仍 2 Mi 字符，探针仍 64 KiB，保持流式背压、token、超时和取消上限。`51c2972` 明确 Review 的合法 H2 修订目标，严格范围校验不变。初次使用 `548a7c2`（应用代码同 `854ac9c`），第一次恢复使用 `4a8fffc`，第二次恢复使用 `51c2972`，不能声称整个运行来自单一提交。
+
+验证：`51c2972` 的 [CI 34428524075](https://github.com/linlisWorkTeam/domain-knowledge/actions/runs/34428524075) 类型、Spec、324/324 回归及 Console 21/21 全通过。新增定向授权、传输限制与 Review 目标测试通过。一次误用 Node 22 启动的本地完整回归已中止，不计入通过证据；ECS 同时有其他任务，未重复争抢资源。原 ohMyWorkPanel 仓库仍干净。
+
+完整脱敏记录保存在 `/root/projects/domain-knowledge-releases/2026-09-10-additional-acceptance/Acceptance.json` 及同目录初始失败、两次恢复、调用统计与 CI 日志。七角色真实执行和反馈修订已有证据，但本地发布未通过。现有 `v0.2.0-stage-repair-candidate` 安装包仍来自 `854ac9c`，不包含本次两项应用修复；没有新安装包验收或正式 Release。PR #38 保持草稿。4/4 启动额度已用完，不自动发起第五次。
