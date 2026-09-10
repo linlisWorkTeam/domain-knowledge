@@ -18,6 +18,8 @@ import { SqliteWorkbenchPipelines } from '../../infrastructure/sqlite/SqliteWork
 import { WorkbenchGeneration } from '../../application/services/WorkbenchGeneration.ts';
 import { NativeToolchain } from '../../infrastructure/evaluation/project/NativeToolchain.ts';
 import { WorkbenchAssociations } from '../../application/services/WorkbenchAssociations.ts';
+import { WorkbenchSourceRevision } from '../../application/services/WorkbenchSourceRevision.ts';
+import { SOURCE_REVISION_CONTRACT } from '../../domain/services/knowledge/SourceRevision.ts';
 import { WorkbenchSourceVerification } from '../../application/services/WorkbenchSourceVerification.ts';
 import { SOURCE_VERIFICATION_CONTRACT } from '../../domain/services/knowledge/KnowledgeSourceVerification.ts';
 import { WorkbenchKnowledgeRevision } from '../../application/services/WorkbenchKnowledgeRevision.ts';
@@ -192,11 +194,12 @@ export function createComposition(input: {
   let workbenchGeneration!: WorkbenchGeneration;
   let workbenchReconstruction!: WorkbenchReconstruction;
   let workbenchEvaluation!: WorkbenchEvaluation;
+  let workbenchSourceRevision!: WorkbenchSourceRevision;
   let workbenchSourceVerification!: WorkbenchSourceVerification;
   let workbenchKnowledgeRevision!: WorkbenchKnowledgeRevision;
   let workbenchAssociations!: WorkbenchAssociations;
   const workbenchStages = new WorkbenchStages(stageStore, { INDEX: (context) => knowledgeIndex.build(context), GENERATE: (context) => workbenchGeneration.generate(context),
-    FLYWHEEL: (context) => context.task.input.parameters.operation === 'KNOWLEDGE_REVISION' ? workbenchKnowledgeRevision.revise(context) : workbenchReconstruction.reconstruct(context), EVALUATE: (context) => context.task.input.parameters.operation === 'KNOWLEDGE_SOURCE_VERIFICATION' ? workbenchSourceVerification.verify(context) : workbenchEvaluation.evaluate(context), ASSOCIATE: (context) => workbenchAssociations.build(context) }, (input) => input.stage === 'EVALUATE' ? (input.parameters.operation === undefined || (input.parameters.operation === 'KNOWLEDGE_SOURCE_VERIFICATION' && input.parameters.verificationContract === SOURCE_VERIFICATION_CONTRACT)) : input.stage !== 'FLYWHEEL' || (input.parameters.operation === 'KNOWLEDGE_REVISION' ? input.parameters.revisionContract === KNOWLEDGE_REVISION_CONTRACT : input.parameters.operation === undefined && input.parameters.comparisonContract === SOURCE_COMPARISON_CONTRACT));
+    FLYWHEEL: (context) => context.task.input.parameters.operation === 'KNOWLEDGE_SOURCE_REVISION' ? workbenchSourceRevision.revise(context) : context.task.input.parameters.operation === 'KNOWLEDGE_REVISION' ? workbenchKnowledgeRevision.revise(context) : workbenchReconstruction.reconstruct(context), EVALUATE: (context) => context.task.input.parameters.operation === 'KNOWLEDGE_SOURCE_VERIFICATION' ? workbenchSourceVerification.verify(context) : workbenchEvaluation.evaluate(context), ASSOCIATE: (context) => workbenchAssociations.build(context) }, (input) => input.stage === 'EVALUATE' ? (input.parameters.operation === undefined || (input.parameters.operation === 'KNOWLEDGE_SOURCE_VERIFICATION' && input.parameters.verificationContract === SOURCE_VERIFICATION_CONTRACT)) : input.stage !== 'FLYWHEEL' || (input.parameters.operation === 'KNOWLEDGE_SOURCE_REVISION' ? input.parameters.revisionContract === SOURCE_REVISION_CONTRACT : input.parameters.operation === 'KNOWLEDGE_REVISION' ? input.parameters.revisionContract === KNOWLEDGE_REVISION_CONTRACT : input.parameters.operation === undefined && input.parameters.comparisonContract === SOURCE_COMPARISON_CONTRACT));
   const scanner = new SourceScanner(repositoryRoot, repository);
   const knowledgeDiscoveryApp = new KnowledgeDiscoveryApp(scanner, undefined, {
     migrate: (legacyKnowledgeRoot) => migrateLegacyOkf({
@@ -420,6 +423,7 @@ export function createComposition(input: {
     roles: new WorkbenchRoleExecution({ artifacts, events: (taskId, after) => workbenchStages.store.events(taskId, after), contracts: new JsonSchemaAgentContractValidator(schemaRoot), model: workbenchGeneration.dependencies.model }) });
   workbenchEvaluation = new WorkbenchEvaluation({ projects: projectStore, repository, artifacts, native: new NativeToolchain(),
     configuration: runConfiguration, stages: workbenchStages, roles: workbenchReconstruction.dependencies.roles, evaluation: nativeEvaluation });
+  workbenchSourceRevision = new WorkbenchSourceRevision(workbenchEvaluation, flywheelApp, knowledgeIndex);
   workbenchSourceVerification = new WorkbenchSourceVerification(workbenchEvaluation);
   workbenchKnowledgeRevision = new WorkbenchKnowledgeRevision(workbenchEvaluation, flywheelApp, knowledgeIndex);
   const workbenchPipelines = new WorkbenchPipelines({ materials: workbenchMaterials.store, environment: async (snapshotId, signal) => {
@@ -592,6 +596,7 @@ export function createComposition(input: {
       workbenchEvaluation,
       workbenchKnowledgeRevision,
       workbenchSourceVerification,
+      workbenchSourceRevision,
       markdownLite: {
         start: async (directory: string, budgetMode?: 'provider-quota') => {
           // 固定模块入口只接受服务器目录；源码与模型设置在服务端验证。

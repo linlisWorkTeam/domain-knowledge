@@ -172,3 +172,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 [2026-09-11-0409-automatic-iterations.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/e3b09c1fd26e94f54a9cdc9e6f57075abe4b8ea9/docs/epitaph/2026-09-11-0409-automatic-iterations.md) 接通多轮协调、原失败绑定重试及累计用量，受控六轮和真实旧产物重放通过；当时没有新真实模型修订，最终发布和完整部署未完成。
 
 [2026-09-11-0450-source-review.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/a0c8f96f39291b0e831c1c14f0106002bb469de6/docs/epitaph/2026-09-11-0450-source-review.md) 记录修订后源码 Review 门禁、独立真实验收中错误 parser 卡片与未完成的全卡验证。随后参考观察对象混淆已修正，完整整卡复核入口本次接通；真实双目标最终验证和发布仍待完成。
+
+[2026-09-11-0509-role-attempt-audit.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/30aa16eadf23176cf831c75125cf98e2eae183b6/docs/epitaph/2026-09-11-0509-role-attempt-audit.md) 交付角色语义尝试审计和下载，类型/Spec/架构/集成208/Console通过。其对旧真实超时的DocGen归因不正确，0521及本文件的更正为准；实际为DocGen成功后独立源码Review超时。原始错误记录在固定提交保留供审计。

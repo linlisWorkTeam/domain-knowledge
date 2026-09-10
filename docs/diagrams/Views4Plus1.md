@@ -301,5 +301,8 @@ flowchart LR
   SourceDomain --> Matched[来源匹配 仍未发布]
   SourceDomain --> Mismatch[明确矛盾及 H2]
   SourceDomain --> Unknown[未解决风险]
-  Mismatch -.待接通.-> Repair[来源意见驱动修订和再评测]
+  Mismatch --> SourceRevision[WorkbenchSourceRevision 校验原始 Review 绑定]
+  SourceRevision --> SharedRevision[WorkbenchCardRevision 定点修订与源码复核]
+  SharedRevision --> Reindex[增量索引]
+  Reindex --> Rebuild[新版本重建与再评测]
 ```

@@ -988,20 +988,22 @@ test('操作中心从固定 Git 版本分析仓库，显示模块和环境且窄
     await expect(page.locator('[data-generation-task]').getByRole('button', { name: 'Parser generated card', exact: true })).toBeVisible();
     reconstruction.snapshot = async (language, build) => ({ schemaVersion: 'native-toolchain-v1', language, build, architecture: 'test', files: [], digest: 'a'.repeat(64) });
     reconstruction.native = instance.composition.apps.workbenchGeneration.dependencies.native;
-    let docGenAttempts = 0;
+    let docGenAttempts = 0, sourceCorrection = false;
     reconstruction.roles.dependencies.model = (command) => ({ assertOutput: assertModelOutput, execute: async (request) => {
       expect(request.readablePaths).toEqual([]);
       if (['code', 'test-gen'].includes(request.role)) expect(request.prompt).not.toContain('return 1;');
       else expect(request.prompt).toContain('return 1;');
       if (request.role === 'review') {
         const criteria = JSON.parse(Buffer.from(await instance.composition.artifacts.get(command.payload.criteriaRef as any)).toString('utf8'));
-        if (criteria.phase === 'FINAL_SOURCE_REVIEW') return { blocking: true, recommendation: 'ITERATE', correction: null, unresolvedRisks: ['Whole-card source evidence needs clarification.'] };
+        if (criteria.phase === 'FINAL_SOURCE_REVIEW') return sourceCorrection
+          ? { blocking: true, recommendation: 'ITERATE', correction: { correctionId: 'COR-0001', knowledgePath: `knowledge/${criteria.binding.moduleId}.md#Behavior`, criterion: 'Clarify the pinned return value for this source review.', risk: 'Ambiguous boundary.' }, unresolvedRisks: [] }
+          : { blocking: true, recommendation: 'ITERATE', correction: null, unresolvedRisks: ['Whole-card source evidence needs clarification.'] };
         if (criteria.phase === 'REVISION_SOURCE_REVIEW') { expect(request.prompt).toContain('exactly 1, not 0'); return { blocking: false, recommendation: 'PASS', correction: null, unresolvedRisks: [] }; }
         const card = instance.composition.repository.getKnowledgeVersion(criteria.candidate.versionId)!;
         return { blocking: true, recommendation: 'ITERATE', correction: { correctionId: 'COR-0001', knowledgePath: `knowledge/${card.moduleId}.md#Behavior`, criterion: 'Clarify the fixed integer return value.', risk: 'Unclear reconstruction guidance' }, unresolvedRisks: [] };
       }
       if (request.role === 'doc-gen' && ++docGenAttempts === 1) return { title: 'Parser generated card', description: 'The fixed parser interface.', sections: [{ sectionId: 'section-1', body: '## Invalid nested title' }] };
-      if (request.role === 'doc-gen') return { title: 'Parser generated card', description: 'The fixed parser interface.', sections: [{ sectionId: 'section-1', body: 'The parse function takes no arguments and always returns the integer one. Its public interface is int parse(void). The return value is exactly 1, not 0. The fixed source has no external dependencies or mutable state. This describes only the provided function; unsupported inputs and unrelated parsers are outside the scope. Behavioral verification of reconstructed code is still required.\n\nThis boundary matters because a generated implementation may compile with the correct signature while returning a different value. Callers should compare the returned integer with one; the presence of a callable function alone is insufficient. No allocation, callback, error code, or global configuration is part of this interface. These statements apply to the pinned source version and do not describe a general JSON parser.' }] };
+      if (request.role === 'doc-gen') return { title: 'Parser generated card', description: 'The fixed parser interface.', sections: [{ sectionId: 'section-1', body: 'The parse function takes no arguments and always returns the integer one. Its public interface is int parse(void). The return value is exactly 1, not 0. The fixed source has no external dependencies or mutable state. This describes only the provided function; unsupported inputs and unrelated parsers are outside the scope. Behavioral verification of reconstructed code is still required.\n\nThis boundary matters because a generated implementation may compile with the correct signature while returning a different value. Callers should compare the returned integer with one; the presence of a callable function alone is insufficient. No allocation, callback, error code, or global configuration is part of this interface. These statements apply to the pinned source version and do not describe a general JSON parser.' + (sourceCorrection ? '\n\nThe pinned return value remains one for every invocation of this exact no-argument function.' : '') }] };
       if (request.role === 'test-gen') {
         const ref = command.payload.testPolicyRef as Parameters<typeof instance.composition.artifacts.get>[0];
         const policy = JSON.parse(Buffer.from(await instance.composition.artifacts.get(ref)).toString('utf8'));
@@ -1110,6 +1112,25 @@ test('操作中心从固定 Git 版本分析仓库，显示模块和环境且窄
     await expect(page.locator('[data-reconstruction-panel]')).toContainText('重建及接口检查完成');
     const rebuiltTask = instance.composition.apps.workbenchStages.store.list().find(item => item.input.stage === 'FLYWHEEL' && !item.input.parameters.operation)!;
     expect(rebuiltTask.input.cardVersionIds).toEqual(revisedTask.result!.summary.versionIds);
+    sourceCorrection = true;
+    await page.getByRole('button', { name: '执行评测', exact: true }).click();
+    await expect(page.locator('[data-native-evaluation-panel]')).toContainText('评测执行完成');
+    await page.getByRole('button', { name: '复核全部卡片来源', exact: true }).click();
+    await expect(page.locator('[data-source-verification-panel]')).toContainText('正文与源码存在矛盾');
+    await page.getByRole('button', { name: '按来源意见修订', exact: true }).click();
+    await expect(page.locator('[data-source-revision-panel]')).toContainText('受影响索引已刷新');
+    await expect(page.locator('[data-source-revision-panel]')).toContainText('Clarify the pinned return value');
+    const sourceRepair = instance.composition.apps.workbenchStages.store.list().find(item => item.input.parameters.operation === 'KNOWLEDGE_SOURCE_REVISION')!;
+    expect(sourceRepair.status).toBe('SUCCEEDED');
+    await page.screenshot({ path: test.info().outputPath('source-revision-desktop.png'), fullPage: true });
+    await page.setViewportSize({ width: 390, height: 844 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await page.screenshot({ path: test.info().outputPath('source-revision-mobile.png'), fullPage: true });
+    await page.setViewportSize({ width: 1363, height: 936 });
+    await page.locator('[data-source-revision-panel]').getByRole('button', { name: '重建修订版本', exact: true }).click();
+    await expect.poll(() => instance.composition.apps.workbenchStages.store.list().find(item => item.input.stage === 'FLYWHEEL' && !item.input.parameters.operation)?.input.cardVersionIds).toEqual(sourceRepair.result!.summary.versionIds);
+    await expect(page.locator('[data-reconstruction-panel]')).toContainText('重建及接口检查完成');
+
 
   } finally { nativeEvaluation.snapshot = originalEvaluation.snapshot; nativeEvaluation.runner = originalEvaluation.runner; instance.composition.apps.workbenchEvaluation.dependencies.native = originalEvaluation.native; reconstruction.roles.dependencies.model = originalReconstruction.model; reconstruction.snapshot = originalReconstruction.snapshot; reconstruction.native = originalReconstruction.native; instance.composition.apps.workbenchGeneration.dependencies.model = originalModel; instance.composition.apps.workbenchGeneration.dependencies.native = originalNative; rmSync(directory, { recursive: true, force: true }); }
 });
