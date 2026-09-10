@@ -10,19 +10,13 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
-import type { ArtifactStore, GeneratedProjectFile, ProjectCommandResult, ProjectEvaluation, ProjectSnapshot } from '../../../application/ports/ApplicationPorts.ts';
-import { assertModuleBehaviorSuite, type ModuleBehaviorSuite } from '../../../domain/agents/testGenAgent/ModuleBehaviorSuite.ts';
+import type { ArtifactStore, ProjectCommandResult, ProjectEvaluation } from '../../../application/ports/ApplicationPorts.ts';
+import { assertModuleBehaviorSuite } from '../../../domain/agents/testGenAgent/ModuleBehaviorSuite.ts';
 import { modelProcessLane } from '../../agentAdapters/ModelProcessLane.ts';
 import { bundledLibraryEnvironment } from '../../runtime/BundledLibraries.ts';
 import { captureIsolated, type IsolatedCommandResult as ProcessResult } from '../../runtime/IsolatedCommand.ts';
 
-interface ModuleEvaluationInput {
-  label: string;
-  snapshot: ProjectSnapshot;
-  generatedFiles: GeneratedProjectFile[];
-  moduleSuite: ModuleBehaviorSuite;
-  moduleContract?: { modulePath: string; exportName: string; signature: string };
-}
+type ModuleEvaluationInput = import('../../../application/ports/LanguageToolchainPorts.ts').TypeScriptModuleInput;
 
 const hash = (value: string | Uint8Array) => createHash('sha256').update(value).digest('hex');
 const repetitions = 5;
@@ -220,6 +214,8 @@ async function evaluateInProcessLane(artifacts: ArtifactStore, input: ModuleEval
       || /bwrap:|prlimit:|failed to reserve|out of memory|cannot allocate memory/i.test(result.stderr));
     const toolchain = { node: process.version, nodeSha256: await fileDigest(realpathSync(process.execPath)),
       typescriptSha256: await fileDigest(join(compilerRoot, 'tsc')), runnerSha256: hash(runner),
+      executorSha256: await fileDigest(fileURLToPath(import.meta.url)),
+      languageBoundarySha256: await fileDigest(fileURLToPath(new URL('./IsolatedLanguageCases.ts', import.meta.url))),
       isolation: 'linux-bwrap-unshare-all-node-permission-vm-v1', processMemoryBytes: 1_073_741_824,
       heapMiB: 64, compilerMemoryBytes: 2_147_483_648, maxConcurrentProcesses: 1 };
     const stability = testsTotal ? testsPassed / testsTotal : 0;

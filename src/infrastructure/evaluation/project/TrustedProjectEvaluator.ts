@@ -17,7 +17,7 @@ import type {
   ProjectEvaluation, ProjectEvaluator, ProjectSnapshot, ProjectTool,
 } from '../../../application/ports/ApplicationPorts.ts';
 import type { ModuleBehaviorSuite } from '../../../domain/agents/testGenAgent/ModuleBehaviorSuite.ts';
-import { evaluateModuleSuite } from './ModuleCaseExecutor.ts';
+import { IsolatedLanguageCases } from './IsolatedLanguageCases.ts';
 import { bundledLibraryEnvironment } from '../../runtime/BundledLibraries.ts';
 
 interface ResolvedTool {
@@ -384,7 +384,7 @@ export class TrustedProjectEvaluator implements ProjectEvaluator {
     moduleSuite?: ModuleBehaviorSuite;
     moduleContract?: { modulePath: string; exportName: string; signature: string };
   }, signal?: AbortSignal): Promise<ProjectEvaluation> {
-    if (input.moduleSuite) return evaluateModuleSuite(this.artifacts, { ...input, moduleSuite: input.moduleSuite }, signal);
+    if (input.moduleSuite) return (await new IsolatedLanguageCases(this.artifacts).evaluate({ language: 'typescript', input: { ...input, moduleSuite: input.moduleSuite } }, signal)).detail;
     if (input.commands.length === 0) throw new Error('PROJECT_GATE_EMPTY');
     const tempRoot = mkdtempSync(join(tmpdir(), 'wp-project-eval-'));
     const workspace = join(tempRoot, 'workspace');

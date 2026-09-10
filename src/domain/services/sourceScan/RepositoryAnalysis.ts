@@ -30,7 +30,8 @@ export function groupRepositoryModules(files: RepositoryFile[]): RepositoryModul
   }
   return [...groups].map(([moduleId, group]) => {
     const language = group.find((file) => /\.(c|cpp|cc|cxx|ts|tsx)$/.test(file.path))?.language ?? group[0]!.language;
-    const reasons = language === 'unsupported' ? ['LANGUAGE_NOT_SUPPORTED'] : [];
+    const reasons = language === 'unsupported' ? ['LANGUAGE_NOT_SUPPORTED']
+      : language === 'typescript' ? ['TYPESCRIPT_MODULE_REGRESSION_ONLY'] : [];
     if (new Set(group.filter((file) => /\.(c|cpp|cc|cxx|ts|tsx)$/.test(file.path)).map((file) => file.language)).size > 1) reasons.push('MIXED_LANGUAGE_MODULE');
     if (group.some((file) => file.size > 1_048_576)) reasons.push('SOURCE_FILE_TOO_LARGE');
     const name = moduleId.split('/').at(-1)!;

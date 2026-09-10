@@ -249,7 +249,7 @@ npm run site:serve
 
 分析后可勾选支持的模块，调整C/C++编译器与标准，填写相对包含目录和预处理定义，再点击“保存项目输入”。保存使用分析结果的完整提交，不重新跟随分支；页面显示不可变输入版本。修改选项后须重新保存，旧输入仍保留。每个文件最多1MiB，总源码输入8MiB；缩小模块范围可降低用量。该输入供公开接口提取、生成和参考评测使用。
 
-C/C++验收输入固定在 `tests/fixtures/nativeTargets/Targets.json`：包含jsmn与TinyXML2提交、头文件/实现/上游测试SHA-256和限定符号范围。当前仅固定输入，可信测试仍为PENDING_REFERENCE_VALIDATION。jsmn上游Makefile包含默认、STRICT、PARENT_LINKS及两者组合四种配置；TinyXML2只重建XMLUtil类型转换，不重建整个XML库。上游测试文件摘要不等同于已完成限定模块的可信测试提取或真实运行。
+C/C++验收输入固定在 `tests/fixtures/nativeTargets/Targets.json`：包含jsmn与TinyXML2提交、头文件/实现/上游测试SHA-256和限定符号范围。固定声明式案例已在对应参考提交通过（jsmn 11、XMLUtil 40），fixedSuite 记录报告摘要与工具链摘要；模型候选测试的可信晋升独立处理，不能据此改变旧 trustedSuiteStatus 或发布知识。jsmn上游Makefile包含默认、STRICT、PARENT_LINKS及两者组合四种配置；TinyXML2只重建XMLUtil类型转换，不重建整个XML库。上游测试文件摘要不等同于已完成限定模块的可信测试提取或真实运行。
 
 ### 整卡来源复核与来源修订
 

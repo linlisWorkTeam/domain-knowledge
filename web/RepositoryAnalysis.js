@@ -16,7 +16,7 @@ export function createRepositoryAnalysisPanel({ root, request, escapeHtml: escap
   let selected = new Set()
   const build = { cCompiler: 'gcc', cppCompiler: 'g++', cStandard: 'c11', cppStandard: 'c++17', includeDirectories: '', definitions: '' }
   const language = { c: 'C', cpp: 'C++', typescript: 'TypeScript', unsupported: '尚未支持' }
-  const reasons = { LANGUAGE_NOT_SUPPORTED: '此语言尚未支持', SOURCE_FILE_TOO_LARGE: '文件超出默认生成大小', MIXED_LANGUAGE_MODULE: '需要明确不同语言的构建范围' }
+  const reasons = { LANGUAGE_NOT_SUPPORTED: '此语言尚未支持', TYPESCRIPT_MODULE_REGRESSION_ONLY: '保留现有模块回归；此多卡片生成入口尚未支持 TypeScript', SOURCE_FILE_TOO_LARGE: '文件超出默认生成大小', MIXED_LANGUAGE_MODULE: '需要明确不同语言的构建范围' }
   function result() {
     if (!report) return ''
     return `<p>源码版本 <code>${escape(report.commit)}</code></p><p>构建配置：${escape(report.buildSystems.join('、') || '未发现')}</p>

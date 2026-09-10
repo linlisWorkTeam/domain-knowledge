@@ -9,7 +9,7 @@ import { SqliteExternalMaterials } from '../../infrastructure/sqlite/SqliteExter
 import { MaterialText } from '../../infrastructure/source/MaterialText.ts';
 import { RepositoryAnalysisService } from '../../application/services/RepositoryAnalysis.ts';
 import { NativeSuiteEvaluation } from '../../application/services/NativeSuiteEvaluation.ts';
-import { NativeCaseExecutor } from '../../infrastructure/evaluation/project/NativeCaseExecutor.ts';
+import { IsolatedLanguageCases } from '../../infrastructure/evaluation/project/IsolatedLanguageCases.ts';
 import { nativeFingerprint } from '../../infrastructure/evaluation/project/NativeFingerprint.ts';
 import { SqliteNativeTests } from '../../infrastructure/sqlite/SqliteNativeTests.ts';
 import { WorkbenchProjects } from '../../application/services/WorkbenchProjects.ts';
@@ -188,7 +188,7 @@ export function createComposition(input: {
   const pipelineStore = new SqliteWorkbenchPipelines(join(runtimeDir, 'workbench.sqlite'));
   const stageStore = new SqliteStageTasks(join(runtimeDir, 'workbench.sqlite'));
   const nativeTestStore = new SqliteNativeTests(join(runtimeDir, 'workbench.sqlite'));
-  const nativeEvaluation = new NativeSuiteEvaluation({ artifacts, runner: new NativeCaseExecutor(new NativeToolchain()), snapshot: nativeFingerprint, store: nativeTestStore });
+  const nativeEvaluation = new NativeSuiteEvaluation({ artifacts, runner: new IsolatedLanguageCases(artifacts), snapshot: nativeFingerprint, store: nativeTestStore });
   const indexStore = new SqliteKnowledgeIndex(join(runtimeDir, 'workbench.sqlite'), join(runtimeDir, 'card-index'));
   const knowledgeIndex = new KnowledgeIndexService(repository, artifacts, indexStore);
   let workbenchGeneration!: WorkbenchGeneration;

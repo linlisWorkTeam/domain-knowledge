@@ -26,8 +26,13 @@
         "path": "JsmnFixedCases.json",
         "sha256": "bf61494f3a04dd3002bfc8d62b060f1be034277017916c31989f013c027beab2",
         "caseCount": 11,
-        "status": "PENDING_REFERENCE_VALIDATION",
-        "profile": "default-c11"
+        "status": "REFERENCE_VALIDATED",
+        "profile": "default-c11",
+        "referenceValidation": {
+          "reportSha256": "233fc6a636857ff6d8f96ba3a6d3a3627a40ddf0a9dfea27f350e9e800e4c1f4",
+          "toolchainDigest": "9949767a88f2626a49c7d82b77a489d5222ea793a67ad5302f8c00913ea782a5",
+          "publicationVerified": false
+        }
       }
     },
     {
@@ -57,8 +62,13 @@
         "path": "Tinyxml2FixedCases.json",
         "sha256": "1fe8bddf338ee9996ccbf224282cb91b9c5f59016a5120013fd49762c89c056f",
         "caseCount": 40,
-        "status": "PENDING_REFERENCE_VALIDATION",
-        "profile": "xmlutil-conversions-c++17"
+        "status": "REFERENCE_VALIDATED",
+        "profile": "xmlutil-conversions-c++17",
+        "referenceValidation": {
+          "reportSha256": "fed91a7be1ddeb4316aca5ce7426f71725ff2b46fdf1836a0a9e1370312b5feb",
+          "toolchainDigest": "e7529fb907e61289b1fe14040b1749e8999bd46057b280782046d4711ce63baa",
+          "publicationVerified": false
+        }
       }
     }
   ]
