@@ -12,7 +12,7 @@ SPDX-License-Identifier: MIT
 
 ## 共同协议
 
-每个 XxxAgent 目录有入口、Contract、Prompt、测试和显式样例。`execute(input, context)` 的 input 使用角色专属 Payload 与已加载材料；context 注入模型 Port、promptAddon 与取消信号。入口依次检查取消和材料、构建 Prompt / Schema、按角色阶段调用模型、每阶段后再次检查取消并校验输出，最终返回 output / payload / artifacts。格式重试由 Adapter 负责；DocWorker/DocGen 的可定位语义错误由阶段执行器最多反馈修正一次，权限、材料、传输错误不自动重试。
+每个 XxxAgent 目录有入口、Contract、Prompt、测试和显式样例。`execute(input, context)` 的 input 使用角色专属 Payload 与已加载材料；context 注入模型 Port、promptAddon 与取消信号。入口依次检查取消和材料、构建 Prompt / Schema、按角色阶段调用模型、每阶段后再次检查取消并校验输出，最终返回 output / payload / artifacts。格式重试由 Adapter 负责；DocWorker/DocGen/Review 的可定位语义错误由阶段执行器最多反馈修正一次，权限、材料、传输错误不自动重试。
 
 `RoleResult` 中 pending 引用由 Application 保存正文后绑定，Domain 不操作 CAS 路径或信封事务。材料的可见范围由角色 Prompt 定义与载荷引用共同限制，不能把完整工作流上下文交给所有角色。
 
@@ -76,3 +76,7 @@ Review 的提示材料由程序提取当前知识的唯一 H2 与完整 knowledg
 Domain 按 Application 绑定的冻结场景与本轮可信评测逐项形成 OPEN / VERIFIED / OUT_OF_SCOPE。只有完整、非空、无基础设施失败、稳定性为 1 的通过评测能验证 MODULE_BEHAVIOR_TESTS；不声称覆盖所有输入。没有模块契约或证据不足保持 OPEN；未知种类和篡改的声明不能通过。每轮重新评估，不沿用上一版本的通过。原始记录不删除、不修改，处置工件作为门禁 evidenceRefs 保存，可从 Console 评测证据下载；页面独立显示知识风险原因。
 
 本版普通自由文本缺证据风险尚不支持自动解除，需要补充材料后重新提取事实；不提供任意风险的模型自评清除接口。验收覆盖失败后修订通过且保留逐轮风险审计、未解决风险拒绝、缺少范围证据、跨版本评测不复用及旧版本拒绝恢复。
+
+Review evidence-attribution 阶段为 180 秒，PASS 与阻塞/修订/未解决风险矛盾时最多反馈一次，保留两次输出与共享截止时间。反馈要求保留实际风险并选择 ITERATE，不能通过清空风险满足格式；权限与传输失败不重试。DocWorker 在字段 Schema 中明确风险、待验证事项和适用限制的职责，未来版本及未承诺的性能上界不等于当前源码行为未知；具体安全缺陷仍阻止发布。旧风险及失败门禁不重分类、不删除。
+
+本次显式授权的 provider-quota 验收采用 v5 预算模式：不限制完整启动次数、总轮次或总时长，直到成功、取消或供应商额度拒绝；单阶段截止时间与隔离约束保留。默认产品模式仍是 3 轮/30 分钟，恢复不重置已消耗预算。

@@ -57,8 +57,8 @@ export const outputSchema: Record<string, unknown> = {
         endLine: { type: 'integer', minimum: 1 }, quote: { type: 'string', minLength: 1 },
       },
     } },
-    verificationNeeds: { type: 'array', uniqueItems: true, items: { enum: Object.keys(VERIFICATION_NEEDS) } },
-    unresolvedRisks: { type: 'array', uniqueItems: true, items: { type: 'string', minLength: 1 } },
+    verificationNeeds: { type: 'array', description: '未运行测试用 MODULE_BEHAVIOR_TESTS；未验证 UI 集成用 SYSTEM_INTEGRATION；类型外输入用 OUTSIDE_PUBLIC_TYPES。同一事项不重复写入 unresolvedRisks。', uniqueItems: true, items: { enum: Object.keys(VERIFICATION_NEEDS) } },
+    unresolvedRisks: { type: 'array', description: '仅登记当前公开类型内、无法从已提供源码确定的具体行为或缺陷，说明证据缺口。无此类缺口时为 []。通用的未运行测试/未集成/未验证类型外输入使用 verificationNeeds；未来版本与没有承诺的性能上界写入 fragment 的适用限制。实际安全缺陷仍必须登记。', uniqueItems: true, items: { type: 'string', minLength: 1 } },
   },
 };
 

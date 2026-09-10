@@ -7,6 +7,7 @@ import { sha256 } from '../../Domain.ts';
 import type { ExecutionContext, RoleResult, PendingArtifact } from '../AgentExecution.ts';
 import { assertActive } from '../AgentExecution.ts';
 import { type Input, type Output, schemaFor, validateInput, validateOutput } from './ReviewAgentContract.ts';
+import { validatedStage } from '../StageValidation.ts';
 import { definition, buildPrompt, readablePaths } from './ReviewAgentPrompt.ts';
 
 /** 依据知识与评测证据给出纠正意见，并将意见绑定到本轮评测工件。 */
@@ -16,19 +17,20 @@ export async function execute(input: Input, context: ExecutionContext): Promise<
   validateInput(input);
   const schema = schemaFor(input);
   // 角色决定本阶段的任务与能力范围；会话、工具执行和格式修复交给模型适配器。
-  const raw = await context.model.execute({
+  const output = await validatedStage(context, {
     role: definition.agentId,
     stage: 'evidence-attribution',
     prompt: buildPrompt(input, context),
     outputSchema: schema,
     tools: definition.tools,
     readablePaths: readablePaths(input),
-  }, context.signal);
+  }, (raw) => {
+    const output = raw as unknown as Output;
+    validateOutput(output, input);
+    return output;
+  }, 180_000);
   // 模型返回后仍需检查取消状态，迟到结果不能被当作成功输出。
   assertActive(context.signal);
-  context.model.assertOutput(raw, schema);
-  const output = raw as unknown as Output;
-  validateOutput(output, input);
   const artifacts: PendingArtifact[] = [];
   const review = output;
   const evaluationRef = input.payload.evaluationReportRef;

@@ -6,6 +6,7 @@
 import type { ArtifactRef } from '../../Domain.ts';
 import type { RoleInput } from '../AgentExecution.ts';
 import { requireMaterials } from '../AgentExecution.ts';
+import { StageValidationIssue } from '../StageValidation.ts';
 import { markdownSections } from '../docGenAgent/DocGenRevision.ts';
 
 /** 角色业务载荷。 */
@@ -33,7 +34,7 @@ export interface Output {
 export const outputSchema: Record<string, unknown> = {
   type: 'object', required: ['blocking', 'recommendation', 'correction'], additionalProperties: false,
   properties: {
-    blocking: { type: 'boolean' }, recommendation: { enum: ['PASS', 'ITERATE'] },
+    blocking: { type: 'boolean' }, recommendation: { enum: ['PASS', 'ITERATE'], description: 'PASS 仅适用于无阻塞、无修订、无未解决风险；存在任一问题必须 ITERATE。' },
     unresolvedRisks: { type: 'array', items: { type: 'string', minLength: 1 } },
     correction: {
       type: ['object', 'null'],
@@ -60,7 +61,8 @@ export function validateInput(input: Input): void {
 /** 纠正意见必须定位已有 H2；缺乏定位证据时交付未解决问题，不能凭空扩大修订范围。 */
 export function validateOutput(output: Output, input: Input): void {
   if (output.recommendation === 'PASS' && (output.blocking || output.correction || output.unresolvedRisks?.length)) {
-    throw new Error('REVIEW_PASS_CONTRADICTION');
+    throw new StageValidationIssue('REVIEW_PASS_CONTRADICTION', 'recommendation/blocking/correction/unresolvedRisks',
+      'PASS 必须同时 blocking=false、correction=null、unresolvedRisks=[]。仍有风险时应返回 ITERATE 并保留风险；不能为满足结构而删除风险或宣称证据已存在。');
   }
   const correction = output.correction;
   if (!correction) return;

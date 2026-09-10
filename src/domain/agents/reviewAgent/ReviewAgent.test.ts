@@ -93,3 +93,25 @@ test('review: prompt lists exact existing H2 targets and does not authorize subh
   assert.ok(!line.includes('"heading":"Paragraphs"'));
   assert.ok(!line.includes('"heading":"Fake heading"'));
 });
+
+
+test('review: contradictory PASS receives one bounded feedback and preserves unresolved risk', async () => {
+  const sample = roleExample<Input>('review');
+  const attempts: any[] = [];
+  sample.context.stageJournal = { read: async () => attempts, record: async entry => { attempts.push(entry); } };
+  let calls = 0;
+  sample.context.model.execute = async request => {
+    calls++;
+    if (calls === 2) {
+      assert.match(request.prompt, /REVIEW_PASS_CONTRADICTION/);
+      assert.match(request.prompt, /不能为满足结构而删除风险/);
+    }
+    return { blocking: true, recommendation: calls === 1 ? 'PASS' : 'ITERATE', correction: null,
+      unresolvedRisks: ['missing source branch evidence'] };
+  };
+  const result = await execute(sample.input, sample.context);
+  assert.equal(calls, 2);
+  assert.deepEqual(result.payload.unresolvedRisks, ['missing source branch evidence']);
+  assert.deepEqual(attempts.map(entry => entry.status), ['STARTED', 'REJECTED', 'STARTED', 'PASSED']);
+  assert.equal(attempts[0].deadlineAt, attempts[2].deadlineAt);
+});
