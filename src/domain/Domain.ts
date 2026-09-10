@@ -26,7 +26,7 @@ export type QualityOutcome = 'ACCEPTED' | 'REJECTED';
 export const DOMAIN_EVENT_TYPES = [
   'RunCreated', 'RunStateChanged', 'ArtifactCommitted', 'GateDecided',
   'KnowledgePublished', 'NodeCompleted', 'NodeFailed', 'AgentPromptConfigured',
-  'WorkflowNodeStateChanged', 'RunConfigurationCaptured', 'ComponentStatusChanged',
+  'WorkflowNodeStateChanged', 'RunConfigurationCaptured', 'ComponentStatusChanged', 'ReviewHandoffPrepared', 'RunModuleSelected',
 ] as const;
 /** 定义Domain事件类型的数据结构与类型约束。 */
 export type DomainEventType = typeof DOMAIN_EVENT_TYPES[number];

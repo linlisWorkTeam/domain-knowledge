@@ -11,7 +11,7 @@ import type { ExecutionContext } from '../AgentExecution.ts';
 export const definition = {
     agentId: 'orchestrator', displayName: '编排智能体',
     responsibility: '读取固化策略和执行摘要，形成当前轮的确定性任务计划。',
-    basePrompt: '规划当前一轮知识飞轮。根据业务目标、模块概况、项目配置和进度，为当前模块输出 tasks。五类外层角色各一次，每项包含 agentType、moduleId 和 materials 材料槽位。只使用授权槽位，不安排 DocWorker，不改变固定拓扑，不决定 Gate 结果。',
+    basePrompt: '规划当前一轮知识飞轮。根据业务目标、模块概况、项目配置和进度，从明确授权的 modules 概览中依据目标和进度选择本批次最应处理的一个模块，为它输出 tasks 和说明选择依据的 strategy；后续轮次只能继续已选择模块。五类外层角色各一次，每项包含 agentType、moduleId 和 materials 材料槽位。只使用授权槽位，不安排 DocWorker，不改变固定拓扑，不决定 Gate 结果。',
     inputContract: ['运行策略', '当前轮次', '上次路由摘要'],
     outputContract: ['计划摘要'], tools: [], customizableFields: ['promptAddon'],
   } as const;

@@ -530,7 +530,13 @@ export class SQLiteFlywheelRepository implements FlywheelRepository {
     let reasonCode = '';
     let summary = '';
     let allowedActions: ActionItemObservation['allowedActions'] = [];
-    if (event.eventType === 'RunStateChanged' && event.payload.to === 'FAILED') {
+    if (event.eventType === 'ReviewHandoffPrepared') {
+      type = 'GATE_STOPPED';
+      reasonCode = 'REVIEW_HANDOFF';
+      summary = [String(event.payload.summary), String(event.payload.historySummary ?? ''),
+        `证据摘要：${JSON.stringify(event.payload.handoffRef)}`].filter(Boolean).join('\n');
+      allowedActions = ['ACKNOWLEDGE', 'RESOLVE', 'REGENERATE'];
+    } else if (event.eventType === 'RunStateChanged' && event.payload.to === 'FAILED') {
       type = 'RUN_FAILED';
       reasonCode = String(event.payload.reasonCode ?? 'RUN_FAILED');
       summary = '批次执行失败';
@@ -588,8 +594,8 @@ export class SQLiteFlywheelRepository implements FlywheelRepository {
   updateRun(run: FlywheelRun, event: DomainEvent): void {
     this.transaction(() => {
       const result = this.database.prepare(`
-        UPDATE runs SET state = ?, iteration = ?, best_version_id = ?, updated_at = ? WHERE run_id = ?
-      `).run(run.state, run.iteration, run.bestVersionId, run.updatedAt, run.runId);
+        UPDATE runs SET module_id = ?, state = ?, iteration = ?, best_version_id = ?, updated_at = ? WHERE run_id = ?
+      `).run(run.moduleId, run.state, run.iteration, run.bestVersionId, run.updatedAt, run.runId);
       assertInvariant(Number(result.changes) === 1, `run not found: ${run.runId}`);
       this.insertEvent(event);
     });

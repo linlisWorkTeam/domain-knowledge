@@ -26,6 +26,12 @@ export class FlywheelDomainService {
     return createRun(moduleId, policyId, now);
   }
 
+  /** 业务计划只可在第一次生成前绑定模块，后续轮次不得改换知识归属。 */
+  selectModule(run: FlywheelRun, moduleId: string, now: string): FlywheelRun {
+    if (run.state !== 'PLANNED' || run.iteration !== 0 || !/^[a-z0-9][a-z0-9_-]{0,127}$/.test(moduleId)) throw new Error('RUN_MODULE_SELECTION_INVALID');
+    return { ...run, moduleId, updatedAt: now };
+  }
+
   /** 迁移请求。 */
   transition(run: FlywheelRun, next: RunState, now: string): FlywheelRun {
     return transitionRun(run, next, now);

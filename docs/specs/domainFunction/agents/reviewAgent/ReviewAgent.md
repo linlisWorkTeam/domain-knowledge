@@ -21,9 +21,9 @@ SPDX-License-Identifier: MIT
 
 ## 当前输入输出
 
-IO-15、16 已实现。必需输入为 `knowledgeRef`、`evaluationReportRef`、`comparisonReportRef`；可选 `previousCorrectionRefs` 只加载 Application 显式提供的历史纠正记录。角色不获得原始仓库文件，`readablePaths` 为空。
+IO-15、16 已实现。必需输入为 `knowledgeRef`、`evaluationReportRef`、`comparisonReportRef`；可选 `previousCorrectionRefs` 加载 Application 按轮次整理的历史材料包，每包包含先前文档、实际测评、比较报告、纠正意见正文及其证据引用。角色不获得原始仓库文件，`readablePaths` 为空。
 
-模型输出 `blocking` 与 `corrections` 数组。每条修订意见包含：
+模型输出 `blocking` 与 `corrections` 数组；有历史输入时必须同时输出 `historySummary`，总结有用尝试、回归和下一步建议。每条修订意见包含：
 
 | 字段 | 含义 |
 | --- | --- |
@@ -41,4 +41,8 @@ IO-15、16 已实现。必需输入为 `knowledgeRef`、`evaluationReportRef`、
 
 角色测试覆盖多条意见、两类依据绑定、无意见、位置越界与取消。完整 C++ 测试覆盖失败测评 → Review → DocGen 修订 → 再测评。意见的业务质量仍待真实模型验证。
 
-Knowledge IO-19 的完整人工治理清单、历史提炼和资料保留/清理属于独立治理能力，当前只保留结构化意见及证据，不执行自动删除。状态与验收依据见 [Status](../../../../Status.md)。
+工作流 STOPPED 时生成 `ReviewHandoffPrepared` 事件及 CAS 摘要，人工待办包含问题段落、建议、历史对比及证据入口。所有详细材料保存在后台。Knowledge IO-19 的治理后资料清理仍属于原有共享能力待办；本次端到端验收显式保留全部中间产物。状态与验收依据见 [Status](../../../../Status.md)。
+
+## 本轮缺口修复验收
+
+修订定位与 DocGen 共用解析规则：当前文档路径、唯一章节或唯一原文所在章节。历史材料提供先前文档、实际评测、比较与意见正文，并形成带证据引用的问题与建议摘要。

@@ -90,6 +90,8 @@ interface ReviewOutput {
 
 /** 定义Real源码Scenario的数据结构与类型约束。 */
 export interface RealSourceScenario {
+  /** 明确授权的候选模块；每个 Run 选择一个模块并保持到结束。 */
+  modules?: Omit<RealSourceScenario, 'modules'>[];
   /** 本轮冻结的项目级 Agent 编写约束。 */
   agentConfiguration?: ProjectAgentConfiguration;
   comparisonRules?: { id: string; description: string }[];

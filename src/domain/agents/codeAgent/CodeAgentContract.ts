@@ -17,6 +17,7 @@ export interface Payload {
   projectConfigurationRef: ArtifactRef;
   /** 提供allowedGenerated路径列表信息，供调用方读取或传入。 */
   allowedGeneratedPaths: string[];
+  requiredGeneratedPaths?: string[];
 }
 /** 角色输入。 */
 export type Input = RoleInput<Payload>;
@@ -45,6 +46,7 @@ export function schemaFor(input: Input): Record<string, unknown> {
 /** 检查本角色必需字段及所引用材料是否完整。 */
 export function validateInput(input: Input): void {
   requireMaterials(input.payload, input.materials, ['knowledgeRef', 'languageId', 'projectConfigurationRef', 'allowedGeneratedPaths']);
+  if (input.payload.requiredGeneratedPaths?.some((path) => !input.payload.allowedGeneratedPaths.includes(path))) throw new Error('CODE_RECONSTRUCTION_SCOPE_INVALID');
   if (!['c', 'cpp'].includes(input.payload.languageId)) throw new Error('CODE_LANGUAGE_INVALID');
   const config = input.materials.find(({ ref }) => ref.artifactId === input.payload.projectConfigurationRef.artifactId)?.content as Record<string, unknown>;
   if (!config || Object.keys(config).some((key) => !['languageId', 'standard', 'dependencies', 'constraints', 'allowedGeneratedPaths'].includes(key))
@@ -67,4 +69,5 @@ export function validateOutput(output: Output, input: Input): void {
     if (seen.has(file.path)) throw new Error(`PROJECT_PATH_DUPLICATED: ${file.path}`);
     seen.add(file.path);
   }
+  if (input.payload.requiredGeneratedPaths?.some((path) => !seen.has(path))) throw new Error('CODE_RECONSTRUCTION_INCOMPLETE');
 }

@@ -47,6 +47,6 @@ test('orchestrator: reject foreign modules, source leakage and incomplete plans'
     (output: any) => { output.iteration = 99; },
   ]) {
     const sample = roleExample<Input>('orchestrator'); mutate(sample.output);
-    await assert.rejects(execute(sample.input, sample.context), /ORCHESTRATOR_(TASK_SCOPE|PLAN)_INVALID/);
+    await assert.rejects(execute(sample.input, sample.context), /ORCHESTRATOR_(TASK_SCOPE|PLAN|MODULE_SELECTION)_INVALID/);
   }
 });

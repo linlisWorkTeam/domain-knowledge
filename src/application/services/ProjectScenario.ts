@@ -63,6 +63,13 @@ export function parseProjectScenario(value: unknown, repositoryRoot?: string): R
     if (typeof item.businessGoal !== 'string' || !item.businessGoal.trim()) return fail();
     result.businessGoal = item.businessGoal;
   }
+  if (item.modules !== undefined) {
+    if (!Array.isArray(item.modules) || !item.modules.length || item.modules.length > 32) return fail();
+    const modules = item.modules.map((module) => parseProjectScenario(module, result.repositoryRoot as string));
+    if (modules.some((module) => module.modules || module.expectedCommit !== result.expectedCommit)
+      || new Set(modules.map((module) => module.moduleId)).size !== modules.length) return fail();
+    result.modules = modules;
+  }
   // Fixture assets and unknown fields cannot enter the public role contract.
   if (Object.keys(item).some((key) => !(key in result))) return fail();
   return result as unknown as RealSourceScenario;

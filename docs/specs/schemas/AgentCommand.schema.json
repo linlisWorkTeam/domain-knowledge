@@ -132,6 +132,7 @@
         "knowledgeRef": {"$ref": "#/$defs/artifactRef"},
         "languageId": {"type": "string", "pattern": "^[a-z][a-z0-9+.-]*$"},
         "projectConfigurationRef": {"$ref": "#/$defs/artifactRef"},
+        "requiredGeneratedPaths": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
         "allowedGeneratedPaths": {
           "type": "array",
           "minItems": 1,

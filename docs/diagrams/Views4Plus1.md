@@ -142,3 +142,23 @@ flowchart LR
   P --> R[workflow_router STOPPED]
   R --> U[用户决定后准备单文档任务]
 ```
+
+## Agent 证据交接补充（2026-09-10）
+
+```mermaid
+flowchart LR
+  Goal[业务目标与授权模块概览] --> Plan[Orchestrator 选择本 Run 模块]
+  Plan --> Bind[Application 绑定模块及任务材料]
+  Bind --> Tests[TestGen 测试源码与清单]
+  Tests --> Reference[原实现 + 项目命令 + 绑定测试编译运行]
+  Reference -->|失败证据与完整候选| Tests
+  Reference -->|成功固定测试集| Eval[删除目标原实现后评测重建代码]
+  Eval --> Review[Review 当前证据与历史全文]
+  Review --> Revision[统一定位的 DocGen 修订]
+  Revision --> Eval
+  Review --> Gate[确定性 Gate]
+  Gate -->|PASS| Publish[发布知识]
+  Gate -->|STOPPED| Handoff[问题、建议、历史对比及证据摘要]
+```
+
+该图补充业务材料交接，不改变固定 LangGraph 拓扑。修订迭代继续使用选定模块及已固定测试集。验收运行可显式保留评测工作区、编译产物和完整证据。

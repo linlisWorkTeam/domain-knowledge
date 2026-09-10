@@ -86,6 +86,19 @@ export class KnowledgeFlywheelService {
     return run;
   }
 
+  recordReviewHandoff(runId: string, payload: Record<string, unknown>): void {
+    this.repository.recordOperationalEvent(createEvent(runId, 'ReviewHandoffPrepared', payload, this.clock()));
+  }
+
+  /** 固定 Orchestrator 已校验计划选中的模块。 */
+  selectRunModule(runId: string, moduleId: string): void {
+    const run = this.requireRun(runId);
+    if (run.moduleId === moduleId) return;
+    const now = this.clock();
+    const updated = this.flywheelDomain.selectModule(run, moduleId, now);
+    this.repository.updateRun(updated, createEvent(runId, 'RunModuleSelected', { previousModuleId: run.moduleId, moduleId }, now));
+  }
+
   /** 迁移请求。 */
   transition(runId: string, next: RunState): FlywheelRun {
     const current = this.requireRun(runId);

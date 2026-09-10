@@ -31,8 +31,14 @@ export function validateInput(input: Input): void {
 }
 export function validateOutput(output: Output, input: Input, iteration: number): void {
   if (output.iteration !== iteration || new Set(output.tasks.map((task) => task.agentType)).size !== 5) throw new Error('ORCHESTRATOR_PLAN_INVALID');
+  const overview = input.payload.moduleRefs.flatMap((ref) => {
+    const material = input.materials.find((item) => item.ref.artifactId === ref.artifactId)?.content as { modules?: { moduleId: string }[] };
+    return material?.modules ?? [];
+  });
+  const allowedModules = overview.length ? overview.map((module) => module.moduleId) : [input.moduleId];
+  if (new Set(output.tasks.map((task) => task.moduleId)).size !== 1) throw new Error('ORCHESTRATOR_MODULE_SELECTION_INVALID');
   for (const task of output.tasks) {
     const allowed: readonly string[] = taskMaterials[task.agentType];
-    if (task.moduleId !== input.moduleId || task.materials.length !== allowed.length || task.materials.some((key) => !allowed.includes(key))) throw new Error('ORCHESTRATOR_TASK_SCOPE_INVALID');
+    if (!allowedModules.includes(task.moduleId) || task.materials.length !== allowed.length || task.materials.some((key) => !allowed.includes(key))) throw new Error('ORCHESTRATOR_TASK_SCOPE_INVALID');
   }
 }

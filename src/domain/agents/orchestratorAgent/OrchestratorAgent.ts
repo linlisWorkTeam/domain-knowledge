@@ -40,7 +40,7 @@ export async function execute(input: Input, context: ExecutionContext): Promise<
   const payload = {
     resultKind: 'plan',
     nodes: nodes.map(([agentType, dependsOn, resourceClaims, artifactExpectations]) => ({
-      moduleId: input.moduleId,
+      moduleId: output.tasks[0]!.moduleId,
       materials: output.tasks.find((task) => task.agentType === agentType)!.materials,
       nodeId: { agentNode: agentType },
       agentType,
