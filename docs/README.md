@@ -13,7 +13,7 @@ SPDX-License-Identifier: MIT
 | 阅读架构与开发报告 | [目录、DDD、Spec 与 Agent 编排报告](reports/FrameworkArchitectureAndSpecDevelopment.md) | 本次代码快照说明，现行设计仍在 specs |
 | 理解架构 | [4+1 视图](diagrams/Views4Plus1.md) | [Architecture](specs/totalRules/Architecture.md)、[DDD](specs/totalRules/DomainDrivenDesign.md) |
 | 修改代码 | [Development](Development.md) | [设计目录](specs/README.md)、[CodeTaste](specs/totalRules/CodeTaste.md) |
-| 修改单个角色 | [AgentDevelopment](AgentDevelopment.md) | [Agents](specs/domainFunction/agents/Agents.md) |
+| 修改单个角色 | [AgentDevelopment](AgentDevelopment.md) | [七角色独立设计索引](specs/domainFunction/agents/Agents.md) |
 | 接入模型 | [Runtime](Runtime.md) | [AgentAdapters](specs/infrastructure/agentAdapters/AgentAdapters.md) |
 | 运行和排障 | [Operations](Operations.md) | [HttpApi](specs/interfaces/HttpApi.md)、基础设施同名设计 |
 | 看开发任务、步骤与验收进度 | [Status](Status.md) | [验收追踪](specs/totalRules/Verification.md) |

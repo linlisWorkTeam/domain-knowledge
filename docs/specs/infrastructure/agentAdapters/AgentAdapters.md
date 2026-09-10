@@ -22,7 +22,7 @@ ConfiguredProvider 解析已验证设置或环境配置。Console 已保存但�
 
 ProviderSettings 加密保存凭据，对外只返回配置状态、脱敏摘要和校验结果；密钥不进入浏览器持久化、Prompt 日志或 Run 摘要。PublicHttps 位于独立 http 适配器，模型探针与来源读取共用。材料插件按角色白名单读取；Bubblewrap 隔离和会话限制由运行时实现，不扩大 Domain 工具权限。
 
-2026-09-10 已确认的 CodeAgent 目标见 [Agents](../../domainFunction/agents/Agents.md) 和 [Workspace](../../domainFunction/workspace/Workspace.md)：读取本轮卡片与必要配置，不给原仓库接口授权；工具限制与进程隔离必须同时落实，不能仅设置 cwd。当前默认 DSH 入口启用 Bubblewrap，但底层仍允许 `processIsolation: none`，因此不能把现有可选隔离描述为目标已完成。后续实现应拒绝无法满足隔离的目标运行，并验证提示词材料也没有绕过文件白名单。CodeAgent 不开放 Shell、全局文件读取或直接写入工具；源码由框架校验后落盘。
+2026-09-10 已确认的 CodeAgent 目标见 [CodeAgent](../../domainFunction/agents/codeAgent/CodeAgent.md) 和 [Workspace](../../domainFunction/workspace/Workspace.md)：读取本轮卡片与必要配置，不给原仓库接口授权；工具限制与进程隔离必须同时落实，不能仅设置 cwd。当前默认 DSH 入口启用 Bubblewrap，但底层仍允许 `processIsolation: none`，因此不能把现有可选隔离描述为目标已完成。后续实现应拒绝无法满足隔离的目标运行，并验证提示词材料也没有绕过文件白名单。CodeAgent 不开放 Shell、全局文件读取或直接写入工具；源码由框架校验后落盘。
 
 ## 公司 CLI 的实际边界
 

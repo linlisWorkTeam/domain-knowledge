@@ -38,19 +38,19 @@ SPDX-License-Identifier: MIT
 
 | 任务 | 角色 | 细化与验收重点 | 状态 | 当前证据 |
 | --- | --- | --- | --- | --- |
-| S2-01 | Orchestrator | 计划输入、任务输出和失败处理；保持固定业务连接，不能由模型决定 Gate PASS | 待开发 | 已有结构；本阶段验收待补 |
-| S2-02 | DocWorker | 源码分块、片段覆盖、来源引用及材料不足处理 | 待开发 | 已有结构；本阶段验收待补 |
-| S2-03 | DocGen | 正文与来源、旧版和 Correction 输入、质量反馈及定向修订 | 待开发 | 固定源码样例及历史 live 记录可参考；本阶段验收待补 |
-| S2-04 | TestGen | 确认输入与测试预期依据，再细化测试候选、oracle 声明和门禁接线 | 开发中（设计确认） | S2-04.a 的 IO-02 确认中，见 [角色确认记录](specs/domainFunction/agents/Agents.md)；尚未修改实现，验收待补 |
-| S2-05 | CodeAgent | 知识卡片包含接口，项目配置提供 C/C++ 必要约束；本轮白名单与隔离限制读取，框架校验源码列表并落盘 | 开发中（设计已确认，待实现） | IO-03～06 已确认，见 [角色设计](specs/domainFunction/agents/Agents.md)；KF-SYS-044、045 为 Planned，代码未改，验收待补 |
-| S2-06 | Check | 检查输入、判据、findings 可追溯性及只读边界 | 待开发 | 已有结构；本阶段验收待补 |
-| S2-07 | Review | 评测证据、Check findings 接入与归因、Correction 及无须修订时的输出 | 待开发 | 当前未单独绑定 Check findings 明细；本阶段验收待补 |
+| S2-01 | [Orchestrator](specs/domainFunction/agents/orchestratorAgent/OrchestratorAgent.md) | 计划输入、任务输出和失败处理；保持固定业务连接，不能由模型决定 Gate PASS | 待开发 | 已有结构；本阶段验收待补 |
+| S2-02 | [DocWorker](specs/domainFunction/agents/docWorkerAgent/DocWorkerAgent.md) | 源码分块、片段覆盖、来源引用及材料不足处理 | 待开发 | 已有结构；本阶段验收待补 |
+| S2-03 | [DocGen](specs/domainFunction/agents/docGenAgent/DocGenAgent.md) | 正文与来源、旧版和 Correction 输入、质量反馈及定向修订 | 待开发 | 固定源码样例及历史 live 记录可参考；本阶段验收待补 |
+| S2-04 | [TestGen](specs/domainFunction/agents/testGenAgent/TestGenAgent.md) | 确认输入与测试预期依据，再细化测试候选、oracle 声明和门禁接线 | 开发中（设计确认） | S2-04.a 的 IO-02 确认中，见 [TestGen 设计](specs/domainFunction/agents/testGenAgent/TestGenAgent.md)；尚未修改实现，验收待补 |
+| S2-05 | [CodeAgent](specs/domainFunction/agents/codeAgent/CodeAgent.md) | 知识卡片包含接口，项目配置提供 C/C++ 必要约束；本轮白名单与隔离限制读取，框架校验源码列表并落盘 | 开发中（设计已确认，待实现） | IO-03～06 已确认，见 [CodeAgent 设计](specs/domainFunction/agents/codeAgent/CodeAgent.md)；KF-SYS-044、045 为 Planned，代码未改，验收待补 |
+| S2-06 | [Check](specs/domainFunction/agents/checkAgent/CheckAgent.md) | 检查输入、判据、findings 可追溯性及只读边界 | 待开发 | 已有结构；本阶段验收待补 |
+| S2-07 | [Review](specs/domainFunction/agents/reviewAgent/ReviewAgent.md) | 评测证据、Check findings 接入与归因、Correction 及无须修订时的输出 | 待开发 | 当前未单独绑定 Check findings 明细；本阶段验收待补 |
 
 每个角色依次执行下面四步，用任务号加后缀单独跟踪，例如 `S2-03.a`。启动角色任务时在本节追加该角色的步骤状态和证据，不为每个角色另建任务文档。
 
 | 后缀 | 具体步骤 | 交付与验收条件 |
 | --- | --- | --- |
-| a | 对照已有实现，明确输入、职责、输出、权限和失败行为 | 更新 [Agents](specs/domainFunction/agents/Agents.md) 的对应角色设计；列出本次缺口与验收场景，涉及业务接线时同步 [Workflow](specs/domainFunction/services/workflow/Workflow.md) |
+| a | 对照已有实现，明确输入、职责、输出、权限和失败行为 | 从 [角色索引](specs/domainFunction/agents/Agents.md) 进入并更新对应独立设计；列出本次缺口与验收场景，涉及业务接线时同步 [Workflow](specs/domainFunction/services/workflow/Workflow.md) |
 | b | 实现角色内部步骤，调整 Contract、Prompt 和必要的上下游交接 | 代码与设计一致；公共契约/材料变化同步 Schema、消费者及验收追踪；不能只改提示词代替强制校验 |
 | c | 更新独立样例和有行为判定的测试 | 覆盖正常结果、材料不足、非法输出、执行失败和适用权限边界；按 AC-SCHEMA-001 及角色相关验收场景核对 |
 | d | 运行独立入口及相关回归，审查业务输出并记录证据 | 使用 [AgentDevelopment](AgentDevelopment.md) 的统一入口，记录版本、命令、结果及工件；区分 Fixture 与真实模型，完成后交给 S3 |
@@ -61,7 +61,7 @@ SPDX-License-Identifier: MIT
 
 | 步骤 | 当前进度 | 交付与后续验收 |
 | --- | --- | --- |
-| S2-05.a | 设计已确认并落稿 | [Agents](specs/domainFunction/agents/Agents.md)、[Application](specs/application/Application.md)、[Workspace](specs/domainFunction/workspace/Workspace.md) 定义输入、项目配置、读写范围和输出；TestGen 输入不在本次结论内 |
+| S2-05.a | 设计已确认并落稿 | [CodeAgent](specs/domainFunction/agents/codeAgent/CodeAgent.md)、[Application](specs/application/Application.md)、[Workspace](specs/domainFunction/workspace/Workspace.md) 定义输入、项目配置、读写范围和输出；TestGen 输入不在本次结论内 |
 | S2-05.b | 待开发 | 调整角色契约、Prompt、Schema 与材料加载；移除独立接口输入及授权，按项目/场景裁剪配置并冻结，按本轮权限准备工作区和落盘 |
 | S2-05.c | 待开发 | 补 C/C++ 样例和配置切换、材料隔离、输出拒绝场景，覆盖 AC-CODE-001、002、AC-CONFIG-001、AC-SEC-001；机器字段与兼容策略随实现明确 |
 | S2-05.d | 待开发 | 执行相关回归及受控隔离验证，保存版本、命令、结果和工件；本服务器真实调用交 S3，公司 CLI 真实隔离交 S4，不能用旧 TypeScript 样例替代 |

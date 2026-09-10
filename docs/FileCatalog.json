@@ -174,7 +174,49 @@
     {
       "path": "docs/specs/domainFunction/agents/Agents.md",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
-      "description": "七角色执行设计。",
+      "description": "七角色设计索引与共同执行协议。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "docs/specs/domainFunction/agents/checkAgent/CheckAgent.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "CheckAgent 的职责、输入输出与确认状态。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "docs/specs/domainFunction/agents/codeAgent/CodeAgent.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "CodeAgent 的职责、输入输出与确认状态。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "docs/specs/domainFunction/agents/docGenAgent/DocGenAgent.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "DocGenAgent 的职责、输入输出与确认状态。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "docs/specs/domainFunction/agents/docWorkerAgent/DocWorkerAgent.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "DocWorkerAgent 的职责、输入输出与确认状态。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "docs/specs/domainFunction/agents/orchestratorAgent/OrchestratorAgent.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "OrchestratorAgent 的职责、输入输出与确认状态。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "docs/specs/domainFunction/agents/reviewAgent/ReviewAgent.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "ReviewAgent 的职责、输入输出与确认状态。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "docs/specs/domainFunction/agents/testGenAgent/TestGenAgent.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "TestGenAgent 的职责、输入输出与确认状态。",
       "metadataLocation": "file-header"
     },
     {

@@ -18,7 +18,7 @@ LocalAgentWorkspace 根据 isolationKey、role、sourceRoot、可选 sourceCommi
 
 ## CodeAgent 目标工作区（已确认，待实现）
 
-按 [Agents](../agents/Agents.md) 的目标，CodeAgent 的主要材料来自本轮知识卡片；公开接口包含在卡片内，取消从 `publicInterfacePaths` 取得原仓库接口文件的授权。模型可见正文和配置也要经过材料裁剪，不能只限制文件工具而让答案通过 Prompt 进入。
+按 [CodeAgent](../agents/codeAgent/CodeAgent.md) 的目标，CodeAgent 的主要材料来自本轮知识卡片；公开接口包含在卡片内，取消从 `publicInterfacePaths` 取得原仓库接口文件的授权。模型可见正文和配置也要经过材料裁剪，不能只限制文件工具而让答案通过 Prompt 进入。
 
 项目/场景配置保存读取与输出规则，Application 在启动时解析为本轮文件白名单和输出位置并冻结。规则和实际路径由受信框架产生，知识卡片正文或模型输出中的路径请求不能扩大权限。CodeAgent 不读取原始实现、参考测试、其他角色材料和其他运行的文件。
 

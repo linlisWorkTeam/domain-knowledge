@@ -11,7 +11,7 @@ SPDX-License-Identifier: MIT
 
 | 改动 | 设计 | 实现 |
 | --- | --- | --- |
-| 角色内部步骤 | domainFunction/agents | src/domain/agents/xxxAgent |
+| 角色内部步骤 | domainFunction/agents/xxxAgent/XxxAgent.md（[索引](specs/domainFunction/agents/Agents.md)） | src/domain/agents/xxxAgent |
 | 跨角色流程 | domainFunction/services/workflow | src/domain/services/workflow |
 | 领域状态与 Gate | domainFunction/services | src/domain/Domain.ts、services |
 | 用例、材料加载和事务协调 | application | src/application/apps、services、ports |
