@@ -10,6 +10,9 @@ export function createKnowledgeEvaluationPanel({ root, request, escapeHtml: esca
   const active = () => task && ['PENDING', 'RUNNING'].includes(task.status)
   const labels = { PENDING: '排队中', RUNNING: '评测中', SUCCEEDED: '评测执行完成', FAILED: '执行失败', PAUSED: '已暂停', CANCELLED: '已取消' }
   const reasons = {
+    NATIVE_TRUSTED_REFERENCE_FAILED: '历史可信用例在当前参考实现上失败。原输入与预期已保留，请检查源码和环境，不能重新生成测试绕过门禁。',
+    NATIVE_TRUSTED_INTERFACE_CHANGED: '公开接口发生变化，历史可信测试的适用性需要确认；已有用例不会自动删除。',
+    NATIVE_TRUSTED_GATE_LIMIT: '历史可信用例总数超出当前执行上限，任务已暂停，未删减门禁。',
     AGENT_OUTPUT_INVALID: '模型返回的候选测试缺少必填字段或不符合协议。前序结果已保留，可恢复原任务重新提出。',
     DSH_AGENT_OUTPUT_NOT_JSON: '模型返回内容不完整或格式错误。前序结果已保留，可恢复原任务。',
     TEST_CANDIDATE_REJECTED: '候选用例未通过参考实现，不能用于评测生成代码，也不能据此判定知识错误。可重新生成候选，累计用量保留。',
@@ -37,9 +40,9 @@ export function createKnowledgeEvaluationPanel({ root, request, escapeHtml: esca
   function render() {
     const panel = host(); if (!panel) return
     const parent = selection(); if (!parent && !task) { panel.innerHTML = ''; return }
-    const rejected = checkpoints.filter((item) => item.key.startsWith('candidate-rejection:')).at(-1)?.result
-    const summaries = task?.result?.summary?.modules ?? [...checkpoints.filter((item) => item.key.startsWith('module-report:')).map((item) => item.result.summary), ...(task?.reasonCode === 'TEST_CANDIDATE_REJECTED' && rejected ? [rejected.summary] : [])]
-    const modules = summaries.map((module) => module.status === 'CANDIDATE_REJECTED' ? { ...module, ...(reportCache.get(module.reportRef?.sha256) ?? {}) } : { ...module, report: reportCache.get(module.reportRef?.sha256) })
+    const rejected = checkpoints.filter((item) => (item.key.startsWith('candidate-rejection:') || item.key.startsWith('trusted-gate-conflict:'))).at(-1)?.result
+    const summaries = task?.result?.summary?.modules ?? [...checkpoints.filter((item) => item.key.startsWith('module-report:')).map((item) => item.result.summary), ...(['TEST_CANDIDATE_REJECTED', 'NATIVE_TRUSTED_REFERENCE_FAILED'].includes(task?.reasonCode) && rejected ? [rejected.summary] : [])]
+    const modules = summaries.map((module) => ['CANDIDATE_REJECTED', 'TRUSTED_GATE_CONFLICT'].includes(module.status) ? { ...module, ...(reportCache.get(module.reportRef?.sha256) ?? {}) } : { ...module, report: reportCache.get(module.reportRef?.sha256) })
     const resume = task && ['FAILED', 'PAUSED', 'CANCELLED'].includes(task.status) && task.contractVersion === 'knowledge-workbench-v1'
       && Object.entries(task.limits ?? {}).every(([key, limit]) => task.usage[key] < limit)
     const progress = [...events].reverse().find((event) => event.kind === 'PROGRESS' && event.detail?.caseId)?.detail
@@ -49,7 +52,7 @@ export function createKnowledgeEvaluationPanel({ root, request, escapeHtml: esca
       ${progress && active() ? `<p>当前用例：${escape(progress.caseId)} · ${escape(progress.completed)}/${escape(progress.total)}</p>` : ''}
       ${task.result?.summary ? `<p>已处理 ${escape(task.result.summary.completedModules)}/${escape(task.result.summary.requestedModules)} 个模块。</p>` : ''}
       ${task.reasonCode ? `<p>${escape(reasons[task.reasonCode] ?? task.reasonCode)}</p>` : ''}
-      ${modules.map((module) => `<section><h4>${escape(module.moduleId)} · ${escape({ BEHAVIOR_PASSED: '可信用例全部通过', BEHAVIOR_FAILED: '可信用例存在失败', CANDIDATE_REJECTED: '候选未通过参考验证' }[module.status] ?? module.status)}</h4>
+      ${modules.map((module) => `<section><h4>${escape(module.moduleId)} · ${escape({ BEHAVIOR_PASSED: '可信用例全部通过', BEHAVIOR_FAILED: '可信用例存在失败', CANDIDATE_REJECTED: '候选未通过参考验证', TRUSTED_GATE_CONFLICT: '历史可信门禁与当前参考冲突' }[module.status] ?? module.status)}</h4>
       <p>新增 ${escape(module.proposed ?? 0)} 个候选；复用 ${escape(module.reused ?? 0)} 个用例${module.revalidated ? '，已重新验证参考实现' : ''}。</p>
       ${module.report ? `<p>通过 ${escape(module.report.passed)}/${escape(module.report.total)}${module.interfaceCompatible === false ? '；公开接口存在差异' : ''}</p>` : ''}
       ${download(module.reportRef, '下载评测报告')}${download(module.oracleRef, '下载参考验证')}
@@ -65,7 +68,7 @@ export function createKnowledgeEvaluationPanel({ root, request, escapeHtml: esca
       const detail = await request(`/api/v1/stage-tasks/${encodeURIComponent(id)}`)
       if (current !== epoch || task?.taskId !== id) return
       task = detail.task; checkpoints = detail.checkpoints ?? []; events = detail.events ?? []; notice = ''; render()
-      const summaries = task.result?.summary?.modules ?? checkpoints.filter((item) => item.key.startsWith('module-report:') || item.key.startsWith('candidate-rejection:')).map((item) => item.result.summary)
+      const summaries = task.result?.summary?.modules ?? checkpoints.filter((item) => item.key.startsWith('module-report:') || (item.key.startsWith('candidate-rejection:') || item.key.startsWith('trusted-gate-conflict:'))).map((item) => item.result.summary)
       await Promise.all(summaries.map(async (module) => {
         const ref = module.reportRef
         if (!ref || reportCache.has(ref.sha256)) return

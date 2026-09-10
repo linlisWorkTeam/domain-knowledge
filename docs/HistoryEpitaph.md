@@ -142,3 +142,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 - [2026-09-10-1850-workbench-evaluation.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/bdc8b1dc63aab1706cbb93add422d296e1d58e6c/docs/epitaph/2026-09-10-1850-workbench-evaluation.md)：接通原生评测和失败用例界面，原验证integration189/Console29；完整目标尚缺自动修订、关联、固定门禁和真实双目标验收。后续真实jsmn与关联结果见1913和1931交接。
 
 - [2026-09-10-1908-native-live.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/a9556351702cac6b3f6b2d70e348a85dee19a705/docs/epitaph/2026-09-10-1908-native-live.md)：真实jsmn多卡片/重建及早期TestGen JSON失败，新增验收脚本并修正provider必填字段提示；当时未通过行为门禁。后续真实双目标当前工具链结果与恢复修复见最新交接，发布仍未完成。
+
+- [2026-09-10-1913-jsmn-behavior.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/6e5e6d9bbc46f8bfe27985ead1363ff5270fc3f8/docs/epitaph/2026-09-10-1913-jsmn-behavior.md)：旧引擎jsmn16例真实参考与生成通过，补候选拒绝反馈；当时完整闭环未完成。历史测试套件保留，当前门禁继承规则见最新交接，不将旧报告当新执行器验收。

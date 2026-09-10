@@ -7,21 +7,22 @@ import { sha256, type ArtifactRef } from '../../Domain.ts';
 import { canonicalJson } from '../workbench/StageTask.ts';
 import { compareNativeObservations, type NativeBehaviorSuite, type NativeScalar } from './NativeBehaviorSuite.ts';
 export interface NativeTestBinding {
-  cardIds: string[]; knowledgeBodyDigests: string[]; referenceDigest: string; interfaceDigest: string; policyDigest: string; toolchainDigest: string;
+  gateDigest?: string; cardIds: string[]; knowledgeBodyDigests: string[]; referenceDigest: string; interfaceDigest: string; policyDigest: string; toolchainDigest: string;
 }
 export interface NativeTestSet {
-  testSetId: string; cacheKey: string; referenceKey: string; parentTestSetId: string | null;
+  inheritedTestSetIds?: string[]; testSetId: string; cacheKey: string; referenceKey: string; parentTestSetId: string | null;
   originVersionIds: string[]; sourceRevision: string; projectSnapshotId: string; binding: NativeTestBinding; status: 'TRUSTED' | 'REJECTED';
   suiteRef: ArtifactRef; oracleRef: ArtifactRef; referenceRef: ArtifactRef; fingerprintRef: ArtifactRef; createdAt: string;
   sectionBindings: Array<{ sectionId: string; versionId: string; matchesInput: boolean }>;
 }
 export function nativeTestKeys(binding: NativeTestBinding): { cacheKey: string; referenceKey: string } {
-  const { knowledgeBodyDigests, cardIds, ...reference } = binding;
+  const { knowledgeBodyDigests, cardIds, gateDigest, ...reference } = binding;
   if (!Array.isArray(knowledgeBodyDigests) || !knowledgeBodyDigests.length || knowledgeBodyDigests.length > 200
     || !Array.isArray(cardIds) || cardIds.length !== knowledgeBodyDigests.length || new Set(cardIds).size !== cardIds.length
     || cardIds.some((id) => typeof id !== 'string' || !/^[A-Za-z0-9:_-]{1,160}$/.test(id))
+    || (gateDigest !== undefined && !/^[a-f0-9]{64}$/.test(gateDigest))
     || [...knowledgeBodyDigests, ...Object.values(reference)].some((digest) => typeof digest !== 'string' || !/^[a-f0-9]{64}$/.test(digest))) throw new Error('NATIVE_TEST_BINDING_INVALID');
-  return { cacheKey: sha256(canonicalJson({ ...reference, knowledge: cardIds.map((cardId, index) => ({ cardId, bodyDigest: knowledgeBodyDigests[index] })).sort((a, b) => a.cardId.localeCompare(b.cardId)) })),
+  return { cacheKey: sha256(canonicalJson({ ...reference, ...(gateDigest ? { gateDigest } : {}), knowledge: cardIds.map((cardId, index) => ({ cardId, bodyDigest: knowledgeBodyDigests[index] })).sort((a, b) => a.cardId.localeCompare(b.cardId)) })),
     referenceKey: sha256(canonicalJson({ ...reference, cardIds: [...cardIds].sort() })) };
 }
 export function nativeOracleTrusted(suite: NativeBehaviorSuite, observations: Array<{ caseId: string; status: 'PASSED' | 'FAILED'; actual: Record<string, NativeScalar> | null }>): boolean {

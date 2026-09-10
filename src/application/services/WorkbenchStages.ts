@@ -23,7 +23,7 @@ function safeCode(error: unknown): string {
   const message = error instanceof Error ? error.message : '';
   return /^([A-Z][A-Z0-9_]{1,79})(?::|$)/.exec(message)?.[1] ?? 'STAGE_EXECUTION_FAILED';
 }
-const paused = (code: string) => code === 'STAGE_SHUTDOWN' || code === 'STAGE_BUDGET_EXHAUSTED'
+const paused = (code: string) => ['NATIVE_TRUSTED_REFERENCE_FAILED', 'NATIVE_TRUSTED_INTERFACE_CHANGED', 'NATIVE_TRUSTED_GATE_LIMIT'].includes(code) || code === 'STAGE_SHUTDOWN' || code === 'STAGE_BUDGET_EXHAUSTED'
   || code === 'STAGE_HANDLER_UNAVAILABLE' || code.startsWith('PROVIDER_QUOTA_')
   || code === 'PROVIDER_PAYMENT_REQUIRED' || code.startsWith('WORKBENCH_RESOURCE_') || code.startsWith('TOOLCHAIN_MISSING')
   || ['DSH_CONFIGURATION_UNAVAILABLE', 'DSH_CONFIGURATION_CHANGED', 'RUN_CONFIGURATION_INCOMPATIBLE',

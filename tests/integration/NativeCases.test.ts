@@ -115,10 +115,34 @@ test('persisted oracle cache rejects bad candidates, reuses unchanged input and 
     const historical = await composition.apps.nativeEvaluation.prepare({ ...request, bodyRefs: [removed], versionIds: ['version-three'] });
     assert.equal(historical.set.sectionBindings[0]?.matchesInput, false); assert.equal(historical.set.sectionBindings[0]?.versionId, 'version-two');
     compiler = sha256('changed-toolchain');
-    const toolsChanged = await composition.apps.nativeEvaluation.prepare(request); assert.notEqual(toolsChanged.set.cacheKey, first.set.cacheKey); assert.equal(proposals, 2);
+    const toolsChanged = await composition.apps.nativeEvaluation.prepare(request); assert.notEqual(toolsChanged.set.cacheKey, first.set.cacheKey); assert.equal(proposals, 1, 'toolchain changes must revalidate trusted gates without proposing replacements');
     const sourceChanged = await composition.apps.nativeEvaluation.prepare({ ...request, reference: input('int add(int a,int b){return a+b+1;}') });
+    assert.equal(sourceChanged.reused, 1); assert.equal(sourceChanged.proposed, 0);
+    assert.equal(sourceChanged.set.suiteRef.sha256, first.set.suiteRef.sha256);
+    assert.ok(sourceChanged.set.inheritedTestSetIds?.includes(first.set.testSetId));
+    const policyChanged = await composition.apps.nativeEvaluation.prepare({ ...request, policyDigest: sha256('new-policy') });
+    assert.equal(policyChanged.revalidated, true); assert.equal(proposals, 1);
+    await assert.rejects(composition.apps.nativeEvaluation.prepare({ ...request, contract: { ...contract, includePath: 'changed.h' } }), /NATIVE_TRUSTED_INTERFACE_CHANGED/);
     assert.equal(sourceChanged.set.status, 'REJECTED'); assert.notEqual(sourceChanged.set.binding.referenceDigest, toolsChanged.set.binding.referenceDigest);
     assert.equal(composition.apps.nativeEvaluation.dependencies.store.get(first.set.testSetId)?.status, 'TRUSTED');
     assert.deepEqual(composition.apps.nativeEvaluation.dependencies.store.get(first.set.testSetId)?.binding, first.set.binding);
+    // Import a separately validated historical gate from before lineage-aware caching.
+    const { nativeTestKeys } = await import('../../src/domain/services/evaluation/NativeTestCache.ts');
+    const legacySuite = { ...suite, cases: [{ ...suite.cases[0]!, expected: { sum: '8' } }] };
+    const legacyReference = input('int add(int a,int b){return a+b+1;}');
+    const legacyObservation = await executor.execute(legacyReference, contract, legacySuite.cases[0]!);
+    assert.equal(legacyObservation.status, 'PASSED');
+    const { gateDigest: _gateDigest, ...legacyBinding } = sourceChanged.set.binding;
+    const legacyKeys = nativeTestKeys(legacyBinding);
+    const legacyGate = composition.apps.nativeEvaluation.dependencies.store.save({ ...sourceChanged.set, ...legacyKeys,
+      binding: legacyBinding, testSetId: 'native-tests-historical-independent', parentTestSetId: null, status: 'TRUSTED',
+      suiteRef: await composition.artifacts.put(Buffer.from(JSON.stringify(legacySuite)), 'application/json'),
+      oracleRef: await composition.artifacts.put(Buffer.from(JSON.stringify([legacyObservation])), 'application/json') });
+    const inheritedConflict = await composition.apps.nativeEvaluation.prepare(request);
+    assert.equal(inheritedConflict.set.status, 'REJECTED', 'an older successful cache cannot hide a later trusted assertion');
+    assert.equal(inheritedConflict.reused, 2); assert.equal(inheritedConflict.proposed, 0); assert.equal(proposals, 1);
+    assert.ok(inheritedConflict.set.inheritedTestSetIds?.includes(legacyGate.testSetId));
+    assert.notEqual(inheritedConflict.set.cacheKey, toolsChanged.set.cacheKey);
+
   } finally { await composition.close(); rmSync(directory, { recursive: true, force: true }); }
 });

@@ -83,6 +83,21 @@ test('native stage rejects bad candidates, resumes trusted cases after restart a
     assert.equal(module.status, 'BEHAVIOR_FAILED'); assert.equal(module.reused, 1); assert.equal(testCalls, 2); assert.equal(codeCalls, 2);
     const behaviorReport = JSON.parse(Buffer.from(await composition.artifacts.get(module.reportRef)).toString('utf8'));
     assert.equal(behaviorReport.cases[0]?.actual.sum, '-1'); assert.equal(behaviorReport.cases[0]?.sectionBindings[0]?.versionId, revised.version.versionId);
+    writeFileSync(join(root, 'math.c'), '#include "math.h"\nint add(int a,int b){return a+b+1;}');
+    git('add', '.'); git('commit', '-qm', 'Changed reference behavior');
+    const changedProject = await composition.apps.workbenchProjects.create({ directory: root, moduleIds: ['math'] });
+    const changedCard = await composition.apps.flywheel.ingestCandidate({ ...input, body: input.body + '\nReference source revision changed.',
+      metadata: { ...input.metadata, projectSnapshotId: changedProject.snapshotId }, provenance: [{ path: 'math.c', commit: changedProject.commit, pinned: true }] });
+    const changedCode = await composition.apps.workbenchReconstruction.start(changedProject.snapshotId, [changedCard.version.versionId]);
+    assert.equal((await composition.apps.workbenchStages.wait(changedCode.taskId)).status, 'SUCCEEDED');
+    const conflictTask = await composition.apps.workbenchEvaluation.start(changedCode.taskId);
+    const conflict = await composition.apps.workbenchStages.wait(conflictTask.taskId);
+    assert.equal(conflict.status, 'PAUSED'); assert.equal(conflict.reasonCode, 'NATIVE_TRUSTED_REFERENCE_FAILED');
+    assert.equal(testCalls, 2, 'source changes cannot replace historical trusted expectations');
+    assert.ok(composition.apps.workbenchStages.store.checkpoints(conflictTask.taskId).some((item) => item.key.startsWith('trusted-gate-conflict:')));
+    composition.apps.workbenchStages.resume(conflictTask.taskId, conflictTask.inputDigest);
+    assert.equal((await composition.apps.workbenchStages.wait(conflictTask.taskId)).reasonCode, 'NATIVE_TRUSTED_REFERENCE_FAILED');
+    assert.equal(testCalls, 2, 'resuming a trusted conflict cannot propose replacement tests');
     writeFileSync(join(root, 'math.c'), '#include "missing_dependency.h"\nint add(int a,int b){return a+b;}');
     git('add', '.'); git('commit', '-qm', 'Missing reference dependency');
     const brokenProject = await composition.apps.workbenchProjects.create({ directory: root, moduleIds: ['math'] });

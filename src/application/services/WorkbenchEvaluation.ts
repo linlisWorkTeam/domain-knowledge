@@ -135,15 +135,16 @@ export class WorkbenchEvaluation {
       if (prepared.set.status !== 'TRUSTED') {
         const suite = await this.load<NativeBehaviorSuite>(prepared.set.suiteRef);
         const observations = await this.load<Array<{ caseId: string; actual: unknown; reasonCode: string }>>(prepared.set.oracleRef);
-        const rejected = { moduleId: module.moduleId, testSetId: prepared.set.testSetId, status: 'CANDIDATE_REJECTED', proposed: prepared.proposed, reused: prepared.reused,
+        const conflict = prepared.reused > 0;
+        const rejected = { moduleId: module.moduleId, testSetId: prepared.set.testSetId, status: conflict ? 'TRUSTED_GATE_CONFLICT' : 'CANDIDATE_REJECTED', proposed: prepared.proposed, reused: prepared.reused,
           oracleRef: prepared.set.oracleRef, suiteRef: prepared.set.suiteRef, generatedEvaluated: false, knowledgeErrorProven: false,
           cases: suite.cases.map((input) => ({ input, expected: input.expected, sectionBindings: prepared.set.sectionBindings.filter((item) => input.sections.includes(item.sectionId)), observation: observations.find((item) => item.caseId === input.caseId) })) };
         const rejectionRef = await artifacts.put(Buffer.from(JSON.stringify(rejected)), 'application/json');
-        await context.step(`candidate-rejection:${module.moduleId}:${candidateRevision}`, async () => ({
-          artifactRefs: [rejectionRef, prepared.set.oracleRef, prepared.set.suiteRef], summary: { moduleId: module.moduleId, status: 'CANDIDATE_REJECTED', proposed: prepared.proposed, reused: prepared.reused, knowledgeErrorProven: false, reportRef: json(rejectionRef), oracleRef: json(prepared.set.oracleRef) } }));
-        context.progress({ phase: 'candidate-rejected', module: module.moduleId, testSetId: prepared.set.testSetId, reportRef: json(rejectionRef) });
+        await context.step(`${conflict ? 'trusted-gate-conflict' : 'candidate-rejection'}:${module.moduleId}:${conflict ? context.task.attempt : candidateRevision}`, async () => ({
+          artifactRefs: [rejectionRef, prepared.set.oracleRef, prepared.set.suiteRef], summary: { moduleId: module.moduleId, status: rejected.status, proposed: prepared.proposed, reused: prepared.reused, knowledgeErrorProven: false, reportRef: json(rejectionRef), oracleRef: json(prepared.set.oracleRef) } }));
+        context.progress({ phase: conflict ? 'trusted-gate-conflict' : 'candidate-rejected', module: module.moduleId, testSetId: prepared.set.testSetId, reportRef: json(rejectionRef) });
         // 恢复保留累计预算，仅重新生成已证明不可信的候选；中断中的候选仍复用。
-        throw new Error('TEST_CANDIDATE_REJECTED');
+        throw new Error(prepared.reused > 0 ? 'NATIVE_TRUSTED_REFERENCE_FAILED' : 'TEST_CANDIDATE_REJECTED');
       }
       const generated = await this.load<{ files: ToolchainFile[] }>(module.codeRef);
       context.progress({ phase: 'generated-evaluation', module: module.moduleId, testSetId: prepared.set.testSetId });

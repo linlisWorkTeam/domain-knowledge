@@ -23,6 +23,7 @@ export type NativeSnapshotter = (language: 'c' | 'cpp', build: BuildConstraints,
 export interface NativeTestStore {
   get(testSetId: string): NativeTestSet | null;
   trusted(cacheKey: string): NativeTestSet | null;
+  lineage(cardIds: string[]): NativeTestSet[];
   head(referenceKey: string): NativeTestSet | null;
   save(record: NativeTestSet): NativeTestSet;
 }

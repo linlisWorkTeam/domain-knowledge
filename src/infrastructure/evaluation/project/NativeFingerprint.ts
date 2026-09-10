@@ -46,7 +46,7 @@ export async function nativeFingerprint(language: 'c' | 'cpp', constraints: Buil
       for (const line of libraries.split('\n')) { const library = /(?:=>\s*)?(\/[^\s(]+)/.exec(line)?.[1]; if (library) binaries.add(library); }
     }
     const engine = ['NativeCaseHarness.ts', 'NativeCaseExecutor.ts', 'NativeToolchain.ts', 'NativeFingerprint.ts',
-      '../../../domain/services/evaluation/NativeBehaviorSuite.ts', '../../../domain/services/evaluation/NativeTestCache.ts',
+      '../../../domain/services/evaluation/NativeBehaviorSuite.ts', '../../../domain/services/evaluation/NativeTestCache.ts', '../../../domain/services/evaluation/NativeTrustedGates.ts',
       '../../../domain/services/evaluation/NativeBehaviorSchema.ts', '../../../domain/services/knowledge/KnowledgeSections.ts',
       '../../../application/services/NativeSuiteEvaluation.ts', '../../runtime/IsolatedCommand.ts', '../../runtime/CommandResourceGroup.ts'];
     for (const path of engine) binaries.add(fileURLToPath(new URL(path, import.meta.url)));

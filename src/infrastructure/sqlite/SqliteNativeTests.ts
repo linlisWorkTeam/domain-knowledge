@@ -26,6 +26,12 @@ export class SqliteNativeTests implements NativeTestStore {
     const row = this.db.prepare("SELECT record FROM wb_native_test_sets WHERE cache_key=? AND status='TRUSTED' ORDER BY rowid LIMIT 1").get(cacheKey);
     return row ? JSON.parse(String(row.record)) : null;
   }
+  lineage(cardIds: string[]): NativeTestSet[] {
+    const key = canonicalJson([...cardIds].sort());
+    return this.db.prepare("SELECT record FROM wb_native_test_sets WHERE status='TRUSTED' ORDER BY rowid").all()
+      .map((row) => JSON.parse(String(row.record)) as NativeTestSet)
+      .filter((set) => canonicalJson([...set.binding.cardIds].sort()) === key);
+  }
   head(referenceKey: string): NativeTestSet | null {
     const row = this.db.prepare('SELECT s.record FROM wb_native_test_heads h JOIN wb_native_test_sets s ON h.test_set_id=s.test_set_id WHERE h.reference_key=?').get(referenceKey);
     return row ? JSON.parse(String(row.record)) : null;
