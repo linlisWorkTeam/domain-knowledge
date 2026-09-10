@@ -5,7 +5,7 @@ SPDX-License-Identifier: MIT
 -->
 # 七角色 MVP 实施与验收记录
 
-目标版本为 `0.2.0`，环境限定 OpenCloudOS 9.4 x86_64，代表模块为 ohMyWorkPanel 的 `src/chat/markdownLite.ts`。当前已实现闭环及真实失败后的修复候选，最新结果见文末；用户追加一次授权后共使用 4/4 次真实启动，第四次完成七角色及三轮反馈修订，最终行为评测 315/315，但遗留知识风险阻止发布，不能视为已验收 MVP，也未创建正式 GitHub Release。历史单角色 live 记录不能替代本次七角色验收。
+`v0.2.0` 已正式发布：[GitHub Release](https://github.com/linlisWorkTeam/domain-knowledge/releases/tag/v0.2.0)。范围限定 OpenCloudOS 9.4 x86_64 与 ohMyWorkPanel 的 `src/chat/markdownLite.ts`。发行提交 `94d431a86b7656ded4109c3a00ae93b182df2e6c` 的真实七角色飞轮经三轮修订通过，最终 270/270 次行为测试并自动本地发布；CI 340/340、Console 22/22、离线安装及实际升级/浏览器验收通过。用户追加不限总轮次、按供应商额度停止的授权后，历史累计 8 次启动、2 次完整成功；历史失败与取消保留，不改判。下文旧阶段记录是历史证据，最终结果见文末与 Release 验收报告。
 
 操作见[Linux 安装指南](LinuxInstall.md)，工作流约定见[Workflow](specs/domainFunction/services/workflow/Workflow.md)、[LangGraph](specs/infrastructure/langgraph/LangGraph.md)，七角色设计见[Agents](specs/domainFunction/agents/Agents.md)。历史交接见[HistoryEpitaph](HistoryEpitaph.md)。
 
@@ -19,7 +19,7 @@ SPDX-License-Identifier: MIT
 | TestGen | 声明式可执行行为案例、说明和复现工件；参考实现验证通过后晋升 | 不做覆盖率驱动搜索或混合变异 |
 | Code | 只接收知识、公开签名和允许输出路径；独立会话/目录 | 仅验独立 TypeScript 模块，不验整个 Tauri 项目 |
 | Check / Review | 约束检查、定位问题、评测/Check 证据绑定、H2 Correction 与未解决风险 | 复杂归因排序与停滞回退延期 |
-| 评测与预算 | 固定门禁先冻结；参考/生成空间分离；内核隔离、严格编译、宿主比较、每案例 5 次重复 | 最多 3 轮、30 分钟；恢复不重置预算；缺少隔离能力拒绝任务 |
+| 评测与预算 | 固定门禁先冻结；参考/生成空间分离；内核隔离、严格编译、宿主比较、每案例 5 次重复 | 默认最多 3 轮、30 分钟；显式授权验收支持 provider-quota；恢复不重置预算；缺少隔离能力拒绝任务 |
 | 发布与 Git | SQLite 与工件审计、可恢复文件发布、幂等；手动 Git 默认关闭、冲突与认证失败可重试 | 使用独立知识目录；不强制覆盖远端 |
 | Console | 模型配置、服务器目录、固定任务、取消、角色进度、失败证据、知识阅读、Diff 与 Git | 远程访问需要令牌和受保护的传输 |
 | 安装 | 应用与数据分离，携带 Node/Git/DSH/隔离工具/编译器/依赖/许可证，升级卸载保留数据 | 仅指定 Linux；浏览器和基础系统工具由使用环境提供 |
@@ -30,7 +30,7 @@ SPDX-License-Identifier: MIT
 
 源码提交 `1bf4c5894b3f196d2e2aba1d8db3aac77aef7095`；源码 SHA-256 `8783c8e83822a97dd25a79e35860b6fe5dc8cf5ae663935db33f266edf645e4e`；参考测试 `0f4db3eda161b93aebb462331deed18c7d3a0d81f96c32a72b68231bf4f8217b`；依赖锁 `6d490bc60496109e58b0c0f9222e1c15fc94f9189d9fbafa93c73c3f3881cf4c`。入口核对固定 Git 对象，原仓库只读。28 个固定行为案例在模型生成前冻结。
 
-执行信封版本为 `seven-role-mvp-v3`；旧记录可读，不跨版本恢复。TestGen 看不到生成知识/实现，Code 看不到参考源码/测试/隐藏门禁；源材料、公开签名与模型可见场景分开存储。沙箱不挂载原仓库，禁止路径穿越、动态导入和通过输出篡改执行器计数。发布要求构建、固定案例、已晋升候选案例、稳定性、Check、Review 及来源证据共同通过。
+当前角色执行版本为 `seven-role-mvp-v5`；旧记录可读，不跨版本恢复。TestGen 看不到生成知识/实现，Code 看不到参考源码/测试/隐藏门禁；源材料、公开签名与模型可见场景分开存储。沙箱不挂载原仓库，禁止路径穿越、动态导入和通过输出篡改执行器计数。发布要求构建、固定案例、已晋升候选案例、稳定性、Check、Review 及来源证据共同通过。
 
 ECS 约 3.6 GiB 内存、无 swap。模型与模块评测共享一个进程槽，编译器单核，Node 小堆；回归、浏览器与打包按顺序执行。预算涵盖排队和重试，取消/超时杀死子进程组。
 
@@ -157,3 +157,18 @@ Application 保存初始风险元数据及每轮审计 CAS 工件，门禁 evide
 
 
 风险修复最终整合提交为 `9e35adfe5523c156dcbd8d0e1dc1a0fe490d4358`，合入远端 `e1c470e` 的 Domain/services 重构；风险规则现位于 `src/domain/services/knowledge/KnowledgeRisks.ts`。该提交 [CI 34430538172](https://github.com/linlisWorkTeam/domain-knowledge/actions/runs/34430538172) 类型、Spec、331/331 回归与 Console 22/22 全通过。整合前本地 330 项与整合后 CI 的统计分别保留；新增一项来自远端架构测试。证据目录 `/root/projects/domain-knowledge-releases/2026-09-10-risk-repair/` 含最终索引、日志、受控截图与摘要。本次只完成风险修复的受控验收，不新增真实飞轮或安装验收。
+
+
+## 正式发行与最终验收（2026-09-10）
+
+用户明确授权“飞轮轮次不限，token用完为止”。账本升级为 mvp-real-attempts-v3，保留原四次记录及摘要；验收取消总次数、总轮次和总时长限制，保留单阶段截止时间、取消、隔离及串行资源约束。供应商明确额度/付款错误持久化为账户停止标记，普通限流不当成余额耗尽；连接探针与执行共用停止记录。默认产品入口仍为三轮/三十分钟。
+
+第五次在 275/275 行为测试后因 Review PASS 与未解决风险矛盾失败。修复 DocWorker 字段职责及 Review 一次语义反馈，第六次 `cc297303-00c5-41b7-a1ec-2bb74d18ff96` 在提交 a90ebd9 两轮通过 285/285 并发布。视觉复核发现版本数量误显示为零及模块范围不明，修复只读统计后重新验收发行提交；第七次候选预期与参考实现不符而拒绝，未改预期或晋升失败测试。
+
+最终第八次 `da8de66a-cce3-4922-a5f5-0b3e62eadcaf` 在提交 `94d431a86b7656ded4109c3a00ae93b182df2e6c` 三轮完成，七角色真实执行、两个 H2 修订及逐轮证据均保留。每轮 28 个固定与 26 个已晋升候选案例各重复五次，270/270 通过；第三轮 Review 和确定性门禁通过，发布 `kv_452f056dce70cb05d252658c`。成功后停止额外模型调用。
+
+[最终 CI](https://github.com/linlisWorkTeam/domain-knowledge/actions/runs/34433077664) 类型、Spec、架构及 340 自动化、22 Console 测试通过；OpenCloudOS 本机 Console 22/22 与截图比较通过。最终包在断网同内核最小系统中完成参考 140/140、模块飞轮 7/7、原生工具 1/1、探针与阶段恢复 22/22，以及安装、重启、升级、卸载和数据保留。实际用户升级保持数据库、配置、凭据、账本字节摘要一致；真实浏览器校验批次数量、已评测版本、历史失败、成功批次及知识阅读，无水平溢出。
+
+Release 包为 177979475 字节，SHA-256 `ea2949fbe9e5962c70475e405459fe57f2dda7767140c0e724bd227e370dbbd1`；9 个上传资产的 GitHub 摘要与本地一致，标签指向同一受测提交。交付目录 `/root/projects/domain-knowledge-releases/v0.2.0/` 含安装包、许可证清单、SHA256SUMS、安装说明和 AcceptanceReport.md；证据包区分受控、真实、历史与安装证据。用户安装 `/root/.local/share/domain-knowledge-mvp` 已更新，服务在验收后停止节省资源，原数据与回退版本保留。
+
+普通缺证据风险不自动解除；通过仅证明固定及已晋升案例。Windows、任意项目工具链、复杂回退等限制不变。干净安装是相同内核的独立文件系统验证，不宣称独立虚拟机验收。旧发行候选、旧墓志铭和本文件早期阶段不代表当前发行状态。

@@ -107,3 +107,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 - [2026-09-09-1645-mvp-run-state.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/471dfc5fec5f4d37ce7f176ed3a07fe01c5e90f1/docs/epitaph/2026-09-09-1645-mvp-run-state.md)：新增执行状态投影与两阶段模型验证界面，失败不再伪装为 GENERATING；当时状态/HTTP 7 项、架构 7 项、Console 21 项及类型/Spec 通过，均为受控验证。未重建安装包或增加真实预算，后续集成与第四次真实验收分别见保留交接。合并开发结构分支时归档此记录，保留最近三份墓志铭。
 
 - [2026-09-09-1710-mvp-stage-repair-candidate.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/9e35adfe5523c156dcbd8d0e1dc1a0fe490d4358/docs/epitaph/2026-09-09-1710-mvp-stage-repair-candidate.md)：854ac9c 阶段修复候选的 321 回归、21 Console、离线安装与实际历史数据浏览器验证；当时真实预算为3/3。后续第四次已授权并失败，风险复核代码现为v4；旧安装与真实记录只作历史证据。
+
+- [2026-09-10-1017-domain-services-subagents.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/94d431a86b7656ded4109c3a00ae93b182df2e6c/docs/epitaph/2026-09-10-1017-domain-services-subagents.md)：开发 subagent 协作规范、Domain agents/services 平级迁移及 AgentExecutionService 入口；当时定向架构/类型/Spec 通过，全量唯一官网摘要失败复测通过，没有外网模型验收。后由 MVP 集成与 340 项最终回归覆盖；开发调度能力与产品动态派生 Agent 不混同。
