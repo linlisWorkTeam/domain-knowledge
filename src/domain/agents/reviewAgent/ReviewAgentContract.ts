@@ -6,44 +6,27 @@
 import type { ArtifactRef } from '../../Domain.ts';
 import type { RoleInput } from '../AgentExecution.ts';
 import { requireMaterials } from '../AgentExecution.ts';
-
-/** 角色业务载荷。 */
-export interface Payload {
-  /** 提供知识引用信息，供调用方读取或传入。 */
-  knowledgeRef: ArtifactRef;
-  /** 提供评测报告引用信息，供调用方读取或传入。 */
-  evaluationReportRef: ArtifactRef;
-  /** 提供criteria引用信息，供调用方读取或传入。 */
-  criteriaRef: ArtifactRef;
-  /** 提供previous纠正意见引用列表信息，供调用方读取或传入。 */
-  previousCorrectionRefs?: ArtifactRef[];
-}
-/** 角色输入。 */
+export interface Payload { knowledgeRef: ArtifactRef; evaluationReportRef: ArtifactRef; comparisonReportRef: ArtifactRef; previousCorrectionRefs?: ArtifactRef[] }
 export type Input = RoleInput<Payload>;
-/** 角色输出。 */
-export interface Output { blocking: boolean; recommendation: 'PASS' | 'ITERATE'; correction: { correctionId: string; knowledgePath: string; criterion: string; risk: string } | null; }
-/** 对外提供输出Schema，作为调用方使用的统一约定。 */
+export interface Correction { correctionId: string; knowledgePath: string; problem: string; suggestion: string; evidence: ('comparison' | 'evaluation')[] }
+export interface Output { blocking: boolean; corrections: Correction[] }
+const text = { type: 'string', pattern: '\\S' };
 export const outputSchema: Record<string, unknown> = {
-  type: 'object', required: ['blocking', 'recommendation', 'correction'], additionalProperties: false,
-  properties: {
-    blocking: { type: 'boolean' }, recommendation: { enum: ['PASS', 'ITERATE'] },
-    correction: {
-      type: ['object', 'null'],
-      properties: {
-        correctionId: { type: 'string', minLength: 1 }, knowledgePath: { type: 'string', minLength: 1 },
-        criterion: { type: 'string', minLength: 1 }, risk: { type: 'string', minLength: 1 },
-      },
-      required: ['correctionId', 'knowledgePath', 'criterion', 'risk'], additionalProperties: false,
-    },
-  },
+  type: 'object', required: ['blocking', 'corrections'], additionalProperties: false,
+  properties: { blocking: { type: 'boolean' }, corrections: { type: 'array', items: {
+    type: 'object', additionalProperties: false, required: ['correctionId', 'knowledgePath', 'problem', 'suggestion', 'evidence'],
+    properties: { correctionId: text, knowledgePath: text, problem: text, suggestion: text,
+      evidence: { type: 'array', minItems: 1, uniqueItems: true, items: { enum: ['comparison', 'evaluation'] } } },
+  } } },
 };
-
-/** 构造本次角色执行使用的输出 Schema。 */
-export function schemaFor(_input: Input): Record<string, unknown> {
-  return outputSchema;
-}
-
-/** 检查本角色必需字段及所引用材料是否完整。 */
+export function schemaFor(_input: Input): Record<string, unknown> { return outputSchema; }
 export function validateInput(input: Input): void {
-  requireMaterials(input.payload, input.materials, ['knowledgeRef', 'evaluationReportRef', 'criteriaRef']);
+  requireMaterials(input.payload, input.materials, ['knowledgeRef', 'evaluationReportRef', 'comparisonReportRef']);
+}
+/** 定位必须出现在本轮知识正文中；不能为其他卡片创建修订意见。 */
+export function validateOutput(output: Output, input: Input): void {
+  const knowledge = input.materials.find(({ ref }) => ref.artifactId === input.payload.knowledgeRef.artifactId)!.content;
+  const ids = output.corrections.map((item) => item.correctionId);
+  if (new Set(ids).size !== ids.length) throw new Error('REVIEW_CORRECTION_DUPLICATED');
+  if (typeof knowledge !== 'string' || output.corrections.some((item) => !knowledge.includes(item.knowledgePath))) throw new Error('REVIEW_LOCATION_INVALID');
 }

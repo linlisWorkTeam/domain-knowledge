@@ -6,7 +6,7 @@
 import { sha256 } from '../../Domain.ts';
 import type { ExecutionContext, RoleResult, PendingArtifact } from '../AgentExecution.ts';
 import { assertActive } from '../AgentExecution.ts';
-import { type Input, type Output, schemaFor, validateInput } from './ReviewAgentContract.ts';
+import { type Input, type Output, schemaFor, validateInput, validateOutput } from './ReviewAgentContract.ts';
 import { definition, buildPrompt, readablePaths } from './ReviewAgentPrompt.ts';
 
 /** 依据知识与评测证据给出纠正意见，并将意见绑定到本轮评测工件。 */
@@ -27,18 +27,17 @@ export async function execute(input: Input, context: ExecutionContext): Promise<
   assertActive(context.signal);
   context.model.assertOutput(raw, schema);
   const output = raw as unknown as Output;
+  validateOutput(output, input);
   const artifacts: PendingArtifact[] = [];
   const review = output;
-  const evaluationRef = input.payload.evaluationReportRef;
-  const correction = review.correction;
-  // 纠正意见沿用统一编号，证据引用来自受信输入，不能由模型自行指定。
-  const corrections = correction ? [{
-    correctionId: correctionId(correction['correctionId']),
-    knowledgePath: String(correction['knowledgePath']),
-    criterion: String(correction['criterion']),
-    evidenceRefs: [evaluationRef],
-    risk: String(correction['risk']),
-  }] : [];
+  const evidence = { evaluation: input.payload.evaluationReportRef, comparison: input.payload.comparisonReportRef };
+  const corrections = review.corrections.map((correction) => ({
+    correctionId: correctionId(correction.correctionId),
+    knowledgePath: correction.knowledgePath,
+    criterion: `${correction.problem}\n修订建议：${correction.suggestion}`,
+    evidenceRefs: correction.evidence.map((kind) => evidence[kind]),
+    risk: correction.problem,
+  }));
   const payload = {
     resultKind: 'attribution',
     corrections,

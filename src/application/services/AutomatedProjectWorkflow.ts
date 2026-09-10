@@ -634,7 +634,13 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
       if (!knowledgeRef || !evaluationReportRef) {
         throw new Error('AGENT_COMMAND_INPUT_MISSING: review');
       }
-      payload = { knowledgeRef, evaluationReportRef, criteriaRef: scenarioRef };
+      const checkResultRef = input.context[contextKey('check', input.iteration)] as ArtifactRef | undefined;
+      if (!checkResultRef) throw new Error('AGENT_COMMAND_INPUT_MISSING: review.comparisonReportRef');
+      const checkResult = await this.readAgentResult(checkResultRef, 'check', input.runId, this.expectedAgentGenerationKey(input, 'check', input.iteration));
+      if (!checkResult.rawOutputRef) throw new Error('AGENT_RESULT_RAW_OUTPUT_MISSING: check');
+      const previousCorrectionRef = input.iteration > 0 ? input.context[contextKey('review', input.iteration - 1)] as ArtifactRef | undefined : undefined;
+      payload = { knowledgeRef, evaluationReportRef, comparisonReportRef: checkResult.rawOutputRef,
+        ...(previousCorrectionRef ? { previousCorrectionRefs: [previousCorrectionRef] } : {}) };
     }
     const generationKey = this.agentGenerationKey(input, agentId);
     return {

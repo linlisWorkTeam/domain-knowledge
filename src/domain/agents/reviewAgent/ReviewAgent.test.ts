@@ -40,12 +40,24 @@ test('review: cancellation before and during model execution cannot return succe
 });
 test('review: correction IDs are normalized and bound to evaluation evidence', async () => {
   const sample = roleExample<Input>('review');
-  sample.output.correction.correctionId = 'newline-failure';
+  sample.output.corrections[0].correctionId = 'newline-failure';
   const result = await execute(sample.input, sample.context);
   const corrections = result.payload.corrections as { correctionId: string; evidenceRefs: unknown[] }[];
   assert.match(corrections[0]!.correctionId, /^COR-[0-9]{4,}$/);
   assert.deepEqual(corrections[0]!.evidenceRefs, [sample.input.payload.evaluationReportRef]);
-  sample.output.blocking = true; sample.output.correction = null;
+  sample.output.blocking = true; sample.output.corrections = [];
   const blocked = await execute(sample.input, sample.context);
   assert.deepEqual(blocked.payload.unresolvedRisks, ['review reported a blocking condition without a correction']);
+});
+
+test('review: multiple corrections bind to their selected trusted reports', async () => {
+  const sample = roleExample<Input>('review');
+  sample.output.corrections.push({ ...sample.output.corrections[0], correctionId: 'comparison-failure', evidence: ['comparison', 'evaluation'] });
+  const result = await execute(sample.input, sample.context);
+  const corrections = result.payload.corrections as { evidenceRefs: unknown[]; criterion: string }[];
+  assert.equal(corrections.length, 2);
+  assert.deepEqual(corrections[1]!.evidenceRefs, [sample.input.payload.comparisonReportRef, sample.input.payload.evaluationReportRef]);
+  assert.match(corrections[1]!.criterion, /Document return value/);
+  sample.output.corrections[0].knowledgePath = 'another document';
+  await assert.rejects(execute(sample.input, sample.context), /REVIEW_LOCATION_INVALID/);
 });

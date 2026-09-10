@@ -51,3 +51,7 @@ Review 输出修订意见列表，由 Application 将意见及原知识卡片交
 知识修订由 [DocGenAgent](../docGenAgent/DocGenAgent.md) 接收 Application 显式提供的旧正文与纠正材料后执行；跨角色连接见 [Workflow](../../workflow/Workflow.md)。
 
 开发步骤与证据统一记录在 [Status](../../../../Status.md)，独立运行方法见 [AgentDevelopment](../../../../AgentDevelopment.md)。
+
+## 本轮实施约定（2026-09-10）
+
+IO-15 必需 comparisonReportRef，与 evaluationReportRef 同时进入可见材料。IO-16 输出 corrections 数组，每项包含 correctionId、knowledgePath、problem、suggestion、evidence（comparison/evaluation 的选择）；空数组合法。框架把依据选择绑定到受信引用，转换为 DocGen 现有 criterion/risk/evidenceRefs 契约，拒绝跨文档定位及伪造来源。Review 不读原始源码，不直接修改知识；Gate 继续消费 blocking。

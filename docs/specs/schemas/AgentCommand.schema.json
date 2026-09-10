@@ -151,11 +151,11 @@
     },
     "reviewPayload": {
       "type": "object",
-      "required": ["knowledgeRef", "evaluationReportRef", "criteriaRef"],
+      "required": ["knowledgeRef", "evaluationReportRef", "comparisonReportRef"],
       "properties": {
         "knowledgeRef": {"$ref": "#/$defs/artifactRef"},
         "evaluationReportRef": {"$ref": "#/$defs/artifactRef"},
-        "criteriaRef": {"$ref": "#/$defs/artifactRef"},
+        "comparisonReportRef": {"$ref": "#/$defs/artifactRef"},
         "previousCorrectionRefs": {"$ref": "#/$defs/artifactRefArray"}
       },
       "additionalProperties": false
