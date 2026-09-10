@@ -1262,3 +1262,22 @@ body.drawer-active { overflow: hidden; }
 .publication-readable { margin: 24px auto; }
 
 .current-run-card.needs-attention .run-state-meta b { color: var(--danger); }
+
+/* 索引操作沿用知识页；窄屏表单纵向排列，YAML 仅在自身区域横向滚动。 */
+.index-panel { margin: 0 0 18px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+.index-panel > summary { cursor: pointer; padding: 14px 18px; font-weight: 600; }
+.index-panel-body { padding: 0 18px 18px; min-width: 0; }
+.index-panel-body p { margin: 10px 0; color: var(--muted); }
+.index-panel-body code { overflow-wrap: anywhere; }
+.index-panel-body pre { max-width: 100%; overflow: auto; padding: 14px; background: var(--bg); }
+.index-search { display: flex; align-items: end; gap: 12px; margin: 18px 0; }
+.index-search label { flex: 1; min-width: 0; display: grid; gap: 6px; }
+.index-search input { width: 100%; min-width: 0; }
+.index-hits { list-style: none; padding: 0; }
+.index-hits li { display: grid; gap: 8px; padding: 14px 0; border-top: 1px solid var(--border); }
+.index-hits button { justify-self: start; }
+.index-hits small { overflow-wrap: anywhere; color: var(--muted); }
+@media (max-width: 600px) {
+  .index-search { flex-direction: column; align-items: stretch; }
+  .index-panel-body { padding: 0 12px 14px; }
+}

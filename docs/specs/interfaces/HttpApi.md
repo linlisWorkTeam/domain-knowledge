@@ -43,6 +43,13 @@ Available 是已接线路由；Planned 路由不作为当前能力。Available /
 | `GET /api/v1/activity` | Available | 跨 Run 审计活动列表，支持 type、runId、severity、时间和分页过滤。 |
 | `GET /api/v1/activity/stream` | Available | 跨 Run SSE 活动流，支持断线续传。 |
 | `GET /api/v1/knowledge/health?window=<window>` | Available | 返回有明确分子、分母、样本窗口和规则版本的 freshness、coverage、quality，以及仅在三项均可用时计算的 0–100 总分；不得输出模型臆测分数。 |
+| `POST /api/v1/index-builds` | Available | 可选 versionIds，必须是当前版本；冻结输入后创建或复用 INDEX 任务。200 表示 reusedTask，202 表示已接受；restored 为恢复文件数。 |
+| `GET /api/v1/knowledge-index?q=` | Available | 摘要命中、原因、正文入口及 stale/missing 数量；不加载正文。 |
+| `GET /api/v1/knowledge-index/:cardId` | Available | YAML 预览、工件引用及 stale 标记。 |
+| `GET /api/v1/stage-tasks` | Available | projectId 筛选与分页；当前仅 INDEX 接通公开启动。 |
+| `GET /api/v1/stage-tasks/:taskId` | Available | 冻结输入、状态、累计用量、检查点与审计事件。 |
+| `POST /api/v1/stage-tasks/:taskId/resume` | Available | inputDigest 必须匹配；旧契约/输入变化/预算耗尽返回409。 |
+| `POST /api/v1/stage-tasks/:taskId/cancel` | Available | 幂等请求取消；运行中清理完成前不释放槽位。 |
 | `GET /api/v1/cards` | Available | `contractVersion=1.0`；当前卡片目录，支持 `q/status/versionId/limit/cursor`，`versionId` 可定位某历史版本所属卡片。返回稳定 `cardId`、当前 `versionId`、`versionCount/history`、`identitySource`、`matchedTerms/matchReason`。仅检索摘要元数据，不读取正文；状态筛选作用于当前版本。 |
 | `GET /api/v1/knowledge` | Available | 治理知识目录与简单检索；统一支持 `q`、`status`、`category`、`limit`、`cursor`，未给 `status` 时返回 `CANDIDATE,VERIFIED,LOW_CONFIDENCE,SUPERSEDED`。面向知识消费者的调用必须显式使用 `status=VERIFIED`；该路由已取代 `/api/v1/query`。 |
 | `GET /api/v1/knowledge/:versionId` | Available | 正文、状态、quality 和 provenance 详情。 |
@@ -119,3 +126,5 @@ Run 列表及详情的 `run` 保留领域 `state`，额外返回 `executionStatu
 | `POST /api/v1/publications/sync` | 空对象；手动同步已发布知识，失败保留本地版本 |
 
 PENDING、Git 关闭、Git 冲突及认证失败使用可定位的错误码。API 不暴露手工将候选升级为本地发布的入口。操作说明见 [Linux 安装与本地发布](../../LinuxInstall.md)。
+
+上述工作台路由复用 directEditing / Bearer 边界；免登录仍拒绝跨站浏览器写入。当前未开放通用 JSON 阶段启动入口，后续代码仓界面将通过服务端分析构造其他阶段输入。

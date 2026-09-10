@@ -115,3 +115,8 @@ This document summarizes older handoffs, milestones and architectural decisions 
 - [2026-09-10-1020-fourth-real-risk-blocker.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/55661e054edabcb694f84565da41b3f262481171/docs/epitaph/2026-09-10-1020-fourth-real-risk-blocker.md)：第四次真实飞轮在三轮行为门禁通过后仍受未处置知识风险阻塞；当时仅授权四次、PR38 为草稿，传输与 H2 修订修复已有受控验证。后来用户追加额度授权，风险生命周期、真实发布及 v0.2.0 验收已经完成，见保留的 1047、1141 记录；旧失败证据与原账本不改写。此次归档只为保留最新三份交接，不重开已完成的 MVP 验收。
 
 - [2026-09-10-1047-risk-review-verified.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/94d431a86b7656ded4109c3a00ae93b182df2e6c/docs/epitaph/2026-09-10-1047-risk-review-verified.md)：风险生命周期修复与执行版本 v4，330 项本地、331 项整合 CI 和 22 项 Console 等受控验证；当时尚未获得后续真实预算，未正式发布。之后真实验收与 v0.2.0 发布已由 1141 记录覆盖，本次只归档历史交接。
+
+## 五阶段工作台基础接入前的交接
+
+- [2026-09-10-1141-mvp-v020-released.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/26e3b48d427ab5b0c1b98449d101f633bda99969/docs/epitaph/2026-09-10-1141-mvp-v020-released.md)：v0.2.0 发布和安装包来自94d431a，最终真实 Run da8de66a-cce3-4922-a5f5-0b3e62eadcaf 通过270/270并发布；保留模型凭据、固定源码、用户数据及原始失败账本，不因新工作台重复发布。发布当时任意语言/项目及复杂检索回退延期，当前新任务另行扩展 C/C++；旧版本验收不证明新闭环完成。完整记录可从上述固定 Git 对象读取。
+- [2026-09-10-1227-taste-console-live.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/26e3b48d427ab5b0c1b98449d101f633bda99969/docs/epitaph/2026-09-10-1227-taste-console-live.md)：独立 taste 工作树的七页导航、正文阅读和真实待办筛选重构，24项浏览器及定向复验；当时为只读预览，后由1433记录改为免登录。线上运行源码和隧道不属于本次工作台已部署证据；本任务不改写 v0.2.0。历史截图位于 domain-knowledge-releases/2026-09-10-taste-ui；ECS 重任务串行。

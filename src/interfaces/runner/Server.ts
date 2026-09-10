@@ -46,6 +46,7 @@ const assets = new Map([
   ['/index.html', 'index.html'],
   ['/App.js', 'App.js'],
   ['/KnowledgeMarkdown.js', 'KnowledgeMarkdown.js'],
+  ['/KnowledgeIndex.js', 'KnowledgeIndex.js'],
   ['/Styles.css', 'Styles.css'],
 ]);
 
@@ -265,6 +266,8 @@ function requireOnlyKeys(payload: Record<string, unknown>, allowed: readonly str
 export function mapHttpError(error: unknown, id = 'req_unknown'): { status: number; body: ApiErrorBody } {
   const message = error instanceof Error ? error.message : String(error);
   const code = message.split(':', 1)[0] || 'INTERNAL_ERROR';
+  if (['STAGE_CONTRACT_INCOMPATIBLE', 'STAGE_INPUT_CHANGED', 'STAGE_NOT_RESUMABLE', 'STAGE_BUDGET_EXHAUSTED', 'INDEX_VERSION_NOT_CURRENT'].includes(code)) return { status: 409, body: errorBody(code, message, id) };
+  if (['STAGE_OWNER_UNAVAILABLE', 'STAGE_SHUTDOWN'].includes(code)) return { status: 503, body: errorBody(code, message, id) };
   if (code === 'MODULE_BASELINE_MISMATCH') return { status: 422, body: errorBody(code, '所选仓库不包含本版固定的 markdownLite 源码、参考测试或依赖快照。', id) };
   if (code === 'MODULE_ISOLATION_UNAVAILABLE' || code === 'MODULE_ISOLATION_REQUIRED') return { status: 503, body: errorBody(code, '服务器的 Linux 隔离能力不可用，任务未启动。请检查 Bubblewrap 和内核命名空间配置。', id) };
   if (code === 'RUN_CONFIGURATION_INCOMPATIBLE' || code === 'PROVIDER_MIGRATION_REQUIRED' || code === 'DSH_CONFIGURATION_UNAVAILABLE') return { status: 409, body: errorBody(code, message, id) };
@@ -323,6 +326,7 @@ export function createKnowledgeServer(input: {
     markdownLite: { start(repositoryRoot: string): Promise<unknown> };
   };
   const idempotencyResults = new Map<string, { fingerprint: string; status: number; value: unknown }>();
+  composition.apps.workbenchStages.recover();
   const server = createHttpServer(async (request, response) => {
     const url = new URL(request.url ?? '/', 'http://127.0.0.1');
     const currentRequestId = requestId(request);
@@ -348,12 +352,50 @@ export function createKnowledgeServer(input: {
       }
       // 目录、配置和写入仅允许直接本机访问，或携带远程访问令牌。
       const localClient = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(request.socket.remoteAddress ?? '');
+      const workbenchRoute = /^\/api\/v1\/(stage-tasks|index-builds|knowledge-index)(\/|$)/.test(url.pathname);
       const productRoute = url.pathname.startsWith('/api/v1/publications')
         || url.pathname === '/api/v1/server-directories' || url.pathname === '/api/v1/runs/markdown-lite';
-      if (url.pathname.startsWith('/api/') && (!localClient || productRoute) && !authorized(request, writeToken, anonymousAccess)) {
+      if (url.pathname.startsWith('/api/') && (!localClient || productRoute || workbenchRoute) && !authorized(request, writeToken, anonymousAccess)) {
         send(response, writeToken ? 401 : 503, errorBody(writeToken ? 'UNAUTHORIZED' : 'WRITE_API_DISABLED',
           'A valid Bearer token is required for remote access and server directory operations.', currentRequestId));
         return;
+      }
+      if (workbenchRoute) {
+        const stages = composition.apps.workbenchStages;
+        const index = composition.apps.knowledgeIndex;
+        if (request.method === 'GET' && url.pathname === '/api/v1/stage-tasks') {
+          send(response, 200, page(stages.store.list(url.searchParams.get('projectId') ?? undefined), url)); return;
+        }
+        const taskRoute = url.pathname.match(/^\/api\/v1\/stage-tasks\/([^/]+)(?:\/(resume|cancel))?$/);
+        if (taskRoute && request.method === 'GET' && !taskRoute[2]) {
+          const taskId = decodeURIComponent(taskRoute[1]!);
+          send(response, 200, { task: stages.get(taskId), checkpoints: stages.store.checkpoints(taskId), events: stages.store.events(taskId) }); return;
+        }
+        if (taskRoute && request.method === 'POST' && taskRoute[2]) {
+          const payload = await body(request); const taskId = decodeURIComponent(taskRoute[1]!);
+          requireOnlyKeys(payload, taskRoute[2] === 'resume' ? ['inputDigest'] : []);
+          if (taskRoute[2] === 'resume' && typeof payload.inputDigest !== 'string') throw new Error('STAGE_INPUT_INVALID');
+          const task = taskRoute[2] === 'resume' ? stages.resume(taskId, String(payload.inputDigest)) : stages.cancel(taskId);
+          send(response, 202, { task }); return;
+        }
+        if (request.method === 'POST' && url.pathname === '/api/v1/index-builds') {
+          const payload = await body(request); requireOnlyKeys(payload, ['versionIds']);
+          if (payload.versionIds !== undefined && (!Array.isArray(payload.versionIds) || !payload.versionIds.every((id) => typeof id === 'string'))) throw new Error('INDEX_SELECTION_INVALID');
+          const frozen = index.prepare(payload.versionIds as string[] | undefined);
+          const restored = await index.recover();
+          const task = stages.start(frozen);
+          send(response, task.status === 'SUCCEEDED' ? 200 : 202, { task, restored, reusedTask: task.status === 'SUCCEEDED' }); return;
+        }
+        if (request.method === 'GET' && url.pathname === '/api/v1/knowledge-index') {
+          const query = url.searchParams.get('q') ?? '';
+          if (query.length > 1024) throw new Error('ARGUMENT_INVALID');
+          send(response, 200, index.search(query)); return;
+        }
+        const preview = url.pathname.match(/^\/api\/v1\/knowledge-index\/([^/]+)$/);
+        if (preview && request.method === 'GET') {
+          send(response, 200, await index.preview(decodeURIComponent(preview[1]!))); return;
+        }
+        send(response, 404, errorBody('NOT_FOUND', 'Resource not found.', currentRequestId)); return;
       }
       if (productRoute) {
         if (!productApps.publicationOperations) throw new Error('PRODUCT_UNAVAILABLE: publication service is unavailable');

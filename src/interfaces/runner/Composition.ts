@@ -3,6 +3,10 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：提供Composition的外部入口、参数转换与响应处理。
  */
+import { WorkbenchStages } from '../../application/services/WorkbenchStages.ts';
+import { KnowledgeIndexService } from '../../application/services/KnowledgeIndex.ts';
+import { SqliteStageTasks } from '../../infrastructure/sqlite/SqliteStageTasks.ts';
+import { SqliteKnowledgeIndex } from '../../infrastructure/sqlite/SqliteKnowledgeIndex.ts';
 import { AgentExampleService } from '../../application/services/AgentExample.ts';
 import { PublicationOperations } from '../../application/services/PublicationOperations.ts';
 import { LocalMarkdownPublisher } from '../../infrastructure/publication/LocalMarkdownPublisher.ts';
@@ -151,6 +155,10 @@ export function createComposition(input: {
   });
   const evalRunnerApp = new EvalRunnerApp(flywheelApp);
   const knowledgeSearchApp = new KnowledgeSearchApp(artifacts, repository);
+  const stageStore = new SqliteStageTasks(join(runtimeDir, 'workbench.sqlite'));
+  const indexStore = new SqliteKnowledgeIndex(join(runtimeDir, 'workbench.sqlite'), join(runtimeDir, 'card-index'));
+  const knowledgeIndex = new KnowledgeIndexService(repository, artifacts, indexStore);
+  const workbenchStages = new WorkbenchStages(stageStore, { INDEX: (context) => knowledgeIndex.build(context) });
   const scanner = new SourceScanner(repositoryRoot, repository);
   const knowledgeDiscoveryApp = new KnowledgeDiscoveryApp(scanner, undefined, {
     migrate: (legacyKnowledgeRoot) => migrateLegacyOkf({
@@ -498,6 +506,8 @@ export function createComposition(input: {
     repository,
     apps: {
       publicationOperations,
+      workbenchStages,
+      knowledgeIndex,
       markdownLite: {
         start: async (directory: string, budgetMode?: 'provider-quota') => {
           // 固定模块入口只接受服务器目录；源码与模型设置在服务端验证。
@@ -530,7 +540,11 @@ export function createComposition(input: {
     runConfiguration,
     agentProviderMode,
     automatedWorkflow: workflow,
-    shutdown: async () => { if (workflowPromise) await (await workflowPromise).shutdown(); },
-    close: () => { publisher.close(); repository.close(); },
+    shutdown: async () => { await workbenchStages.shutdown(); if (workflowPromise) await (await workflowPromise).shutdown(); },
+    close: () => {
+      const release = () => { indexStore.close(); stageStore.close(); publisher.close(); repository.close(); };
+      if (workbenchStages.idle) { void workbenchStages.shutdown(); release(); }
+      else return workbenchStages.shutdown().then(release);
+    },
   };
 }

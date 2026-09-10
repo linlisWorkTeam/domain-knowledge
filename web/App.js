@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：提供app页面的展示、交互或样式资源。
  */
+import { createKnowledgeIndexPanel } from './KnowledgeIndex.js'
 import { renderKnowledgeMarkdown } from './KnowledgeMarkdown.js'
 
 const content = document.querySelector('#page-content')
@@ -605,6 +606,8 @@ function evaluationCard(record) {
   </article>`
 }
 
+const knowledgeIndexPanel = createKnowledgeIndexPanel({ root: content, request, escapeHtml, isEditable: () => Boolean(state.capabilities?.directEditing || state.token) })
+
 function renderKnowledge(items = state.knowledge) {
   if (state.resourceErrors.knowledge) {
     content.innerHTML = errorState('无法读取知识目录', state.resourceErrors.knowledge, '<button class="primary-button" data-reload type="button">重新连接</button>')
@@ -614,6 +617,7 @@ function renderKnowledge(items = state.knowledge) {
   const visible = state.knowledgeModule ? items.filter((item) => item.moduleId === state.knowledgeModule) : items
   content.innerHTML = `
     <section class="reference-knowledge-tools"><label>⌕　<input id="knowledge-search" type="search" value="${escapeHtml(state.knowledgeQuery)}" placeholder="搜索名称、用途或关键词…"></label><kbd>⌘ K</kbd><select id="knowledge-status" aria-label="知识状态"><option value="">全部状态</option>${['VERIFIED', 'CANDIDATE', 'LOW_CONFIDENCE', 'SUPERSEDED'].map((value) => `<option value="${value}" ${state.knowledgeStatus === value ? 'selected' : ''}>${displayLabel(value)}</option>`).join('')}</select></section>
+    ${knowledgeIndexPanel.html()}
     <div class="reference-knowledge-grid"><aside class="reference-domains"><header><h3>领域</h3><span id="knowledge-count">${visible.length}</span></header><button class="${state.knowledgeModule ? '' : 'active'}" data-knowledge-module="">全部知识 <b>${items.length}</b></button>${modules.map((moduleId) => `<button class="${state.knowledgeModule === moduleId ? 'active' : ''}" data-knowledge-module="${escapeHtml(moduleId)}">${escapeHtml(moduleId)} <b>${items.filter((item) => item.moduleId === moduleId).length}</b></button>`).join('')}</aside><section class="reference-docs"><header><span>知识</span><span>来源</span><span>质量</span><span>更新时间</span></header><div id="knowledge-list">${knowledgeCards(visible)}</div></section></div>`
 }
 

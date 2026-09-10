@@ -234,3 +234,10 @@ npm run site:serve
 ```
 
 打开 <http://127.0.0.1:4175>。公开站点的唯一源码在 `site/`。根目录 `index.html` 只是分支/Jekyll 模式的兼容入口；Pages Source 为 GitHub Actions 时，工作流直接发布 `site/`。预期公网地址是 <https://linlisworkteam.github.io/domain-knowledge/>。
+
+
+## 知识索引与阶段任务
+
+在知识页展开“知识索引与试检索”，点击“更新索引”。页面展示输入版本数量和新增、更新、复用、失败统计；无需填写 JSON。输入问题并点“检索索引”查看匹配字段和词，打开命中后加载正文；“预览 YAML”查看索引头。待更新数量大于零时重新更新索引。
+
+运行中可取消；失败或进程中断后可恢复同一任务，已完成卡片和累计用量保留。卡片发生变化时应重新点击更新索引创建新输入任务。索引失败不会删除知识卡片。runtime/card-index 文件可从既有 CAS 恢复；运行中不要删除 runtime/workbench.sqlite 或 CAS。其余四阶段执行器及完整 C/C++ 链路尚待接通，不能把本操作当成完整飞轮验收。

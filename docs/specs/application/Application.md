@@ -57,3 +57,10 @@ Console 通过应用边界读取发布设置、枚举服务器授权目录、读
 失败执行的恢复展示同时检查阶段 journal：两次尝试耗尽或阶段截止时间已过时，不展示恢复按钮。此展示不代替阶段执行器、运行总预算和执行版本的最终校验。
 
 真实验收入口的默认三次账本可在显式用户追加一次授权后升级为 mvp-real-attempts-v2；授权文件绑定旧账本 SHA-256，持久化原三次内容摘要并只开放第四次。重放不得增加额度，原记录篡改或摘要不符时拒绝。该授权不改变每次飞轮三轮、三十分钟的业务预算。
+
+
+## 工作台阶段与索引
+
+WorkbenchStages 通过 StageTaskStore 调度版本化任务；输入身份、恢复条件和预算规则位于 Domain [Workbench](../domainFunction/services/workbench/Workbench.md)。单阶段执行结果与检查点可独立等待，不复用 AgentExampleService 的每次新建 Run 行为。当前只有 INDEX handler 接通，其他阶段不得宣称已可运行。
+
+KnowledgeIndexService 读取冻结卡片版本，协调 YAML/Markdown 工件、增量索引、恢复与摘要查询。索引失败保留知识和已提交子步骤。查询只访问摘要和版本元数据，正文由详情按需加载；不调用模型、发布或外部搜索。

@@ -33,3 +33,10 @@ Git fetch 后、任何 merge 前读取远端完整树，拒绝非允许路径和
 迁移版本 7 新增 `checkpoint_owners`，不改旧 checkpoint 信封。Linux 领取时记录宿主 boot ID、PID 和 `/proc/<pid>/stat` 启动时刻。恢复在同一事务内确认旧执行者已退出或 PID 已复用后，才可提前接管 RUNNING checkpoint；仍检查 generationKey、输入摘要和递增 retry fence。活着的旧执行者不能因新服务启动而被提前替换，身份不可读取和无身份的旧记录保留原租约行为。
 
 这使进程崩溃后的阶段能在 90–240 秒预算内使用剩余尝试，不必等待默认 15 分钟租约。阶段 journal 的首次开始时间和已占用次数保持不变；旧进程已完成的输出仍须以原有事务提交为准。角色和评测子进程的 Bubblewrap 保留 `--die-with-parent`。
+
+
+## 工作台阶段与索引
+
+`workbench.sqlite` 中 wb_stage_tasks、wb_stage_events、wb_stage_checkpoints、wb_stage_usage 分别保存冻结任务、事务审计、子步骤结果和幂等用量。SqliteStageTasks 使用 BEGIN IMMEDIATE 与单执行租约唯一索引；回收依据 CheckpointOwner 的实际进程身份，不猜测超时。SqliteKnowledgeIndex 保存 wb_card_index，稳定 Markdown 位于 runtime/card-index；YAML 和整份 Markdown 同时保存 CAS，文件可独立恢复。
+
+阶段存储与旧 registry.sqlite 的知识版本分离；索引失败不会回滚版本。应用在跨库交接处使用确定性任务 ID、CAS 与子步骤检查点，不宣称跨库和外部副作用拥有单一数据库事务。

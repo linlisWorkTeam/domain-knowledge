@@ -887,3 +887,36 @@ test('anonymous direct editing can download evidence without a Bearer token', as
   await downloaded;
   expect(requested).toBe(true);
 });
+
+test('知识索引可独立构建、试检索并预览 YAML，命中后才读取正文', async ({ page }) => {
+  const bodies: string[] = [];
+  page.on('request', (request) => {
+    const path = new URL(request.url()).pathname;
+    if (/^\/api\/v1\/knowledge\/[^/]+$/.test(path) && !path.endsWith('/health')) bodies.push(path);
+  });
+  await page.goto(baseUrl);
+  await enterGovernance(page);
+  await navigateTo(page, '知识');
+  await page.getByText('知识索引与试检索', { exact: true }).click();
+  await page.getByRole('button', { name: '更新索引', exact: true }).click();
+  await expect(page.locator('[data-index-task]')).toContainText('已完成');
+  await expect(page.locator('[data-index-task]')).toContainText('失败 0');
+  bodies.length = 0;
+  await page.getByLabel('试检索', { exact: true }).fill('浏览器验收');
+  await page.getByRole('button', { name: '检索索引', exact: true }).click();
+  const hit = page.locator('.index-hits li').filter({ has: page.locator(`[data-version-id="${latestVersionId}"]`) });
+  await expect(hit).toBeVisible();
+  await expect(hit).toContainText('命中');
+  await hit.getByRole('button', { name: '预览 YAML' }).click();
+  await expect(page.locator('[data-index-preview] pre')).toContainText('cardId:');
+  await expect(page.locator('[data-index-preview] pre')).toContainText(latestVersionId);
+  expect(bodies).toHaveLength(0);
+  await page.screenshot({ path: test.info().outputPath('index-desktop.png'), fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.getByRole('button', { name: '更新索引', exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: test.info().outputPath('index-mobile.png'), fullPage: true });
+  await hit.locator(`[data-version-id="${latestVersionId}"]`).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  expect(bodies).toEqual([`/api/v1/knowledge/${latestVersionId}`]);
+});
