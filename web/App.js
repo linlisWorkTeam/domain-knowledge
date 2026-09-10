@@ -913,7 +913,7 @@ async function openEvaluation(evaluationId, returnFocus) {
 }
 
 async function downloadArtifact(path) {
-  if ((!state.token && !state.capabilities?.directEditing) || !/^\/api\/v1\/evaluations\/[^/]+\/artifacts\/[^/?#]+$/.test(String(path))) {
+  if ((!state.token && !state.capabilities?.directEditing) || !/^\/api\/v1\/(?:evaluations\/[^/]+\/artifacts\/[^/?#]+|stage-tasks\/[^/]+\/artifacts\/[a-f0-9]{64})$/.test(String(path))) {
     showToast('请先进入治理模式。', 'warning')
     return
   }
@@ -928,7 +928,7 @@ async function downloadArtifact(path) {
   const url = URL.createObjectURL(await response.blob())
   const link = document.createElement('a')
   link.href = url
-  link.download = 'evaluation-evidence'
+  link.download = path.includes('/stage-tasks/') ? 'stage-evidence.json' : 'evaluation-evidence'
   link.click()
   setTimeout(() => URL.revokeObjectURL(url), 0)
 }
@@ -1433,6 +1433,8 @@ nav.addEventListener('click', (event) => {
 })
 
 content.addEventListener('click', (event) => {
+  const download = event.target.closest('[data-download-artifact]')
+  if (download) { downloadArtifact(download.dataset.downloadArtifact).catch((error) => showToast(userFacingError(error, '无法下载阶段证据。'), 'danger')); return }
   const queueFilter = event.target.closest('[data-queue-filter]')
   if (queueFilter) {
     state.queueFilter = queueFilter.dataset.queueFilter

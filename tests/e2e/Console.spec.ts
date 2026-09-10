@@ -928,6 +928,8 @@ test('操作中心从固定 Git 版本分析仓库，显示模块和环境且窄
   const directory = mkdtempSync(join(tmpdir(), 'console-analysis-'));
   const originalModel = instance.composition.apps.workbenchGeneration.dependencies.model;
   const originalNative = instance.composition.apps.workbenchGeneration.dependencies.native;
+  const reconstruction = instance.composition.apps.workbenchReconstruction.dependencies;
+  const originalReconstruction = { model: reconstruction.roles.dependencies.model, snapshot: reconstruction.snapshot, native: reconstruction.native };
   const git = (args: string[]) => execFileSync('git', ['-c', 'user.name=Browser Test', '-c', 'user.email=browser@example.test', ...args], {
     cwd: directory, encoding: 'utf8', env: { PATH: process.env.PATH, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null' },
   }).trim();
@@ -964,6 +966,19 @@ test('操作中心从固定 Git 版本分析仓库，显示模块和环境且窄
     await expect(page.locator('[data-generation-task]')).toContainText('已生成 1 张');
     await expect(page.locator('[data-generation-task]')).toContainText('已完成');
     await expect(page.getByRole('button', { name: 'Parser generated card', exact: true })).toBeVisible();
+    reconstruction.snapshot = async (language, build) => ({ schemaVersion: 'native-toolchain-v1', language, build, architecture: 'test', files: [], digest: 'a'.repeat(64) });
+    reconstruction.native = instance.composition.apps.workbenchGeneration.dependencies.native;
+    reconstruction.roles.dependencies.model = () => ({ assertOutput: assertModelOutput, execute: async (request) => {
+      expect(request.readablePaths).toEqual([]); expect(request.prompt).not.toContain('return 1;');
+      return { files: [{ path: 'parser.c', content: 'int parse(void) { return 1; }' }] };
+    } });
+    await page.getByRole('button', { name: '执行代码重建', exact: true }).click();
+    await expect(page.locator('[data-reconstruction-panel]')).toContainText('重建及接口检查完成');
+    await expect(page.locator('[data-reconstruction-panel]')).toContainText('公开接口匹配');
+    await expect(page.locator('[data-reconstruction-panel]')).toContainText('尚未行为验证或发布');
+    const download = page.waitForEvent('download');
+    await page.getByRole('button', { name: '下载生成代码', exact: true }).click();
+    expect((await download).suggestedFilename()).toBe('stage-evidence.json');
     await page.screenshot({ path: test.info().outputPath('repository-analysis-desktop.png'), fullPage: true });
     await page.setViewportSize({ width: 390, height: 844 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
@@ -972,10 +987,11 @@ test('操作中心从固定 Git 版本分析仓库，显示模块和环境且窄
     await page.reload(); await enterGovernance(page);
     await expect(page.locator('[data-generation-task]')).toContainText('已生成 1 张');
     await expect(page.getByRole('button', { name: 'Parser generated card', exact: true })).toBeVisible();
+    await expect(page.locator('[data-reconstruction-panel]')).toContainText('重建及接口检查完成');
     await page.getByLabel('服务器仓库目录', { exact: true }).fill(directory);
     await page.getByLabel('源码版本', { exact: true }).fill('missing-commit-for-analysis');
     await page.getByRole('button', { name: '分析仓库', exact: true }).click();
     await expect(page.locator('[data-repository-notice]')).toContainText('无法读取这个源码版本');
     await expect(page.locator('[data-repository-result]')).not.toContainText(commit);
-  } finally { instance.composition.apps.workbenchGeneration.dependencies.model = originalModel; instance.composition.apps.workbenchGeneration.dependencies.native = originalNative; rmSync(directory, { recursive: true, force: true }); }
+  } finally { reconstruction.roles.dependencies.model = originalReconstruction.model; reconstruction.snapshot = originalReconstruction.snapshot; reconstruction.native = originalReconstruction.native; instance.composition.apps.workbenchGeneration.dependencies.model = originalModel; instance.composition.apps.workbenchGeneration.dependencies.native = originalNative; rmSync(directory, { recursive: true, force: true }); }
 });

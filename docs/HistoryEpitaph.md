@@ -130,3 +130,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 - [2026-09-10-1614-workbench-repository-analysis.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/2479904f1fe3824682e69b155330552e25b2922d/docs/epitaph/2026-09-10-1614-workbench-repository-analysis.md)：接入固定Git源码分析、模块候选和环境观察，类型/Spec/架构、172项integration和29项Console通过；仅分析入口，模型闭环及部署未完成。后续项目输入和原生工具链见1623/1645记录；原知识、线上taste和v0.2.0保留。
 
 - [2026-09-10-1623-workbench-project-inputs.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/7422ca29677cae769a96323a15a96900ac70d207/docs/epitaph/2026-09-10-1623-workbench-project-inputs.md)：固定项目输入与源码CAS、Console构建约束、jsmn/TinyXML2固定提交；当时integration173/173和Console29/29通过，真实模型与原生评测未实现。固定目标和快照位置继续见最新交接及Targets.json。
+
+- [2026-09-10-1645-native-toolchain.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/b290752057f1a841f090887f1e8a1df0bc757d47/docs/epitaph/2026-09-10-1645-native-toolchain.md)：新增C/C++隔离构建和公开声明投影，固定jsmn/TinyXML2参考观察；当时并未接模型重建或可信用例晋升，参考stdout不算行为门禁证据。后续接线见最新交接。

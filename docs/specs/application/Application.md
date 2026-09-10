@@ -61,7 +61,7 @@ Console 通过应用边界读取发布设置、枚举服务器授权目录、读
 
 ## 工作台阶段与索引
 
-WorkbenchStages 通过 StageTaskStore 调度版本化任务；输入身份、恢复条件和预算规则位于 Domain [Workbench](../domainFunction/services/workbench/Workbench.md)。单阶段执行结果与检查点可独立等待，不复用 AgentExampleService 的每次新建 Run 行为。当前 GENERATE（C/C++）与 INDEX handler 已接通；飞轮、评测、关联执行器仍待接通。
+WorkbenchStages 通过 StageTaskStore 调度版本化任务；输入身份、恢复条件和预算规则位于 Domain [Workbench](../domainFunction/services/workbench/Workbench.md)。单阶段执行结果与检查点可独立等待，不复用 AgentExampleService 的每次新建 Run 行为。当前 GENERATE（C/C++）与 INDEX handler 已接通；FLYWHEEL已接通重建和接口比较部分；评测、修订与关联执行器仍待接通。
 
 KnowledgeIndexService 读取冻结卡片版本，协调 YAML/Markdown 工件、增量索引、恢复与摘要查询。索引失败保留知识和已提交子步骤。查询只访问摘要和版本元数据，正文由详情按需加载；不调用模型、发布或外部搜索。
 
@@ -70,7 +70,7 @@ RepositoryAnalysisService 调用 RepositoryAnalyzer 并将固定清单写入 CAS
 
 WorkbenchProjects 已接入：项目身份绑定仓库，输入版本绑定提交、模块选择、构建约束和固定源文件工件。先校验选择，再将选定源码与构建配置存 CAS，最后原子记录 SQLite 快照；同输入重复请求复用，历史快照不可变。源文件工件仅供源码分析、DocGen和参考评测使用，不能作为 Code 的公开接口。公开接口提取成功前不能启动重建。构建参数只接受编译器、标准、相对包含目录及预处理定义，不接受 shell 命令。
 
-NativeLanguageToolchain端口用于原生声明投影与独立构建/原始执行观察。当前基础适配器已接通GENERATE的接口提取，尚未接通FLYWHEEL或EVALUATE；不能将compileAndRun返回的stdout/exitCode直接作为可信测试或发布门禁。公开接口材料须单独保存，只把native-interface-v1声明投影传给Code，禁止传源文件、原构建文件或完整AST。
+NativeLanguageToolchain端口用于原生声明投影与独立构建/原始执行观察。当前基础适配器已接通GENERATE的接口提取，已接通FLYWHEEL公开接口比较，尚未接通EVALUATE；不能将compileAndRun返回的stdout/exitCode直接作为可信测试或发布门禁。公开接口材料须单独保存，只把native-interface-v1声明投影传给Code，禁止传源文件、原构建文件或完整AST。
 
 WorkbenchGeneration 已接通：从固定项目与接口选择构造稳定知识单元，一张卡片对应同名函数/重载族，类型布局独立成卡；配置先固定为阶段工件，阶段身份绑定配置摘要与输入。复用Domain角色及RoleExecution的结果工件提交，不用旧Run生命周期表示“生成完成未评测”。角色尝试写入阶段审计，成功卡片逐张提交、立即可读，失败保留前序产物；发布资格仍由后续评测决定。
 
@@ -82,3 +82,6 @@ NativeSuiteEvaluation 已实现原生候选的参考验证、生成实现独立�
 缓存身份绑定稳定 cardId、正文摘要、参考文件清单、公开接口、测试策略及实际工具链指纹。指纹涵盖编译器、头文件、依赖库、运行资源适配器和测试解释器；前后不一致拒绝提交。索引元数据不进入正文摘要。相同输入跨重启复用；正文修订后原可信用例和预期保持不变，在参考实现重新验证。可信 head 使用 SQLite 事务及父版本比较，拒绝候选不覆盖历史可信记录。工具链或源码变化建立新的验证身份。
 
 用例关联通过 cardId#二级标题定位，并绑定不可变知识版本。新候选引用不存在的章节时拒绝；历史可信用例的章节被删除时保留历史版本链接，matchesInput=false，不伪造当前章节。报告保留用例输入、预期、实际值、编译运行证据、生成文件清单和章节绑定。整数按十进制字符串比较以保留 64 位精度，浮点允许误差为 1e-7 × max(1, abs(expected))；布尔和字符串精确比较。阶段上下文可逐用例记录检查点及取消信号，但前台阶段接线与失败修订仍待实现。
+
+
+已接通部分：WorkbenchReconstruction 从固定项目及卡片版本准备 Code 材料。仅传正文、native-interface-v1 声明投影与白名单路径/构建约束，绝不传参考源文件或隐藏用例。模型配置、输入版本与工具链摘要进入阶段身份；成功 Code 结果由公共角色提交边界保存，失败或取消保留前序检查点，恢复不重复已完成模型调用。生成代码需再提取公开声明进行比较，声明失败保留诊断，不以产出代码冒充完成行为验证或发布。

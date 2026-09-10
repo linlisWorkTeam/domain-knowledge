@@ -3,9 +3,13 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：展示独立知识生成任务、逐卡产物及同版本恢复入口。
  */
+import { createKnowledgeReconstructionPanel } from './KnowledgeReconstruction.js'
 export function createKnowledgeGenerationPanel({ root, request, escapeHtml: escape, isEditable }) {
   let project = null, task = null, checkpoints = [], events = [], timer = null
   let busy = false, notice = '', epoch = 0, initialized = false, scopesOpen = false
+  const reconstruction = createKnowledgeReconstructionPanel({ root, request, escapeHtml: escape, isEditable,
+    selection: () => task?.status === 'SUCCEEDED' ? { snapshotId: task.input.parameters.snapshotId,
+      versionIds: (task.result?.summary?.cards ?? []).map((card) => card.versionId) } : null })
   const scopes = new Map()
   const host = () => root.querySelector('[data-generation-panel]')
   const active = () => task && ['PENDING', 'RUNNING'].includes(task.status)
@@ -45,13 +49,14 @@ export function createKnowledgeGenerationPanel({ root, request, escapeHtml: esca
         ${project.modules.map((module) => `<fieldset><legend>${escape(module.moduleId)}</legend>
           ${[['entryPath', '接口入口路径'], ['astFilter', '类范围（例如 tinyxml2::XMLUtil）'], ['symbols', '限定符号（每行一个，留空自动提取）']].map(([key, label]) => `<label>${label}<textarea name="scope-${escape(module.moduleId)}-${key}" data-generation-scope="${key}" data-generation-module="${escape(module.moduleId)}" ${busy || active() ? 'disabled' : ''}>${escape(scopes.get(module.moduleId)?.[key] ?? '')}</textarea></label>`).join('')}</fieldset>`).join('')}</details>
         <button class="primary-button" data-generation-action="start" ${busy || active() || !isEditable() ? 'disabled' : ''} type="button">生成知识库</button>` : '<p>先保存项目输入，再生成知识库。</p>'}
-      <p data-generation-notice role="status">${escape(notice)}</p><div data-generation-task aria-live="polite">${taskHtml()}</div></section>`
+      <p data-generation-notice role="status">${escape(notice)}</p><div data-generation-task aria-live="polite">${taskHtml()}</div><section data-reconstruction-panel></section></section>`
   }
   function render() {
     const panel = host(); if (!panel) return
     panel.querySelector('[data-generation-task]').innerHTML = taskHtml()
     panel.querySelector('[data-generation-notice]').textContent = notice
     const start = panel.querySelector('[data-generation-action="start"]'); if (start) start.disabled = !project || busy || active() || !isEditable()
+    reconstruction.render()
     for (const field of panel.querySelectorAll('[data-generation-scope]')) field.disabled = busy || active()
   }
   async function observe() {
@@ -90,8 +95,9 @@ export function createKnowledgeGenerationPanel({ root, request, escapeHtml: esca
     finally { if (current === epoch) { busy = false; render() } }
   })
   return { html,
-    setProject(value) { project = value; const panel = host(); if (panel) panel.outerHTML = html(); queueMicrotask(observe) },
+    setProject(value) { project = value; const panel = host(); if (panel) panel.outerHTML = html(); queueMicrotask(observe); reconstruction.refresh() },
     refresh() {
+      reconstruction.refresh()
       if (!isEditable()) return
       if (!initialized && host()) {
         initialized = true; const current = epoch
