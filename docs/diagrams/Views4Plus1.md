@@ -12,7 +12,11 @@ SPDX-License-Identifier: MIT
 ```mermaid
 flowchart LR
   User[用户] --> Apps[Application Apps]
-  Apps --> Roles[七角色 Domain Agents]
+  Apps --> Services[Domain services]
+  Services --> Execute[AgentExecutionService]
+  Execute --> Roles[内部七角色 agents]
+  Services --> Association[AssociationDomainService]
+  Services --> Evaluation[EvalRunnerDomainService]
   Apps --> Run[FlywheelRun]
   Roles --> Pending[结构化结果与待保存工件]
   Pending --> Commit[RoleExecutionService]
@@ -29,7 +33,7 @@ flowchart LR
 ```mermaid
 flowchart TB
   I[interfaces: HTTP / CLI / Composition] --> A[application: apps / services / ports]
-  A --> D[domain: agents / workflow / evaluation / association / knowledge / sourceScan / workspace / migration]
+  A --> D[domain: agents / services / Domain.ts]
   I --> F[infrastructure: agentAdapters / langgraph / sqlite / redis / evaluation]
   F --> A
   F --> D

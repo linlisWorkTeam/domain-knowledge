@@ -12,7 +12,7 @@ import test from 'node:test';
 import type { ArtifactRef } from '../../src/domain/Domain.ts';
 import type { ModelRequest } from '../../src/domain/agents/AgentExecution.ts';
 import type { ModuleBehaviorSuite } from '../../src/domain/agents/testGenAgent/ModuleBehaviorSuite.ts';
-import { NODE_BY_AGENT } from '../../src/domain/workflow/AgentDefinitions.ts';
+import { NODE_BY_AGENT } from '../../src/domain/services/workflow/AgentDefinitions.ts';
 import { AutomatedProjectWorkflowService, ProjectWorkflowStages } from '../../src/application/services/AutomatedProjectWorkflow.ts';
 import { FixtureProjectWorkflowStages, type FixtureProjectScenario } from '../../src/infrastructure/agentAdapters/scenario/ProjectWorkflowFixture.ts';
 import { JsonSchemaAgentContractValidator } from '../../src/infrastructure/agentAdapters/contracts/JsonSchemaAgentContractValidator.ts';

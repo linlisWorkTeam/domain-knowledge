@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：定义跨角色业务流程、文档任务拆分及质量判定后的流转规则。
  */
-import type { AgentId } from '../agents/AgentContracts.ts';
+import type { AgentId } from '../../agents/AgentContracts.ts';
 import { NODE_BY_AGENT } from './AgentDefinitions.ts';
 
 /** 业务阶段绑定的角色；非角色阶段不调用模型。 */

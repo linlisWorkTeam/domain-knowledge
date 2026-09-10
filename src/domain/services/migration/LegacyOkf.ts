@@ -14,7 +14,7 @@ export interface LegacyMigrationTarget {
     tags: string[]; provenance: ProvenanceRef[]; metadata: Record<string, unknown>;
   }): Promise<{ replayed: boolean; quality: { outcome: string } }>;
 }
-import type { ProvenanceRef } from '../Domain.ts';
+import type { ProvenanceRef } from '../../Domain.ts';
 
 interface LegacyCard {
   /** 提供元数据信息，供调用方读取或传入。 */

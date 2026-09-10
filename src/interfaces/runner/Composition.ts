@@ -7,7 +7,7 @@ import { AgentExampleService } from '../../application/services/AgentExample.ts'
 import { PublicationOperations } from '../../application/services/PublicationOperations.ts';
 import { LocalMarkdownPublisher } from '../../infrastructure/publication/LocalMarkdownPublisher.ts';
 import { createMarkdownLiteScenario } from '../../infrastructure/evaluation/markdownLite/MarkdownLiteScenario.ts';
-import { NODE_BY_AGENT } from '../../domain/workflow/AgentDefinitions.ts';
+import { NODE_BY_AGENT } from '../../domain/services/workflow/AgentDefinitions.ts';
 import { assertModelOutput, modelExecutionFactory } from '../../infrastructure/agentAdapters/ModelExecution.ts';
 import { appendFile, mkdir } from 'node:fs/promises';
 import { readFileSync } from 'node:fs';
@@ -41,8 +41,8 @@ import {
   LocalCasArtifactStore, SQLiteFlywheelRepository,
 } from '../../infrastructure/sqlite/SqliteCas.ts';
 import { SQLiteContentGovernance } from '../../infrastructure/sqlite/SqliteContentGovernance.ts';
-import { SourceScanner } from '../../domain/sourceScan/SourceScan.ts';
-import { LocalAgentWorkspace } from '../../domain/workspace/LocalAgentWorkspace.ts';
+import { SourceScanner } from '../../domain/services/sourceScan/SourceScan.ts';
+import { LocalAgentWorkspace } from '../../domain/services/workspace/LocalAgentWorkspace.ts';
 import {
   EncryptedFileProviderSettingsStore, OpenAiCompatibleProviderProbe,
   PublicHttpsEndpointPolicy,
@@ -52,7 +52,7 @@ import { FixtureProjectWorkflowStages } from '../../infrastructure/agentAdapters
 import { writeOpenCodeGoPatch } from '../../infrastructure/agentAdapters/deepSeekHarness/OpencodeGo.ts';
 import { JsonSchemaAgentContractValidator } from '../../infrastructure/agentAdapters/contracts/JsonSchemaAgentContractValidator.ts';
 import { SQLiteOperationalMetrics } from '../../infrastructure/observability/SqliteOperationalMetrics.ts';
-import { migrateLegacyOkf } from '../../domain/migration/LegacyOkf.ts';
+import { migrateLegacyOkf } from '../../domain/services/migration/LegacyOkf.ts';
 import { ConsoleReadModel } from './ConsoleReadModel.ts';
 import { buildDemoReport } from './DemoReport.ts';
 

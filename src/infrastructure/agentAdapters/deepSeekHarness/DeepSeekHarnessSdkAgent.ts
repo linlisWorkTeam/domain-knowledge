@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：提供DeepSeekHarnessSdk角色的基础设施实现与外部系统接入。
  */
-import { roleDefinitions } from '../../../domain/agents/AgentRegistry.ts';
+import { DOMAIN_KNOWLEDGE_AGENT_DEFINITIONS } from '../../../domain/services/workflow/AgentDefinitions.ts';
 import { spawn } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
@@ -389,7 +389,7 @@ export class DeepSeekHarnessSdkAgent implements AgentProvider {
           maxTokens: maxTokens }],
       } }] : []),
       ...['persistent-bash', 'persistent-pwsh', 'str-replace-editor'].map((id) => ({ id, disabled: true })),
-      { insert: [{ id: 'workpanel-role-tools', name: policyPath, config: { workspaceRoot, canRead: (request.authorizedTools ?? roleDefinitions.find((definition) => definition.agentId === request.role)?.tools ?? []).includes('read_material') } }] },
+      { insert: [{ id: 'workpanel-role-tools', name: policyPath, config: { workspaceRoot, canRead: (request.authorizedTools ?? DOMAIN_KNOWLEDGE_AGENT_DEFINITIONS.find((definition) => definition.agentId === request.role)?.tools ?? []).includes('read_material') } }] },
     ]), { mode: 0o600 });
     // The final patch and monotonic DSH guard enforce the business role view.
     const patches = [...(this.options.patches ?? []).map((path) => resolve(path)), policyPatch];

@@ -23,8 +23,11 @@ function markdownFiles(root: string): string[] {
 }
 
 test('Knowledge Flywheel implementation owns the domain-knowledge repository root', () => {
-  assert.equal(existsSync('src/domain/services'), false, 'Domain directories must follow business features');
-  assert.equal(existsSync('docs/specs/domainFunction/services'), false, 'Domain designs must follow feature directories');
+  assert.equal(existsSync('src/domain/services'), true, 'Domain exposes services alongside internal agents');
+  assert.equal(existsSync('docs/specs/domainFunction/services'), true, 'Service designs follow code ownership');
+  for (const retired of ['association', 'evaluation', 'knowledge', 'workflow', 'sourceScan', 'workspace', 'migration']) {
+    assert.equal(existsSync(`src/domain/${retired}`), false, `service remains outside services: ${retired}`);
+  }
   assert.equal(existsSync('endlessWpKnowledgeRunner'), false, 'retired wrapper directory must not be reintroduced');
   for (const required of [
     'src/interfaces/runner/Server.ts',
@@ -43,10 +46,10 @@ test('Knowledge Flywheel implementation owns the domain-knowledge repository roo
     'src/application/ports/ApplicationPorts.ts',
     'src/application/apps/ApplicationApps.ts',
     'src/application/services/ApplicationServices.ts',
-    'src/domain/workflow/Workflow.ts',
-    'src/domain/evaluation/EvalRunnerDomainService.ts',
-    'src/domain/association/AssociationDomainService.ts',
-    'src/domain/knowledge/MarkdownDiff.ts',
+    'src/domain/services/workflow/Workflow.ts',
+    'src/domain/services/evaluation/EvalRunnerDomainService.ts',
+    'src/domain/services/association/AssociationDomainService.ts',
+    'src/domain/services/knowledge/MarkdownDiff.ts',
     'src/infrastructure/sqlite/SqliteCas.ts',
     'src/infrastructure/redis/Redis.ts',
     'docs/HistoryEpitaph.md',

@@ -5,17 +5,17 @@
  */
 import {
   decideGate, type EvaluationReport, type FlywheelRun, type GateDecision, type GatePolicy,
-} from '../Domain.ts';
+} from '../../Domain.ts';
 
 /** 对外提供能力，作为调用方使用的统一约定。 */
 export const EVALUATION_CAPABILITY = 'evaluation-agent' as const;
 
 /**
- * EvaluationAgent is a domain capability name. The implementation remains
- * deterministic and does not add an eighth generative workflow node.
+ * evaluation-agent 保留为既有能力标识；服务只做确定性判定，
+ * 不注册为第八个生成角色，也不接收模型执行端口。
  */
 /** 定义评测角色的数据结构与类型约束。 */
-export interface EvaluationAgent {
+export interface EvaluationService {
   /** 提供 decide 对应的decide操作。 */
   decide(
     run: FlywheelRun,
@@ -26,7 +26,7 @@ export interface EvaluationAgent {
 }
 
 /** 封装EvalRunnerDomain服务的对外操作与协作依赖。 */
-export class EvalRunnerDomainService implements EvaluationAgent {
+export class EvalRunnerDomainService implements EvaluationService {
   /** 提供 decide 对应的decide操作。 */
   decide(
     run: FlywheelRun,

@@ -5,7 +5,7 @@ SPDX-License-Identifier: MIT
 -->
 # 基础设施层
 
-本目录实现外部系统接入。业务流程规则位于 [Domain Workflow](../domain/workflow/Workflow.ts)，角色实现位于 [Domain Agents](../domain/agents/AgentRegistry.ts)。基础设施通过 Application Port 接收请求，不定义发布资格或角色业务输出。
+本目录实现外部系统接入。业务流程规则位于 [Domain Workflow](../domain/services/workflow/Workflow.ts)，角色实现位于 [Domain Agents](../domain/agents/AgentRegistry.ts)。基础设施通过 Application Port 接收请求，不定义发布资格或角色业务输出。
 
 | 目录 | 职责 |
 | --- | --- |

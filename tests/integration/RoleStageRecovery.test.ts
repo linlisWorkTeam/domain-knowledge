@@ -13,7 +13,7 @@ import { tmpdir } from 'node:os';
 import { createComposition } from '../../src/interfaces/runner/Composition.ts';
 import { RoleExecutionService } from '../../src/application/services/RoleExecution.ts';
 import { JsonSchemaAgentContractValidator } from '../../src/infrastructure/agentAdapters/contracts/JsonSchemaAgentContractValidator.ts';
-import { NODE_BY_AGENT } from '../../src/domain/workflow/AgentDefinitions.ts';
+import { NODE_BY_AGENT } from '../../src/domain/services/workflow/AgentDefinitions.ts';
 import { StageValidationIssue, validatedStage } from '../../src/domain/agents/StageValidation.ts';
 import type { ModelRequest, RoleInput, StageAttempt } from '../../src/domain/agents/AgentExecution.ts';
 import { roleExample } from '../helpers/RoleExample.ts';

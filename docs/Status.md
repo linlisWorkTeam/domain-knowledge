@@ -7,7 +7,7 @@ SPDX-License-Identifier: MIT
 
 目标版本为 `0.2.0`，环境限定 OpenCloudOS 9.4 x86_64，代表模块为 ohMyWorkPanel 的 `src/chat/markdownLite.ts`。当前已实现闭环及真实失败后的修复候选，最新结果见文末；真实模型验收 3 次启动额度已用完，均未通过，不能视为已验收 MVP，也未创建正式 GitHub Release。历史单角色 live 记录不能替代本次七角色验收。
 
-操作见[Linux 安装指南](LinuxInstall.md)，工作流约定见[Workflow](specs/domainFunction/workflow/Workflow.md)、[LangGraph](specs/infrastructure/langgraph/LangGraph.md)，七角色设计见[Agents](specs/domainFunction/agents/Agents.md)。历史交接见[HistoryEpitaph](HistoryEpitaph.md)。
+操作见[Linux 安装指南](LinuxInstall.md)，工作流约定见[Workflow](specs/domainFunction/services/workflow/Workflow.md)、[LangGraph](specs/infrastructure/langgraph/LangGraph.md)，七角色设计见[Agents](specs/domainFunction/agents/Agents.md)。历史交接见[HistoryEpitaph](HistoryEpitaph.md)。
 
 ## 实现与取舍
 
@@ -112,3 +112,9 @@ ECS 约 3.6 GiB 内存、无 swap。模型与模块评测共享一个进程槽�
 新交付目录为 `/root/projects/domain-knowledge-releases/v0.2.0-stage-repair-candidate/`，包含安装器、工具及许可证清单、SHA256SUMS、说明、受控/安装/浏览器证据和 Acceptance.json。修复前候选目录保持原样。首个实际浏览器检查因执行会话结束后服务已停止而连接失败，第二次因脚本未等待控制台初始化而操作过早；这些失败记录保留，验收脚本改为同一会话运行并等待就绪。截图审阅另发现窄屏隐藏列表状态文字，已修复并增加可见性断言，随后重建安装包和重做安装、实际浏览器验收。
 
 已安装实例 `/root/.local/share/domain-knowledge-mvp` 在验收后停止，释放 ECS 内存；原 ohMyWorkPanel 仍为固定提交且干净。尚缺修复后的真实模型完整闭环：本轮新增调用 0，历史 3/3 启动、0 次通过、0 次发布不变。进一步真实验收必须追加用户授权，不能删除账本、另换目录或重写原失败证据绕过限制。正式 Release 仍不发布。
+
+## 2026-09-10 开发规范与领域服务结构
+
+`agents` 与 `services` 在 Domain 平级；角色选择通过 AgentExecutionService 封装，association/evaluation 等服务持有各自确定性规则。Spec、目录契约和调用方已同步，详见 [领域边界](specs/totalRules/DomainDrivenDesign.md)。开发 subagent 并行规范见 [CodeTaste](specs/totalRules/CodeTaste.md#开发过程中的-subagent-并行协作)，NFR-013 的实际双任务宿主验收尚未执行。
+
+本次类型、Spec、架构与目录契约通过；完整回归 325 项中 324 通过，唯一站点资产摘要失配已修复并通过站点 12/12 定向复测。未重复执行完整回归，也未运行浏览器、外网模型或重新构建安装包；前述真实 MVP 验收结论保持原有边界。具体交接见 [本次墓志铭](epitaph/2026-09-10-1017-domain-services-subagents.md)。

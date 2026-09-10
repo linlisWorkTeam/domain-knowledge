@@ -12,7 +12,7 @@ import type {
   AgentPromptResolver, StartWorkflowCommand, WorkflowEngine, WorkflowExecutionView,
   WorkflowHandle, WorkflowObserver, WorkflowStageExecutor,
 } from '../../application/ports/ApplicationPorts.ts';
-import { DOMAIN_KNOWLEDGE_AGENT_DEFINITIONS } from '../../domain/workflow/AgentDefinitions.ts';
+import { DOMAIN_KNOWLEDGE_AGENT_DEFINITIONS } from '../../domain/services/workflow/AgentDefinitions.ts';
 import { buildInfrastructureGraph } from './Graph.ts';
 import type { InfrastructureState } from './State.ts';
 

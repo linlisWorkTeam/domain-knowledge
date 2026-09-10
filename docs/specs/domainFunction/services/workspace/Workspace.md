@@ -5,7 +5,7 @@ SPDX-License-Identifier: MIT
 -->
 # 角色材料工作空间设计
 
-代码位置：[src/domain/workspace/LocalAgentWorkspace.ts](../../../../src/domain/workspace/LocalAgentWorkspace.ts)、[src/infrastructure/agentAdapters/ModelExecution.ts](../../../../src/infrastructure/agentAdapters/ModelExecution.ts)。
+代码位置：[src/domain/services/workspace/LocalAgentWorkspace.ts](../../../../../src/domain/services/workspace/LocalAgentWorkspace.ts)、[src/infrastructure/agentAdapters/ModelExecution.ts](../../../../../src/infrastructure/agentAdapters/ModelExecution.ts)。
 
 
 LocalAgentWorkspace 根据 isolationKey、role、sourceRoot、可选 sourceCommit 和 readablePaths 生成 AgentWorkspaceView。它为一次角色执行准备可读文件，不是供开发者修改项目的 Git worktree。
@@ -15,4 +15,4 @@ LocalAgentWorkspace 根据 isolationKey、role、sourceRoot、可选 sourceCommi
 返回 workspaceRoot 和实际可读路径给 Adapter；DSH 工具再按授权范围读取。Code 的白名单不含参考源码和门禁测试，TestGen 的材料不含候选知识。该模块本身不提供操作系统级沙箱证明，进程隔离由模型 Adapter 处理。
 
 
-文档关系：[设计目录](../../README.md)负责代码与设计定位；[开发指南](../../../Development.md)说明修改和交付步骤。
+文档关系：[设计目录](../../../README.md)负责代码与设计定位；[开发指南](../../../../Development.md)说明修改和交付步骤。

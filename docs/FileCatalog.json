@@ -166,19 +166,19 @@
       "metadataLocation": "file-header"
     },
     {
-      "path": "docs/specs/domainFunction/association/Association.md",
+      "path": "docs/specs/domainFunction/services/association/Association.md",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "事实提取与目标关联的领域设计。",
       "metadataLocation": "file-header"
     },
     {
-      "path": "docs/specs/domainFunction/evaluation/Evaluation.md",
+      "path": "docs/specs/domainFunction/services/evaluation/Evaluation.md",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "确定性评测判定设计。",
       "metadataLocation": "file-header"
     },
     {
-      "path": "docs/specs/domainFunction/knowledge/Knowledge.md",
+      "path": "docs/specs/domainFunction/services/knowledge/Knowledge.md",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "知识实体与正文差异设计。",
       "metadataLocation": "file-header"
@@ -190,25 +190,25 @@
       "metadataLocation": "file-header"
     },
     {
-      "path": "docs/specs/domainFunction/migration/LegacyOkf.md",
+      "path": "docs/specs/domainFunction/services/migration/LegacyOkf.md",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "旧 OKF 候选迁移设计。",
       "metadataLocation": "file-header"
     },
     {
-      "path": "docs/specs/domainFunction/sourceScan/SourceScan.md",
+      "path": "docs/specs/domainFunction/services/sourceScan/SourceScan.md",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "候选文件发现设计。",
       "metadataLocation": "file-header"
     },
     {
-      "path": "docs/specs/domainFunction/workflow/Workflow.md",
+      "path": "docs/specs/domainFunction/services/workflow/Workflow.md",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "跨角色工作流设计。",
       "metadataLocation": "file-header"
     },
     {
-      "path": "docs/specs/domainFunction/workspace/Workspace.md",
+      "path": "docs/specs/domainFunction/services/workspace/Workspace.md",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "角色材料工作空间设计。",
       "metadataLocation": "file-header"
@@ -910,55 +910,55 @@
       "metadataLocation": "catalog"
     },
     {
-      "path": "src/domain/association/AssociationDomainService.ts",
+      "path": "src/domain/services/association/AssociationDomainService.ts",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "定义AssociationDomain服务的领域数据与确定性业务规则。",
       "metadataLocation": "file-header"
     },
     {
-      "path": "src/domain/evaluation/EvalRunnerDomainService.ts",
+      "path": "src/domain/services/evaluation/EvalRunnerDomainService.ts",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "定义EvalRunnerDomain服务的领域数据与确定性业务规则。",
       "metadataLocation": "file-header"
     },
     {
-      "path": "src/domain/knowledge/MarkdownDiff.ts",
+      "path": "src/domain/services/knowledge/MarkdownDiff.ts",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "定义Markdown差异的领域数据与确定性业务规则。",
       "metadataLocation": "file-header"
     },
     {
-      "path": "src/domain/migration/LegacyOkf.ts",
+      "path": "src/domain/services/migration/LegacyOkf.ts",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "读取旧 OKF 卡片并转换为知识候选，保留来源证据且重新执行质量与行为验收。",
       "metadataLocation": "file-header"
     },
     {
-      "path": "src/domain/sourceScan/SourceScan.ts",
+      "path": "src/domain/services/sourceScan/SourceScan.ts",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "发现待入库知识文件，执行目录范围校验、内容摘要去重和候选排序。",
       "metadataLocation": "file-header"
     },
     {
-      "path": "src/domain/workflow/AgentDefinitions.ts",
+      "path": "src/domain/services/workflow/AgentDefinitions.ts",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "定义业务工作流角色与节点的绑定，复用各角色拥有的职责及提示词。",
       "metadataLocation": "file-header"
     },
     {
-      "path": "src/domain/workflow/FlywheelDomainService.ts",
+      "path": "src/domain/services/workflow/FlywheelDomainService.ts",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "定义FlywheelDomain服务的领域数据与确定性业务规则。",
       "metadataLocation": "file-header"
     },
     {
-      "path": "src/domain/workflow/Workflow.ts",
+      "path": "src/domain/services/workflow/Workflow.ts",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "定义跨角色业务流程、文档任务拆分及质量判定后的流转规则。",
       "metadataLocation": "file-header"
     },
     {
-      "path": "src/domain/workspace/LocalAgentWorkspace.ts",
+      "path": "src/domain/services/workspace/LocalAgentWorkspace.ts",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "根据角色可读路径和固定 Git 提交构建只读工作空间，防止混入未授权源码。",
       "metadataLocation": "file-header"
@@ -1513,6 +1513,12 @@
       "path": "web/prototype/index.html",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "提供index页面的展示、交互或样式资源。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/domain/services/workflow/AgentExecutionService.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "提供领域角色执行入口，封装内部注册与角色选择。",
       "metadataLocation": "file-header"
     }
   ]

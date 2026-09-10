@@ -12,7 +12,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { createComposition, componentRoot } from '../../../interfaces/runner/Composition.ts';
 import { checkDocGenDocument, DOCGEN_SOURCE_COMMIT, DOCGEN_SOURCE_SHA256, prepareDocGenReference } from './examples/DocGenReference.ts';
-import { structuredMarkdownDiff } from '../../knowledge/MarkdownDiff.ts';
+import { structuredMarkdownDiff } from '../../services/knowledge/MarkdownDiff.ts';
 import { executeDevelopmentStage } from '../../../application/services/AgentDevelopmentObserver.ts';
 import type { AgentExampleInput } from '../../../application/services/AgentExample.ts';
 import { sha256, type ArtifactRef } from '../../Domain.ts';

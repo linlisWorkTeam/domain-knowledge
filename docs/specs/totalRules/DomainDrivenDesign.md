@@ -8,7 +8,27 @@ SPDX-License-Identifier: MIT
 代码位置：[src/domain/Domain.ts](../../../src/domain/Domain.ts)、[src/domain/agents/AgentExecution.ts](../../../src/domain/agents/AgentExecution.ts)、[src/application/services/RoleExecution.ts](../../../src/application/services/RoleExecution.ts)、[src/application/ports/ApplicationPorts.ts](../../../src/application/ports/ApplicationPorts.ts)。
 
 
-Domain 按领域功能组织：agents、workflow、evaluation、association、knowledge、sourceScan、workspace、migration 是同层级目录，不设置 services 分组或总导出文件。领域服务类放在所属功能目录；Domain.ts 保留共享实体与不变量。
+Domain 中 `agents` 与 `services` 平级：`agents/<role>` 保存领域内部角色实现；`services/<feature>` 按 association、evaluation、knowledge、workflow、sourceScan、workspace、migration 组织领域对外服务及所属规则。`Domain.ts` 保留共享实体与不变量。领域服务封装业务能力，不复制 Agent 的生成步骤，也不承担 Application 的持久化事务。
+
+## 目录与调用边界
+
+```text
+src/domain/
+├── Domain.ts                 # 共享实体与确定性不变量
+├── agents/                   # 七角色内部实现、契约、Prompt 与独立样例
+└── services/                 # 对 Application 提供的领域能力
+    ├── association/          # 事实提取策略和目标关联校验
+    ├── evaluation/           # 基于评测报告与策略生成 GateDecision
+    ├── workflow/             # 生命周期、跨角色规则、AgentExecutionService 入口
+    ├── knowledge/            # 正文差异规则
+    ├── sourceScan/           # 来源扫描能力（既有资源访问例外）
+    ├── workspace/            # 工作区能力（既有资源访问例外）
+    └── migration/            # 历史数据迁移能力（既有资源访问例外）
+```
+
+Application 的 RoleExecutionService 经 `services/workflow/AgentExecutionService.ts` 执行角色，由领域服务选择内部显式注册的 Agent。Application 保留材料加载、阶段日志、CAS 写入及幂等提交；领域执行服务只委派已有角色实现。外层不能直接调用角色 execute 或读取 AgentRegistry；共享类型、Schema、材料校验函数及受控 fixture 辅助函数仍可按职责导入，不额外建立全 Domain 总导出。
+
+AssociationDomainService 注入 ExternalExtractor / ReverseMapper，校验事实身份、目标引用和置信度；DocWorkerAgent 从固定源码提取可追溯事实供 DocGen 使用，当前两者没有互相调用。未来若用 Agent 实现提取策略，应接入既有服务边界，不复制关联校验。EvalRunnerDomainService 根据独立报告确定 PASS / ITERATE / STOPPED；TestGen、Check、Review 只生成候选或意见，不能替代该判定。`evaluation-agent` 是既有能力标识，接口命名为 EvaluationService，不加入七角色注册。
 
 ## 聚合与边界
 

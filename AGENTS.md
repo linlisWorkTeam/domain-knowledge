@@ -28,3 +28,8 @@ SPDX-License-Identifier: MIT
 - `docs/diagrams/Views4Plus1.md` 集中维护逻辑、开发、进程、物理和场景视图。
 
 - 命名规则：文件夹 lowerCamelCase，文件 PascalCase；角色为 `agents/codeAgent/CodeAgent.ts`。工具约定名称、外部兼容入口、时间戳交接和不可变历史路径的保留范围以 `docs/specs/totalRules/CodeTaste.md` 为准。
+
+## Subagent 开发协作
+
+- 开发过程中允许主 Agent 调度 subagent 并行完成独立任务；执行 [并行协作 Spec](docs/specs/totalRules/CodeTaste.md#开发过程中的-subagent-并行协作)，写入任务使用独立 worktree 并完成 READY。
+- 主 Agent 明确目标、基线、文件范围与验收，负责处理依赖、资源上限和最终集成；没有宿主调度能力时明确记录串行回退。

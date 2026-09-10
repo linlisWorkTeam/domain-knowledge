@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
-import { migrateLegacyOkf, parseLegacyCard } from '../../src/domain/migration/LegacyOkf.ts';
+import { migrateLegacyOkf, parseLegacyCard } from '../../src/domain/services/migration/LegacyOkf.ts';
 import { createTestComposition, GOOD_BODY } from '../helpers/Fixture.ts';
 
 test('legacy verified cards migrate as candidates requiring behavioral verification', async () => {

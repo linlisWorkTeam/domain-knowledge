@@ -23,7 +23,7 @@ SPDX-License-Identifier: MIT
 
 ## 角色提交链
 
-RoleExecutionService 为生产、Fixture 和 agent:run 共用生成键、命令工件、RoleResult 和结果信封。先验证可信材料，执行显式注册角色，写入标准化角色结果及待保存正文，将 pending/角色节点/生成键符号绑定为实际引用，校验结果信封后提交 checkpoint、结果与事件。失败和取消保留失败记录，不能提交半份成功结果。DocWorker/DocGen 阶段 journal 在模型调用前保存占额，调用后把原始模型输出、字段定位和 PASSED/REJECTED/FAILED 单独写入不可变 CAS；事件只携带引用、次数与截止时间。恢复复用已通过阶段，不能重置次数或截止时间。失败阶段原文不进入下游成功结果信封。
+RoleExecutionService 为生产、Fixture 和 agent:run 共用生成键、命令工件、RoleResult 和结果信封。先验证可信材料，经 Domain 的 `services/workflow/AgentExecutionService.ts` 执行显式注册角色，写入标准化角色结果及待保存正文，将 pending/角色节点/生成键符号绑定为实际引用，校验结果信封后提交 checkpoint、结果与事件。失败和取消保留失败记录，不能提交半份成功结果。DocWorker/DocGen 阶段 journal 在模型调用前保存占额，调用后把原始模型输出、字段定位和 PASSED/REJECTED/FAILED 单独写入不可变 CAS；事件只携带引用、次数与截止时间。恢复复用已通过阶段，不能重置次数或截止时间。失败阶段原文不进入下游成功结果信封。
 
 ProjectWorkflowStages 负责解析场景上下文、读取历史工件、构造各角色 Input，再调用公共角色服务。评测、候选保存和发布继续由应用服务协调，不能把 WorkflowStageInput 透传给 Domain 角色。
 

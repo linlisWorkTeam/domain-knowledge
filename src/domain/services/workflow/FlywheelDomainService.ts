@@ -5,7 +5,7 @@
  */
 import {
   createRun, transitionRun, type FlywheelRun, type RunState,
-} from '../Domain.ts';
+} from '../../Domain.ts';
 
 /** 对外提供能力集合，作为调用方使用的统一约定。 */
 export const FLYWHEEL_GENERATION_CAPABILITIES = [

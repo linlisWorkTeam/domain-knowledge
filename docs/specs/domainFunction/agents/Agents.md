@@ -8,6 +8,8 @@ SPDX-License-Identifier: MIT
 代码位置：[src/domain/agents/AgentRegistry.ts](../../../../src/domain/agents/AgentRegistry.ts)、[src/domain/agents/AgentExecution.ts](../../../../src/domain/agents/AgentExecution.ts)、[src/domain/agents/AgentContracts.ts](../../../../src/domain/agents/AgentContracts.ts)。
 
 
+领域外调用角色统一经过 `src/domain/services/workflow/AgentExecutionService.ts`；本目录拥有角色内部实现和共享契约。服务负责选择已注册角色，角色负责生成步骤，Application 负责材料与持久化。association / evaluation 的确定性规则归各自服务，详见 [领域边界](../../totalRules/DomainDrivenDesign.md)。开发时的 subagent 委派遵循 [并行协作规则](../../totalRules/CodeTaste.md#开发过程中的-subagent-并行协作)。
+
 ## 共同协议
 
 每个 XxxAgent 目录有入口、Contract、Prompt、测试和显式样例。`execute(input, context)` 的 input 使用角色专属 Payload 与已加载材料；context 注入模型 Port、promptAddon 与取消信号。入口依次检查取消和材料、构建 Prompt / Schema、按角色阶段调用模型、每阶段后再次检查取消并校验输出，最终返回 output / payload / artifacts。格式重试由 Adapter 负责；DocWorker/DocGen 的可定位语义错误由阶段执行器最多反馈修正一次，权限、材料、传输错误不自动重试。

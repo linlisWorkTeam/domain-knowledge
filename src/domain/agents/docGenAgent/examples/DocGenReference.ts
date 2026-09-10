@@ -60,7 +60,7 @@ export async function prepareDocGenReference(repositoryRoot: string, outputRoot:
     // 当前测试只改了模块路径；还原为历史导入后校验原摘要，并在固定源码副本中执行。
     const referenceTest = Buffer.from(readFileSync(join(repositoryRoot, 'tests/unit/MarkdownDiff.test.ts'), 'utf8')
       .replace(/^\/\*\*\n \* Copyright \(c\) 2026 linlisWorkTeam[\s\S]*?\*\/\n/, '')
-      .replace('../../src/domain/knowledge/MarkdownDiff.ts', '../../src/domain/services/markdown-diff.ts'));
+      .replace('../../src/domain/services/knowledge/MarkdownDiff.ts', '../../src/domain/services/markdown-diff.ts'));
     assert.equal(sha256(referenceTest), REFERENCE_TEST_SHA256, 'DOCGEN_REFERENCE_TEST_CHANGED');
     mkdirSync(join(directory, 'tests/unit'), { recursive: true });
     writeFileSync(join(directory, 'tests/unit/MarkdownDiff.test.ts'), referenceTest);
