@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：协调Query服务用例及其依赖的领域规则与端口。
  */
+import { groupKnowledgeCards } from '../../domain/services/knowledge/KnowledgeCards.ts';
 import type { KnowledgeVersion } from '../../domain/Domain.ts';
 import type { ArtifactStore, FlywheelRepository } from '../ports/ApplicationPorts.ts';
 
@@ -55,6 +56,28 @@ export class KnowledgeQueryService {
   /** 提供 latest版本标识 对应的latest版本标识操作。 */
   latestVersionId(moduleId: string): string | null {
     return this.repository.latestKnowledgeVersion(moduleId)?.versionId ?? null;
+  }
+
+  /** 卡片目录只读取 SQLite 元数据；正文通过既有版本详情按需加载。 */
+  cards(input: { query?: string; statuses?: string[]; versionId?: string } = {}): Record<string, unknown>[] {
+    const cards = groupKnowledgeCards(this.repository.listKnowledgeVersions([
+      'CANDIDATE', 'VERIFIED', 'LOW_CONFIDENCE', 'SUPERSEDED',
+    ]));
+    const terms = [...new Set(tokenize(input.query ?? ''))];
+    return cards.flatMap((card) => {
+      if (input.versionId && !card.versions.some((entry) => entry.versionId === input.versionId)) return [];
+      const version = card.current;
+      if (input.statuses?.length && !input.statuses.includes(version.status)) return [];
+      const summary = [version.moduleId, version.title, version.description, ...version.tags].join(' ').toLowerCase();
+      const matchedTerms = terms.filter((term) => summary.includes(term));
+      if (terms.length && !matchedTerms.length) return [];
+      return [{ ...version, cardId: card.cardId, identitySource: card.identitySource,
+        versionCount: card.versions.length,
+        history: card.versions.map((entry) => ({ versionId: entry.versionId, title: entry.title,
+          status: entry.status, createdAt: entry.createdAt })),
+        matchedTerms, matchReason: terms.length ? 'SUMMARY_MATCH' : 'CURRENT_CARD',
+      }];
+    });
   }
 
   /** 检索请求。 */

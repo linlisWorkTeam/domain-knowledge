@@ -43,6 +43,7 @@ Available 是已接线路由；Planned 路由不作为当前能力。Available /
 | `GET /api/v1/activity` | Available | 跨 Run 审计活动列表，支持 type、runId、severity、时间和分页过滤。 |
 | `GET /api/v1/activity/stream` | Available | 跨 Run SSE 活动流，支持断线续传。 |
 | `GET /api/v1/knowledge/health?window=<window>` | Available | 返回有明确分子、分母、样本窗口和规则版本的 freshness、coverage、quality，以及仅在三项均可用时计算的 0–100 总分；不得输出模型臆测分数。 |
+| `GET /api/v1/cards` | Available | `contractVersion=1.0`；当前卡片目录，支持 `q/status/versionId/limit/cursor`，`versionId` 可定位某历史版本所属卡片。返回稳定 `cardId`、当前 `versionId`、`versionCount/history`、`identitySource`、`matchedTerms/matchReason`。仅检索摘要元数据，不读取正文；状态筛选作用于当前版本。 |
 | `GET /api/v1/knowledge` | Available | 治理知识目录与简单检索；统一支持 `q`、`status`、`category`、`limit`、`cursor`，未给 `status` 时返回 `CANDIDATE,VERIFIED,LOW_CONFIDENCE,SUPERSEDED`。面向知识消费者的调用必须显式使用 `status=VERIFIED`；该路由已取代 `/api/v1/query`。 |
 | `GET /api/v1/knowledge/:versionId` | Available | 正文、状态、quality 和 provenance 详情。 |
 | `POST /api/v1/knowledge/candidates` | Available | 创建候选但不表示发布；已由旧 `/api/v1/ingest` 迁移。 |

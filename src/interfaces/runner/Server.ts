@@ -727,6 +727,16 @@ export function createKnowledgeServer(input: {
           value ?? errorBody('KNOWLEDGE_VERSION_NOT_FOUND', 'Resource not found.', currentRequestId));
         return;
       }
+      // v1 卡片读取契约；旧版本检索与正文入口保持可审计。
+      if (request.method === 'GET' && url.pathname === '/api/v1/cards') {
+        const cards = composition.apps.knowledgeSearch.cards({
+          versionId: url.searchParams.get('versionId') ?? undefined,
+          query: url.searchParams.get('q') ?? '',
+          statuses: (url.searchParams.get('status') ?? '').split(',').filter(Boolean),
+        });
+        send(response, 200, { ...page(cards, url), total: cards.length, contractVersion: '1.0' });
+        return;
+      }
       // GET /api/v1/knowledge：读取知识条目、正文和血缘。
       if (request.method === 'GET' && url.pathname === '/api/v1/knowledge') {
         const statuses = (url.searchParams.get('status') ?? '').split(',').filter(Boolean);

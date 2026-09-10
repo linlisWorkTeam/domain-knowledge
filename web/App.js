@@ -613,12 +613,12 @@ function renderKnowledge(items = state.knowledge) {
   const modules = [...new Set(state.knowledge.map((item) => item.moduleId))].slice(0, 12)
   const visible = state.knowledgeModule ? items.filter((item) => item.moduleId === state.knowledgeModule) : items
   content.innerHTML = `
-    <section class="reference-knowledge-tools"><label>⌕　<input id="knowledge-search" type="search" value="${escapeHtml(state.knowledgeQuery)}" placeholder="搜索概念、模块或正文…"></label><kbd>⌘ K</kbd><select id="knowledge-status" aria-label="知识状态"><option value="">全部状态</option>${['VERIFIED', 'CANDIDATE', 'LOW_CONFIDENCE', 'SUPERSEDED'].map((value) => `<option value="${value}" ${state.knowledgeStatus === value ? 'selected' : ''}>${displayLabel(value)}</option>`).join('')}</select></section>
+    <section class="reference-knowledge-tools"><label>⌕　<input id="knowledge-search" type="search" value="${escapeHtml(state.knowledgeQuery)}" placeholder="搜索名称、用途或关键词…"></label><kbd>⌘ K</kbd><select id="knowledge-status" aria-label="知识状态"><option value="">全部状态</option>${['VERIFIED', 'CANDIDATE', 'LOW_CONFIDENCE', 'SUPERSEDED'].map((value) => `<option value="${value}" ${state.knowledgeStatus === value ? 'selected' : ''}>${displayLabel(value)}</option>`).join('')}</select></section>
     <div class="reference-knowledge-grid"><aside class="reference-domains"><header><h3>领域</h3><span id="knowledge-count">${visible.length}</span></header><button class="${state.knowledgeModule ? '' : 'active'}" data-knowledge-module="">全部知识 <b>${items.length}</b></button>${modules.map((moduleId) => `<button class="${state.knowledgeModule === moduleId ? 'active' : ''}" data-knowledge-module="${escapeHtml(moduleId)}">${escapeHtml(moduleId)} <b>${items.filter((item) => item.moduleId === moduleId).length}</b></button>`).join('')}</aside><section class="reference-docs"><header><span>知识</span><span>来源</span><span>质量</span><span>更新时间</span></header><div id="knowledge-list">${knowledgeCards(visible)}</div></section></div>`
 }
 
 function knowledgeCards(items) {
-  return items.length ? items.map((item) => `<button class="reference-doc" data-version-id="${escapeHtml(item.versionId)}" data-module="${escapeHtml(item.moduleId)}"><span><em class="${item.status === 'VERIFIED' ? 'verified' : ''}">${escapeHtml(displayLabel(item.status))}</em><b>${escapeHtml(item.title || item.moduleId)}</b><small>${escapeHtml(item.description || item.moduleId)}</small></span><span>${escapeHtml(item.provenance?.length ?? 0)} 来源</span><strong class="${item.status === 'LOW_CONFIDENCE' ? 'risk' : ''}">${escapeHtml(item.qualityScore)}</strong><time>${escapeHtml(relativeTime(item.createdAt))}</time></button>`).join('') : emptyState('没有知识版本', '当前筛选条件下没有可以展示的知识。')
+  return items.length ? items.map((item) => `<button class="reference-doc" data-version-id="${escapeHtml(item.versionId)}" data-module="${escapeHtml(item.moduleId)}"><span><em class="${item.status === 'VERIFIED' ? 'verified' : ''}">${escapeHtml(displayLabel(item.status))}</em><b>${escapeHtml(item.title || item.moduleId)}</b><small>${escapeHtml(item.description || item.moduleId)}${item.matchedTerms?.length ? ` · 命中：${escapeHtml(item.matchedTerms.join('、'))}` : ''}</small></span><span>${escapeHtml(item.provenance?.length ?? 0)} 来源 · ${escapeHtml(item.versionCount ?? 1)} 版本</span><strong class="${item.status === 'LOW_CONFIDENCE' ? 'risk' : ''}">${escapeHtml(item.qualityScore)}</strong><time>${escapeHtml(relativeTime(item.createdAt))}</time></button>`).join('') : emptyState('没有知识版本', '当前筛选条件下没有可以展示的知识。')
 }
 
 function applyKnowledgeModule(moduleId) {
@@ -639,7 +639,7 @@ async function refreshKnowledgeList() {
   const params = new URLSearchParams()
   if (state.knowledgeQuery) params.set('q', state.knowledgeQuery)
   if (state.knowledgeStatus) params.set('status', state.knowledgeStatus)
-  const result = await request(`/api/v1/knowledge${params.size ? `?${params}` : ''}`)
+  const result = await request(`/api/v1/cards${params.size ? `?${params}` : ''}`)
   const items = collection(result, 'knowledge')
   const list = document.querySelector('#knowledge-list')
   const focusedVersionId = document.activeElement?.dataset?.versionId
@@ -655,13 +655,15 @@ async function refreshKnowledgeList() {
 
 async function openKnowledge(versionId, returnFocus) {
   const encoded = encodeURIComponent(versionId)
-  const [item, lineageResult] = await Promise.all([
+  const [item, lineageResult, cardResult] = await Promise.all([
     request(`/api/v1/knowledge/${encoded}`),
     request(`/api/v1/knowledge/${encoded}/lineage`).catch((error) => ({ error })),
+    request(`/api/v1/cards?versionId=${encoded}`).catch(() => ({ items: [] })),
   ])
   const lineage = lineageResult?.error ? null : lineageResult
   const lineageNodes = Array.isArray(lineage?.nodes) ? lineage.nodes.map((node) => node?.version ?? node) : []
-  const comparisonVersions = lineageNodes
+  const cardHistory = collection(cardResult, 'cards')[0]?.history ?? []
+  const comparisonVersions = [...cardHistory, ...lineageNodes]
     .filter((node) => node?.versionId && node.versionId !== item.versionId)
     .filter((node, index, all) => all.findIndex((entry) => entry.versionId === node.versionId) === index)
   const defaultAgainst = item.parentVersionId && comparisonVersions.some((node) => node.versionId === item.parentVersionId)
@@ -685,7 +687,7 @@ async function openKnowledge(versionId, returnFocus) {
       <article class="knowledge-body">${rendered.html || '<p>暂无正文</p>'}</article>
       <details class="reader-source"><summary>查看 Markdown 原文</summary><pre>${escapeHtml(item.body)}</pre></details>
     </section>
-    <section class="drawer-section"><h3>版本血缘</h3>${lineage
+    <section class="drawer-section"><h3>版本血缘</h3>${comparisonVersions.length ? `<details><summary>历史版本 · ${comparisonVersions.length}</summary>${comparisonVersions.map((version) => `<button class="text-button" data-version-id="${escapeHtml(version.versionId)}">${escapeHtml(version.title || version.versionId)} · ${escapeHtml(displayLabel(version.status))}</button>`).join('')}</details>` : ''}${lineage
       ? `<p class="lead">${escapeHtml(relationCounts || `${lineageNodes.length} 个关联版本`)}</p>${lineageRelationList(lineage)}${comparisonVersions.length ? `<form id="knowledge-diff-form" data-version="${escapeHtml(item.versionId)}"><label>对比版本<select name="against">${comparisonVersions.map((node) => `<option value="${escapeHtml(node.versionId)}" ${node.versionId === defaultAgainst ? 'selected' : ''}>${escapeHtml(shortId(node.versionId, 28))}${node.status ? ` · ${escapeHtml(displayLabel(node.status))}` : ''}</option>`).join('')}</select></label><button class="secondary-button" type="submit">比较版本</button></form><div id="knowledge-diff-result"></div>` : emptyState('暂无可比较版本', '当前血缘中只有这个知识版本。')}`
       : partialNotice(userFacingError(lineageResult.error, '版本血缘暂不可用。'))}</section>
     <section class="drawer-section feedback-section"><h3>使用反馈</h3><p>反馈会进入后续治理流程，但不会直接修改知识或门禁判定。</p>
@@ -752,7 +754,7 @@ function graphStatus(status) {
   if (['COMMITTED', 'COMPLETED'].includes(status)) return 'complete'
   if (status === 'RUNNING') return 'running'
   if (status === 'FAILED') return 'failed'
-  return 'idle'
+  return status === 'PENDING' ? 'idle' : 'unknown'
 }
 
 function graphEdge(from, to, nodeStates) {
@@ -775,7 +777,7 @@ async function loadGraph(runId) {
   const encoded = encodeURIComponent(runId)
   const [snapshot, nodePayload, workflowStatus, eventPayload] = await Promise.all([
     request(`/api/v1/runs/${encoded}`), request(`/api/v1/runs/${encoded}/workflow-nodes`),
-    request(`/api/v1/runs/${encoded}/workflow-status`).catch(() => ({ status: 'PENDING', partial: true })),
+    request(`/api/v1/runs/${encoded}/workflow-status`).catch(() => ({ executionStatus: 'UNKNOWN', partial: true })),
     request(`/api/v1/runs/${encoded}/events?after=0`),
   ])
   const nodes = collection(nodePayload, 'nodes').length ? collection(nodePayload, 'nodes') : (snapshot.workflowNodes ?? [])
@@ -786,9 +788,9 @@ async function loadGraph(runId) {
   if (!stage || state.page !== 'graph' || state.graphRunId !== runId) return
   const definitions = state.agents.length ? state.agents : Object.keys(AGENT_LABELS).map((agentId) => ({ agentId }))
   const nodeStates = new Map(definitions.map((agent) => [agent.agentId, graphNodeState(agent.agentId, nodes)]))
-  const statusCounts = { complete: 0, running: 0, failed: 0, idle: 0 }
+  const statusCounts = { complete: 0, running: 0, failed: 0, idle: 0, unknown: 0 }
   for (const node of nodeStates.values()) statusCounts[graphStatus(node?.status)] += 1
-  stage.innerHTML = `<div class="reference-graph-canvas"><div class="workflow-graph" aria-label="只读 Agent 工作流图"><svg class="graph-connections" viewBox="0 0 900 540" preserveAspectRatio="none" aria-hidden="true"><defs><marker id="graph-arrow-idle" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z"></path></marker><marker id="graph-arrow-running" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z"></path></marker><marker id="graph-arrow-complete" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z"></path></marker></defs>${GRAPH_EDGES.map(([from, to]) => graphEdge(from, to, nodeStates)).join('')}</svg>${definitions.map((agent) => { const node = nodeStates.get(agent.agentId); const status = node?.status ?? 'PENDING'; return `<button class="graph-node node-${escapeHtml(agent.agentId)} ${graphStatus(status)}" data-graph-agent="${escapeHtml(agent.agentId)}"><span class="graph-node-icon" aria-hidden="true">${['COMMITTED', 'COMPLETED'].includes(status) ? '✓' : status === 'FAILED' ? '!' : status === 'RUNNING' ? '●' : '○'}</span><b>${escapeHtml(AGENT_LABELS[agent.agentId] ?? agent.name ?? agent.agentId)}</b><small>${escapeHtml(displayLabel(status))}${node ? ` · 第 ${(node.iteration ?? 0) + 1} 轮 · 第 ${node.attempt ?? (node.retryCount ?? 0) + 1} 次尝试` : ''}</small></button>` }).join('')}</div><div class="graph-status-legend"><span><i class="running"></i>运行中 ${statusCounts.running}</span><span><i class="complete"></i>已完成 ${statusCounts.complete}</span><span><i class="failed"></i>失败 ${statusCounts.failed}</span><span><i></i>未开始 ${statusCounts.idle}</span></div></div><aside class="reference-node-detail"><header><em>执行记录</em><b>${nodes.length}</b></header><h3>${escapeHtml(snapshot.run?.moduleId ?? runId)}</h3><p>业务状态 ${escapeHtml(displayLabel(snapshot.run?.state))}<br>工作流 ${escapeHtml(displayLabel(workflowStatus.status ?? workflowStatus.workflowStatus ?? 'PENDING'))}</p><small>执行情况</small><div><span>运行中</span><b>${statusCounts.running}</b></div><div><span>已完成</span><b>${statusCounts.complete}</b></div><div><span>失败</span><b>${statusCounts.failed}</b></div><div><span>未开始</span><b>${statusCounts.idle}</b></div><button class="wide" data-page-link="evaluations">查看评测证据 →</button></aside>`
+  stage.innerHTML = `<div class="reference-graph-canvas"><div class="workflow-graph" aria-label="只读 Agent 工作流图"><svg class="graph-connections" viewBox="0 0 900 540" preserveAspectRatio="none" aria-hidden="true"><defs><marker id="graph-arrow-idle" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z"></path></marker><marker id="graph-arrow-running" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z"></path></marker><marker id="graph-arrow-complete" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z"></path></marker></defs>${GRAPH_EDGES.map(([from, to]) => graphEdge(from, to, nodeStates)).join('')}</svg>${definitions.map((agent) => { const node = nodeStates.get(agent.agentId); const status = node?.status ?? 'UNKNOWN'; return `<button class="graph-node node-${escapeHtml(agent.agentId)} ${graphStatus(status)}" data-graph-agent="${escapeHtml(agent.agentId)}"><span class="graph-node-icon" aria-hidden="true">${['COMMITTED', 'COMPLETED'].includes(status) ? '✓' : status === 'FAILED' ? '!' : status === 'RUNNING' ? '●' : '○'}</span><b>${escapeHtml(AGENT_LABELS[agent.agentId] ?? agent.name ?? agent.agentId)}</b><small>${escapeHtml(displayLabel(status))}${node ? ` · 第 ${(node.iteration ?? 0) + 1} 轮 · 第 ${node.attempt ?? (node.retryCount ?? 0) + 1} 次尝试` : ''}</small></button>` }).join('')}</div><div class="graph-status-legend"><span><i class="running"></i>运行中 ${statusCounts.running}</span><span><i class="complete"></i>已完成 ${statusCounts.complete}</span><span><i class="failed"></i>失败 ${statusCounts.failed}</span><span><i></i>未开始 ${statusCounts.idle}</span><span><i></i>未知 ${statusCounts.unknown}</span></div></div><aside class="reference-node-detail"><header><em>执行记录</em><b>${nodes.length}</b></header><h3>${escapeHtml(snapshot.run?.moduleId ?? runId)}</h3><p>业务状态 ${escapeHtml(displayLabel(snapshot.run?.state))}<br>工作流 ${escapeHtml(displayLabel(workflowStatus.executionStatus ?? workflowStatus.status ?? workflowStatus.workflowStatus ?? 'UNKNOWN'))}</p><small>执行情况</small><div><span>运行中</span><b>${statusCounts.running}</b></div><div><span>已完成</span><b>${statusCounts.complete}</b></div><div><span>失败</span><b>${statusCounts.failed}</b></div><div><span>未开始</span><b>${statusCounts.idle}</b></div><div><span>未知</span><b>${statusCounts.unknown}</b></div><button class="wide" data-page-link="evaluations">查看评测证据 →</button></aside>`
 }
 
 function ensureGraphStream(runId, after) {
@@ -901,11 +903,11 @@ async function openEvaluation(evaluationId, returnFocus) {
 }
 
 async function downloadArtifact(path) {
-  if (!state.token || !String(path).startsWith('/api/v1/evaluations/')) {
+  if ((!state.token && !state.capabilities?.directEditing) || !/^\/api\/v1\/evaluations\/[^/]+\/artifacts\/[^/?#]+$/.test(String(path))) {
     showToast('请先进入治理模式。', 'warning')
     return
   }
-  const response = await fetch(path, { headers: { authorization: `Bearer ${state.token}` } })
+  const response = await fetch(path, { headers: state.token ? { authorization: `Bearer ${state.token}` } : {} })
   if (!response.ok) {
     let payload = null
     try { payload = await response.json() } catch {}
@@ -1758,7 +1760,7 @@ function showFatal(error) {
 async function boot() {
   const keys = ['status', 'capabilities', 'runs', 'knowledge', 'agents', 'actionItems', 'activities', 'components', 'knowledgeHealth']
   const results = await Promise.allSettled([
-    request('/api/v1/system/status'), request('/api/v1/system/capabilities'), request('/api/v1/runs'), request('/api/v1/knowledge'), request('/api/v1/agents'),
+    request('/api/v1/system/status'), request('/api/v1/system/capabilities'), request('/api/v1/runs'), request('/api/v1/cards'), request('/api/v1/agents'),
     request('/api/v1/action-items'), request('/api/v1/activity'), request('/api/v1/system/components'), request('/api/v1/knowledge/health'),
   ])
   results.forEach((result, index) => {

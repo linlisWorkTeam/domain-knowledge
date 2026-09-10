@@ -291,7 +291,7 @@ test('knowledge search and detail drawer are keyboard operable and restore focus
   await page.getByRole('combobox', { name: '知识状态' }).selectOption('');
   const searchResponse = page.waitForResponse((response) => {
     const url = new URL(response.url());
-    return url.pathname === '/api/v1/knowledge' && url.searchParams.get('q') === '浏览器验收';
+    return url.pathname === '/api/v1/cards' && url.searchParams.get('q') === '浏览器验收';
   });
   await search.fill('浏览器验收');
   await searchResponse;
@@ -302,7 +302,7 @@ test('knowledge search and detail drawer are keyboard operable and restore focus
   assert.ok(openedVersionId);
   await card.focus();
   await card.press('Enter');
-  const drawer = page.getByRole('dialog', { name: '浏览器验收知识' });
+  const drawer = page.getByRole('dialog', { name: '浏览器验收知识（修订）' });
   await expect(drawer).toBeVisible();
   await expect(page.getByRole('button', { name: '关闭详情' })).toBeFocused();
   await page.keyboard.press('Escape');
@@ -468,7 +468,10 @@ test('Knowledge Health 保持 0..100 总分与 0..1 比率的真实 API 口径',
 test('Knowledge lineage/diff 可反向进入版本、批次与评测事实', async ({ page }) => {
   await page.goto(baseUrl);
   await navigateTo(page, '知识');
-  await page.locator(`#knowledge-list [data-version-id="${firstVersionId}"]`).click();
+  await expect(page.locator(`#knowledge-list [data-version-id="${firstVersionId}"]`)).toHaveCount(0);
+  await page.locator(`#knowledge-list [data-version-id="${latestVersionId}"]`).click();
+  await page.getByText('历史版本 · 1', { exact: true }).click();
+  await page.getByRole('dialog').locator(`[data-version-id="${firstVersionId}"]`).click();
   let drawer = page.getByRole('dialog');
   await expect(drawer).toBeVisible();
   await expect(drawer.getByRole('heading', { name: '浏览器验收知识' })).toBeVisible();
@@ -847,4 +850,40 @@ test('操作中心分类筛选真实事项并允许恢复全部', async ({ page 
   await all.click();
   await expect(page.locator('.attention-row')).toHaveCount(count);
   await expect(all).toBeFocused();
+});
+
+test('workflow uses executionStatus and reports missing execution facts as unknown', async ({ page }) => {
+  await page.route('**/workflow-status', (route) => route.fulfill({ json: { executionStatus: 'COMPLETED' } }));
+  await page.goto(baseUrl);
+  await navigateTo(page, '工作流图');
+  await expect(page.locator('.reference-node-detail')).toContainText('工作流 已完成');
+  await page.route('**/workflow-status', (route) => route.fulfill({ status: 503, json: {} }));
+  await page.reload();
+  await navigateTo(page, '工作流图');
+  await expect(page.locator('.reference-node-detail')).toContainText('工作流 未知');
+});
+
+test('anonymous direct editing can download evidence without a Bearer token', async ({ page }) => {
+  await page.route('**/api/v1/system/capabilities', async (route) => {
+    const response = await route.fetch();
+    const data = await response.json();
+    await route.fulfill({ json: { ...data, directEditing: true, authentication: 'none' } });
+  });
+  const path = `/api/v1/evaluations/${lineageEvaluationId}/artifacts/anonymous-evidence`;
+  await page.route(`**/api/v1/evaluations/${lineageEvaluationId}/artifacts`, (route) => route.fulfill({
+    json: { items: [{ relation: 'EVIDENCE', artifactId: 'anonymous-evidence', downloadUrl: path }] },
+  }));
+  let requested = false;
+  await page.route(`**${path}`, (route) => {
+    expect(route.request().headers().authorization).toBeUndefined();
+    requested = true;
+    return route.fulfill({ contentType: 'text/plain', body: 'verified download bytes' });
+  });
+  await page.goto(baseUrl);
+  await navigateTo(page, '评测');
+  await page.locator(`[data-evaluation-id="${lineageEvaluationId}"]`).click();
+  const downloaded = page.waitForEvent('download');
+  await page.getByRole('button', { name: '下载', exact: true }).click();
+  await downloaded;
+  expect(requested).toBe(true);
 });
