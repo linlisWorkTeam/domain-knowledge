@@ -49,3 +49,7 @@ Check 输出机器可读取的比较结果及差异依据，供后续 Review 结
 对应 S2-06：按 IO-14 落实两份源码与比较规则的输入，按 IO-15 补齐比较结果及差异依据到 Review 的交接；比较规则及相似度算法待论文调研后确定。验收关注 findings 可追溯性、检查范围和只读边界；当前固定判据及统一证据位置不能视为完整归因或已确定的相似度算法。
 
 开发步骤与证据统一记录在 [Status](../../../../Status.md)，独立运行方法见 [AgentDevelopment](../../../../AgentDevelopment.md)。
+
+## 本轮实施约定（2026-09-10）
+
+IO-14 输入 sourceSnapshotRef、generatedCodeRef、comparisonRulesRef。输出 blocking、scope 和 findings（findingId、severity、criterionId、sourcePath、generatedPath、message）；每项依据的路径必须属于授权范围，判据引用配置的规则。原始源码通过受限 read_material 读取，生成文件通过工件正文提供。IO-15 保存结构化报告供 Review 读取。不预设相似度算法或数值阈值；规则由场景显式配置。

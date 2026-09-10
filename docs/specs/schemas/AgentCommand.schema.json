@@ -141,11 +141,11 @@
     },
     "checkPayload": {
       "type": "object",
-      "required": ["diffRef", "criteriaRef", "publicInterfaceRefs"],
+      "required": ["sourceSnapshotRef", "generatedCodeRef", "comparisonRulesRef"],
       "properties": {
-        "diffRef": {"$ref": "#/$defs/artifactRef"},
-        "criteriaRef": {"$ref": "#/$defs/artifactRef"},
-        "publicInterfaceRefs": {"$ref": "#/$defs/artifactRefArray"}
+        "sourceSnapshotRef": {"$ref": "#/$defs/artifactRef"},
+        "generatedCodeRef": {"$ref": "#/$defs/artifactRef"},
+        "comparisonRulesRef": {"$ref": "#/$defs/artifactRef"}
       },
       "additionalProperties": false
     },

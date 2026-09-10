@@ -626,7 +626,8 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
       );
       const diffRef = codeResult.payload['codeRef'] as ArtifactRef | undefined;
       if (!diffRef) throw new Error('AGENT_COMMAND_INPUT_MISSING: check.diffRef');
-      payload = { diffRef, criteriaRef: scenarioRef, publicInterfaceRefs };
+      const comparisonRulesRef = await this.flywheel.putArtifact(Buffer.from(JSON.stringify(scenario.comparisonRules ?? [])), 'application/json');
+      payload = { sourceSnapshotRef: snapshot.manifestRef, generatedCodeRef: diffRef, comparisonRulesRef };
     } else {
       const knowledgeRef = input.context[contextKey('candidateBodyRef', input.iteration)] as ArtifactRef | undefined;
       const evaluationReportRef = input.context[contextKey('evaluationEvidenceRef', input.iteration)] as ArtifactRef | undefined;

@@ -92,7 +92,7 @@ function validateAgentContracts(): [number, number] {
     command('doc-worker', { moduleId: 'example', sourceRefs: [refA], publicInterfaceRefs: [refB] }),
     command('test-gen', { moduleId: 'example', sourceSnapshotRef: refA, publicInterfaceRefs: [refB], languageId: 'cpp', testPolicyRef: refA, allowedTestPaths: ['tests/generated.cpp'] }),
     command('code', { knowledgeRef: refA, languageId: 'cpp', projectConfigurationRef: refB, allowedGeneratedPaths: ['src/out.cpp'] }),
-    command('check', { diffRef: refA, criteriaRef: refB, publicInterfaceRefs: [refA] }),
+    command('check', { sourceSnapshotRef: refA, generatedCodeRef: refB, comparisonRulesRef: refA }),
     command('review', { knowledgeRef: refA, evaluationReportRef: refB, criteriaRef: refA }),
   ];
   invariant(AGENT_IDS.every((agentId) => commands.some((fixture) => fixture.agentType === agentId)), 'Agent command fixtures must cover AGENT_IDS');
