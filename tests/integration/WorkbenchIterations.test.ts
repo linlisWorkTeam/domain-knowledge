@@ -4,6 +4,7 @@
  * 文件功能：验证跨轮次历史、无进展暂停及修订中的取消和恢复。
  */
 import test from 'node:test';
+import { sourceInput, sourceResult } from '../helpers/WorkbenchSourceFixture.ts';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -31,7 +32,7 @@ function fixture(target: number, stagnant = false) {
         }
         return { artifactRefs: [], summary: { modules: [{ interfaceComparison: { compatible: true } }] } };
       },
-      EVALUATE: async context => { calls++; context.account('call', { modelCalls: 1 }); return { artifactRefs: [], summary: { completedModules: 1, requestedModules: 1,
+      EVALUATE: async context => { if (context.task.input.parameters.operation === 'KNOWLEDGE_SOURCE_VERIFICATION') return sourceResult(context.task.input); calls++; context.account('call', { modelCalls: 1 }); return { artifactRefs: [], summary: { completedModules: 1, requestedModules: 1,
         modules: [{ interfaceCompatible: true, status: !stagnant && Number(context.task.input.parameters.round) >= target ? 'BEHAVIOR_PASSED' : 'BEHAVIOR_FAILED' }] } }; },
       ASSOCIATE: async context => { calls++; context.account('call', { modelCalls: 1 }); return { artifactRefs: [], summary: { relations: 0 } }; },
     });
@@ -44,6 +45,7 @@ function fixture(target: number, stagnant = false) {
       evaluation: { prepare: async codeId => { const code = stages.get(codeId); return input('EVALUATE', Number(code.input.parameters.round), code.input.cardVersionIds); },
         progress: async id => { const round = Number(stages.get(id).input.parameters.round); const failed = stagnant ? ['unchanged'] : Array.from({ length: Math.max(0, target - round) }, (_, i) => `case-${i}`); return { total: target, passed: target - failed.length, failed }; } },
       revision: { prepare: async id => { const task = stages.get(id); return input('FLYWHEEL', Number(task.input.parameters.round), task.input.cardVersionIds, 'KNOWLEDGE_REVISION'); } },
+      sourceVerification: { prepare: async id => sourceInput(stages.get(id)) },
       associations: { prepare: versions => input('ASSOCIATE', 0, versions) },
     });
     return { app, store, stageStore, stages, close: async () => { await app.shutdown(); await stages.shutdown(); store.close(); stageStore.close(); } };
@@ -58,7 +60,7 @@ test('automatic repair can exceed three rounds with behavior progress and preser
     assert.equal(done.iterations?.filter(round => round.revision).length, 5);
     assert.deepEqual(done.children.ASSOCIATE!.input.cardVersionIds, ['v6']);
     const detail = r.app.detail(value.pipelineId);
-    assert.equal(detail.tasks.length, 20); assert.equal(detail.usage.modelCalls, 20); assert.equal(f.calls(), 20);
+    assert.equal(detail.tasks.length, 21); assert.equal(detail.usage.modelCalls, 20); assert.equal(f.calls(), 20);
     assert.equal(new Set(done.iterations!.map(round => round.evaluation!.taskId)).size, 6);
     assert.equal((await r.app.start('s')).pipelineId, value.pipelineId); assert.equal(f.calls(), 20);
   } finally { await r.close(); rmSync(f.directory, { recursive: true, force: true }); }

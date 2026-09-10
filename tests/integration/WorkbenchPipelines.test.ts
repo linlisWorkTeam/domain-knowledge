@@ -4,6 +4,7 @@
  * 文件功能：验证持久化五阶段协调的幂等、取消、恢复及业务门禁。
  */
 import test from 'node:test';
+import { sourceInput, sourceResult } from '../helpers/WorkbenchSourceFixture.ts';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -29,8 +30,8 @@ test('pipeline preserves children and usage across failure, restart, cancellatio
         : stage === 'EVALUATE' ? { completedModules: 1, requestedModules: 1, modules: [{ status: behavior ? 'BEHAVIOR_PASSED' : 'BEHAVIOR_FAILED', interfaceCompatible: true }] } : { failed: 0 } };
     }])));
     const app = new WorkbenchPipelines({ materials: { get: () => null }, environment: async () => 'environment', store, stages, generation: { prepare: async () => input('GENERATE') }, index: { prepare: () => input('INDEX') },
-      reconstruction: { prepare: async (_snapshot, versions, options) => { assert.deepEqual(versions, ['card-v1']); assert.equal(options?.configurationDigest, 'config'); return input('FLYWHEEL'); } },
-      evaluation: { prepare: async () => input('EVALUATE') }, associations: { prepare: () => input('ASSOCIATE') } });
+      reconstruction: { prepare: async (_snapshot, versions, options) => { assert.deepEqual(versions, ['card-v1']); assert.equal(options?.configurationDigest, 'config'); return { ...input('FLYWHEEL'), cardVersionIds: versions }; } },
+      evaluation: { prepare: async id => ({ ...input('EVALUATE'), cardVersionIds: stages.get(id).input.cardVersionIds }) }, sourceVerification: { prepare: async id => sourceInput(stages.get(id)) }, associations: { prepare: () => input('ASSOCIATE') } });
     return { app, store, stages, stageStore, close: async () => { await app.shutdown(); await stages.shutdown(); store.close(); stageStore.close(); } };
   };
   let runtime = open();
@@ -88,11 +89,12 @@ test('dead coordinator owners pause without losing the frozen generation task', 
 test('successful one-click execution reaches all five stages and reuses task identities', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'pipeline-all-')), db = join(directory, 'workbench.sqlite');
   const store = new SqliteWorkbenchPipelines(db), stageStore = new SqliteStageTasks(db); const seen: WorkbenchStage[] = [];
-  const stages = new WorkbenchStages(stageStore, Object.fromEntries(WORKBENCH_STAGES.map((stage) => [stage, async () => {
+  const stages = new WorkbenchStages(stageStore, Object.fromEntries(WORKBENCH_STAGES.map((stage) => [stage, async (context: import('../../src/application/services/WorkbenchStages.ts').StageExecutionContext) => {
+    if (context.task.input.parameters.operation === 'KNOWLEDGE_SOURCE_VERIFICATION') return sourceResult(context.task.input);
     seen.push(stage); return { artifactRefs: [], summary: stage === 'GENERATE' ? { cards: [{ versionId: 'v1' }] } : stage === 'FLYWHEEL' ? { modules: [{ interfaceComparison: { compatible: true } }] }
       : stage === 'EVALUATE' ? { completedModules: 1, requestedModules: 1, modules: [{ interfaceCompatible: true, status: 'BEHAVIOR_PASSED' }] } : { failed: 0, relations: 0 } };
   }])));
-  const app = new WorkbenchPipelines({ materials: { get: () => null }, environment: async () => 'environment', store, stages, generation: { prepare: async () => input('GENERATE') }, reconstruction: { prepare: async () => input('FLYWHEEL') }, evaluation: { prepare: async () => input('EVALUATE') }, index: { prepare: () => input('INDEX') }, associations: { prepare: () => input('ASSOCIATE') } });
+  const app = new WorkbenchPipelines({ materials: { get: () => null }, environment: async () => 'environment', store, stages, generation: { prepare: async () => input('GENERATE') }, reconstruction: { prepare: async (_snapshot, versions) => ({ ...input('FLYWHEEL'), cardVersionIds: versions }) }, evaluation: { prepare: async id => ({ ...input('EVALUATE'), cardVersionIds: stages.get(id).input.cardVersionIds }) }, sourceVerification: { prepare: async id => sourceInput(stages.get(id)) }, index: { prepare: () => input('INDEX') }, associations: { prepare: () => input('ASSOCIATE') } });
   try {
     const first = await app.start('snapshot'); assert.equal((await app.wait(first.pipelineId)).status, 'SUCCEEDED');
     assert.deepEqual(seen, [...WORKBENCH_STAGES]); assert.equal(app.detail(first.pipelineId).publicationVerified, false);

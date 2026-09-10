@@ -22,6 +22,7 @@ for (const rejectSourceReview of [false, true]) test(`native stage rejects bad c
   writeFileSync(join(root, 'math.c'), '#include "math.h"\n/* REFERENCE_PRIVATE */\nint add(int a,int b){return a+b;}');
   git('add', '.'); git('commit', '-qm', 'Fixed reference');
   let composition = createComposition({ runtimeDir }); let testCalls = 0, codeCalls = 0, generatedRuns = 0, reviewCalls = 0, revisionCalls = 0, sourceReviewCalls = 0;
+  let interruptSourceSection = true; const sectionCalls = new Map<string, number>();
   let wrongCandidate = true, wrongCode = false, interrupt = true, reviewKeepsKnowledge = false;
   const install = () => {
     const deps = composition.apps.workbenchReconstruction.dependencies;
@@ -42,8 +43,13 @@ for (const rejectSourceReview of [false, true]) test(`native stage rejects bad c
         const sourceReport = JSON.parse(Buffer.from(await composition.artifacts.get(_command.payload.evaluationReportRef as any)).toString('utf8'));
         assert.equal(sourceReport.observedImplementation, 'PINNED_REFERENCE'); assert.equal(sourceReport.cases[0].observation.actual.sum, '7');
         const body = Buffer.from(await composition.artifacts.get(_command.payload.knowledgeRef as any)).toString('utf8');
-        usage('whole-source', 3);
-        return body.includes('The difference') ? { blocking: true, recommendation: 'ITERATE', correction: { correctionId: 'source-error', knowledgePath: 'knowledge/unit-add.md#Behavior', criterion: 'Pinned source adds the arguments.', risk: 'Incorrect operation.' }, unresolvedRisks: [] }
+        usage(`whole-source-${_command.commandId}`, 3);
+        const criteria = JSON.parse(Buffer.from(await composition.artifacts.get(_command.payload.criteriaRef as any)).toString('utf8'));
+        assert.equal(criteria.verifyPreamble, criteria.section === 'Behavior');
+        const sectionKey = `${_command.runId}:${criteria.section}`;
+        sectionCalls.set(sectionKey, (sectionCalls.get(sectionKey) ?? 0) + 1);
+        if (criteria.section === 'Limits' && interruptSourceSection) { interruptSourceSection = false; throw new Error('TEST_SOURCE_SECTION_INTERRUPTION'); }
+        return body.includes('The difference') && criteria.section === 'Behavior' ? { blocking: true, recommendation: 'ITERATE', correction: { correctionId: 'source-error', knowledgePath: 'knowledge/unit-add.md#Behavior', criterion: 'Pinned source adds the arguments.', risk: 'Incorrect operation.' }, unresolvedRisks: [] }
           : { blocking: false, recommendation: 'PASS', correction: null, unresolvedRisks: [] };
       }
       if (request.role === 'review' && request.prompt.includes('REVISION_SOURCE_REVIEW')) { sourceReviewCalls++; const sourceRef = _command.payload.evaluationReportRef as any; const sourceReport = JSON.parse(Buffer.from(await composition.artifacts.get(sourceRef)).toString('utf8')); assert.equal(sourceReport.observedImplementation, 'PINNED_REFERENCE'); assert.ok(composition.apps.workbenchStages.store.checkpoints(_command.runId).some(row => row.key.startsWith('revision-source-materials:')), 'source review inputs persist before invoking the model'); assert.equal(sourceReport.cases[0].observation.actual.sum, '7'); assert.doesNotMatch(request.prompt, /\"sum\":\"-1\"/); usage('source-review', 3); if (rejectSourceReview) return { blocking: true, recommendation: 'ITERATE', correction: null, unresolvedRisks: ['Candidate contradicts the fixed source.'] }; return { blocking: false, recommendation: 'PASS', correction: null, unresolvedRisks: [] }; }
@@ -89,7 +95,15 @@ for (const rejectSourceReview of [false, true]) test(`native stage rejects bad c
     assert.equal((await composition.apps.workbenchEvaluation.start(code.taskId)).taskId, evaluation.taskId);
     assert.equal((await composition.apps.workbenchEvaluation.revisionEvidence(done.taskId)).modules[0]?.nextAction, 'NO_BEHAVIOR_REVISION_REQUIRED');
     const sourceTask = await composition.apps.workbenchSourceVerification.start(done.taskId);
+    const sourceInterrupted = await composition.apps.workbenchStages.wait(sourceTask.taskId);
+    assert.equal(sourceInterrupted.status, 'FAILED');
+    assert.ok(composition.apps.workbenchStages.store.checkpoints(sourceTask.taskId).some(item => item.key.startsWith('source-section:')));
+    await composition.close(); composition = createComposition({ runtimeDir }); install();
+    composition.apps.workbenchStages.resume(sourceTask.taskId, sourceTask.inputDigest);
     const sourceDone = await composition.apps.workbenchStages.wait(sourceTask.taskId);
+    assert.equal(sectionCalls.get(`${sourceTask.taskId}:Behavior`), 1, 'finished chapters survive restart without a new model call');
+    assert.equal(sectionCalls.get(`${sourceTask.taskId}:Limits`), 2);
+    assert.equal(sourceDone.usage.modelCalls, sourceInterrupted.usage.modelCalls + 1);
     assert.equal(sourceDone.status, 'SUCCEEDED', sourceDone.reasonCode ?? '');
     await assert.rejects(composition.apps.workbenchSourceRevision.start(done.taskId), /SOURCE_REVISION_VERIFICATION_REQUIRED/);
     await assert.rejects(composition.apps.workbenchSourceRevision.start(sourceTask.taskId), /SOURCE_REVISION_NO_CORRECTION/);

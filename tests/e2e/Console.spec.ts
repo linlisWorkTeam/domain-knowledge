@@ -995,6 +995,7 @@ test('操作中心从固定 Git 版本分析仓库，显示模块和环境且窄
       else expect(request.prompt).toContain('return 1;');
       if (request.role === 'review') {
         const criteria = JSON.parse(Buffer.from(await instance.composition.artifacts.get(command.payload.criteriaRef as any)).toString('utf8'));
+        if (criteria.phase === 'FINAL_SOURCE_REVIEW' && criteria.section !== 'Behavior') return { blocking: false, recommendation: 'PASS', correction: null, unresolvedRisks: [] };
         if (criteria.phase === 'FINAL_SOURCE_REVIEW') return sourceCorrection
           ? { blocking: true, recommendation: 'ITERATE', correction: { correctionId: 'COR-0001', knowledgePath: `knowledge/${criteria.binding.moduleId}.md#Behavior`, criterion: 'Clarify the pinned return value for this source review.', risk: 'Ambiguous boundary.' }, unresolvedRisks: [] }
           : { blocking: true, recommendation: 'ITERATE', correction: null, unresolvedRisks: ['Whole-card source evidence needs clarification.'] };

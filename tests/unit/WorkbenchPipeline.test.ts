@@ -4,8 +4,9 @@
  * 文件功能：验证一键流程不能把部分成功或接口失败当作推进依据。
  */
 import test from 'node:test';
+import { sourceInput, sourceResult } from '../helpers/WorkbenchSourceFixture.ts';
 import assert from 'node:assert/strict';
-import { pipelineStageFailure, pipelineStagnant } from '../../src/domain/services/workbench/WorkbenchPipeline.ts';
+import { pipelineStageFailure, pipelineStagnant, pipelineSourceFailure, pipelineSourceStagnant } from '../../src/domain/services/workbench/WorkbenchPipeline.ts';
 import { createStageTask, type WorkbenchStage, type StageResult } from '../../src/domain/services/workbench/StageTask.ts';
 test('pipeline advancement requires successful artifacts and behavior, not just task completion', () => {
   const task = (stage: WorkbenchStage, summary: StageResult['summary']) => ({ ...createStageTask({ projectId: 'p', stage, sourceRevision: 'r', sourceDigest: 's', configurationDigest: 'c', cardVersionIds: [], parameters: {} }, {}, 'now'), status: 'SUCCEEDED' as const, result: { artifactRefs: [], summary } });
@@ -22,4 +23,23 @@ test('regression and recovery to an old best cannot manufacture new behavior pro
   assert.equal(pipelineStagnant(rounds([['a'], ['a', 'b'], ['a'], ['a', 'b']])), true);
   assert.equal(pipelineStagnant(rounds([['a', 'b', 'c', 'd'], ['a', 'b', 'c'], ['a', 'b'], ['a'], []])), false);
   assert.equal(pipelineStagnant(rounds([['a'], ['b'], ['c'], ['d']])), true);
+});
+
+test('source gate rejects missing versions and aggregate claims that contradict card findings', () => {
+  const evaluation = createStageTask({ projectId: 'p', stage: 'EVALUATE', sourceRevision: 'r', sourceDigest: 's', configurationDigest: 'c', cardVersionIds: ['v1', 'v2'], parameters: { snapshotId: 's' } }, {}, 'now');
+  const input = sourceInput(evaluation);
+  const task = { ...createStageTask(input, {}, 'now'), status: 'SUCCEEDED' as const, result: sourceResult(input) };
+  assert.equal(pipelineSourceFailure(task), null);
+  assert.equal(pipelineSourceFailure({ ...task, result: sourceResult(input, 'SOURCE_MISMATCH') }), 'PIPELINE_SOURCE_MISMATCH');
+  const wrong = sourceResult(input, 'UNRESOLVED'); wrong.summary.outcome = 'SOURCE_MATCHED';
+  assert.equal(pipelineSourceFailure({ ...task, result: wrong }), 'PIPELINE_SOURCE_RESULT_INVALID');
+  task.result.summary.cards = (task.result.summary.cards as unknown[]).slice(1) as never;
+  assert.equal(pipelineSourceFailure(task), 'PIPELINE_SOURCE_RESULT_INVALID');
+});
+test('source progress tracks newly repaired sections, not body hashes or a three-round total', () => {
+  const rounds = (paths: string[][]) => paths.map((sourceRepairs, i) => ({ number: i + 1, versionIds: [`changed-${i}`], sourceRepairs }));
+  assert.equal(pipelineSourceStagnant(rounds([['A'], ['B'], ['C'], ['D'], ['E'], ['F']])), false);
+  assert.equal(pipelineSourceStagnant(rounds([['A'], ['A'], ['A'], ['A']])), true);
+  const behavior = [[], [], [], ['regression']].map((failed, i) => ({ number: i + 1, versionIds: [`v${i}`], progress: { failed, passed: 1 - failed.length, total: 1 } }));
+  assert.equal(pipelineStagnant(behavior), false, 'completed behavior phases cannot consume the new regression retry allowance');
 });

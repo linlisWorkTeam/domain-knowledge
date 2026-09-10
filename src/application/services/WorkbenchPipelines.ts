@@ -3,20 +3,22 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：通过独立持久化协调记录串联现有五阶段用例。
  */
-import { PIPELINE_CONTRACT, createPipeline, pipelineStageFailure, pipelineRevisionFailure, pipelineStagnant, type WorkbenchPipeline, type PipelineIteration } from '../../domain/services/workbench/WorkbenchPipeline.ts';
-import { WORKBENCH_STAGES, createStageTask, type StageInput, type StageTask, type WorkbenchStage } from '../../domain/services/workbench/StageTask.ts';
+import { PIPELINE_CONTRACT, createPipeline, pipelineStageFailure, pipelineRevisionFailure, pipelineStagnant, pipelineSourceFailure, pipelineSourceRepairs, pipelineSourceStagnant, type WorkbenchPipeline, type PipelineIteration } from '../../domain/services/workbench/WorkbenchPipeline.ts';
+import { WORKBENCH_STAGES, canonicalJson, createStageTask, type StageInput, type StageTask, type WorkbenchStage } from '../../domain/services/workbench/StageTask.ts';
 import type { ExternalMaterialStore } from '../ports/ExternalMaterialPorts.ts';
 import type { WorkbenchPipelineStore } from '../ports/WorkbenchPipelinePorts.ts';
 import type { WorkbenchStages } from './WorkbenchStages.ts';
 import type { WorkbenchGeneration, GenerationScope } from './WorkbenchGeneration.ts';
 import type { WorkbenchReconstruction } from './WorkbenchReconstruction.ts';
 import type { WorkbenchKnowledgeRevision } from './WorkbenchKnowledgeRevision.ts';
+import type { WorkbenchSourceVerification } from './WorkbenchSourceVerification.ts';
+import type { WorkbenchSourceRevision } from './WorkbenchSourceRevision.ts';
 import type { WorkbenchEvaluation } from './WorkbenchEvaluation.ts';
 import type { KnowledgeIndexService } from './KnowledgeIndex.ts';
 import type { WorkbenchAssociations } from './WorkbenchAssociations.ts';
 export class WorkbenchPipelines {
   readonly dependencies: { materials: Pick<ExternalMaterialStore, 'get'>; environment(snapshotId: string, signal?: AbortSignal): Promise<string>; store: WorkbenchPipelineStore; stages: WorkbenchStages; generation: Pick<WorkbenchGeneration, 'prepare'>;
-    reconstruction: Pick<WorkbenchReconstruction, 'prepare'>; evaluation: Pick<WorkbenchEvaluation, 'prepare'> & Partial<Pick<WorkbenchEvaluation, 'progress'>>; revision?: Pick<WorkbenchKnowledgeRevision, 'prepare'>; index: Pick<KnowledgeIndexService, 'prepare'> & Partial<Pick<KnowledgeIndexService, 'currentVersions'>>; associations: Pick<WorkbenchAssociations, 'prepare'> };
+    reconstruction: Pick<WorkbenchReconstruction, 'prepare'>; evaluation: Pick<WorkbenchEvaluation, 'prepare'> & Partial<Pick<WorkbenchEvaluation, 'progress'>>; revision?: Pick<WorkbenchKnowledgeRevision, 'prepare'>; sourceVerification?: Pick<WorkbenchSourceVerification, 'prepare'>; sourceRevision?: Pick<WorkbenchSourceRevision, 'prepare'>; index: Pick<KnowledgeIndexService, 'prepare'> & Partial<Pick<KnowledgeIndexService, 'currentVersions'>>; associations: Pick<WorkbenchAssociations, 'prepare'> };
   private readonly pending = new Map<string, Promise<void>>();
   private readonly controllers = new Map<string, AbortController>();
   private readonly errors = new Map<string, unknown>();
@@ -26,7 +28,7 @@ export class WorkbenchPipelines {
   detail(id: string) {
     const pipeline = this.get(id);
     const references = [...WORKBENCH_STAGES.flatMap(stage => pipeline.children[stage] ? [pipeline.children[stage]!] : []),
-      ...(pipeline.iterations ?? []).flatMap(round => [round.reconstruction, round.evaluation, round.revision].filter((task): task is StageTask => Boolean(task)))];
+      ...(pipeline.iterations ?? []).flatMap(round => [round.reconstruction, round.evaluation, round.revision, round.sourceVerification].filter((task): task is StageTask => Boolean(task)))];
     const tasks = [...new Map(references.map(child => [child.taskId, this.dependencies.stages.store.get(child.taskId) ?? child])).values()];
     return { pipeline, tasks, checkpoints: Object.fromEntries(tasks.map((task) => [task.taskId, this.dependencies.stages.store.checkpoints(task.taskId)])), publicationVerified: false,
       usage: tasks.reduce((sum, task) => ({ modelCalls: sum.modelCalls + task.usage.modelCalls, tokens: sum.tokens + task.usage.tokens,
@@ -128,7 +130,7 @@ export class WorkbenchPipelines {
             const previous = value.iterations.at(-2);
             round.reconstruction = await freeze(await this.dependencies.reconstruction.prepare(snapshotId, round.versionIds, {
               configurationDigest: generation.input.configurationDigest, signal: controller.signal,
-              ...(previous?.evaluation ? { retryEvaluationTaskId: previous.evaluation.taskId } : {}) }));
+              ...(previous?.evaluation && previous.progress?.failed.length ? { retryEvaluationTaskId: previous.evaluation.taskId } : {}) }));
             value.children.FLYWHEEL = round.reconstruction; store.save(value, lease.leaseId);
           }
           const code = await execute(round.reconstruction); const codeReason = pipelineStageFailure(code);
@@ -139,13 +141,33 @@ export class WorkbenchPipelines {
           if (evaluated.status === 'SUCCEEDED' && this.dependencies.evaluation.progress && !round.progress) {
             round.progress = await this.dependencies.evaluation.progress(evaluated.taskId); store.save(value, lease.leaseId);
           }
-          if (!reason) { value.completed.push('EVALUATE'); store.save(value, lease.leaseId); break; }
-          if (reason !== 'PIPELINE_BEHAVIOR_FAILED' || !this.dependencies.revision) { stop(evaluated, reason); return; }
-          if (!round.progress) throw new Error('PIPELINE_PROGRESS_UNAVAILABLE');
-          if (pipelineStagnant(value.iterations)) { stop(evaluated, 'PIPELINE_NO_BEHAVIOR_PROGRESS'); return; }
-          if (!round.revision) { round.revision = await freeze(await this.dependencies.revision.prepare(evaluated.taskId)); store.save(value, lease.leaseId); }
+          let prepareRevision: () => Promise<StageInput>; let sourceRepair = false;
+          if (!reason) {
+            if (!this.dependencies.sourceVerification) throw new Error('PIPELINE_SOURCE_VERIFICATION_REQUIRED');
+            if (!round.sourceVerification) {
+              const sourceInput = await this.dependencies.sourceVerification.prepare(evaluated.taskId);
+              if (canonicalJson([...sourceInput.cardVersionIds].sort()) !== canonicalJson([...round.versionIds].sort())
+                || sourceInput.projectId !== evaluated.input.projectId || sourceInput.parameters.snapshotId !== evaluated.input.parameters.snapshotId
+                || sourceInput.parameters.evaluationTaskId !== evaluated.taskId || sourceInput.configurationDigest !== evaluated.input.configurationDigest
+                || sourceInput.sourceDigest !== evaluated.input.sourceDigest || sourceInput.sourceRevision !== evaluated.input.sourceRevision) throw new Error('PIPELINE_SOURCE_INPUT_CHANGED');
+              round.sourceVerification = await freeze(sourceInput); store.save(value, lease.leaseId);
+            }
+            const verified = await execute(round.sourceVerification); const sourceReason = pipelineSourceFailure(verified);
+            if (!sourceReason) { value.completed.push('EVALUATE'); store.save(value, lease.leaseId); break; }
+            if (sourceReason !== 'PIPELINE_SOURCE_MISMATCH') { stop(verified, sourceReason); return; }
+            if (pipelineSourceStagnant(value.iterations)) { stop(verified, 'PIPELINE_NO_SOURCE_PROGRESS'); return; }
+            if (!this.dependencies.sourceRevision) throw new Error('PIPELINE_SOURCE_REVISION_REQUIRED');
+            sourceRepair = true; prepareRevision = () => this.dependencies.sourceRevision!.prepare(verified.taskId);
+          } else {
+            if (reason !== 'PIPELINE_BEHAVIOR_FAILED' || !this.dependencies.revision) { stop(evaluated, reason); return; }
+            if (!round.progress) throw new Error('PIPELINE_PROGRESS_UNAVAILABLE');
+            if (pipelineStagnant(value.iterations)) { stop(evaluated, 'PIPELINE_NO_BEHAVIOR_PROGRESS'); return; }
+            prepareRevision = () => this.dependencies.revision!.prepare(evaluated.taskId);
+          }
+          if (!round.revision) { round.revision = await freeze(await prepareRevision()); store.save(value, lease.leaseId); }
           const revised = await execute(round.revision); const revisionReason = pipelineRevisionFailure(revised);
           if (revisionReason) { stop(revised, revisionReason); return; }
+          if (sourceRepair && !round.sourceRepairs) { round.sourceRepairs = pipelineSourceRepairs(revised); store.save(value, lease.leaseId); }
           const versions = revised.result!.summary.versionIds;
           if (!Array.isArray(versions) || versions.length !== round.versionIds.length || !versions.every(id => typeof id === 'string')) throw new Error('PIPELINE_REVISION_INPUT_INVALID');
           value.iterations.push({ number: round.number + 1, versionIds: versions as string[] }); store.save(value, lease.leaseId);

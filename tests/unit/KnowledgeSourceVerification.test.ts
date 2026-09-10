@@ -5,7 +5,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { sourceCardDecision, sourceVerificationOutcome, type SourceCardBinding } from '../../src/domain/services/knowledge/KnowledgeSourceVerification.ts';
+import { sourceCardDecision, sourceVerificationOutcome, sourceSectionDecision, sourceSectionsOutcome, type SourceCardBinding } from '../../src/domain/services/knowledge/KnowledgeSourceVerification.ts';
 const body = '# Parser\n## Behavior\nEnd is one past the closing quote.\n## Limits\nPinned source only.\n';
 const correction = { correctionId: 'COR-1', knowledgePath: 'knowledge/parser.md#Behavior', criterion: 'End is the closing quote index in the fixed source.', risk: 'Incorrect token boundary.' };
 test('source contradictions remain actionable without a generated behavior failure; unknown risks cannot become PASS', () => {
@@ -23,4 +23,12 @@ test('all frozen cards are required, including unchanged cards; stale and duplic
   assert.throws(() => sourceVerificationOutcome(expected, [passed[0]!, passed[0]!]), /SOURCE_VERIFICATION_BINDING_INVALID/);
   assert.throws(() => sourceVerificationOutcome(expected, [{ ...passed[0]!, bodyDigest: 'old body' }, passed[1]!]), /SOURCE_VERIFICATION_BINDING_INVALID/);
   assert.throws(() => sourceVerificationOutcome(expected, [{ ...passed[0]!, versionId: 'old version' }, passed[1]!]), /SOURCE_VERIFICATION_BINDING_INVALID/);
+});
+
+test('section-by-section checks require complete H2 coverage and prohibit a correction to another section', () => {
+  assert.equal(sourceSectionDecision('parser', body, 'Behavior', { recommendation: 'ITERATE', blocking: true, correction, unresolvedRisks: [] }).outcome, 'SOURCE_MISMATCH');
+  assert.throws(() => sourceSectionDecision('parser', body, 'Limits', { recommendation: 'ITERATE', blocking: true, correction, unresolvedRisks: [] }), /SOURCE_VERIFICATION_SECTION_INVALID/);
+  assert.throws(() => sourceSectionsOutcome(body, [{ section: 'Behavior', outcome: 'SOURCE_MATCHED' }]), /SOURCE_VERIFICATION_SECTION_INVALID/);
+  assert.equal(sourceSectionsOutcome(body, [{ section: 'Behavior', outcome: 'SOURCE_MATCHED' }, { section: 'Limits', outcome: 'SOURCE_MISMATCH' }]), 'SOURCE_MISMATCH');
+  assert.equal(sourceSectionsOutcome(body, [{ section: 'Behavior', outcome: 'SOURCE_MATCHED' }, { section: 'Limits', outcome: 'UNRESOLVED' }]), 'UNRESOLVED');
 });

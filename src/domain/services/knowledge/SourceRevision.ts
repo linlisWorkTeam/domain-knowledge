@@ -7,7 +7,7 @@ import { sha256, type ArtifactRef } from '../../Domain.ts';
 import type { AgentCommand, AgentResult } from '../../agents/AgentContracts.ts';
 import type { Output as ReviewOutput } from '../../agents/reviewAgent/ReviewAgentContract.ts';
 import { sourceCardDecision, type SourceCardResult } from './KnowledgeSourceVerification.ts';
-export const SOURCE_REVISION_CONTRACT = 'knowledge-source-revision-v1';
+export const SOURCE_REVISION_CONTRACT = 'knowledge-source-revision-v2';
 export function authorizeSourceCorrection(input: {
   sourceTaskId: string; card: SourceCardResult; body: string; raw: ReviewOutput; rawRef: ArtifactRef;
   result: AgentResult; command: AgentCommand;

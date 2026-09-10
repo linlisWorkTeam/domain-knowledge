@@ -6,7 +6,7 @@
 import type { Output as ReviewOutput } from '../../agents/reviewAgent/ReviewAgentContract.ts';
 import { markdownSections } from './KnowledgeSections.ts';
 import { knowledgeRevisionDecision } from './KnowledgeRevision.ts';
-export const SOURCE_VERIFICATION_CONTRACT = 'knowledge-source-verification-v1';
+export const SOURCE_VERIFICATION_CONTRACT = 'knowledge-source-verification-v2';
 export interface SourceCardBinding { cardId: string; versionId: string; moduleId: string; bodyDigest: string }
 export type SourceCardOutcome = 'SOURCE_MATCHED' | 'SOURCE_MISMATCH' | 'UNRESOLVED';
 export interface SourceCardResult extends SourceCardBinding { outcome: SourceCardOutcome }
@@ -32,4 +32,21 @@ export function sourceVerificationOutcome(expected: SourceCardBinding[], results
   }
   return results.some(card => card.outcome === 'UNRESOLVED') ? 'UNRESOLVED'
     : results.some(card => card.outcome === 'SOURCE_MISMATCH') ? 'SOURCE_MISMATCH' : 'SOURCE_MATCHED';
+}
+
+/** 分章执行仍需完整覆盖整卡；遗漏章节和跨章节意见不能成为来源通过。 */
+export function sourceSectionDecision(moduleId: string, body: string, heading: string, review: ReviewOutput) {
+  const headings = markdownSections(body).map(section => section.heading);
+  if (!headings.includes(heading)) throw new Error('SOURCE_VERIFICATION_SECTION_INVALID');
+  const decision = sourceCardDecision(moduleId, body, review);
+  if (decision.heading && decision.heading !== heading) throw new Error('SOURCE_VERIFICATION_SECTION_INVALID');
+  return decision;
+}
+export function sourceSectionsOutcome(body: string, results: Array<{ section: string; outcome: SourceCardOutcome }>): SourceCardOutcome {
+  const headings = markdownSections(body).map(section => section.heading);
+  if (!headings.length || new Set(headings).size !== headings.length || results.length !== headings.length
+    || new Set(results.map(result => result.section)).size !== headings.length
+    || results.some(result => !headings.includes(result.section) || !['SOURCE_MATCHED', 'SOURCE_MISMATCH', 'UNRESOLVED'].includes(result.outcome))) throw new Error('SOURCE_VERIFICATION_SECTION_INVALID');
+  return results.some(result => result.outcome === 'UNRESOLVED') ? 'UNRESOLVED'
+    : results.some(result => result.outcome === 'SOURCE_MISMATCH') ? 'SOURCE_MISMATCH' : 'SOURCE_MATCHED';
 }

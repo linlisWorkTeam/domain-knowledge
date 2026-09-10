@@ -7,13 +7,14 @@ import { sha256, type ArtifactRef } from '../../domain/Domain.ts';
 import { canonicalJson, type JsonValue, type StageInput } from '../../domain/services/workbench/StageTask.ts';
 import { markdownSections } from '../../domain/services/knowledge/KnowledgeSections.ts';
 import { sourceReviewObservations } from '../../domain/services/knowledge/KnowledgeRevision.ts';
-import { SOURCE_VERIFICATION_CONTRACT, sourceCardDecision, sourceVerificationOutcome, type SourceCardBinding, type SourceCardResult } from '../../domain/services/knowledge/KnowledgeSourceVerification.ts';
+import { SOURCE_VERIFICATION_CONTRACT, sourceSectionDecision, sourceSectionsOutcome, sourceVerificationOutcome, type SourceCardBinding, type SourceCardResult } from '../../domain/services/knowledge/KnowledgeSourceVerification.ts';
 import type { NativeBehaviorSuite } from '../../domain/services/evaluation/NativeBehaviorSuite.ts';
 import type { Output as ReviewOutput } from '../../domain/agents/reviewAgent/ReviewAgentContract.ts';
 import type { StageModelConfiguration } from '../ports/WorkbenchGenerationPorts.ts';
 import type { WorkbenchEvaluation } from './WorkbenchEvaluation.ts';
 import type { StageExecutionContext } from './WorkbenchStages.ts';
 const json = (value: unknown): JsonValue => JSON.parse(JSON.stringify(value));
+const uniqueRefs = (refs: ArtifactRef[]) => [...new Map(refs.map(ref => [ref.sha256, ref])).values()];
 export class WorkbenchSourceVerification {
   readonly evaluation: WorkbenchEvaluation;
   constructor(evaluation: WorkbenchEvaluation) { this.evaluation = evaluation; }
@@ -79,22 +80,36 @@ export class WorkbenchSourceVerification {
           suiteRef: moduleEvidence.suiteRef, oracleRef: moduleEvidence.oracleRef,
           ...sourceReviewObservations(suite, await this.load<Parameters<typeof sourceReviewObservations>[1]>(moduleEvidence.oracleRef), suite.cases.map(item => item.caseId)) };
         const reportRef = await artifacts.put(Buffer.from(JSON.stringify(report)), 'application/json');
-        const criteria = { schemaVersion: SOURCE_VERIFICATION_CONTRACT, phase: 'FINAL_SOURCE_REVIEW', binding,
-          allowedKnowledgePaths: headings.map(heading => `knowledge/${card.moduleId}.md#${heading}`),
-          instruction: '独立核对整张冻结卡片与固定源码的一致性，包括此前未修改的章节。参考观察明确标记PINNED_REFERENCE，只证明对应参考用例；不能推断所有可能输入都已验证。逐项核对边界、状态、接口及示例。与固定源码直接矛盾的事实必须指出，即使重建代码通过了行为测试。上游失败归因PASS不代表正文正确。发现明确错误时指向已有H2；缺少证据则保留风险。仅在全卡片无矛盾、无未知风险时PASS；这不是发布授权。' };
-        const criteriaRef = await artifacts.put(Buffer.from(JSON.stringify(criteria)), 'application/json');
-        const inputRefs = [card.bodyRef, referenceRef, reportRef, criteriaRef, moduleEvidence.suiteRef, moduleEvidence.oracleRef];
-        await context.step(`source-materials:${versionId}`, async () => ({ artifactRefs: inputRefs, summary: { versionId } }));
-        const review = await roles.execute(context, frozen, 'review', `final-source:${versionId}`, { moduleId: card.moduleId, sourcePaths: [], publicInterfacePaths: [], provenance: [card.bodyRef, referenceRef],
-          payload: { knowledgeRef: card.bodyRef, evaluationReportRef: reportRef, checkReportRef: referenceRef, criteriaRef },
-          materials: [{ ref: card.bodyRef, content: body }, { ref: referenceRef, content: reference }, { ref: reportRef, content: report }, { ref: criteriaRef, content: criteria }] });
-        const opinion = review.output as unknown as ReviewOutput;
-        const decision = sourceCardDecision(card.moduleId, body, opinion);
-        return { artifactRefs: [...inputRefs, review.resultRef, review.rawRef], summary: { ...binding, ...decision, criterion: opinion.correction?.criterion ?? null, referenceRef: json(referenceRef), referenceObservationsRef: json(reportRef), criteriaRef: json(criteriaRef), reviewResultRef: json(review.resultRef), reviewRef: json(review.rawRef) } };
+        const sections: Array<SourceCardResult & { section: string; unresolved: string[] } & Record<string, unknown>> = [];
+        const sectionRefs: ArtifactRef[] = [];
+        for (const [sectionIndex, heading] of headings.entries()) {
+          context.progress({ phase: 'source-section', versionId, heading, completed: sectionIndex, total: headings.length });
+          const sectionKey = sha256(heading).slice(0, 24);
+          const section = await context.step(`source-section:${versionId}:${sectionKey}`, async () => {
+            const criteria = { schemaVersion: SOURCE_VERIFICATION_CONTRACT, phase: 'FINAL_SOURCE_REVIEW', binding,
+              section: heading, verifyPreamble: sectionIndex === 0, allowedKnowledgePaths: [`knowledge/${card.moduleId}.md#${heading}`],
+              instruction: '本次只独立核对 section 指定的 H2 与固定源码的一致性。完整正文提供上下文，其他 H2 由独立调用复核，不属于本次纠正范围或未知风险。必须核对该节全部事实、边界和例子。verifyPreamble为true时也须核对标题及首个H2之前的文本；若该区域有无法在授权H2修正的矛盾，保留未解决风险，不能放行或修改其他区域。参考观察明确标记PINNED_REFERENCE，只证明对应参考用例；不能推断所有可能输入都已验证。逐项核对边界、状态、接口及示例。与固定源码直接矛盾的事实必须指出，即使重建代码通过了行为测试。上游失败归因PASS不代表正文正确。发现明确错误时指向已有H2；缺少证据则保留风险。仅在当前 H2 无矛盾、无未知风险时PASS；这不是发布授权。' };
+            const criteriaRef = await artifacts.put(Buffer.from(JSON.stringify(criteria)), 'application/json');
+            const inputRefs = [card.bodyRef, referenceRef, reportRef, criteriaRef, moduleEvidence.suiteRef, moduleEvidence.oracleRef];
+            await context.step(`source-materials:${versionId}:${sectionKey}`, async () => ({ artifactRefs: inputRefs, summary: { versionId, heading } }));
+            const review = await roles.execute(context, frozen, 'review', `final-source:${versionId}:${sectionKey}`, { moduleId: card.moduleId, sourcePaths: [], publicInterfacePaths: [], provenance: [card.bodyRef, referenceRef],
+              payload: { knowledgeRef: card.bodyRef, evaluationReportRef: reportRef, checkReportRef: referenceRef, criteriaRef },
+              materials: [{ ref: card.bodyRef, content: body }, { ref: referenceRef, content: reference }, { ref: reportRef, content: report }, { ref: criteriaRef, content: criteria }] });
+            const opinion = review.output as unknown as ReviewOutput;
+            const decision = sourceSectionDecision(card.moduleId, body, heading, opinion);
+            return { artifactRefs: [...inputRefs, review.resultRef, review.rawRef], summary: { ...binding, section: heading, ...decision, criterion: opinion.correction?.criterion ?? null, referenceRef: json(referenceRef), referenceObservationsRef: json(reportRef), criteriaRef: json(criteriaRef), reviewResultRef: json(review.resultRef), reviewRef: json(review.rawRef) } };
+          });
+          sections.push(section.summary as unknown as typeof sections[number]); sectionRefs.push(...section.artifactRefs);
+          context.progress({ phase: 'source-section', versionId, heading, completed: sectionIndex + 1, total: headings.length });
+        }
+        const primary = sections.find(section => section.outcome === 'SOURCE_MISMATCH') ?? sections.find(section => section.outcome === 'UNRESOLVED') ?? sections[0]!;
+        return { artifactRefs: uniqueRefs(sectionRefs), summary: { ...json(primary) as Record<string, JsonValue>,
+          outcome: sourceSectionsOutcome(body, sections), unresolved: [...new Set(sections.flatMap(section => section.unresolved))], sections: json(sections) } };
+
       });
       results.push(output.summary as unknown as SourceCardResult & Record<string, unknown>); refs.push(...output.artifactRefs);
     }
-    return { artifactRefs: refs, summary: { operation: 'KNOWLEDGE_SOURCE_VERIFICATION', evaluationTaskId: parent.taskId,
+    return { artifactRefs: uniqueRefs(refs), summary: { operation: 'KNOWLEDGE_SOURCE_VERIFICATION', evaluationTaskId: parent.taskId,
       snapshotId: project.snapshotId, versionIds: context.task.input.cardVersionIds, cards: json(results), outcome: sourceVerificationOutcome(expected, results), publicationVerified: false } };
   }
 }

@@ -306,3 +306,20 @@ flowchart LR
   SharedRevision --> Reindex[增量索引]
   Reindex --> Rebuild[新版本重建与再评测]
 ```
+
+一键 pipeline-v10 接通来源门禁：
+
+```mermaid
+flowchart LR
+  Code[冻结版本重建] --> Behavior[可信行为评测]
+  Behavior -->|失败| BehavioralRepair[行为归因与修订]
+  BehavioralRepair --> Code
+  Behavior -->|全部通过| Chapters[逐 H2 来源复核 完整覆盖全部卡片]
+  Chapters -->|明确矛盾| SourceRepair[来源意见驱动修订与增量索引]
+  SourceRepair --> Code
+  Chapters -->|未知或无有效进展| Pause[保存子任务与累计预算 暂停]
+  Chapters -->|全部匹配| Associate[知识关联]
+  Associate -.待实现.-> Publish[固定测试及独立发布事务]
+```
+
+来源章节检查点、来源修订与行为子任务统一纳入轮次历史；通过行为评测结束该连续失败阶段，来源进展另按新完成的章节复核计数。旧 v9 不跨版本恢复。
