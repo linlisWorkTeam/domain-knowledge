@@ -30,3 +30,15 @@ MVP 使用 `moduleSuite` 分支及 `module-cases-v1` 数据契约。每个案例
 
 
 文档关系：[设计目录](../../README.md)负责代码与设计定位；[开发指南](../../../Development.md)说明修改和交付步骤。
+
+## 原生工具链隔离边界
+
+现有ModuleCaseExecutor的captureIsolated已抽取到runtime/IsolatedCommand供TypeScript与C/C++共用，保持旧TS调用的参数及报告。原生调用额外要求独立cgroup v2，设置memory.max、memory.swap.max=0、pids.max和memory.oom.group；受信Node启动器先将自身加入组，再execve资源限制器和Bubblewrap，消除启动后迁入的fork竞态。输入源码只读挂载，构建输出独立可写；网络与PID命名空间隔离。退出、取消、超时、输出超限都清理整个资源组，确认没有进程后才返回。缺控制器/权限/工具时失败关闭，不修改宿主控制器配置或降级为宿主编译。
+
+NativeToolchain通过NativeLanguageToolchain端口支持C/C++源码文件的隔离编译/运行与Clang声明投影。只使用现有gcc、g++、clang、clang++；不执行仓库Makefile或自动下载依赖。构建返回原始报告，失败不执行。原始stdout不是可信用例数、相似度或发布门禁。C/C++候选测试协议、测试晋升/缓存、模型重建和阶段应用接线仍未实现。
+
+publicInterface输入明确入口和符号选择，可用astFilter限制类范围。Clang AST只保留函数类型/参数、公开字段/成员、typedef和枚举值，不输出函数体、注释、源码范围或私有成员；重载保留，重复声明合并。过滤器保留在native-interface-v1材料中，避免丢失类的选择上下文。这是声明投影，不宣称完整C++语义或AST结构相似度已实现；自动模块/依赖划分及构建配置解析仍待完成。
+
+原生任务先检查可用内存至少576MiB、磁盘至少32MiB。源码单文件1MiB、总8MiB；编译整组内存512MiB、进程32、墙钟30秒，运行128MiB、进程16、墙钟3秒。Clang AST输出最多8MiB，其余128KiB。文件大小、CPU、描述符及取消边界由共享执行器执行。参考与生成源码必须使用不同调用和独立临时目录；最终源码/失败证据由应用层存CAS，临时构建退出后清理。
+
+固定jsmn四种配置均已执行上游参考测试，TinyXML2已执行三个基本类型转换参考观察；记录位于workbench-progress/native-toolchain。这些不是模型Run或发布门禁，不据此把待验证候选测试晋升为可信测试。

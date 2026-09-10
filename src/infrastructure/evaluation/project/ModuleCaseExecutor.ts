@@ -13,7 +13,8 @@ import { isDeepStrictEqual } from 'node:util';
 import type { ArtifactStore, GeneratedProjectFile, ProjectCommandResult, ProjectEvaluation, ProjectSnapshot } from '../../../application/ports/ApplicationPorts.ts';
 import { assertModuleBehaviorSuite, type ModuleBehaviorSuite } from '../../../domain/agents/testGenAgent/ModuleBehaviorSuite.ts';
 import { modelProcessLane } from '../../agentAdapters/ModelProcessLane.ts';
-import { bundledLibraryEnvironment, bundledLibrarySandboxArgs } from '../../runtime/BundledLibraries.ts';
+import { bundledLibraryEnvironment } from '../../runtime/BundledLibraries.ts';
+import { captureIsolated, type IsolatedCommandResult as ProcessResult } from '../../runtime/IsolatedCommand.ts';
 
 interface ModuleEvaluationInput {
   label: string;
@@ -22,13 +23,9 @@ interface ModuleEvaluationInput {
   moduleSuite: ModuleBehaviorSuite;
   moduleContract?: { modulePath: string; exportName: string; signature: string };
 }
-interface ProcessResult {
-  exitCode: number | null; timedOut: boolean; outputLimitExceeded: boolean; durationMs: number;
-  stdout: string; stderr: string;
-}
+
 const hash = (value: string | Uint8Array) => createHash('sha256').update(value).digest('hex');
 const repetitions = 5;
-const maxOutputBytes = 131_072;
 async function fileDigest(path: string): Promise<string> {
   const value = createHash('sha256');
   for await (const chunk of createReadStream(path)) value.update(chunk);
@@ -70,59 +67,6 @@ function plain(value, depth = 0, ancestors = new Set()) {
 process.stdout.write(JSON.stringify({ value: plain(output) }));
 `;
 
-/** 每个案例独占一个 PID / 网络 / 文件系统命名空间，取消或输出超限均杀死整组子进程。 */
-async function captureIsolated(input: {
-  workspace: string; command: string[]; compilerRoot?: string; buildOutput?: string; timeoutMs: number; memoryBytes: number;
-}, signal?: AbortSignal): Promise<ProcessResult> {
-  if (signal?.aborted) throw new Error('PROJECT_EVALUATION_CANCELLED');
-  if (process.platform !== 'linux') throw new Error('PROJECT_ISOLATION_UNAVAILABLE: Linux namespaces required');
-  const mounts = ['/usr', '/lib', '/lib64'].filter(existsSync).flatMap((path) => ['--ro-bind', path, path]);
-  const args = [
-    `--as=${input.memoryBytes}`, '--cpu=15', '--nofile=96', '--fsize=1048576', '--',
-    process.env.WP_EVALUATION_BWRAP_COMMAND ?? 'bwrap',
-    '--unshare-all', '--die-with-parent', '--new-session', '--cap-drop', 'ALL',
-    ...mounts, '--proc', '/proc', '--dev', '/dev', '--tmpfs', '/tmp',
-    '--ro-bind', realpathSync(process.execPath), '/runtime-node',
-    '--ro-bind', input.workspace, '/workspace',
-    ...(input.buildOutput ? ['--bind', input.buildOutput, '/workspace/build'] : []),
-    ...(input.compilerRoot ? ['--ro-bind', input.compilerRoot, '/compiler'] : []),
-    '--clearenv', '--setenv', 'HOME', '/tmp', '--setenv', 'TMPDIR', '/tmp',
-    ...bundledLibrarySandboxArgs(),
-    '--setenv', 'GOMAXPROCS', '1', '--setenv', 'GOMEMLIMIT', '128MiB',
-    '--setenv', 'NODE_NO_WARNINGS', '1', '--chdir', '/workspace', '--', ...input.command,
-  ];
-  const startedAt = Date.now();
-  return new Promise((resolve, reject) => {
-    const child = spawn(process.env.WP_EVALUATION_PRLIMIT_COMMAND ?? 'prlimit', args, {
-      env: { PATH: process.env.PATH, ...bundledLibraryEnvironment() }, detached: true, stdio: ['ignore', 'pipe', 'pipe'], shell: false,
-    });
-    let stdout = Buffer.alloc(0), stderr = Buffer.alloc(0);
-    let timedOut = false, outputLimitExceeded = false, cancelled = false;
-    const kill = () => { if (child.pid) { try { process.kill(-child.pid, 'SIGKILL'); } catch { /* already reaped */ } } };
-    const append = (current: Buffer<ArrayBufferLike>, chunk: Buffer<ArrayBufferLike>) => {
-      const remaining = Math.max(0, maxOutputBytes - stdout.length - stderr.length);
-      if (chunk.length > remaining) { outputLimitExceeded = true; kill(); }
-      return Buffer.concat([current, chunk.subarray(0, remaining)]);
-    };
-    child.stdout.on('data', (chunk: Buffer) => { stdout = append(stdout, chunk); });
-    child.stderr.on('data', (chunk: Buffer) => { stderr = append(stderr, chunk); });
-    const timer = setTimeout(() => { timedOut = true; kill(); }, input.timeoutMs);
-    const abort = () => { cancelled = true; kill(); };
-    signal?.addEventListener('abort', abort, { once: true });
-    // 覆盖 spawn 与监听器注册之间的取消竞态。
-    if (signal?.aborted) abort();
-    child.once('error', (error) => {
-      clearTimeout(timer); signal?.removeEventListener('abort', abort);
-      reject(new Error(`PROJECT_ISOLATION_UNAVAILABLE: ${error.message}`));
-    });
-    child.once('close', (exitCode) => {
-      clearTimeout(timer); signal?.removeEventListener('abort', abort);
-      if (cancelled) { reject(new Error('PROJECT_EVALUATION_CANCELLED')); return; }
-      resolve({ exitCode, timedOut, outputLimitExceeded, durationMs: Date.now() - startedAt,
-        stdout: stdout.toString('utf8'), stderr: stderr.toString('utf8') });
-    });
-  });
-}
 
 function commandResult(result: ProcessResult, input: {
   purpose: 'check' | 'test'; args: string[]; attempt: number; passed?: boolean;

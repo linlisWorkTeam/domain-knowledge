@@ -124,3 +124,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 - [2026-09-10-1433-console-direct-editing.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/0265f608a11026d3bdf7a4dd70b91020559f5447/docs/epitaph/2026-09-10-1433-console-direct-editing.md)：用户明确授权免登录，线上 Console 配置、目录及批次操作无需旧令牌；当时25项Console、19项服务与官网回归通过。后续工作台在独立工作树实现，线上未更新；原发布证据及 v0.2.0 不改写。
 
 - [2026-09-10-1511-five-stage-foundation.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/47ef4c5f043aec14842ecc5f8d7a0dfb51a391d8/docs/epitaph/2026-09-10-1511-five-stage-foundation.md)：稳定卡片身份与历史只读分组、匿名证据下载及未知状态修复；当时45单元、163集成、19既有acceptance和27Console通过。随后阶段/索引及仓库分析由1547/1614交接覆盖，完整C/C++闭环与部署仍未完成。
+
+- [2026-09-10-1547-workbench-stages-index.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/e65140a92d27379923cb856c62e347bccd9956ab/docs/epitaph/2026-09-10-1547-workbench-stages-index.md)：knowledge-workbench-v1持久化阶段、Linux租约/取消/累计预算、独立增量索引与检索接通；当时170集成、29contract及28Console通过。只有INDEX handler，其他四阶段、真实C/C++模型及最终部署未完成。后续仓库/项目输入与原生工具链在保留交接继续推进。
