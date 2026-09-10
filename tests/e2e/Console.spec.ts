@@ -1063,10 +1063,17 @@ test('关联阶段可独立执行并在卡片详情查看真实引用候选', as
     metadata: { cardId: `card-association-${symbol}`, repositoryId: 'association-repo', symbol, sourceModule: 'api', language: 'c' } });
   const source = await add('Parse', '# Parse\n## Behavior\nUse Result for output.');
   await add('Result', '# Result\n## Layout\nContains an integer value.');
+  const locator = 'knowledge/inbox/association-guide.md';
+  writeFileSync(join(repositoryDir, locator), '# External guide\nParse returns Result.');
+  const registered = await instance.composition.apps.contentGovernance.createSource({ kind: 'FILE', locator, displayName: 'External parser guide' }, { idempotencyKey: 'external-guide', fingerprint: 'external-guide', actor: 'test' });
+  const material = await instance.composition.apps.workbenchMaterials.capture(String(registered.resourceId), '仅适用于示例解析接口');
+
   await page.goto(baseUrl); await enterGovernance(page); await navigateTo(page, '知识');
   await page.getByText('知识索引与试检索', { exact: true }).click();
   await page.getByRole('button', { name: '更新索引', exact: true }).click();
   await expect(page.locator('[data-index-task]')).toContainText('已完成');
+  await page.getByText('选择外部材料快照', { exact: true }).click();
+  await page.locator(`[data-association-material="${material.materialId}"]`).check();
   await page.getByRole('button', { name: '建立关联', exact: true }).click();
   await expect(page.locator('[data-association-panel]')).toContainText('关联完成');
   await expect(page.getByRole('button', { name: '下载关系索引' })).toBeVisible();
@@ -1074,6 +1081,12 @@ test('关联阶段可独立执行并在卡片详情查看真实引用候选', as
   await page.getByRole('button', { name: '当前卡片不适用' }).click();
   await expect(page.locator('[data-card-relations]')).toContainText('正文第 3 行引用 Result');
   await expect(page.locator('[data-card-relations]')).toContainText('候选未验证可替代性');
+  await expect(page.locator('[data-card-relations]')).toContainText('指定材料正文第 2 行提及 Parse');
+  await expect(page.locator('[data-card-relations]')).toContainText('仅适用于示例解析接口');
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: '下载材料原文', exact: true }).click();
+  expect((await download).suggestedFilename()).toBeTruthy();
+
   await page.screenshot({ path: test.info().outputPath('associations-desktop.png'), fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByRole('button', { name: '查看关联卡片' })).toBeVisible();

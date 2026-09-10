@@ -28,7 +28,7 @@ test('pipeline preserves children and usage across failure, restart, cancellatio
       return { artifactRefs: [], summary: stage === 'GENERATE' ? { cards: [{ versionId: 'card-v1' }] } : stage === 'FLYWHEEL' ? { modules: [{ interfaceComparison: { compatible: true } }] }
         : stage === 'EVALUATE' ? { completedModules: 1, requestedModules: 1, modules: [{ status: behavior ? 'BEHAVIOR_PASSED' : 'BEHAVIOR_FAILED', interfaceCompatible: true }] } : { failed: 0 } };
     }])));
-    const app = new WorkbenchPipelines({ environment: async () => 'environment', store, stages, generation: { prepare: async () => input('GENERATE') }, index: { prepare: () => input('INDEX') },
+    const app = new WorkbenchPipelines({ materials: { get: () => null }, environment: async () => 'environment', store, stages, generation: { prepare: async () => input('GENERATE') }, index: { prepare: () => input('INDEX') },
       reconstruction: { prepare: async (_snapshot, versions, options) => { assert.deepEqual(versions, ['card-v1']); assert.equal(options?.configurationDigest, 'config'); return input('FLYWHEEL'); } },
       evaluation: { prepare: async () => input('EVALUATE') }, associations: { prepare: () => input('ASSOCIATE') } });
     return { app, store, stages, stageStore, close: async () => { await app.shutdown(); await stages.shutdown(); store.close(); stageStore.close(); } };
@@ -67,7 +67,7 @@ test('pipeline recovers a persisted handoff before child insertion and reuses su
   const stages = new WorkbenchStages(stageStore, { GENERATE: async () => ({ artifactRefs: [], summary: { cards: [{ versionId: 'v1' }] } }) });
   const original = stages.start.bind(stages); stages.start = (...args) => { starts++; if (starts === 1) throw new Error('TEST_INTERRUPTED_BEFORE_INSERT'); return original(...args); };
   const prepare = async () => { throw new Error('TEST_NEXT_STAGE_STOP'); };
-  const app = new WorkbenchPipelines({ environment: async () => 'environment', store, stages, generation: { prepare: async () => input('GENERATE') }, reconstruction: { prepare }, evaluation: { prepare }, index: { prepare: () => { throw new Error('TEST_NEXT_STAGE_STOP'); } }, associations: { prepare: () => input('ASSOCIATE') } });
+  const app = new WorkbenchPipelines({ materials: { get: () => null }, environment: async () => 'environment', store, stages, generation: { prepare: async () => input('GENERATE') }, reconstruction: { prepare }, evaluation: { prepare }, index: { prepare: () => { throw new Error('TEST_NEXT_STAGE_STOP'); } }, associations: { prepare: () => input('ASSOCIATE') } });
   try {
     const first = await app.start('snapshot'); assert.equal((await app.wait(first.pipelineId)).reasonCode, 'TEST_INTERRUPTED_BEFORE_INSERT');
     const child = app.get(first.pipelineId).children.GENERATE!; assert.equal(stageStore.get(child.taskId), null);
@@ -92,11 +92,30 @@ test('successful one-click execution reaches all five stages and reuses task ide
     seen.push(stage); return { artifactRefs: [], summary: stage === 'GENERATE' ? { cards: [{ versionId: 'v1' }] } : stage === 'FLYWHEEL' ? { modules: [{ interfaceComparison: { compatible: true } }] }
       : stage === 'EVALUATE' ? { completedModules: 1, requestedModules: 1, modules: [{ interfaceCompatible: true, status: 'BEHAVIOR_PASSED' }] } : { failed: 0, relations: 0 } };
   }])));
-  const app = new WorkbenchPipelines({ environment: async () => 'environment', store, stages, generation: { prepare: async () => input('GENERATE') }, reconstruction: { prepare: async () => input('FLYWHEEL') }, evaluation: { prepare: async () => input('EVALUATE') }, index: { prepare: () => input('INDEX') }, associations: { prepare: () => input('ASSOCIATE') } });
+  const app = new WorkbenchPipelines({ materials: { get: () => null }, environment: async () => 'environment', store, stages, generation: { prepare: async () => input('GENERATE') }, reconstruction: { prepare: async () => input('FLYWHEEL') }, evaluation: { prepare: async () => input('EVALUATE') }, index: { prepare: () => input('INDEX') }, associations: { prepare: () => input('ASSOCIATE') } });
   try {
     const first = await app.start('snapshot'); assert.equal((await app.wait(first.pipelineId)).status, 'SUCCEEDED');
     assert.deepEqual(seen, [...WORKBENCH_STAGES]); assert.equal(app.detail(first.pipelineId).publicationVerified, false);
     assert.equal((await app.start('snapshot')).pipelineId, first.pipelineId); assert.equal(seen.length, 5);
     for (const task of app.detail(first.pipelineId).tasks) assert.equal(stages.start(task.input).taskId, task.taskId);
+    await assert.rejects(app.start('snapshot', {}, ['missing']), /MATERIAL_NOT_FOUND/);
+    const ref = { artifactId: 'fixture', sha256: 'a'.repeat(64), size: 1, mediaType: 'text/plain' };
+    app.dependencies.materials = { get: (id) => ({ materialId: id, contractVersion: 'external-material-v1', sourceId: 'source', sourceRevision: `sha256:${ref.sha256}`, locator: 'guide.md', title: 'Guide', applicability: 'Scoped', rawRef: ref, textRef: ref, capturedAt: 'fixed' }) };
+    app.dependencies.associations.prepare = (_versions, materialIds) => ({ ...input('ASSOCIATE'), parameters: { materialIds: materialIds ?? [] } });
+    const ids = ['material-b', 'material-a'];
+    const pending = app.start('snapshot', {}, ids); ids.push('late-material');
+    const withMaterials = await pending;
+    assert.notEqual(withMaterials.pipelineId, first.pipelineId);
+    assert.deepEqual(withMaterials.materialIds, ['material-a', 'material-b']);
+    const done = await app.wait(withMaterials.pipelineId); assert.equal(done.status, 'SUCCEEDED');
+    assert.deepEqual(done.children.ASSOCIATE!.input.parameters.materialIds, ['material-a', 'material-b']);
+    assert.equal(seen.length, 6, 'material selection reruns only association, all prior stages reused');
+    assert.equal((await app.start('snapshot', {}, ['material-a', 'material-b'])).pipelineId, done.pipelineId);
+    const legacy = { ...createPipeline(input('GENERATE'), new Date().toISOString(), 'legacy'), contractVersion: 'knowledge-pipeline-v1', status: 'PAUSED' as const };
+    store.insert(legacy);
+    assert.throws(() => app.resume(legacy.pipelineId, legacy.inputDigest), /PIPELINE_CONTRACT_INCOMPATIBLE/);
+    assert.throws(() => app.cancel(legacy.pipelineId), /PIPELINE_CONTRACT_INCOMPATIBLE/);
+    assert.deepEqual(app.get(legacy.pipelineId), legacy);
+
   } finally { await app.shutdown(); await stages.shutdown(); store.close(); stageStore.close(); rmSync(directory, { recursive: true, force: true }); }
 });

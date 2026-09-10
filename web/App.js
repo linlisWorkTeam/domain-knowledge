@@ -914,7 +914,7 @@ async function openEvaluation(evaluationId, returnFocus) {
 }
 
 async function downloadArtifact(path) {
-  if ((!state.token && !state.capabilities?.directEditing) || !/^\/api\/v1\/(?:evaluations\/[^/]+\/artifacts\/[^/?#]+|stage-tasks\/[^/]+\/artifacts\/[a-f0-9]{64})$/.test(String(path))) {
+  if ((!state.token && !state.capabilities?.directEditing) || !/^\/api\/v1\/(?:evaluations\/[^/]+\/artifacts\/[^/?#]+|(?:stage-tasks|external-materials)\/[^/]+\/artifacts\/[a-f0-9]{64})$/.test(String(path))) {
     showToast('请先进入治理模式。', 'warning')
     return
   }
@@ -929,7 +929,7 @@ async function downloadArtifact(path) {
   const url = URL.createObjectURL(await response.blob())
   const link = document.createElement('a')
   link.href = url
-  link.download = path.includes('/stage-tasks/') ? 'stage-evidence.json' : 'evaluation-evidence'
+  link.download = path.includes('/external-materials/') ? 'material-evidence' : path.includes('/stage-tasks/') ? 'stage-evidence.json' : 'evaluation-evidence'
   link.click()
   setTimeout(() => URL.revokeObjectURL(url), 0)
 }
@@ -1642,7 +1642,7 @@ drawerContent.addEventListener('click', (event) => {
     panel.textContent = '正在读取已有关联…'
     request(`/api/v1/associations/${encodeURIComponent(cardId)}`).then((result) => {
       if (!panel.isConnected) return
-      panel.innerHTML = `<p>仅库内关联；候选未验证可替代性。${result.staleTasks ? '部分关系已失效，请重新建立关联。' : ''}</p>${result.relations.length ? result.relations.map((relation) => `<article><button class="text-button" type="button" data-version-id="${escapeHtml(relation.fromCardId === cardId ? relation.toVersionId : relation.fromVersionId)}">查看关联卡片</button><p>${escapeHtml(relation.reason)}</p><blockquote>${escapeHtml(relation.evidence.excerpt)}</blockquote><p>适用条件：${escapeHtml(relation.fromCardId === cardId ? relation.applicability : relation.fromApplicability ?? '未提供适用条件')}</p></article>`).join('') : '<p>没有有效关联。可先更新索引并建立关联，或直接检索其他卡片。</p>'}`
+      panel.innerHTML = `<p>${result.scope === 'INTERNAL_AND_EXTERNAL' ? '包含固定外部材料引用' : '仅库内关联'}；候选未验证可替代性。${result.staleTasks ? '部分关系已失效，请重新建立关联。' : ''}</p>${result.relations.length ? result.relations.map((relation) => `<article><button class="text-button" type="button" data-version-id="${escapeHtml(relation.fromCardId === cardId ? relation.toVersionId : relation.fromVersionId)}">查看关联卡片</button><p>${escapeHtml(relation.reason)}</p><blockquote>${escapeHtml(relation.evidence.excerpt)}</blockquote><p>适用条件：${escapeHtml(relation.fromCardId === cardId ? relation.applicability : relation.fromApplicability ?? '未提供适用条件')}</p></article>`).join('') : '<p>没有有效库内关联。可先更新索引并建立关联，或直接检索其他卡片。</p>'}${(result.externalRelations ?? []).map((relation) => `<article><h4>${escapeHtml(relation.title)}</h4><p>${escapeHtml(relation.reason)}</p><blockquote>${escapeHtml(relation.evidence.excerpt)}</blockquote><p>材料适用条件：${escapeHtml(relation.materialApplicability)}</p><p>卡片适用条件：${escapeHtml(relation.cardApplicability)}</p><p class="material-identity">来源：${escapeHtml(relation.locator)} · ${escapeHtml(relation.sourceRevision)}</p><button class="secondary-button" type="button" data-download-artifact="/api/v1/external-materials/${escapeHtml(relation.materialId)}/artifacts/${escapeHtml(relation.materialDigest)}">下载引用正文</button><button class="secondary-button" type="button" data-download-artifact="/api/v1/external-materials/${escapeHtml(relation.materialId)}/artifacts/${escapeHtml(relation.rawDigest)}">下载材料原文</button></article>`).join('')}`
     }).catch(() => { if (panel.isConnected) panel.textContent = '关联暂不可读取，请重试。' })
     return
   }

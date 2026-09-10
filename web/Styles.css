@@ -1304,3 +1304,7 @@ body.drawer-active { overflow: hidden; }
 [data-generation-panel] textarea { width: 100%; box-sizing: border-box; }
 
 .material-identity { overflow-wrap: anywhere; }
+
+.material-choice { flex-wrap: wrap; gap: 8px; }
+.material-choice > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.material-choice > small { flex-basis: 100%; overflow-wrap: anywhere; }

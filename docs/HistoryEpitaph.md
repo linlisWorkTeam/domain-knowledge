@@ -148,3 +148,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 - [2026-09-10-1931-associations-tinyxml.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/3d82c6a2255531cb3416a9e8b65918cb7b781daf/docs/epitaph/2026-09-10-1931-associations-tinyxml.md)：库内关联与早期 TinyXML2 运行交接；后续编译修复、可信门禁继承和真实结果见当前墓志铭。该时点不代表完整闭环或发布完成。
 
 - [2026-09-11-0143-native-repair-verified.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/525690a2d484a90aeec28edc9f5f9e739e348aa6/docs/epitaph/2026-09-11-0143-native-repair-verified.md)：编译反馈修复与旧引擎真实 TinyXML2 37/37、jsmn15/15。此后可信门禁引擎已更新；当前 jsmn 一键31/31见0233记录，TinyXML2最终引擎仍待重验。真实运行配置、固定仓库与证据位置保存在原记录，不将历史结果当完整发布证明。
+
+- [2026-09-11-0153-trusted-gates.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/192ba38a2e3ff8e6dc3f199a47e5b5f099ee75b9/docs/epitaph/2026-09-11-0153-trusted-gates.md)：跨输入版本保留可信测试并集、冲突暂停、缓存失效规则；当时integration196/Console30通过。此后jsmn当前引擎31/31已验，旧TinyXML2仍待最终重验。原始门禁和历史证据保留，不以候选替换旧可信预期。

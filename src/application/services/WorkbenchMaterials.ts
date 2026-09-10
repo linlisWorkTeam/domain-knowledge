@@ -21,6 +21,13 @@ export class WorkbenchMaterials {
       applicability: applicability.trim(), rawRef, textRef, capturedAt: new Date().toISOString(), contractVersion: MATERIAL_CONTRACT };
     return this.store.insert({ ...value, materialId: materialIdentity(value) });
   }
+  async artifact(id: string, digest: string) {
+    const material = this.store.get(id); if (!material) throw new Error('MATERIAL_NOT_FOUND');
+    const ref = [material.rawRef, material.textRef].find((value) => value.sha256 === digest);
+    if (!ref) throw new Error('MATERIAL_NOT_FOUND');
+    if (!await this.artifacts.verify(ref)) throw new Error('STAGE_ARTIFACT_CORRUPT');
+    return { ref, bytes: await this.artifacts.get(ref) };
+  }
   async read(id: string) {
     const material = this.store.get(id); if (!material) throw new Error('MATERIAL_NOT_FOUND');
     if (!await this.artifacts.verify(material.textRef) || !await this.artifacts.verify(material.rawRef)) throw new Error('STAGE_ARTIFACT_CORRUPT');

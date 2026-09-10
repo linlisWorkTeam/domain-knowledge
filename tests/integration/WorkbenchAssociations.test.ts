@@ -50,3 +50,40 @@ test('association stage retains JSON evidence across restart and invalidates old
     assert.equal((await composition.apps.workbenchAssociations.candidates('card-encode')).relations.length, 1, 'unaffected pair remains readable');
   } finally { await composition.close(); rmSync(runtimeDir, { recursive: true, force: true }); }
 });
+
+test('explicit material selection binds frozen evidence, survives source deletion and invalidates revised card references', async () => {
+  const { mkdirSync, writeFileSync } = await import('node:fs');
+  const root = mkdtempSync(join(tmpdir(), 'external-relations-'));
+  mkdirSync(join(root, 'knowledge/inbox'), { recursive: true });
+  const path = join(root, 'knowledge/inbox/guide.md');
+  writeFileSync(path, '# Guide\nparse accepts tokens.\nparseExtra is different.');
+  const runtimeDir = join(root, 'runtime'); let composition = createComposition({ runtimeDir, repositoryRoot: root });
+  try {
+    const created = await composition.apps.contentGovernance.createSource({ kind: 'FILE', locator: 'knowledge/inbox/guide.md', displayName: 'Parser guide' }, { idempotencyKey: 'source', fingerprint: 'source', actor: 'test' });
+    const material = await composition.apps.workbenchMaterials.capture(String(created.resourceId), 'Only JSON token parsing');
+    const ingest = (body: string) => composition.apps.flywheel.ingestCandidate({ moduleId: 'parser', title: 'parse', description: 'API', body, tags: ['c'], provenance: [{ path: 'api.h', commit: 'commit', pinned: true }], metadata: { cardId: 'card-parser', repositoryId: 'repo', sourceModule: 'api', language: 'c', symbol: 'parse' } });
+    const card = await ingest('# Parse\nParse complete token buffers.');
+    const ids = [card.version.versionId]; const stages = composition.apps.workbenchStages;
+    await stages.wait(stages.start(composition.apps.knowledgeIndex.prepare(ids)).taskId);
+    const input = composition.apps.workbenchAssociations.prepare(ids, [material.materialId]);
+    assert.equal(input.parameters.associationContract, 'card-associations-v2');
+    assert.throws(() => composition.apps.workbenchAssociations.prepare(ids, ['missing']), /MATERIAL_NOT_FOUND/);
+    assert.throws(() => composition.apps.workbenchAssociations.prepare(ids, [material.materialId, material.materialId]), /SELECTION_INVALID/);
+    rmSync(path);
+    const done = await stages.wait(stages.start(input).taskId);
+    assert.equal(done.status, 'SUCCEEDED', done.reasonCode ?? '');
+    assert.equal(done.result?.summary.externalRelations, 1); assert.equal(done.result?.summary.internalRelations, 0);
+    assert.equal(done.result?.artifactRefs.length, 3, 'index, original and converted evidence are downloadable');
+    const candidates = await composition.apps.workbenchAssociations.candidates('card-parser');
+    assert.equal(candidates.relations.length, 0); assert.equal(candidates.externalRelations.length, 1);
+    const relation = candidates.externalRelations[0]!;
+    assert.equal(relation.evidence.line, 2); assert.equal(relation.sourceRevision, material.sourceRevision);
+    assert.equal(relation.materialApplicability, material.applicability); assert.equal(relation.replacementVerified, false);
+    assert.equal(Buffer.from((await composition.apps.workbenchMaterials.artifact(material.materialId, material.rawRef.sha256)).bytes).toString(), '# Guide\nparse accepts tokens.\nparseExtra is different.');
+    assert.equal(stages.start(composition.apps.workbenchAssociations.prepare(ids, [material.materialId])).taskId, done.taskId);
+    await composition.shutdown(); composition = createComposition({ runtimeDir, repositoryRoot: root });
+    assert.equal((await composition.apps.workbenchAssociations.candidates('card-parser')).externalRelations.length, 1);
+    await ingest('# Parse\nChanged behavior.');
+    assert.equal((await composition.apps.workbenchAssociations.candidates('card-parser')).externalRelations.length, 0);
+  } finally { await composition.shutdown(); rmSync(root, { recursive: true, force: true }); }
+});

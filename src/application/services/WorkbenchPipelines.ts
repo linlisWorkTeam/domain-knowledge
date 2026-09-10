@@ -5,6 +5,7 @@
  */
 import { PIPELINE_CONTRACT, createPipeline, pipelineStageFailure, type WorkbenchPipeline } from '../../domain/services/workbench/WorkbenchPipeline.ts';
 import { WORKBENCH_STAGES, createStageTask, type StageInput, type StageTask, type WorkbenchStage } from '../../domain/services/workbench/StageTask.ts';
+import type { ExternalMaterialStore } from '../ports/ExternalMaterialPorts.ts';
 import type { WorkbenchPipelineStore } from '../ports/WorkbenchPipelinePorts.ts';
 import type { WorkbenchStages } from './WorkbenchStages.ts';
 import type { WorkbenchGeneration, GenerationScope } from './WorkbenchGeneration.ts';
@@ -13,7 +14,7 @@ import type { WorkbenchEvaluation } from './WorkbenchEvaluation.ts';
 import type { KnowledgeIndexService } from './KnowledgeIndex.ts';
 import type { WorkbenchAssociations } from './WorkbenchAssociations.ts';
 export class WorkbenchPipelines {
-  readonly dependencies: { environment(snapshotId: string, signal?: AbortSignal): Promise<string>; store: WorkbenchPipelineStore; stages: WorkbenchStages; generation: Pick<WorkbenchGeneration, 'prepare'>;
+  readonly dependencies: { materials: Pick<ExternalMaterialStore, 'get'>; environment(snapshotId: string, signal?: AbortSignal): Promise<string>; store: WorkbenchPipelineStore; stages: WorkbenchStages; generation: Pick<WorkbenchGeneration, 'prepare'>;
     reconstruction: Pick<WorkbenchReconstruction, 'prepare'>; evaluation: Pick<WorkbenchEvaluation, 'prepare'>; index: Pick<KnowledgeIndexService, 'prepare'>; associations: Pick<WorkbenchAssociations, 'prepare'> };
   private readonly pending = new Map<string, Promise<void>>();
   private readonly controllers = new Map<string, AbortController>();
@@ -30,12 +31,15 @@ export class WorkbenchPipelines {
       usage: tasks.reduce((sum, task) => ({ modelCalls: sum.modelCalls + task.usage.modelCalls, tokens: sum.tokens + task.usage.tokens,
         reservedTokens: sum.reservedTokens + task.usage.reservedTokens, elapsedMs: sum.elapsedMs + task.usage.elapsedMs }), { modelCalls: 0, tokens: 0, reservedTokens: 0, elapsedMs: 0 }) };
   }
-  async start(snapshotId: string, scopes: Record<string, GenerationScope> = {}) {
+  async start(snapshotId: string, scopes: Record<string, GenerationScope> = {}, materialIds: string[] = []) {
+    if (!Array.isArray(materialIds) || materialIds.length > 32 || materialIds.some((id) => typeof id !== 'string' || !id) || new Set(materialIds).size !== materialIds.length) throw new Error('PIPELINE_INPUT_INVALID');
+    const selectedMaterials = [...materialIds].sort();
+    for (const id of selectedMaterials) if (!this.dependencies.materials.get(id)) throw new Error('MATERIAL_NOT_FOUND');
     if (this.closing) throw new Error('PIPELINE_SHUTDOWN');
     const input = await this.dependencies.generation.prepare(snapshotId, scopes);
     const environment = await this.dependencies.environment(snapshotId);
     if (this.closing) throw new Error('PIPELINE_SHUTDOWN');
-    const value = this.dependencies.store.insert(createPipeline(input, new Date().toISOString(), environment));
+    const value = this.dependencies.store.insert(createPipeline(input, new Date().toISOString(), environment, selectedMaterials));
     if (value.status === 'PENDING') this.schedule(value.pipelineId, false);
     return value;
   }
@@ -69,7 +73,7 @@ export class WorkbenchPipelines {
     if (stage === 'INDEX') return index.prepare(versions);
     if (stage === 'FLYWHEEL') return reconstruction.prepare(String(generation.input.parameters.snapshotId), versions, { configurationDigest: generation.input.configurationDigest, signal });
     if (stage === 'EVALUATE') return evaluation.prepare(value.children.FLYWHEEL!.taskId);
-    if (stage === 'ASSOCIATE') return associations.prepare(versions);
+    if (stage === 'ASSOCIATE') return associations.prepare(versions, value.materialIds);
     throw new Error('PIPELINE_STAGE_INVALID');
   }
   private async run(id: string, resume: boolean) {

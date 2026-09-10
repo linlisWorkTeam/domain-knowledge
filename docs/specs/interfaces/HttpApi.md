@@ -137,11 +137,11 @@ PENDING、Git 关闭、Git 冲突及认证失败使用可定位的错误码。AP
 
 上述工作台路由复用 directEditing / Bearer 边界；免登录仍拒绝跨站浏览器写入。当前未开放通用 JSON 阶段启动入口，后续代码仓界面将通过服务端分析构造其他阶段输入。
 
-`POST /api/v1/associations {versionIds}` 启动冻结卡片的 ASSOCIATE 阶段，沿用阶段状态/取消/恢复和工件下载。`GET /api/v1/associations/:cardId` 读取与当前卡片有关的有效关系、引用证据及失效任务数。当前 scope=INTERNAL_ONLY、externalMaterials=0；符号提及关系不保证可替代性。外部材料接口仍待实现。
+`POST /api/v1/associations {versionIds}` 启动冻结卡片的 ASSOCIATE 阶段，沿用阶段状态/取消/恢复和工件下载。`GET /api/v1/associations/:cardId` 读取与当前卡片有关的有效关系、引用证据及失效任务数。未选材料时 scope=INTERNAL_ONLY、externalMaterials=0；选材后 scope=INTERNAL_AND_EXTERNAL。符号提及关系不保证可替代性。
 
 ### 五阶段一键执行
 
-- `POST /api/v1/workbench-pipelines {snapshotId, scopes?}`：冻结生成输入并创建或复用knowledge-pipeline-v1协调记录，返回`{pipeline}`，202或已成功时200。
+- `POST /api/v1/workbench-pipelines {snapshotId, scopes?, materialIds?}`：冻结生成输入并创建或复用knowledge-pipeline-v2协调记录，返回`{pipeline}`，202或已成功时200。
 - `GET /api/v1/workbench-pipelines`：读取协调记录列表；`GET /api/v1/workbench-pipelines/:id`返回`pipeline`、按阶段排列的`tasks`、累计`usage`及`publicationVerified:false`。
 - `POST /api/v1/workbench-pipelines/:id/cancel {}`：取消协调和当前子任务；`POST .../resume {inputDigest}`只恢复同契约输入，累计子任务用量不重置。契约/输入冲突为409，不存在为404。
 - 所有入口使用现有匿名部署授权策略，无新增登录。旧契约可读，不能跨契约恢复。逐阶段状态、证据和下载继续复用stage-tasks接口。
@@ -149,3 +149,5 @@ PENDING、Git 关闭、Git 冲突及认证失败使用可定位的错误码。AP
 ### 外部材料快照
 
 `POST /api/v1/external-materials` 接受已登记 `sourceId` 和非空 `applicability`，校验固定来源修订，捕获 UTF-8 文本/Markdown/HTML/JSON（正文上限 2 MiB）；返回 `material`。不搜索、不递归读取链接。`GET /api/v1/external-materials` 返回不可变快照列表，`GET /api/v1/external-materials/:id` 返回材料及转换正文。原始和转换工件保存于 CAS；同修订/条件重复捕获返回相同标识，来源变动需先确认新修订。来源限制沿用既有策略，材料格式/编码/容量错误为 422，不存在为 404。
+
+关联启动 `POST /api/v1/associations` 可附加 `materialIds`（最多32个且不重复），冻结选定快照，返回实际内外部关系数量。候选响应增加 `externalRelations`，不将其当替代卡片。`GET /api/v1/external-materials/:id/artifacts/:sha256` 只下载该快照绑定的原文或转换正文，校验 CAS 后返回附件。

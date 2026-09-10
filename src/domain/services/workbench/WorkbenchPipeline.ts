@@ -5,18 +5,20 @@
  */
 import { sha256 } from '../../Domain.ts';
 import { canonicalJson, createStageTask, type StageInput, type StageTask, type StageStatus, type WorkbenchStage } from './StageTask.ts';
-export const PIPELINE_CONTRACT = 'knowledge-pipeline-v1';
+export const PIPELINE_CONTRACT = 'knowledge-pipeline-v2';
 export interface WorkbenchPipeline {
-  pipelineId: string; environmentDigest: string; contractVersion: string; inputDigest: string;
+  pipelineId: string; materialIds: string[]; environmentDigest: string; contractVersion: string; inputDigest: string;
   status: StageStatus; reasonCode: string | null; cancelRequested: boolean; resumeRequested: boolean;
   children: Partial<Record<WorkbenchStage, StageTask>>; completed: WorkbenchStage[];
   currentStage: WorkbenchStage; createdAt: string; updatedAt: string;
 }
-export function createPipeline(input: StageInput, now: string, environmentDigest: string): WorkbenchPipeline {
+export function createPipeline(input: StageInput, now: string, environmentDigest: string, materialIds: string[] = []): WorkbenchPipeline {
+  if (!Array.isArray(materialIds) || materialIds.length > 32 || materialIds.some((id) => typeof id !== 'string' || !id) || new Set(materialIds).size !== materialIds.length) throw new Error('PIPELINE_INPUT_INVALID');
+  const selectedMaterials = [...materialIds].sort();
   if (typeof environmentDigest !== 'string' || !environmentDigest || environmentDigest.length > 1024 || input.stage !== 'GENERATE') throw new Error('PIPELINE_INPUT_INVALID');
   const child = createStageTask(input, {}, now);
-  const digest = sha256(canonicalJson({ contract: PIPELINE_CONTRACT, generation: child.inputDigest, environmentDigest }));
-  return { pipelineId: `pipeline-${digest}`, environmentDigest, contractVersion: PIPELINE_CONTRACT, inputDigest: digest,
+  const digest = sha256(canonicalJson({ contract: PIPELINE_CONTRACT, generation: child.inputDigest, environmentDigest, materialIds: selectedMaterials }));
+  return { materialIds: selectedMaterials, pipelineId: `pipeline-${digest}`, environmentDigest, contractVersion: PIPELINE_CONTRACT, inputDigest: digest,
     status: 'PENDING', reasonCode: null, cancelRequested: false, resumeRequested: false, children: { GENERATE: child }, completed: [], currentStage: 'GENERATE', createdAt: now, updatedAt: now };
 }
 export function pipelineStageFailure(task: StageTask): string | null {

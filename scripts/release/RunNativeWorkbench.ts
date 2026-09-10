@@ -14,11 +14,13 @@ import type { StageTask } from '../../src/domain/services/workbench/StageTask.ts
 const args = new Map<string, string>();
 for (let index = 2; index < process.argv.length; index += 2) {
   const key = process.argv[index]!, value = process.argv[index + 1];
-  if (!['--target', '--repository', '--runtime', '--report', '--resume-task', '--mode', '--resume-pipeline'].includes(key) || !value || args.has(key)) throw new Error('NATIVE_ACCEPTANCE_ARGUMENTS_INVALID');
+  if (!['--target', '--repository', '--runtime', '--report', '--resume-task', '--mode', '--resume-pipeline', '--material-ids'].includes(key) || !value || args.has(key)) throw new Error('NATIVE_ACCEPTANCE_ARGUMENTS_INVALID');
   args.set(key, value);
 }
 for (const key of ['--target', '--repository', '--runtime', '--report']) if (!args.has(key)) throw new Error(`NATIVE_ACCEPTANCE_ARGUMENT_REQUIRED: ${key}`);
 const mode = args.get('--mode') ?? 'steps';
+const materialIds = args.has('--material-ids') ? args.get('--material-ids')!.split(',') : [];
+if (args.has('--material-ids') && (args.has('--resume-task') || args.has('--resume-pipeline'))) throw new Error('NATIVE_ACCEPTANCE_ARGUMENTS_INVALID');
 if (!['steps', 'pipeline'].includes(mode) || (args.has('--resume-pipeline') && mode !== 'pipeline') || (args.has('--resume-task') && mode !== 'steps')) throw new Error('NATIVE_ACCEPTANCE_ARGUMENTS_INVALID');
 const targets = JSON.parse(readFileSync(fileURLToPath(new URL('../../tests/fixtures/nativeTargets/Targets.json', import.meta.url)), 'utf8')).targets as Array<{
   name: string; commit: string; language: 'c' | 'cpp'; files: Record<string, string>; scope: string[];
@@ -63,7 +65,7 @@ try {
       pipeline = app.get(args.get('--resume-pipeline')!);
       if (pipeline.children.GENERATE?.input.parameters.snapshotId !== project.snapshotId) throw new Error('NATIVE_ACCEPTANCE_RESUME_MISMATCH');
       if (pipeline.status !== 'SUCCEEDED') pipeline = app.resume(pipeline.pipelineId, pipeline.inputDigest);
-    } else pipeline = await app.start(project.snapshotId, scopes);
+    } else pipeline = await app.start(project.snapshotId, scopes, materialIds);
     activePipeline = pipeline.pipelineId;
     const refresh = () => { const detail = app.detail(pipeline.pipelineId); report.pipeline = detail.pipeline; report.tasks = detail.tasks; save();
       console.log(JSON.stringify({ target: target.name, pipelineId: pipeline.pipelineId, stage: detail.pipeline.currentStage, status: detail.pipeline.status, reasonCode: detail.pipeline.reasonCode, usage: detail.usage })); };
@@ -83,7 +85,7 @@ try {
   await wait(composition.apps.workbenchStages.start(composition.apps.knowledgeIndex.prepare(versionIds)));
   const reconstructed = await wait(await composition.apps.workbenchReconstruction.start(project.snapshotId, versionIds));
   const evaluated = await wait(await composition.apps.workbenchEvaluation.start(reconstructed.taskId));
-  await wait(composition.apps.workbenchStages.start(composition.apps.workbenchAssociations.prepare(versionIds)));
+  await wait(composition.apps.workbenchStages.start(composition.apps.workbenchAssociations.prepare(versionIds, materialIds)));
   const modules = evaluated.result!.summary.modules as Array<{ status: string }>;
   report.outcome = modules.every((module) => module.status === 'BEHAVIOR_PASSED') && modules.length === project.modules.length ? 'BEHAVIOR_PASSED_PUBLICATION_PENDING' : 'BEHAVIOR_FAILED';
   }

@@ -8,23 +8,33 @@ import { AssociationDomainService } from '../../domain/services/association/Asso
 import { type AssociationCard, type CardAssociation } from '../../domain/services/association/CardAssociations.ts';
 import { cardIndexSourceDigest } from '../../domain/services/knowledge/KnowledgeIndex.ts';
 import { groupKnowledgeCards } from '../../domain/services/knowledge/KnowledgeCards.ts';
-import type { StageInput } from '../../domain/services/workbench/StageTask.ts';
+import { canonicalJson, type StageInput } from '../../domain/services/workbench/StageTask.ts';
 import type { ArtifactStore, FlywheelRepository } from '../ports/ApplicationPorts.ts';
 import type { KnowledgeIndexService } from './KnowledgeIndex.ts';
 import type { WorkbenchStages, StageExecutionContext } from './WorkbenchStages.ts';
+import type { WorkbenchMaterials } from './WorkbenchMaterials.ts';
+import type { ExternalAssociation } from '../../domain/services/association/ExternalAssociations.ts';
 const contract = 'card-associations-v1';
+const externalContract = 'card-associations-v2';
 export class WorkbenchAssociations {
   readonly repository: FlywheelRepository; readonly artifacts: ArtifactStore;
-  readonly index: KnowledgeIndexService; readonly stages: WorkbenchStages;
-  constructor(repository: FlywheelRepository, artifacts: ArtifactStore, index: KnowledgeIndexService, stages: WorkbenchStages) {
-    this.repository = repository; this.artifacts = artifacts; this.index = index; this.stages = stages;
+  readonly index: KnowledgeIndexService; readonly stages: WorkbenchStages; readonly materials: WorkbenchMaterials;
+  constructor(repository: FlywheelRepository, artifacts: ArtifactStore, index: KnowledgeIndexService, stages: WorkbenchStages, materials: WorkbenchMaterials) {
+    this.repository = repository; this.artifacts = artifacts; this.index = index; this.stages = stages; this.materials = materials;
   }
-  prepare(versionIds?: string[]): StageInput {
+  prepare(versionIds?: string[], materialIds: string[] = []): StageInput {
+    if (!Array.isArray(materialIds) || materialIds.length > 32 || materialIds.some((id) => typeof id !== 'string' || !id) || new Set(materialIds).size !== materialIds.length) throw new Error('ASSOCIATION_SELECTION_INVALID');
     const input = this.index.prepare(versionIds);
+    if (materialIds.length) {
+      const ids = [...materialIds].sort();
+      const materials = ids.map((id) => { const value = this.materials.store.get(id); if (!value) throw new Error('MATERIAL_NOT_FOUND'); return value; });
+      return { ...input, stage: 'ASSOCIATE', sourceDigest: sha256(canonicalJson([input.sourceDigest, materials])),
+        configurationDigest: sha256(externalContract), parameters: { associationContract: externalContract, materialIds: ids } };
+    }
     return { ...input, stage: 'ASSOCIATE', configurationDigest: sha256(contract), parameters: { associationContract: contract } };
   }
   async build(context: StageExecutionContext) {
-    const frozen = this.prepare(context.task.input.cardVersionIds);
+    const frozen = this.prepare(context.task.input.cardVersionIds, (context.task.input.parameters.materialIds ?? []) as string[]);
     if (context.task.input.configurationDigest !== frozen.configurationDigest || context.task.input.sourceDigest !== frozen.sourceDigest) throw new Error('STAGE_INPUT_CHANGED');
     const result = await context.step('relation-index', async () => {
       const cards = groupKnowledgeCards(this.repository.listKnowledgeVersions(['CANDIDATE', 'VERIFIED', 'LOW_CONFIDENCE', 'SUPERSEDED']))
@@ -44,15 +54,26 @@ export class WorkbenchAssociations {
           repositoryId: typeof version.metadata.repositoryId === 'string' ? version.metadata.repositoryId : '',
           sourceRevision: entry.header.sourceVersions.length === 1 ? entry.header.sourceVersions[0]! : '', applicability: entry.header.applicability });
       }
-      const relations = new AssociationDomainService().associateCards(inputs);
-      const ref = await this.artifacts.put(Buffer.from(JSON.stringify({ schemaVersion: contract, relations, externalMaterials: [], scope: 'INTERNAL_ONLY' })), 'application/json');
-      return { artifactRefs: [ref], summary: { relations: relations.length, cards: cards.length, scope: 'INTERNAL_ONLY', externalMaterials: 0 } };
+      const domain = new AssociationDomainService();
+      const relations = domain.associateCards(inputs);
+      const materials: Awaited<ReturnType<WorkbenchMaterials['read']>>[] = [];
+      for (const id of (frozen.parameters.materialIds ?? []) as string[]) {
+        context.signal.throwIfAborted();
+        const material = this.materials.store.get(id)!;
+        bodyBytes += material.textRef.size;
+        if (bodyBytes > 8_388_608) throw new Error('ASSOCIATION_LIMIT_EXCEEDED');
+        materials.push(await this.materials.read(id));
+      }
+      const externalRelations = domain.associateExternalMaterials(inputs, materials);
+      const scope = materials.length ? 'INTERNAL_AND_EXTERNAL' : 'INTERNAL_ONLY';
+      const ref = await this.artifacts.put(Buffer.from(JSON.stringify({ schemaVersion: frozen.parameters.associationContract, relations, externalRelations, externalMaterials: materials.map(({ material }) => material), scope })), 'application/json');
+      return { artifactRefs: [ref, ...materials.flatMap(({ material }) => [material.rawRef, material.textRef])], summary: { relations: relations.length + externalRelations.length, internalRelations: relations.length, externalRelations: externalRelations.length, cards: cards.length, scope, externalMaterials: materials.length } };
     });
     context.progress({ ...result.summary, phase: 'association-index' });
     return result;
   }
   async candidates(cardId: string) {
-    const relations = new Map<string, CardAssociation>(); let staleTasks = 0;
+    const relations = new Map<string, CardAssociation>(); const externalRelations = new Map<string, ExternalAssociation>(); let staleTasks = 0;
     const current = new Map(groupKnowledgeCards(this.repository.listKnowledgeVersions(['CANDIDATE', 'VERIFIED', 'LOW_CONFIDENCE', 'SUPERSEDED'])).map((card) => [card.cardId, card.current]));
     const valid = (id: string, versionId: string, digest: string) => {
       const card = current.get(id), index = this.index.index.get(id);
@@ -61,18 +82,24 @@ export class WorkbenchAssociations {
     };
     for (const task of this.stages.store.list()) {
       if (task.input.stage !== 'ASSOCIATE' || task.status !== 'SUCCEEDED' || !task.result) continue;
-      if (task.input.configurationDigest !== sha256(contract)) { staleTasks++; continue; }
+      if (![contract, externalContract].some((value) => task.input.configurationDigest === sha256(value))) { staleTasks++; continue; }
       const ref = task.result.artifactRefs[0] as ArtifactRef;
       if (!ref || !await this.artifacts.verify(ref)) throw new Error('STAGE_ARTIFACT_CORRUPT');
-      const data = JSON.parse(Buffer.from(await this.artifacts.get(ref)).toString('utf8')) as { schemaVersion: string; relations: CardAssociation[] };
-      if (data.schemaVersion !== contract) continue;
+      const data = JSON.parse(Buffer.from(await this.artifacts.get(ref)).toString('utf8')) as { schemaVersion: string; relations: CardAssociation[]; externalRelations?: ExternalAssociation[] };
+      if (![contract, externalContract].includes(data.schemaVersion)) continue;
       let stale = false;
       for (const relation of data.relations) {
         if (!valid(relation.fromCardId, relation.fromVersionId, relation.fromBodyDigest) || !valid(relation.toCardId, relation.toVersionId, relation.toBodyDigest)) { stale = true; continue; }
         if (relation.fromCardId === cardId || relation.toCardId === cardId) relations.set(relation.relationId, relation);
       }
+      for (const relation of data.externalRelations ?? []) {
+        if (!valid(relation.cardId, relation.versionId, relation.bodyDigest)) { stale = true; continue; }
+        const material = this.materials.store.get(relation.materialId);
+        if (!material || material.textRef.sha256 !== relation.materialDigest || !await this.artifacts.verify(material.textRef) || !await this.artifacts.verify(material.rawRef)) { stale = true; continue; }
+        if (relation.cardId === cardId) externalRelations.set(relation.relationId, relation);
+      }
       if (stale) staleTasks++;
     }
-    return { cardId, relations: [...relations.values()], staleTasks, replacementVerified: false, scope: 'INTERNAL_ONLY' };
+    return { cardId, relations: [...relations.values()], externalRelations: [...externalRelations.values()], staleTasks, replacementVerified: false, scope: externalRelations.size ? 'INTERNAL_AND_EXTERNAL' : 'INTERNAL_ONLY' };
   }
 }

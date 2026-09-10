@@ -273,7 +273,9 @@ export function mapHttpError(error: unknown, id = 'req_unknown'): { status: numb
   const message = error instanceof Error ? error.message : String(error);
   const code = message.split(':', 1)[0] || 'INTERNAL_ERROR';
   if (code === 'MATERIAL_NOT_FOUND') return { status: 404, body: errorBody(code, '材料不存在', id) };
+  if (code.startsWith('ASSOCIATION_')) return { status: 422, body: errorBody(code, code, id) };
   if (code.startsWith('MATERIAL_')) return { status: 422, body: errorBody(code, code, id) };
+  if (code === 'PIPELINE_INPUT_INVALID') return { status: 422, body: errorBody(code, '流程输入无效', id) };
   if (code === 'PIPELINE_NOT_FOUND') return { status: 404, body: errorBody(code, '流程不存在', id) };
   if (['PIPELINE_CONTRACT_INCOMPATIBLE', 'PIPELINE_INPUT_CHANGED', 'PIPELINE_NOT_RESUMABLE'].includes(code)) return { status: 409, body: errorBody(code, code, id) };
   if (['PIPELINE_SHUTDOWN', 'PIPELINE_OWNER_UNAVAILABLE'].includes(code)) return { status: 503, body: errorBody(code, code, id) };
@@ -386,6 +388,12 @@ export function createKnowledgeServer(input: {
           if (typeof payload.sourceId !== 'string' || typeof payload.applicability !== 'string') throw new Error('PAYLOAD_INVALID');
           send(response, 201, { material: await materials.capture(payload.sourceId, payload.applicability) }); return;
         }
+        const materialArtifact = /^\/api\/v1\/external-materials\/([^/]+)\/artifacts\/([a-f0-9]{64})$/.exec(url.pathname);
+        if (materialArtifact && request.method === 'GET') {
+          const result = await materials.artifact(decodeURIComponent(materialArtifact[1]!), materialArtifact[2]!);
+          response.setHeader('content-disposition', 'attachment; filename="material-evidence"');
+          send(response, 200, Buffer.from(result.bytes), result.ref.mediaType); return;
+        }
         const materialRoute = /^\/api\/v1\/external-materials\/([^/]+)$/.exec(url.pathname);
         if (materialRoute && request.method === 'GET') { send(response, 200, await materials.read(decodeURIComponent(materialRoute[1]!))); return; }
         const pipelines = composition.apps.workbenchPipelines;
@@ -393,9 +401,9 @@ export function createKnowledgeServer(input: {
           send(response, 200, { items: pipelines.dependencies.store.list() }); return;
         }
         if (url.pathname === '/api/v1/workbench-pipelines' && request.method === 'POST') {
-          const payload = await body(request); requireOnlyKeys(payload, ['snapshotId', 'scopes']);
+          const payload = await body(request); requireOnlyKeys(payload, ['snapshotId', 'scopes', 'materialIds']);
           if (typeof payload.snapshotId !== 'string') throw new Error('PAYLOAD_INVALID');
-          const pipeline = await pipelines.start(payload.snapshotId, payload.scopes as Parameters<typeof pipelines.start>[1]);
+          const pipeline = await pipelines.start(payload.snapshotId, payload.scopes as Parameters<typeof pipelines.start>[1], payload.materialIds as string[] | undefined);
           send(response, pipeline.status === 'SUCCEEDED' ? 200 : 202, { pipeline }); return;
         }
         const pipelineRoute = /^\/api\/v1\/workbench-pipelines\/([^/]+)(?:\/(resume|cancel))?$/.exec(url.pathname);
@@ -410,9 +418,9 @@ export function createKnowledgeServer(input: {
           send(response, 202, { pipeline }); return;
         }
         if (request.method === 'POST' && url.pathname === '/api/v1/associations') {
-          const payload = await body(request); requireOnlyKeys(payload, ['versionIds']);
+          const payload = await body(request); requireOnlyKeys(payload, ['versionIds', 'materialIds']);
           if (!Array.isArray(payload.versionIds) || payload.versionIds.some((id) => typeof id !== 'string')) throw new Error('PAYLOAD_INVALID');
-          const task = composition.apps.workbenchStages.start(composition.apps.workbenchAssociations.prepare(payload.versionIds as string[]));
+          const task = composition.apps.workbenchStages.start(composition.apps.workbenchAssociations.prepare(payload.versionIds as string[], payload.materialIds as string[] | undefined));
           send(response, task.status === 'SUCCEEDED' ? 200 : 202, { task }); return;
         }
         const associated = url.pathname.match(/^\/api\/v1\/associations\/([^/]+)$/);

@@ -67,6 +67,7 @@ export class SqliteWorkbenchPipelines implements WorkbenchPipelineStore {
   cancel(id: string): WorkbenchPipeline {
     return this.transaction(() => {
       const value = this.required(id);
+      if (value.contractVersion !== PIPELINE_CONTRACT) throw new Error('PIPELINE_CONTRACT_INCOMPATIBLE');
       if (!['PENDING', 'RUNNING'].includes(value.status)) return value;
       value.cancelRequested = true;
       if (value.status === 'PENDING') { value.status = 'CANCELLED'; value.reasonCode = 'PIPELINE_CANCELLED'; }
@@ -87,6 +88,7 @@ export class SqliteWorkbenchPipelines implements WorkbenchPipelineStore {
       for (const row of this.db.prepare('SELECT id,record,owner FROM wb_pipelines WHERE lease_id IS NOT NULL').all()) {
         if (!checkpointOwnerExited(JSON.parse(String(row.owner)))) continue;
         const value = JSON.parse(String(row.record)) as WorkbenchPipeline;
+        if (value.contractVersion !== PIPELINE_CONTRACT) continue;
         value.status = value.cancelRequested ? 'CANCELLED' : 'PAUSED'; value.reasonCode = value.cancelRequested ? 'PIPELINE_CANCELLED' : 'PIPELINE_PROCESS_EXITED';
         this.write(value); this.db.prepare('UPDATE wb_pipelines SET lease_id=NULL,owner=NULL WHERE id=?').run(String(row.id));
       }

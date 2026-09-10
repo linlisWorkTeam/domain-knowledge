@@ -190,7 +190,6 @@ export function createComposition(input: {
   let workbenchAssociations!: WorkbenchAssociations;
   const workbenchStages = new WorkbenchStages(stageStore, { INDEX: (context) => knowledgeIndex.build(context), GENERATE: (context) => workbenchGeneration.generate(context),
     FLYWHEEL: (context) => workbenchReconstruction.reconstruct(context), EVALUATE: (context) => workbenchEvaluation.evaluate(context), ASSOCIATE: (context) => workbenchAssociations.build(context) });
-  workbenchAssociations = new WorkbenchAssociations(repository, artifacts, knowledgeIndex, workbenchStages);
   const scanner = new SourceScanner(repositoryRoot, repository);
   const knowledgeDiscoveryApp = new KnowledgeDiscoveryApp(scanner, undefined, {
     migrate: (legacyKnowledgeRoot) => migrateLegacyOkf({
@@ -216,6 +215,7 @@ export function createComposition(input: {
   });
   const contentGovernance = new ContentGovernanceApp(contentGovernanceStore);
   const workbenchMaterials = new WorkbenchMaterials(contentGovernanceStore, new SqliteExternalMaterials(repository.database), artifacts, new MaterialText());
+  workbenchAssociations = new WorkbenchAssociations(repository, artifacts, knowledgeIndex, workbenchStages, workbenchMaterials);
   const metrics = input.operationalMetrics ?? new SQLiteOperationalMetrics(
     repository.database,
     () => new Date(input.clock?.() ?? Date.now()),
@@ -413,7 +413,7 @@ export function createComposition(input: {
     roles: new WorkbenchRoleExecution({ artifacts, contracts: new JsonSchemaAgentContractValidator(schemaRoot), model: workbenchGeneration.dependencies.model }) });
   workbenchEvaluation = new WorkbenchEvaluation({ projects: projectStore, repository, artifacts, native: new NativeToolchain(),
     configuration: runConfiguration, stages: workbenchStages, roles: workbenchReconstruction.dependencies.roles, evaluation: nativeEvaluation });
-  const workbenchPipelines = new WorkbenchPipelines({ environment: async (snapshotId, signal) => {
+  const workbenchPipelines = new WorkbenchPipelines({ materials: workbenchMaterials.store, environment: async (snapshotId, signal) => {
     const project = projectStore.get(snapshotId); if (!project) throw new Error('PROJECT_INPUT_NOT_FOUND');
     const fingerprints = [];
     for (const language of [...new Set(project.modules.map((module) => module.language))].sort()) {

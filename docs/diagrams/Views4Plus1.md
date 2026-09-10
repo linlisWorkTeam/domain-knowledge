@@ -208,7 +208,7 @@ sequenceDiagram
   A-->>U: 有效关系及适用条件，排除受版本变更影响的关系
 ```
 
-图中各阶段由同一持久化阶段服务承载，可分别启动或由knowledge-pipeline-v1独立协调租约顺序启动；行为通过不自动赋予发布资格。关系是可审计的引用事实，不保证可替代性；外部材料和自动修订为剩余实现范围。
+图中各阶段由同一持久化阶段服务承载，可分别启动或由knowledge-pipeline-v2独立协调租约顺序启动；行为通过不自动赋予发布资格。关系是可审计的引用事实，不保证可替代性；自动知识修订和发布为剩余实现范围。
 
 
 ```mermaid
@@ -225,7 +225,7 @@ flowchart LR
   UI -->|取消或同输入恢复| P
 ```
 
-指定外部材料捕获链路（已实现快照，关联任务选材待接线）：
+指定外部材料捕获链路（快照与关联任务选材已接线）：
 
 ```mermaid
 flowchart LR
@@ -236,4 +236,7 @@ flowchart LR
   RevisionCheck --> TextAdapter[UTF-8 正文转换]
   TextAdapter --> MaterialCAS[原始字节及正文 CAS]
   MaterialCAS --> MaterialRegistry[SQLite 不可变材料快照]
+  MaterialRegistry --> FrozenSelection[分步或一键冻结选材]
+  FrozenSelection --> Association[Domain 明确符号引用]
+  Association --> Evidence[关系索引与原文证据下载]
 ```
