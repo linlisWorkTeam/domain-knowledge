@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：提供Composition的外部入口、参数转换与响应处理。
  */
+import { SOURCE_COMPARISON_CONTRACT } from '../../domain/services/evaluation/NativeSourceComparison.ts';
 import { WorkbenchMaterials } from '../../application/services/WorkbenchMaterials.ts';
 import { SqliteExternalMaterials } from '../../infrastructure/sqlite/SqliteExternalMaterials.ts';
 import { MaterialText } from '../../infrastructure/source/MaterialText.ts';
@@ -189,7 +190,7 @@ export function createComposition(input: {
   let workbenchEvaluation!: WorkbenchEvaluation;
   let workbenchAssociations!: WorkbenchAssociations;
   const workbenchStages = new WorkbenchStages(stageStore, { INDEX: (context) => knowledgeIndex.build(context), GENERATE: (context) => workbenchGeneration.generate(context),
-    FLYWHEEL: (context) => workbenchReconstruction.reconstruct(context), EVALUATE: (context) => workbenchEvaluation.evaluate(context), ASSOCIATE: (context) => workbenchAssociations.build(context) });
+    FLYWHEEL: (context) => workbenchReconstruction.reconstruct(context), EVALUATE: (context) => workbenchEvaluation.evaluate(context), ASSOCIATE: (context) => workbenchAssociations.build(context) }, (input) => input.stage !== 'FLYWHEEL' || input.parameters.comparisonContract === SOURCE_COMPARISON_CONTRACT);
   const scanner = new SourceScanner(repositoryRoot, repository);
   const knowledgeDiscoveryApp = new KnowledgeDiscoveryApp(scanner, undefined, {
     migrate: (legacyKnowledgeRoot) => migrateLegacyOkf({

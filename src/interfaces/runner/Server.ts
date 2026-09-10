@@ -49,6 +49,7 @@ const assets = new Map([
   ['/KnowledgeIndex.js', 'KnowledgeIndex.js'],
   ['/RepositoryAnalysis.js', 'RepositoryAnalysis.js'],
   ['/KnowledgeGeneration.js', 'KnowledgeGeneration.js'],
+  ['/SourceComparison.js', 'SourceComparison.js'],
   ['/WorkbenchPipeline.js', 'WorkbenchPipeline.js'],
   ['/KnowledgeReconstruction.js', 'KnowledgeReconstruction.js'],
   ['/KnowledgeEvaluation.js', 'KnowledgeEvaluation.js'],

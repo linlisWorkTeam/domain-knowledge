@@ -208,7 +208,7 @@ sequenceDiagram
   A-->>U: 有效关系及适用条件，排除受版本变更影响的关系
 ```
 
-图中各阶段由同一持久化阶段服务承载，可分别启动或由knowledge-pipeline-v2独立协调租约顺序启动；行为通过不自动赋予发布资格。关系是可审计的引用事实，不保证可替代性；自动知识修订和发布为剩余实现范围。
+图中各阶段由同一持久化阶段服务承载，可分别启动或由knowledge-pipeline-v3独立协调租约顺序启动；行为通过不自动赋予发布资格。关系是可审计的引用事实，不保证可替代性；自动知识修订和发布为剩余实现范围。
 
 
 ```mermaid
@@ -239,4 +239,20 @@ flowchart LR
   MaterialRegistry --> FrozenSelection[分步或一键冻结选材]
   FrozenSelection --> Association[Domain 明确符号引用]
   Association --> Evidence[关系索引与原文证据下载]
+```
+
+
+重建诊断在 Code 之后读取参考源码，缓存绑定不变输入：
+
+```mermaid
+flowchart LR
+  Frozen[冻结知识/接口/构建/模型/工具链] --> Reuse{匹配已成功代码与角色证据}
+  Reuse -->|命中| Credit[幂等继承历史用量及代码工件]
+  Reuse -->|未命中| Code[Code 仅获取知识和公开接口]
+  Credit --> Check[重新检查生成接口]
+  Code --> Check
+  Reference[固定参考源码 CAS] --> Compare[公开函数规范化诊断]
+  Check --> Compare
+  Compare --> Evidence[差异与未解决项]
+  Evidence --> Evaluation[独立可信行为门禁]
 ```

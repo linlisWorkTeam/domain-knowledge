@@ -1,0 +1,24 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：交接规范化源码比较、代码缓存和双目标当前引擎真实验证。
+-->
+# 规范化源码比较与双目标验证
+
+工作树 /tmp/domain-knowledge-workbench，feat/five-stage-workbench；本轮基线7c81fd0cdf99ef2012a87d1c05b40a0b0156b042。完整目标仍active，不能标记全部完成。原wxc、taste/4310线上、v0.2.0未改。Node24/384MiB；所有测试、真实模型/编译、浏览器严格串行且本轮均已terminal。磁盘约240MiB，未删除知识库。用户允许不足时清理旧知识库，不能清理当前验收CAS和证据。
+
+新增Domain NativeSourceComparison：只比较选定公开函数，词法移除注释/空白，保留标识符/常量/预处理分支；作用域、参数类型及内置类型等价写法定位，复杂声明/歧义明确未解决。不宣称语义等价。总100000tokens、256函数、8MiB字符、800万编辑距离单元；报告公式、完整规范化函数体、200变更token预览、源码路径行号和词法控制关键词计数。类型/布局仍使用Clang接口比较。比较失败保留证据并失败，不伪造0相似度。源码只在Code完成后交给确定性比较，不给Code。
+
+新FLYWHEEL输入comparisonContract=native-source-comparison-v1；旧无诊断输入只读，不能start/resume/cancel/recover调度。Code缓存只排除已知诊断契约，仍绑定完整源码/卡片/配置/工具链摘要。冻结cache-selection，校验CAS、AgentCommand/Result、原成功任务、知识/接口/构建约束；不再请求相同Code。历史用量通过稳定inherited:sourceTaskId幂等记录继承；测试注入继承后检查点失败再恢复，证实不重复计费/调用。复用代码仍重新检查接口和比较。没有更改NativeFingerprint引擎文件。Pipeline升级knowledge-pipeline-v3，v1/v2只读，保留冻结外部材料。
+
+真实运行目录 /tmp/workbench-native-acceptance-20260910；配置仍在加密存储中，不输出。固定目标 /tmp/workbench-reference-inputs/jsmn 与tinyxml2，提交见tests/fixtures/nativeTargets/Targets.json。证据 /root/projects/domain-knowledge-releases/2026-09-10-workbench-progress/source-comparison/，Verification.json含完整编号及验证边界。
+
+jsmn v3 pipeline-ba0d833fd879279d8e2621f878cbed55641d1e78e39fc2b63bf89a20483b1157：重建stage-9ab2cef1dd2bc80c9ab929ba57b72e1d15bd28356f4232d85525b47263fa3add复用stage-2530337d83bf51459ced238af3a6cb25dcdf9d98b3ddd46581327c2f72d12ba1代码，继承原用量，无新增模型请求。公开函数2/2，init完全一致，parse词法相似度0.8926728586171311、距离104。可信生成测试重新运行31/31，40库内+5README引用=45关系。累计15calls218936tokens包含历史。随后补unsigned类型定位后从同CAS重新计算jsmn报告，deepEqual通过，结果未变。
+
+TinyXML2 v3 pipeline-9fee1fa45187c5058e421e3041c40d167d807def6ca473a6c8949f790a2e5190：复用9张生成卡片及索引，旧Code引擎摘要不同因此新调用一次Code、39480tokens。新FLY stage-6c90426ab4e9411531f90f05cf0e2b7f96426de30af1c4e03a212b73b1f82687，15/15选定XMLUtil重载均定位无未解决。EVAL stage-5377823175a28a2f7caa81d377387cb4eab75569b734f32c2f26d6e43d38019f，37个历史可信测试重新参考验证并评测生成代码37/37，proposed=0,reused=37,revalidated=true。关联stage-899ac86c4b8ccc1d8130b0bc25a24969cbd2cc9609f99edfdc0294d15b2cb7b6返回0条库内关系，无外部材料；这是实际空结果，不能伪造。当前Tiny完整五阶段通过不再只依赖旧引擎37/37。历史诊断TinyXml2HistoricalComparison.json仍明确currentEngineAcceptance=false，与新Pipeline报告分开。
+
+两者outcome=BEHAVIOR_PASSED_PUBLICATION_PENDING，均未发布。真实浏览器检查两组函数数量、行为用例、关系数、免登录下载、390窄屏无页面溢出；截图在证据目录。临时浏览器脚本 /tmp/SourceComparisonBrowser.ts 和/tmp/SourceComparisonTinyBrowser.ts；server.close已经自动释放composition，不要再次close。所有进程已结束。最后打开页面是Tiny，全局最近面板会展示Tiny。
+
+验证typecheck/Spec通过、architecture8、domain57、integration203、Console30通过。前轮交接Console31计数有误，本轮实际命令npm run test:ui -- Console.spec.ts匹配Console/ProductConsole/RunExecutionConsole共30项，完整成功；未改基线或放宽断言。测试新增诊断定位/字面量/重载、缓存输入绑定、失败恢复用量不重复、旧FLY只读，以及Console诊断说明。详细日志和Verification.json已保存。
+
+下一步：证据驱动的知识定点修订及多轮推进，不能把文本差异或候选参考失败直接判成知识错。复用ReviewAgentContract的已有H2定位、ITERATE/unresolvedRisks，与DocGenRevision.ts的baseKnowledgeRef/corrections/evidenceRefs约束；DocGen只能修改授权H2，生成新版本后先刷新索引，再重建并继承可信门禁。不因相似度无限重写等价代码。Pipeline当前每stage只有一个冻结child，修订循环需要版本化的迭代历史与累计预算，不能覆盖v3已完成输入。还欠固定发布门禁、TS统一执行边界/markdownLite最终回归、编译参数落地、多项目面板与阶段评测血缘、最终完整双目标修订链路和网站更新。经典卡片详情仍缺Stage评测投影，可能显示0，勿把31/31或37/37混成发布。以后改NativeFingerprint引擎文件，旧运行只能历史证据，不跨版本恢复。保持重验证串行，新增功能先Spec后实现。

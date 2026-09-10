@@ -3,8 +3,11 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：从固定卡片与公开接口启动隔离重建，保存代码和接口比较证据。
  */
+import type { AgentCommand, AgentResult } from '../../domain/agents/AgentContracts.ts';
 import { sha256, type ArtifactRef, type KnowledgeVersion } from '../../domain/Domain.ts';
 import { canonicalJson, type JsonValue } from '../../domain/services/workbench/StageTask.ts';
+import { compareNativeSources, SOURCE_COMPARISON_CONTRACT } from '../../domain/services/evaluation/NativeSourceComparison.ts';
+import { nativeCodeReuseKey } from '../../domain/services/evaluation/NativeCodeReuse.ts';
 import { canRepairNativeCode } from '../../domain/services/evaluation/NativeCodeRepair.ts';
 import { compareNativeInterfaces } from '../../domain/services/evaluation/NativeInterfaceComparison.ts';
 import type { ArtifactStore, FlywheelRepository } from '../ports/ApplicationPorts.ts';
@@ -66,16 +69,22 @@ export class WorkbenchReconstruction {
     }
     return { projectId: project.projectId, stage: 'FLYWHEEL', sourceRevision: project.commit, sourceDigest: project.sourceDigest,
       cardVersionIds: [...versionIds].sort(), configurationDigest: configurationRef.sha256,
-      parameters: { snapshotId, selectionDigest: this.selectionDigest(versions), configurationRef: json(configurationRef), fingerprints: json(fingerprints) } };
+      parameters: { comparisonContract: SOURCE_COMPARISON_CONTRACT, snapshotId, selectionDigest: this.selectionDigest(versions), configurationRef: json(configurationRef), fingerprints: json(fingerprints) } };
   }
   async reconstruct(context: StageExecutionContext) {
     const { artifacts, configuration, native, snapshot, roles, stages } = this.dependencies;
+    if (context.task.input.parameters.comparisonContract !== SOURCE_COMPARISON_CONTRACT) throw new Error('STAGE_CONTRACT_INCOMPATIBLE');
+    const reuseKey = nativeCodeReuseKey(context.task.input);
+    const cacheCandidate = stages.store.list().find((task) => task.taskId !== context.task.taskId && task.status === 'SUCCEEDED' && task.result && Array.isArray(task.result.summary.modules) && (task.result.summary.modules as Array<{ interfaceComparison?: { compatible?: boolean }; codeRef?: unknown; roleResultRef?: unknown }>).every((item) => item.interfaceComparison?.compatible && item.codeRef && item.roleResultRef) && reuseKey !== null && nativeCodeReuseKey(task.input) === reuseKey);
     const { project, versions } = this.selection(String(context.task.input.parameters.snapshotId), context.task.input.cardVersionIds);
     if (this.selectionDigest(versions) !== context.task.input.parameters.selectionDigest || project.sourceDigest !== context.task.input.sourceDigest || project.commit !== context.task.input.sourceRevision) throw new Error('STAGE_INPUT_CHANGED');
     const configurationRef = context.task.input.parameters.configurationRef as unknown as ArtifactRef;
     if (configurationRef.sha256 !== context.task.input.configurationDigest) throw new Error('STAGE_INPUT_CHANGED');
     const frozen = JSON.parse(await this.load(configurationRef)) as StageModelConfiguration;
     await configuration.assertStageCompatible(frozen);
+    const cacheSelection = await context.step('code-cache-selection', async () => ({ artifactRefs: [], summary: { sourceTaskId: cacheCandidate?.taskId ?? null } }));
+    const reusable = cacheSelection.summary.sourceTaskId ? stages.get(String(cacheSelection.summary.sourceTaskId)) : undefined;
+    if (reusable && (reusable.status !== 'SUCCEEDED' || nativeCodeReuseKey(reusable.input) !== reuseKey)) throw new Error('STAGE_ARTIFACT_CORRUPT');
     const fingerprints = context.task.input.parameters.fingerprints as unknown as Record<string, ArtifactRef>;
     const results: JsonValue[] = []; const artifactRefs: ArtifactRef[] = [];
     for (const module of project.modules.filter((module) => versions.some((version) => version.metadata.sourceModule === module.moduleId))) {
@@ -118,7 +127,33 @@ export class WorkbenchReconstruction {
       const buildContractRef = await artifacts.put(Buffer.from(JSON.stringify(buildContract)), 'application/json');
       const payload = { knowledgeRef, publicInterfaceRefs: interfaceRefs, languageId: language, buildContractRef, allowedGeneratedPaths: module.sourcePaths };
       context.progress({ phase: 'reconstruction', module: module.moduleId, versions: cards.map((card) => card.versionId) });
-      const generated = await roles.execute(context, frozen, 'code', revision ? `${module.moduleId}:repair:${revision}` : module.moduleId, { payload,
+      const cachedModule = !revision && reusable ? (reusable.result!.summary.modules as unknown as Array<{ moduleId: string; codeRef: ArtifactRef; roleResultRef: ArtifactRef }>).find((item) => item.moduleId === module.moduleId) : undefined;
+      let generated: { output: Record<string, unknown>; resultRef: ArtifactRef; rawRef: ArtifactRef };
+      if (cachedModule && reusable) {
+        const saved = await context.step(`code-cache:${module.moduleId}`, async () => {
+          const output = JSON.parse(await this.load(cachedModule.codeRef));
+          const result = JSON.parse(await this.load(cachedModule.roleResultRef)) as AgentResult;
+          roles.dependencies.contracts.assertResult(result);
+          const command = JSON.parse(await this.load(result.commandRef)) as AgentCommand;
+          roles.dependencies.contracts.assertCommand(command);
+          const owner = stages.get(result.runId);
+          const sourceBuild = JSON.parse(await this.load(command.payload.buildContractRef as ArtifactRef));
+          const { previousGeneratedAttempt: _priorAttempt, ...sourceConstraints } = sourceBuild;
+          const { previousGeneratedAttempt: _currentAttempt, ...constraints } = buildContract;
+          if (result.agentType !== 'code' || result.status !== 'SUCCEEDED' || command.agentType !== 'code'
+            || result.commandId !== command.commandId || result.runId !== command.runId || result.rawOutputRef?.sha256 !== cachedModule.codeRef.sha256
+            || owner.status !== 'SUCCEEDED' || nativeCodeReuseKey(owner.input) !== reuseKey
+            || canonicalJson(command.payload.knowledgeRef) !== canonicalJson(knowledgeRef)
+            || canonicalJson(command.payload.publicInterfaceRefs) !== canonicalJson(interfaceRefs)
+            || command.payload.languageId !== language || canonicalJson(command.payload.allowedGeneratedPaths) !== canonicalJson(module.sourcePaths)
+            || canonicalJson(sourceConstraints) !== canonicalJson(constraints)) throw new Error('RECONSTRUCTION_CACHE_BINDING_INVALID');
+          if (!Array.isArray(output.files)) throw new Error('STAGE_ARTIFACT_CORRUPT');
+          context.inheritUsage(reusable.taskId);
+          return { artifactRefs: [cachedModule.roleResultRef, cachedModule.codeRef], summary: { sourceTaskId: reusable.taskId } };
+        });
+        generated = { output: JSON.parse(await this.load(saved.artifactRefs[1]!)), resultRef: saved.artifactRefs[0]!, rawRef: saved.artifactRefs[1]! };
+        context.progress({ phase: 'code-reused', module: module.moduleId, sourceTaskId: reusable.taskId });
+      } else generated = await roles.execute(context, frozen, 'code', revision ? `${module.moduleId}:repair:${revision}` : module.moduleId, { payload,
         materials: [{ ref: knowledgeRef, content: knowledge }, { ref: interfaceRefs[0]!, content: api }, { ref: buildContractRef, content: buildContract }],
         sourcePaths: [], publicInterfacePaths: [], provenance: cards.map((card) => card.bodyRef), moduleId: module.moduleId });
       const files = generated.output.files as ToolchainFile[];
@@ -145,10 +180,24 @@ export class WorkbenchReconstruction {
         }
       });
       if ((await snapshot(language, project.build, context.signal)).digest !== fingerprint.digest) throw new Error('NATIVE_TEST_TOOLCHAIN_CHANGED');
+      const compared = await context.step(`source-comparison:${module.moduleId}${revision ? `:repair:${revision}` : ''}`, async () => {
+        const reference: ToolchainFile[] = [];
+        const referenceRefs: ArtifactRef[] = [];
+        for (const file of project.sourceFiles.filter((item) => item.kind === 'source' && module.sourcePaths.includes(item.path))) {
+          reference.push({ path: file.path, content: await this.load(file.ref) }); referenceRefs.push(file.ref);
+        }
+        let report;
+        try { report = compareNativeSources(reference, files, api.declarations, api.astFilter); }
+        catch (error) { report = { schemaVersion: SOURCE_COMPARISON_CONTRACT, available: false, requested: null, compared: 0, functions: [], unresolved: [{ reason: error instanceof Error ? error.message : 'SOURCE_COMPARISON_UNAVAILABLE' }], behaviorVerified: false, knowledgeErrorProven: false }; }
+        const ref = await artifacts.put(Buffer.from(JSON.stringify({ ...report, referenceRefs, codeRef: generated.rawRef, cardVersionIds: cards.map((card) => card.versionId) })), 'application/json');
+        return { artifactRefs: [ref, ...referenceRefs], summary: json(report) as { [key: string]: JsonValue } };
+      });
+      if (compared.summary.available === false) throw new Error('SOURCE_COMPARISON_UNAVAILABLE');
       const result = { moduleId: module.moduleId, language, cardVersionIds: cards.map((card) => card.versionId),
+        sourceComparisonRef: compared.artifactRefs[0], sourceComparison: compared.summary, codeReusedFrom: cachedModule ? reusable!.taskId : null,
         codeRef: generated.rawRef, roleResultRef: generated.resultRef, interfaceRef: interfaceRefs[0], comparisonRef: checked.artifactRefs[0],
-        interfaceComparison: checked.summary, behaviorVerified: false, revisions: [], unresolved: ['BEHAVIOR_EVALUATION_REQUIRED', 'NORMALIZED_SOURCE_COMPARISON_REQUIRED'] };
-      results.push(json(result)); artifactRefs.push(generated.rawRef, generated.resultRef, ...checked.artifactRefs);
+        interfaceComparison: checked.summary, behaviorVerified: false, revisions: [], unresolved: ['BEHAVIOR_EVALUATION_REQUIRED', ...(compared.summary.unresolved as unknown[]).length ? ['SOURCE_COMPARISON_UNRESOLVED'] : []] };
+      results.push(json(result)); artifactRefs.push(generated.rawRef, generated.resultRef, ...checked.artifactRefs, ...compared.artifactRefs);
     }
     return { artifactRefs, summary: { snapshotId: project.snapshotId, modules: results, evaluated: false, verified: false } };
   }

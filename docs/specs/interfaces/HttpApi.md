@@ -141,7 +141,7 @@ PENDING、Git 关闭、Git 冲突及认证失败使用可定位的错误码。AP
 
 ### 五阶段一键执行
 
-- `POST /api/v1/workbench-pipelines {snapshotId, scopes?, materialIds?}`：冻结生成输入并创建或复用knowledge-pipeline-v2协调记录，返回`{pipeline}`，202或已成功时200。
+- `POST /api/v1/workbench-pipelines {snapshotId, scopes?, materialIds?}`：冻结生成输入并创建或复用knowledge-pipeline-v3协调记录，返回`{pipeline}`，202或已成功时200。
 - `GET /api/v1/workbench-pipelines`：读取协调记录列表；`GET /api/v1/workbench-pipelines/:id`返回`pipeline`、按阶段排列的`tasks`、累计`usage`及`publicationVerified:false`。
 - `POST /api/v1/workbench-pipelines/:id/cancel {}`：取消协调和当前子任务；`POST .../resume {inputDigest}`只恢复同契约输入，累计子任务用量不重置。契约/输入冲突为409，不存在为404。
 - 所有入口使用现有匿名部署授权策略，无新增登录。旧契约可读，不能跨契约恢复。逐阶段状态、证据和下载继续复用stage-tasks接口。

@@ -14,6 +14,7 @@ export interface StageExecutionContext {
   task: StageTask;
   signal: AbortSignal;
   step(key: string, work: (idempotencyKey: string) => Promise<StageResult>): Promise<StageResult>;
+  inheritUsage(sourceTaskId: string): void;
   account(operationId: string, delta: Partial<StageUsage>): void;
   progress(detail: { [key: string]: JsonValue }): void;
 }
@@ -32,22 +33,25 @@ const paused = (code: string) => ['NATIVE_TRUSTED_REFERENCE_FAILED', 'NATIVE_TRU
 /** 所有启动入口共享持久化单执行槽；旧执行仅可读取，不自动跨版本恢复。 */
 export class WorkbenchStages {
   readonly store: StageTaskStore;
+  private readonly accepts: (input: StageInput) => boolean;
   private readonly handlers: Partial<Record<WorkbenchStage, StageHandler>>;
   private readonly pending = new Map<string, Promise<void>>();
   private readonly controllers = new Map<string, AbortController>();
   private closing = false;
   private readonly executionErrors = new Map<string, unknown>();
-  constructor(store: StageTaskStore, handlers: Partial<Record<WorkbenchStage, StageHandler>>) {
+  constructor(store: StageTaskStore, handlers: Partial<Record<WorkbenchStage, StageHandler>>, accepts: (input: StageInput) => boolean = () => true) {
+    this.accepts = accepts;
     this.store = store;
     this.handlers = handlers;
   }
   /** 服务恢复只接续尚未开始的任务；中断阶段停在 PAUSED，等待显式同输入恢复。 */
   recover(): void {
     this.store.recoverOrphans();
-    for (const task of this.store.list().reverse()) if (task.contractVersion === STAGE_CONTRACT && task.status === 'PENDING') this.schedule(task.taskId);
+    for (const task of this.store.list().reverse()) if (task.contractVersion === STAGE_CONTRACT && this.accepts(task.input) && task.status === 'PENDING') this.schedule(task.taskId);
   }
   start(input: StageInput, limits: StageLimits = {}): StageTask {
     if (this.closing) throw new Error('STAGE_SHUTDOWN');
+    if (!this.accepts(input)) throw new Error('STAGE_CONTRACT_INCOMPATIBLE');
     const task = this.store.insert(createStageTask(input, limits, new Date().toISOString()));
     if (task.status === 'PENDING') this.schedule(task.taskId);
     return task;
@@ -59,11 +63,13 @@ export class WorkbenchStages {
   }
   resume(taskId: string, expectedInputDigest: string): StageTask {
     if (this.closing) throw new Error('STAGE_SHUTDOWN');
+    if (!this.accepts(this.get(taskId).input)) throw new Error('STAGE_CONTRACT_INCOMPATIBLE');
     const task = this.store.resume(taskId, expectedInputDigest);
     this.schedule(taskId);
     return task;
   }
   cancel(taskId: string): StageTask {
+    if (!this.accepts(this.get(taskId).input)) throw new Error('STAGE_CONTRACT_INCOMPATIBLE');
     const task = this.store.cancel(taskId);
     this.controllers.get(taskId)?.abort(new Error('STAGE_CANCELLED'));
     return task;
@@ -129,6 +135,12 @@ export class WorkbenchStages {
           const result = await work(`${taskId}:${key}`);
           controller.signal.throwIfAborted();
           return this.store.checkpoint(taskId, leaseId, key, result).result;
+        },
+        inheritUsage: (sourceTaskId) => {
+          controller.signal.throwIfAborted();
+          const source = this.get(sourceTaskId);
+          if (source.status !== 'SUCCEEDED' || sourceTaskId === taskId) throw new Error('STAGE_USAGE_SOURCE_INVALID');
+          this.store.addUsage(taskId, leaseId, `inherited:${sourceTaskId}`, source.usage);
         },
         account: (operationId, delta) => {
           if ((delta.modelCalls ?? 0) > 0 || (delta.reservedTokens ?? 0) > 0) {

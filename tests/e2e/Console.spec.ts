@@ -1011,6 +1011,12 @@ test('操作中心从固定 Git 版本分析仓库，显示模块和环境且窄
     await page.getByRole('button', { name: '执行代码重建', exact: true }).click();
     await expect(page.locator('[data-reconstruction-panel]')).toContainText('重建及接口检查完成');
     await expect(page.locator('[data-reconstruction-panel]')).toContainText('公开接口匹配');
+    const comparison = page.locator('[data-reconstruction-panel] .source-comparison');
+    await expect(comparison).toContainText('定位 1/1 个公开函数');
+    await comparison.locator(':scope > summary').click();
+    await expect(comparison).toContainText('规范化代码一致');
+    await expect(comparison).toContainText('代码差异不等于知识错误');
+    await comparison.locator(':scope > summary').click();
     await expect(page.locator('[data-reconstruction-panel]')).toContainText('重建结果不代表行为验证或发布');
     const download = page.waitForEvent('download');
     await page.getByRole('button', { name: '下载生成代码', exact: true }).click();
