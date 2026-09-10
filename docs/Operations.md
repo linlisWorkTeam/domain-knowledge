@@ -260,3 +260,5 @@ C/C++验收输入固定在 `tests/fixtures/nativeTargets/Targets.json`：包含j
 真实验收脚本 `scripts/release/RunNativeWorkbench.ts` 的 steps 模式在行为通过后执行同一个来源复核入口，明确矛盾或未知风险返回失败并保留任务编号；处理后再继续。pipeline 模式使用当前v10自动修订流程，旧契约不得恢复。二者通过均标记 `BEHAVIOR_AND_SOURCE_PASSED_PUBLICATION_PENDING`，不冒充最终发布。
 
 固定参考验收可运行 `node scripts/release/RunNativeFixedCases.ts --target jsmn --repository /path/to/jsmn --report /path/to/report.json`；TinyXML2 将 target 改为 tinyxml2 并使用对应仓库。需 Node24、现有原生工具链及隔离环境。与模型/构建任务串行运行，保留报告；报告通过仍不能发布知识。
+
+评测已生成的固定版本时，给固定验收命令加 `--runtime /path/to/runtime --reconstruction-task stage-...`。脚本先验证参考实现，再从该任务的CAS读取生成代码，以相同固定用例独立执行，报告包含输入版本、正文与Code摘要。该命令不调用模型，失败不会修改代码或预期；`FIXED_GENERATED_VALIDATED` 仍不表示知识来源复核或发布完成。

@@ -180,3 +180,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 [2026-09-11-0540-whole-card-source-verification.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/07d1c3148e8731d1e4bd4dd13597cd905298e7ed/docs/epitaph/2026-09-11-0540-whole-card-source-verification.md) 接通来源复核v1与Console，并保留行为通过但正文错误的实际gcc受控反例。后续全208集成通过。真实旧Code协议失败和待修坏parser卡片仍是当时限制；没有发布。仅清理npm缓存，未删知识。
 
 [2026-09-11-0554-source-driven-revision.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/ac5c740d5111ae0912875a5360eb2a7a909fded6/docs/epitaph/2026-09-11-0554-source-driven-revision.md) 交付来源修订v1、共享卡片修订和索引恢复；真实v9行为31/31完成但坏parser卡仍未修正。整卡来源v1首次超时，后续恢复再次超时，已由v2替代，不再恢复。没有发布。
+
+[2026-09-11-0624-source-gated-pipeline.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/39f766e9295986913df43d1b72fe0ae955c6a03a/docs/epitaph/2026-09-11-0624-source-gated-pipeline.md) 交付pipeline-v10来源门禁与source-v2逐章恢复，集成212/单元75/架构8/Console31/受控验收19通过。真实旧source-v1两次超时，不再跨版本恢复。固定测试与最终发布当时未完成。

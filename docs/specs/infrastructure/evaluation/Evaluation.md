@@ -71,3 +71,5 @@ C/C++ 原生案例和既有 TypeScript 模块案例通过同一个 LanguageCaseT
 共用分派器正文加入原生与TypeScript工具链摘要。改变执行边界后重新验证缓存，不跨旧摘要恢复构建；正在进行的只读来源复核仍使用其冻结的既有执行证据。
 
 固定参考验收本次实际通过jsmn 11/11、XMLUtil 40/40；核对报告后在Targets.fixedSuite记录REFERENCE_VALIDATED和报告/工具链摘要。原trustedSuiteStatus保留，固定参考成功不等于候选测试自动晋升或生成实现通过。
+
+固定验收脚本可绑定成功重建任务执行生成代码：必须同时提供runtime与reconstruction-task，校验冻结项目提交/源码摘要/默认构建配置、模块及卡片版本、Code CAS和当前公开接口。参考分支先通过，才用相同冻结用例执行生成分支；生成分支不挂载参考实现。报告记录任务/inputDigest/Code摘要/知识正文摘要，失败保留真实逐案观察；FIXED_GENERATED_VALIDATED仍非来源匹配或发布授权。此验收入口只读取既有重建任务，不调用模型，不修改可信预期或正文。
