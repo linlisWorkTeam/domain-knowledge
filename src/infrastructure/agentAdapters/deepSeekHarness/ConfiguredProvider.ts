@@ -17,6 +17,8 @@ export const DSH_DEFAULT_MAX_TOKENS = 32_768;
 export const DSH_DEFAULT_MAX_SCHEMA_ATTEMPTS = 2;
 /** 对外提供窗口，作为调用方使用的统一约定。 */
 export const DSH_DEFAULT_CONTEXT_WINDOW = 128_000;
+/** SSE 帧有固定协议开销；累计传输上限独立于单行缓冲和模型输出上限。 */
+export const DSH_DEFAULT_MAX_WIRE_BYTES = 16 * 1024 * 1024;
 
 interface Options extends Partial<DshExecutionParameters> {
   /** 提供settings信息，供调用方读取或传入。 */
@@ -62,7 +64,7 @@ export class ConfiguredDshProvider implements AgentProvider {
     if (!request.workspaceRoot) throw new Error('DSH_AGENT_WORKSPACE_REQUIRED');
     const settings = this.options.settings;
     const endpoint = await (this.options.endpointPolicy ?? new PublicHttpsEndpointPolicy()).validate(settings.apiUrl);
-    const dispatcher = createPinnedHttpsDispatcher(endpoint, this.options.maxProviderResponseBytes);
+    const dispatcher = createPinnedHttpsDispatcher(endpoint, this.options.maxProviderResponseBytes ?? DSH_DEFAULT_MAX_WIRE_BYTES);
     const token = randomUUID();
     const abort = new AbortController();
     let transportError: string | null = null;
@@ -111,12 +113,12 @@ export class ConfiguredDshProvider implements AgentProvider {
         const decoder = new TextDecoder();
         for await (const chunk of response.body ?? []) {
           responseBytes += chunk.byteLength;
-          if (responseBytes > (this.options.maxProviderResponseBytes ?? 2 * 1024 * 1024)) throw new Error('DSH_PROVIDER_OUTPUT_LIMIT');
+          if (responseBytes > (this.options.maxProviderResponseBytes ?? DSH_DEFAULT_MAX_WIRE_BYTES)) throw new Error('DSH_PROVIDER_OUTPUT_LIMIT');
           if (!res.write(chunk)) await once(res, 'drain', { signal: abort.signal });
           pending += decoder.decode(chunk, { stream: true });
           const lines = pending.split('\n');
           pending = lines.pop() ?? '';
-          if (pending.length > 2 * 1024 * 1024) throw new Error('DSH_PROVIDER_OUTPUT_LIMIT');
+          if (pending.length > 2 * 1024 * 1024) throw new Error('DSH_PROVIDER_FRAME_LIMIT');
           for (const line of lines) {
             if (!line.startsWith('data: ')) continue;
             try {
@@ -135,7 +137,9 @@ export class ConfiguredDshProvider implements AgentProvider {
         }
         res.end();
       } catch (error) {
-        transportError = error instanceof Error && /^[A-Z_]+$/.test(error.message) ? error.message : 'DSH_PROVIDER_REQUEST_FAILED';
+        const limitCodes = [(error as { code?: unknown })?.code, (error as { cause?: { code?: unknown } })?.cause?.code];
+        transportError = limitCodes.includes('UND_ERR_RES_EXCEEDED_MAX_SIZE') ? 'DSH_PROVIDER_OUTPUT_LIMIT'
+          : error instanceof Error && /^[A-Z_]+$/.test(error.message) ? error.message : 'DSH_PROVIDER_REQUEST_FAILED';
         if (!res.headersSent) res.writeHead(400, { 'content-type': 'application/json' });
         res.end(JSON.stringify({ error: { message: transportError, type: 'invalid_request_error' } }));
       }

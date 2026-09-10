@@ -298,3 +298,50 @@ test('DSH adapter fails after the configured schema-attempt budget is exhausted'
     rmSync(directory, { recursive: true, force: true });
   }
 });
+
+
+test('native streaming separates bounded wire overhead from line buffers and explicit probe limits', async () => {
+  for (const scenario of [
+    { name: 'framed-success', bytes: 3 * 1024 * 1024, framed: true, error: null },
+    { name: 'wire-limit', bytes: 17 * 1024 * 1024, framed: true, error: /DSH_PROVIDER_OUTPUT_LIMIT/ },
+    { name: 'frame-limit', bytes: 3 * 1024 * 1024, framed: false, error: /DSH_PROVIDER_FRAME_LIMIT/ },
+    { name: 'probe-limit', bytes: 128 * 1024, framed: true, error: /DSH_PROVIDER_OUTPUT_LIMIT/, limit: 65_536 },
+  ]) {
+    const directory = mkdtempSync(join(tmpdir(), 'dsh-wire-'));
+    let requests = 0;
+    const upstream = createServer(async (request, response) => {
+      requests++;
+      for await (const _ of request) { /* drain the small request */ }
+      response.writeHead(200, { 'content-type': 'text/event-stream' });
+      // 单次只持有 8KiB；总帧开销较大不等于正文或内存需要同样大的缓冲。
+      const frame = scenario.framed ? ': ' + 'x'.repeat(8187) + '\n\n' : 'x'.repeat(8192);
+      try {
+        for (let bytes = 0; bytes < scenario.bytes && !response.destroyed; bytes += Buffer.byteLength(frame)) {
+          if (!response.write(frame)) await once(response, 'drain', { signal: AbortSignal.timeout(5000) });
+        }
+        if (!response.destroyed) response.end('data: ' + JSON.stringify({ id: 'stream-test', object: 'chat.completion.chunk', model: 'test-model',
+          choices: [{ index: 0, delta: { role: 'assistant', content: '{"answer":"ok"}' }, finish_reason: 'stop' }] }) + '\n\ndata: [DONE]\n\n');
+      } catch { response.destroy(); }
+    });
+    upstream.listen(0, '127.0.0.1'); await once(upstream, 'listening');
+    const address = upstream.address(); assert.ok(address && typeof address === 'object');
+    const apiUrl = `http://provider.invalid:${address.port}/v1/`;
+    const provider = new ConfiguredDshProvider({
+      settings: { provider: 'deepseek-harness', apiUrl, apiKey: 'fixture-only', model: 'test-model', enabled: true,
+        revision: 1, verificationStatus: 'VERIFIED', verificationReasonCode: 'READY', lastVerifiedAt: null,
+        verifiedFingerprint: null, updatedAt: new Date().toISOString() },
+      dshHome: join(directory, 'dsh'), maxSchemaAttempts: 1, maxTokens: 64,
+      maxProviderResponseBytes: scenario.limit,
+      endpointPolicy: { validate: async () => ({ url: new URL(apiUrl), addresses: ['127.0.0.1'] }) },
+      runtime: { processIsolation: 'bubblewrap', allowedWorkspaceRoots: [directory], timeoutMs: 15_000, maxOutputBytes: 65_536 },
+    });
+    try {
+      const pending = provider.run({ role: 'test-gen', prompt: 'Return JSON.', authorizedTools: [], workspaceRoot: directory,
+        idempotencyKey: scenario.name, outputSchema: { type: 'object', required: ['answer'], additionalProperties: false,
+          properties: { answer: { const: 'ok' } } } });
+      if (scenario.error) await assert.rejects(pending, scenario.error);
+      else assert.deepEqual(await pending, { answer: 'ok' });
+      assert.equal(requests, 1, 'a transport limit must not trigger another provider request');
+    } finally { upstream.closeAllConnections(); upstream.close(); await once(upstream, 'close'); rmSync(directory, { recursive: true, force: true }); }
+  }
+});
