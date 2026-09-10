@@ -31,7 +31,7 @@ export function baseBody(input: Input): string | undefined {
 }
 
 /** 显式文档路径只能指向当前文档，沿用 Review 的裸章节标题定位。 */
-function target(input: Input, path: string): string | null {
+function target(input: { moduleId: string }, path: string): string | null {
   const document = `knowledge/${input.moduleId}.md`;
   if (path === document) return null;
   if (path.startsWith(`${document}#`) && path.length > document.length + 1) return path.slice(document.length + 1);
@@ -61,6 +61,21 @@ function section(body: string, title: string): [number, number] {
   return [found.start, headings.find((heading) => heading.start > found.start && heading.level <= found.level)?.start ?? body.length];
 }
 
+/** Review 与 DocGen 共用定位：唯一原文片段归入所在章节，歧义一律拒绝。 */
+export function correctionTarget(body: string, moduleId: string, path: string): string | null {
+  const title = target({ moduleId }, path);
+  if (title === null) return null;
+  try { section(body, title); return title; } catch (error) {
+    const first = body.indexOf(path);
+    if (first < 0 || body.indexOf(path, first + 1) >= 0) throw error;
+    const headings = [...body.matchAll(/^ {0,3}#{1,6}\s+(.+?)\s*#*\s*$/gm)];
+    const enclosing = headings.filter((match) => match.index! < first).at(-1)?.[1];
+    if (!enclosing) throw error;
+    section(body, enclosing);
+    return enclosing;
+  }
+}
+
 /** 在模型调用前检查修订材料与定位，不让材料缺失变成新的生成任务。 */
 export function validateRevision(input: Input): void {
   const { corrections, qualityFeedback, baseKnowledgeRef } = input.payload;
@@ -74,7 +89,7 @@ export function validateRevision(input: Input): void {
       || !correction.criterion?.trim() || !correction.risk?.trim()
       || !Array.isArray(correction.evidenceRefs) || !correction.evidenceRefs.length) throw new Error('DOCGEN_CORRECTION_INVALID');
     ids.add(correction.correctionId);
-    const title = target(input, correction.knowledgePath);
+    const title = correctionTarget(body!, input.moduleId, correction.knowledgePath);
     if (title !== null) section(body!, title);
   }
 }
@@ -95,7 +110,7 @@ export function validateRevisionOutput(input: Input, revised: string): void {
   const body = baseBody(input);
   const corrections = input.payload.corrections ?? [];
   if (body === undefined || !corrections.length || input.payload.qualityFeedback !== undefined) return;
-  const titles = corrections.map((correction) => target(input, correction.knowledgePath));
+  const titles = corrections.map((correction) => correctionTarget(body!, input.moduleId, correction.knowledgePath));
   if (titles.includes(null)) return;
   const unique = [...new Set(titles as string[])];
   const before = outside(body, unique.map((title) => section(body, title)));

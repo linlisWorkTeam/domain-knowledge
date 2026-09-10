@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：实现证据复核角色的业务步骤与结构化结果转换。
  */
+import { correctionTarget } from '../docGenAgent/DocGenRevision.ts';
 import { sha256 } from '../../Domain.ts';
 import type { ExecutionContext, RoleResult, PendingArtifact } from '../AgentExecution.ts';
 import { assertActive } from '../AgentExecution.ts';
@@ -33,7 +34,7 @@ export async function execute(input: Input, context: ExecutionContext): Promise<
   const evidence = { evaluation: input.payload.evaluationReportRef, comparison: input.payload.comparisonReportRef };
   const corrections = review.corrections.map((correction) => ({
     correctionId: correctionId(correction.correctionId),
-    knowledgePath: correction.knowledgePath,
+    knowledgePath: correctionTarget(input.materials.find(({ ref }) => ref.artifactId === input.payload.knowledgeRef.artifactId)!.content as string, input.moduleId, correction.knowledgePath) ?? `knowledge/${input.moduleId}.md`,
     criterion: `${correction.problem}\n修订建议：${correction.suggestion}`,
     evidenceRefs: correction.evidence.map((kind) => evidence[kind]),
     risk: correction.problem,
