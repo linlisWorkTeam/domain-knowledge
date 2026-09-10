@@ -45,3 +45,23 @@ test('test-gen: unrelated candidate knowledge never reaches the prompt or worksp
   assert.doesNotMatch(sample.requests[0]!.prompt, /CANDIDATE_KNOWLEDGE_SECRET/);
   assert.deepEqual(sample.requests[0]!.readablePaths, [...sample.input.sourcePaths, ...sample.input.publicInterfacePaths]);
 });
+
+test('test-gen rejects undeclared test files and invented evidence and stores distinct artifacts', async () => {
+  const sample = roleExample<Input>('test-gen');
+  const result = await execute(sample.input, sample.context);
+  assert.deepEqual(result.payload.candidateSetRef, { pendingArtifact: 'tests' });
+  assert.deepEqual(result.payload.caseManifestRef, { pendingArtifact: 'cases' });
+  sample.output.cases[0].sourceEvidence = ['private.cpp'];
+  sample.context.model.execute = async () => sample.output;
+  await assert.rejects(execute(sample.input, sample.context), /CASE_MANIFEST_INVALID/);
+  sample.output.files[0].path = '../source.cpp';
+  await assert.rejects(execute(sample.input, sample.context), /OUTPUT_PATH_INVALID/);
+});
+
+test('validated source tests bypass the model even when the prompt changes', async () => {
+  const sample = roleExample<Input>('test-gen');
+  sample.context.effectivePrompt = 'new prompt';
+  sample.context.model.execute = async () => { throw new Error('must reuse'); };
+  const result = await execute(sample.input, { ...sample.context, validatedOutput: sample.output });
+  assert.deepEqual(result.output, sample.output);
+});

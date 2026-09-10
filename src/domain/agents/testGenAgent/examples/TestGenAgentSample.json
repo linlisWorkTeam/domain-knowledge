@@ -3,17 +3,14 @@
   "scenario": {
     "schemaVersion": "1.0",
     "name": "single-role-development",
-    "moduleId": "markdown-diff",
+    "moduleId": "cpp-module",
     "repositoryRoot": ".",
-    "expectedCommit": "a743ffcb624b1aca47d0f8adb272582ecf0250d6",
     "sourcePaths": [
-      "src/domain/services/markdown-diff.ts"
+      "tests/fixtures/cpp/Module.cpp"
     ],
-    "publicInterfacePaths": [
-      "examples/docgen/markdown-diff.d.ts"
-    ],
+    "publicInterfacePaths": [],
     "allowedGeneratedPaths": [
-      "src/domain/services/markdown-diff.ts"
+      "tests/fixtures/cpp/Module.cpp"
     ],
     "prepareCommands": [],
     "referenceCommands": [],
@@ -22,52 +19,56 @@
   },
   "iteration": 0,
   "payload": {
-    "moduleId": "markdown-diff",
+    "moduleId": "cpp-module",
     "sourceSnapshotRef": {
       "material": "source"
     },
-    "publicInterfaceRefs": [
-      {
-        "material": "interface"
-      }
-    ],
-    "languageId": "typescript",
+    "publicInterfaceRefs": [],
+    "languageId": "cpp",
     "testPolicyRef": {
       "material": "policy"
-    }
+    },
+    "allowedTestPaths": [
+      "tests/generated.cpp"
+    ]
   },
   "materials": {
     "source": {
       "content": {
-        "path": "src/domain/services/markdown-diff.ts",
-        "commit": "a743ffcb624b1aca47d0f8adb272582ecf0250d6",
-        "publicInterface": "structuredMarkdownDiff(before: string, after: string)"
+        "path": "tests/fixtures/cpp/Module.cpp",
+        "content": "int calculate() { return 4; }"
       },
       "mediaType": "application/json"
     },
     "policy": {
       "content": {
-        "policyId": "development",
-        "minimumStability": 1,
-        "requireAllTests": true,
-        "maxIterations": 1
+        "languageId": "cpp",
+        "standard": "c++17",
+        "allowedTestPaths": [
+          "tests/generated.cpp"
+        ]
       },
       "mediaType": "application/json"
-    },
-    "interface": {
-      "content": "/** Public API of the CPU example pinned in the runner; no implementation or oracle. */\nexport declare function structuredMarkdownDiff(beforeBody: string, afterBody: string): {\n  hunks: Array<{\n    oldStart: number; oldCount: number; newStart: number; newCount: number;\n    lines: Array<{ type: 'CONTEXT' | 'REMOVE' | 'ADD'; oldLine: number | null; newLine: number | null; text: string }>;\n  }>;\n  changedSections: string[];\n  rangeValidation: {\n    status: 'PASS'; scope: 'FULL_DOCUMENT'; oldLines: number; newLines: number;\n    algorithm: 'LCS' | 'BOUNDED_FALLBACK'; validated: true;\n  };\n};\n",
-      "mediaType": "text/plain"
     }
   },
   "modelOutput": {
-    "candidateCommands": [
+    "files": [
       {
-        "tool": "node",
-        "args": [
-          "--test"
-        ]
+        "path": "tests/generated.cpp",
+        "content": "#include <cassert>\n#include <cstdio>\nint calculate();\nint main() { assert(calculate() == 4); puts(\"1..1\\nok 1 - result\"); }\n"
       }
     ],
-    "oracleRequired": true
+    "cases": [
+      {
+        "caseId": "case-1",
+        "testPath": "tests/generated.cpp",
+        "target": "Public result",
+        "input": "calculate()",
+        "expected": "4",
+        "sourceEvidence": [
+          "tests/fixtures/cpp/Module.cpp"
+        ]
+      }
+    ]
   }
 }

@@ -262,6 +262,16 @@ export class KnowledgeFlywheelService {
   }
 
   /** 按生成键执行节点并幂等提交结果。 */
+  /** 读取已校验源码测试集的不可变引用。 */
+  getValidatedTestSuite(sourceKey: string): ArtifactRef | null { return this.repository.getValidatedTestSuite(sourceKey); }
+  /** 仅接受已保存且身份一致的测试集工件，再以首次成功值固定索引。 */
+  async saveValidatedTestSuite(sourceKey: string, suiteRef: ArtifactRef): Promise<ArtifactRef> {
+    assertInvariant(await this.artifacts.verify(suiteRef), 'validated test suite integrity mismatch');
+    const suite = JSON.parse(Buffer.from(await this.artifacts.get(suiteRef)).toString('utf8'));
+    assertInvariant(suite.sourceKey === sourceKey && suite.validationEvidenceRef, 'validated test suite source mismatch');
+    return this.repository.saveValidatedTestSuite(sourceKey, suiteRef);
+  }
+
   async executeNode(
     input: Omit<NodeCheckpoint, 'status' | 'outputRefs' | 'retryCount' | 'updatedAt'>,
     /** 提供 operation 对应的operation操作。 */

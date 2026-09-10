@@ -5,17 +5,17 @@
  */
 import type { ExecutionContext, RoleResult, PendingArtifact } from '../AgentExecution.ts';
 import { assertActive, pending } from '../AgentExecution.ts';
-import { type Input, type Output, schemaFor, validateInput } from './TestGenAgentContract.ts';
+import { type Input, type Output, type TestGenContext, schemaFor, validateInput, validateOutput } from './TestGenAgentContract.ts';
 import { definition, buildPrompt, readablePaths } from './TestGenAgentPrompt.ts';
 
 /** 仅根据源码、公开接口和测试策略提出候选测试，不接收候选知识作为依据。 */
-export async function execute(input: Input, context: ExecutionContext): Promise<RoleResult<Output>> {
+export async function execute(input: Input, context: TestGenContext): Promise<RoleResult<Output>> {
   assertActive(context.signal);
   // 缺失材料应在调用模型之前失败，避免模型用猜测填补业务证据。
   validateInput(input);
   const schema = schemaFor(input);
   // 角色决定本阶段的任务与能力范围；会话、工具执行和格式修复交给模型适配器。
-  const raw = await context.model.execute({
+  const raw = context.validatedOutput ?? await context.model.execute({
     role: definition.agentId,
     prompt: buildPrompt(input, context),
     outputSchema: schema,
@@ -26,14 +26,16 @@ export async function execute(input: Input, context: ExecutionContext): Promise<
   assertActive(context.signal);
   context.model.assertOutput(raw, schema);
   const output = raw as unknown as Output;
-  const artifacts: PendingArtifact[] = [];
+  validateOutput(output, input);
+  const artifacts: PendingArtifact[] = [
+    { key: 'tests', content: JSON.stringify(output.files), mediaType: 'application/json' },
+    { key: 'cases', content: JSON.stringify(output.cases), mediaType: 'application/json' },
+  ];
   const payload = {
     resultKind: 'testCandidates',
-    candidateSetRef: pending('raw'),
-    caseManifestRef: pending('raw'),
-    oracleClaims: [output.oracleRequired === true
-      ? 'reference oracle must pass before generated tests are trusted'
-      : 'candidate commands require deterministic evaluation'],
+    candidateSetRef: pending('tests'),
+    caseManifestRef: pending('cases'),
+    oracleClaims: ['Generated tests must pass on the original source before reuse'],
   };
   return { output, payload, artifacts };
 }

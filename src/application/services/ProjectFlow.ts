@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：协调项目Flow用例及其依赖的领域规则与端口。
  */
+import type { ProjectAgentConfiguration } from '../../domain/agents/ProjectAgentConfiguration.ts';
 import { sha256 } from '../../domain/Domain.ts';
 import type {
   ArtifactRef, GateDecision, KnowledgeVersion,
@@ -89,6 +90,10 @@ interface ReviewOutput {
 
 /** 定义Real源码Scenario的数据结构与类型约束。 */
 export interface RealSourceScenario {
+  /** 本轮冻结的项目级 Agent 编写约束。 */
+  agentConfiguration?: ProjectAgentConfiguration;
+  comparisonRules?: { id: string; description: string }[];
+  businessGoal?: string;
   /** 提供Schema版本信息，供调用方读取或传入。 */
   schemaVersion: '1.0';
   /** 提供名称信息，供调用方读取或传入。 */

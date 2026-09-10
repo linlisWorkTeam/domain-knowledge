@@ -3,6 +3,9 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：加载工作流上下文与历史工件，协调角色执行、独立评测和发布。
  */
+import type { Output as TestOutput } from '../../domain/agents/testGenAgent/TestGenAgentContract.ts';
+import { sourceIdentity, testValidationAction } from '../../domain/agents/testGenAgent/TestSuitePolicy.ts';
+import { validateProjectAgentConfiguration } from '../../domain/agents/ProjectAgentConfiguration.ts';
 import { renderKnowledgeDocument } from '../../domain/knowledge/KnowledgeDocument.ts';
 import type { Output as DocumentOutput } from '../../domain/agents/docGenAgent/DocGenAgentContract.ts';
 import type { Output as CodeOutput } from '../../domain/agents/codeAgent/CodeAgentContract.ts';
@@ -117,6 +120,7 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
   async execute(input: WorkflowStageInput): Promise<WorkflowStageResult> {
     const scenario = input.context.scenario as AutomatedProjectScenario | undefined;
     if (!scenario || scenario.schemaVersion !== '1.0') throw new Error('WORKFLOW_SCENARIO_INVALID');
+    if (input.nodeId === 'review' && input.context.testValidationRequired) return { route: 'STOPPED', detail: '测试参考校验未通过，等待人工处理' };
     switch (input.nodeId) {
       case 'orchestrator': return this.orchestrate(input, scenario);
       case 'doc_gen':
@@ -179,7 +183,8 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
     const ref = await this.runRole(input, scenario, agentId);
     return {
       detail: `${agentId} produced schema-validated role output`,
-      context: { [contextKey(input.nodeId, input.iteration, input.workerId)]: ref },
+      context: { [contextKey(input.nodeId, input.iteration, input.workerId)]: ref,
+        ...(agentId === 'test-gen' ? { testGenPrompt: input.prompt } : {}) },
     };
   }
 
@@ -204,6 +209,9 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
       ref, content: await this.readArtifact(ref),
     })));
     const snapshot = input.context.snapshot as ProjectSnapshot;
+    const cachedSuite = agentId === 'test-gen' && !input.context.testRepair
+      ? this.flywheel.getValidatedTestSuite(await this.testSourceKey(input, scenario)) : null;
+    const cached = cachedSuite ? await this.readJson<{ output: TestOutput }>(cachedSuite) : undefined;
     return new RoleExecutionService(this.flywheel, this.contracts, this.nodeByAgent).execute({
       command, nodeId: input.workerId ? `${input.nodeId}:${input.workerId}` : input.nodeId,
       inputRefs: this.agentInputRefs(input, agentId),
@@ -216,6 +224,7 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
       context: {
         model: this.modelFactory({ provider: this.agentForRun(input.runId), command, stage: input, scenario }),
         command, effectivePrompt: input.prompt, iteration: input.iteration, signal: input.signal,
+        ...(cached ? { validatedOutput: cached.output } : {}),
         ...(agentId === 'doc-gen' && this.workerRuntime ? { docWorkers: new DocWorkerExecutionService({
           ...this.workerRuntime, stage: input, flywheel: this.flywheel, contracts: this.contracts, nodeByAgent: this.nodeByAgent,
           parent: { payload: command.payload as unknown as DocGenInput['payload'], materials,
@@ -326,38 +335,56 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
     };
   }
 
-  private async validateOracle(
-    input: WorkflowStageInput,
-    scenario: AutomatedProjectScenario,
-  ): Promise<WorkflowStageResult> {
+  private async testSourceKey(input: WorkflowStageInput, scenario: AutomatedProjectScenario): Promise<string> {
     const snapshot = input.context.snapshot as ProjectSnapshot;
-    const scenarioRef = input.context.scenarioRef as ArtifactRef;
-    const checkpoint = await this.flywheel.executeNode({
-      runId: input.runId,
-      nodeId: input.nodeId,
-      generationKey: `${input.runId}:${input.nodeId}:${input.iteration}`,
-      inputRefs: [scenarioRef, snapshot.manifestRef],
-    }, async () => {
-      const evaluation = await this.evaluator.evaluate({
-        label: `reference-oracle-${input.iteration}`,
-        snapshot,
-        generatedFiles: [],
-        prepareCommands: scenario.prepareCommands,
-        commands: scenario.referenceCommands,
-      }, input.signal);
-      if (!evaluation.passed) throw new Error(`REFERENCE_GATE_FAILED: ${evaluation.evidenceRef.artifactId}`);
-      return [evaluation.evidenceRef];
-    });
-    return {
-      detail: 'reference oracle passed',
-      context: { [contextKey('oracleEvidenceRef', input.iteration)]: checkpoint.outputRefs[0] },
-    };
+    const manifest = await this.readJson<{ files: { path: string; sha256: string }[] }>(snapshot.manifestRef);
+    return sourceIdentity(scenario.moduleId, [...scenario.sourcePaths, ...scenario.publicInterfacePaths], manifest.files);
+  }
+
+  private async validateOracle(input: WorkflowStageInput, scenario: AutomatedProjectScenario): Promise<WorkflowStageResult> {
+    validateProjectAgentConfiguration(scenario.agentConfiguration);
+    const snapshot = input.context.snapshot as ProjectSnapshot;
+    const sourceKey = await this.testSourceKey(input, scenario);
+    const cached = this.flywheel.getValidatedTestSuite(sourceKey);
+    let candidateRef = input.context[contextKey('test_gen', input.iteration)] as ArtifactRef;
+    if (!candidateRef) throw new Error('TEST_CANDIDATE_MISSING');
+    let roleStage = { ...input, nodeId: 'test_gen', agentId: 'test-gen' as const };
+    let output = await this.readAgentOutput<TestOutput>(candidateRef, 'test-gen', roleStage);
+    for (let repairs = 0; ; repairs++) {
+      const checked = await this.flywheel.executeNode({ runId: input.runId, nodeId: 'oracle_validation',
+        generationKey: `${input.runId}:oracle_validation:${input.iteration}:${repairs}:tests-v1`, inputRefs: [candidateRef, snapshot.manifestRef] }, async () => {
+        const evaluation = await this.evaluator.evaluate({ label: `test-reference-${input.iteration}-${repairs}`, snapshot,
+          generatedFiles: output.files, prepareCommands: scenario.prepareCommands, commands: scenario.referenceCommands }, input.signal);
+        return [evaluation.evidenceRef];
+      });
+      const evidenceRef = checked.outputRefs[0]!;
+      const evaluation = await this.readJson<ProjectEvaluation>(evidenceRef);
+      const action = testValidationAction({ passed: evaluation.passed, infrastructureFailure: evaluation.infrastructureFailure,
+        reused: Boolean(cached), repairs, maxRepairs: scenario.agentConfiguration.maxTestRepairs ?? 1 });
+      if (action === 'ACCEPT') {
+        const suiteRef = await this.flywheel.putArtifact(Buffer.from(JSON.stringify({ sourceKey, output, validationEvidenceRef: evidenceRef })), 'application/json');
+        const fixed = await this.flywheel.saveValidatedTestSuite(sourceKey, suiteRef);
+        return { detail: `source tests validated${cached ? ' and reused' : ''}`, context: {
+          [contextKey('oracleEvidenceRef', input.iteration)]: evidenceRef,
+          [contextKey('validatedTestSuiteRef', input.iteration)]: fixed,
+          [contextKey('test_gen', input.iteration)]: candidateRef,
+        } };
+      }
+      if (action === 'MANUAL') return { detail: '生成测试需要人工处理', route: 'STOPPED',
+        context: { testValidationRequired: { candidateRef, evidenceRef, repairs, infrastructureFailure: evaluation.infrastructureFailure } } };
+      roleStage = { ...roleStage, workerId: `repair-${repairs + 1}`, attempt: repairs + 2,
+        context: { ...input.context, testRepair: { candidateRef, failureRef: evidenceRef } },
+        prompt: input.context.testGenPrompt as string ?? input.prompt };
+      candidateRef = await this.runRole(roleStage, scenario, 'test-gen');
+      output = await this.readAgentOutput<TestOutput>(candidateRef, 'test-gen', roleStage);
+    }
   }
 
   private async evaluate(
     input: WorkflowStageInput,
     scenario: AutomatedProjectScenario,
   ): Promise<WorkflowStageResult> {
+    if (input.context.testValidationRequired) return { route: 'STOPPED', detail: '测试参考校验未通过，等待人工处理' };
     const snapshot = input.context.snapshot as ProjectSnapshot;
     const scenarioRef = input.context.scenarioRef as ArtifactRef;
     const codeRef = input.context[contextKey('code', input.iteration)] as ArtifactRef | undefined;
@@ -369,6 +396,9 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
       throw new Error('WORKFLOW_EVALUATION_INPUT_MISSING');
     }
     const code = await this.readAgentOutput<CodeOutput>(codeRef, 'code', input);
+    const suiteRef = input.context[contextKey('validatedTestSuiteRef', input.iteration)] as ArtifactRef | undefined;
+    if (!suiteRef) throw new Error('VALIDATED_TEST_SUITE_MISSING');
+    const suite = await this.readJson<{ output: TestOutput }>(suiteRef);
     for (const file of code.files) {
       if (!scenario.allowedGeneratedPaths.includes(file.path)) throw new Error(`PROJECT_PATH_DENIED: ${file.path}`);
     }
@@ -376,14 +406,14 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
       runId: input.runId,
       nodeId: input.nodeId,
       generationKey: `${input.runId}:${input.nodeId}:${input.iteration}`,
-      inputRefs: [scenarioRef, snapshot.manifestRef, bodyRef, codeRef, oracleRef, checkRef],
+      inputRefs: [scenarioRef, snapshot.manifestRef, bodyRef, codeRef, oracleRef, checkRef, suiteRef],
     }, async () => {
       const evaluation = await this.evaluator.evaluate({
         label: `generated-iteration-${input.iteration}`,
         snapshot,
-        generatedFiles: code.files,
+        generatedFiles: [...code.files, ...suite.output.files],
         prepareCommands: scenario.prepareCommands,
-        commands: input.iteration === 0 ? scenario.firstIterationCommands : scenario.finalCommands,
+        commands: scenario.finalCommands,
       }, input.signal);
       return [evaluation.evidenceRef];
     });
@@ -410,11 +440,11 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
   }
 
   private async route(input: WorkflowStageInput): Promise<WorkflowStageResult> {
-    if (input.context.docGenDecisionRequired) {
+    if (input.context.docGenDecisionRequired || input.context.testValidationRequired) {
       const run = this.flywheel.getRun(input.runId);
       if (run?.state === 'GENERATING') this.flywheel.transition(input.runId, 'LOW_CONFIDENCE');
-      return { route: 'STOPPED', detail: 'DocGen 等待用户决定文档范围',
-        context: { docGenDecisionRequired: input.context.docGenDecisionRequired } };
+      return { route: 'STOPPED', detail: input.context.testValidationRequired ? '测试参考校验未通过，等待人工处理' : 'DocGen 等待用户决定文档范围',
+        context: { docGenDecisionRequired: input.context.docGenDecisionRequired, testValidationRequired: input.context.testValidationRequired } };
     }
     const quality = input.context[contextKey('qualityReport', input.iteration)] as QualityReport | undefined;
     if (quality?.outcome === 'REJECTED') {
@@ -564,12 +594,17 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
         }
       }
     } else if (agentId === 'test-gen') {
+      validateProjectAgentConfiguration(scenario.agentConfiguration);
+      const testPolicyRef = await this.flywheel.putArtifact(Buffer.from(JSON.stringify({ languageId: scenario.agentConfiguration.languageId, standard: scenario.agentConfiguration.standard, allowedTestPaths: scenario.agentConfiguration.testPaths })), 'application/json');
+      const repair = input.context.testRepair as { candidateRef: ArtifactRef; failureRef: ArtifactRef } | undefined;
       payload = {
         moduleId: scenario.moduleId,
         sourceSnapshotRef: snapshot.manifestRef,
         publicInterfaceRefs,
         languageId: this.scenarioLanguage(scenario),
-        testPolicyRef: scenarioRef,
+        testPolicyRef,
+        allowedTestPaths: scenario.agentConfiguration.testPaths,
+        ...(repair ? { previousCandidateRef: repair.candidateRef, validationFailureRef: repair.failureRef } : {}),
       };
     } else if (agentId === 'code') {
       const knowledgeRef = input.context[contextKey('candidateBodyRef', input.iteration)] as ArtifactRef | undefined;
@@ -626,12 +661,12 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
   }
 
   private scenarioLanguage(scenario: AutomatedProjectScenario): string {
+    if (scenario.agentConfiguration) return scenario.agentConfiguration.languageId;
     const tool = scenario.finalCommands[0]?.tool ?? scenario.referenceCommands[0]?.tool ?? 'node';
     return tool === 'cargo' ? 'rust' : 'typescript';
   }
 
   private agentGenerationKey(input: WorkflowStageInput, agentId: AgentId): string {
-    if (agentId === 'test-gen') return `${input.runId}:test_gen:stable-source:contract-v5`;
     return `${input.runId}:${input.nodeId}:${input.iteration}:${input.workerId ?? 'main'}:contract-v5`;
   }
 
@@ -676,9 +711,9 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
       ref,
       expectedAgent,
       input.runId,
-      this.expectedAgentGenerationKey(input, expectedAgent, input.iteration),
+      this.expectedAgentGenerationKey(input, expectedAgent, input.iteration, input.workerId),
     );
-    const rawRef = result.outputRefs.find((outputRef) => outputRef.mediaType === 'application/json');
+    const rawRef = result.rawOutputRef ?? result.outputRefs.find((outputRef) => outputRef.mediaType === 'application/json');
     if (!rawRef) throw new Error(`AGENT_RESULT_RAW_OUTPUT_MISSING: ${expectedAgent}`);
     return this.readJson<T>(rawRef);
   }

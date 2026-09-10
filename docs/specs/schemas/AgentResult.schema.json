@@ -11,6 +11,7 @@
     "runId": {"type": "string", "minLength": 1},
     "agentType": {"enum": ["orchestrator", "doc-gen", "doc-worker", "test-gen", "code", "check", "review"]},
     "status": {"enum": ["SUCCEEDED", "FAILED"]},
+    "rawOutputRef": {"$ref": "https://wpknowledge.local/schemas/artifact-ref/v1"},
     "outputRefs": {
       "type": "array",
       "items": {"$ref": "https://wpknowledge.local/schemas/artifact-ref/v1"}

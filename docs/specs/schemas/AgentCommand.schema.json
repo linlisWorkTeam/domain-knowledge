@@ -110,13 +110,16 @@
     },
     "testgenPayload": {
       "type": "object",
-      "required": ["moduleId", "sourceSnapshotRef", "publicInterfaceRefs", "languageId", "testPolicyRef"],
+      "required": ["moduleId", "sourceSnapshotRef", "publicInterfaceRefs", "languageId", "testPolicyRef", "allowedTestPaths"],
       "properties": {
         "moduleId": {"type": "string", "minLength": 1},
         "sourceSnapshotRef": {"$ref": "#/$defs/artifactRef"},
         "publicInterfaceRefs": {"$ref": "#/$defs/artifactRefArray"},
         "languageId": {"type": "string", "pattern": "^[a-z][a-z0-9+.-]*$"},
-        "testPolicyRef": {"$ref": "#/$defs/artifactRef"}
+        "testPolicyRef": {"$ref": "#/$defs/artifactRef"},
+        "allowedTestPaths": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "previousCandidateRef": {"$ref": "#/$defs/artifactRef"},
+        "validationFailureRef": {"$ref": "#/$defs/artifactRef"}
       },
       "additionalProperties": false
     },

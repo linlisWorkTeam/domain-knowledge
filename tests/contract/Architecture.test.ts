@@ -120,7 +120,7 @@ test('each role owns execution, contract and prompt while application commits wi
       assert.ok(statSync(`src/domain/agents/${directory}/${file}`).isFile());
     }
     const agent = readFileSync(`src/domain/agents/${directory}/${name}.ts`, 'utf8');
-    assert.match(agent, /export async function execute\(input: Input, context: (?:ExecutionContext|DocGenContext)\)/);
+    assert.match(agent, /export async function execute\(input: Input, context: (?:ExecutionContext|DocGenContext|TestGenContext)\)/);
     assert.doesNotMatch(agent, /WorkflowStageInput|putArtifact|executeNode|repository\./);
   }
   const stages = readFileSync('src/application/services/AutomatedProjectWorkflow.ts', 'utf8');

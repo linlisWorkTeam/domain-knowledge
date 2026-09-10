@@ -1,44 +1,55 @@
 /**
  * Copyright (c) 2026 linlisWorkTeam
  * SPDX-License-Identifier: MIT
- * 文件功能：定义测试生成角色的输入输出契约、输出 Schema 与材料校验。
+ * 文件功能：定义测试源码和用例清单契约及授权边界。
  */
 import type { ArtifactRef } from '../../Domain.ts';
-import type { RoleInput } from '../AgentExecution.ts';
+import type { RoleInput, ExecutionContext } from '../AgentExecution.ts';
 import { requireMaterials } from '../AgentExecution.ts';
 
-/** 角色业务载荷。 */
+/** 测试只基于源码；失败候选仅在参考校验失败时显式传回。 */
 export interface Payload {
-  /** 提供模块标识信息，供调用方读取或传入。 */
-  moduleId: string;
-  /** 提供源码快照引用信息，供调用方读取或传入。 */
-  sourceSnapshotRef: ArtifactRef;
-  /** 提供publicInterface引用列表信息，供调用方读取或传入。 */
-  publicInterfaceRefs: ArtifactRef[];
-  /** 提供语言标识信息，供调用方读取或传入。 */
-  languageId: string;
-  /** 提供测试策略引用信息，供调用方读取或传入。 */
-  testPolicyRef: ArtifactRef;
+  moduleId: string; sourceSnapshotRef: ArtifactRef; publicInterfaceRefs: ArtifactRef[];
+  languageId: string; testPolicyRef: ArtifactRef; allowedTestPaths: string[];
+  previousCandidateRef?: ArtifactRef; validationFailureRef?: ArtifactRef;
 }
-/** 角色输入。 */
 export type Input = RoleInput<Payload>;
-/** 角色输出。 */
-export interface Output { candidateCommands: Record<string, unknown>[]; oracleRequired: boolean; }
-/** 对外提供输出Schema，作为调用方使用的统一约定。 */
+/** 用例与生成文件、源码依据一一建立可审计关系。 */
+export interface Output {
+  files: { path: string; content: string }[];
+  cases: { caseId: string; testPath: string; target: string; input: string; expected: string; sourceEvidence: string[] }[];
+}
+export interface TestGenContext extends ExecutionContext { validatedOutput?: Output }
+const text = { type: 'string', pattern: '\\S' };
 export const outputSchema: Record<string, unknown> = {
-  type: 'object', required: ['candidateCommands', 'oracleRequired'], additionalProperties: false,
+  type: 'object', required: ['files', 'cases'], additionalProperties: false,
   properties: {
-    candidateCommands: { type: 'array', minItems: 1, items: { type: 'object' } },
-    oracleRequired: { type: 'boolean' },
+    files: { type: 'array', minItems: 1, items: { type: 'object', required: ['path', 'content'], additionalProperties: false,
+      properties: { path: text, content: text } } },
+    cases: { type: 'array', minItems: 1, items: { type: 'object',
+      required: ['caseId', 'testPath', 'target', 'input', 'expected', 'sourceEvidence'], additionalProperties: false,
+      properties: { caseId: text, testPath: text, target: text, input: { type: 'string' }, expected: text,
+        sourceEvidence: { type: 'array', minItems: 1, uniqueItems: true, items: text } } } },
   },
 };
-
-/** 构造本次角色执行使用的输出 Schema。 */
-export function schemaFor(_input: Input): Record<string, unknown> {
-  return outputSchema;
-}
-
-/** 检查本角色必需字段及所引用材料是否完整。 */
+export function schemaFor(_input: Input): Record<string, unknown> { return outputSchema; }
+/** 生成路径不能覆盖原始源码、接口或其他文件。 */
 export function validateInput(input: Input): void {
-  requireMaterials(input.payload, input.materials, ['moduleId', 'sourceSnapshotRef', 'publicInterfaceRefs', 'languageId', 'testPolicyRef']);
+  requireMaterials(input.payload, input.materials, ['moduleId', 'sourceSnapshotRef', 'publicInterfaceRefs', 'languageId', 'testPolicyRef', 'allowedTestPaths']);
+  if (!['c', 'cpp'].includes(input.payload.languageId)) throw new Error('TESTGEN_LANGUAGE_INVALID');
+  for (const path of input.payload.allowedTestPaths) {
+    if (!/^[a-zA-Z0-9_][a-zA-Z0-9_./-]*\.(c|cc|cpp|cxx|h|hpp)$/.test(path)
+      || path.split('/').some((part) => !part || part === '.' || part === '..')
+      || [...input.sourcePaths, ...input.publicInterfacePaths].includes(path)) throw new Error('TESTGEN_PATH_INVALID');
+  }
+  if (Boolean(input.payload.previousCandidateRef) !== Boolean(input.payload.validationFailureRef)) throw new Error('TESTGEN_REPAIR_INPUT_INCOMPLETE');
+}
+/** 校验用例清单不能虚报不存在的文件或越界依据。 */
+export function validateOutput(output: Output, input: Input): void {
+  const paths = output.files.map((file) => file.path);
+  if (new Set(paths).size !== paths.length || paths.some((path) => !input.payload.allowedTestPaths.includes(path))) throw new Error('TESTGEN_OUTPUT_PATH_INVALID');
+  const ids = output.cases.map((item) => item.caseId);
+  if (new Set(ids).size !== ids.length || output.cases.some((item) => !paths.includes(item.testPath)
+    || item.sourceEvidence.some((path) => ![...input.sourcePaths, ...input.publicInterfacePaths].includes(path)))
+    || paths.some((path) => !output.cases.some((item) => item.testPath === path))) throw new Error('TESTGEN_CASE_MANIFEST_INVALID');
 }

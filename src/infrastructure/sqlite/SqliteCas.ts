@@ -145,6 +145,10 @@ export class SQLiteFlywheelRepository implements FlywheelRepository {
       PRAGMA synchronous = FULL;
       PRAGMA foreign_keys = ON;
 
+      CREATE TABLE IF NOT EXISTS validated_test_suites (
+        source_key TEXT PRIMARY KEY,
+        suite_ref_json TEXT NOT NULL
+      );
       CREATE TABLE IF NOT EXISTS schema_migrations (
         version INTEGER PRIMARY KEY,
         applied_at TEXT NOT NULL
@@ -755,6 +759,16 @@ export class SQLiteFlywheelRepository implements FlywheelRepository {
   }
 
   /** 读取检查点。 */
+  /** 同一源码首次成功固定测试，后续写入不替换已有版本。 */
+  getValidatedTestSuite(sourceKey: string): ArtifactRef | null {
+    const row = this.database.prepare('SELECT suite_ref_json FROM validated_test_suites WHERE source_key = ?').get(sourceKey) as { suite_ref_json: string } | undefined;
+    return row ? JSON.parse(row.suite_ref_json) as ArtifactRef : null;
+  }
+  saveValidatedTestSuite(sourceKey: string, suiteRef: ArtifactRef): ArtifactRef {
+    this.database.prepare('INSERT OR IGNORE INTO validated_test_suites (source_key, suite_ref_json) VALUES (?, ?)').run(sourceKey, JSON.stringify(suiteRef));
+    return this.getValidatedTestSuite(sourceKey)!;
+  }
+
   getCheckpoint(generationKey: string): NodeCheckpoint | null {
     const row = this.database.prepare('SELECT * FROM checkpoints WHERE generation_key = ?').get(generationKey) as Record<string, unknown> | undefined;
     return row ? this.checkpointFromRow(row) : null;

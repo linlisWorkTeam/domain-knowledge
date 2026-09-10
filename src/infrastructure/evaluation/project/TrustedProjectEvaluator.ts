@@ -8,7 +8,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import {
   existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync,
 } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { constants, tmpdir } from 'node:os';
 import {
   delimiter, dirname, isAbsolute, join, resolve, sep,
 } from 'node:path';
@@ -126,6 +126,7 @@ function installedPnpmStore(script: string): string | null {
 }
 
 function resolveTool(tool: ProjectTool, usePackageStore = false): ResolvedTool {
+  if (tool === 'gcc' || tool === 'g++') return { executable: tool, prefixArgs: [] };
   if (tool === 'node') return { executable: process.execPath, prefixArgs: [] };
   if (tool === 'pnpm') {
     const script = pnpmScript();
@@ -265,7 +266,7 @@ async function capture(
       signal?.removeEventListener('abort', abort);
       reject(error);
     });
-    child.once('close', (exitCode) => {
+    child.once('close', (exitCode, terminationSignal) => {
       if (settled) return;
       settled = true;
       clearTimeout(timeout);
@@ -275,7 +276,7 @@ async function capture(
         return;
       }
       resolvePromise({
-        exitCode,
+        exitCode: exitCode ?? (terminationSignal ? 128 + constants.signals[terminationSignal] : null),
         timedOut,
         outputLimitExceeded,
         durationMs: Date.now() - startedAt,
@@ -308,6 +309,13 @@ export function parseTestCounts(output: string): { passed: number; total: number
   const nodePassed = output.match(/^[\s#\u2139]*pass\s+(\d+)\s*$/im);
   if (nodeTotal && nodePassed) {
     return { passed: Number(nodePassed[1]), total: Number(nodeTotal[1]), parsed: true };
+  }
+  const tapPlan = output.match(/^1\.\.(\d+)\s*$/m);
+  if (tapPlan) {
+    const passed = [...output.matchAll(/^ok\s+\d+\b/gm)].length;
+    const failed = [...output.matchAll(/^not ok\s+\d+\b/gm)].length;
+    const total = Number(tapPlan[1]);
+    if (passed + failed === total) return { passed, total, parsed: true };
   }
   return { passed: 0, total: 0, parsed: false };
 }
@@ -394,6 +402,9 @@ export class TrustedProjectEvaluator implements ProjectEvaluator {
         git: syncText('git', ['--version'], workspace),
         tar: syncText('tar', ['--version'], workspace).split('\n')[0],
       };
+      for (const compiler of ['gcc', 'g++'] as const) {
+        if (declaredTools.has(compiler)) toolchain[compiler] = syncText(compiler, ['--version'], workspace).split('\n')[0]!;
+      }
       if (declaredTools.has('pnpm')) toolchain.pnpm = syncText(process.execPath, [pnpmScript(), '--version'], workspace);
       if (declaredTools.has('cargo')) {
         toolchain.cargo = syncText('cargo', ['--version'], workspace);
@@ -417,8 +428,16 @@ export class TrustedProjectEvaluator implements ProjectEvaluator {
         }
         const commandCwd = command.cwd ? pathInside(workspace, command.cwd) : workspace;
         if (command.cwd) assertNoSymlink(workspace, command.cwd);
+        let tool: ResolvedTool;
+        let args = command.args;
+        if (command.tool === 'binary') {
+          const executable = safeRelativePath(args[0] ?? '');
+          assertNoSymlink(workspace, executable);
+          tool = { executable: pathInside(workspace, executable), prefixArgs: [] };
+          args = args.slice(1);
+        } else tool = resolveTool(command.tool, phase === 'prepare');
         const captured = await capture(
-          resolveTool(command.tool, phase === 'prepare'), command.args, commandCwd,
+          tool, args, commandCwd,
           timeoutMs, maxOutputBytes,
           redactionRoots, tempRoot, signal,
         );
