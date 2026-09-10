@@ -20,7 +20,7 @@ import type {
   ArtifactRef, EvaluationReport, GateDecision, KnowledgeVersion, ProvenanceRef,
 } from '../../domain/Domain.ts';
 import { assertInvariant, sha256 } from '../../domain/Domain.ts';
-import { structuredMarkdownDiff } from '../../domain/services/MarkdownDiff.ts';
+import { structuredMarkdownDiff } from '../../domain/knowledge/MarkdownDiff.ts';
 import {
   createPinnedHttpsDispatcher, PublicHttpsEndpointPolicy,
 } from '../http/PublicHttps.ts';

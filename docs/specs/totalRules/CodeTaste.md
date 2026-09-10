@@ -14,6 +14,8 @@ SPDX-License-Identifier: MIT
 
 工具约定名称保留：`AGENTS.md`、`README.md`、`CONTRIBUTING.md`、`SECURITY.md`、`LICENSE`、`package.json`、`package-lock.json`、`tsconfig.json`、`index.html`、GitHub PR 模板和隐藏配置；`fw.mjs` 为既有外部兼容入口。交接文件按项目规则保留时间戳命名。运行时生成文件与固定历史提交中的路径不改写。其他自有源码、脚本、文档、Schema 和静态资源使用大驼峰文件名，不再把角色目录写成 XxxAgent。
 
+Domain 按领域功能组织：agents、workflow、evaluation、association、knowledge、sourceScan、workspace、migration 是同层级目录，不设置 services 分组或总导出文件。领域服务类放在所属功能目录；Domain.ts 保留共享实体与不变量。
+
 统一异步入口不意味着输入输出类型相同。用显式注册和依赖注入复用，只有实际存在成组替换需求才引入工厂。业务步骤使用普通函数、条件和循环；不为一次调用添加基类。
 
 ## 注释和文件说明

@@ -5,7 +5,7 @@ SPDX-License-Identifier: MIT
 -->
 # 跨角色工作流设计
 
-代码位置：[src/domain/services/workflow/Workflow.ts](../../../../../src/domain/services/workflow/Workflow.ts)、[src/domain/services/workflow/AgentDefinitions.ts](../../../../../src/domain/services/workflow/AgentDefinitions.ts)、[src/application/services/AutomatedProjectWorkflow.ts](../../../../../src/application/services/AutomatedProjectWorkflow.ts)。
+代码位置：[src/domain/workflow/Workflow.ts](../../../../src/domain/workflow/Workflow.ts)、[src/domain/workflow/AgentDefinitions.ts](../../../../src/domain/workflow/AgentDefinitions.ts)、[src/application/services/AutomatedProjectWorkflow.ts](../../../../src/application/services/AutomatedProjectWorkflow.ts)。
 
 
 ## 输入、阶段和输出
@@ -24,6 +24,10 @@ SPDX-License-Identifier: MIT
 
 `ProjectWorkflowStages` 加载历史知识、纠正意见、质量反馈和可信工件，调用 RoleExecutionService；角色不查询历史数据库。质量拒绝反馈进入下一轮 DocGen，预算用尽停止。评测由独立执行器完成，候选命令不直接成为门禁。
 
+## 运行生命周期
+
+[FlywheelDomainService](../../../../src/domain/workflow/FlywheelDomainService.ts) 封装创建 Run、状态迁移和生成能力声明，调用 Domain.ts 中的共享实体规则拒绝非法状态变化。Application 决定何时调用并保存结果；本模块不执行模型调用或数据库写入。业务连接与生命周期同属 workflow，LangGraph 引擎接线保留在 Infrastructure。
+
 ## 恢复和可观察性
 
 Application 冻结配置，LangGraph 保存执行 checkpoint，Registry 记录业务提交和节点投影。相同 generationKey 的完成结果可重放；同版本失败节点可恢复，旧 roleExecutionVersion 明确拒绝。取消信号传到模型和外部执行，迟到角色结果不能提交。
@@ -35,4 +39,4 @@ Application 冻结配置，LangGraph 保存执行 checkpoint，Registry 记录�
 两轮源码、双场景图、质量不足、取消和同版本恢复有现有测试入口；本轮文档重写不执行这些测试。业务规则修改定位本模块；仅调整一个角色内部步骤定位 agents 目录。
 
 
-文档关系：[设计目录](../../../README.md)负责代码与设计定位；[开发指南](../../../../Development.md)说明修改和交付步骤。
+文档关系：[设计目录](../../README.md)负责代码与设计定位；[开发指南](../../../Development.md)说明修改和交付步骤。

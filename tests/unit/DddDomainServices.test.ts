@@ -5,11 +5,9 @@
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {
-  AssociationDomainService,
-  EvalRunnerDomainService,
-  FlywheelDomainService,
-} from '../../src/domain/services/DomainServices.ts';
+import { AssociationDomainService } from '../../src/domain/association/AssociationDomainService.ts';
+import { EvalRunnerDomainService } from '../../src/domain/evaluation/EvalRunnerDomainService.ts';
+import { FlywheelDomainService } from '../../src/domain/workflow/FlywheelDomainService.ts';
 
 test('FlywheelDomainService owns lifecycle rules and keeps generation capabilities explicit', () => {
   const domain = new FlywheelDomainService();

@@ -11,9 +11,8 @@ import type {
   ArtifactRef, EvaluationReport, FlywheelRun, GateDecision, GatePolicy,
   KnowledgeVersion, ProvenanceRef, RunState,
 } from '../../domain/Domain.ts';
-import {
-  EvalRunnerDomainService, FlywheelDomainService,
-} from '../../domain/services/DomainServices.ts';
+import { EvalRunnerDomainService } from '../../domain/evaluation/EvalRunnerDomainService.ts';
+import { FlywheelDomainService } from '../../domain/workflow/FlywheelDomainService.ts';
 import type {
   ArtifactStore, EvaluationSubmission, FlywheelRepository, NodeCheckpoint, QualityPolicy,
   RunProjectionReader,
