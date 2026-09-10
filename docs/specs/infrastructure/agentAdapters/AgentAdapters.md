@@ -51,3 +51,7 @@ CompanyCodeAgentCliAdapter 保留进程调用和既有契约测试，真实公�
 ConfiguredProvider有界读取最多16KiB错误JSON，仅以机器code/type识别insufficient_quota、quota_exceeded、credit_balance_too_low；不依据自然语言或全部429推测额度耗尽。402无明确机器码映射PROVIDER_PAYMENT_REQUIRED，其他429仍为PROVIDER_RATE_LIMITED。模型错误正文不进入报告。所有这些传输失败不进入Schema/阶段语义重试。
 
 ProviderQuotaStop按端点与凭据摘要在私有DSH目录留下停止状态。先创建停止目录，再写固定原因；原因不可读时拒绝调用。每次上游请求检查，同一凭据的配置revision或模型变化不自动清除。原始凭据不写入标记；临时限流不产生永久标记。新实例和进程重启必须保持停止。
+
+### 流式超时诊断
+
+ConfiguredDshProvider 审计 metadata.streamDiagnostics 增加 JSON 编码的 provider-stream-diagnostics-v1，范围为单次 provider.run 的累计 HTTP 传输：请求数、首响应头/首数据/末数据距启动毫秒、接收字节、SSE 数据帧数、可见输出和 reasoning 字段的 UTF-16 字符数。只保存计数，不保存正文、推理内容、凭据、URL 或请求头。工具往返与内部格式重试属于同一 provider.run，快照显式标记累计范围。没有数据时首末时刻为 null。字符数不能换算或代替供应商 tokens；供应商未报告用量仍未知。该诊断不改变请求材料、角色期限、失败状态或发布门禁。

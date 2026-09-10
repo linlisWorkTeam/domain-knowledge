@@ -4,6 +4,7 @@
  * 文件功能：提供Configured提供方的基础设施实现与外部系统接入。
  */
 import { ProviderQuotaStop, providerErrorCode } from './ProviderQuota.ts';
+import { ProviderStreamDiagnostics } from './ProviderStreamDiagnostics.ts';
 import { randomUUID } from 'node:crypto';
 import { once } from 'node:events';
 import { createServer } from 'node:http';
@@ -77,6 +78,7 @@ export class ConfiguredDshProvider implements AgentProvider {
     let providerRequests = 0;
     let inputTokens: number | null = null;
     let outputTokens: number | null = null;
+    const streamDiagnostics = new ProviderStreamDiagnostics();
     // The real upstream credential stays in the parent. DSH receives only an
     // invocation-local relay token; DNS and redirects cannot escape approval.
     const relay = createServer(async (req, res) => {
@@ -97,12 +99,14 @@ export class ConfiguredDshProvider implements AgentProvider {
         if (!sessionId) throw new Error('DSH_AGENT_SESSION_MISMATCH');
         quota.assertAvailable();
         if (++providerRequests > (this.options.maxProviderRequests ?? Infinity)) throw new Error('PROVIDER_REQUEST_LIMIT');
+        streamDiagnostics.request();
         const response = await fetch(target, {
           method: 'POST', body: Buffer.concat(chunks), dispatcher, redirect: 'manual', signal: abort.signal,
           // 使用本次原生会话的稳定标识，工具往返保持一致，重试和其他角色各自隔离。
           headers: { 'content-type': 'application/json', 'user-agent': 'domain-knowledge/0.2.0',
             'x-opencode-session': sessionId, ...(settings.apiKey ? { authorization: `Bearer ${settings.apiKey}` } : {}) },
         });
+        streamDiagnostics.headers();
         if (response.status >= 300 && response.status < 400) {
           await response.body?.cancel();
           throw new Error('PROVIDER_REDIRECT_DENIED');
@@ -123,6 +127,7 @@ export class ConfiguredDshProvider implements AgentProvider {
         let responseBytes = 0;
         const decoder = new TextDecoder();
         for await (const chunk of response.body ?? []) {
+          streamDiagnostics.data(chunk.byteLength);
           responseBytes += chunk.byteLength;
           if (responseBytes > (this.options.maxProviderResponseBytes ?? DSH_DEFAULT_MAX_WIRE_BYTES)) throw new Error('DSH_PROVIDER_OUTPUT_LIMIT');
           if (!res.write(chunk)) await once(res, 'drain', { signal: abort.signal });
@@ -133,7 +138,9 @@ export class ConfiguredDshProvider implements AgentProvider {
           for (const line of lines) {
             if (!line.startsWith('data: ')) continue;
             try {
-              const usage = JSON.parse(line.slice(6)).usage;
+              const event = JSON.parse(line.slice(6));
+              streamDiagnostics.frame(event);
+              const usage = event.usage;
               // 同一 HTTP 流里的 usage 是累计快照；替换该请求旧值，工具往返的独立请求才相加。
               if (Number.isSafeInteger(usage?.prompt_tokens) && usage.prompt_tokens >= 0) {
                 inputTokens = (inputTokens ?? 0) - (requestInputTokens ?? 0) + usage.prompt_tokens;
@@ -170,7 +177,7 @@ export class ConfiguredDshProvider implements AgentProvider {
         maxSchemaAttempts: this.options.maxSchemaAttempts ?? DSH_DEFAULT_MAX_SCHEMA_ATTEMPTS,
         onAudit: async (record) => {
           const errorCode = transportError ?? record.errorCode;
-          await this.options.onAudit?.({ ...record, errorCode, metadata: { ...record.metadata, model: settings.model! } });
+          await this.options.onAudit?.({ ...record, errorCode, metadata: { ...record.metadata, model: settings.model!, streamDiagnostics: JSON.stringify(streamDiagnostics.snapshot()) } });
           await this.options.onInvocation?.({
             invocationId: `pinv_${randomUUID()}`, runId: String(request.metadata?.runId ?? ''), agentId: request.role,
             provider: 'deepseek-harness', model: settings.model!, startedAt: record.startedAt, completedAt: record.completedAt,

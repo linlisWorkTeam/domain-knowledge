@@ -188,3 +188,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 [2026-09-11-0635-language-case-boundary.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/6cba6d3374cce85a13a0450a46c8484da138d86e/docs/epitaph/2026-09-11-0635-language-case-boundary.md) 共享语言案例端口接通原生和既有 TS 执行，3单元/8架构/17集成通过。来源 v2 后续仍超时，最终发布与双目标完整链路未完成。
 
 [2026-09-11-0645-fixed-generated-acceptance.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/c15a9fdd55ba3f1a66bca871b25ba7f5cbdce589/docs/epitaph/2026-09-11-0645-fixed-generated-acceptance.md) 固定生成验收C11/11、C++40/40与错绑定拒绝通过；当时来源v2恢复仍未完成，后续第三次超时，已由v3替代。固定工作台独立阶段随后接通，最终发布未实现。
+
+[2026-09-11-0715-fixed-stage-ui.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/0889101d1c9d2468f5e20e48b1dc75c9da2c0fc7/docs/epitaph/2026-09-11-0715-fixed-stage-ui.md) 独立固定评测API/Console与真实C11/11、C++40/40通过，重复启动复用task/checkpoints/events。来源v2第三次超时，最终一键固定门禁与工作台发布仍未完成。

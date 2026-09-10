@@ -13,6 +13,38 @@ import test from 'node:test';
 import type { ProviderInvocationRecord, ProviderSettingsRecord } from '../../src/application/ports/ApplicationPorts.ts';
 import { ConfiguredDshProvider } from '../../src/infrastructure/agentAdapters/deepSeekHarness/ConfiguredProvider.ts';
 
+test('interrupted upstream streaming retains activity diagnostics while unreported token usage stays unknown', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'provider-stream-interruption-'));
+  const controller = new AbortController();
+  const invocations: ProviderInvocationRecord[] = []; const streams: Array<Record<string, unknown>> = [];
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const upstream = createServer((request, response) => {
+    request.resume(); response.writeHead(200, { 'content-type': 'text/event-stream' });
+    response.write(`data: ${JSON.stringify({ id: 'partial', object: 'chat.completion.chunk', created: 1, model: 'test-model', choices: [{ index: 0, delta: { reasoning_content: 'private response fragment' }, finish_reason: null }] })}\n\n`);
+    timer = setTimeout(() => controller.abort(), 250);
+  });
+  upstream.listen(0, '127.0.0.1'); await once(upstream, 'listening');
+  const address = upstream.address(); assert.ok(address && typeof address === 'object');
+  const provider = new ConfiguredDshProvider({
+    settings: { provider: 'deepseek-harness', apiUrl: `http://provider.invalid:${address.port}/v1`, apiKey: 'test-key', model: 'test-model', enabled: true,
+      revision: 1, verificationStatus: 'VERIFIED', verificationReasonCode: 'READY', lastVerifiedAt: '2026-09-04T00:00:00.000Z', verifiedFingerprint: 'test-only', updatedAt: '2026-09-04T00:00:00.000Z' },
+    runtime: { processIsolation: 'none', allowedWorkspaceRoots: [directory] }, dshHome: join(directory, 'agent'),
+    endpointPolicy: { validate: async raw => ({ url: new URL(raw.endsWith('/') ? raw : `${raw}/`), addresses: ['127.0.0.1'] }) },
+    onInvocation: record => { invocations.push(record); },
+    onAudit: record => { streams.push(JSON.parse(String(record.metadata.streamDiagnostics))); },
+  });
+  try {
+    await assert.rejects(provider.run({ role: 'review', prompt: 'Return an answer.', workspaceRoot: directory, idempotencyKey: 'interrupted-stream',
+      outputSchema: { type: 'object', required: ['answer'], properties: { answer: { type: 'string' } } } }, controller.signal));
+    assert.equal(controller.signal.aborted, true); assert.equal(streams.length, 1);
+    assert.equal(streams[0]!.requests, 1); assert.ok(Number(streams[0]!.responseBytes) > 0);
+    assert.equal(streams[0]!.reasoningUtf16Units, 'private response fragment'.length);
+    assert.equal(streams[0]!.contentUtf16Units, 0); assert.notEqual(streams[0]!.lastDataMs, null);
+    assert.equal(invocations[0]!.inputTokens, null); assert.equal(invocations[0]!.outputTokens, null);
+    assert.doesNotMatch(JSON.stringify(streams), /private response fragment|test-key/);
+  } finally { clearTimeout(timer); controller.abort(); upstream.closeAllConnections(); await new Promise<void>(resolve => upstream.close(() => resolve())); rmSync(directory, { recursive: true, force: true }); }
+});
+
 test('DSH adapter executes through the official native DSH SDK and reports token usage', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'pi-agent-'));
   let authorization = '';
@@ -20,6 +52,7 @@ test('DSH adapter executes through the official native DSH SDK and reports token
   let receivedBody = '';
   const sessionHeaders: string[] = [];
   const auditedSessions: string[] = [];
+  const streamAudits: unknown[] = [];
   writeFileSync(join(directory, 'source.txt'), 'AUTHORIZED_MATERIAL');
   const upstream = createServer(async (request, response) => {
     assert.equal(request.headers['user-agent'], 'domain-knowledge/0.2.0');
@@ -71,7 +104,7 @@ test('DSH adapter executes through the official native DSH SDK and reports token
       validate: async (raw) => ({ url: new URL(raw.endsWith('/') ? raw : `${raw}/`), addresses: ['127.0.0.1'] }),
     },
     onInvocation: (record) => { invocations.push(record); },
-    onAudit: (record) => { auditedSessions.push(record.sessionId!); },
+    onAudit: (record) => { auditedSessions.push(record.sessionId!); streamAudits.push(JSON.parse(String(record.metadata.streamDiagnostics))); },
   });
   try {
     const result = await provider.run({
@@ -93,6 +126,10 @@ test('DSH adapter executes through the official native DSH SDK and reports token
     assert.match(receivedBody, /AUTHORIZED_MATERIAL/);
     assert.equal(JSON.parse(receivedBody).max_tokens, 64, 'request ceiling reaches the actual tool-roundtrip HTTP request');
     assert.equal(sessionHeaders.length, 2);
+    const stream = streamAudits[0] as Record<string, number | string>;
+    assert.equal(stream.schemaVersion, 'provider-stream-diagnostics-v1');
+    assert.equal(stream.requests, 2); assert.ok(Number(stream.responseBytes) > 0); assert.ok(Number(stream.contentUtf16Units) > 0);
+    assert.doesNotMatch(JSON.stringify(stream), /test-key|AUTHORIZED_MATERIAL|answer/);
     assert.match(sessionHeaders[0]!, /^wp-[a-f0-9]{32}$/);
     assert.deepEqual(sessionHeaders, [auditedSessions[0], auditedSessions[0]], 'tool requests retain the native conversation ID');
     assert.equal(invocations.length, 1);
