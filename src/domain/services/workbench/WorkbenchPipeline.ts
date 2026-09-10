@@ -5,28 +5,48 @@
  */
 import { SOURCE_VERIFICATION_CONTRACT, sourceVerificationOutcome, type SourceCardResult } from '../knowledge/KnowledgeSourceVerification.ts';
 import { SOURCE_REVISION_CONTRACT } from '../knowledge/SourceRevision.ts';
-import { sha256 } from '../../Domain.ts';
+import { sha256, type ArtifactRef } from '../../Domain.ts';
+import { FIXED_EVALUATION_CONTRACT } from '../evaluation/NativeFixedEvaluation.ts';
 import { canonicalJson, createStageTask, type StageInput, type StageTask, type StageStatus, type WorkbenchStage } from './StageTask.ts';
-export const PIPELINE_CONTRACT = 'knowledge-pipeline-v12';
+export const PIPELINE_CONTRACT = 'knowledge-pipeline-v13';
 export interface IterationProgress { failed: string[]; total: number; passed: number }
-export interface PipelineIteration { number: number; versionIds: string[]; reconstruction?: StageTask; evaluation?: StageTask; revision?: StageTask; progress?: IterationProgress; sourceVerification?: StageTask; sourceRepairs?: string[] }
+export interface PipelineIteration { number: number; versionIds: string[]; reconstruction?: StageTask; evaluation?: StageTask; fixedEvaluation?: StageTask; revision?: StageTask; progress?: IterationProgress; sourceVerification?: StageTask; sourceRepairs?: string[] }
+export interface PipelineFixedSuite { moduleId: string; suiteRef: ArtifactRef }
 export interface WorkbenchPipeline {
+  fixedSuites?: PipelineFixedSuite[];
   iterations?: PipelineIteration[]; activeTaskId?: string; initialVersionIds?: string[];
   pipelineId: string; materialIds: string[]; environmentDigest: string; contractVersion: string; inputDigest: string;
   status: StageStatus; reasonCode: string | null; cancelRequested: boolean; resumeRequested: boolean;
   children: Partial<Record<WorkbenchStage, StageTask>>; completed: WorkbenchStage[];
   currentStage: WorkbenchStage; createdAt: string; updatedAt: string;
 }
-export function createPipeline(input: StageInput, now: string, environmentDigest: string, materialIds: string[] = [], initialVersionIds?: string[]): WorkbenchPipeline {
+export function createPipeline(input: StageInput, now: string, environmentDigest: string, materialIds: string[] = [], initialVersionIds?: string[], fixedSuites: PipelineFixedSuite[] = []): WorkbenchPipeline {
+  if (!Array.isArray(fixedSuites) || fixedSuites.length > 200 || fixedSuites.some(item => !item || typeof item.moduleId !== 'string' || !item.moduleId || !/^[a-f0-9]{64}$/.test(item.suiteRef?.sha256 ?? '')) || new Set(fixedSuites.map(item => item.moduleId)).size !== fixedSuites.length) throw new Error('PIPELINE_FIXED_INPUT_INVALID');
+  const selectedFixed = [...fixedSuites].sort((a, b) => a.moduleId.localeCompare(b.moduleId));
   if (!Array.isArray(materialIds) || materialIds.length > 32 || materialIds.some((id) => typeof id !== 'string' || !id) || new Set(materialIds).size !== materialIds.length) throw new Error('PIPELINE_INPUT_INVALID');
   if (initialVersionIds && (!initialVersionIds.length || initialVersionIds.some(id => typeof id !== 'string' || !id) || new Set(initialVersionIds).size !== initialVersionIds.length)) throw new Error('PIPELINE_CARD_SELECTION_INVALID');
   const selectedVersions = initialVersionIds ? [...initialVersionIds].sort() : null;
   const selectedMaterials = [...materialIds].sort();
   if (typeof environmentDigest !== 'string' || !environmentDigest || environmentDigest.length > 1024 || input.stage !== 'GENERATE') throw new Error('PIPELINE_INPUT_INVALID');
   const child = createStageTask(input, {}, now);
-  const digest = sha256(canonicalJson({ contract: PIPELINE_CONTRACT, generation: child.inputDigest, environmentDigest, materialIds: selectedMaterials, initialVersionIds: selectedVersions }));
-  return { ...(selectedVersions ? { initialVersionIds: selectedVersions } : {}), materialIds: selectedMaterials, pipelineId: `pipeline-${digest}`, environmentDigest, contractVersion: PIPELINE_CONTRACT, inputDigest: digest,
+  const digest = sha256(canonicalJson({ contract: PIPELINE_CONTRACT, generation: child.inputDigest, environmentDigest, materialIds: selectedMaterials, initialVersionIds: selectedVersions, fixedSuites: selectedFixed }));
+  return { ...(selectedVersions ? { initialVersionIds: selectedVersions } : {}), fixedSuites: selectedFixed, materialIds: selectedMaterials, pipelineId: `pipeline-${digest}`, environmentDigest, contractVersion: PIPELINE_CONTRACT, inputDigest: digest,
     iterations: [], status: 'PENDING', reasonCode: null, cancelRequested: false, resumeRequested: false, children: { GENERATE: child }, completed: [], currentStage: 'GENERATE', createdAt: now, updatedAt: now };
+}
+
+export function pipelineFixedFailure(task: StageTask, reconstructionTaskId: string): string | null {
+  if (task.status !== 'SUCCEEDED') return task.reasonCode ?? `STAGE_${task.status}`;
+  const summary = task.result?.summary;
+  if (task.input.stage !== 'EVALUATE' || task.input.parameters.operation !== 'FIXED_NATIVE_EVALUATION'
+    || task.input.parameters.fixedEvaluationContract !== FIXED_EVALUATION_CONTRACT || task.input.parameters.reconstructionTaskId !== reconstructionTaskId
+    || summary?.reconstructionTaskId !== reconstructionTaskId || summary.publicationVerified !== false
+    || !Array.isArray(summary.modules) || !summary.modules.length) return 'PIPELINE_FIXED_RESULT_INVALID';
+  const modules = summary.modules as Array<{ moduleId: string; status: string; referencePassed: boolean; interfaceCompatible: boolean; passed: number; total: number }>;
+  if (modules.some(module => !module || typeof module.moduleId !== 'string') || new Set(modules.map(module => module.moduleId)).size !== modules.length) return 'PIPELINE_FIXED_RESULT_INVALID';
+  const suites = task.input.parameters.suiteRefs;
+  if (!suites || Array.isArray(suites) || typeof suites !== 'object' || Object.keys(suites).length !== modules.length || modules.some(module => !Object.hasOwn(suites, module.moduleId))) return 'PIPELINE_FIXED_RESULT_INVALID';
+  return modules.every(module => module.status === 'FIXED_PASSED' && module.referencePassed === true && module.interfaceCompatible === true
+    && Number.isSafeInteger(module.total) && module.total > 0 && module.passed === module.total) ? null : 'PIPELINE_FIXED_FAILED';
 }
 export function pipelineStageFailure(task: StageTask): string | null {
   if (task.status !== 'SUCCEEDED') return task.reasonCode ?? `STAGE_${task.status}`;

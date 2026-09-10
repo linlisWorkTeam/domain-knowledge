@@ -70,6 +70,8 @@ test('analysis pins Git objects and does not read dirty source, test bodies or s
     const encodingCommit = fixture.git(['rev-parse', 'HEAD']);
     await assert.rejects(analyzer.readFiles(fixture.root, encodingCommit, ['binary.c']), /REPOSITORY_ENCODING_UNSUPPORTED/);
     assert.equal((await analyzer.readFiles(fixture.root, encodingCommit, ['bom.c']))[0]?.content, '\ufeffint bom(void);\n');
+    fixture.git(['rm', '-f', 'compile_commands.json']); fixture.git(['commit', '-qm', 'No compilation database']);
+    assert.equal(Object.hasOwn(await analyzer.analyze(fixture.root), 'buildCandidates'), false, 'empty optional analysis metadata must not change legacy manifest identity');
   } finally { rmSync(fixture.root, { recursive: true, force: true }); }
 });
 

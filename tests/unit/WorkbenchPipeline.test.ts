@@ -6,7 +6,7 @@
 import test from 'node:test';
 import { sourceInput, sourceResult } from '../helpers/WorkbenchSourceFixture.ts';
 import assert from 'node:assert/strict';
-import { pipelineStageFailure, pipelineStagnant, pipelineSourceFailure, pipelineSourceStagnant } from '../../src/domain/services/workbench/WorkbenchPipeline.ts';
+import { pipelineFixedFailure, pipelineStageFailure, pipelineStagnant, pipelineSourceFailure, pipelineSourceStagnant } from '../../src/domain/services/workbench/WorkbenchPipeline.ts';
 import { createStageTask, type WorkbenchStage, type StageResult } from '../../src/domain/services/workbench/StageTask.ts';
 test('pipeline advancement requires successful artifacts and behavior, not just task completion', () => {
   const task = (stage: WorkbenchStage, summary: StageResult['summary']) => ({ ...createStageTask({ projectId: 'p', stage, sourceRevision: 'r', sourceDigest: 's', configurationDigest: 'c', cardVersionIds: [], parameters: {} }, {}, 'now'), status: 'SUCCEEDED' as const, result: { artifactRefs: [], summary } });
@@ -42,4 +42,19 @@ test('source progress tracks newly repaired sections, not body hashes or a three
   assert.equal(pipelineSourceStagnant(rounds([['A'], ['A'], ['A'], ['A']])), true);
   const behavior = [[], [], [], ['regression']].map((failed, i) => ({ number: i + 1, versionIds: [`v${i}`], progress: { failed, passed: 1 - failed.length, total: 1 } }));
   assert.equal(pipelineStagnant(behavior), false, 'completed behavior phases cannot consume the new regression retry allowance');
+});
+
+test('fixed pipeline gate checks full module counts, oracle success and reconstruction identity', () => {
+  const task = { ...createStageTask({ projectId: 'p', stage: 'EVALUATE', sourceRevision: 'r', sourceDigest: 's', configurationDigest: 'c', cardVersionIds: ['v1'],
+    parameters: { operation: 'FIXED_NATIVE_EVALUATION', fixedEvaluationContract: 'fixed-native-evaluation-v1', reconstructionTaskId: 'code', suiteRefs: { module: {} } } }, {}, 'now'),
+    status: 'SUCCEEDED' as const, result: { artifactRefs: [], summary: { reconstructionTaskId: 'code', publicationVerified: false,
+      modules: [{ moduleId: 'module', status: 'FIXED_PASSED', referencePassed: true, interfaceCompatible: true, passed: 2, total: 2 }] } } };
+  assert.equal(pipelineFixedFailure(task, 'code'), null);
+  assert.equal(pipelineFixedFailure(task, 'other-code'), 'PIPELINE_FIXED_RESULT_INVALID');
+  task.result.summary.modules[0]!.passed = 1;
+  assert.equal(pipelineFixedFailure(task, 'code'), 'PIPELINE_FIXED_FAILED');
+  task.result.summary.modules[0]!.passed = 2; task.result.summary.modules[0]!.referencePassed = false;
+  assert.equal(pipelineFixedFailure(task, 'code'), 'PIPELINE_FIXED_FAILED');
+  task.result.summary.modules = [];
+  assert.equal(pipelineFixedFailure(task, 'code'), 'PIPELINE_FIXED_RESULT_INVALID');
 });

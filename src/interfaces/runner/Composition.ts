@@ -430,7 +430,7 @@ export function createComposition(input: {
   workbenchSourceVerification = new WorkbenchSourceVerification(workbenchEvaluation);
   workbenchFixedEvaluation = new WorkbenchFixedEvaluation(workbenchEvaluation);
   workbenchKnowledgeRevision = new WorkbenchKnowledgeRevision(workbenchEvaluation, flywheelApp, knowledgeIndex);
-  const workbenchPipelines = new WorkbenchPipelines({ materials: workbenchMaterials.store, environment: async (snapshotId, signal) => {
+  const workbenchPipelines = new WorkbenchPipelines({ artifacts, fixedEvaluation: workbenchFixedEvaluation, materials: workbenchMaterials.store, environment: async (snapshotId, signal) => {
     const project = projectStore.get(snapshotId); if (!project) throw new Error('PROJECT_INPUT_NOT_FOUND');
     const fingerprints = [];
     for (const language of [...new Set(project.modules.map((module) => module.language))].sort()) {

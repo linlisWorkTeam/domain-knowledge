@@ -405,9 +405,9 @@ export function createKnowledgeServer(input: {
           send(response, 200, { items: pipelines.dependencies.store.list() }); return;
         }
         if (url.pathname === '/api/v1/workbench-pipelines' && request.method === 'POST') {
-          const payload = await body(request); requireOnlyKeys(payload, ['snapshotId', 'scopes', 'materialIds']);
+          const payload = await body(request); requireOnlyKeys(payload, ['snapshotId', 'scopes', 'materialIds', 'fixedSuites']);
           if (typeof payload.snapshotId !== 'string') throw new Error('PAYLOAD_INVALID');
-          const pipeline = await pipelines.start(payload.snapshotId, payload.scopes as Parameters<typeof pipelines.start>[1], payload.materialIds as string[] | undefined);
+          const pipeline = await pipelines.start(payload.snapshotId, payload.scopes as Parameters<typeof pipelines.start>[1], payload.materialIds as string[] | undefined, payload.fixedSuites as Parameters<typeof pipelines.start>[3]);
           send(response, pipeline.status === 'SUCCEEDED' ? 200 : 202, { pipeline }); return;
         }
         const pipelineRoute = /^\/api\/v1\/workbench-pipelines\/([^/]+)(?:\/(resume|cancel))?$/.exec(url.pathname);

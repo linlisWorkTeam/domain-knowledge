@@ -1092,12 +1092,19 @@ test('操作中心从固定 Git 版本分析仓库，显示模块和环境且窄
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await expect(page.getByRole('button', { name: '分析仓库', exact: true })).toBeVisible();
     await page.screenshot({ path: test.info().outputPath('repository-analysis-mobile.png'), fullPage: true });
+    await page.locator('[data-workbench-pipeline-panel]').getByText('一键流程的固定用例', { exact: true }).click();
+    await page.locator('[data-pipeline-fixed="parser"]').setInputFiles({ name: 'PipelineFixed.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ schemaVersion: 'native-cases-v1', cases: [{
+      caseId: 'fixedParse', description: '固定解析结果', sections: ['fixed-interface#parse'], variables: [], calls: [{ function: 'parse', arguments: [], result: 'result' }],
+      observations: [{ name: 'result', kind: 'integer', read: { variable: 'result' } }], expected: { result: '1' },
+    }] })) });
+    await expect(page.locator('[data-workbench-pipeline-panel]')).toContainText('PipelineFixed.json');
     await page.getByRole('button', { name: '一键执行全部', exact: true }).click();
     await expect(page.locator('[data-workbench-pipeline-panel]')).toContainText('可信行为测试未通过');
     await expect(page.locator('[data-workbench-pipeline-panel]')).toContainText('知识关联 · 尚未启动');
     await expect(page.getByRole('button', { name: '恢复全部', exact: true })).toBeVisible();
     const pipelineRecords = instance.composition.apps.workbenchPipelines.dependencies.store.list();
     expect(pipelineRecords).toHaveLength(1);
+    expect(pipelineRecords[0]?.fixedSuites?.map(item => item.moduleId)).toEqual(['parser']);
     await expect(page.locator('[data-workbench-pipeline-panel]').getByRole('button', { name: 'Parser generated card', exact: true })).toBeVisible();
     expect(pipelineRecords[0]?.completed).toEqual(['GENERATE', 'INDEX', 'FLYWHEEL']);
     expect(instance.composition.apps.workbenchPipelines.detail(pipelineRecords[0]!.pipelineId).publicationVerified).toBe(false);

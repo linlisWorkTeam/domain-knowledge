@@ -3,7 +3,10 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：通过独立持久化协调记录串联现有五阶段用例。
  */
-import { PIPELINE_CONTRACT, createPipeline, pipelineStageFailure, pipelineRevisionFailure, pipelineStagnant, pipelineSourceFailure, pipelineSourceRepairs, pipelineSourceStagnant, type WorkbenchPipeline, type PipelineIteration } from '../../domain/services/workbench/WorkbenchPipeline.ts';
+import type { ArtifactStore } from '../ports/ApplicationPorts.ts';
+import type { WorkbenchFixedEvaluation, FixedModuleSuite } from './WorkbenchFixedEvaluation.ts';
+import type { PipelineFixedSuite } from '../../domain/services/workbench/WorkbenchPipeline.ts';
+import { PIPELINE_CONTRACT, createPipeline, pipelineFixedFailure, pipelineStageFailure, pipelineRevisionFailure, pipelineStagnant, pipelineSourceFailure, pipelineSourceRepairs, pipelineSourceStagnant, type WorkbenchPipeline, type PipelineIteration } from '../../domain/services/workbench/WorkbenchPipeline.ts';
 import { WORKBENCH_STAGES, canonicalJson, createStageTask, type StageInput, type StageTask, type WorkbenchStage } from '../../domain/services/workbench/StageTask.ts';
 import type { ExternalMaterialStore } from '../ports/ExternalMaterialPorts.ts';
 import type { WorkbenchPipelineStore } from '../ports/WorkbenchPipelinePorts.ts';
@@ -17,7 +20,7 @@ import type { WorkbenchEvaluation } from './WorkbenchEvaluation.ts';
 import type { KnowledgeIndexService } from './KnowledgeIndex.ts';
 import type { WorkbenchAssociations } from './WorkbenchAssociations.ts';
 export class WorkbenchPipelines {
-  readonly dependencies: { materials: Pick<ExternalMaterialStore, 'get'>; environment(snapshotId: string, signal?: AbortSignal): Promise<string>; store: WorkbenchPipelineStore; stages: WorkbenchStages; generation: Pick<WorkbenchGeneration, 'prepare'>;
+  readonly dependencies: { artifacts?: Pick<ArtifactStore, 'put' | 'get' | 'verify'>; fixedEvaluation?: Pick<WorkbenchFixedEvaluation, 'prepare'>; materials: Pick<ExternalMaterialStore, 'get'>; environment(snapshotId: string, signal?: AbortSignal): Promise<string>; store: WorkbenchPipelineStore; stages: WorkbenchStages; generation: Pick<WorkbenchGeneration, 'prepare'>;
     reconstruction: Pick<WorkbenchReconstruction, 'prepare'>; evaluation: Pick<WorkbenchEvaluation, 'prepare'> & Partial<Pick<WorkbenchEvaluation, 'progress'>>; revision?: Pick<WorkbenchKnowledgeRevision, 'prepare'>; sourceVerification?: Pick<WorkbenchSourceVerification, 'prepare'>; sourceRevision?: Pick<WorkbenchSourceRevision, 'prepare'>; index: Pick<KnowledgeIndexService, 'prepare'> & Partial<Pick<KnowledgeIndexService, 'currentVersions'>>; associations: Pick<WorkbenchAssociations, 'prepare'> };
   private readonly pending = new Map<string, Promise<void>>();
   private readonly controllers = new Map<string, AbortController>();
@@ -28,14 +31,23 @@ export class WorkbenchPipelines {
   detail(id: string) {
     const pipeline = this.get(id);
     const references = [...WORKBENCH_STAGES.flatMap(stage => pipeline.children[stage] ? [pipeline.children[stage]!] : []),
-      ...(pipeline.iterations ?? []).flatMap(round => [round.reconstruction, round.evaluation, round.revision, round.sourceVerification].filter((task): task is StageTask => Boolean(task)))];
+      ...(pipeline.iterations ?? []).flatMap(round => [round.reconstruction, round.evaluation, round.fixedEvaluation, round.revision, round.sourceVerification].filter((task): task is StageTask => Boolean(task)))];
     const tasks = [...new Map(references.map(child => [child.taskId, this.dependencies.stages.store.get(child.taskId) ?? child])).values()];
     return { pipeline, tasks, checkpoints: Object.fromEntries(tasks.map((task) => [task.taskId, this.dependencies.stages.store.checkpoints(task.taskId)])), publicationVerified: false,
       usage: tasks.reduce((sum, task) => ({ modelCalls: sum.modelCalls + task.usage.modelCalls, tokens: sum.tokens + task.usage.tokens,
         reservedTokens: sum.reservedTokens + task.usage.reservedTokens, elapsedMs: sum.elapsedMs + task.usage.elapsedMs }), { modelCalls: 0, tokens: 0, reservedTokens: 0, elapsedMs: 0 }) };
   }
-  async start(snapshotId: string, scopes: Record<string, GenerationScope> = {}, materialIds: string[] = []) {
+  async start(snapshotId: string, scopes: Record<string, GenerationScope> = {}, materialIds: string[] = [], fixedSuites: FixedModuleSuite[] = []) {
     if (!Array.isArray(materialIds) || materialIds.length > 32 || materialIds.some((id) => typeof id !== 'string' || !id) || new Set(materialIds).size !== materialIds.length) throw new Error('PIPELINE_INPUT_INVALID');
+    if (!Array.isArray(fixedSuites) || fixedSuites.length > 200 || fixedSuites.some(item => !item || typeof item.moduleId !== 'string' || !item.moduleId || Object.keys(item).some(key => !['moduleId', 'suite'].includes(key))
+      || item.suite?.schemaVersion !== 'native-cases-v1' || !Array.isArray(item.suite.cases) || !item.suite.cases.length || item.suite.cases.length > 64)
+      || new Set(fixedSuites.map(item => item.moduleId)).size !== fixedSuites.length) throw new Error('PIPELINE_FIXED_INPUT_INVALID');
+    const frozenFixed: PipelineFixedSuite[] = [];
+    const fixedInputs = fixedSuites.map(item => ({ moduleId: item.moduleId, content: canonicalJson(item.suite) })).sort((a, b) => a.moduleId.localeCompare(b.moduleId));
+    for (const item of fixedInputs) {
+      if (!this.dependencies.artifacts || !this.dependencies.fixedEvaluation) throw new Error('PIPELINE_FIXED_EVALUATION_REQUIRED');
+      frozenFixed.push({ moduleId: item.moduleId, suiteRef: await this.dependencies.artifacts.put(Buffer.from(item.content), 'application/json') });
+    }
     const selectedMaterials = [...materialIds].sort();
     for (const id of selectedMaterials) if (!this.dependencies.materials.get(id)) throw new Error('MATERIAL_NOT_FOUND');
     if (this.closing) throw new Error('PIPELINE_SHUTDOWN');
@@ -49,7 +61,7 @@ export class WorkbenchPipelines {
       const selected = this.dependencies.index.currentVersions(snapshotId, baseIds);
       if (JSON.stringify(selected) !== JSON.stringify(baseIds)) initialVersionIds = selected;
     }
-    const value = this.dependencies.store.insert(createPipeline(input, new Date().toISOString(), environment, selectedMaterials, initialVersionIds));
+    const value = this.dependencies.store.insert(createPipeline(input, new Date().toISOString(), environment, selectedMaterials, initialVersionIds, frozenFixed));
     if (value.status === 'PENDING') this.schedule(value.pipelineId, false);
     return value;
   }
@@ -143,6 +155,25 @@ export class WorkbenchPipelines {
           }
           let prepareRevision: () => Promise<StageInput>; let sourceRepair = false;
           if (!reason) {
+            if (value.fixedSuites?.length) {
+              const { artifacts, fixedEvaluation } = this.dependencies;
+              if (!artifacts || !fixedEvaluation) throw new Error('PIPELINE_FIXED_EVALUATION_REQUIRED');
+              if (!round.fixedEvaluation) {
+                const suites: FixedModuleSuite[] = [];
+                for (const item of value.fixedSuites) {
+                  if (!await artifacts.verify(item.suiteRef)) throw new Error('PIPELINE_FIXED_ARTIFACT_INVALID');
+                  suites.push({ moduleId: item.moduleId, suite: JSON.parse(Buffer.from(await artifacts.get(item.suiteRef)).toString('utf8')) });
+                }
+                const fixedInput = await fixedEvaluation.prepare(code.taskId, suites);
+                if (fixedInput.parameters.reconstructionTaskId !== code.taskId || fixedInput.projectId !== code.input.projectId
+                  || fixedInput.sourceRevision !== code.input.sourceRevision || fixedInput.sourceDigest !== code.input.sourceDigest
+                  || fixedInput.configurationDigest !== code.input.configurationDigest || fixedInput.parameters.snapshotId !== code.input.parameters.snapshotId
+                  || canonicalJson(fixedInput.cardVersionIds) !== canonicalJson(code.input.cardVersionIds)) throw new Error('PIPELINE_FIXED_INPUT_CHANGED');
+                round.fixedEvaluation = await freeze(fixedInput); store.save(value, lease.leaseId);
+              }
+              const fixed = await execute(round.fixedEvaluation); const fixedReason = pipelineFixedFailure(fixed, code.taskId);
+              if (fixedReason) { stop(fixed, fixedReason); return; }
+            }
             if (!this.dependencies.sourceVerification) throw new Error('PIPELINE_SOURCE_VERIFICATION_REQUIRED');
             if (!round.sourceVerification) {
               const sourceInput = await this.dependencies.sourceVerification.prepare(evaluated.taskId);

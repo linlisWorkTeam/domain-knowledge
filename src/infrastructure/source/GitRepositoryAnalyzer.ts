@@ -134,7 +134,7 @@ export class GitRepositoryAnalyzer implements RepositoryAnalyzer, RepositorySour
     if (buildSystems.includes('cmake') && !tools.find((tool) => tool.name === 'cmake')?.available) warnings.push('检测到 CMake 配置，但服务器没有可用的 cmake。');
     if (!sources.length) warnings.push('固定提交中没有可分析的源码。');
     return { schemaVersion: 'repository-analysis-v1', repositoryId: `repository-${sha256(root).slice(0, 32)}`, directory: root,
-      requestedRevision: revision, commit, sourceDigest: sha256(JSON.stringify(files)), files, modules, buildSystems, tools, buildCandidates,
+      requestedRevision: revision, commit, sourceDigest: sha256(JSON.stringify(files)), files, modules, buildSystems, tools, ...(buildCandidates.length ? { buildCandidates } : {}),
       resources: { availableMemoryBytes, availableDiskBytes }, warnings };
   }
 }
