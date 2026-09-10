@@ -32,8 +32,12 @@
   "materials": {
     "source": {
       "content": {
-        "path": "tests/fixtures/cpp/Module.cpp",
-        "content": "int calculate() { return 4; }"
+        "files": [
+          {
+            "path": "tests/fixtures/cpp/Module.cpp",
+            "content": "int calculate() { return 4; }"
+          }
+        ]
       },
       "mediaType": "application/json"
     },

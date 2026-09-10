@@ -35,3 +35,7 @@ Application 将真实 Check 原始报告作为 Review 的 `comparisonReportRef`�
 相似度算法、评分、权重和阈值仍属下一版本研究范围。当前不内置这些判据；没有配置规则时只允许空 findings，不能据此宣称比较覆盖完整。
 
 角色回归覆盖规则伪造、生成片段伪造、越界位置和 blocking 不一致。完整 C++ 流程验证 Check 报告进入 Review，报告引用进入最终 Gate 输入。
+
+## 本轮缺口修复验收
+
+比较规则必须非空且标识唯一；缺少配置必须停止，不能返回无差异。original 和 generated 证据都必须在冻结原文及生成文件中核验。

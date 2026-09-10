@@ -22,17 +22,22 @@ export const outputSchema: Record<string, unknown> = {
 export function schemaFor(_input: Input): Record<string, unknown> { return outputSchema; }
 export function validateInput(input: Input): void {
   requireMaterials(input.payload, input.materials, ['sourceSnapshotRef', 'generatedCodeRef', 'comparisonRulesRef']);
+  const rules = input.materials.find(({ ref }) => ref.artifactId === input.payload.comparisonRulesRef.artifactId)!.content as { id: string; description: string }[];
+  if (!Array.isArray(rules) || !rules.length || rules.some((rule) => !rule.id?.trim() || !rule.description?.trim())
+    || new Set(rules.map((rule) => rule.id)).size !== rules.length) throw new Error('CHECK_RULES_REQUIRED');
 }
 /** 差异必须指向实际生成文件和用户给定规则；不从模型文本推导相似度阈值。 */
 export function validateOutput(output: Output, input: Input): void {
   const read = (ref: ArtifactRef) => input.materials.find((item) => item.ref.artifactId === ref.artifactId)!.content;
   const code = read(input.payload.generatedCodeRef) as { files: { path: string; content: string }[] };
   const rules = read(input.payload.comparisonRulesRef) as { id: string; description: string }[];
+  const source = read(input.payload.sourceSnapshotRef) as { files?: { path: string; content?: string }[] };
   const paths = code.files.map((file) => file.path);
   if (output.scope.some((path) => !paths.includes(path)) || paths.some((path) => !output.scope.includes(path))) throw new Error('CHECK_SCOPE_INVALID');
   if (output.blocking !== output.findings.some((finding) => finding.severity === 'BLOCKER')) throw new Error('CHECK_BLOCKING_INCONSISTENT');
   for (const finding of output.findings) {
     if (![...input.sourcePaths, ...input.publicInterfacePaths].includes(finding.sourcePath) || !rules.some((rule) => rule.id === finding.ruleId) || !output.scope.includes(finding.path)
+      || !source.files?.find((file) => file.path === finding.sourcePath)?.content?.includes(finding.original)
       || !code.files.find((file) => file.path === finding.path)!.content.includes(finding.generated)) throw new Error('CHECK_EVIDENCE_INVALID');
   }
 }
