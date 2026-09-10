@@ -154,3 +154,6 @@ Application 保存初始风险元数据及每轮审计 CAS 工件，门禁 evide
 受控验证：本地完整回归 330/330 通过；随后增加非有限计数防护并保留旧缺失版本断言，最终定向 12/12 通过。独立模块隔离验收覆盖首轮失败、修订后通过并自动发布，同时保留两轮风险审计；原“行为测试全过但真实缺证据仍拒绝”断言保留并细分门禁原因。类型及 Spec 通过。Console 22/22 通过，新风险原因截图已审阅；最终提交 CI 状态见此次交接与证据索引。
 
 本次没有调用真实模型，没有改账本；SHA-256 仍为 f52cc9087ceee9638cb90e62bc05403b8bd85dac9febbaf19e04ddb183c76081。原 4/4 次启动保持不变。修复验证是受控模型数据，不证明 deepseek-v4-flash 已在 v4 完整通过；未打新安装包或发布正式 Release。历史854ac9c安装候选继续保留，不能冒充本次修复的安装验收。
+
+
+风险修复最终整合提交为 `9e35adfe5523c156dcbd8d0e1dc1a0fe490d4358`，合入远端 `e1c470e` 的 Domain/services 重构；风险规则现位于 `src/domain/services/knowledge/KnowledgeRisks.ts`。该提交 [CI 34430538172](https://github.com/linlisWorkTeam/domain-knowledge/actions/runs/34430538172) 类型、Spec、331/331 回归与 Console 22/22 全通过。整合前本地 330 项与整合后 CI 的统计分别保留；新增一项来自远端架构测试。证据目录 `/root/projects/domain-knowledge-releases/2026-09-10-risk-repair/` 含最终索引、日志、受控截图与摘要。本次只完成风险修复的受控验收，不新增真实飞轮或安装验收。

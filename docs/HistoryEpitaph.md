@@ -105,3 +105,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 - [2026-09-09-1640-provider-generation-probe.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/27ec9dfb3472f8a07327271470d8767efcebd4c7/docs/epitaph/2026-09-09-1640-provider-generation-probe.md)：生产 DSH 的一次 64 token 生成探针与受控取消/排队/输出限制验证；当时未调用真实提供方。后续第四次授权前已成功完成真实探针，完整飞轮仍受独立门禁约束。
 
 - [2026-09-09-1645-mvp-run-state.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/471dfc5fec5f4d37ce7f176ed3a07fe01c5e90f1/docs/epitaph/2026-09-09-1645-mvp-run-state.md)：新增执行状态投影与两阶段模型验证界面，失败不再伪装为 GENERATING；当时状态/HTTP 7 项、架构 7 项、Console 21 项及类型/Spec 通过，均为受控验证。未重建安装包或增加真实预算，后续集成与第四次真实验收分别见保留交接。合并开发结构分支时归档此记录，保留最近三份墓志铭。
+
+- [2026-09-09-1710-mvp-stage-repair-candidate.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/9e35adfe5523c156dcbd8d0e1dc1a0fe490d4358/docs/epitaph/2026-09-09-1710-mvp-stage-repair-candidate.md)：854ac9c 阶段修复候选的 321 回归、21 Console、离线安装与实际历史数据浏览器验证；当时真实预算为3/3。后续第四次已授权并失败，风险复核代码现为v4；旧安装与真实记录只作历史证据。
