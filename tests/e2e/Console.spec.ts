@@ -1071,6 +1071,8 @@ test('操作中心从固定 Git 版本分析仓库，显示模块和环境且窄
     await page.getByRole('button', { name: '分析仓库', exact: true }).click();
     await expect(page.locator('[data-repository-notice]')).toContainText('无法读取这个源码版本');
     await expect(page.locator('[data-repository-result]')).not.toContainText(commit);
+    await page.locator('[data-workbench-pipeline-panel] details').filter({ has: page.locator('[data-pipeline-round="1"]') }).locator('summary').click();
+    await page.getByRole('button', { name: '查看第 1 轮评测', exact: true }).click();
     await page.getByRole('button', { name: '查看修订依据', exact: true }).click();
     await page.getByRole('button', { name: '执行知识修订', exact: true }).click();
     await expect(page.locator('[data-knowledge-revision-panel]')).toContainText('受影响索引已刷新');
@@ -1082,7 +1084,7 @@ test('操作中心从固定 Git 版本分析仓库，显示模块和环境且窄
     await page.setViewportSize({ width: 1363, height: 936 });
     await page.screenshot({ path: test.info().outputPath('knowledge-revision-desktop.png'), fullPage: true });
     await page.locator('[data-knowledge-revision-panel]').screenshot({ path: test.info().outputPath('knowledge-revision-desktop-detail.png') });
-    const revisedTask = instance.composition.apps.workbenchStages.store.list().find(item => item.input.parameters.operation === 'KNOWLEDGE_REVISION')!;
+    const revisedTask = instance.composition.apps.workbenchStages.store.list().find(item => item.input.parameters.operation === 'KNOWLEDGE_REVISION' && item.input.parameters.evaluationTaskId === pipelineRecords[0]!.iterations![0]!.evaluation!.taskId)!;
     expect(revisedTask.result!.summary.outcome).toBe('REVISED_INDEXED');
     const updatedCard = instance.composition.repository.getKnowledgeVersion(String((revisedTask.result!.summary.updatedVersionIds as string[])[0]))!;
     expect(Buffer.from(await instance.composition.artifacts.get(updatedCard.bodyRef)).toString('utf8')).toContain(`来源提交：\`${commit}\``);

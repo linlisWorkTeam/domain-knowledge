@@ -6,6 +6,7 @@
 import { sha256, type ArtifactRef } from '../../domain/Domain.ts';
 import { canonicalJson, type JsonValue } from '../../domain/services/workbench/StageTask.ts';
 import { nativeFunctions, assertNativeContract, type NativeContract, type NativeBehaviorSuite } from '../../domain/services/evaluation/NativeBehaviorSuite.ts';
+import { compareNativeObservations, type NativeBehaviorCase, type NativeScalar } from '../../domain/services/evaluation/NativeBehaviorSuite.ts';
 import { nativeRevisionEvidence } from '../../domain/services/evaluation/NativeRevisionEvidence.ts';
 import { nativeCandidateHints } from '../../domain/services/evaluation/NativeCandidateFeedback.ts';
 import { markdownSections } from '../../domain/services/knowledge/KnowledgeSections.ts';
@@ -52,6 +53,22 @@ export class WorkbenchEvaluation {
       modules.push({ moduleId: summary.moduleId, reportRef: summary.reportRef, suiteRef: set.suiteRef, oracleRef: set.oracleRef, ...evidence });
     }
     return { taskId, inputDigest: task.inputDigest, modules, revisionAuthorized: false };
+  }
+  /** 比较失败用例本身，忽略可重命名的 caseId，不以正文或词法分数制造进展。 */
+  async progress(taskId: string) {
+    const task = this.dependencies.stages.get(taskId);
+    if (task.input.stage !== 'EVALUATE' || task.status !== 'SUCCEEDED' || !task.result) throw new Error('PIPELINE_PROGRESS_UNAVAILABLE');
+    const failed: string[] = []; let total = 0, passed = 0;
+    for (const module of task.result.summary.modules as unknown as Array<{ moduleId: string; reportRef: ArtifactRef }>) {
+      const report = await this.load<{ cases: Array<{ status: string; actual: Record<string, NativeScalar> | null; input: NativeBehaviorCase }> }>(module.reportRef);
+      for (const item of report.cases) {
+        total++;
+        if (item.status === 'PASSED' && item.actual !== null && compareNativeObservations(item.input, item.actual).length === 0) passed++;
+        else { const { caseId: _alias, description: _description, sections: _sections, ...input } = item.input; failed.push(sha256(canonicalJson({ moduleId: module.moduleId, input }))); }
+      }
+    }
+    if (!total) throw new Error('PIPELINE_PROGRESS_UNAVAILABLE');
+    return { total, passed, failed: [...new Set(failed)].sort() };
   }
   async start(reconstructionTaskId: string) {
     return this.dependencies.stages.start(await this.prepare(reconstructionTaskId));

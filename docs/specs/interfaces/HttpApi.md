@@ -143,8 +143,8 @@ PENDING、Git 关闭、Git 冲突及认证失败使用可定位的错误码。AP
 
 ### 五阶段一键执行
 
-- `POST /api/v1/workbench-pipelines {snapshotId, scopes?, materialIds?}`：冻结生成输入并创建或复用knowledge-pipeline-v3协调记录，返回`{pipeline}`，202或已成功时200。
-- `GET /api/v1/workbench-pipelines`：读取协调记录列表；`GET /api/v1/workbench-pipelines/:id`返回`pipeline`、按阶段排列的`tasks`、累计`usage`及`publicationVerified:false`。
+- `POST /api/v1/workbench-pipelines {snapshotId, scopes?, materialIds?}`：冻结生成输入并创建或复用knowledge-pipeline-v4协调记录，返回`{pipeline}`，202或已成功时200。
+- `GET /api/v1/workbench-pipelines`：读取协调记录列表；`GET /api/v1/workbench-pipelines/:id`返回`pipeline`、当前阶段及历史轮次去重后的`tasks`、累计`usage`及`publicationVerified:false`。
 - `POST /api/v1/workbench-pipelines/:id/cancel {}`：取消协调和当前子任务；`POST .../resume {inputDigest}`只恢复同契约输入，累计子任务用量不重置。契约/输入冲突为409，不存在为404。
 - 所有入口使用现有匿名部署授权策略，无新增登录。旧契约可读，不能跨契约恢复。逐阶段状态、证据和下载继续复用stage-tasks接口。
 
@@ -153,3 +153,9 @@ PENDING、Git 关闭、Git 冲突及认证失败使用可定位的错误码。AP
 `POST /api/v1/external-materials` 接受已登记 `sourceId` 和非空 `applicability`，校验固定来源修订，捕获 UTF-8 文本/Markdown/HTML/JSON（正文上限 2 MiB）；返回 `material`。不搜索、不递归读取链接。`GET /api/v1/external-materials` 返回不可变快照列表，`GET /api/v1/external-materials/:id` 返回材料及转换正文。原始和转换工件保存于 CAS；同修订/条件重复捕获返回相同标识，来源变动需先确认新修订。来源限制沿用既有策略，材料格式/编码/容量错误为 422，不存在为 404。
 
 关联启动 `POST /api/v1/associations` 可附加 `materialIds`（最多32个且不重复），冻结选定快照，返回实际内外部关系数量。候选响应增加 `externalRelations`，不将其当替代卡片。`GET /api/v1/external-materials/:id/artifacts/:sha256` 只下载该快照绑定的原文或转换正文，校验 CAS 后返回附件。
+
+### 行为失败后的重建重试
+
+`POST /api/v1/reconstructions` 可附加 `retryEvaluationTaskId`。必须是同项目、源码、配置和同一卡片集合的已完成失败行为评测；卡片版本允许修订。输入冻结 `native-reconstruction-retry-v1`、原评测输入和结果摘要，改变 Code 尝试身份，阻止复用上一轮失败代码。标识与隐藏报告不交给 Code。非法绑定返回 `RECONSTRUCTION_RETRY_INVALID`。
+
+v4 流程详情返回 `iterations` 与 `activeTaskId`，每轮包含冻结卡片版本、重建/评测/修订任务引用和可信行为进展。`tasks` 与累计用量按任务编号去重。`PIPELINE_NO_BEHAVIOR_PROGRESS`、`PIPELINE_REVISION_QUALITY_REJECTED`、`PIPELINE_REVISION_UNRESOLVED` 保留前序证据并停止后续关联；恢复不清空历史及额度。v3 及更早执行只读。

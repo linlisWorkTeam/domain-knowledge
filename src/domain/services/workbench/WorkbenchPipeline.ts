@@ -5,8 +5,11 @@
  */
 import { sha256 } from '../../Domain.ts';
 import { canonicalJson, createStageTask, type StageInput, type StageTask, type StageStatus, type WorkbenchStage } from './StageTask.ts';
-export const PIPELINE_CONTRACT = 'knowledge-pipeline-v3';
+export const PIPELINE_CONTRACT = 'knowledge-pipeline-v4';
+export interface IterationProgress { failed: string[]; total: number; passed: number }
+export interface PipelineIteration { number: number; versionIds: string[]; reconstruction?: StageTask; evaluation?: StageTask; revision?: StageTask; progress?: IterationProgress }
 export interface WorkbenchPipeline {
+  iterations?: PipelineIteration[]; activeTaskId?: string;
   pipelineId: string; materialIds: string[]; environmentDigest: string; contractVersion: string; inputDigest: string;
   status: StageStatus; reasonCode: string | null; cancelRequested: boolean; resumeRequested: boolean;
   children: Partial<Record<WorkbenchStage, StageTask>>; completed: WorkbenchStage[];
@@ -19,7 +22,7 @@ export function createPipeline(input: StageInput, now: string, environmentDigest
   const child = createStageTask(input, {}, now);
   const digest = sha256(canonicalJson({ contract: PIPELINE_CONTRACT, generation: child.inputDigest, environmentDigest, materialIds: selectedMaterials }));
   return { materialIds: selectedMaterials, pipelineId: `pipeline-${digest}`, environmentDigest, contractVersion: PIPELINE_CONTRACT, inputDigest: digest,
-    status: 'PENDING', reasonCode: null, cancelRequested: false, resumeRequested: false, children: { GENERATE: child }, completed: [], currentStage: 'GENERATE', createdAt: now, updatedAt: now };
+    iterations: [], status: 'PENDING', reasonCode: null, cancelRequested: false, resumeRequested: false, children: { GENERATE: child }, completed: [], currentStage: 'GENERATE', createdAt: now, updatedAt: now };
 }
 export function pipelineStageFailure(task: StageTask): string | null {
   if (task.status !== 'SUCCEEDED') return task.reasonCode ?? `STAGE_${task.status}`;
@@ -34,4 +37,23 @@ export function pipelineStageFailure(task: StageTask): string | null {
     if (task.input.stage === 'EVALUATE' && (!Number.isInteger(summary.requestedModules) || Number(summary.requestedModules) < 1 || summary.completedModules !== summary.requestedModules || modules.length !== summary.requestedModules || modules.some((item) => item.status !== 'BEHAVIOR_PASSED' || item.interfaceCompatible !== true))) return 'PIPELINE_BEHAVIOR_FAILED';
   }
   return null;
+}
+
+/** 新增通过用例或文本变化不能掩盖旧失败；仅严格缩小失败集合算改进。 */
+export function pipelineStagnant(iterations: PipelineIteration[]): boolean {
+  let unchanged = 0;
+  const progress = iterations.flatMap(item => item.progress ? [item.progress] : []);
+  let best = new Set(progress[0]?.failed ?? []);
+  for (const item of progress.slice(1)) {
+    const after = new Set(item.failed);
+    if (after.size < best.size && [...after].every(key => best.has(key))) { best = after; unchanged = 0; }
+    else unchanged++;
+  }
+  return unchanged >= 3;
+}
+export function pipelineRevisionFailure(task: StageTask): string | null {
+  if (task.status !== 'SUCCEEDED') return task.reasonCode ?? `STAGE_${task.status}`;
+  const outcome = task.result?.summary.outcome;
+  return outcome === 'REVISED_INDEXED' || outcome === 'NO_REVISION' ? null
+    : outcome === 'QUALITY_REJECTED' ? 'PIPELINE_REVISION_QUALITY_REJECTED' : 'PIPELINE_REVISION_UNRESOLVED';
 }

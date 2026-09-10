@@ -5,7 +5,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { pipelineStageFailure } from '../../src/domain/services/workbench/WorkbenchPipeline.ts';
+import { pipelineStageFailure, pipelineStagnant } from '../../src/domain/services/workbench/WorkbenchPipeline.ts';
 import { createStageTask, type WorkbenchStage, type StageResult } from '../../src/domain/services/workbench/StageTask.ts';
 test('pipeline advancement requires successful artifacts and behavior, not just task completion', () => {
   const task = (stage: WorkbenchStage, summary: StageResult['summary']) => ({ ...createStageTask({ projectId: 'p', stage, sourceRevision: 'r', sourceDigest: 's', configurationDigest: 'c', cardVersionIds: [], parameters: {} }, {}, 'now'), status: 'SUCCEEDED' as const, result: { artifactRefs: [], summary } });
@@ -15,4 +15,11 @@ test('pipeline advancement requires successful artifacts and behavior, not just 
   assert.equal(pipelineStageFailure(task('EVALUATE', { completedModules: 1, requestedModules: 2, modules: [{ status: 'BEHAVIOR_PASSED', interfaceCompatible: true }] })), 'PIPELINE_BEHAVIOR_FAILED');
   assert.equal(pipelineStageFailure(task('EVALUATE', { completedModules: 1, requestedModules: 1, modules: [{ status: 'BEHAVIOR_FAILED', interfaceCompatible: true }] })), 'PIPELINE_BEHAVIOR_FAILED');
   assert.equal(pipelineStageFailure(task('ASSOCIATE', { relations: 0, scope: 'INTERNAL_ONLY' })), null);
+});
+
+test('regression and recovery to an old best cannot manufacture new behavior progress', () => {
+  const rounds = (failures: string[][]) => failures.map((failed, index) => ({ number: index + 1, versionIds: [`v${index}`], progress: { failed, total: 6, passed: 6 - failed.length } }));
+  assert.equal(pipelineStagnant(rounds([['a'], ['a', 'b'], ['a'], ['a', 'b']])), true);
+  assert.equal(pipelineStagnant(rounds([['a', 'b', 'c', 'd'], ['a', 'b', 'c'], ['a', 'b'], ['a'], []])), false);
+  assert.equal(pipelineStagnant(rounds([['a'], ['b'], ['c'], ['d']])), true);
 });

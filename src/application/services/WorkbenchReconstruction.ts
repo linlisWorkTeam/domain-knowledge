@@ -53,15 +53,26 @@ export class WorkbenchReconstruction {
       cardId: version.metadata.cardId, module: version.metadata.sourceModule, language: version.metadata.language,
       interfaceRef: version.metadata.interfaceRef })).sort((a, b) => a.versionId.localeCompare(b.versionId))));
   }
-  async start(snapshotId: string, versionIds: string[]) {
-    return this.dependencies.stages.start(await this.prepare(snapshotId, versionIds));
+  async start(snapshotId: string, versionIds: string[], options: { retryEvaluationTaskId?: string } = {}) {
+    return this.dependencies.stages.start(await this.prepare(snapshotId, versionIds, options));
   }
-  async prepare(snapshotId: string, versionIds: string[], options: { configurationDigest?: string; signal?: AbortSignal } = {}): Promise<import('../../domain/services/workbench/StageTask.ts').StageInput> {
+  async prepare(snapshotId: string, versionIds: string[], options: { configurationDigest?: string; signal?: AbortSignal; retryEvaluationTaskId?: string } = {}): Promise<import('../../domain/services/workbench/StageTask.ts').StageInput> {
     const { project, versions } = this.selection(snapshotId, versionIds);
     const { artifacts, configuration, snapshot, stages } = this.dependencies;
     const frozen = await configuration.captureStage();
     const configurationRef = await artifacts.put(Buffer.from(canonicalJson(frozen)), 'application/json');
     if (options.configurationDigest && configurationRef.sha256 !== options.configurationDigest) throw new Error('RUN_CONFIGURATION_INCOMPATIBLE');
+    let retry: JsonValue = null;
+    if (options.retryEvaluationTaskId) {
+      const previous = stages.get(options.retryEvaluationTaskId);
+      const modules = previous.result?.summary.modules as unknown as Array<{ status?: string }> | undefined;
+      if (previous.input.stage !== 'EVALUATE' || previous.status !== 'SUCCEEDED' || !modules?.some(item => item.status === 'BEHAVIOR_FAILED')
+        || previous.input.projectId !== project.projectId || previous.input.sourceDigest !== project.sourceDigest || previous.input.sourceRevision !== project.commit
+        || previous.input.parameters.snapshotId !== snapshotId || previous.input.configurationDigest !== configurationRef.sha256) throw new Error('RECONSTRUCTION_RETRY_INVALID');
+      const oldCards = previous.input.cardVersionIds.map(id => this.dependencies.repository.getKnowledgeVersion(id)?.metadata.cardId).sort();
+      if (canonicalJson(oldCards) !== canonicalJson(versions.map(card => card.metadata.cardId).sort())) throw new Error('RECONSTRUCTION_RETRY_INVALID');
+      retry = { contract: 'native-reconstruction-retry-v1', evaluationTaskId: previous.taskId, inputDigest: previous.inputDigest, resultDigest: sha256(canonicalJson(previous.result!)) };
+    }
     const fingerprints: Record<string, ArtifactRef> = {};
     for (const language of new Set(versions.map((version) => String(version.metadata.language)))) {
       if (language !== 'c' && language !== 'cpp') throw new Error('RECONSTRUCTION_LANGUAGE_UNSUPPORTED');
@@ -69,11 +80,18 @@ export class WorkbenchReconstruction {
     }
     return { projectId: project.projectId, stage: 'FLYWHEEL', sourceRevision: project.commit, sourceDigest: project.sourceDigest,
       cardVersionIds: [...versionIds].sort(), configurationDigest: configurationRef.sha256,
-      parameters: { comparisonContract: SOURCE_COMPARISON_CONTRACT, snapshotId, selectionDigest: this.selectionDigest(versions), configurationRef: json(configurationRef), fingerprints: json(fingerprints) } };
+      parameters: { ...(retry ? { retry } : {}), comparisonContract: SOURCE_COMPARISON_CONTRACT, snapshotId, selectionDigest: this.selectionDigest(versions), configurationRef: json(configurationRef), fingerprints: json(fingerprints) } };
   }
   async reconstruct(context: StageExecutionContext) {
     const { artifacts, configuration, native, snapshot, roles, stages } = this.dependencies;
     if (context.task.input.parameters.comparisonContract !== SOURCE_COMPARISON_CONTRACT) throw new Error('STAGE_CONTRACT_INCOMPATIBLE');
+    const retry = context.task.input.parameters.retry as { contract: string; evaluationTaskId: string; inputDigest: string; resultDigest: string } | undefined;
+    if (retry) {
+      const previous = stages.get(retry.evaluationTaskId);
+      if (retry.contract !== 'native-reconstruction-retry-v1' || previous.input.stage !== 'EVALUATE' || previous.status !== 'SUCCEEDED'
+        || previous.input.projectId !== context.task.input.projectId || previous.input.sourceDigest !== context.task.input.sourceDigest || previous.input.configurationDigest !== context.task.input.configurationDigest
+        || previous.inputDigest !== retry.inputDigest || sha256(canonicalJson(previous.result!)) !== retry.resultDigest) throw new Error('RECONSTRUCTION_RETRY_INVALID');
+    }
     const reuseKey = nativeCodeReuseKey(context.task.input);
     const cacheCandidate = stages.store.list().find((task) => task.taskId !== context.task.taskId && task.status === 'SUCCEEDED' && task.result && Array.isArray(task.result.summary.modules) && (task.result.summary.modules as Array<{ interfaceComparison?: { compatible?: boolean }; codeRef?: unknown; roleResultRef?: unknown }>).every((item) => item.interfaceComparison?.compatible && item.codeRef && item.roleResultRef) && reuseKey !== null && nativeCodeReuseKey(task.input) === reuseKey);
     const { project, versions } = this.selection(String(context.task.input.parameters.snapshotId), context.task.input.cardVersionIds);

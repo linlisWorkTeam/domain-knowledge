@@ -426,7 +426,7 @@ export function createComposition(input: {
       fingerprints.push({ language, digest: (await workbenchReconstruction.dependencies.snapshot(language, project.build, signal)).digest });
     }
     return sha256(JSON.stringify(fingerprints));
-  }, store: pipelineStore, stages: workbenchStages, generation: workbenchGeneration, reconstruction: workbenchReconstruction, evaluation: workbenchEvaluation, index: knowledgeIndex, associations: workbenchAssociations });
+  }, store: pipelineStore, stages: workbenchStages, generation: workbenchGeneration, reconstruction: workbenchReconstruction, evaluation: workbenchEvaluation, revision: workbenchKnowledgeRevision, index: knowledgeIndex, associations: workbenchAssociations });
   const projectStages = () => {
       const auditDirectory = join(runtimeDir, 'demo');
       const auditPath = join(auditDirectory, 'agent-runs.jsonl');
