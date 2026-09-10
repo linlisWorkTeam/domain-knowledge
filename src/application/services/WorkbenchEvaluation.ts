@@ -28,13 +28,16 @@ export class WorkbenchEvaluation {
     return JSON.parse(Buffer.from(await artifacts.get(ref)).toString('utf8')) as T;
   }
   async start(reconstructionTaskId: string) {
+    return this.dependencies.stages.start(await this.prepare(reconstructionTaskId));
+  }
+  async prepare(reconstructionTaskId: string): Promise<import('../../domain/services/workbench/StageTask.ts').StageInput> {
     const { stages, configuration } = this.dependencies;
     const previous = stages.get(reconstructionTaskId);
     if (previous.contractVersion !== 'knowledge-workbench-v1' || previous.input.stage !== 'FLYWHEEL' || previous.status !== 'SUCCEEDED' || !previous.result) throw new Error('EVALUATION_RECONSTRUCTION_REQUIRED');
     const configurationRef = previous.input.parameters.configurationRef as unknown as ArtifactRef;
     await configuration.assertStageCompatible(await this.load<StageModelConfiguration>(configurationRef));
-    return stages.start({ ...previous.input, stage: 'EVALUATE', parameters: { ...previous.input.parameters, reconstructionTaskId,
-      reconstructionDigest: sha256(canonicalJson(previous.result)) } });
+    return { ...previous.input, stage: 'EVALUATE', parameters: { ...previous.input.parameters, reconstructionTaskId,
+      reconstructionDigest: sha256(canonicalJson(previous.result)) } };
   }
   async evaluate(context: StageExecutionContext) {
     const { projects, repository, artifacts, native, stages, configuration, roles, evaluation } = this.dependencies;

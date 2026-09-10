@@ -9,6 +9,8 @@ import { NativeCaseExecutor } from '../../infrastructure/evaluation/project/Nati
 import { nativeFingerprint } from '../../infrastructure/evaluation/project/NativeFingerprint.ts';
 import { SqliteNativeTests } from '../../infrastructure/sqlite/SqliteNativeTests.ts';
 import { WorkbenchProjects } from '../../application/services/WorkbenchProjects.ts';
+import { WorkbenchPipelines } from '../../application/services/WorkbenchPipelines.ts';
+import { SqliteWorkbenchPipelines } from '../../infrastructure/sqlite/SqliteWorkbenchPipelines.ts';
 import { WorkbenchGeneration } from '../../application/services/WorkbenchGeneration.ts';
 import { NativeToolchain } from '../../infrastructure/evaluation/project/NativeToolchain.ts';
 import { WorkbenchAssociations } from '../../application/services/WorkbenchAssociations.ts';
@@ -173,6 +175,7 @@ export function createComposition(input: {
   });
   const evalRunnerApp = new EvalRunnerApp(flywheelApp);
   const knowledgeSearchApp = new KnowledgeSearchApp(artifacts, repository);
+  const pipelineStore = new SqliteWorkbenchPipelines(join(runtimeDir, 'workbench.sqlite'));
   const stageStore = new SqliteStageTasks(join(runtimeDir, 'workbench.sqlite'));
   const nativeTestStore = new SqliteNativeTests(join(runtimeDir, 'workbench.sqlite'));
   const nativeEvaluation = new NativeSuiteEvaluation({ artifacts, runner: new NativeCaseExecutor(new NativeToolchain()), snapshot: nativeFingerprint, store: nativeTestStore });
@@ -405,6 +408,15 @@ export function createComposition(input: {
     roles: new WorkbenchRoleExecution({ artifacts, contracts: new JsonSchemaAgentContractValidator(schemaRoot), model: workbenchGeneration.dependencies.model }) });
   workbenchEvaluation = new WorkbenchEvaluation({ projects: projectStore, repository, artifacts, native: new NativeToolchain(),
     configuration: runConfiguration, stages: workbenchStages, roles: workbenchReconstruction.dependencies.roles, evaluation: nativeEvaluation });
+  const workbenchPipelines = new WorkbenchPipelines({ environment: async (snapshotId, signal) => {
+    const project = projectStore.get(snapshotId); if (!project) throw new Error('PROJECT_INPUT_NOT_FOUND');
+    const fingerprints = [];
+    for (const language of [...new Set(project.modules.map((module) => module.language))].sort()) {
+      if (language !== 'c' && language !== 'cpp') throw new Error('GENERATION_LANGUAGE_UNSUPPORTED');
+      fingerprints.push({ language, digest: (await workbenchReconstruction.dependencies.snapshot(language, project.build, signal)).digest });
+    }
+    return sha256(JSON.stringify(fingerprints));
+  }, store: pipelineStore, stages: workbenchStages, generation: workbenchGeneration, reconstruction: workbenchReconstruction, evaluation: workbenchEvaluation, index: knowledgeIndex, associations: workbenchAssociations });
   const projectStages = () => {
       const auditDirectory = join(runtimeDir, 'demo');
       const auditPath = join(auditDirectory, 'agent-runs.jsonl');
@@ -555,6 +567,7 @@ export function createComposition(input: {
     apps: {
       publicationOperations,
       workbenchStages,
+      workbenchPipelines,
       knowledgeIndex,
       workbenchAssociations,
       repositoryAnalysis,
@@ -595,11 +608,11 @@ export function createComposition(input: {
     runConfiguration,
     agentProviderMode,
     automatedWorkflow: workflow,
-    shutdown: async () => { await workbenchStages.shutdown(); if (workflowPromise) await (await workflowPromise).shutdown(); },
+    shutdown: async () => { await workbenchPipelines.shutdown(); await workbenchStages.shutdown(); if (workflowPromise) await (await workflowPromise).shutdown(); },
     close: () => {
-      const release = () => { nativeTestStore.close(); projectStore.close(); indexStore.close(); stageStore.close(); publisher.close(); repository.close(); };
-      if (workbenchStages.idle) { void workbenchStages.shutdown(); release(); }
-      else return workbenchStages.shutdown().then(release);
+      const release = () => { pipelineStore.close(); nativeTestStore.close(); projectStore.close(); indexStore.close(); stageStore.close(); publisher.close(); repository.close(); };
+      if (workbenchPipelines.idle && workbenchStages.idle) { void workbenchPipelines.shutdown(); void workbenchStages.shutdown(); release(); }
+      else return workbenchPipelines.shutdown().then(() => workbenchStages.shutdown()).then(release);
     },
   };
 }

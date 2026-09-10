@@ -967,7 +967,7 @@ test('操作中心从固定 Git 版本分析仓库，显示模块和环境且窄
     await page.getByRole('button', { name: '生成知识库', exact: true }).click();
     await expect(page.locator('[data-generation-task]')).toContainText('已生成 1 张');
     await expect(page.locator('[data-generation-task]')).toContainText('已完成');
-    await expect(page.getByRole('button', { name: 'Parser generated card', exact: true })).toBeVisible();
+    await expect(page.locator('[data-generation-task]').getByRole('button', { name: 'Parser generated card', exact: true })).toBeVisible();
     reconstruction.snapshot = async (language, build) => ({ schemaVersion: 'native-toolchain-v1', language, build, architecture: 'test', files: [], digest: 'a'.repeat(64) });
     reconstruction.native = instance.composition.apps.workbenchGeneration.dependencies.native;
     reconstruction.roles.dependencies.model = (command) => ({ assertOutput: assertModelOutput, execute: async (request) => {
@@ -1013,11 +1013,23 @@ test('操作中心从固定 Git 版本分析仓库，显示模块和环境且窄
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await expect(page.getByRole('button', { name: '分析仓库', exact: true })).toBeVisible();
     await page.screenshot({ path: test.info().outputPath('repository-analysis-mobile.png'), fullPage: true });
+    await page.getByRole('button', { name: '一键执行全部', exact: true }).click();
+    await expect(page.locator('[data-workbench-pipeline-panel]')).toContainText('可信行为测试未通过');
+    await expect(page.locator('[data-workbench-pipeline-panel]')).toContainText('知识关联 · 尚未启动');
+    await expect(page.getByRole('button', { name: '恢复全部', exact: true })).toBeVisible();
+    const pipelineRecords = instance.composition.apps.workbenchPipelines.dependencies.store.list();
+    expect(pipelineRecords).toHaveLength(1);
+    await expect(page.locator('[data-workbench-pipeline-panel]').getByRole('button', { name: 'Parser generated card', exact: true })).toBeVisible();
+    expect(pipelineRecords[0]?.completed).toEqual(['GENERATE', 'INDEX', 'FLYWHEEL']);
+    expect(instance.composition.apps.workbenchPipelines.detail(pipelineRecords[0]!.pipelineId).publicationVerified).toBe(false);
+    await page.screenshot({ path: test.info().outputPath('pipeline-mobile.png'), fullPage: true });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await page.reload(); await enterGovernance(page);
     await expect(page.locator('[data-generation-task]')).toContainText('已生成 1 张');
-    await expect(page.getByRole('button', { name: 'Parser generated card', exact: true })).toBeVisible();
+    await expect(page.locator('[data-generation-task]').getByRole('button', { name: 'Parser generated card', exact: true })).toBeVisible();
     await expect(page.locator('[data-reconstruction-panel]')).toContainText('重建及接口检查完成');
     await expect(page.locator('[data-native-evaluation-panel]')).toContainText('可信用例存在失败');
+    await expect(page.locator('[data-workbench-pipeline-panel]')).toContainText('可信行为测试未通过');
     await page.getByLabel('服务器仓库目录', { exact: true }).fill(directory);
     await page.getByLabel('源码版本', { exact: true }).fill('missing-commit-for-analysis');
     await page.getByRole('button', { name: '分析仓库', exact: true }).click();
@@ -1049,4 +1061,24 @@ test('关联阶段可独立执行并在卡片详情查看真实引用候选', as
   await expect(page.getByRole('button', { name: '查看关联卡片' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.screenshot({ path: test.info().outputPath('associations-mobile.png'), fullPage: true });
+});
+
+test('已完成的一键流程重载展示评测和关联数量', async ({ page }) => {
+  const pipeline = { pipelineId: 'pipeline-browser-summary', status: 'SUCCEEDED', currentStage: 'ASSOCIATE', contractVersion: 'knowledge-pipeline-v1', children: {} };
+  await page.route('**/api/v1/workbench-pipelines', (route) => route.fulfill({ json: { items: [pipeline] } }));
+  await page.route('**/api/v1/workbench-pipelines/pipeline-browser-summary', (route) => route.fulfill({ json: {
+    pipeline, checkpoints: {}, usage: { modelCalls: 15, tokens: 218936 }, tasks: [
+      { taskId: 'evaluation-summary', input: { stage: 'EVALUATE', sourceRevision: 'fixed' }, status: 'SUCCEEDED', result: { summary: { modules: [{ moduleId: 'parser', passed: 31, total: 31 }] }, artifactRefs: [] } },
+      { taskId: 'association-summary', input: { stage: 'ASSOCIATE', sourceRevision: 'fixed' }, status: 'SUCCEEDED', result: { summary: { cards: 7, relations: 40, scope: 'INTERNAL_ONLY' }, artifactRefs: [] } },
+    ],
+  } }));
+  const errors: string[] = []; page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto(baseUrl);
+  const panel = page.locator('[data-workbench-pipeline-panel]');
+  await expect(panel).toContainText('通过 31/31');
+  await expect(panel).toContainText('40 条关系');
+  await expect(panel).toContainText('累计模型调用 15 次');
+  await page.reload();
+  await expect(panel).toContainText('40 条关系');
+  expect(errors).toEqual([]);
 });

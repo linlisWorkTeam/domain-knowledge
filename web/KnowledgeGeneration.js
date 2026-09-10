@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：展示独立知识生成任务、逐卡产物及同版本恢复入口。
  */
+import { createWorkbenchPipelinePanel } from './WorkbenchPipeline.js'
 import { createKnowledgeReconstructionPanel } from './KnowledgeReconstruction.js'
 export function createKnowledgeGenerationPanel({ root, request, escapeHtml: escape, isEditable }) {
   let project = null, task = null, checkpoints = [], events = [], timer = null
@@ -11,6 +12,8 @@ export function createKnowledgeGenerationPanel({ root, request, escapeHtml: esca
     selection: () => task?.status === 'SUCCEEDED' ? { snapshotId: task.input.parameters.snapshotId,
       versionIds: (task.result?.summary?.cards ?? []).map((card) => card.versionId) } : null })
   const scopes = new Map()
+  const pipeline = createWorkbenchPipelinePanel({ root, request, escapeHtml: escape, isEditable, selection: () => project ? { snapshotId: project.snapshotId,
+    scopes: Object.fromEntries(project.modules.map((module) => [module.moduleId, Object.fromEntries(Object.entries(scopes.get(module.moduleId) ?? {}).filter(([, value]) => value.trim()).map(([key, value]) => [key, key === 'symbols' ? value.split('\n').map((line) => line.trim()).filter(Boolean) : value.trim()]))])) } : null })
   const host = () => root.querySelector('[data-generation-panel]')
   const active = () => task && ['PENDING', 'RUNNING'].includes(task.status)
   const labels = { PENDING: '排队中', RUNNING: '生成中', SUCCEEDED: '已完成', FAILED: '失败', PAUSED: '已暂停', CANCELLED: '已取消' }
@@ -44,7 +47,7 @@ export function createKnowledgeGenerationPanel({ root, request, escapeHtml: esca
       <details><summary>输入与执行记录</summary><code>${escape(task.taskId)}</code><p>源码 ${escape(task.input.sourceRevision)}；累计模型请求 ${escape(task.usage.modelCalls)} 次，已报告 Token ${escape(task.usage.tokens)}，预留 ${escape(task.usage.reservedTokens)}。未报告的用量不视为零。</p></details>`
   }
   function html() {
-    return `<section data-generation-panel><h3>知识库生成</h3>
+    return `<section data-generation-panel><section data-workbench-pipeline-panel></section><h3>知识库生成</h3>
       ${project ? `<p>使用已保存输入 ${escape(project.snapshotId)}</p><details data-generation-scopes ${scopesOpen ? 'open' : ''}><summary>接口范围（可选）</summary>
         ${project.modules.map((module) => `<fieldset><legend>${escape(module.moduleId)}</legend>
           ${[['entryPath', '接口入口路径'], ['astFilter', '类范围（例如 tinyxml2::XMLUtil）'], ['symbols', '限定符号（每行一个，留空自动提取）']].map(([key, label]) => `<label>${label}<textarea name="scope-${escape(module.moduleId)}-${key}" data-generation-scope="${key}" data-generation-module="${escape(module.moduleId)}" ${busy || active() ? 'disabled' : ''}>${escape(scopes.get(module.moduleId)?.[key] ?? '')}</textarea></label>`).join('')}</fieldset>`).join('')}</details>
@@ -57,6 +60,7 @@ export function createKnowledgeGenerationPanel({ root, request, escapeHtml: esca
     panel.querySelector('[data-generation-notice]').textContent = notice
     const start = panel.querySelector('[data-generation-action="start"]'); if (start) start.disabled = !project || busy || active() || !isEditable()
     reconstruction.render()
+    pipeline.render()
     for (const field of panel.querySelectorAll('[data-generation-scope]')) field.disabled = busy || active()
   }
   async function observe() {
@@ -95,8 +99,9 @@ export function createKnowledgeGenerationPanel({ root, request, escapeHtml: esca
     finally { if (current === epoch) { busy = false; render() } }
   })
   return { html,
-    setProject(value) { project = value; const panel = host(); if (panel) panel.outerHTML = html(); queueMicrotask(observe); reconstruction.refresh() },
+    setProject(value) { project = value; const panel = host(); if (panel) panel.outerHTML = html(); queueMicrotask(observe); reconstruction.refresh(); pipeline.refresh() },
     refresh() {
+      pipeline.refresh()
       reconstruction.refresh()
       if (!isEditable()) return
       if (!initialized && host()) {

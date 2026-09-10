@@ -151,7 +151,7 @@ sequenceDiagram
   U->>A: 后续独立INDEX操作
 ```
 
-上图描述已接通的 C/C++ 生成入口，INDEX由KnowledgeIndexService执行。新阶段有自己的冻结输入、尝试审计和恢复记录，不借用旧Run的发布状态；FLYWHEEL、EVALUATE和ASSOCIATE已有独立应用入口；持久化一键编排和自动知识修订仍未接通。
+上图描述已接通的 C/C++ 生成入口，INDEX由KnowledgeIndexService执行。新阶段有自己的冻结输入、尝试审计和恢复记录，不借用旧Run的发布状态；FLYWHEEL、EVALUATE和ASSOCIATE已有独立应用入口；持久化一键编排已接通，自动知识修订仍未接通。
 
 
 ```mermaid
@@ -208,4 +208,19 @@ sequenceDiagram
   A-->>U: 有效关系及适用条件，排除受版本变更影响的关系
 ```
 
-图中各阶段由同一持久化阶段服务承载，仍须分别启动；行为通过不自动赋予发布资格。关系是可审计的引用事实，不保证可替代性；外部材料、一键编排和自动修订为剩余实现范围。
+图中各阶段由同一持久化阶段服务承载，可分别启动或由knowledge-pipeline-v1独立协调租约顺序启动；行为通过不自动赋予发布资格。关系是可审计的引用事实，不保证可替代性；外部材料和自动修订为剩余实现范围。
+
+
+```mermaid
+flowchart LR
+  UI[操作中心一键执行] --> P[WorkbenchPipelines]
+  P --> PS[(SQLite协调记录与独立租约)]
+  P --> PREP[相同阶段prepare用例]
+  PREP --> HANDOFF[先冻结子任务输入与身份]
+  HANDOFF --> S[WorkbenchStages单执行槽]
+  S --> G[生成 → 索引 → 重建 → 评测 → 关联]
+  G --> D[Domain推进门禁]
+  D -->|通过| P
+  D -->|失败或部分成功| STOP[停止推进并保留全部前序结果]
+  UI -->|取消或同输入恢复| P
+```

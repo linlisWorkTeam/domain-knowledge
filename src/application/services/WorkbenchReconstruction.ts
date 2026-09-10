@@ -51,18 +51,22 @@ export class WorkbenchReconstruction {
       interfaceRef: version.metadata.interfaceRef })).sort((a, b) => a.versionId.localeCompare(b.versionId))));
   }
   async start(snapshotId: string, versionIds: string[]) {
+    return this.dependencies.stages.start(await this.prepare(snapshotId, versionIds));
+  }
+  async prepare(snapshotId: string, versionIds: string[], options: { configurationDigest?: string; signal?: AbortSignal } = {}): Promise<import('../../domain/services/workbench/StageTask.ts').StageInput> {
     const { project, versions } = this.selection(snapshotId, versionIds);
     const { artifacts, configuration, snapshot, stages } = this.dependencies;
     const frozen = await configuration.captureStage();
     const configurationRef = await artifacts.put(Buffer.from(canonicalJson(frozen)), 'application/json');
+    if (options.configurationDigest && configurationRef.sha256 !== options.configurationDigest) throw new Error('RUN_CONFIGURATION_INCOMPATIBLE');
     const fingerprints: Record<string, ArtifactRef> = {};
     for (const language of new Set(versions.map((version) => String(version.metadata.language)))) {
       if (language !== 'c' && language !== 'cpp') throw new Error('RECONSTRUCTION_LANGUAGE_UNSUPPORTED');
-      fingerprints[language] = await artifacts.put(Buffer.from(JSON.stringify(await snapshot(language, project.build))), 'application/json');
+      fingerprints[language] = await artifacts.put(Buffer.from(JSON.stringify(await snapshot(language, project.build, options.signal))), 'application/json');
     }
-    return stages.start({ projectId: project.projectId, stage: 'FLYWHEEL', sourceRevision: project.commit, sourceDigest: project.sourceDigest,
+    return { projectId: project.projectId, stage: 'FLYWHEEL', sourceRevision: project.commit, sourceDigest: project.sourceDigest,
       cardVersionIds: [...versionIds].sort(), configurationDigest: configurationRef.sha256,
-      parameters: { snapshotId, selectionDigest: this.selectionDigest(versions), configurationRef: json(configurationRef), fingerprints: json(fingerprints) } });
+      parameters: { snapshotId, selectionDigest: this.selectionDigest(versions), configurationRef: json(configurationRef), fingerprints: json(fingerprints) } };
   }
   async reconstruct(context: StageExecutionContext) {
     const { artifacts, configuration, native, snapshot, roles, stages } = this.dependencies;

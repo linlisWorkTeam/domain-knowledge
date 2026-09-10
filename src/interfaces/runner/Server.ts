@@ -49,6 +49,7 @@ const assets = new Map([
   ['/KnowledgeIndex.js', 'KnowledgeIndex.js'],
   ['/RepositoryAnalysis.js', 'RepositoryAnalysis.js'],
   ['/KnowledgeGeneration.js', 'KnowledgeGeneration.js'],
+  ['/WorkbenchPipeline.js', 'WorkbenchPipeline.js'],
   ['/KnowledgeReconstruction.js', 'KnowledgeReconstruction.js'],
   ['/KnowledgeEvaluation.js', 'KnowledgeEvaluation.js'],
   ['/KnowledgeAssociations.js', 'KnowledgeAssociations.js'],
@@ -271,6 +272,9 @@ function requireOnlyKeys(payload: Record<string, unknown>, allowed: readonly str
 export function mapHttpError(error: unknown, id = 'req_unknown'): { status: number; body: ApiErrorBody } {
   const message = error instanceof Error ? error.message : String(error);
   const code = message.split(':', 1)[0] || 'INTERNAL_ERROR';
+  if (code === 'PIPELINE_NOT_FOUND') return { status: 404, body: errorBody(code, '流程不存在', id) };
+  if (['PIPELINE_CONTRACT_INCOMPATIBLE', 'PIPELINE_INPUT_CHANGED', 'PIPELINE_NOT_RESUMABLE'].includes(code)) return { status: 409, body: errorBody(code, code, id) };
+  if (['PIPELINE_SHUTDOWN', 'PIPELINE_OWNER_UNAVAILABLE'].includes(code)) return { status: 503, body: errorBody(code, code, id) };
   if (['STAGE_CONTRACT_INCOMPATIBLE', 'STAGE_INPUT_CHANGED', 'STAGE_NOT_RESUMABLE', 'STAGE_BUDGET_EXHAUSTED', 'INDEX_VERSION_NOT_CURRENT', 'EVALUATION_RECONSTRUCTION_REQUIRED'].includes(code)) return { status: 409, body: errorBody(code, message, id) };
   if (['STAGE_OWNER_UNAVAILABLE', 'STAGE_SHUTDOWN'].includes(code)) return { status: 503, body: errorBody(code, message, id) };
   if (code.startsWith('REPOSITORY_')) return { status: 422, body: errorBody(code, code, id) };
@@ -336,6 +340,7 @@ export function createKnowledgeServer(input: {
   };
   const idempotencyResults = new Map<string, { fingerprint: string; status: number; value: unknown }>();
   composition.apps.workbenchStages.recover();
+  composition.apps.workbenchPipelines.recover();
   const server = createHttpServer(async (request, response) => {
     const url = new URL(request.url ?? '/', 'http://127.0.0.1');
     const currentRequestId = requestId(request);
@@ -361,7 +366,7 @@ export function createKnowledgeServer(input: {
       }
       // 目录、配置和写入仅允许直接本机访问，或携带远程访问令牌。
       const localClient = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(request.socket.remoteAddress ?? '');
-      const workbenchRoute = /^\/api\/v1\/(stage-tasks|index-builds|knowledge-index|repository-analyses|projects|generations|reconstructions|native-evaluations|associations)(\/|$)/.test(url.pathname);
+      const workbenchRoute = /^\/api\/v1\/(workbench-pipelines|stage-tasks|index-builds|knowledge-index|repository-analyses|projects|generations|reconstructions|native-evaluations|associations)(\/|$)/.test(url.pathname);
       const productRoute = url.pathname.startsWith('/api/v1/publications')
         || url.pathname === '/api/v1/server-directories' || url.pathname === '/api/v1/runs/markdown-lite';
       if (url.pathname.startsWith('/api/') && (!localClient || productRoute || workbenchRoute) && !authorized(request, writeToken, anonymousAccess)) {
@@ -370,6 +375,27 @@ export function createKnowledgeServer(input: {
         return;
       }
       if (workbenchRoute) {
+        const pipelines = composition.apps.workbenchPipelines;
+        if (url.pathname === '/api/v1/workbench-pipelines' && request.method === 'GET') {
+          send(response, 200, { items: pipelines.dependencies.store.list() }); return;
+        }
+        if (url.pathname === '/api/v1/workbench-pipelines' && request.method === 'POST') {
+          const payload = await body(request); requireOnlyKeys(payload, ['snapshotId', 'scopes']);
+          if (typeof payload.snapshotId !== 'string') throw new Error('PAYLOAD_INVALID');
+          const pipeline = await pipelines.start(payload.snapshotId, payload.scopes as Parameters<typeof pipelines.start>[1]);
+          send(response, pipeline.status === 'SUCCEEDED' ? 200 : 202, { pipeline }); return;
+        }
+        const pipelineRoute = /^\/api\/v1\/workbench-pipelines\/([^/]+)(?:\/(resume|cancel))?$/.exec(url.pathname);
+        if (pipelineRoute && request.method === 'GET' && !pipelineRoute[2]) {
+          send(response, 200, pipelines.detail(decodeURIComponent(pipelineRoute[1]!))); return;
+        }
+        if (pipelineRoute && request.method === 'POST' && pipelineRoute[2]) {
+          const payload = await body(request); const id = decodeURIComponent(pipelineRoute[1]!);
+          requireOnlyKeys(payload, pipelineRoute[2] === 'resume' ? ['inputDigest'] : []);
+          if (pipelineRoute[2] === 'resume' && typeof payload.inputDigest !== 'string') throw new Error('PAYLOAD_INVALID');
+          const pipeline = pipelineRoute[2] === 'resume' ? pipelines.resume(id, payload.inputDigest as string) : pipelines.cancel(id);
+          send(response, 202, { pipeline }); return;
+        }
         if (request.method === 'POST' && url.pathname === '/api/v1/associations') {
           const payload = await body(request); requireOnlyKeys(payload, ['versionIds']);
           if (!Array.isArray(payload.versionIds) || payload.versionIds.some((id) => typeof id !== 'string')) throw new Error('PAYLOAD_INVALID');

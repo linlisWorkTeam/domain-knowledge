@@ -271,4 +271,4 @@ npm run knowledge -- set-agent-prompt --agent doc-gen --prompt "优先写清适�
 - Agent 是否把查询为空解释为“尚无 VERIFIED”，而不是绕过 Gate 手工改状态；
 - 失败时是否留下命令、错误摘要和下一步，而不是降低测试或安全要求。
 
-原生真实验收脚本 `scripts/release/RunNativeWorkbench.ts` 使用固定目标提交，依次调用生成、索引、重建、评测、关联的现有应用入口。使用 `--target jsmn|tinyxml2 --repository <本地仓库> --runtime <独立运行目录> --report <报告路径>`，失败后以 `--resume-task <原任务编号>` 保留检查点及累计用量恢复。报告区分行为通过、行为失败和未完成；关联仅来自当前库内证据，脚本成功不代表知识发布门禁通过。该脚本是验收入口，操作中心的一键执行仍待接入。
+原生真实验收脚本 `scripts/release/RunNativeWorkbench.ts` 使用固定目标提交，依次调用生成、索引、重建、评测、关联的现有应用入口。使用 `--target jsmn|tinyxml2 --repository <本地仓库> --runtime <独立运行目录> --report <报告路径>`，失败后以 `--resume-task <原任务编号>` 保留检查点及累计用量恢复。报告区分行为通过、行为失败和未完成；关联仅来自当前库内证据，脚本成功不代表知识发布门禁通过。添加 `--mode pipeline` 可使用与操作中心相同的持久化一键入口，失败后以 `--resume-pipeline <流程编号>` 恢复。操作中心保存项目输入、确认接口范围后点击「一键执行全部」；失败时查看对应阶段产物，再按原输入恢复。自动知识修订和最终发布仍未接通。

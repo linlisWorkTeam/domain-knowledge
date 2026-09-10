@@ -28,6 +28,9 @@ export class WorkbenchGeneration {
   readonly dependencies: Dependencies;
   constructor(dependencies: Dependencies) { this.dependencies = dependencies; }
   async start(snapshotId: string, scopes: Record<string, GenerationScope> = {}) {
+    return this.dependencies.stages.start(await this.prepare(snapshotId, scopes));
+  }
+  async prepare(snapshotId: string, scopes: Record<string, GenerationScope> = {}): Promise<import('../../domain/services/workbench/StageTask.ts').StageInput> {
     const { projects, artifacts, configuration, stages } = this.dependencies;
     const project = projects.get(snapshotId); if (!project) throw new Error('PROJECT_INPUT_NOT_FOUND');
     if (!scopes || typeof scopes !== 'object' || Array.isArray(scopes)) throw new Error('GENERATION_SCOPE_INVALID');
@@ -39,8 +42,8 @@ export class WorkbenchGeneration {
     }
     const frozen = await configuration.captureStage();
     const configurationRef = await artifacts.put(Buffer.from(canonicalJson(frozen)), 'application/json');
-    return stages.start({ projectId: project.projectId, stage: 'GENERATE', sourceRevision: project.commit, sourceDigest: project.sourceDigest,
-      cardVersionIds: [], configurationDigest: configurationRef.sha256, parameters: { snapshotId, configurationRef: json(configurationRef), scopes: json(scopes) } });
+    return { projectId: project.projectId, stage: 'GENERATE', sourceRevision: project.commit, sourceDigest: project.sourceDigest,
+      cardVersionIds: [], configurationDigest: configurationRef.sha256, parameters: { snapshotId, configurationRef: json(configurationRef), scopes: json(scopes) } };
   }
   async generate(context: StageExecutionContext) {
     const { projects, artifacts, configuration, native, model, contracts, flywheel, stages } = this.dependencies;
