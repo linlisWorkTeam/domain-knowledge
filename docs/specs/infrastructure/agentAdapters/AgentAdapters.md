@@ -55,3 +55,5 @@ ProviderQuotaStop按端点与凭据摘要在私有DSH目录留下停止状态。
 ### 流式超时诊断
 
 ConfiguredDshProvider 审计 metadata.streamDiagnostics 增加 JSON 编码的 provider-stream-diagnostics-v1，范围为单次 provider.run 的累计 HTTP 传输：请求数、首响应头/首数据/末数据距启动毫秒、接收字节、SSE 数据帧数、可见输出和 reasoning 字段的 UTF-16 字符数。只保存计数，不保存正文、推理内容、凭据、URL 或请求头。工具往返与内部格式重试属于同一 provider.run，快照显式标记累计范围。没有数据时首末时刻为 null。字符数不能换算或代替供应商 tokens；供应商未报告用量仍未知。该诊断不改变请求材料、角色期限、失败状态或发布门禁。
+
+来源Review的source-review-policy-v1最长600000ms，与适配器默认600000ms并列约束；适配器或阶段总预算更短时先停止。策略来自冻结criteria，不能关闭AbortSignal、放开输出上限或更改供应商用量未知规则。

@@ -194,3 +194,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 [2026-09-11-0718-scoped-source-evidence.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/9569d94f6d96c7402cd757d2a61708a0a8dde2c8/docs/epitaph/2026-09-11-0718-scoped-source-evidence.md) 来源v3按精确章节缩减观察，定向测试通过，但真实恢复后漏判已有字段矛盾。v3已取消并只读；v4冻结历史矛盾、恢复相关观察摘要，不能将当时受控通过当作真实语义质量通过。
 
 [2026-09-11-0724-compilation-database.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/a051b44aeb918c6a6956a26613a1d86a540254ae/docs/epitaph/2026-09-11-0724-compilation-database.md) 编译数据库候选解析/Console和2单元/3集成/8架构/类型/Spec/1Console通过。来源v3首次超时，后续恢复漏判已知矛盾而取消；来源v4保留历史矛盾。空候选字段造成旧快照身份变化的问题随后修复，双目标旧快照复用已验证。最终发布未完成。
+
+[2026-09-11-0727-provider-stream-diagnostics.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/9ae594d71337840c625dcee63324e57afdca3253/docs/epitaph/2026-09-11-0727-provider-stream-diagnostics.md) 增加无正文流式诊断，受控取消保留计数；来源v3后续误放行已知矛盾而取消。v4保留历史意见，真实180秒持续推理无最终正文后超时，下一版冻结600秒来源期限。尚未发布。

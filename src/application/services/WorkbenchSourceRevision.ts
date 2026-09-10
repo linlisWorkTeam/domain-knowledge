@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：消费独立来源复核的明确纠正意见，复用定点修订和增量索引。
  */
+import { readSourceReviewPolicy } from '../../domain/services/knowledge/SourceReviewPolicy.ts';
 import { WorkbenchSourceFindingHistory, type SourceFindingProof } from './WorkbenchSourceFindingHistory.ts';
 import { type ArtifactRef } from '../../domain/Domain.ts';
 import type { AgentCommand, AgentResult } from '../../domain/agents/AgentContracts.ts';
@@ -54,9 +55,10 @@ export class WorkbenchSourceRevision {
     }
     const configurationRef = source.input.parameters.configurationRef as unknown as ArtifactRef;
     await configuration.assertStageCompatible(await this.load<StageModelConfiguration>(configurationRef));
+    const sourceReviewPolicy = readSourceReviewPolicy(source.input.parameters.sourceReviewPolicy);
     const evidenceRef = await artifacts.put(Buffer.from(canonicalJson(source.result)), 'application/json');
     return { ...source.input, stage: 'FLYWHEEL', parameters: { operation: 'KNOWLEDGE_SOURCE_REVISION', revisionContract: SOURCE_REVISION_CONTRACT,
-      sourceVerificationTaskId, evaluationTaskId: source.input.parameters.evaluationTaskId!, evidenceRef: json(evidenceRef), configurationRef: json(configurationRef) } };
+      ...(sourceReviewPolicy ? { sourceReviewPolicy: json(sourceReviewPolicy) } : {}), sourceVerificationTaskId, evaluationTaskId: source.input.parameters.evaluationTaskId!, evidenceRef: json(evidenceRef), configurationRef: json(configurationRef) } };
   }
   async revise(context: StageExecutionContext) {
     const { artifacts, repository, projects, roles, configuration } = this.evaluation.dependencies;
@@ -64,6 +66,8 @@ export class WorkbenchSourceRevision {
     if (parameters.operation !== 'KNOWLEDGE_SOURCE_REVISION' || parameters.revisionContract !== SOURCE_REVISION_CONTRACT) throw new Error('STAGE_CONTRACT_INCOMPATIBLE');
     const source = this.source(String(parameters.sourceVerificationTaskId));
     const evidenceRef = parameters.evidenceRef as unknown as ArtifactRef;
+    readSourceReviewPolicy(parameters.sourceReviewPolicy);
+    if (canonicalJson(parameters.sourceReviewPolicy ?? null) !== canonicalJson(source.input.parameters.sourceReviewPolicy ?? null)) throw new Error('STAGE_INPUT_CHANGED');
     if (canonicalJson(await this.load(evidenceRef)) !== canonicalJson(source.result)
       || canonicalJson(source.input.cardVersionIds) !== canonicalJson(context.task.input.cardVersionIds)
       || source.input.sourceRevision !== context.task.input.sourceRevision || source.input.sourceDigest !== context.task.input.sourceDigest

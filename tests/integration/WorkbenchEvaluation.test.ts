@@ -47,6 +47,7 @@ for (const rejectSourceReview of [false, true]) test(`native stage rejects bad c
         usage(`whole-source-${_command.commandId}`, 3);
         const criteria = JSON.parse(Buffer.from(await composition.artifacts.get(_command.payload.criteriaRef as any)).toString('utf8'));
         assert.equal(criteria.verifyPreamble, criteria.section === 'Behavior');
+        assert.deepEqual(criteria.sourceReviewPolicy, { schemaVersion: 'source-review-policy-v1', timeoutMs: 600000 });
         assert.equal(sourceReport.sectionId, `card-add#${criteria.section}`);
         assert.deepEqual(criteria.applicationVerified, { artifactDigests: true, frozenVersionBindings: true });
         if (criteria.section === 'Behavior') { assert.equal(sourceReport.cases[0].observation.actual.sum, '7'); assert.equal(sourceReport.coverage, 'DIRECT_BEHAVIOR_EVIDENCE'); }
@@ -247,6 +248,7 @@ for (const rejectSourceReview of [false, true]) test(`native stage rejects bad c
     composition.apps.knowledgeIndex.index.write = () => { throw new Error('TEST_SOURCE_INDEX_INTERRUPTION'); };
     const beforeSourceDocGen = revisionCalls;
     const sourceRepair = await composition.apps.workbenchSourceRevision.start(falseSource.taskId);
+    assert.deepEqual(sourceRepair.input.parameters.sourceReviewPolicy, { schemaVersion: 'source-review-policy-v1', timeoutMs: 600000 });
     const partialSource = await composition.apps.workbenchStages.wait(sourceRepair.taskId);
     assert.equal(partialSource.status, 'FAILED'); assert.equal(partialSource.reasonCode, 'INDEX_BUILD_PARTIAL');
     assert.equal(revisionCalls, beforeSourceDocGen + 1);

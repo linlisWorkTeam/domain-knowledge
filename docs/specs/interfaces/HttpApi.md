@@ -143,7 +143,7 @@ PENDING、Git 关闭、Git 冲突及认证失败使用可定位的错误码。AP
 
 ### 五阶段一键执行
 
-- `POST /api/v1/workbench-pipelines {snapshotId, scopes?, materialIds?}`：冻结生成输入并创建或复用knowledge-pipeline-v13协调记录，返回`{pipeline}`，202或已成功时200。
+- `POST /api/v1/workbench-pipelines {snapshotId, scopes?, materialIds?}`：冻结生成输入并创建或复用knowledge-pipeline-v14协调记录，返回`{pipeline}`，202或已成功时200。
 - `GET /api/v1/workbench-pipelines`：读取协调记录列表；`GET /api/v1/workbench-pipelines/:id`返回`pipeline`、当前阶段及历史轮次去重后的`tasks`、累计`usage`及`publicationVerified:false`。
 - `POST /api/v1/workbench-pipelines/:id/cancel {}`：取消协调和当前子任务；`POST .../resume {inputDigest}`只恢复同契约输入，累计子任务用量不重置。契约/输入冲突为409，不存在为404。
 - 所有入口使用现有匿名部署授权策略，无新增登录。旧契约可读，不能跨契约恢复。逐阶段状态、证据和下载继续复用stage-tasks接口。
@@ -164,7 +164,7 @@ v4 流程详情返回 `iterations` 与 `activeTaskId`，每轮包含冻结卡片
 v5 在已有生成结果存在时，冻结同源码快照内当前后代卡片版本；修订集合进入流程身份。详情 `initialVersionIds` 表示替代原生成版本的冻结集合，首次索引和重建均使用它。重复启动未变输入复用任务；恢复不读取新头。跨源码快照或无有效血缘分别返回409 `PIPELINE_CARD_SNAPSHOT_CHANGED` / `PIPELINE_CARD_LINEAGE_CHANGED`。v4及更早仅可读。
 
 
-当前修订执行使用 knowledge-revision-v5，流程使用 knowledge-pipeline-v13；v4及更早修订、v12及更早流程只读。Review 材料包含固定参考和生成代码，DocGen 只接收已标准化且绑定当前任务/原输出的纠正意见。前端风险状态仍不允许以未知归因或质量拒绝推进。
+当前修订执行使用 knowledge-revision-v5，流程使用 knowledge-pipeline-v14；v4及更早修订、v13及更早流程只读。Review 材料包含固定参考和生成代码，DocGen 只接收已标准化且绑定当前任务/原输出的纠正意见。前端风险状态仍不允许以未知归因或质量拒绝推进。
 
 修订源码复核拒绝以 `UNRESOLVED` 结果保留 `REVISION_SOURCE_REVIEW_REJECTED` 和 `draftRef`；不产生新版本，不刷新该草稿索引。成功版本 metadata 绑定 `sourceReviewResultRef`，仍不表示发布门禁已通过。
 
@@ -187,3 +187,5 @@ v5 在已有生成结果存在时，冻结同源码快照内当前后代卡片�
 来源v4冻结priorFindingsRef；继承章节返回carriedForward与originEvidence（原任务、检查点、结果摘要），明确区分既有意见与本次模型执行。旧v3/v11只读。来源修订重新验证历史原命令与冻结证明后才能授权。
 
 一键流程POST可含fixedSuites:[{moduleId,suite}]。suite先冻结CAS，固定子任务在每轮可信评测通过后执行；查询的iterations包含fixedEvaluation并计入tasks/usage。流程v13身份包含固定suite摘要，改用例创建新流程，不能覆盖旧预期。v12只读。固定失败暂停评测且不进入来源/关联。
+
+新来源任务input.parameters包含sourceReviewPolicy（source-review-policy-v1，timeoutMs=600000），来源修订继承并校验一致性。旧无策略任务仍为180000ms，恢复不补写策略；新策略通过输入摘要产生新的任务身份。流程v14采用新策略，v13只读。

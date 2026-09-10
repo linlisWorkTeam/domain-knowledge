@@ -8,6 +8,7 @@ import type { ExecutionContext, RoleResult, PendingArtifact } from '../AgentExec
 import { assertActive } from '../AgentExecution.ts';
 import { type Input, type Output, schemaFor, validateInput, validateOutput } from './ReviewAgentContract.ts';
 import { validatedStage } from '../StageValidation.ts';
+import { sourceReviewTimeoutMs } from '../../services/knowledge/SourceReviewPolicy.ts';
 import { definition, buildPrompt, readablePaths } from './ReviewAgentPrompt.ts';
 
 /** 依据知识与评测证据给出纠正意见，并将意见绑定到本轮评测工件。 */
@@ -16,6 +17,7 @@ export async function execute(input: Input, context: ExecutionContext): Promise<
   // 缺失材料应在调用模型之前失败，避免模型用猜测填补业务证据。
   validateInput(input);
   const schema = schemaFor(input);
+  const criteria = input.materials.find(material => material.ref.artifactId === input.payload.criteriaRef.artifactId)?.content;
   // 角色决定本阶段的任务与能力范围；会话、工具执行和格式修复交给模型适配器。
   const output = await validatedStage(context, {
     role: definition.agentId,
@@ -28,7 +30,7 @@ export async function execute(input: Input, context: ExecutionContext): Promise<
     const output = raw as unknown as Output;
     validateOutput(output, input);
     return output;
-  }, 180_000);
+  }, sourceReviewTimeoutMs(criteria));
   // 模型返回后仍需检查取消状态，迟到结果不能被当作成功输出。
   assertActive(context.signal);
   const artifacts: PendingArtifact[] = [];

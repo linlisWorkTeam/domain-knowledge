@@ -1083,6 +1083,7 @@ test('操作中心从固定 Git 版本分析仓库，显示模块和环境且窄
 
     await page.getByRole('button', { name: '复核全部卡片来源', exact: true }).click();
     await expect(page.locator('[data-source-verification-panel]')).toContainText('仍有未解决问题');
+    await expect(page.locator('[data-source-verification-panel]')).toContainText('单次来源复核上限 600 秒');
     await expect(page.locator('[data-source-verification-panel]')).toContainText('Whole-card source evidence needs clarification.');
     const sourceDownload = page.waitForEvent('download');
     await page.getByRole('button', { name: '下载来源意见', exact: true }).click();

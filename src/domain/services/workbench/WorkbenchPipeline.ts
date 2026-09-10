@@ -8,7 +8,7 @@ import { SOURCE_REVISION_CONTRACT } from '../knowledge/SourceRevision.ts';
 import { sha256, type ArtifactRef } from '../../Domain.ts';
 import { FIXED_EVALUATION_CONTRACT } from '../evaluation/NativeFixedEvaluation.ts';
 import { canonicalJson, createStageTask, type StageInput, type StageTask, type StageStatus, type WorkbenchStage } from './StageTask.ts';
-export const PIPELINE_CONTRACT = 'knowledge-pipeline-v13';
+export const PIPELINE_CONTRACT = 'knowledge-pipeline-v14';
 export interface IterationProgress { failed: string[]; total: number; passed: number }
 export interface PipelineIteration { number: number; versionIds: string[]; reconstruction?: StageTask; evaluation?: StageTask; fixedEvaluation?: StageTask; revision?: StageTask; progress?: IterationProgress; sourceVerification?: StageTask; sourceRepairs?: string[] }
 export interface PipelineFixedSuite { moduleId: string; suiteRef: ArtifactRef }
