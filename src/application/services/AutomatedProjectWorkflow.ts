@@ -4,6 +4,7 @@
  * 文件功能：加载工作流上下文与历史工件，协调角色执行、独立评测和发布。
  */
 import type { Output as TestOutput } from '../../domain/agents/testGenAgent/TestGenAgentContract.ts';
+import { testExecutionPlan } from '../../domain/agents/testGenAgent/TestExecutionPlan.ts';
 import { sourceIdentity, testValidationAction } from '../../domain/agents/testGenAgent/TestSuitePolicy.ts';
 import { validateProjectAgentConfiguration } from '../../domain/agents/ProjectAgentConfiguration.ts';
 import { renderKnowledgeDocument } from '../../domain/knowledge/KnowledgeDocument.ts';
@@ -355,7 +356,7 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
       const checked = await this.flywheel.executeNode({ runId: input.runId, nodeId: 'oracle_validation',
         generationKey: `${input.runId}:oracle_validation:${input.iteration}:${repairs}:${sha256(JSON.stringify(output))}:${fixedSuiteRef?.sha256 ?? 'candidate'}:tests-v1`, inputRefs: [fixedSuiteRef ?? candidateRef, snapshot.manifestRef] }, async () => {
         const evaluation = await this.evaluator.evaluate({ label: `test-reference-${input.iteration}-${repairs}`, snapshot,
-          generatedFiles: output.files, prepareCommands: scenario.prepareCommands, commands: scenario.referenceCommands }, input.signal);
+          generatedFiles: output.files, prepareCommands: scenario.prepareCommands, commands: [...scenario.referenceCommands, ...testExecutionPlan(scenario.agentConfiguration!, scenario.sourcePaths, output)] }, input.signal);
         return [evaluation.evidenceRef];
       });
       const evidenceRef = checked.outputRefs[0]!;
@@ -404,6 +405,7 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
     const suiteRef = input.context[contextKey('validatedTestSuiteRef', input.iteration)] as ArtifactRef | undefined;
     if (!suiteRef) throw new Error('VALIDATED_TEST_SUITE_MISSING');
     const suite = await this.readJson<{ output: TestOutput }>(suiteRef);
+    validateProjectAgentConfiguration(scenario.agentConfiguration);
     for (const file of code.files) {
       if (!scenario.allowedGeneratedPaths.includes(file.path)) throw new Error(`PROJECT_PATH_DENIED: ${file.path}`);
     }
@@ -418,7 +420,8 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
         snapshot,
         generatedFiles: [...code.files, ...suite.output.files],
         prepareCommands: scenario.prepareCommands,
-        commands: scenario.finalCommands,
+        commands: [...scenario.finalCommands, ...testExecutionPlan(scenario.agentConfiguration!, scenario.sourcePaths, suite.output)],
+        replaceSourcePaths: scenario.sourcePaths.filter((path) => !scenario.publicInterfacePaths.includes(path)),
       }, input.signal);
       return [evaluation.evidenceRef];
     });
@@ -428,7 +431,7 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
     const run = this.flywheel.getRun(input.runId);
     if (run?.state === 'GENERATING') this.flywheel.transition(input.runId, 'EVALUATING');
     if (evaluation.infrastructureFailure) {
-      const decision = await this.recordGateDecision(input, evaluation);
+      const decision = await this.recordGateDecision({ ...input, context: { ...input.context, [contextKey('evaluationEvidenceRef', input.iteration)]: evidenceRef } }, evaluation);
       return {
         detail: `evaluation infrastructure failed; gate ${decision.outcome}`,
         context: {
@@ -617,7 +620,7 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
         languageId: this.scenarioLanguage(scenario),
         testPolicyRef,
         allowedTestPaths,
-        ...(repair ? { previousCandidateRef: repair.candidateRef, validationFailureRef: repair.failureRef } : {}),
+        ...(repair ? { previousCandidateRef: (await this.readJson<AgentResult>(repair.candidateRef)).rawOutputRef!, validationFailureRef: repair.failureRef } : {}),
       };
     } else if (agentId === 'code') {
       const knowledgeRef = input.context[contextKey('candidateBodyRef', input.iteration)] as ArtifactRef | undefined;

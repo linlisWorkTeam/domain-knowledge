@@ -661,6 +661,7 @@ export interface ProjectEvaluator {
     label: string;
     snapshot: ProjectSnapshot;
     generatedFiles: GeneratedProjectFile[];
+    replaceSourcePaths?: string[];
     prepareCommands: ProjectCommand[];
     commands: ProjectCommand[];
   }, signal?: AbortSignal): Promise<ProjectEvaluation>;

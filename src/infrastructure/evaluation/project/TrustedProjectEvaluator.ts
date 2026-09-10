@@ -357,7 +357,7 @@ export class TrustedProjectEvaluator implements ProjectEvaluator {
       });
       if (bytes.error) throw bytes.error;
       if (bytes.status !== 0 || !bytes.stdout) throw new Error(`PROJECT_SOURCE_MISSING: ${path}`);
-      return { path, sha256: digest(bytes.stdout), size: bytes.stdout.byteLength };
+      return { path, sha256: digest(bytes.stdout), size: bytes.stdout.byteLength, content: bytes.stdout.toString('utf8') };
     });
     const remote = syncText('git', ['config', '--get', 'remote.origin.url'], repositoryRoot, true);
     const dirty = syncText('git', ['status', '--porcelain=v1'], repositoryRoot, true).length > 0;
@@ -374,6 +374,7 @@ export class TrustedProjectEvaluator implements ProjectEvaluator {
     label: string;
     snapshot: ProjectSnapshot;
     generatedFiles: GeneratedProjectFile[];
+    replaceSourcePaths?: string[];
     prepareCommands: ProjectCommand[];
     commands: ProjectCommand[];
   }, signal?: AbortSignal): Promise<ProjectEvaluation> {
@@ -386,6 +387,12 @@ export class TrustedProjectEvaluator implements ProjectEvaluator {
       mkdirSync(workspace, { recursive: true });
       syncText('git', ['-C', input.snapshot.repositoryRoot, 'archive', '--format=tar', `--output=${archivePath}`, input.snapshot.commit], tempRoot);
       syncText('tar', ['-xf', archivePath, '-C', workspace], tempRoot);
+      for (const path of input.replaceSourcePaths ?? []) {
+        const normalized = safeRelativePath(path);
+        if (!input.generatedFiles.some((file) => file.path === normalized)) throw new Error(`PROJECT_RECONSTRUCTION_INCOMPLETE: ${normalized}`);
+        assertNoSymlink(workspace, normalized);
+        rmSync(pathInside(workspace, normalized), { force: true });
+      }
       for (const file of input.generatedFiles) {
         const normalized = safeRelativePath(file.path);
         assertNoSymlink(workspace, normalized);
