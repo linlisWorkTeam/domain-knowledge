@@ -121,3 +121,34 @@ sequenceDiagram
 ```
 
 该场景是已有两轮回归的设计路径。质量不足可在代码生成前进入下一轮；基础设施失败和取消另行记录；有图和受控测试不代表真实模型质量已验收。
+
+## 工作台场景：固定源码生成可阅读卡片
+
+```mermaid
+sequenceDiagram
+  actor U as Console用户
+  participant A as WorkbenchGeneration
+  participant T as StageTaskStore
+  participant N as NativeLanguageToolchain
+  participant D as Domain KnowledgeUnits与DocGen
+  participant M as 隔离模型会话
+  participant S as SQLite与CAS
+  U->>A: 已保存项目输入与接口范围
+  A->>S: 冻结模型配置和源码引用
+  A->>T: 启动GENERATE并取得单任务租约
+  A->>N: 从固定源码提取公开声明
+  N-->>A: 无实现正文的接口投影
+  A->>D: 划分稳定知识单元
+  loop 每张未完成卡片
+    A->>D: 固定单元、源码材料与提示词
+    D->>M: 概要、章节正文（内联材料，无文件工具）
+    M-->>D: 结构化结果
+    D-->>A: 角色结果及待提交工件
+    A->>S: 保存候选版本与来源
+    A->>T: 保存卡片检查点和累计用量
+    A-->>U: 可立即阅读，尚未评测
+  end
+  U->>A: 后续独立INDEX操作
+```
+
+上图描述已接通的 C/C++ 生成入口，INDEX由KnowledgeIndexService执行。新阶段有自己的冻结输入、尝试审计和恢复记录，不借用旧Run的发布状态；FLYWHEEL、EVALUATE和ASSOCIATE尚未接通该新链路。

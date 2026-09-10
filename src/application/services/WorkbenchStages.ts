@@ -25,7 +25,9 @@ function safeCode(error: unknown): string {
 }
 const paused = (code: string) => code === 'STAGE_SHUTDOWN' || code === 'STAGE_BUDGET_EXHAUSTED'
   || code === 'STAGE_HANDLER_UNAVAILABLE' || code.startsWith('PROVIDER_QUOTA_')
-  || code === 'PROVIDER_PAYMENT_REQUIRED' || code.startsWith('WORKBENCH_RESOURCE_') || code.startsWith('TOOLCHAIN_MISSING');
+  || code === 'PROVIDER_PAYMENT_REQUIRED' || code.startsWith('WORKBENCH_RESOURCE_') || code.startsWith('TOOLCHAIN_MISSING')
+  || ['DSH_CONFIGURATION_UNAVAILABLE', 'DSH_CONFIGURATION_CHANGED', 'RUN_CONFIGURATION_INCOMPATIBLE',
+    'MODULE_ISOLATION_REQUIRED', 'PROJECT_RESOURCE_ISOLATION_UNAVAILABLE'].includes(code);
 
 /** 所有启动入口共享持久化单执行槽；旧执行仅可读取，不自动跨版本恢复。 */
 export class WorkbenchStages {

@@ -19,7 +19,7 @@ export interface CardIndexEntry {
 export function cardIndexSourceDigest(cardId: string, version: KnowledgeVersion): string {
   return sha256(JSON.stringify([CARD_INDEX_VERSION, cardId, version.versionId, version.bodyRef.sha256,
     version.title, version.description, version.moduleId, version.tags, version.provenance,
-    version.metadata.applicability ?? '', version.metadata.language ?? '', version.status]));
+    version.metadata.applicability ?? '', version.metadata.language ?? '', version.metadata.sourceModule ?? '', version.status]));
 }
 /** 只提取确定性的正文摘要；缺适用条件时明确未提供，不推测源码行为。 */
 export function cardIndexHeader(cardId: string, version: KnowledgeVersion, body: string): CardIndexHeader {
@@ -30,7 +30,7 @@ export function cardIndexHeader(cardId: string, version: KnowledgeVersion, body:
     : paths.some((path) => /\.(ts|tsx)$/.test(path)) ? 'typescript' : 'unknown';
   return { cardId, versionId: version.versionId, name: version.title, purpose: version.description,
     applicability: typeof version.metadata.applicability === 'string' ? version.metadata.applicability : '未提供适用条件',
-    language, module: version.moduleId, keywords: [...new Set(version.tags)],
+    language, module: typeof version.metadata.sourceModule === 'string' ? version.metadata.sourceModule : version.moduleId, keywords: [...new Set(version.tags)],
     sourceVersions: [...new Set(version.provenance.map((source) => source.commit).filter((commit): commit is string => !!commit))],
     summary: body.replace(/```[\s\S]*?```/g, ' ').replace(/[#*_>`|]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 800),
   };

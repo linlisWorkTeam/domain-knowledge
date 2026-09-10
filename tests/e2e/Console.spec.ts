@@ -11,6 +11,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { createKnowledgeServer } from '../../src/interfaces/runner/Server.ts';
+import { assertModelOutput } from '../../src/infrastructure/agentAdapters/ModelExecution.ts';
 import { GENERIC_SCENARIO, GOOD_BODY } from '../helpers/Fixture.ts';
 
 let instance: ReturnType<typeof createKnowledgeServer>;
@@ -925,6 +926,8 @@ test('知识索引可独立构建、试检索并预览 YAML，命中后才读取
 
 test('操作中心从固定 Git 版本分析仓库，显示模块和环境且窄屏可操作', async ({ page }) => {
   const directory = mkdtempSync(join(tmpdir(), 'console-analysis-'));
+  const originalModel = instance.composition.apps.workbenchGeneration.dependencies.model;
+  const originalNative = instance.composition.apps.workbenchGeneration.dependencies.native;
   const git = (args: string[]) => execFileSync('git', ['-c', 'user.name=Browser Test', '-c', 'user.email=browser@example.test', ...args], {
     cwd: directory, encoding: 'utf8', env: { PATH: process.env.PATH, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null' },
   }).trim();
@@ -945,14 +948,34 @@ test('操作中心从固定 Git 版本分析仓库，显示模块和环境且窄
     await expect(page.locator('[data-project-summary]')).toContainText('已保存 1 个模块');
     const saved = await (await savedResponse).json();
     expect(saved.commit).toBe(commit); expect(saved.build.cStandard).toBe('c17');
+    // UI测试固定接口投影；真实编译、资源预检查及角色恢复由integration串行覆盖。
+    instance.composition.apps.workbenchGeneration.dependencies.native = { ...originalNative,
+      compileAndRun: (...args) => originalNative.compileAndRun(...args), publicInterface: async () => ({
+        schemaVersion: 'native-interface-v1', language: 'c', sourcePath: 'parser.c', astFilter: null,
+        declarations: [{ kind: 'FunctionDecl', name: 'parse', type: 'int (void)', parameters: [] }],
+      }),
+    };
+    instance.composition.apps.workbenchGeneration.dependencies.model = () => ({ assertOutput: assertModelOutput, execute: async (request) => {
+      const title = 'Parser generated card'; const description = 'The fixed parser interface.';
+      return request.stage?.startsWith('outline') ? { title, description, sections: [{ heading: 'Behavior', purpose: 'Interface and limits' }] }
+        : { title, description, sections: [{ sectionId: 'section-1', body: 'The parse function takes no arguments and returns the integer one. Its public interface is int parse(void). The fixed source contains no external dependencies or mutable state. This card describes only the provided function and does not establish behavior for any other parser. Behavioral evaluation and publication approval remain pending.' }] };
+    } });
+    await page.getByRole('button', { name: '生成知识库', exact: true }).click();
+    await expect(page.locator('[data-generation-task]')).toContainText('已生成 1 张');
+    await expect(page.locator('[data-generation-task]')).toContainText('已完成');
+    await expect(page.getByRole('button', { name: 'Parser generated card', exact: true })).toBeVisible();
     await page.screenshot({ path: test.info().outputPath('repository-analysis-desktop.png'), fullPage: true });
     await page.setViewportSize({ width: 390, height: 844 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await expect(page.getByRole('button', { name: '分析仓库', exact: true })).toBeVisible();
     await page.screenshot({ path: test.info().outputPath('repository-analysis-mobile.png'), fullPage: true });
+    await page.reload(); await enterGovernance(page);
+    await expect(page.locator('[data-generation-task]')).toContainText('已生成 1 张');
+    await expect(page.getByRole('button', { name: 'Parser generated card', exact: true })).toBeVisible();
+    await page.getByLabel('服务器仓库目录', { exact: true }).fill(directory);
     await page.getByLabel('源码版本', { exact: true }).fill('missing-commit-for-analysis');
     await page.getByRole('button', { name: '分析仓库', exact: true }).click();
-    await expect(page.locator('[data-repository-panel] [role="status"]')).toContainText('无法读取这个源码版本');
+    await expect(page.locator('[data-repository-notice]')).toContainText('无法读取这个源码版本');
     await expect(page.locator('[data-repository-result]')).not.toContainText(commit);
-  } finally { rmSync(directory, { recursive: true, force: true }); }
+  } finally { instance.composition.apps.workbenchGeneration.dependencies.model = originalModel; instance.composition.apps.workbenchGeneration.dependencies.native = originalNative; rmSync(directory, { recursive: true, force: true }); }
 });

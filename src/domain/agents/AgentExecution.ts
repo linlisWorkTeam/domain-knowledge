@@ -51,6 +51,10 @@ export interface ModelExecutionPort {
 }
 /** 执行上下文。 */
 export interface ExecutionContext {
+  /** 新阶段使用累计活跃时间；旧Run省略时保留原墙钟契约。 */
+  now?: () => number;
+  /** 新阶段可在额度、取消等操作性中断后继续；实际请求仍累计计费。 */
+  resumeOperationalFailures?: boolean;
   /** Application 保存阶段尝试，包括失败；同版本恢复使用同一记录。 */
   stageJournal?: {
     read(stage: string): Promise<StageAttempt[]>;
@@ -77,6 +81,7 @@ export interface StageAttempt {
   status: 'STARTED' | 'PASSED' | 'REJECTED' | 'FAILED';
   output?: Record<string, unknown>;
   issue?: { code: string; field: string; hint: string };
+  failureCode?: string;
 }
 /** 待保存工件只有内容和逻辑名称，Domain 不创建 CAS 引用或操作文件系统。 */
 export interface PendingArtifact { key: string; content: string; mediaType: string }

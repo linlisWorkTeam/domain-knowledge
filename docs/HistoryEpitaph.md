@@ -126,3 +126,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 - [2026-09-10-1511-five-stage-foundation.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/47ef4c5f043aec14842ecc5f8d7a0dfb51a391d8/docs/epitaph/2026-09-10-1511-five-stage-foundation.md)：稳定卡片身份与历史只读分组、匿名证据下载及未知状态修复；当时45单元、163集成、19既有acceptance和27Console通过。随后阶段/索引及仓库分析由1547/1614交接覆盖，完整C/C++闭环与部署仍未完成。
 
 - [2026-09-10-1547-workbench-stages-index.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/e65140a92d27379923cb856c62e347bccd9956ab/docs/epitaph/2026-09-10-1547-workbench-stages-index.md)：knowledge-workbench-v1持久化阶段、Linux租约/取消/累计预算、独立增量索引与检索接通；当时170集成、29contract及28Console通过。只有INDEX handler，其他四阶段、真实C/C++模型及最终部署未完成。后续仓库/项目输入与原生工具链在保留交接继续推进。
+
+- [2026-09-10-1614-workbench-repository-analysis.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/2479904f1fe3824682e69b155330552e25b2922d/docs/epitaph/2026-09-10-1614-workbench-repository-analysis.md)：接入固定Git源码分析、模块候选和环境观察，类型/Spec/架构、172项integration和29项Console通过；仅分析入口，模型闭环及部署未完成。后续项目输入和原生工具链见1623/1645记录；原知识、线上taste和v0.2.0保留。

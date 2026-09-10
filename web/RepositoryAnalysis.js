@@ -3,7 +3,9 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：提供无需场景 JSON 的固定源码分析入口。
  */
+import { createKnowledgeGenerationPanel } from './KnowledgeGeneration.js'
 export function createRepositoryAnalysisPanel({ root, request, escapeHtml: escape, isEditable }) {
+  const generation = createKnowledgeGenerationPanel({ root, request, escapeHtml: escape, isEditable })
   let directory = ''
   let revision = 'HEAD'
   let report = null
@@ -27,7 +29,7 @@ export function createRepositoryAnalysisPanel({ root, request, escapeHtml: escap
       <label>包含目录（每行一个，相对仓库）<textarea name="includeDirectories" ${saving ? 'disabled' : ''}>${escape(build.includeDirectories)}</textarea></label>
       <label>预处理定义（每行一个）<textarea name="definitions" ${saving ? 'disabled' : ''}>${escape(build.definitions)}</textarea></label></div>
       <button class="secondary-button" type="submit" ${saving || !isEditable() ? 'disabled' : ''}>${saving ? '保存中…' : '保存项目输入'}</button></form>
-      <p data-project-summary>${project ? `已保存 ${escape(project.modules.length)} 个模块，输入版本 <code>${escape(project.snapshotId)}</code>。` : '保存会固定所选模块、源码正文和构建参数。'}公开接口提取及生成操作尚未开放。</p>`
+      <p data-project-summary>${project ? `已保存 ${escape(project.modules.length)} 个模块，输入版本 <code>${escape(project.snapshotId)}</code>。` : '保存会固定所选模块、源码正文和构建参数。'}</p>`
   }
   const errors = { SOURCE_ACCESS_DENIED: '目录不在允许范围内。', SOURCE_DIRECTORY_INVALID: '目录不存在或不可访问。',
     REPOSITORY_ROOT_REQUIRED: '请选择 Git 仓库的根目录。', REPOSITORY_REVISION_UNAVAILABLE: '无法读取这个源码版本，请检查仓库和版本。',
@@ -38,19 +40,19 @@ export function createRepositoryAnalysisPanel({ root, request, escapeHtml: escap
     }
     if (event.target.closest('[data-project-form]') && Object.hasOwn(build, event.target.name)) build[event.target.name] = event.target.value
     if (event.target.matches('[data-project-module]') || event.target.closest('[data-project-form]')) {
-      project = null; root.querySelector('[data-project-summary]').textContent = '选择或参数已修改，请重新保存项目输入。'
+      project = null; generation.setProject(null); root.querySelector('[data-project-summary]').textContent = '选择或参数已修改，请重新保存项目输入。'
     }
   })
   root.addEventListener('submit', (event) => {
     if (!event.target.matches('[data-project-form]')) return
     event.preventDefault()
     if (!report || saving || busy || !isEditable()) return
-    saving = true; project = null; error = ''
+    saving = true; project = null; generation.setProject(null); error = ''
     const lines = (text) => text.split('\n').map((line) => line.trim()).filter(Boolean)
     const payload = { directory: report.directory, revision: report.commit, moduleIds: [...selected], build: { ...build, includeDirectories: lines(build.includeDirectories), definitions: lines(build.definitions) } }
     root.querySelector('[data-repository-result]').innerHTML = result()
     request('/api/v1/projects', { method: 'POST', body: JSON.stringify(payload) })
-      .then((value) => { project = value })
+      .then((value) => { project = value; generation.setProject(value) })
       .catch((failure) => { error = errors[failure.code] ?? '项目输入保存失败，前序分析仍可查看。' })
       .finally(() => { saving = false; const panel = root.querySelector('[data-repository-panel]'); if (panel) { panel.querySelector('[data-repository-result]').innerHTML = result(); panel.querySelector('[role="status"]').textContent = error } })
   })
@@ -63,7 +65,7 @@ export function createRepositoryAnalysisPanel({ root, request, escapeHtml: escap
     if (!event.target.matches('[data-repository-form]')) return
     event.preventDefault()
     if (!isEditable() || busy || saving) return
-    busy = true; error = ''; report = null; project = null
+    busy = true; error = ''; report = null; project = null; generation.setProject(null)
     event.target.querySelector('button').disabled = true
     event.target.querySelector('button').textContent = '分析中…'
     root.querySelector('[data-repository-result]').textContent = '正在读取固定源码版本…'
@@ -77,12 +79,12 @@ export function createRepositoryAnalysisPanel({ root, request, escapeHtml: escap
       })
   })
   return {
-    focus: () => { const element = document.activeElement; return element?.closest('[data-repository-form], [data-project-form]') ? { name: element.name, start: element.selectionStart, end: element.selectionEnd } : null },
-    restore: (focus) => { if (!focus) return; const field = root.querySelector(`[name="${CSS.escape(focus.name)}"]`); field?.focus({ preventScroll: true }); if (typeof focus.start === 'number') field?.setSelectionRange(focus.start, focus.end) },
+    focus: () => { const element = document.activeElement; return element?.closest('[data-repository-form], [data-project-form], [data-generation-panel]') ? { name: element.name, start: element.selectionStart, end: element.selectionEnd } : null },
+    restore: (focus) => { generation.refresh(); if (!focus) return; const field = root.querySelector(`[name="${CSS.escape(focus.name)}"]`); field?.focus({ preventScroll: true }); if (typeof focus.start === 'number') field?.setSelectionRange(focus.start, focus.end) },
     html: () => `<section class="repository-panel" data-repository-panel><h2>代码仓</h2><form data-repository-form>
       <label>服务器仓库目录<input name="repositoryDirectory" value="${escape(directory)}" placeholder="粘贴 Git 仓库根目录" required></label>
       <label>源码版本<input name="repositoryRevision" value="${escape(revision)}" placeholder="分支、标签或提交" maxlength="256" required></label>
       <button class="primary-button" type="submit" ${busy || saving || !isEditable() ? 'disabled' : ''}>${busy ? '分析中…' : '分析仓库'}</button></form>
-      <p role="status">${escape(error)}</p><details ${report || error ? 'open' : ''}><summary>分析结果</summary><div data-repository-result>${result() || '<p>分析后显示固定提交、模块候选和环境检查。</p>'}</div></details></section>`,
+      <p role="status" data-repository-notice>${escape(error)}</p><details ${report || error ? 'open' : ''}><summary>分析结果</summary><div data-repository-result>${result() || '<p>分析后显示固定提交、模块候选和环境检查。</p>'}</div></details>${generation.html()}</section>`,
   }
 }

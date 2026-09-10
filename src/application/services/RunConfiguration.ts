@@ -12,6 +12,8 @@ import type {
   RunConfigurationManager, RunConfigurationSnapshot,
 } from '../ports/ApplicationPorts.ts';
 import { AGENT_IDS } from '../ports/ApplicationPorts.ts';
+import type { StageModelConfiguration } from '../ports/WorkbenchGenerationPorts.ts';
+import { canonicalJson } from '../../domain/services/workbench/StageTask.ts';
 
 /** 对外提供标识，作为调用方使用的统一约定。 */
 export const AGENT_COMMAND_SCHEMA_ID = 'https://wpknowledge.local/schemas/agent-command/v1' as const;
@@ -20,6 +22,34 @@ export const AGENT_RESULT_SCHEMA_ID = 'https://wpknowledge.local/schemas/agent-r
 
 /** 封装注册表运行配置服务的对外操作与协作依赖。 */
 export class RegistryRunConfigurationService implements RunConfigurationManager {
+  /** 阶段配置不借用旧Run生命周期；所有正文材料仍按CAS引用冻结。 */
+  async captureStage(): Promise<StageModelConfiguration> {
+    const provider = structuredClone(this.currentProvider());
+    const configured = new Map(this.repository.listAgentPromptConfigurations().map((value) => [value.agentId, value]));
+    const agents = [];
+    for (const definition of this.definitions) {
+      const configuration = configured.get(definition.agentId);
+      const addon = configuration?.promptAddon ?? '';
+      const prompt = `${definition.basePrompt}${addon ? `\n\nOperator prompt add-on:\n${addon}` : ''}`;
+      agents.push({ agentId: definition.agentId, promptRevision: configuration?.revision ?? 0,
+        basePromptSha256: sha256(definition.basePrompt), promptAddonSha256: sha256(addon), effectivePromptSha256: sha256(prompt),
+        effectivePromptRef: await this.artifacts.put(Buffer.from(prompt), 'text/plain; charset=utf-8'), tools: [...definition.tools] });
+    }
+    return { schemaVersion: 'workbench-model-v1', roleExecutionVersion: ROLE_EXECUTION_VERSION, provider,
+      contracts: structuredClone(this.contracts), agents, policy: { maxProviderRequests: 1, maxSchemaAttempts: 1, clock: 'stage-active-v1', resumeOperationalFailures: true } };
+  }
+  async assertStageCompatible(configuration: StageModelConfiguration): Promise<void> {
+    if (configuration.schemaVersion !== 'workbench-model-v1' || configuration.roleExecutionVersion !== ROLE_EXECUTION_VERSION
+      || canonicalJson(configuration.provider) !== canonicalJson(this.currentProvider())
+      || canonicalJson(configuration.contracts) !== canonicalJson(this.contracts)
+      || configuration.policy.maxProviderRequests !== 1 || configuration.policy.maxSchemaAttempts !== 1 || configuration.policy.clock !== 'stage-active-v1'
+      || configuration.policy.resumeOperationalFailures !== true) throw new Error('RUN_CONFIGURATION_INCOMPATIBLE');
+    for (const definition of this.definitions) {
+      const agent = configuration.agents.find((entry) => entry.agentId === definition.agentId);
+      if (!agent || agent.basePromptSha256 !== sha256(definition.basePrompt) || JSON.stringify(agent.tools) !== JSON.stringify(definition.tools)
+        || !await this.artifacts.verify(agent.effectivePromptRef)) throw new Error('RUN_CONFIGURATION_INCOMPATIBLE');
+    }
+  }
   /** 提供definitions信息，供调用方读取或传入。 */
   readonly definitions: readonly AgentDefinition[];
   /** 提供仓库信息，供调用方读取或传入。 */

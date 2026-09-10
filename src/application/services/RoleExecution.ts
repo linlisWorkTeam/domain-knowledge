@@ -3,8 +3,9 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：为生产与独立开发统一执行角色、保存工件并提交结果信封。
  */
+import { commitRoleArtifacts } from './RoleArtifacts.ts';
 import { executeAgent } from '../../domain/services/workflow/AgentExecutionService.ts';
-import type { AgentCommand, AgentResult, AgentId } from '../../domain/agents/AgentContracts.ts';
+import type { AgentCommand, AgentId } from '../../domain/agents/AgentContracts.ts';
 import type { ExecutionContext, RoleInput, StageAttempt } from '../../domain/agents/AgentExecution.ts';
 import { assertActive } from '../../domain/agents/AgentExecution.ts';
 import { createEvent, type ArtifactRef } from '../../domain/Domain.ts';
@@ -64,36 +65,8 @@ export class RoleExecutionService {
         },
       };
       const roleResult = await executeAgent(input, { ...context, stageJournal });
-      const rawRef = await this.flywheel.putArtifact(Buffer.from(JSON.stringify(roleResult.output, null, 2)), 'application/json');
-      // 先保存标准化角色结果与声明工件；阶段模型原文已由 stageJournal 单独留证。
-      const refs = new Map<string, ArtifactRef>([['raw', rawRef]]);
-      for (const artifact of roleResult.artifacts) {
-        if (refs.has(artifact.key)) throw new Error('AGENT_PENDING_ARTIFACT_DUPLICATED');
-        refs.set(artifact.key, await this.flywheel.putArtifact(Buffer.from(artifact.content), artifact.mediaType));
-      }
-      // 只做通用引用绑定，不在这里维护七角色的业务分支或决定图连接。
-      const bind = (value: unknown): unknown => {
-        if (!value || typeof value !== 'object') return value;
-        if ('agentNode' in value) return this.nodeByAgent[value.agentNode as AgentId];
-        if ('agentGeneration' in value) return `${command.runId}:${this.nodeByAgent[value.agentGeneration as AgentId]}:${context.iteration}:contract-v5`;
-        if ('pendingArtifact' in value) {
-          const ref = refs.get(String(value.pendingArtifact));
-          if (!ref) throw new Error('AGENT_PENDING_ARTIFACT_MISSING');
-          return ref;
-        }
-        if (Array.isArray(value)) return value.map(bind);
-        return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, bind(item)]));
-      };
-      const result: AgentResult = {
-        rawOutputRef: rawRef,
-        schemaVersion: '1.0', commandId: command.commandId, commandRef,
-        runId: command.runId, agentType: command.agentType, status: 'SUCCEEDED',
-        outputRefs: uniqueRefs([...refs.values()]), payload: bind(roleResult.payload) as Record<string, unknown>,
-      };
-      // 保存结果信封前再次校验对外契约，取消或失败时不能提交成功 checkpoint。
-      this.contracts.assertResult(result);
-      const resultRef = await this.flywheel.putArtifact(Buffer.from(JSON.stringify(result, null, 2)), 'application/json');
-      assertActive(context.signal);
+      const { resultRef, rawRef } = await commitRoleArtifacts(this.flywheel.artifacts, this.contracts, command, commandRef, roleResult,
+        (role) => this.nodeByAgent[role], (role) => `${command.runId}:${this.nodeByAgent[role]}:${context.iteration}:contract-v5`, context.signal);
       return [resultRef, rawRef];
     });
     const ref = checkpoint.outputRefs[0];

@@ -5,6 +5,9 @@
  */
 import { RepositoryAnalysisService } from '../../application/services/RepositoryAnalysis.ts';
 import { WorkbenchProjects } from '../../application/services/WorkbenchProjects.ts';
+import { WorkbenchGeneration } from '../../application/services/WorkbenchGeneration.ts';
+import { NativeToolchain } from '../../infrastructure/evaluation/project/NativeToolchain.ts';
+import { materialModelExecution } from '../../infrastructure/agentAdapters/MaterialModelExecution.ts';
 import { SqliteWorkbenchProjects } from '../../infrastructure/sqlite/SqliteWorkbenchProjects.ts';
 import { GitRepositoryAnalyzer } from '../../infrastructure/source/GitRepositoryAnalyzer.ts';
 import { WorkbenchStages } from '../../application/services/WorkbenchStages.ts';
@@ -165,7 +168,8 @@ export function createComposition(input: {
   const stageStore = new SqliteStageTasks(join(runtimeDir, 'workbench.sqlite'));
   const indexStore = new SqliteKnowledgeIndex(join(runtimeDir, 'workbench.sqlite'), join(runtimeDir, 'card-index'));
   const knowledgeIndex = new KnowledgeIndexService(repository, artifacts, indexStore);
-  const workbenchStages = new WorkbenchStages(stageStore, { INDEX: (context) => knowledgeIndex.build(context) });
+  let workbenchGeneration!: WorkbenchGeneration;
+  const workbenchStages = new WorkbenchStages(stageStore, { INDEX: (context) => knowledgeIndex.build(context), GENERATE: (context) => workbenchGeneration.generate(context) });
   const scanner = new SourceScanner(repositoryRoot, repository);
   const knowledgeDiscoveryApp = new KnowledgeDiscoveryApp(scanner, undefined, {
     migrate: (legacyKnowledgeRoot) => migrateLegacyOkf({
@@ -364,6 +368,23 @@ export function createComposition(input: {
     },
     clock: input.clock,
   });
+  workbenchGeneration = new WorkbenchGeneration({ projects: projectStore, artifacts, configuration: runConfiguration,
+    native: new NativeToolchain(), contracts: new JsonSchemaAgentContractValidator(schemaRoot), flywheel: flywheelApp, stages: workbenchStages,
+    model: (command, configuration, onUsage) => {
+      if (processIsolation !== 'bubblewrap') throw new Error('MODULE_ISOLATION_REQUIRED');
+      const configured = providerOperations.requireRuntimeConfiguration(configuration.provider);
+      const provider = new ConfiguredDshProvider({ ...configured, maxProviderRequests: configuration.policy.maxProviderRequests,
+        maxSchemaAttempts: configuration.policy.maxSchemaAttempts, dshHome: join(runtimeDir, 'dsh-configured'), quotaHome: join(runtimeDir, 'provider-budget'),
+        runtime: { processIsolation, bubblewrapCommand, timeoutMs, maxOutputBytes, allowedWorkspaceRoots: [...allowedRoots, agentWorkspaceRoot] },
+        endpointPolicy: providerEndpointPolicy,
+        onInvocation: (record) => { metrics.recordProviderInvocation(record); onUsage(record.invocationId,
+          record.inputTokens === null || record.outputTokens === null ? null : record.inputTokens + record.outputTokens); },
+        onAudit: async (record) => { const directory = join(runtimeDir, 'workbench-audit'); await mkdir(directory, { recursive: true });
+          await appendFile(join(directory, 'model.jsonl'), `${JSON.stringify(record)}\n`, { encoding: 'utf8', mode: 0o600 }); },
+      });
+      return materialModelExecution(provider, command, join(agentWorkspaceRoot, 'stage-materials'));
+    },
+  });
   const projectStages = () => {
       const auditDirectory = join(runtimeDir, 'demo');
       const auditPath = join(auditDirectory, 'agent-runs.jsonl');
@@ -517,6 +538,7 @@ export function createComposition(input: {
       knowledgeIndex,
       repositoryAnalysis,
       workbenchProjects,
+      workbenchGeneration,
       markdownLite: {
         start: async (directory: string, budgetMode?: 'provider-quota') => {
           // 固定模块入口只接受服务器目录；源码与模型设置在服务端验证。

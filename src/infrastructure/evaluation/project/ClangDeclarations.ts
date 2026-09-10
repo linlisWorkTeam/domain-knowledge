@@ -8,12 +8,13 @@ interface Node {
   id?: string; kind?: string; name?: string; tagUsed?: string; access?: string;
   storageClass?: string; isImplicit?: boolean; completeDefinition?: boolean;
   type?: { qualType?: string }; value?: string; ownedTagDecl?: { id?: string };
+  loc?: { file?: string; offset?: number; includedFrom?: unknown };
   inner?: Node[];
 }
 const declarationKinds = new Set(['FunctionDecl', 'CXXMethodDecl', 'CXXConstructorDecl', 'CXXDestructorDecl', 'RecordDecl', 'CXXRecordDecl', 'EnumDecl', 'TypedefDecl', 'TypeAliasDecl']);
 const containers = new Set(['TranslationUnitDecl', 'NamespaceDecl', 'LinkageSpecDecl', 'RecordDecl', 'CXXRecordDecl']);
-export function clangDeclarations(raw: unknown, symbols: string[]): NativeDeclaration[] {
-  if (!raw || typeof raw !== 'object' || !Array.isArray(symbols) || !symbols.length || symbols.length > 100) throw new Error('NATIVE_INTERFACE_INVALID');
+export function clangDeclarations(raw: unknown, symbols?: string[], sourcePath?: string, astFilter?: string): NativeDeclaration[] {
+  if (!raw || typeof raw !== 'object' || (symbols !== undefined && (!Array.isArray(symbols) || !symbols.length || symbols.length > 100))) throw new Error('NATIVE_INTERFACE_INVALID');
   const root = raw as Node; const ids = new Map<string, Node>();
   const index = (node: Node, depth = 0) => {
     if (depth > 128) throw new Error('NATIVE_AST_TOO_DEEP');
@@ -35,7 +36,11 @@ export function clangDeclarations(raw: unknown, symbols: string[]): NativeDeclar
     if (node.name && declarationKinds.has(node.kind ?? '') && !(node.kind === 'FunctionDecl' && node.storageClass === 'static')) candidates.push({ qualified: name, node });
     if (containers.has(node.kind ?? '')) for (const child of children(node)) collect(child, node.name ? [...scope, node.name] : scope);
   };
-  collect(root, []);
+  const prefix = root.name && astFilter?.endsWith(`::${root.name}`) ? astFilter.slice(0, -(root.name.length + 2)).split('::') : [];
+  collect(root, prefix);
+  const selected = symbols ?? candidates.filter(({ node }) => typeof node.loc?.offset === 'number' && !node.loc.includedFrom
+    && (!node.loc.file || node.loc.file === sourcePath) && !['CXXMethodDecl', 'CXXConstructorDecl', 'CXXDestructorDecl'].includes(node.kind ?? '')).map(({ qualified }) => qualified);
+  if (!selected.length) throw new Error('NATIVE_INTERFACE_EMPTY');
   const type = (node: Node) => node.type?.qualType ?? '';
   const owned = (node: Node): Node | undefined => {
     if (node.ownedTagDecl?.id) return ids.get(node.ownedTagDecl.id);
@@ -69,7 +74,7 @@ export function clangDeclarations(raw: unknown, symbols: string[]): NativeDeclar
     return result;
   };
   const output: NativeDeclaration[] = [];
-  for (const symbol of [...new Set(symbols)].sort()) {
+  for (const symbol of [...new Set(selected)].sort()) {
     if (!/^[A-Za-z_][\w]*(?:::[A-Za-z_][\w]*)*$/.test(symbol)) throw new Error('NATIVE_INTERFACE_SYMBOL_INVALID');
     const matches = candidates.filter((candidate) => candidate.qualified === symbol || candidate.qualified.endsWith(`::${symbol}`));
     if (!matches.length) throw new Error(`NATIVE_INTERFACE_SYMBOL_MISSING: ${symbol}`);

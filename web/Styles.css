@@ -1296,3 +1296,9 @@ body.drawer-active { overflow: hidden; }
 .project-build-fields select, .project-build-fields textarea { width: 100%; min-width: 0; }
 @media (max-width: 720px) { .repository-panel form { flex-direction: column; align-items: stretch; } }
 @media (max-width: 480px) { .project-build-fields { grid-template-columns: minmax(0, 1fr); } }
+
+/* 阶段输入标识和诊断在窄屏换行，接口字段不撑开操作中心。 */
+[data-generation-panel] { min-width: 0; overflow-wrap: anywhere; }
+[data-generation-panel] fieldset { min-width: 0; }
+[data-generation-panel] label { display: block; margin-block: .6rem; }
+[data-generation-panel] textarea { width: 100%; box-sizing: border-box; }

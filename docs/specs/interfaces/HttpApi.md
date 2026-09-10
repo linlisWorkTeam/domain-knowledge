@@ -47,10 +47,11 @@ Available 是已接线路由；Planned 路由不作为当前能力。Available /
 | `POST /api/v1/projects` | Available | directory、revision、moduleIds及声明式build；固定选定源码正文和构建配置，返回不可变workbench-project-v1快照。同输入复用，不启动生成。 |
 | `GET /api/v1/projects` | Available | snapshots输入历史，可按projectId过滤，最新保存优先；不读取源码正文。 |
 | `GET /api/v1/projects/:snapshotId` | Available | 读取明确输入版本，不跟随HEAD或覆盖历史。 |
+| `POST /api/v1/generations` | Available | snapshotId及可选scopes（以moduleId为键，entryPath/astFilter/symbols）；冻结模型配置，启动或复用C/C++ GENERATE任务，返回task。已有卡片可立即读取；任务状态、取消和同输入恢复共用stage-tasks。 |
 | `POST /api/v1/index-builds` | Available | 可选 versionIds，必须是当前版本；冻结输入后创建或复用 INDEX 任务。200 表示 reusedTask，202 表示已接受；restored 为恢复文件数。 |
 | `GET /api/v1/knowledge-index?q=` | Available | 摘要命中、原因、正文入口及 stale/missing 数量；不加载正文。 |
 | `GET /api/v1/knowledge-index/:cardId` | Available | YAML 预览、工件引用及 stale 标记。 |
-| `GET /api/v1/stage-tasks` | Available | projectId 筛选与分页；当前仅 INDEX 接通公开启动。 |
+| `GET /api/v1/stage-tasks` | Available | projectId 筛选与分页；当前 GENERATE 与 INDEX 接通公开启动。 |
 | `GET /api/v1/stage-tasks/:taskId` | Available | 冻结输入、状态、累计用量、检查点与审计事件。 |
 | `POST /api/v1/stage-tasks/:taskId/resume` | Available | inputDigest 必须匹配；旧契约/输入变化/预算耗尽返回409。 |
 | `POST /api/v1/stage-tasks/:taskId/cancel` | Available | 幂等请求取消；运行中清理完成前不释放槽位。 |

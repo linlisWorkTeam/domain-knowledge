@@ -61,7 +61,7 @@ Console 通过应用边界读取发布设置、枚举服务器授权目录、读
 
 ## 工作台阶段与索引
 
-WorkbenchStages 通过 StageTaskStore 调度版本化任务；输入身份、恢复条件和预算规则位于 Domain [Workbench](../domainFunction/services/workbench/Workbench.md)。单阶段执行结果与检查点可独立等待，不复用 AgentExampleService 的每次新建 Run 行为。当前只有 INDEX handler 接通，其他阶段不得宣称已可运行。
+WorkbenchStages 通过 StageTaskStore 调度版本化任务；输入身份、恢复条件和预算规则位于 Domain [Workbench](../domainFunction/services/workbench/Workbench.md)。单阶段执行结果与检查点可独立等待，不复用 AgentExampleService 的每次新建 Run 行为。当前 GENERATE（C/C++）与 INDEX handler 已接通；飞轮、评测、关联执行器仍待接通。
 
 KnowledgeIndexService 读取冻结卡片版本，协调 YAML/Markdown 工件、增量索引、恢复与摘要查询。索引失败保留知识和已提交子步骤。查询只访问摘要和版本元数据，正文由详情按需加载；不调用模型、发布或外部搜索。
 
@@ -70,4 +70,8 @@ RepositoryAnalysisService 调用 RepositoryAnalyzer 并将固定清单写入 CAS
 
 WorkbenchProjects 已接入：项目身份绑定仓库，输入版本绑定提交、模块选择、构建约束和固定源文件工件。先校验选择，再将选定源码与构建配置存 CAS，最后原子记录 SQLite 快照；同输入重复请求复用，历史快照不可变。源文件工件仅供源码分析、DocGen和参考评测使用，不能作为 Code 的公开接口。公开接口提取成功前不能启动重建。构建参数只接受编译器、标准、相对包含目录及预处理定义，不接受 shell 命令。
 
-NativeLanguageToolchain端口用于原生声明投影与独立构建/原始执行观察。当前基础适配器已实现，尚未接通GENERATE、FLYWHEEL或EVALUATE；不能将compileAndRun返回的stdout/exitCode直接作为可信测试或发布门禁。公开接口材料须单独保存，只把native-interface-v1声明投影传给Code，禁止传源文件、原构建文件或完整AST。
+NativeLanguageToolchain端口用于原生声明投影与独立构建/原始执行观察。当前基础适配器已接通GENERATE的接口提取，尚未接通FLYWHEEL或EVALUATE；不能将compileAndRun返回的stdout/exitCode直接作为可信测试或发布门禁。公开接口材料须单独保存，只把native-interface-v1声明投影传给Code，禁止传源文件、原构建文件或完整AST。
+
+WorkbenchGeneration 已接通：从固定项目与接口选择构造稳定知识单元，一张卡片对应同名函数/重载族，类型布局独立成卡；配置先固定为阶段工件，阶段身份绑定配置摘要与输入。复用Domain角色及RoleExecution的结果工件提交，不用旧Run生命周期表示“生成完成未评测”。角色尝试写入阶段审计，成功卡片逐张提交、立即可读，失败保留前序产物；发布资格仍由后续评测决定。
+
+阶段配置为 workbench-model-v1 工件，包含七角色提示词、契约摘要、模型身份和阶段执行策略；不写依赖旧Run外键的配置表。只接受已验证的Console Provider配置，配置变化不能跨输入恢复。DocGen复用Domain概要与章节生成，RoleArtifacts负责契约校验和CAS提交，旧RoleExecution共用相同提交边界。每次模型调用前记录累计请求与保守Token预留，实际用量另记，未报告不是零；每次模型会话限一次供应商请求且禁用工具，源码材料全部内联，物理模型工作区为空。角色日志保留成功输出，阶段恢复时重用；新阶段使用累计活动时钟，暂停时长不计角色超时，旧Run时钟不变。

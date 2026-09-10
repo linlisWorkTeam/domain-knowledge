@@ -17,6 +17,20 @@ const native = new NativeToolchain();
 const build = buildConstraints();
 const groups = () => readdirSync('/sys/fs/cgroup').filter((name) => name.startsWith('knowledge-workbench-'));
 
+test('automatic interface discovery excludes included declarations and restores filtered C++ namespace identity', async () => {
+  const c = await native.publicInterface({ language: 'c', build, entryPath: 'api.h', files: [
+    { path: 'dependency.h', content: 'int dependency(void);\n' },
+    { path: 'api.h', content: '#include <stddef.h>\n#include "dependency.h"\ntypedef struct {size_t count;} Result;\nint parse(Result *result);\n' },
+  ] });
+  assert.deepEqual(c.declarations.map((entry) => entry.name).sort(), ['Result', 'parse']);
+  const cpp = await native.publicInterface({ language: 'cpp', build, entryPath: 'api.h', astFilter: 'tiny::Convert', files: [
+    { path: 'api.h', content: 'namespace tiny { class Convert { public: static int value(const char *s); static int value(int n); private: static int hidden(); }; }' },
+  ] });
+  assert.equal(cpp.declarations[0]?.name, 'tiny::Convert');
+  assert.equal(cpp.declarations[0]?.members?.filter((entry) => entry.name === 'value').length, 2);
+  assert.doesNotMatch(JSON.stringify(cpp), /hidden/);
+});
+
 test('C and C++ compile and run under isolation; failed builds never execute', async () => {
   for (const language of ['c', 'cpp'] as const) {
     const path = `main.${language === 'c' ? 'c' : 'cpp'}`;

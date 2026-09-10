@@ -25,10 +25,15 @@ export async function validatedStage<T>(context: ExecutionContext, request: Mode
     assertActive(context.signal);
     return validate(accepted.output);
   }
-  const used = Math.max(0, ...history.map((entry) => entry.attempt));
+  const latest = [...new Map(history.map((entry) => [entry.attempt, entry])).values()];
+  const operational = (code?: string) => code?.startsWith('PROVIDER_QUOTA_') || ['PROVIDER_PAYMENT_REQUIRED', 'STAGE_CANCELLED', 'STAGE_SHUTDOWN', 'STAGE_BUDGET_EXHAUSTED'].includes(code ?? '');
+  const used = context.resumeOperationalFailures
+    ? latest.filter((entry) => !(entry.status === 'FAILED' && operational(entry.failureCode))).length
+    : Math.max(0, ...history.map((entry) => entry.attempt));
   if (used >= 2) throw new Error(`AGENT_STAGE_ATTEMPTS_EXHAUSTED: ${request.stage}`);
-  const startedAt = history[0]?.startedAt ?? Date.now();
-  const remainingMs = timeoutMs - (Date.now() - startedAt);
+  const now = context.now ?? Date.now;
+  const startedAt = history[0]?.startedAt ?? now();
+  const remainingMs = timeoutMs - (now() - startedAt);
   if (remainingMs <= 0) throw new Error(`AGENT_STAGE_TIMEOUT: ${request.stage}`);
   const deadline = new AbortController();
   const timer = setTimeout(() => deadline.abort(new Error(`AGENT_STAGE_TIMEOUT: ${request.stage}`)), remainingMs);
@@ -39,7 +44,8 @@ export async function validatedStage<T>(context: ExecutionContext, request: Mode
     assertActive(signal);
   };
   try {
-    for (let attempt = used + 1; attempt <= 2; attempt++) {
+    const first = Math.max(0, ...history.map((entry) => entry.attempt)) + 1;
+    for (let attempt = first; attempt < first + 2 - used; attempt++) {
       active();
       const entry: StageAttempt = { schemaVersion: 'role-stage-v1', stage: request.stage, attempt, startedAt, deadlineAt: startedAt + timeoutMs, status: 'STARTED' };
       // 先持久化占用次数，崩溃或取消后不能免费获得新尝试。
@@ -59,11 +65,14 @@ export async function validatedStage<T>(context: ExecutionContext, request: Mode
         return result;
       } catch (error) {
         const repairable = error instanceof StageValidationIssue && !signal.aborted;
+        const failure = signal.aborted ? signal.reason : error;
+        const code = failure instanceof Error ? /^([A-Z][A-Z0-9_]+)(?::|$)/.exec(failure.message)?.[1] : undefined;
         await context.stageJournal?.record({ ...entry, status: repairable ? 'REJECTED' : 'FAILED',
           ...(raw ? { output: raw } : {}), ...(error instanceof StageValidationIssue ? { issue: error.issue } : {}),
+          ...(context.resumeOperationalFailures && operational(code) ? { failureCode: code } : {}),
         });
         active();
-        if (!repairable || attempt === 2) throw error;
+        if (!repairable || attempt === first + 1 - used) throw error;
         issue = error.issue;
       }
     }

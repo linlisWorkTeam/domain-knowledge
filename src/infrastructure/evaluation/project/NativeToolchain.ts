@@ -63,7 +63,7 @@ export class NativeToolchain implements NativeLanguageToolchain {
       return { build: compiled, execution };
     }, signal);
   }
-  async publicInterface(input: NativeToolchainInput & { entryPath: string; symbols: string[]; astFilter?: string }, signal?: AbortSignal) {
+  async publicInterface(input: NativeToolchainInput & { entryPath: string; symbols?: string[]; astFilter?: string }, signal?: AbortSignal) {
     if (!safePath(input.entryPath) || !input.files.some((file) => file.path === input.entryPath)) throw new Error('NATIVE_ENTRY_INVALID');
     if (input.astFilter !== undefined && !/^[A-Za-z_][\w]*(?:::[A-Za-z_][\w]*)*$/.test(input.astFilter)) throw new Error('NATIVE_INTERFACE_SYMBOL_INVALID');
     return this.workspace(input, async (directory, flags) => {
@@ -76,7 +76,7 @@ export class NativeToolchain implements NativeLanguageToolchain {
       });
       let ast: unknown; try { ast = JSON.parse(result.stdout); } catch { throw new Error('NATIVE_AST_AMBIGUOUS'); }
       return { schemaVersion: 'native-interface-v1' as const, language: input.language, sourcePath: input.entryPath,
-        astFilter: input.astFilter ?? null, declarations: clangDeclarations(ast, input.symbols) };
+        astFilter: input.astFilter ?? null, declarations: clangDeclarations(ast, input.symbols, `/workspace/source/${input.entryPath}`, input.astFilter) };
     }, signal);
   }
 }
