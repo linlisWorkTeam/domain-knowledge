@@ -158,3 +158,7 @@ This document summarizes older handoffs, milestones and architectural decisions 
 - [2026-09-11-0249-external-relations.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/698d6d51cf3dd2ea4d4cec76493402a55c433634/docs/epitaph/2026-09-11-0249-external-relations.md)：外部材料关联、v2一键选材和真实jsmn45条关系验收，后续执行契约见新交接。
 
 - [2026-09-11-0316-source-comparison.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/73848161ea22574a1c194369db508ab75628201b/docs/epitaph/2026-09-11-0316-source-comparison.md)：规范化公开函数差异及绑定 Code 缓存，jsmn 31/31、TinyXML2 37/37 真实行为通过；后续 v4 复用相同阶段证据，仍未通过最终发布或真实模型知识修订验收。
+
+## 修订依据归档
+
+[2026-09-11-0326-revision-evidence.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/6d3d24098ec2bb4c45ede8e0b78af599db0a1fcf/docs/epitaph/2026-09-11-0326-revision-evidence.md) 将可信失败绑定到固定版本 H2，区分候选归因与已证明知识错误。已通过当时契约和受控测试；真实修订、最终发布门禁尚未通过，不能将归因候选当作纠正事实。

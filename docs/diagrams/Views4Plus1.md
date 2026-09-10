@@ -271,11 +271,15 @@ flowchart LR
   Candidate --> UI[Console 只读修订依据]
   Unresolved --> UI
   None --> UI
+  Generated[固定生成代码 CAS] --> Review
   Candidate --> Review[Review 对当前章节归因]
-  Review -->|明确修订且无未解决风险| DocGen[DocGen 无损 H2 修订]
+  Review --> Bound[校验标准化纠正意见及原始输出绑定]
+  Bound -->|明确修订且无未解决风险| DocGen[DocGen 无损 H2 修订]
   Review -->|证据不足| Unresolved
   Review -->|知识正确无需修改| Retry[绑定失败评测的新 Code 尝试]
-  DocGen --> Parent[提交前校验原卡片头版本]
+  DocGen --> SourceReview[最终正文独立源码复核]
+  SourceReview -->|PASS 无风险| Parent[提交前校验原卡片头版本]
+  SourceReview -->|拒绝或证据不足 保留草稿不提交| Unresolved
   Parent --> CandidateVersion[幂等保存新候选版本]
   CandidateVersion --> Index[同一索引用例刷新受影响项]
   Index --> Retry

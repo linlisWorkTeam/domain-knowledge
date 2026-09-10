@@ -15,13 +15,13 @@ import { assertModelOutput } from '../../src/infrastructure/agentAdapters/ModelE
 import { NativeToolchain } from '../../src/infrastructure/evaluation/project/NativeToolchain.ts';
 import { NativeCaseExecutor } from '../../src/infrastructure/evaluation/project/NativeCaseExecutor.ts';
 
-test('native stage rejects bad candidates, resumes trusted cases after restart and maps generated failures to revised cards', async () => {
+for (const rejectSourceReview of [false, true]) test(`native stage rejects bad candidates, resumes trusted cases after restart and maps generated failures to revised cards (source rejection=${rejectSourceReview})`, async () => {
   const root = mkdtempSync(join(tmpdir(), 'evaluation-source-')); const runtimeDir = mkdtempSync(join(tmpdir(), 'evaluation-runtime-'));
   const git = (...args: string[]) => execFileSync('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.test', ...args], { cwd: root, encoding: 'utf8' }).trim();
   git('init', '-q'); writeFileSync(join(root, 'math.h'), 'int add(int a,int b);');
   writeFileSync(join(root, 'math.c'), '#include "math.h"\n/* REFERENCE_PRIVATE */\nint add(int a,int b){return a+b;}');
   git('add', '.'); git('commit', '-qm', 'Fixed reference');
-  let composition = createComposition({ runtimeDir }); let testCalls = 0, codeCalls = 0, generatedRuns = 0, reviewCalls = 0, revisionCalls = 0;
+  let composition = createComposition({ runtimeDir }); let testCalls = 0, codeCalls = 0, generatedRuns = 0, reviewCalls = 0, revisionCalls = 0, sourceReviewCalls = 0;
   let wrongCandidate = true, wrongCode = false, interrupt = true, reviewKeepsKnowledge = false;
   const install = () => {
     const deps = composition.apps.workbenchReconstruction.dependencies;
@@ -37,8 +37,9 @@ test('native stage rejects bad candidates, resumes trusted cases after restart a
       assert.deepEqual(request.readablePaths, []);
       if (['code', 'test-gen'].includes(request.role)) assert.doesNotMatch(request.prompt, /REFERENCE_PRIVATE|return a\+b/);
       else assert.match(request.prompt, /REFERENCE_PRIVATE/, 'revision roles receive the pinned reference, never Code or TestGen');
-      if (request.role === 'review') { reviewCalls++; usage(`review-${reviewCalls}`, 3); if (reviewKeepsKnowledge) { wrongCode = false; return { blocking: false, recommendation: 'PASS', correction: null, unresolvedRisks: [] }; } return { blocking: true, recommendation: 'ITERATE', correction: { correctionId: 'COR-0001', knowledgePath: 'knowledge/unit-add.md#Behavior', criterion: 'Describe addition rather than subtraction according to the trusted sum observation.', risk: 'Incorrect arithmetic operation' }, unresolvedRisks: [] }; }
-      if (request.role === 'doc-gen') { revisionCalls++; usage(`revision-${revisionCalls}`, 4); assert.equal(request.stage, 'revision'); return { title: 'Addition', description: 'Representable sum', sections: [{ sectionId: 'section-1', body: 'The sum of the two arguments is returned, rather than their difference. For the fixed inputs 3 and 4, the expected result is 7. Inputs and result must be representable signed integers. Overflow and unsupported values remain outside the specified interface contract.\n\nAddition is required because the public operation combines both arguments, rather than computing an ordered difference. The trusted reference observation is evidence for the fixed sample; it does not establish that every possible integer input has been tested. Callers must still respect the signed integer range. Negative operands may affect the sign of the sum, but they do not change the arithmetic operation into subtraction. No memory allocation or persistent state is part of this interface.' }] }; }
+      if (request.role === 'review' && request.prompt.includes('REVISION_SOURCE_REVIEW')) { sourceReviewCalls++; usage('source-review', 3); if (rejectSourceReview) return { blocking: true, recommendation: 'ITERATE', correction: null, unresolvedRisks: ['Candidate contradicts the fixed source.'] }; return { blocking: false, recommendation: 'PASS', correction: null, unresolvedRisks: [] }; }
+      if (request.role === 'review') { reviewCalls++; usage(`review-${reviewCalls}`, 3); if (reviewKeepsKnowledge) { wrongCode = false; return { blocking: false, recommendation: 'PASS', correction: null, unresolvedRisks: [] }; } return { blocking: true, recommendation: 'ITERATE', correction: { correctionId: 'fix-arithmetic-operation', targetHeading: 'Behavior', replacementMarkdown: '## Behavior\nReturn the sum of the representable signed arguments.', knowledgePath: 'knowledge/unit-add.md#Behavior', criterion: 'Describe addition rather than subtraction according to the trusted sum observation.', risk: 'Incorrect arithmetic operation' }, unresolvedRisks: [] }; }
+      if (request.role === 'doc-gen') { revisionCalls++; usage(`revision-${revisionCalls}`, 4); assert.equal(request.stage, 'revision'); const correction = (_command.payload.corrections as Array<Record<string, unknown>>)[0]!; assert.match(String(correction.correctionId), /^COR-[0-9]+$/); assert.deepEqual(Object.keys(correction).sort(), ['correctionId', 'criterion', 'evidenceRefs', 'knowledgePath', 'risk']); return { title: 'Addition', description: 'Representable sum', sections: [{ sectionId: 'section-1', body: 'The sum of the two arguments is returned, rather than their difference. For the fixed inputs 3 and 4, the expected result is 7. Inputs and result must be representable signed integers. Overflow and unsupported values remain outside the specified interface contract.\n\nAddition is required because the public operation combines both arguments, rather than computing an ordered difference. The trusted reference observation is evidence for the fixed sample; it does not establish that every possible integer input has been tested. Callers must still respect the signed integer range. Negative operands may affect the sign of the sum, but they do not change the arithmetic operation into subtraction. No memory allocation or persistent state is part of this interface.' }] }; }
       if (request.role === 'code') { codeCalls++; usage(`code-${codeCalls}`, 7);
         return { files: [{ path: 'math.h', content: 'int add(int a,int b);' }, { path: 'math.c', content: `#include "math.h"\nint add(int a,int b){return a${wrongCode ? '-' : '+'}b;}` }] }; }
       assert.equal(request.role, 'test-gen'); testCalls++; usage(`test-${testCalls}`, 5);
@@ -99,11 +100,23 @@ test('native stage rejects bad candidates, resumes trusted cases after restart a
     composition.apps.knowledgeIndex.index.write = (...args) => { if (indexFail) throw new Error('TEST_INDEX_INTERRUPTION'); return indexWrite(...args); };
     const revision = await composition.apps.workbenchKnowledgeRevision.start(next.taskId);
     const partial = await composition.apps.workbenchStages.wait(revision.taskId);
+    assert.equal(sourceReviewCalls, 1);
+    if (rejectSourceReview) {
+      assert.equal(partial.status, 'SUCCEEDED'); assert.equal(partial.result!.summary.outcome, 'UNRESOLVED');
+      assert.deepEqual(partial.result!.summary.updatedVersionIds, []); assert.equal(partial.result!.summary.indexed, false);
+      assert.equal(composition.repository.latestKnowledgeVersion(input.moduleId)?.versionId, revised.version.versionId);
+      const rejected = (partial.result!.summary.cards as Array<Record<string, any>>)[0]!;
+      assert.ok(rejected.unresolved.includes('REVISION_SOURCE_REVIEW_REJECTED'));
+      assert.ok(await composition.artifacts.verify(rejected.draftRef));
+      assert.equal((await composition.apps.workbenchKnowledgeRevision.start(next.taskId)).taskId, revision.taskId);
+      assert.equal(sourceReviewCalls, 1); assert.equal(testCalls, 2, 'source rejection retains trusted expectations');
+      return;
+    }
     assert.equal(partial.reasonCode, 'INDEX_BUILD_PARTIAL'); assert.equal(reviewCalls, 1); assert.equal(revisionCalls, 1);
     const saved = composition.apps.workbenchStages.store.checkpoints(revision.taskId).find(item => item.key.startsWith('revision-card:'))!;
     const correctedId = String(saved.result.summary.versionId);
     const corrected = composition.repository.getKnowledgeVersion(correctedId)!;
-    assert.equal(corrected.metadata.cardId, 'card-add'); assert.equal(corrected.parentVersionId, revised.version.versionId);
+    assert.ok(corrected.metadata.sourceReviewResultRef); assert.equal(corrected.metadata.cardId, 'card-add'); assert.equal(corrected.parentVersionId, revised.version.versionId);
     const correctedBody = Buffer.from(await composition.artifacts.get(corrected.bodyRef)).toString('utf8');
     assert.match(correctedBody, /The sum/); assert.ok(correctedBody.endsWith('## Limits\nNo overflow.\nOverflow is excluded explicitly.'));
     await composition.close(); composition = createComposition({ runtimeDir }); install();
@@ -111,6 +124,7 @@ test('native stage rejects bad candidates, resumes trusted cases after restart a
     const revisionDone = await composition.apps.workbenchStages.wait(revision.taskId);
     assert.equal(revisionDone.status, 'SUCCEEDED', revisionDone.reasonCode ?? ''); assert.equal(revisionDone.result!.summary.outcome, 'REVISED_INDEXED'); assert.equal(reviewCalls, 1); assert.equal(revisionCalls, 1);
     assert.equal((await composition.apps.workbenchKnowledgeRevision.start(next.taskId)).taskId, revision.taskId);
+    assert.equal(sourceReviewCalls, 1, 'index recovery reuses the review of the committed final body');
     assert.equal((await composition.apps.knowledgeIndex.preview('card-add')).versionId, correctedId);
     await assert.rejects(composition.apps.flywheel.ingestCandidate({ ...input, body: input.body + '\nConcurrent stale write.', expectedParentVersionId: revised.version.versionId }), /CANDIDATE_PARENT_CHANGED/);
     assert.equal(composition.repository.latestKnowledgeVersion(input.moduleId)?.versionId, correctedId);

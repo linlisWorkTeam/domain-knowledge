@@ -994,6 +994,7 @@ test('操作中心从固定 Git 版本分析仓库，显示模块和环境且窄
       else expect(request.prompt).toContain('return 1;');
       if (request.role === 'review') {
         const criteria = JSON.parse(Buffer.from(await instance.composition.artifacts.get(command.payload.criteriaRef as any)).toString('utf8'));
+        if (criteria.phase === 'REVISION_SOURCE_REVIEW') { expect(request.prompt).toContain('exactly 1, not 0'); return { blocking: false, recommendation: 'PASS', correction: null, unresolvedRisks: [] }; }
         const card = instance.composition.repository.getKnowledgeVersion(criteria.candidate.versionId)!;
         return { blocking: true, recommendation: 'ITERATE', correction: { correctionId: 'COR-0001', knowledgePath: `knowledge/${card.moduleId}.md#Behavior`, criterion: 'Clarify the fixed integer return value.', risk: 'Unclear reconstruction guidance' }, unresolvedRisks: [] };
       }

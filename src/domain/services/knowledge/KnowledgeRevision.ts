@@ -5,7 +5,7 @@
  */
 import { validateRevision } from '../../agents/docGenAgent/DocGenRevision.ts';
 import type { Output } from '../../agents/reviewAgent/ReviewAgentContract.ts';
-export const KNOWLEDGE_REVISION_CONTRACT = 'knowledge-revision-v1';
+export const KNOWLEDGE_REVISION_CONTRACT = 'knowledge-revision-v4';
 export function knowledgeRevisionDecision(review: Output, moduleId: string, headings: string[]) {
   if (!review.correction && review.recommendation === 'PASS' && !review.blocking && !review.unresolvedRisks?.length) return { heading: null, unresolved: [] };
   if (!review.correction || review.unresolvedRisks?.length) return { heading: null, unresolved: review.unresolvedRisks?.length ? review.unresolvedRisks : ['REVIEW_NO_KNOWLEDGE_CORRECTION'] };

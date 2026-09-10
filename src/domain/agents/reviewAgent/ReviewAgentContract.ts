@@ -49,13 +49,39 @@ export const outputSchema: Record<string, unknown> = {
 };
 
 /** 构造本次角色执行使用的输出 Schema。 */
-export function schemaFor(_input: Input): Record<string, unknown> {
-  return outputSchema;
+export function schemaFor(input: Input): Record<string, unknown> {
+  const allowed = scopedPaths(input);
+  if (!allowed) return outputSchema;
+  const schema = structuredClone(outputSchema);
+  const properties = (schema.properties as Record<string, unknown>);
+  const correction = properties.correction as Record<string, unknown>;
+  const fields = correction.properties as Record<string, Record<string, unknown>>;
+  fields.knowledgePath!.enum = correctionTargets(input).map(target => target.knowledgePath);
+  fields.targetHeading!.enum = correctionTargets(input).map(target => target.heading);
+  return schema;
+}
+function scopedPaths(input: Input): string[] | undefined {
+  const criteria = input.materials.find(({ ref }) => ref.artifactId === input.payload.criteriaRef.artifactId)?.content;
+  if (!criteria || typeof criteria !== 'object' || !('allowedKnowledgePaths' in criteria)) return undefined;
+  const paths = criteria.allowedKnowledgePaths;
+  if (!Array.isArray(paths) || !paths.length || paths.some(path => typeof path !== 'string') || new Set(paths).size !== paths.length) throw new Error('REVIEW_CORRECTION_SCOPE_INVALID');
+  return paths as string[];
+}
+/** 授权范围先进入模型协议，不能在接受角色结果之后才发现越界。 */
+export function correctionTargets(input: Input) {
+  const content = input.materials.find(({ ref }) => ref.artifactId === input.payload.knowledgeRef.artifactId)?.content;
+  const body = typeof content === 'string' ? content : content && typeof content === 'object' && 'body' in content && typeof content.body === 'string' ? content.body : '';
+  const targets = markdownSections(body).map(({ heading }) => ({ heading, knowledgePath: `knowledge/${input.moduleId}.md#${heading}` }));
+  const allowed = scopedPaths(input);
+  if (!allowed) return targets;
+  if (allowed.some(path => targets.filter(target => target.knowledgePath === path).length !== 1)) throw new Error('REVIEW_CORRECTION_SCOPE_INVALID');
+  return targets.filter(target => allowed.includes(target.knowledgePath));
 }
 
 /** 检查本角色必需字段及所引用材料是否完整。 */
 export function validateInput(input: Input): void {
   requireMaterials(input.payload, input.materials, ['knowledgeRef', 'evaluationReportRef', 'criteriaRef']);
+  correctionTargets(input);
 }
 
 /** 纠正意见必须定位已有 H2；缺乏定位证据时交付未解决问题，不能凭空扩大修订范围。 */
@@ -75,6 +101,7 @@ export function validateOutput(output: Output, input: Input): void {
   const headings = markdownSections(body).map((section) => section.heading);
   if (!heading || headings.filter((item) => item === heading).length !== 1
     || (correction.targetHeading !== undefined && correction.targetHeading !== heading)) throw new Error('REVIEW_CORRECTION_SCOPE_INVALID');
+  if (!correctionTargets(input).some(target => target.knowledgePath === correction.knowledgePath)) throw new Error('REVIEW_CORRECTION_OUTSIDE_EVIDENCE');
   if (correction.replacementMarkdown !== undefined) {
     const replacements = markdownSections(correction.replacementMarkdown);
     if (replacements.length !== 1 || replacements[0]!.heading !== heading || replacements[0]!.start !== 0) {
