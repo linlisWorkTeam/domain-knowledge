@@ -170,3 +170,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 0509交接把第一次真实超时归于DocGen语义重试，这是错误判断。完整检查点和Provider审计表明：DocGen一次成功（约66秒），随后源码Review在约180秒超时；无证据证明该次DocGen输出被拒绝。恢复后仍是源码Review，它误将旧生成实现pos=1观察用于拒绝pos=0正确草稿。原记录保留供审计，更正证据见真实验收目录source-review-v4/Attempt1StageCorrection.json及SourceReviewSubjectMixing.json。
 
 [2026-09-11-0409-automatic-iterations.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/e3b09c1fd26e94f54a9cdc9e6f57075abe4b8ea9/docs/epitaph/2026-09-11-0409-automatic-iterations.md) 接通多轮协调、原失败绑定重试及累计用量，受控六轮和真实旧产物重放通过；当时没有新真实模型修订，最终发布和完整部署未完成。
+
+[2026-09-11-0450-source-review.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/a0c8f96f39291b0e831c1c14f0106002bb469de6/docs/epitaph/2026-09-11-0450-source-review.md) 记录修订后源码 Review 门禁、独立真实验收中错误 parser 卡片与未完成的全卡验证。随后参考观察对象混淆已修正，完整整卡复核入口本次接通；真实双目标最终验证和发布仍待完成。

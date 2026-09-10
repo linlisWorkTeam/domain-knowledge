@@ -171,3 +171,5 @@ v5 在已有生成结果存在时，冻结同源码快照内当前后代卡片�
 阶段详情 `events` 的 `role-stage-attempt` 记录绑定角色、任务尝试和语义阶段，`artifactRef` 可经同任务 evidence 下载端点读取原输出/校验反馈；别的任务不能仅凭摘要访问。此审计记录不代表角色通过，也不改变旧任务的成功检查点或累计用量。
 
 源码复核的 evaluationReportRef 指向明确标识 PINNED_REFERENCE 的可信参考观察投影；旧生成实现报告仍通过原评测任务读取，两者不得混用。
+
+`POST /api/v1/source-verifications` 接受 `{evaluationTaskId}`，返回202阶段任务。输入必须是成功的普通原生评测；行为通过时也允许启动。读取、取消、同版本恢复和材料下载复用 stage-tasks 接口。结果逐卡返回冻结版本、正文摘要、来源结论和角色证据；publicationVerified 始终为 false。未知来源复核契约不可恢复。

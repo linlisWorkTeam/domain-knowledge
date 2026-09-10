@@ -33,7 +33,7 @@ export class WorkbenchEvaluation {
   async revisionEvidence(taskId: string) {
     const { stages, repository, artifacts, evaluation } = this.dependencies;
     const task = stages.get(taskId);
-    if (task.input.stage !== 'EVALUATE' || task.status !== 'SUCCEEDED' || !task.result) throw new Error('REVISION_COMPLETED_EVALUATION_REQUIRED');
+    if (task.input.stage !== 'EVALUATE' || task.input.parameters.operation !== undefined || task.status !== 'SUCCEEDED' || !task.result) throw new Error('REVISION_COMPLETED_EVALUATION_REQUIRED');
     const previous = stages.get(String(task.input.parameters.reconstructionTaskId));
     if (!previous.result || previous.status !== 'SUCCEEDED' || sha256(canonicalJson(previous.result)) !== task.input.parameters.reconstructionDigest) throw new Error('STAGE_INPUT_CHANGED');
     const modules = [];
@@ -57,7 +57,7 @@ export class WorkbenchEvaluation {
   /** 比较失败用例本身，忽略可重命名的 caseId，不以正文或词法分数制造进展。 */
   async progress(taskId: string) {
     const task = this.dependencies.stages.get(taskId);
-    if (task.input.stage !== 'EVALUATE' || task.status !== 'SUCCEEDED' || !task.result) throw new Error('PIPELINE_PROGRESS_UNAVAILABLE');
+    if (task.input.stage !== 'EVALUATE' || task.input.parameters.operation !== undefined || task.status !== 'SUCCEEDED' || !task.result) throw new Error('PIPELINE_PROGRESS_UNAVAILABLE');
     const failed: string[] = []; let total = 0, passed = 0;
     for (const module of task.result.summary.modules as unknown as Array<{ moduleId: string; reportRef: ArtifactRef }>) {
       const report = await this.load<{ cases: Array<{ status: string; actual: Record<string, NativeScalar> | null; input: NativeBehaviorCase }> }>(module.reportRef);

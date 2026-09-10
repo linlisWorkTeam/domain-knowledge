@@ -995,6 +995,7 @@ test('操作中心从固定 Git 版本分析仓库，显示模块和环境且窄
       else expect(request.prompt).toContain('return 1;');
       if (request.role === 'review') {
         const criteria = JSON.parse(Buffer.from(await instance.composition.artifacts.get(command.payload.criteriaRef as any)).toString('utf8'));
+        if (criteria.phase === 'FINAL_SOURCE_REVIEW') return { blocking: true, recommendation: 'ITERATE', correction: null, unresolvedRisks: ['Whole-card source evidence needs clarification.'] };
         if (criteria.phase === 'REVISION_SOURCE_REVIEW') { expect(request.prompt).toContain('exactly 1, not 0'); return { blocking: false, recommendation: 'PASS', correction: null, unresolvedRisks: [] }; }
         const card = instance.composition.repository.getKnowledgeVersion(criteria.candidate.versionId)!;
         return { blocking: true, recommendation: 'ITERATE', correction: { correctionId: 'COR-0001', knowledgePath: `knowledge/${card.moduleId}.md#Behavior`, criterion: 'Clarify the fixed integer return value.', risk: 'Unclear reconstruction guidance' }, unresolvedRisks: [] };
@@ -1047,6 +1048,12 @@ test('操作中心从固定 Git 版本分析仓库，显示模块和环境且窄
     await expect(page.locator('.revision-evidence')).toContainText('失败本身不能证明知识错误');
     await expect(page.locator('.revision-evidence')).toContainText('parseResult');
 
+    await page.getByRole('button', { name: '复核全部卡片来源', exact: true }).click();
+    await expect(page.locator('[data-source-verification-panel]')).toContainText('仍有未解决问题');
+    await expect(page.locator('[data-source-verification-panel]')).toContainText('Whole-card source evidence needs clarification.');
+    const sourceDownload = page.waitForEvent('download');
+    await page.getByRole('button', { name: '下载来源意见', exact: true }).click();
+    expect((await sourceDownload).suggestedFilename()).toBe('stage-evidence.json');
     await page.screenshot({ path: test.info().outputPath('repository-analysis-desktop.png'), fullPage: true });
     await page.setViewportSize({ width: 390, height: 844 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);

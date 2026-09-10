@@ -51,6 +51,7 @@ const assets = new Map([
   ['/KnowledgeGeneration.js', 'KnowledgeGeneration.js'],
   ['/SourceComparison.js', 'SourceComparison.js'],
   ['/KnowledgeRevision.js', 'KnowledgeRevision.js'],
+  ['/KnowledgeSourceVerification.js', 'KnowledgeSourceVerification.js'],
   ['/WorkbenchPipeline.js', 'WorkbenchPipeline.js'],
   ['/KnowledgeReconstruction.js', 'KnowledgeReconstruction.js'],
   ['/KnowledgeEvaluation.js', 'KnowledgeEvaluation.js'],
@@ -281,7 +282,7 @@ export function mapHttpError(error: unknown, id = 'req_unknown'): { status: numb
   if (code === 'PIPELINE_NOT_FOUND') return { status: 404, body: errorBody(code, '流程不存在', id) };
   if (['PIPELINE_CARD_SELECTION_INVALID', 'PIPELINE_CARD_SNAPSHOT_CHANGED', 'PIPELINE_CARD_LINEAGE_CHANGED', 'PIPELINE_CONTRACT_INCOMPATIBLE', 'PIPELINE_INPUT_CHANGED', 'PIPELINE_NOT_RESUMABLE'].includes(code)) return { status: 409, body: errorBody(code, code, id) };
   if (['PIPELINE_SHUTDOWN', 'PIPELINE_OWNER_UNAVAILABLE'].includes(code)) return { status: 503, body: errorBody(code, code, id) };
-  if (['STAGE_CONTRACT_INCOMPATIBLE', 'STAGE_INPUT_CHANGED', 'STAGE_NOT_RESUMABLE', 'STAGE_BUDGET_EXHAUSTED', 'INDEX_VERSION_NOT_CURRENT', 'EVALUATION_RECONSTRUCTION_REQUIRED', 'RECONSTRUCTION_RETRY_INVALID', 'REVISION_COMPLETED_EVALUATION_REQUIRED', 'REVISION_REFERENCE_NOT_TRUSTED', 'REVISION_REPORT_BINDING_INVALID', 'REVISION_KNOWLEDGE_BINDING_INVALID', 'REVISION_NO_ELIGIBLE_FAILURE', 'REVISION_CARD_CHANGED', 'REVISION_CORRECTION_OUTSIDE_EVIDENCE'].includes(code)) return { status: 409, body: errorBody(code, message, id) };
+  if (['SOURCE_VERIFICATION_EVALUATION_REQUIRED', 'SOURCE_VERIFICATION_CARD_UNBOUND', 'SOURCE_VERIFICATION_BINDING_INVALID', 'STAGE_CONTRACT_INCOMPATIBLE', 'STAGE_INPUT_CHANGED', 'STAGE_NOT_RESUMABLE', 'STAGE_BUDGET_EXHAUSTED', 'INDEX_VERSION_NOT_CURRENT', 'EVALUATION_RECONSTRUCTION_REQUIRED', 'RECONSTRUCTION_RETRY_INVALID', 'REVISION_COMPLETED_EVALUATION_REQUIRED', 'REVISION_REFERENCE_NOT_TRUSTED', 'REVISION_REPORT_BINDING_INVALID', 'REVISION_KNOWLEDGE_BINDING_INVALID', 'REVISION_NO_ELIGIBLE_FAILURE', 'REVISION_CARD_CHANGED', 'REVISION_CORRECTION_OUTSIDE_EVIDENCE'].includes(code)) return { status: 409, body: errorBody(code, message, id) };
   if (['STAGE_OWNER_UNAVAILABLE', 'STAGE_SHUTDOWN'].includes(code)) return { status: 503, body: errorBody(code, message, id) };
   if (code.startsWith('REPOSITORY_')) return { status: 422, body: errorBody(code, code, id) };
   if (code.startsWith('PROJECT_')) return { status: 422, body: errorBody(code, code, id) };
@@ -372,7 +373,7 @@ export function createKnowledgeServer(input: {
       }
       // 目录、配置和写入仅允许直接本机访问，或携带远程访问令牌。
       const localClient = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(request.socket.remoteAddress ?? '');
-      const workbenchRoute = /^\/api\/v1\/(external-materials|workbench-pipelines|stage-tasks|index-builds|knowledge-index|repository-analyses|projects|generations|reconstructions|native-evaluations|knowledge-revisions|associations)(\/|$)/.test(url.pathname);
+      const workbenchRoute = /^\/api\/v1\/(external-materials|workbench-pipelines|stage-tasks|index-builds|knowledge-index|repository-analyses|projects|generations|reconstructions|native-evaluations|knowledge-revisions|source-verifications|associations)(\/|$)/.test(url.pathname);
       const productRoute = url.pathname.startsWith('/api/v1/publications')
         || url.pathname === '/api/v1/server-directories' || url.pathname === '/api/v1/runs/markdown-lite';
       if (url.pathname.startsWith('/api/') && (!localClient || productRoute || workbenchRoute) && !authorized(request, writeToken, anonymousAccess)) {
@@ -505,6 +506,11 @@ export function createKnowledgeServer(input: {
           if (taskRoute[2] === 'resume' && typeof payload.inputDigest !== 'string') throw new Error('STAGE_INPUT_INVALID');
           const task = taskRoute[2] === 'resume' ? stages.resume(taskId, String(payload.inputDigest)) : stages.cancel(taskId);
           send(response, 202, { task }); return;
+        }
+        if (request.method === 'POST' && url.pathname === '/api/v1/source-verifications') {
+          const payload = await body(request); requireOnlyKeys(payload, ['evaluationTaskId']);
+          if (typeof payload.evaluationTaskId !== 'string') throw new Error('PAYLOAD_INVALID');
+          send(response, 202, { task: await composition.apps.workbenchSourceVerification.start(payload.evaluationTaskId) }); return;
         }
         if (request.method === 'POST' && url.pathname === '/api/v1/knowledge-revisions') {
           const payload = await body(request); requireOnlyKeys(payload, ['evaluationTaskId']);

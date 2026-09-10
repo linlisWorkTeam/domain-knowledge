@@ -3,12 +3,14 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：显示参考验证、可信用例评测和失败章节，保留取消/恢复及下载入口。
  */
+import { createSourceVerificationPanel } from './KnowledgeSourceVerification.js'
 import { createKnowledgeRevisionPanel } from './KnowledgeRevision.js'
 export function createKnowledgeEvaluationPanel({ root, request, escapeHtml: escape, isEditable, selection }) {
   let task = null, checkpoints = [], events = [], busy = false, notice = '', timer = null, initialized = false, epoch = 0
   const reportCache = new Map()
   const revisionCache = new Map()
   const revision = createKnowledgeRevisionPanel({ root, request, escapeHtml: escape, isEditable, selection: () => task?.status === 'SUCCEEDED' ? task.taskId : null, evidence: () => revisionCache.get(task?.taskId) })
+  const sourceVerification = createSourceVerificationPanel({ root, request, escapeHtml: escape, isEditable, selection: () => task?.status === 'SUCCEEDED' ? task.taskId : null })
   const host = () => root.querySelector('[data-native-evaluation-panel]')
   const active = () => task && ['PENDING', 'RUNNING'].includes(task.status)
   const labels = { PENDING: '排队中', RUNNING: '评测中', SUCCEEDED: '评测执行完成', FAILED: '执行失败', PAUSED: '已暂停', CANCELLED: '已取消' }
@@ -71,11 +73,11 @@ export function createKnowledgeEvaluationPanel({ root, request, escapeHtml: esca
       ${module.report ? `<p>通过 ${escape(module.report.passed)}/${escape(module.report.total)}${module.interfaceCompatible === false ? '；公开接口存在差异' : ''}</p>` : ''}
       ${download(module.reportRef, '下载评测报告')}${download(module.oracleRef, '下载参考验证')}
       ${(module.report?.cases ?? module.cases ?? []).map(caseHtml).join('')}</section>`).join('')}
-      ${task.status === 'SUCCEEDED' ? '<button class="secondary-button" type="button" data-revision-evidence>查看修订依据</button>' : ''}${revisionHtml()}<section data-knowledge-revision-panel></section>
+      ${task.status === 'SUCCEEDED' ? '<button class="secondary-button" type="button" data-revision-evidence>查看修订依据</button>' : ''}${revisionHtml()}<section data-knowledge-revision-panel></section><section data-source-verification-panel></section>
       ${task.reasonCode === 'NATIVE_REFERENCE_BASELINE_FAILED' ? checkpoints.filter((item) => item.key.startsWith('reference-baseline:')).map((item) => download(item.result.artifactRefs[0], '下载参考构建报告')).join('') : ''}
       ${active() ? `<button class="secondary-button" type="button" data-native-evaluation-action="cancel" ${busy || task.cancelRequested || !isEditable() ? 'disabled' : ''}>取消评测</button>` : ''}
       ${resume ? `<button class="secondary-button" type="button" data-native-evaluation-action="resume" ${busy || !isEditable() ? 'disabled' : ''}>${task.reasonCode === 'TEST_CANDIDATE_REJECTED' ? '重新生成候选测试' : '恢复评测'}</button>` : ''}` : ''}`
-    revision.refresh()
+    revision.refresh(); sourceVerification.refresh()
   }
   async function observe() {
     clearTimeout(timer); timer = null; if (!task || !host()) return
@@ -125,7 +127,7 @@ export function createKnowledgeEvaluationPanel({ root, request, escapeHtml: esca
       initialized = true; const current = epoch
       request('/api/v1/stage-tasks').then((result) => {
         if (current !== epoch) return
-        task = result.items.find((item) => item.input.stage === 'EVALUATE') ?? null; return observe()
+        task = result.items.find((item) => item.input.stage === 'EVALUATE' && item.input.parameters.operation === undefined) ?? null; return observe()
       }).catch(() => { initialized = false })
     } else if (active() && !timer) queueMicrotask(observe)
   } }

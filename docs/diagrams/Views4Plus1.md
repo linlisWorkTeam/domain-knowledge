@@ -289,3 +289,17 @@ flowchart LR
   Progress -->|仍失败但有进展| Evaluation
   Progress -->|连续无进展| Pause[保存历史并暂停]
 ```
+
+整卡来源复核独立于行为失败归因，当前接通入口如下：
+
+```mermaid
+flowchart LR
+  Evaluated[普通原生评测完成] --> SourceApp[WorkbenchSourceVerification 冻结全部卡片]
+  SourceApp --> Materials[固定源码与可信参考观察 CAS]
+  Materials --> ReviewAll[既有 Review 逐张核对全部 H2]
+  ReviewAll --> SourceDomain[Domain 校验正文版本及完整覆盖]
+  SourceDomain --> Matched[来源匹配 仍未发布]
+  SourceDomain --> Mismatch[明确矛盾及 H2]
+  SourceDomain --> Unknown[未解决风险]
+  Mismatch -.待接通.-> Repair[来源意见驱动修订和再评测]
+```

@@ -37,6 +37,15 @@ for (const rejectSourceReview of [false, true]) test(`native stage rejects bad c
       assert.deepEqual(request.readablePaths, []);
       if (['code', 'test-gen'].includes(request.role)) assert.doesNotMatch(request.prompt, /REFERENCE_PRIVATE|return a\+b/);
       else assert.match(request.prompt, /REFERENCE_PRIVATE/, 'revision roles receive the pinned reference, never Code or TestGen');
+      if (request.role === 'review' && request.prompt.includes('FINAL_SOURCE_REVIEW')) {
+        assert.ok(composition.apps.workbenchStages.store.checkpoints(_command.runId).some(row => row.key.startsWith('source-materials:')));
+        const sourceReport = JSON.parse(Buffer.from(await composition.artifacts.get(_command.payload.evaluationReportRef as any)).toString('utf8'));
+        assert.equal(sourceReport.observedImplementation, 'PINNED_REFERENCE'); assert.equal(sourceReport.cases[0].observation.actual.sum, '7');
+        const body = Buffer.from(await composition.artifacts.get(_command.payload.knowledgeRef as any)).toString('utf8');
+        usage('whole-source', 3);
+        return body.includes('The difference') ? { blocking: true, recommendation: 'ITERATE', correction: { correctionId: 'source-error', knowledgePath: 'knowledge/unit-add.md#Behavior', criterion: 'Pinned source adds the arguments.', risk: 'Incorrect operation.' }, unresolvedRisks: [] }
+          : { blocking: false, recommendation: 'PASS', correction: null, unresolvedRisks: [] };
+      }
       if (request.role === 'review' && request.prompt.includes('REVISION_SOURCE_REVIEW')) { sourceReviewCalls++; const sourceRef = _command.payload.evaluationReportRef as any; const sourceReport = JSON.parse(Buffer.from(await composition.artifacts.get(sourceRef)).toString('utf8')); assert.equal(sourceReport.observedImplementation, 'PINNED_REFERENCE'); assert.ok(composition.apps.workbenchStages.store.checkpoints(_command.runId).some(row => row.key.startsWith('revision-source-materials:')), 'source review inputs persist before invoking the model'); assert.equal(sourceReport.cases[0].observation.actual.sum, '7'); assert.doesNotMatch(request.prompt, /\"sum\":\"-1\"/); usage('source-review', 3); if (rejectSourceReview) return { blocking: true, recommendation: 'ITERATE', correction: null, unresolvedRisks: ['Candidate contradicts the fixed source.'] }; return { blocking: false, recommendation: 'PASS', correction: null, unresolvedRisks: [] }; }
       if (request.role === 'review') { reviewCalls++; usage(`review-${reviewCalls}`, 3); if (reviewKeepsKnowledge) { wrongCode = false; return { blocking: false, recommendation: 'PASS', correction: null, unresolvedRisks: [] }; } return { blocking: true, recommendation: 'ITERATE', correction: { correctionId: 'fix-arithmetic-operation', targetHeading: 'Behavior', replacementMarkdown: '## Behavior\nReturn the sum of the representable signed arguments.', knowledgePath: 'knowledge/unit-add.md#Behavior', criterion: 'Describe addition rather than subtraction according to the trusted sum observation.', risk: 'Incorrect arithmetic operation' }, unresolvedRisks: [] }; }
       if (request.role === 'doc-gen') { revisionCalls++; usage(`revision-${revisionCalls}`, 4); if (rejectSourceReview && revisionCalls === 1) return { title: 'Addition', description: 'Representable sum', sections: [{ sectionId: 'section-1', body: '## Invalid top heading' }] }; assert.equal(request.stage, rejectSourceReview ? 'revision:attempt-2' : 'revision'); const correction = (_command.payload.corrections as Array<Record<string, unknown>>)[0]!; assert.match(String(correction.correctionId), /^COR-[0-9]+$/); assert.deepEqual(Object.keys(correction).sort(), ['correctionId', 'criterion', 'evidenceRefs', 'knowledgePath', 'risk']); return { title: 'Addition', description: 'Representable sum', sections: [{ sectionId: 'section-1', body: 'The sum of the two arguments is returned, rather than their difference. For the fixed inputs 3 and 4, the expected result is 7. Inputs and result must be representable signed integers. Overflow and unsupported values remain outside the specified interface contract.\n\nAddition is required because the public operation combines both arguments, rather than computing an ordered difference. The trusted reference observation is evidence for the fixed sample; it does not establish that every possible integer input has been tested. Callers must still respect the signed integer range. Negative operands may affect the sign of the sum, but they do not change the arithmetic operation into subtraction. No memory allocation or persistent state is part of this interface.' }] }; }
@@ -79,6 +88,14 @@ for (const rejectSourceReview of [false, true]) test(`native stage rejects bad c
     assert.equal(reports[0]?.status, 'BEHAVIOR_PASSED'); assert.equal(reports[0]?.passed, 1); assert.equal(reports[0]?.publicationVerified, false);
     assert.equal((await composition.apps.workbenchEvaluation.start(code.taskId)).taskId, evaluation.taskId);
     assert.equal((await composition.apps.workbenchEvaluation.revisionEvidence(done.taskId)).modules[0]?.nextAction, 'NO_BEHAVIOR_REVISION_REQUIRED');
+    const sourceTask = await composition.apps.workbenchSourceVerification.start(done.taskId);
+    const sourceDone = await composition.apps.workbenchStages.wait(sourceTask.taskId);
+    assert.equal(sourceDone.status, 'SUCCEEDED', sourceDone.reasonCode ?? '');
+    assert.equal(sourceDone.result!.summary.outcome, 'SOURCE_MATCHED'); assert.equal(sourceDone.result!.summary.publicationVerified, false);
+    assert.equal((await composition.apps.workbenchSourceVerification.start(done.taskId)).taskId, sourceTask.taskId);
+    await assert.rejects(composition.apps.workbenchSourceVerification.start(sourceTask.taskId), /SOURCE_VERIFICATION_EVALUATION_REQUIRED/);
+    await assert.rejects(composition.apps.workbenchEvaluation.revisionEvidence(sourceTask.taskId), /REVISION_COMPLETED_EVALUATION_REQUIRED/);
+    await assert.rejects(composition.apps.workbenchEvaluation.progress(sourceTask.taskId), /PIPELINE_PROGRESS_UNAVAILABLE/);
     wrongCode = true;
     const revised = await composition.apps.flywheel.ingestCandidate({ ...input, body: input.body.replace('The sum', 'The difference') + '\nOverflow is excluded explicitly.' });
     const rebuilt = await composition.apps.workbenchReconstruction.start(project.snapshotId, [revised.version.versionId]);
@@ -90,6 +107,10 @@ for (const rejectSourceReview of [false, true]) test(`native stage rejects bad c
     assert.equal(module.status, 'BEHAVIOR_FAILED'); assert.equal(module.reused, 1); assert.equal(testCalls, 2); assert.equal(codeCalls, 2);
     const behaviorReport = JSON.parse(Buffer.from(await composition.artifacts.get(module.reportRef)).toString('utf8'));
     assert.equal(behaviorReport.cases[0]?.actual.sum, '-1'); assert.equal(behaviorReport.cases[0]?.sectionBindings[0]?.versionId, revised.version.versionId);
+    const mismatchTask = await composition.apps.workbenchSourceVerification.start(next.taskId);
+    const mismatch = await composition.apps.workbenchStages.wait(mismatchTask.taskId);
+    assert.equal(mismatch.status, 'SUCCEEDED', mismatch.reasonCode ?? ''); assert.equal(mismatch.result!.summary.outcome, 'SOURCE_MISMATCH');
+    assert.equal((mismatch.result!.summary.cards as any[])[0].versionId, revised.version.versionId);
     const evidence = await composition.apps.workbenchEvaluation.revisionEvidence(next.taskId);
     assert.equal(evidence.revisionAuthorized, false);
     assert.equal(evidence.modules[0]?.candidates[0]?.versionId, revised.version.versionId);
@@ -171,6 +192,20 @@ for (const rejectSourceReview of [false, true]) test(`native stage rejects bad c
       assert.equal(codeCalls, calls);
       await assert.rejects(composition.apps.workbenchReconstruction.start(project.snapshotId, second!.versionIds, { retryEvaluationTaskId: second!.evaluation!.taskId }), /RECONSTRUCTION_RETRY_INVALID/);
     } finally { composition.apps.workbenchGeneration.generate = originalGenerate; composition.apps.workbenchPipelines.dependencies.environment = originalEnvironment; reviewKeepsKnowledge = false; wrongCode = false; }
+    // A correct reconstruction must not excuse false knowledge that it happened to ignore.
+    const falseCard = await composition.apps.flywheel.ingestCandidate({ ...input, body: input.body.replace('The sum', 'The difference') + '\nIndependent whole-card counterexample.' });
+    wrongCode = false;
+    const luckyCode = await composition.apps.workbenchReconstruction.start(project.snapshotId, [falseCard.version.versionId]);
+    assert.equal((await composition.apps.workbenchStages.wait(luckyCode.taskId)).status, 'SUCCEEDED');
+    const luckyTask = await composition.apps.workbenchEvaluation.start(luckyCode.taskId);
+    const lucky = await composition.apps.workbenchStages.wait(luckyTask.taskId);
+    assert.equal((lucky.result!.summary.modules as any[])[0].status, 'BEHAVIOR_PASSED');
+    assert.equal((await composition.apps.workbenchEvaluation.revisionEvidence(luckyTask.taskId)).modules[0]!.nextAction, 'NO_BEHAVIOR_REVISION_REQUIRED');
+    const falseSource = await composition.apps.workbenchSourceVerification.start(luckyTask.taskId);
+    const falseResult = await composition.apps.workbenchStages.wait(falseSource.taskId);
+    assert.equal(falseResult.status, 'SUCCEEDED', falseResult.reasonCode ?? '');
+    assert.equal(falseResult.result!.summary.outcome, 'SOURCE_MISMATCH');
+    assert.equal(falseResult.result!.summary.publicationVerified, false);
     writeFileSync(join(root, 'math.c'), '#include "math.h"\nint add(int a,int b){return a+b+1;}');
     git('add', '.'); git('commit', '-qm', 'Changed reference behavior');
     const changedProject = await composition.apps.workbenchProjects.create({ directory: root, moduleIds: ['math'] });
