@@ -6,35 +6,33 @@
 import type { ArtifactRef } from '../../Domain.ts';
 import type { RoleInput } from '../AgentExecution.ts';
 import { requireMaterials } from '../AgentExecution.ts';
-
-/** 角色业务载荷。 */
-export interface Payload {
-  /** 提供策略引用信息，供调用方读取或传入。 */
-  policyRef: ArtifactRef;
-  /** 提供模块引用列表信息，供调用方读取或传入。 */
-  moduleRefs: ArtifactRef[];
-  /** 提供latest报告引用信息，供调用方读取或传入。 */
-  latestReportRef?: ArtifactRef;
-}
-/** 角色输入。 */
+export interface Payload { policyRef: ArtifactRef; moduleRefs: ArtifactRef[]; businessGoalRef: ArtifactRef; projectConfigurationRef: ArtifactRef; progressRef: ArtifactRef }
 export type Input = RoleInput<Payload>;
-/** 角色输出。 */
-export interface Output { strategy: string; iteration: number; parallel: string[]; }
-/** 对外提供输出Schema，作为调用方使用的统一约定。 */
+/** 尚未生成的工件以业务材料槽位描述，实际引用由工作流在上游完成后绑定。 */
+export const taskMaterials = {
+  'doc-gen': ['source', 'interfaces'], 'test-gen': ['source', 'interfaces', 'testPolicy'],
+  code: ['knowledge', 'projectConfiguration'], check: ['source', 'generatedCode', 'comparisonRules'],
+  review: ['knowledge', 'evaluation', 'comparison'],
+} as const;
+export interface Task { agentType: keyof typeof taskMaterials; moduleId: string; materials: string[] }
+export interface Output { strategy: string; iteration: number; tasks: Task[] }
+const text = { type: 'string', pattern: '\\S' };
 export const outputSchema: Record<string, unknown> = {
-  type: 'object', required: ['strategy', 'iteration', 'parallel'], additionalProperties: false,
-  properties: {
-    strategy: { type: 'string', minLength: 1 }, iteration: { type: 'integer', minimum: 0 },
-    parallel: { type: 'array', minItems: 1, items: { type: 'string', minLength: 1 } },
-  },
+  type: 'object', required: ['strategy', 'iteration', 'tasks'], additionalProperties: false,
+  properties: { strategy: text, iteration: { type: 'integer', minimum: 0 }, tasks: {
+    type: 'array', minItems: 5, maxItems: 5, items: { type: 'object', additionalProperties: false,
+      required: ['agentType', 'moduleId', 'materials'], properties: { agentType: { enum: Object.keys(taskMaterials) }, moduleId: text,
+        materials: { type: 'array', minItems: 1, uniqueItems: true, items: text } } },
+  } },
 };
-
-/** 构造本次角色执行使用的输出 Schema。 */
-export function schemaFor(_input: Input): Record<string, unknown> {
-  return outputSchema;
-}
-
-/** 检查本角色必需字段及所引用材料是否完整。 */
+export function schemaFor(_input: Input): Record<string, unknown> { return outputSchema; }
 export function validateInput(input: Input): void {
-  requireMaterials(input.payload, input.materials, ['policyRef', 'moduleRefs']);
+  requireMaterials(input.payload, input.materials, ['policyRef', 'moduleRefs', 'businessGoalRef', 'projectConfigurationRef', 'progressRef']);
+}
+export function validateOutput(output: Output, input: Input, iteration: number): void {
+  if (output.iteration !== iteration || new Set(output.tasks.map((task) => task.agentType)).size !== 5) throw new Error('ORCHESTRATOR_PLAN_INVALID');
+  for (const task of output.tasks) {
+    const allowed: readonly string[] = taskMaterials[task.agentType];
+    if (task.moduleId !== input.moduleId || task.materials.length !== allowed.length || task.materials.some((key) => !allowed.includes(key))) throw new Error('ORCHESTRATOR_TASK_SCOPE_INVALID');
+  }
 }

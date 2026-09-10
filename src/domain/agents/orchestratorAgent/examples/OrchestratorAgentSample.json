@@ -29,7 +29,16 @@
       {
         "material": "source"
       }
-    ]
+    ],
+    "businessGoalRef": {
+      "material": "goal"
+    },
+    "projectConfigurationRef": {
+      "material": "configuration"
+    },
+    "progressRef": {
+      "material": "progress"
+    }
   },
   "materials": {
     "policy": {
@@ -48,14 +57,72 @@
         "publicInterface": "structuredMarkdownDiff(before: string, after: string)"
       },
       "mediaType": "application/json"
+    },
+    "goal": {
+      "mediaType": "application/json",
+      "content": "Generate verified module knowledge"
+    },
+    "configuration": {
+      "mediaType": "application/json",
+      "content": {
+        "languageId": "cpp",
+        "standard": "c++17"
+      }
+    },
+    "progress": {
+      "mediaType": "application/json",
+      "content": {
+        "iteration": 0
+      }
     }
   },
   "modelOutput": {
     "strategy": "fixed-knowledge-flywheel-v1",
     "iteration": 0,
-    "parallel": [
-      "documentation",
-      "test-generation"
+    "tasks": [
+      {
+        "agentType": "doc-gen",
+        "moduleId": "markdown-diff",
+        "materials": [
+          "source",
+          "interfaces"
+        ]
+      },
+      {
+        "agentType": "test-gen",
+        "moduleId": "markdown-diff",
+        "materials": [
+          "source",
+          "interfaces",
+          "testPolicy"
+        ]
+      },
+      {
+        "agentType": "code",
+        "moduleId": "markdown-diff",
+        "materials": [
+          "knowledge",
+          "projectConfiguration"
+        ]
+      },
+      {
+        "agentType": "check",
+        "moduleId": "markdown-diff",
+        "materials": [
+          "source",
+          "generatedCode",
+          "comparisonRules"
+        ]
+      },
+      {
+        "agentType": "review",
+        "moduleId": "markdown-diff",
+        "materials": [
+          "knowledge",
+          "evaluation",
+          "comparison"
+        ]
+      }
     ]
   }
 }

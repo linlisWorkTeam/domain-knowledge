@@ -553,7 +553,12 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
       const policyRef = await this.flywheel.putArtifact(
         Buffer.from(JSON.stringify(gatePolicy, null, 2)), 'application/json',
       );
-      payload = { policyRef, moduleRefs: [scenarioRef, snapshot.manifestRef] };
+      const businessGoalRef = await this.flywheel.putArtifact(Buffer.from(scenario.businessGoal ?? `Generate and evaluate knowledge for ${scenario.moduleId}`), 'text/plain');
+      const projectConfigurationRef = await this.flywheel.putArtifact(Buffer.from(JSON.stringify(scenario.agentConfiguration ?? {})), 'application/json');
+      const progressRef = await this.flywheel.putArtifact(Buffer.from(JSON.stringify({ iteration: input.iteration,
+        state: this.flywheel.getRun(input.runId)?.state, previousQuality: input.context[contextKey('qualityReport', input.iteration - 1)] ?? null,
+      })), 'application/json');
+      payload = { policyRef, moduleRefs: [scenarioRef, snapshot.manifestRef], businessGoalRef, projectConfigurationRef, progressRef };
     } else if (agentId === 'doc-gen') {
       payload = {
         moduleId: scenario.moduleId,

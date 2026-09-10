@@ -87,7 +87,7 @@ function validateAgentContracts(): [number, number] {
     evidenceRefs: [refA], risk: 'Incorrect behavior remains published',
   };
   const commands = [
-    command('orchestrator', { policyRef: refA, moduleRefs: [refB] }),
+    command('orchestrator', { policyRef: refA, moduleRefs: [refB], businessGoalRef: refA, projectConfigurationRef: refB, progressRef: refA }),
     command('doc-gen', { moduleId: 'example', sourceRefs: [refA], publicInterfaceRefs: [refB] }),
     command('doc-worker', { moduleId: 'example', sourceRefs: [refA], publicInterfaceRefs: [refB] }),
     command('test-gen', { moduleId: 'example', sourceSnapshotRef: refA, publicInterfaceRefs: [refB], languageId: 'cpp', testPolicyRef: refA, allowedTestPaths: ['tests/generated.cpp'] }),

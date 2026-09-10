@@ -41,3 +41,7 @@ SPDX-License-Identifier: MIT
 对应 S2-01：按 IO-17 落实输入与本轮任务计划，继续细化模块概况来源、任务材料绑定及材料不足时的处理。当前固定节点计划不等于已经支持目标中的按模块任务规划。验收应覆盖计划与受信模块材料一致、固定节点与依赖、非法模型输出和失败处理；跨角色连接以 [Workflow](../../workflow/Workflow.md) 为准。
 
 开发步骤与证据统一记录在 [Status](../../../../Status.md)，独立运行方法见 [AgentDevelopment](../../../../AgentDevelopment.md)。
+
+## 本轮实施约定（2026-09-10）
+
+IO-17 输入增加业务目标、项目配置与任务进度引用；模块材料显式列出可处理模块及当前单文档模块。输出当前模块的 tasks（agentType、moduleId、materials）与策略/轮次；五类外层角色各一次，materials 是角色授权的业务材料槽位；尚未生成的工件不伪造 ArtifactRef，Application 在上游完成后绑定真实引用。任务计划用于校验调度模块和输入绑定，工作流固定顺序不变，DocWorker 不成为外层计划节点。源码测试复用由框架执行而非模型决定。

@@ -51,11 +51,13 @@
     },
     "orchestratorPayload": {
       "type": "object",
-      "required": ["policyRef", "moduleRefs"],
+      "required": ["policyRef", "moduleRefs", "businessGoalRef", "projectConfigurationRef", "progressRef"],
       "properties": {
         "policyRef": {"$ref": "#/$defs/artifactRef"},
         "moduleRefs": {"$ref": "#/$defs/artifactRefArray"},
-        "latestReportRef": {"$ref": "#/$defs/artifactRef"}
+        "businessGoalRef": {"$ref": "#/$defs/artifactRef"},
+        "projectConfigurationRef": {"$ref": "#/$defs/artifactRef"},
+        "progressRef": {"$ref": "#/$defs/artifactRef"}
       },
       "additionalProperties": false
     },
