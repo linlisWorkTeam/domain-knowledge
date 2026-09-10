@@ -16,6 +16,7 @@ import type {
 } from '../../src/application/ports/ApplicationPorts.ts';
 import type { AutomatedProjectScenario } from '../../src/application/services/ApplicationServices.ts';
 import { createComposition } from '../../src/interfaces/runner/Composition.ts';
+import { cppTestOutput, orchestratorOutput } from '../helpers/CppScenario.ts';
 import { GOOD_BODY } from '../helpers/Fixture.ts';
 
 class MemorySettings implements ProviderSettingsStore {
@@ -33,14 +34,14 @@ function git(root: string, args: string[]): string {
 function agentOutput(agentType: string): Record<string, unknown> {
   switch (agentType) {
     case 'orchestrator':
-      return { strategy: 'fixed-knowledge-flywheel-v1', iteration: 0, parallel: ['documentation', 'test-generation'] };
+      return orchestratorOutput('dsh-module');
     case 'doc-worker':
       return {
         workerId: 'worker-1',
         fragment: 'The public contract returns the fixed value four and is covered by a behavior test.',
-        provenance: ['src/module.js', 'src/module.test.js'],
-        analysisScope: { moduleId: 'dsh-module', files: ['src/module.js', 'src/module.test.js'], symbols: [] },
-        sourceEvidence: ['src/module.js', 'src/module.test.js'].map((path) => ({ claim: 'Returns four', path })),
+        provenance: ['src/module.cpp'],
+        analysisScope: { moduleId: 'dsh-module', files: ['src/module.cpp'], symbols: [] },
+        sourceEvidence: ['src/module.cpp'].map((path) => ({ claim: 'Returns four', path })),
         unresolvedQuestions: [],
       };
     case 'doc-gen':
@@ -50,16 +51,13 @@ function agentOutput(agentType: string): Record<string, unknown> {
         description: '使用真实 DSH SDK 生成并通过确定性门禁的知识。',
       };
     case 'test-gen':
-      return {
-        candidateCommands: [{ tool: 'node', purpose: 'test', args: ['--test', 'src/module.test.js'] }],
-        oracleRequired: true,
-      };
+      return cppTestOutput();
     case 'code':
-      return { files: [{ path: 'src/module.js', content: 'export const calculate = () => 4;\n' }] };
+      return { files: [{ path: 'src/module.cpp', content: 'int calculate() { return 4; }\n' }] };
     case 'check':
-      return { blocking: false, findings: [], scope: ['src/module.js'] };
+      return { blocking: false, findings: [], scope: ['src/module.cpp'] };
     case 'review':
-      return { blocking: false, recommendation: 'PASS', correction: null };
+      return { blocking: false, corrections: [] };
     default:
       throw new Error(`unexpected Agent type: ${agentType}`);
   }
@@ -69,16 +67,7 @@ test('a minimum complete Run sends all seven governed nodes through the real nat
   const repositoryRoot = mkdtempSync(join(tmpdir(), 'dsh-flow-source-'));
   const runtimeDir = mkdtempSync(join(tmpdir(), 'dsh-flow-runtime-'));
   mkdirSync(join(repositoryRoot, 'src'));
-  writeFileSync(join(repositoryRoot, 'package.json'), '{"name":"dsh-flow","type":"module"}\n');
-  writeFileSync(join(repositoryRoot, 'src', 'contract.js'), 'export const expected = 4;\n');
-  writeFileSync(join(repositoryRoot, 'src', 'module.js'), 'export const calculate = () => 4;\n');
-  writeFileSync(join(repositoryRoot, 'src', 'module.test.js'), `
-import assert from 'node:assert/strict';
-import test from 'node:test';
-import { expected } from './contract.js';
-import { calculate } from './module.js';
-test('generated behavior', () => assert.equal(calculate(), expected));
-`.trimStart());
+  writeFileSync(join(repositoryRoot, 'src/module.cpp'), 'int calculate() { return 4; }\n');
   git(repositoryRoot, ['init']);
   git(repositoryRoot, ['config', 'user.email', 'pi-agent@example.invalid']);
   git(repositoryRoot, ['config', 'user.name', 'DSH Acceptance']);
@@ -139,14 +128,16 @@ test('generated behavior', () => assert.equal(calculate(), expected));
     await composition.apps.providerOperations.verify({ expectedRevision: 1 });
     assert.ok(store.value);
     const workflow = await composition.automatedWorkflow();
-    const command = { tool: 'node' as const, purpose: 'test' as const, args: ['--test', 'src/module.test.js'] };
+    const commands = [{ tool: 'g++' as const, purpose: 'check' as const, args: ['-std=c++17', 'src/module.cpp', 'tests/generated.cpp', '-o', 'test-bin'] },
+      { tool: 'binary' as const, purpose: 'test' as const, args: ['test-bin'] }];
     const scenario: AutomatedProjectScenario = {
       schemaVersion: '1.0', name: 'dsh-minimum', moduleId: 'dsh-module',
       repositoryRoot, expectedCommit: commit,
-      sourcePaths: ['src/module.js', 'src/module.test.js'],
-      publicInterfacePaths: ['src/contract.js', 'package.json'],
-      allowedGeneratedPaths: ['src/module.js'], prepareCommands: [],
-      referenceCommands: [command], firstIterationCommands: [command], finalCommands: [command],
+      sourcePaths: ['src/module.cpp'],
+      publicInterfacePaths: [],
+      allowedGeneratedPaths: ['src/module.cpp'], prepareCommands: [],
+      referenceCommands: commands, firstIterationCommands: commands, finalCommands: commands,
+      agentConfiguration: { languageId: 'cpp', standard: 'c++17', dependencies: [], constraints: [], testPaths: ['tests/generated.cpp'] },
     };
     const handle = await workflow.start(scenario, {
       policyId: 'dsh-acceptance-v1', minimumStability: 1, requireAllTests: true,

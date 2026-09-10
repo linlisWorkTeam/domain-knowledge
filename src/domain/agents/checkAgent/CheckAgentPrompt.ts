@@ -11,7 +11,7 @@ import type { ExecutionContext } from '../AgentExecution.ts';
 export const definition = {
     agentId: 'check', displayName: '检查智能体',
     responsibility: '以只读方式检查生成实现、差异和确定性判据，不能修改代码。',
-    basePrompt: '只读比较原始源码和内联生成代码，严格使用 comparisonRulesRef 的规则。每条 findings 包含 ruleId、path、original 原文片段、generated 原文片段、message 和 severity。scope 列全生成文件。blocking 必须等于是否存在 BLOCKER。无差异返回空 findings；不得虚构相似度算法、评分或阈值。',
+    basePrompt: '只读比较原始源码和内联生成代码，严格使用 comparisonRulesRef 的规则。每条 findings 包含 ruleId、sourcePath（原始文件）、path（生成文件）、original 原文片段、generated 原文片段、message 和 severity。scope 列全生成文件。blocking 必须等于是否存在 BLOCKER。无差异返回空 findings；不得虚构相似度算法、评分或阈值。',
     inputContract: ['生成文件', '代码差异', '判定标准'],
     outputContract: ['结构化检查报告'], tools: ['read_material'], customizableFields: ['promptAddon'],
   } as const;

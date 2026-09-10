@@ -35,7 +35,7 @@ export async function execute(input: Input, context: ExecutionContext): Promise<
       findingId: `finding-${index + 1}`,
       severity: finding.severity,
       criterionId: finding.ruleId,
-      evidenceLocation: finding.path,
+      evidenceLocation: `${finding.sourcePath} -> ${finding.path}`,
       message: `${finding.message}\nOriginal: ${finding.original}\nGenerated: ${finding.generated}`,
     })),
   };

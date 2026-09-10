@@ -127,7 +127,7 @@
     },
     "codegenPayload": {
       "type": "object",
-      "required": ["knowledgeRef", "languageId", "projectConfigurationRef"],
+      "required": ["knowledgeRef", "languageId", "projectConfigurationRef", "allowedGeneratedPaths"],
       "properties": {
         "knowledgeRef": {"$ref": "#/$defs/artifactRef"},
         "languageId": {"type": "string", "pattern": "^[a-z][a-z0-9+.-]*$"},

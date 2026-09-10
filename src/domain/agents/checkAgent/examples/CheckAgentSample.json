@@ -70,7 +70,8 @@
         "original": "return 4;",
         "generated": "return 3;",
         "message": "Public result differs",
-        "severity": "BLOCKER"
+        "severity": "BLOCKER",
+        "sourcePath": "tests/fixtures/cpp/Module.cpp"
       }
     ]
   }

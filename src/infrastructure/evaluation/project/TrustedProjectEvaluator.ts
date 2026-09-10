@@ -403,7 +403,13 @@ export class TrustedProjectEvaluator implements ProjectEvaluator {
         tar: syncText('tar', ['--version'], workspace).split('\n')[0],
       };
       for (const compiler of ['gcc', 'g++'] as const) {
-        if (declaredTools.has(compiler)) toolchain[compiler] = syncText(compiler, ['--version'], workspace).split('\n')[0]!;
+        if (declaredTools.has(compiler)) {
+          try { toolchain[compiler] = syncText(compiler, ['--version'], workspace).split('\n')[0]!; }
+          catch (error) {
+            if (!['ENOENT', 'EACCES'].includes((error as NodeJS.ErrnoException).code ?? '')) throw error;
+            toolchain[compiler] = 'unavailable';
+          }
+        }
       }
       if (declaredTools.has('pnpm')) toolchain.pnpm = syncText(process.execPath, [pnpmScript(), '--version'], workspace);
       if (declaredTools.has('cargo')) {
@@ -440,7 +446,11 @@ export class TrustedProjectEvaluator implements ProjectEvaluator {
           tool, args, commandCwd,
           timeoutMs, maxOutputBytes,
           redactionRoots, tempRoot, signal,
-        );
+        ).catch((error: NodeJS.ErrnoException): CapturedProcess => {
+          if (!['ENOENT', 'EACCES'].includes(error.code ?? '')) throw error;
+          return { exitCode: null, timedOut: false, outputLimitExceeded: false, durationMs: 0,
+            stdout: '', stderr: `PROJECT_EXECUTABLE_UNAVAILABLE: ${error.code}` };
+        });
         const counts = command.purpose === 'test'
           ? parseTestCounts(`${captured.stdout}\n${captured.stderr}`)
           : { passed: 0, total: 0, parsed: false };
@@ -493,7 +503,7 @@ export class TrustedProjectEvaluator implements ProjectEvaluator {
       const passed = !prepareFailed && gateResults.length >= expectedExecutions
         && gateResults.every((result) => result.exitCode === 0 && !result.timedOut && !result.outputLimitExceeded)
         && testResults.length > 0
-        && testResults.every((result) => result.testCountsParsed && result.testsTotal > 0);
+        && testResults.every((result) => result.testCountsParsed && result.testsTotal > 0 && result.testsPassed === result.testsTotal);
       const testsPassed = testResults.reduce((sum, result) => sum + result.testsPassed, 0);
       const testsTotal = testResults.reduce((sum, result) => sum + result.testsTotal, 0);
       const stability = expectedExecutions > 0 ? Math.min(1, passedExecutions / expectedExecutions) : 0;

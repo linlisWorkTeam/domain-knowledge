@@ -23,7 +23,11 @@
     "sourceSnapshotRef": {
       "material": "source"
     },
-    "publicInterfaceRefs": [],
+    "publicInterfaceRefs": [
+      {
+        "material": "source"
+      }
+    ],
     "languageId": "cpp",
     "testPolicyRef": {
       "material": "policy"

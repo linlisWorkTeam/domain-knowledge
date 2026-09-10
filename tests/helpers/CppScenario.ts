@@ -29,3 +29,13 @@ export function cppScenario() {
     comparisonRules: [{ id: 'public-behavior', description: 'Compare public function behavior and return values' }] };
   return { scenario, cleanup: () => rmSync(root, { recursive: true, force: true }) };
 }
+
+export function orchestratorOutput(moduleId: string, iteration = 0) {
+  return { strategy: 'Generate and verify module knowledge', iteration, tasks: [
+    { agentType: 'doc-gen', moduleId, materials: ['source', 'interfaces'] },
+    { agentType: 'test-gen', moduleId, materials: ['source', 'interfaces', 'testPolicy'] },
+    { agentType: 'code', moduleId, materials: ['knowledge', 'projectConfiguration'] },
+    { agentType: 'check', moduleId, materials: ['source', 'generatedCode', 'comparisonRules'] },
+    { agentType: 'review', moduleId, materials: ['knowledge', 'evaluation', 'comparison'] },
+  ] };
+}

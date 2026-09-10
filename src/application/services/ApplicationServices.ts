@@ -161,7 +161,7 @@ export class KnowledgeFlywheelService {
     assertInvariant(input.toolchainFingerprint.trim().length > 0, 'toolchain fingerprint is required');
     assertInvariant(Number.isSafeInteger(input.criticalFailures) && input.criticalFailures >= 0, 'criticalFailures must be a non-negative integer');
     assertInvariant(Number.isSafeInteger(input.testsPassed) && Number.isSafeInteger(input.testsTotal), 'test totals must be integers');
-    assertInvariant(input.testsTotal > 0 && input.testsPassed >= 0 && input.testsTotal >= input.testsPassed, 'behavioral evaluation must execute at least one test');
+    assertInvariant(input.testsTotal >= 0 && (input.testsTotal > 0 || input.criticalFailures > 0 || input.infrastructureFailure === true) && input.testsPassed >= 0 && input.testsTotal >= input.testsPassed, 'behavioral evaluation must execute at least one test');
     assertInvariant(input.stability >= 0 && input.stability <= 1, 'stability must be between 0 and 1');
     const inputRefs = input.inputRefs ?? [version.bodyRef];
     for (const ref of inputRefs) {
@@ -269,6 +269,9 @@ export class KnowledgeFlywheelService {
     assertInvariant(await this.artifacts.verify(suiteRef), 'validated test suite integrity mismatch');
     const suite = JSON.parse(Buffer.from(await this.artifacts.get(suiteRef)).toString('utf8'));
     assertInvariant(suite.sourceKey === sourceKey && suite.validationEvidenceRef, 'validated test suite source mismatch');
+    assertInvariant(await this.artifacts.verify(suite.validationEvidenceRef), 'validated test evidence integrity mismatch');
+    const evidence = JSON.parse(Buffer.from(await this.artifacts.get(suite.validationEvidenceRef)).toString('utf8'));
+    assertInvariant(evidence.passed === true && evidence.infrastructureFailure === false && evidence.testsTotal > 0, 'test suite must pass reference validation');
     return this.repository.saveValidatedTestSuite(sourceKey, suiteRef);
   }
 
