@@ -19,6 +19,20 @@ SPDX-License-Identifier: MIT
 
 Domain 按领域功能组织：agents、workflow、evaluation、association、knowledge、sourceScan、workspace、migration 是同层级目录，不设置 services 分组或总导出文件。领域服务类放在所属功能目录；Domain.ts 保留共享实体与不变量。
 
+## 单个 Agent 设计
+
+```text
+domainFunction/agents/
+├── Agents.md                              # 索引、角色划分与共同协议
+├── orchestratorAgent/OrchestratorAgent.md # 业务计划
+├── docGenAgent/subAgents/docWorkerAgent/DocWorkerAgent.md       # 知识片段提取
+├── docGenAgent/DocGenAgent.md             # 知识正文生成与修订
+├── testGenAgent/TestGenAgent.md           # 测试生成
+├── codeAgent/CodeAgent.md                 # 代码生成
+├── checkAgent/CheckAgent.md               # 只读检查
+└── reviewAgent/ReviewAgent.md             # 评测复核与纠正
+```
+
 ## Spec 与操作文档的对应关系
 
 | 设计 | 操作指南 |

@@ -63,21 +63,19 @@ domain-knowledge/
 │   │   │   ├── AgentExecution.ts            # 执行协议与版本
 │   │   │   ├── AgentRegistry.ts             # 显式角色注册
 │   │   │   ├── orchestratorAgent/
-│   │   │   ├── docWorkerAgent/
 │   │   │   ├── docGenAgent/
+│   │   │   │   └── subAgents/docWorkerAgent/
 │   │   │   ├── testGenAgent/
 │   │   │   ├── codeAgent/
 │   │   │   ├── checkAgent/
 │   │   │   └── reviewAgent/
-│   │   ├── services/
-│   │   │   ├── DomainServices.ts            # 公共导出
+│   │   ├── workflow/
 │   │   │   ├── FlywheelDomainService.ts
-│   │   │   ├── EvalRunnerDomainService.ts
-│   │   │   ├── AssociationDomainService.ts
-│   │   │   ├── MarkdownDiff.ts
-│   │   │   └── workflow/
-│   │   │       ├── Workflow.ts              # 固定业务连接与纯路由
-│   │   │       └── AgentDefinitions.ts      # 角色到节点的映射
+│   │   │   ├── Workflow.ts                 # 外层业务连接与纯路由
+│   │   │   └── AgentDefinitions.ts
+│   │   ├── evaluation/EvalRunnerDomainService.ts
+│   │   ├── association/AssociationDomainService.ts
+│   │   ├── knowledge/MarkdownDiff.ts
 │   │   ├── sourceScan/SourceScan.ts
 │   │   ├── workspace/LocalAgentWorkspace.ts
 │   │   └── migration/LegacyOkf.ts
@@ -177,7 +175,7 @@ flowchart LR
 
 ### 2.2 领域与应用服务如何合作
 
-`domain/agents/` 拥有角色步骤、Prompt 和输出契约；`domain/services/workflow/` 决定角色之间怎样流转。`FlywheelDomainService`、`EvalRunnerDomainService` 和 `Domain.ts` 提供生命周期、评测及 Gate 规则；`AssociationDomainService` 校验事实与关联目标关系。
+`domain/agents/` 拥有角色步骤、Prompt 和输出契约；`domain/workflow/` 决定角色之间怎样流转。`FlywheelDomainService`、`EvalRunnerDomainService` 和 `Domain.ts` 提供生命周期、评测及 Gate 规则；`AssociationDomainService` 校验事实与关联目标关系。
 
 `application/services/AutomatedProjectWorkflow.ts` 中的 `ProjectWorkflowStages` 按阶段加载可信材料、历史正文、纠正意见和质量反馈。`RoleExecution.ts` 调用角色，将待保存工件写入 CAS，再绑定引用并校验结果信封。角色不直接读历史数据库，也不直接提交发布事务。
 
@@ -252,12 +250,18 @@ docs/specs/
 │   └── Verification.md             # 怎样验收；需求对应哪些实现和测试
 ├── domainFunction/                   # 业务规则，对应 src/domain/
 │   ├── agents/
-│   │   └── Agents.md                # 七个角色分别做什么、读什么、输出什么
-│   ├── services/
-│   │   ├── Knowledge.md             # 知识版本、来源、状态、关联和发布条件
-│   │   ├── Evaluation.md            # 根据评测事实判断通过、迭代或停止
-│   │   └── workflow/
-│   │       └── Workflow.md          # 角色的先后、并行、汇合和下一轮规则
+│   │   ├── Agents.md                # 索引与共同协议
+│   │   ├── orchestratorAgent/OrchestratorAgent.md
+│   │   ├── docGenAgent/subAgents/docWorkerAgent/DocWorkerAgent.md
+│   │   ├── docGenAgent/DocGenAgent.md
+│   │   ├── testGenAgent/TestGenAgent.md
+│   │   ├── codeAgent/CodeAgent.md
+│   │   ├── checkAgent/CheckAgent.md
+│   │   └── reviewAgent/ReviewAgent.md
+│   ├── knowledge/Knowledge.md       # 知识版本、来源和发布条件
+│   ├── association/Association.md   # 事实关联
+│   ├── evaluation/Evaluation.md     # 评测判定
+│   ├── workflow/Workflow.md         # 外层角色连接与路由
 │   ├── sourceScan/
 │   │   └── SourceScan.md            # 怎样扫描来源文件
 │   ├── workspace/
@@ -320,9 +324,9 @@ docs/specs/schemas/
 
 1. **看交接和现状。** 读根目录 `AGENTS.md`、最新 `docs/epitaph/` 记录和 `docs/Status.md`，执行 `git status` 确认是否已有未提交修改。
 2. **准备开发环境。** 按 `docs/Development.md` 操作；新建工作树后执行 `npm run bootstrap:worktree`，得到 `status: READY` 再开始。
-3. **找到本次设计。** 打开 `docs/specs/README.md`，定位 `domainFunction/agents/Agents.md` 的 DocGen 条目。
+3. **找到本次设计。** 打开 `docs/specs/README.md`，定位 `domainFunction/agents/docGenAgent/DocGenAgent.md`。
 4. **找到对应代码。** 读 Spec 中的代码链接，再到 `src/domain/agents/docGenAgent/` 看入口、Contract、Prompt 和测试。
-5. **按需补读。** 如果只是修改 DocGen 内部规则，就围绕该角色工作；如果要给它增加上游材料，再读 `application/Application.md`；如果要改变角色先后顺序，再读 `services/workflow/Workflow.md`。
+5. **按需补读。** 如果只是修改 DocGen 内部规则，就围绕该角色工作；如果要给它增加上游材料，再读 `application/Application.md`；如果要改变角色先后顺序，再读 `workflow/Workflow.md`。
 
 第一次涉及分层或目录调整时，也要读 `totalRules/Architecture.md`、`DomainDrivenDesign.md` 和 `CodeTaste.md`。每次任务只深入本次影响的模块。
 
@@ -346,7 +350,7 @@ Spec 需要让接手的人回答四个问题：**什么情况下触发？输入�
 
 例如，假设下一次需求是将 DocGen 的正文最短长度从当前 200 字符提高到 300 字符。下面只是教学示例，本报告没有实施这项变更。
 
-**第一步：改原来的设计。** 打开 `docs/specs/domainFunction/agents/Agents.md`，在 DocGen 条目更新原有长度规则，并在相关输出约束处补清楚：
+**第一步：改原来的设计。** 打开 `docs/specs/domainFunction/agents/docGenAgent/DocGenAgent.md`，更新原有长度规则，并在相关输出约束处补清楚：
 
 ```text
 DocGen 输出的 body 至少包含 300 个字符，沿用现有字符串长度计数方式。
@@ -354,7 +358,7 @@ DocGen 输出的 body 至少包含 300 个字符，沿用现有字符串长度�
 长度边界验证：299 个字符应被拒绝；300 个字符且其余字段合法时应通过。
 ```
 
-这样下一位开发者知道要改的数值、处理位置和边界结果。不要只写“提高文档质量”，也不要另建一份与 Agents.md 重复的设计。
+这样下一位开发者知道要改的数值、处理位置和边界结果。不要只写“提高文档质量”，也不要另建一份与 DocGenAgent.md 重复的设计。
 
 **第二步：找实现这条规则的地方。** 在 `src/domain/agents/docGenAgent/` 搜索正文长度相关约束，检查 `DocGenAgentContract.ts`、`DocGenAgent.ts`、`DocGenAgentPrompt.ts` 和测试。更新实际负责强制校验的位置；提示词中的描述也要一致。正文规则涉及公共 Schema 或样例时同步修改；若不涉及，就不必改那些文件。
 
@@ -412,7 +416,7 @@ npm run test:ui
 请在当前 domain-knowledge 仓库实施我修改后的 Spec。
 
 设计输入：
-- docs/specs/domainFunction/agents/Agents.md 的 codeAgent 条目
+- docs/specs/domainFunction/agents/codeAgent/CodeAgent.md
 - docs/specs/application/Application.md 中相关材料加载与提交约束
 - 本次工作区中这些 Spec 的 diff（若已提交，使用我提供的提交号）
 
@@ -464,10 +468,13 @@ npm run knowledge -- workflow-run --scenario /absolute/path/scenario.json --repo
 flowchart TD
     S([开始]) --> O[orchestrator]
     O --> T[test_gen]
-    O -->|workerCount 大于 0：并行分块| W[doc_worker × N]
-    O -->|workerCount 为 0| D[doc_gen]
-    W -->|汇合| D
-    D --> K[candidate_knowledge：候选与质量判断]
+    O --> D0
+    subgraph D[doc_gen：内部拆分与汇总]
+      D0[准备材料] -->|workerCount 大于 0| W[doc_worker × N]
+      D0 -->|workerCount 为 0| D1[汇总正文]
+      W -->|全部成功| D1
+    end
+    D1 --> K[candidate_knowledge：候选与质量判断]
     K -->|继续| C[code]
     K -->|ITERATE / STOPPED| R[workflow_router]
     C --> H[check]
@@ -496,12 +503,12 @@ flowchart TD
 
 ### 5.2 每个角色做什么、改哪里
 
-所有角色的设计入口均为 [Agents.md](../specs/domainFunction/agents/Agents.md)。下面路径均相对于 `src/domain/agents/`。
+各角色独立设计见 [Agents 索引](../specs/domainFunction/agents/Agents.md)，确认状态以独立设计为准。下表记录现有实现。下面路径均相对于 `src/domain/agents/`。
 
 | 角色 ID | 目录与入口 | 输入材料与功能 | 主要输出或限制 |
 | --- | --- | --- | --- |
 | `orchestrator` | `orchestratorAgent/OrchestratorAgent.ts` | 策略、模块材料；生成当前轮固定业务计划 | 固定任务计划，不能改连接 |
-| `doc-worker` | `docWorkerAgent/DocWorkerAgent.ts` | 源码、公开接口和分块身份；提取文档片段 | 片段与来源引用，交 DocGen 汇总 |
+| `doc-worker` | `docGenAgent/subAgents/docWorkerAgent/DocWorkerAgent.ts` | 源码、公开接口和分块身份；提取文档片段 | 片段与来源引用，交 DocGen 汇总 |
 | `doc-gen` | `docGenAgent/DocGenAgent.ts` | 源码、接口、片段、旧正文、纠正和质量反馈 | 正文、标题、描述及来源；正文至少 200 字符 |
 | `test-gen` | `testGenAgent/TestGenAgent.ts` | 固定源码、接口、语言和测试策略 | 测试候选与 oracle 声明；不读取候选知识 |
 | `code` | `codeAgent/CodeAgent.ts` | 知识、接口、构建契约、允许生成路径 | 文件列表；拒绝越界和重复路径，不读取参考源码及门禁测试 |

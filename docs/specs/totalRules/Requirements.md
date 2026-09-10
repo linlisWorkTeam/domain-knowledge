@@ -23,7 +23,7 @@ SPDX-License-Identifier: MIT
 | --- | --- | --- | --- |
 | KF-SYS-001 | P0 | 系统必须以确定性工作流编排源码分析、知识生成、测试生成、代码生成、检查、评测、归因、修订与发布。 | AC-FLOW-001 |
 | KF-SYS-002 | P0 | DocGenAgent 必须是知识正文的唯一自动执笔者；评测者不得修改知识或实现。 | AC-AGENT-001 |
-| KF-SYS-003 | P0 | CodeAgent 必须只读取知识、公开接口和自己的工作区，不能读取参考源码或门禁测试。 | AC-SEC-001 |
+| KF-SYS-003 | P0 | CodeAgent 必须只读取本轮授权知识卡片和裁剪后的必要配置；公开接口包含在卡片中，不单独传入或读取原仓库接口文件。Prompt、工具和进程的材料边界一致，原始实现、参考测试、其他角色及其他运行材料不可见，越界拒绝并审计。 | AC-SEC-001 |
 | KF-SYS-004 | P0 | TestGenAgent 的候选 oracle 必须由参考源码真实执行验证后才能进入门禁集。 | AC-EVAL-001 |
 | KF-SYS-005 | P0 | EvalRunner 必须执行编译、稳定测试和关键行为门禁；相似度只能用于归因。 | AC-EVAL-002 |
 | KF-SYS-006 | P0 | 每轮必须产出不可变 Artifact、血缘、事件和评测证据，并能按 `runId` 审计。 | AC-OBS-001 |
@@ -64,6 +64,8 @@ SPDX-License-Identifier: MIT
 | KF-SYS-041 | P1 | 本地管理员必须能通过服务端安全配置、脱敏读取并无副作用验证模型 API URL 与 API Key；启用后新批次默认使用 DSH 原生 SDK；运行中配置冻结，旧 Pi Run 可读但不跨后端恢复，完整凭据不得进入浏览器持久化、URL、日志或运行快照。 | AC-API-010 |
 | KF-SYS-042 | P1 | 系统必须按批次、节点、Provider 和模型记录排队与执行耗时、调用与重试、Token、可空估算成本、自动修订收敛和人工治理处理数据，并提供 P50/P95 聚合；缺少可信定价源时成本必须为 `null`，指标不得包含凭据、Prompt、模型正文或未脱敏上游错误。 | AC-OBS-004 |
 | KF-SYS-043 | P1 | 用户检索必须由 Application 的 KnowledgeSearchApp 直接调度 SearchAgent，不经过 OrchestratorAgent 或 LangGraph，不创建或推进 FlywheelRun。Agent 只能读取和返回经飞轮治理、原子发布、当前状态为 VERIFIED 且正文完整性有效的文档及授权元数据；结果包含版本、来源和 Artifact 引用，无命中不得自动生成知识或启动治理。 | AC-SEARCH-001 |
+| KF-SYS-044 | P0 | 框架必须按业务项目管理版本化运行配置，场景引用对应配置；依赖和构建说明不进入知识卡片，角色按需获得裁剪配置。每次启动固定知识卡片和项目配置版本、实际可读白名单及输出位置；配置变更只影响新任务，恢复不得静默换用新配置。 | AC-CONFIG-001 |
+| KF-SYS-045 | P0 | CodeAgent 以包含公开接口的知识卡片为主要业务输入，结合项目配置裁剪出的 C/C++ 标准、依赖约束及允许生成路径，返回 path/content 文件列表。完整构建命令交执行器，框架校验文件列表后写入本轮临时目录，再交后续比较、编译和测试；CodeAgent 不直接覆盖业务仓库。 | AC-CODE-001、AC-CODE-002 |
 
 ## 非功能需求
 

@@ -7,11 +7,11 @@ SPDX-License-Identifier: MIT
 
 ## 从代码定位设计
 
-先读 [规范目录](specs/README.md)，选择与改动代码相同的模块。模块设计写输入输出、步骤、不变量、失败与验证；本文件写实际开发操作。不要为每个任务创建六份 proposal/plan/tasks/evidence 模板文档，普通任务在所属设计和 PR 中完成说明。
+先读 [开发任务与进度](Status.md) 确认阶段、任务和依赖，再读 [规范目录](specs/README.md)，选择与改动代码相同的模块。Status 统一记录任务步骤、状态和证据索引；模块设计写输入输出、业务步骤、不变量、失败与验证；本文件写实际开发操作。不要为每个任务创建六份 proposal/plan/tasks/evidence 模板文档，普通任务在所属设计和 PR 中完成说明。
 
 | 改动 | 设计 | 实现 |
 | --- | --- | --- |
-| 角色内部步骤 | domainFunction/agents | src/domain/agents/xxxAgent |
+| 角色内部步骤 | domainFunction/agents/xxxAgent/XxxAgent.md（[索引](specs/domainFunction/agents/Agents.md)） | src/domain/agents/xxxAgent |
 | 跨角色流程 | domainFunction/workflow | src/domain/workflow |
 | 生命周期与业务流转 | domainFunction/workflow | src/domain/workflow、Domain.ts |
 | 评测判定 | domainFunction/evaluation | src/domain/evaluation |
@@ -32,7 +32,7 @@ SPDX-License-Identifier: MIT
 2. 修改所属代码；增加共享能力才修改 Port、显式注册和 Composition。
 3. 行为或协议变化同步 Schema、消费者和验收追踪；纯目录调整只改变路径，不改变 Schema 字节或测试判定。
 4. 更新相应操作指南和有变化的 4+1 视图，避免复制设计全文。
-5. 完成适当检查，记录实际执行结果和未验证项，再提交 PR 供审查。
+5. 完成适当检查，在 Status 更新对应任务/子步骤、代码版本、实际执行结果、证据位置和未验证项，再提交 PR 供审查；必需检查通过前不标记已验收。
 
 新增 HTTP 能力先在 Application App 确认用例和端口，随后接 Server 路由和 Console；不要让接口绕过 App 调用数据库。新增角色必须显式更新 AgentContracts、AgentRegistry、Domain Workflow、可信输入加载和版本化契约。
 

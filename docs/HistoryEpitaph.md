@@ -11,6 +11,7 @@ SPDX-License-Identifier: MIT
 
 | 原记录 | 改动与结论 |
 | --- | --- |
+| [2026-09-08-1216-specs-consolidation.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/96d277b937c0400c8b6cdc978315f9f98f2fc044/docs/epitaph/2026-09-08-1216-specs-consolidation.md) | 按代码模块重写 23 篇设计，迁移 17 个 Schema 并统一目录/文件命名，合并操作指南、4+1 视图和历史任务记录；当时只做类型、路径、Schema 字节和追踪静态检查，未跑回归或真实模型，旧测试结果不能证明迁移后的版本。该记录中的项目级账号规则已由后续会话范围纠正撤销。 |
 | [2026-09-04-0223-dev007-dev008-e2e-acceptance.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/def8dcc/docs/epitaph/2026-09-04-0223-dev007-dev008-e2e-acceptance.md) | 补齐内容治理、评测与来源交互及端到端验收；当时记录只覆盖该版代码。 |
 | [2026-09-04-0710-dev006-dev009-complete.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/def8dcc/docs/epitaph/2026-09-04-0710-dev006-dev009-complete.md) | 完成 DEV-006/009 的 API、执行观测和公司 CLI 契约入口，真实公司 CLI 接入未完成。 |
 | [2026-09-04-0926-dev010-company-cli-blocked.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/def8dcc/docs/epitaph/2026-09-04-0926-dev010-company-cli-blocked.md) | 核实公司 CLI 真实协议与访问条件不足，保留现有 Adapter，未用模拟结果宣称真实验收。 |
@@ -62,6 +63,8 @@ This document summarizes older handoffs, milestones and architectural decisions 
 
 按用户确认取消旧 prepare/run/check CLI、DocgenExampleService 与 LangGraph 兼容导出。固定材料和追加指令归入 docGenAgent 的 JSON 样例，参考检查和原有测试迁入同一角色目录，通过共同 AgentExample 链路验证。历史专用入口的命令与结果格式不再保留。
 
+[2026-09-08-1420 DocGen 样例统一入口交接](https://github.com/linlisWorkTeam/domain-knowledge/blob/96d277b937c0400c8b6cdc978315f9f98f2fc044/docs/epitaph/2026-09-08-1420-docgen-example-consolidation.md)：删除专用 runner/application 入口与命令，固定材料和参考检查移入 DocGen 角色；迁移四项集成测试，保留错误、覆盖、引用、Prompt 冻结、DSH 调用审计、CAS、失败与取消断言。当时仅做类型、导入/链接、样例源码摘要和清单静态检查，未运行测试或真实模型；普通 agent:run 不隐式执行参考检查。该交接中的账号偏好只属于原会话。
+
 [2026-09-08-1130 七角色 PR 准备](https://github.com/linlisWorkTeam/domain-knowledge/blob/5833cf5/docs/epitaph/2026-09-08-1130-seven-role-pr-preparation.md)：在独立工作树准备最初七角色 PR，记录当时 219 项测试与 Console 14 项通过；该历史结果不代表后续清理后的回归状态。
 
 ## Session 账号约定纠正
@@ -73,3 +76,10 @@ This document summarizes older handoffs, milestones and architectural decisions 
 ## 设计与命名整理交接归档
 
 [2026-09-08-1216-specs-consolidation.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/1455ba9c6a84797a2ee22e9939f2542cd4dc7ed4/docs/epitaph/2026-09-08-1216-specs-consolidation.md)：设计集中到 docs/specs 并与代码对应，统一目录小驼峰、文件大驼峰，合并 4+1 视图与历史文档。仅做静态验证，未重跑测试。原记录中的项目级账号规则是误解，已纠正为仅当前会话适用。
+
+## PR #41 合并交接归档
+
+- [2026-09-08-1423-session-identity-scope.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/9e66776cfbadbb1ec56f60991ef01e7e43139cbd/docs/epitaph/2026-09-08-1423-session-identity-scope.md)：删除固定账号的项目规则，明确账号选择只属于原会话；当时只做文档、清单及 diff 检查，未改业务逻辑或运行测试，不得继承旧身份约束。
+- [2026-09-08-1442-domain-feature-layout.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/a79b385e16284ba8b4e76751f54c196b8fa7b33e/docs/epitaph/2026-09-08-1442-domain-feature-layout.md)：去掉 Domain services 分组与总导出，按 workflow、evaluation、association、knowledge 等功能组织，同步引用和设计；当时仅做类型、路径、Schema 与固定样例静态检查，未运行测试或模型。
+- [2026-09-10-1001-development-progress.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/9e66776cfbadbb1ec56f60991ef01e7e43139cbd/docs/epitaph/2026-09-10-1001-development-progress.md)：在 Status 登记四阶段、S2 子步骤、依赖及证据索引；当时通过文档链接、清单及 diff 静态核对，未运行角色或业务验收。CodeAgent 后续确认由 1038 交接补充，其他输入输出继续逐项确认。
+- [2026-09-10-1032-knowledge-generation-agent-baseline.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/a79b385e16284ba8b4e76751f54c196b8fa7b33e/docs/epitaph/2026-09-10-1032-knowledge-generation-agent-baseline.md)：记录知识生成分支的基线和数据流调研，独立 worktree bootstrap READY；当时未修改业务实现、未运行真实模型或端到端。全仓模块发现、TestGen oracle 晋升、Review findings 接入及业务质量仍待细化；Worker 归属随后由 1046 交接更新。
