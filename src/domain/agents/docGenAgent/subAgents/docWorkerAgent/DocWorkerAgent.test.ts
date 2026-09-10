@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { execute } from './DocWorkerAgent.ts';
 import type { Input } from './DocWorkerAgentContract.ts';
-import { roleExample } from '../../../../tests/helpers/RoleExample.ts';
+import { roleExample } from '../../../../../../tests/helpers/RoleExample.ts';
 
 test('doc-worker: normal output uses one model call and validates before returning artifacts', async () => {
   const sample = roleExample<Input>('doc-worker');

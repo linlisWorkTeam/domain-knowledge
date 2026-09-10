@@ -1,0 +1,73 @@
+{
+  "provider": "fixture",
+  "scenario": {
+    "schemaVersion": "1.0",
+    "name": "single-role-development",
+    "moduleId": "markdown-diff",
+    "repositoryRoot": ".",
+    "sourcePaths": [
+      "src/domain/knowledge/MarkdownDiff.ts",
+      "src/domain/Domain.ts"
+    ],
+    "publicInterfacePaths": [],
+    "allowedGeneratedPaths": [
+      "src/domain/knowledge/MarkdownDiff.ts"
+    ],
+    "prepareCommands": [],
+    "referenceCommands": [],
+    "firstIterationCommands": [],
+    "finalCommands": []
+  },
+  "iteration": 0,
+  "payload": {
+    "moduleId": "markdown-diff",
+    "sourceRefs": [
+      {
+        "material": "source"
+      }
+    ],
+    "publicInterfaceRefs": [
+      {
+        "material": "interface"
+      }
+    ],
+    "workerCount": 2
+  },
+  "materials": {
+    "source": {
+      "content": {
+        "description": "Fixture-only source manifest for subAgent composition",
+        "sourcePaths": [
+          "src/domain/knowledge/MarkdownDiff.ts",
+          "src/domain/Domain.ts"
+        ]
+      },
+      "mediaType": "application/json"
+    },
+    "interface": {
+      "content": "Fixture public interface used by both workers and DocGen.",
+      "mediaType": "text/plain"
+    }
+  },
+  "modelOutput": {
+    "body": "# Markdown diff\n\n## Purpose\nCompare two Markdown documents and report changed sections with line ranges.\n\n## Behavior\nIdentical inputs return empty hunks. CRLF is normalized before comparison. Insertions and deletions preserve the old and new line coordinates. The implementation uses bounded processing for large inputs.\n",
+    "title": "Markdown diff",
+    "description": "Document comparison semantics"
+  },
+  "workerModelOutputs": {
+    "worker-1": {
+      "workerId": "worker-1",
+      "fragment": "Fixture source analysis of src/domain/knowledge/MarkdownDiff.ts; independent evidence for DocGen synthesis.",
+      "provenance": [
+        "src/domain/knowledge/MarkdownDiff.ts"
+      ]
+    },
+    "worker-2": {
+      "workerId": "worker-2",
+      "fragment": "Fixture source analysis of src/domain/Domain.ts; independent evidence for DocGen synthesis.",
+      "provenance": [
+        "src/domain/Domain.ts"
+      ]
+    }
+  }
+}

@@ -11,14 +11,6 @@ export type InfrastructureRoute = import('../../domain/workflow/Workflow.ts').Wo
 /** 定义Infrastructure执行状态的数据结构与类型约束。 */
 export type InfrastructureExecutionStatus = 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'STOPPED' | 'CANCELLED';
 
-/** 定义分块任务Task的数据结构与类型约束。 */
-export interface WorkerTask {
-  /** 提供分块任务标识信息，供调用方读取或传入。 */
-  workerId: string;
-  /** 提供index信息，供调用方读取或传入。 */
-  index: number;
-}
-
 const replace = <T>(_left: T, right: T): T => right;
 
 function latestTimestamp(left: string, right: string): string {
@@ -40,7 +32,6 @@ export const InfrastructureStateAnnotation = Annotation.Root({
   workerCount: Annotation<number>({ reducer: replace, default: () => 0 }),
   route: Annotation<InfrastructureRoute | null>({ reducer: replace, default: () => null }),
   error: Annotation<string | null>({ reducer: replace, default: () => null }),
-  workerTask: Annotation<WorkerTask | undefined>({ reducer: replace, default: () => undefined }),
   context: Annotation<Record<string, unknown>>({
     reducer: (left, right) => ({ ...left, ...right }), default: () => ({}),
   }),

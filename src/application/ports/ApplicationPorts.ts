@@ -885,3 +885,8 @@ export interface AgentPromptResolver {
   /** 读取提示词Addon。 */
   getPromptAddon?(agentId: AgentId): string;
 }
+
+/** 有界任务执行器：失败时取消同批任务，等待在途调用结束后再返回。 */
+export interface TaskBatchRunner {
+  run<T>(tasks: Array<(signal: AbortSignal) => Promise<T>>, signal?: AbortSignal): Promise<T[]>;
+}

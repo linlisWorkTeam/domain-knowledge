@@ -41,13 +41,13 @@ test('embedded LangGraph runs every fixed Agent and exposes node projections', a
   assert.equal(result.iteration, 1);
   const calledAgents = new Set(calls.map((call) => call.agentId).filter(Boolean));
   assert.deepEqual([...calledAgents].sort(), [
-    'check', 'code', 'doc-gen', 'doc-worker', 'orchestrator', 'review', 'test-gen',
+    'check', 'code', 'doc-gen', 'orchestrator', 'review', 'test-gen',
   ] satisfies AgentId[]);
   assert.match(calls.find((call) => call.agentId === 'doc-gen')?.prompt ?? '', /Explain the boundary first/);
   const firstDocGen = calls.find((call) => call.agentId === 'doc-gen' && call.iteration === 0);
-  assert.equal(firstDocGen?.context['seen:doc_worker:0:worker-1'], true);
-  assert.equal(firstDocGen?.context['seen:doc_worker:0:worker-2'], true);
-  assert.ok(projections.some((projection) => projection.nodeId === 'doc_worker:worker-1'));
+  assert.equal(firstDocGen?.workerCount, 2);
+  assert.equal(calls.some((call) => call.agentId === 'doc-worker'), false);
+  assert.equal(projections.some((projection) => projection.nodeId.includes('doc_worker')), false);
   assert.ok(projections.some((projection) => projection.nodeId === 'publication' && projection.status === 'COMPLETED'));
   assert.ok(projections.every((projection) => projection.runId === handle.runId));
   const running = projections.filter((projection) => projection.status === 'RUNNING');
@@ -57,7 +57,7 @@ test('embedded LangGraph runs every fixed Agent and exposes node projections', a
   )));
   const firstFanOutReady = new Set(running.filter((projection) => (
     projection.iteration === 0
-      && (projection.nodeId === 'test_gen' || projection.nodeId.startsWith('doc_worker:'))
+      && (projection.nodeId === 'test_gen' || projection.nodeId === 'doc_gen')
   )).map((projection) => projection.readyAt));
   assert.equal(firstFanOutReady.size, 1, 'parallel siblings share the recorded scheduler-ready barrier');
   for (const completed of projections.filter((projection) => projection.status === 'COMPLETED')) {

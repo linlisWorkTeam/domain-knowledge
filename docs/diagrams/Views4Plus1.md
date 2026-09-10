@@ -42,11 +42,14 @@ flowchart TB
 
 ```mermaid
 flowchart TD
-  O[orchestrator] --> W[doc_worker 并行分块]
-  O -->|无分块| D[doc_gen]
+  O[orchestrator] --> D
   O --> T[test_gen]
-  W --> D
-  D --> Q[candidate_knowledge]
+  subgraph DG[DocGen Agent 内部]
+    D[拆分源码任务] --> W[DocWorker subAgents]
+    W --> G[汇总正文]
+    D -->|workerCount 为 0| G
+  end
+  G --> Q[candidate_knowledge]
   Q -->|可继续| C[code]
   Q -->|ITERATE 或 STOPPED| R[workflow_router]
   C --> K[check]

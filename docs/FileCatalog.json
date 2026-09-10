@@ -802,31 +802,31 @@
       "metadataLocation": "file-header"
     },
     {
-      "path": "src/domain/agents/docWorkerAgent/DocWorkerAgent.test.ts",
+      "path": "src/domain/agents/docGenAgent/subAgents/docWorkerAgent/DocWorkerAgent.test.ts",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "验证文档分块角色的行为、约束及失败场景。",
       "metadataLocation": "file-header"
     },
     {
-      "path": "src/domain/agents/docWorkerAgent/DocWorkerAgent.ts",
+      "path": "src/domain/agents/docGenAgent/subAgents/docWorkerAgent/DocWorkerAgent.ts",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "实现文档分块角色的业务步骤与结构化结果转换。",
       "metadataLocation": "file-header"
     },
     {
-      "path": "src/domain/agents/docWorkerAgent/DocWorkerAgentContract.ts",
+      "path": "src/domain/agents/docGenAgent/subAgents/docWorkerAgent/DocWorkerAgentContract.ts",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "定义文档分块角色的输入输出契约、输出 Schema 与材料校验。",
       "metadataLocation": "file-header"
     },
     {
-      "path": "src/domain/agents/docWorkerAgent/DocWorkerAgentPrompt.ts",
+      "path": "src/domain/agents/docGenAgent/subAgents/docWorkerAgent/DocWorkerAgentPrompt.ts",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "维护文档分块角色的基础指令、职责和可读材料范围。",
       "metadataLocation": "file-header"
     },
     {
-      "path": "src/domain/agents/docWorkerAgent/examples/DocWorkerAgentSample.json",
+      "path": "src/domain/agents/docGenAgent/subAgents/docWorkerAgent/examples/DocWorkerAgentSample.json",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "保存DocWorker角色样例的结构化配置、样例或元数据。",
       "metadataLocation": "catalog"
@@ -1513,6 +1513,48 @@
       "path": "web/prototype/index.html",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "提供index页面的展示、交互或样式资源。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/application/services/DocWorkerExecution.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "协调 DocGen 内部子任务的模型执行、独立提交及片段读取。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/infrastructure/agentAdapters/ConcurrentTasks.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "提供有界任务并发、失败取消和在途等待。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/domain/agents/docGenAgent/examples/DocGenWithWorkersSample.json",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "提供两个内部 Worker 与 DocGen 汇总的组合夹具样例。",
+      "metadataLocation": "catalog"
+    },
+    {
+      "path": "tests/integration/DocGenSubAgents.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证 DocGen 组合生成、子任务血缘及恢复复用。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/integration/ConcurrentTasks.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证子任务并发上限、取消和失败等待。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "docs/epitaph/2026-09-10-1032-knowledge-generation-agent-baseline.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "记录知识生成 Agent 分支基线与数据流调研。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "docs/epitaph/2026-09-10-1046-docgen-internal-workers.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "记录 DocGen 内部 Worker 重构及回归证据。",
       "metadataLocation": "file-header"
     }
   ]
