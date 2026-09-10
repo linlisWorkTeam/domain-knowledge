@@ -12,6 +12,7 @@ import { join } from 'node:path';
 import { once } from 'node:events';
 import { GitRepositoryAnalyzer } from '../../src/infrastructure/source/GitRepositoryAnalyzer.ts';
 import { createKnowledgeServer } from '../../src/interfaces/runner/Server.ts';
+import { createComposition } from '../../src/interfaces/runner/Composition.ts';
 
 function repository() {
   const root = mkdtempSync(join(tmpdir(), 'repository-analysis-'));
@@ -54,7 +55,45 @@ test('analysis pins Git objects and does not read dirty source, test bodies or s
     await assert.rejects(analyzer.analyze(fixture.root, '--help'), /REPOSITORY_REVISION_UNAVAILABLE/);
     const controller = new AbortController(); controller.abort();
     await assert.rejects(analyzer.analyze(fixture.root, 'HEAD', controller.signal));
+    const source = await analyzer.readFiles(fixture.root, fixture.commit, ['parser.c']);
+    assert.equal(source[0]?.content, 'int parse(void) { return 1; }\n');
+    await assert.rejects(analyzer.readFiles(fixture.root, fixture.commit, ['tests/parser_test.c']), /REPOSITORY_SOURCE_SELECTION_INVALID/);
+    await assert.rejects(analyzer.readFiles(fixture.root, fixture.commit, ['outside.h']), /REPOSITORY_SOURCE_SELECTION_INVALID/);
+    writeFileSync(join(fixture.root, 'binary.c'), Buffer.from([0xff, 0xfe]));
+    writeFileSync(join(fixture.root, 'bom.c'), '\ufeffint bom(void);\n');
+    fixture.git(['add', 'binary.c', 'bom.c']); fixture.git(['commit', '-qm', 'Source encodings']);
+    const encodingCommit = fixture.git(['rev-parse', 'HEAD']);
+    await assert.rejects(analyzer.readFiles(fixture.root, encodingCommit, ['binary.c']), /REPOSITORY_ENCODING_UNSUPPORTED/);
+    assert.equal((await analyzer.readFiles(fixture.root, encodingCommit, ['bom.c']))[0]?.content, '\ufeffint bom(void);\n');
   } finally { rmSync(fixture.root, { recursive: true, force: true }); }
+});
+
+test('project inputs survive restart, freeze source bodies and isolate changed build or source versions', async () => {
+  const fixture = repository(); const runtimeDir = mkdtempSync(join(tmpdir(), 'project-input-'));
+  let composition = createComposition({ runtimeDir });
+  try {
+    const input = { directory: fixture.root, revision: fixture.commit, moduleIds: ['parser'], build: { includeDirectories: ['.'], definitions: ['FEATURE=1'] } };
+    const first = await composition.apps.workbenchProjects.create(input);
+    assert.equal(first.modules.length, 1);
+    assert.deepEqual(first.sourceFiles.map((file) => file.path), ['Makefile', 'parser.c', 'parser.h']);
+    writeFileSync(join(fixture.root, 'parser.c'), 'int parse(void) { return 9; }\n');
+    const repeated = await composition.apps.workbenchProjects.create(input);
+    assert.deepEqual(repeated, first);
+    const source = first.sourceFiles.find((file) => file.path === 'parser.c')!;
+    assert.equal(Buffer.from(await composition.artifacts.get(source.ref)).toString(), 'int parse(void) { return 1; }\n');
+    const otherBuild = await composition.apps.workbenchProjects.create({ ...input, build: { cStandard: 'c17' } });
+    assert.notEqual(first.snapshotId, otherBuild.snapshotId); assert.equal(first.projectId, otherBuild.projectId);
+    fixture.git(['add', 'parser.c']); fixture.git(['commit', '-qm', 'Changed source']);
+    const changed = await composition.apps.workbenchProjects.create({ ...input, revision: 'HEAD' });
+    assert.notEqual(changed.snapshotId, first.snapshotId); assert.notEqual(changed.sourceDigest, first.sourceDigest);
+    assert.equal(composition.apps.workbenchProjects.store.list().length, 3);
+    await assert.rejects(composition.apps.workbenchProjects.create({ ...input, build: { includeDirectories: ['../outside'] } }), /PROJECT_BUILD_INVALID/);
+    await assert.rejects(composition.apps.workbenchProjects.create({ ...input, build: { command: 'make' } }), /PROJECT_BUILD_INVALID/);
+    await assert.rejects(composition.apps.workbenchProjects.create({ ...input, moduleIds: ['other'] }), /PROJECT_MODULE_UNSUPPORTED/);
+    await composition.close(); composition = createComposition({ runtimeDir });
+    assert.deepEqual(composition.apps.workbenchProjects.store.get(first.snapshotId), first);
+    assert.deepEqual(await composition.apps.workbenchProjects.create(input), first);
+  } finally { await composition.close(); rmSync(runtimeDir, { recursive: true, force: true }); rmSync(fixture.root, { recursive: true, force: true }); }
 });
 
 test('repository analysis API freezes a reusable manifest and rejects cross-site access', async () => {
@@ -75,6 +114,13 @@ test('repository analysis API freezes a reusable manifest and rejects cross-site
     const denied = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', origin: 'https://other.test' },
       body: JSON.stringify({ directory: fixture.root }) });
     assert.equal(denied.status, 503);
+    const projectResponse = await fetch(url.replace('repository-analyses', 'projects'), { method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ directory: fixture.root, revision: fixture.commit, moduleIds: ['parser'] }) });
+    assert.equal(projectResponse.status, 200); const project = await projectResponse.json();
+    const listed = await (await fetch(url.replace('repository-analyses', 'projects'))).json();
+    assert.equal(listed.snapshots[0].snapshotId, project.snapshotId);
+    const detail = await (await fetch(url.replace('repository-analyses', `projects/${project.snapshotId}`))).json();
+    assert.equal(detail.commit, fixture.commit);
     assert.equal(instance.composition.apps.workbenchStages.store.list().length, 0, 'analysis does not start generation');
   } finally {
     await instance.composition.shutdown(); instance.server.close(); await once(instance.server, 'close');

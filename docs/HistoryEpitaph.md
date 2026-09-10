@@ -122,3 +122,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 - [2026-09-10-1227-taste-console-live.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/26e3b48d427ab5b0c1b98449d101f633bda99969/docs/epitaph/2026-09-10-1227-taste-console-live.md)：独立 taste 工作树的七页导航、正文阅读和真实待办筛选重构，24项浏览器及定向复验；当时为只读预览，后由1433记录改为免登录。线上运行源码和隧道不属于本次工作台已部署证据；本任务不改写 v0.2.0。历史截图位于 domain-knowledge-releases/2026-09-10-taste-ui；ECS 重任务串行。
 
 - [2026-09-10-1433-console-direct-editing.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/0265f608a11026d3bdf7a4dd70b91020559f5447/docs/epitaph/2026-09-10-1433-console-direct-editing.md)：用户明确授权免登录，线上 Console 配置、目录及批次操作无需旧令牌；当时25项Console、19项服务与官网回归通过。后续工作台在独立工作树实现，线上未更新；原发布证据及 v0.2.0 不改写。
+
+- [2026-09-10-1511-five-stage-foundation.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/47ef4c5f043aec14842ecc5f8d7a0dfb51a391d8/docs/epitaph/2026-09-10-1511-five-stage-foundation.md)：稳定卡片身份与历史只读分组、匿名证据下载及未知状态修复；当时45单元、163集成、19既有acceptance和27Console通过。随后阶段/索引及仓库分析由1547/1614交接覆盖，完整C/C++闭环与部署仍未完成。

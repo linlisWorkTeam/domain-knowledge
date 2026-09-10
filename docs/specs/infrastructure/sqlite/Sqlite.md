@@ -40,3 +40,7 @@ Git fetch 后、任何 merge 前读取远端完整树，拒绝非允许路径和
 `workbench.sqlite` 中 wb_stage_tasks、wb_stage_events、wb_stage_checkpoints、wb_stage_usage 分别保存冻结任务、事务审计、子步骤结果和幂等用量。SqliteStageTasks 使用 BEGIN IMMEDIATE 与单执行租约唯一索引；回收依据 CheckpointOwner 的实际进程身份，不猜测超时。SqliteKnowledgeIndex 保存 wb_card_index，稳定 Markdown 位于 runtime/card-index；YAML 和整份 Markdown 同时保存 CAS，文件可独立恢复。
 
 阶段存储与旧 registry.sqlite 的知识版本分离；索引失败不会回滚版本。应用在跨库交接处使用确定性任务 ID、CAS 与子步骤检查点，不宣称跨库和外部副作用拥有单一数据库事务。
+
+## 工作台项目输入
+
+SqliteWorkbenchProjects在workbench.sqlite中保存wb_project_inputs。snapshot_id唯一，INSERT OR IGNORE后读取原记录，同输入并发请求不覆盖历史；project_id索引用于读取同仓库历史。正文在CAS，数据库只存固定清单、版本、参数和引用；与阶段任务共用文件但独立表。关闭Composition时关闭连接。

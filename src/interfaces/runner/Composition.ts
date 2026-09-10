@@ -4,6 +4,8 @@
  * 文件功能：提供Composition的外部入口、参数转换与响应处理。
  */
 import { RepositoryAnalysisService } from '../../application/services/RepositoryAnalysis.ts';
+import { WorkbenchProjects } from '../../application/services/WorkbenchProjects.ts';
+import { SqliteWorkbenchProjects } from '../../infrastructure/sqlite/SqliteWorkbenchProjects.ts';
 import { GitRepositoryAnalyzer } from '../../infrastructure/source/GitRepositoryAnalyzer.ts';
 import { WorkbenchStages } from '../../application/services/WorkbenchStages.ts';
 import { KnowledgeIndexService } from '../../application/services/KnowledgeIndex.ts';
@@ -142,7 +144,10 @@ export function createComposition(input: {
   const artifacts = new LocalCasArtifactStore(join(runtimeDir, 'cas'));
   const repository = new SQLiteFlywheelRepository(join(runtimeDir, 'registry.sqlite'));
   const directoryRoots = (process.env.WP_KNOWLEDGE_DIRECTORY_ROOTS ?? `${dirname(runtimeDir)}${delimiter}${dirname(repositoryRoot)}`).split(delimiter).filter(Boolean);
-  const repositoryAnalysis = new RepositoryAnalysisService(new GitRepositoryAnalyzer(directoryRoots, runtimeDir), artifacts);
+  const repositoryReader = new GitRepositoryAnalyzer(directoryRoots, runtimeDir);
+  const repositoryAnalysis = new RepositoryAnalysisService(repositoryReader, artifacts);
+  const projectStore = new SqliteWorkbenchProjects(join(runtimeDir, 'workbench.sqlite'));
+  const workbenchProjects = new WorkbenchProjects(projectStore, repositoryAnalysis, repositoryReader, artifacts);
   const publisher = new LocalMarkdownPublisher({ runtimeDir, directoryRoots,
     defaultDirectory: process.env.WP_KNOWLEDGE_OUTPUT_DIRECTORY ?? join(runtimeDir, 'knowledge'),
   });
@@ -511,6 +516,7 @@ export function createComposition(input: {
       workbenchStages,
       knowledgeIndex,
       repositoryAnalysis,
+      workbenchProjects,
       markdownLite: {
         start: async (directory: string, budgetMode?: 'provider-quota') => {
           // 固定模块入口只接受服务器目录；源码与模型设置在服务端验证。
@@ -545,7 +551,7 @@ export function createComposition(input: {
     automatedWorkflow: workflow,
     shutdown: async () => { await workbenchStages.shutdown(); if (workflowPromise) await (await workflowPromise).shutdown(); },
     close: () => {
-      const release = () => { indexStore.close(); stageStore.close(); publisher.close(); repository.close(); };
+      const release = () => { projectStore.close(); indexStore.close(); stageStore.close(); publisher.close(); repository.close(); };
       if (workbenchStages.idle) { void workbenchStages.shutdown(); release(); }
       else return workbenchStages.shutdown().then(release);
     },

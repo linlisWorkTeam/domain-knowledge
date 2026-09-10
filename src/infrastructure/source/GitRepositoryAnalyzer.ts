@@ -9,7 +9,7 @@ import { freemem } from 'node:os';
 import { relative, isAbsolute, basename, extname } from 'node:path';
 import { groupRepositoryModules } from '../../domain/services/sourceScan/RepositoryAnalysis.ts';
 import { sha256 } from '../../domain/Domain.ts';
-import type { RepositoryAnalyzer, RepositoryAnalysis, RepositoryFile, SourceLanguage } from '../../application/ports/RepositoryAnalysisPorts.ts';
+import type { RepositoryAnalyzer, RepositorySourceReader, RepositoryAnalysis, RepositoryFile, SourceLanguage } from '../../application/ports/RepositoryAnalysisPorts.ts';
 
 /** 只启动明确的只读命令，限制时间和输出；取消始终结束整个进程组。 */
 async function readCommand(command: string, args: string[], directory: string, signal?: AbortSignal, maximum = 2_097_152): Promise<string> {
@@ -35,7 +35,7 @@ async function readCommand(command: string, args: string[], directory: string, s
       clearTimeout(timer); signal?.removeEventListener('abort', abort);
       if (failure) reject(failure);
       else if (code !== 0) reject(new Error('REPOSITORY_REVISION_UNAVAILABLE'));
-      else resolve(output.toString('utf8'));
+      else { try { resolve(new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(output)); } catch { reject(new Error('REPOSITORY_ENCODING_UNSUPPORTED')); } }
     });
   });
 }
@@ -58,12 +58,27 @@ function buildSystem(path: string): string | null {
   return null;
 }
 /** 分析只覆盖固定提交；脏工作区不被悄悄并入。测试与示例保留清单但不成为默认生成输入。 */
-export class GitRepositoryAnalyzer implements RepositoryAnalyzer {
+export class GitRepositoryAnalyzer implements RepositoryAnalyzer, RepositorySourceReader {
   constructor(privateRoots: string[], resourceDirectory: string) {
     this.roots = privateRoots.map((root) => realpathSync(root)); this.resourceDirectory = resourceDirectory;
   }
   private readonly roots: string[];
   private readonly resourceDirectory: string;
+  async readFiles(directory: string, commit: string, paths: string[], signal?: AbortSignal) {
+    if (!/^[a-f0-9]{40,64}$/.test(commit) || !Array.isArray(paths) || !paths.length || paths.length > 2000) throw new Error('REPOSITORY_SOURCE_SELECTION_INVALID');
+    const report = await this.analyze(directory, commit, signal);
+    const selected = [...new Set(paths)].sort().map((path) => report.files.find((file) => file.path === path));
+    if (selected.some((file) => !file || !['source', 'build'].includes(file.kind))) throw new Error('REPOSITORY_SOURCE_SELECTION_INVALID');
+    const files = selected as RepositoryFile[];
+    if (files.some((file) => file.size > 1_048_576) || files.reduce((sum, file) => sum + file.size, 0) > 8_388_608) throw new Error('REPOSITORY_SOURCE_TOO_LARGE');
+    const result: Array<{ path: string; objectId: string; content: string }> = [];
+    for (const file of files) {
+      const content = await readCommand('git', ['--no-replace-objects', 'cat-file', 'blob', file.objectId], report.directory, signal, 1_048_576);
+      if (Buffer.byteLength(content) !== file.size || content.includes('\0')) throw new Error('REPOSITORY_SOURCE_CONTENT_INVALID');
+      result.push({ path: file.path, objectId: file.objectId, content });
+    }
+    return result;
+  }
   async analyze(directory: string, revision = 'HEAD', signal?: AbortSignal): Promise<RepositoryAnalysis> {
     let root: string;
     try { root = realpathSync(directory); } catch { throw new Error('SOURCE_DIRECTORY_INVALID'); }

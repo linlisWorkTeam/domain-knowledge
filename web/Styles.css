@@ -1289,4 +1289,10 @@ body.drawer-active { overflow: hidden; }
 .repository-panel code, .repository-panel li { overflow-wrap: anywhere; }
 .repository-panel li small { display: block; color: var(--muted); }
 .repository-panel summary { cursor: pointer; margin-top: 12px; }
+.repository-panel [data-project-form] { display: block; }
+.repository-panel li label { display: flex; align-items: center; gap: 8px; }
+.repository-panel input[type="checkbox"] { width: auto; flex: none; }
+.project-build-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 12px 0; }
+.project-build-fields select, .project-build-fields textarea { width: 100%; min-width: 0; }
 @media (max-width: 720px) { .repository-panel form { flex-direction: column; align-items: stretch; } }
+@media (max-width: 480px) { .project-build-fields { grid-template-columns: minmax(0, 1fr); } }

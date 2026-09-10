@@ -67,3 +67,5 @@ KnowledgeIndexService 读取冻结卡片版本，协调 YAML/Markdown 工件、�
 
 
 RepositoryAnalysisService 调用 RepositoryAnalyzer 并将固定清单写入 CAS；动态资源、工具观测及请求的分支别名不进入源码 manifestRef，因此相同提交重复分析可复用源码身份。工具链摘要尚待编译阶段另行冻结，不能用源码清单摘要替代测试缓存中的工具链身份。
+
+WorkbenchProjects 已接入：项目身份绑定仓库，输入版本绑定提交、模块选择、构建约束和固定源文件工件。先校验选择，再将选定源码与构建配置存 CAS，最后原子记录 SQLite 快照；同输入重复请求复用，历史快照不可变。源文件工件仅供源码分析、DocGen和参考评测使用，不能作为 Code 的公开接口。公开接口提取成功前不能启动重建。构建参数只接受编译器、标准、相对包含目录及预处理定义，不接受 shell 命令。

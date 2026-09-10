@@ -1,0 +1,51 @@
+{
+  "schemaVersion": "native-acceptance-inputs-v1",
+  "targets": [
+    {
+      "name": "jsmn",
+      "repository": "https://github.com/zserge/jsmn",
+      "commit": "25647e692c7906b96ffd2b05ca54c097948e879c",
+      "language": "c",
+      "scope": [
+        "jsmn_init",
+        "jsmn_parse",
+        "jsmntok_t",
+        "jsmn_parser",
+        "jsmntype_t",
+        "jsmnerr"
+      ],
+      "files": {
+        "jsmn.h": "c04533e9181e1e33baceb0f55ac449b05145bb936e8c68cc77dfe0d8277514fb",
+        "Makefile": "30224351e62a0826dc787e7a6ee73b1afd6d48c8297cfc3f11951ba2fd8ba789",
+        "test/tests.c": "189ed2b1f1077f63c8e73bcce28bc2c8625c5db814f6637a7c18fc3ac1a78f7b",
+        "test/test.h": "8896660fde7631bd514c431a06807a048c9ea37ad60548d70e32f76831e7ed1e",
+        "test/testutil.h": "81c2e4a9ca467eed450a5b7845f874d0d1e59b4c363f5520625f9e62ee5f588a"
+      },
+      "trustedSuiteStatus": "PENDING_REFERENCE_VALIDATION"
+    },
+    {
+      "name": "tinyxml2",
+      "repository": "https://github.com/leethomason/tinyxml2",
+      "commit": "8224e427b655b83dae5e2298f1e6919523a78737",
+      "language": "cpp",
+      "scope": [
+        "XMLUtil::ToStr",
+        "XMLUtil::ToInt",
+        "XMLUtil::ToUnsigned",
+        "XMLUtil::ToBool",
+        "XMLUtil::ToFloat",
+        "XMLUtil::ToDouble",
+        "XMLUtil::ToInt64",
+        "XMLUtil::ToUnsigned64",
+        "XMLUtil::SetBoolSerialization"
+      ],
+      "files": {
+        "tinyxml2.h": "dc6903d27f5f8ff18f7de98179d979ee3986d12273c495b54f48ac385fcdd7c5",
+        "tinyxml2.cpp": "07b4e7a1d021256255b91a0844640f26508201b40cfc576b9499b068d981c39b",
+        "xmltest.cpp": "86aeb878beeb5d5c075314fa977d39b74c24167de833f24f00123551726e4d5d",
+        "CMakeLists.txt": "d93bf5b349fc93a9108e243675d3aabc2af38c24382fad4365db108bb3600a75"
+      },
+      "trustedSuiteStatus": "PENDING_REFERENCE_VALIDATION"
+    }
+  ]
+}

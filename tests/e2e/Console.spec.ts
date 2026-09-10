@@ -939,6 +939,12 @@ test('操作中心从固定 Git 版本分析仓库，显示模块和环境且窄
     await expect(page.locator('[data-repository-result]')).toContainText('parser');
     await expect(page.locator('[data-repository-result]')).toContainText('gcc');
     await expect(page.getByRole('heading', { name: '模块候选' })).toBeVisible();
+    await page.getByRole('combobox', { name: 'C 标准', exact: true }).selectOption('c17');
+    const savedResponse = page.waitForResponse((response) => response.url().endsWith('/api/v1/projects') && response.request().method() === 'POST');
+    await page.getByRole('button', { name: '保存项目输入', exact: true }).click();
+    await expect(page.locator('[data-project-summary]')).toContainText('已保存 1 个模块');
+    const saved = await (await savedResponse).json();
+    expect(saved.commit).toBe(commit); expect(saved.build.cStandard).toBe('c17');
     await page.screenshot({ path: test.info().outputPath('repository-analysis-desktop.png'), fullPage: true });
     await page.setViewportSize({ width: 390, height: 844 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);

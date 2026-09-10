@@ -8,3 +8,6 @@ export type { RepositoryAnalysis, RepositoryFile, RepositoryModule, SourceLangua
 export interface RepositoryAnalyzer {
   analyze(directory: string, revision?: string, signal?: AbortSignal): Promise<RepositoryAnalysis>;
 }
+export interface RepositorySourceReader {
+  readFiles(directory: string, commit: string, paths: string[], signal?: AbortSignal): Promise<Array<{ path: string; objectId: string; content: string }>>;
+}
