@@ -326,8 +326,11 @@ export class TrustedProjectEvaluator implements ProjectEvaluator {
   readonly artifacts: ArtifactStore;
 
   /** 注入协作依赖并初始化实例状态。 */
-  constructor(artifacts: ArtifactStore) {
+  readonly retainedWorkspaceRoot?: string;
+
+  constructor(artifacts: ArtifactStore, retainedWorkspaceRoot?: string) {
     this.artifacts = artifacts;
+    this.retainedWorkspaceRoot = retainedWorkspaceRoot;
   }
 
   /** 检查请求。 */
@@ -379,7 +382,9 @@ export class TrustedProjectEvaluator implements ProjectEvaluator {
     commands: ProjectCommand[];
   }, signal?: AbortSignal): Promise<ProjectEvaluation> {
     if (input.commands.length === 0) throw new Error('PROJECT_GATE_EMPTY');
-    const tempRoot = mkdtempSync(join(tmpdir(), 'wp-project-eval-'));
+    if (this.retainedWorkspaceRoot) mkdirSync(this.retainedWorkspaceRoot, { recursive: true });
+    const tempRoot = mkdtempSync(join(this.retainedWorkspaceRoot ?? tmpdir(), 'wp-project-eval-'));
+    if (this.retainedWorkspaceRoot) writeFileSync(join(tempRoot, 'input.json'), JSON.stringify(input, null, 2));
     const workspace = join(tempRoot, 'workspace');
     const archivePath = join(tempRoot, 'snapshot.tar');
     const generatedFileDigests: Record<string, string> = {};
@@ -525,6 +530,7 @@ export class TrustedProjectEvaluator implements ProjectEvaluator {
         generatedFileDigests, generatedFilesIntact,
         passed, testsPassed, testsTotal, stability, infrastructureFailure, results,
       };
+      if (this.retainedWorkspaceRoot) writeFileSync(join(tempRoot, 'evidence.json'), JSON.stringify(evidence, null, 2));
       const evidenceRef = await this.artifacts.put(Buffer.from(JSON.stringify(evidence, null, 2)), 'application/json');
       return {
         label: input.label, commit: input.snapshot.commit, passed, testsPassed, testsTotal,
@@ -533,7 +539,7 @@ export class TrustedProjectEvaluator implements ProjectEvaluator {
         generatedFileDigests, results, evidenceRef,
       };
     } finally {
-      rmSync(tempRoot, { recursive: true, force: true });
+      if (!this.retainedWorkspaceRoot) rmSync(tempRoot, { recursive: true, force: true });
     }
   }
 }
