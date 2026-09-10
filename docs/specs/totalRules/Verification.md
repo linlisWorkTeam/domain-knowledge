@@ -22,7 +22,7 @@ SPDX-License-Identifier: MIT
 | AC-FLOW-005 | Given DocGen 产出的正文缺少结构或验证证据，When Quality Gate 拒绝候选，Then 本轮不调用 CodeAgent，下一轮 DocGen 收到结构化质量反馈，预算耗尽时转 LOW_CONFIDENCE。 |
 | AC-AGENT-001 | Given 全角色能力令牌，When 尝试写知识，Then 只有 DocGen 可创建候选，任何评测/评审写入均拒绝。 |
 | AC-AGENT-002 | Given Orchestrator 输出主观 PASS，When 处理结果，Then 该字段因 Schema/权限失败，状态只接受 GateDecision。 |
-| AC-SEC-001 | Given CodeAgent 会话，When 读取源码、门禁测试、旧实现、路径穿越或符号链接，Then 全部拒绝并产生 AccessDenied。 |
+| AC-SEC-001 | Given CodeAgent 本轮授权卡片与裁剪配置，When 读取原始实现、独立接口文件、参考测试、其他角色/运行文件，或通过绝对路径、路径穿越、符号链接与未授权工具尝试绕过，Then 全部拒绝并记录角色、Run 和原因；向上游材料或整份场景注入相同禁读内容也不能进入模型 Prompt。真实运行必须验证进程隔离，缺少必要隔离不得静默降级。 |
 | AC-SEC-002 | Given 矩阵内外访问组合，When 执行权限参数化测试，Then 所有列明动作符合矩阵，未定义组合默认拒绝。 |
 | AC-SEC-003 | Given 含源码、密钥和超长输出的任务，When 导出日志，Then 仅保留脱敏摘要/ArtifactRef 且输出受限。 |
 | AC-SEC-004 | Given 新检出的仓库没有写入令牌，When 用户打开控制台设置，Then 页面说明如何把 `.env.example` 复制为被忽略的 `.env.local`、配置 `WP_KNOWLEDGE_WRITE_TOKEN` 并重启服务；When 未配置时，所有写接口仍默认拒绝。 |
@@ -62,10 +62,13 @@ SPDX-License-Identifier: MIT
 | AC-DOC-002 | Given 一个跨层大规模特性，When 准备合入，Then Console、GitHub Pages、工程文档、Spec、追踪矩阵和自动化验收均已更新或在 PR 中明确说明不适用。 |
 | AC-DOC-003 | Given 仓库中已跟踪的 Markdown 和关键入口文档，When 执行文档契约测试，Then 每份文档都有中文说明，关键入口包含相邻的结构化 English summary，代码标识符和协议值仍可与源码直接互查。 |
 | AC-DOC-004 | Given 官网和控制台，When 检查静态文案、状态标签和运行时投影，Then 除品牌、项目名、`Agent`、API/协议缩写、代码字段、枚举原值和技术标识符外，用户看到的栏目、状态与说明均为自然中文；`Registry` 显示为“注册”，名词 `Run` 显示为“批次”。 |
+| AC-CONFIG-001 | Given 两个项目配置、同项目不同场景及知识卡片版本，When 选择项目/场景并启动任务、随后修改配置及恢复旧任务，Then 依赖/构建说明留在项目配置，角色只收到必要字段；同项目只换卡片可复用配置，不同项目使用各自配置；本轮卡片/配置版本与摘要、实际生效场景、可读白名单及输出根目录固定可查，旧任务不随修改漂移，冻结版本不可用则明确失败。 |
+| AC-CODE-001 | Given 含公开接口的知识卡片和合法项目配置，When 组装并执行 CodeAgent，Then 无须独立 publicInterfaceRefs 或原仓库接口文件，只接收卡片与裁剪出的 C/C++ 标准、依赖和允许输出路径；不传整份场景、参考测试或答案，完整构建配置仅交执行器，返回包含源码 path/content 的 files 列表。 |
+| AC-CODE-002 | Given 合法输出及包含绝对路径、越界、重复、未授权文件或符号链接逃逸的输出，When 框架接收 CodeAgent files，Then 先校验整组再落盘，非法输出不写入源码目录；合法 C/C++ 源码只写本轮隔离输出目录并留工件引用，原业务仓库不变，比较、编译和测试由后续执行器完成。 |
 
 ## 需求追踪矩阵
 
-实现和测试路径相对仓库根目录。AC-FLOW-003 的自动回滚、AC-FLOW-004 的完整冲突调度、AC-LANG-002 的 C++ 沙箱、AC-EVAL-001 的候选 oracle 晋升仍按 Partial / Planned 审查，不能根据场景措辞推定已实现。
+实现和测试路径相对仓库根目录。AC-FLOW-003 的自动回滚、AC-FLOW-004 的完整冲突调度、AC-LANG-002 的 C++ 沙箱、AC-EVAL-001 的候选 oracle 晋升仍按 Partial / Planned 审查，不能根据场景措辞推定已实现。2026-09-10 新确认的 CodeAgent 输入和项目配置目标对应 KF-SYS-044、045，保持 Planned；KF-SYS-003 的现有测试只覆盖部分旧边界，不能证明新增接口隔离与 Prompt 材料裁剪已通过。
 
 | 需求 ID | 验收 | 状态 | 实现 | 测试 |
 | --- | --- | --- | --- | --- |
@@ -112,6 +115,8 @@ SPDX-License-Identifier: MIT
 | KF-SYS-041 | AC-API-010 | Implemented | `src/application/apps/ProviderOperationsApp.ts` + `src/infrastructure/agentAdapters/deepSeekHarness` + `src/interfaces/runner/Composition.ts` + `web/App.js` | `tests/security/ProviderSettings.test.ts` + `tests/integration/DshConfiguredProvider.test.ts` + `tests/acceptance/DshConfiguredFlow.test.ts` + `tests/e2e/Console.spec.ts` |
 | KF-SYS-042 | AC-OBS-004 | Implemented | `src/application/apps/OperationalMetricsApp.ts` + `src/infrastructure/observability/SqliteOperationalMetrics.ts` + `web/App.js` | `tests/integration/OperationalMetrics.test.ts` + `tests/integration/ProviderObservability.test.ts` + `tests/e2e/Console.spec.ts` |
 | KF-SYS-043 | AC-SEARCH-001 | Planned | — | — |
+| KF-SYS-044 | AC-CONFIG-001 | Planned | — | — |
+| KF-SYS-045 | AC-CODE-001、AC-CODE-002 | Planned | — | — |
 | KF-UI-001 | AC-UI-001 | Implemented | `web/App.js` + `src/interfaces/runner/Server.ts` | `tests/contract/Site.test.ts` + `tests/integration/Server.test.ts` |
 | KF-UI-002 | AC-UI-002 | Implemented | `web/App.js` + `src/interfaces/runner/ConsoleReadModel.ts` | `tests/contract/Site.test.ts` + `tests/integration/Server.test.ts` |
 | KF-UI-003 | AC-UI-003 | Implemented | `src/application/services/AutomatedProjectWorkflow.ts` + `web/App.js` | `tests/acceptance/AutomatedLanggraphFlow.test.ts` + `tests/contract/Site.test.ts` |

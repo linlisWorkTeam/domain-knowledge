@@ -7,6 +7,8 @@ SPDX-License-Identifier: MIT
 
 角色设计见 [Agents](specs/domainFunction/agents/Agents.md)，跨角色流程见 [Workflow](specs/domainFunction/services/workflow/Workflow.md)。本文件只说明如何定位、运行和修改角色，DocGen 的固定源码教程合并在后半部分。
 
+CodeAgent 的目标输入输出已于 2026-09-10 确认：知识卡片包含接口，项目配置提供 C/C++ 运行约束，框架冻结读取权限并校验源码输出，详见 Agents 的目标章节和 [S2-05 任务](Status.md)。以下命令与样例仍对应现有实现，尚未支持新的项目配置入口；原 TypeScript 样例不能用作 C/C++ 业务验收结论。
+
 ## 定位代码
 
 目录小驼峰，文件大驼峰。每个 `xxxAgent/` 包含 `XxxAgent.ts`、`XxxAgentContract.ts`、`XxxAgentPrompt.ts`、`XxxAgent.test.ts` 和 `examples/XxxAgentSample.json`。
