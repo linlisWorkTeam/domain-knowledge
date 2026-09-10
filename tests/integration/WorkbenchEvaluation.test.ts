@@ -60,6 +60,7 @@ test('native stage rejects bad candidates, resumes trusted cases after restart a
     const rejected = await composition.apps.workbenchStages.wait(evaluation.taskId);
     assert.equal(rejected.status, 'FAILED', rejected.reasonCode ?? ''); assert.equal(rejected.reasonCode, 'TEST_CANDIDATE_REJECTED');
     assert.equal(testCalls, 1); assert.equal(generatedRuns, 0);
+    await assert.rejects(composition.apps.workbenchEvaluation.revisionEvidence(evaluation.taskId), /REVISION_COMPLETED_EVALUATION_REQUIRED/);
     const rejectedCheckpoint = composition.apps.workbenchStages.store.checkpoints(evaluation.taskId).find((item) => item.key.startsWith('candidate-rejection:'))!;
     assert.equal(rejectedCheckpoint.result.summary.knowledgeErrorProven, false);
     wrongCandidate = false; composition.apps.workbenchStages.resume(evaluation.taskId, evaluation.inputDigest);
@@ -72,6 +73,7 @@ test('native stage rejects bad candidates, resumes trusted cases after restart a
     const reports = done.result!.summary.modules as Array<{ status: string; passed: number; total: number; publicationVerified: boolean }>;
     assert.equal(reports[0]?.status, 'BEHAVIOR_PASSED'); assert.equal(reports[0]?.passed, 1); assert.equal(reports[0]?.publicationVerified, false);
     assert.equal((await composition.apps.workbenchEvaluation.start(code.taskId)).taskId, evaluation.taskId);
+    assert.equal((await composition.apps.workbenchEvaluation.revisionEvidence(done.taskId)).modules[0]?.nextAction, 'NO_BEHAVIOR_REVISION_REQUIRED');
     wrongCode = true;
     const revised = await composition.apps.flywheel.ingestCandidate({ ...input, body: input.body + '\nOverflow is excluded explicitly.' });
     const rebuilt = await composition.apps.workbenchReconstruction.start(project.snapshotId, [revised.version.versionId]);
@@ -83,6 +85,12 @@ test('native stage rejects bad candidates, resumes trusted cases after restart a
     assert.equal(module.status, 'BEHAVIOR_FAILED'); assert.equal(module.reused, 1); assert.equal(testCalls, 2); assert.equal(codeCalls, 2);
     const behaviorReport = JSON.parse(Buffer.from(await composition.artifacts.get(module.reportRef)).toString('utf8'));
     assert.equal(behaviorReport.cases[0]?.actual.sum, '-1'); assert.equal(behaviorReport.cases[0]?.sectionBindings[0]?.versionId, revised.version.versionId);
+    const evidence = await composition.apps.workbenchEvaluation.revisionEvidence(next.taskId);
+    assert.equal(evidence.revisionAuthorized, false);
+    assert.equal(evidence.modules[0]?.candidates[0]?.versionId, revised.version.versionId);
+    assert.deepEqual(evidence.modules[0]?.candidates[0]?.sections[0]?.caseIds, ['sum']);
+    assert.equal(evidence.modules[0]?.knowledgeErrorProven, false, 'wrong generated code alone is not a knowledge error');
+    assert.deepEqual(await composition.apps.workbenchEvaluation.revisionEvidence(next.taskId), evidence, 'read-only evidence is deterministic');
     writeFileSync(join(root, 'math.c'), '#include "math.h"\nint add(int a,int b){return a+b+1;}');
     git('add', '.'); git('commit', '-qm', 'Changed reference behavior');
     const changedProject = await composition.apps.workbenchProjects.create({ directory: root, moduleIds: ['math'] });

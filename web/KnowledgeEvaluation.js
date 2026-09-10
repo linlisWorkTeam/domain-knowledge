@@ -6,6 +6,7 @@
 export function createKnowledgeEvaluationPanel({ root, request, escapeHtml: escape, isEditable, selection }) {
   let task = null, checkpoints = [], events = [], busy = false, notice = '', timer = null, initialized = false, epoch = 0
   const reportCache = new Map()
+  const revisionCache = new Map()
   const host = () => root.querySelector('[data-native-evaluation-panel]')
   const active = () => task && ['PENDING', 'RUNNING'].includes(task.status)
   const labels = { PENDING: '排队中', RUNNING: '评测中', SUCCEEDED: '评测执行完成', FAILED: '执行失败', PAUSED: '已暂停', CANCELLED: '已取消' }
@@ -37,6 +38,17 @@ export function createKnowledgeEvaluationPanel({ root, request, escapeHtml: esca
       ${(item.sectionBindings ?? []).map((binding) => `<button class="text-button" type="button" data-version-id="${escape(binding.versionId)}">${escape(binding.sectionId)}${binding.matchesInput ? '' : '（历史章节）'}</button>`).join(' ')}
       <details><summary>完整用例输入</summary><pre>${escape(JSON.stringify(input, null, 2))}</pre></details></details>`
   }
+  function revisionHtml() {
+    const result = revisionCache.get(task?.taskId)
+    if (!result) return ''
+    if (result.error) return `<p>修订依据暂不可用：${escape(result.error)}。原评测结果保留。</p>`
+    if (result.loading) return '<p>正在校验参考证据与当前章节…</p>'
+    return `<section class="revision-evidence"><h4>修订依据</h4><p>以下章节可交给 Review 判断；失败本身不能证明知识错误，尚未授权修改正文。</p>
+      ${result.modules.map((module) => `<p>${escape(module.moduleId)} · ${escape(module.failed)} 个失败用例</p>
+      ${module.nextAction === 'NO_BEHAVIOR_REVISION_REQUIRED' ? '<p>可信行为用例全部通过，没有由行为失败提出的修订。</p>' : ''}
+      ${module.candidates.map((card) => `<button class="text-button" type="button" data-version-id="${escape(card.versionId)}">查看绑定卡片版本</button>${card.sections.map((section) => `<details><summary>${escape(section.heading)} · 用例 ${section.caseIds.map(escape).join('、')}</summary><pre>${escape(section.text)}</pre></details>`).join('')}`).join('')}
+      ${module.unresolved.map((item) => `<p>未解决：${escape(item.caseId)} · ${escape(item.sectionId ?? '')} · ${escape({ CURRENT_SECTION_REQUIRED: '章节或版本已变化，需要重新定位', NO_CONFIRMED_BEHAVIOR_OBSERVATION: '未取得可用于修订的行为观察，先检查构建或运行诊断' }[item.reason] ?? item.reason)}</p>`).join('')}`).join('')}</section>`
+  }
   function render() {
     const panel = host(); if (!panel) return
     const parent = selection(); if (!parent && !task) { panel.innerHTML = ''; return }
@@ -57,6 +69,7 @@ export function createKnowledgeEvaluationPanel({ root, request, escapeHtml: esca
       ${module.report ? `<p>通过 ${escape(module.report.passed)}/${escape(module.report.total)}${module.interfaceCompatible === false ? '；公开接口存在差异' : ''}</p>` : ''}
       ${download(module.reportRef, '下载评测报告')}${download(module.oracleRef, '下载参考验证')}
       ${(module.report?.cases ?? module.cases ?? []).map(caseHtml).join('')}</section>`).join('')}
+      ${task.status === 'SUCCEEDED' ? '<button class="secondary-button" type="button" data-revision-evidence>查看修订依据</button>' : ''}${revisionHtml()}
       ${task.reasonCode === 'NATIVE_REFERENCE_BASELINE_FAILED' ? checkpoints.filter((item) => item.key.startsWith('reference-baseline:')).map((item) => download(item.result.artifactRefs[0], '下载参考构建报告')).join('') : ''}
       ${active() ? `<button class="secondary-button" type="button" data-native-evaluation-action="cancel" ${busy || task.cancelRequested || !isEditable() ? 'disabled' : ''}>取消评测</button>` : ''}
       ${resume ? `<button class="secondary-button" type="button" data-native-evaluation-action="resume" ${busy || !isEditable() ? 'disabled' : ''}>${task.reasonCode === 'TEST_CANDIDATE_REJECTED' ? '重新生成候选测试' : '恢复评测'}</button>` : ''}` : ''}`
@@ -80,6 +93,15 @@ export function createKnowledgeEvaluationPanel({ root, request, escapeHtml: esca
     if (active() && host()) timer = setTimeout(observe, 800)
   }
   root.addEventListener('click', async (event) => {
+    if (event.target.closest('[data-revision-evidence]') && task?.status === 'SUCCEEDED') {
+      const id = task.taskId
+      if (revisionCache.get(id)?.loading) return
+      revisionCache.set(id, { loading: true }); render()
+      try { revisionCache.set(id, await request(`/api/v1/native-evaluations/${encodeURIComponent(id)}/revision-evidence`)) }
+      catch (error) { revisionCache.set(id, { error: error.code ?? '连接失败' }) }
+      if (task?.taskId === id) render()
+      return
+    }
     const action = event.target.closest('[data-native-evaluation-action]')?.dataset.nativeEvaluationAction
     if (!action || busy || !isEditable()) return
     const parent = selection(); if (action === 'start' && (!parent || active())) return

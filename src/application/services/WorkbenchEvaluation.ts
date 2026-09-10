@@ -6,6 +6,7 @@
 import { sha256, type ArtifactRef } from '../../domain/Domain.ts';
 import { canonicalJson, type JsonValue } from '../../domain/services/workbench/StageTask.ts';
 import { nativeFunctions, assertNativeContract, type NativeContract, type NativeBehaviorSuite } from '../../domain/services/evaluation/NativeBehaviorSuite.ts';
+import { nativeRevisionEvidence } from '../../domain/services/evaluation/NativeRevisionEvidence.ts';
 import { nativeCandidateHints } from '../../domain/services/evaluation/NativeCandidateFeedback.ts';
 import { markdownSections } from '../../domain/services/knowledge/KnowledgeSections.ts';
 import type { ArtifactStore, FlywheelRepository } from '../ports/ApplicationPorts.ts';
@@ -26,6 +27,31 @@ export class WorkbenchEvaluation {
     const { artifacts } = this.dependencies;
     if (!ref || !await artifacts.verify(ref)) throw new Error('STAGE_ARTIFACT_CORRUPT');
     return JSON.parse(Buffer.from(await artifacts.get(ref)).toString('utf8')) as T;
+  }
+  /** 只读派生修订候选，重新验证可信来源及固定正文，不改写旧评测。 */
+  async revisionEvidence(taskId: string) {
+    const { stages, repository, artifacts, evaluation } = this.dependencies;
+    const task = stages.get(taskId);
+    if (task.input.stage !== 'EVALUATE' || task.status !== 'SUCCEEDED' || !task.result) throw new Error('REVISION_COMPLETED_EVALUATION_REQUIRED');
+    const previous = stages.get(String(task.input.parameters.reconstructionTaskId));
+    if (!previous.result || previous.status !== 'SUCCEEDED' || sha256(canonicalJson(previous.result)) !== task.input.parameters.reconstructionDigest) throw new Error('STAGE_INPUT_CHANGED');
+    const modules = [];
+    for (const summary of task.result.summary.modules as unknown as Array<{ moduleId: string; testSetId: string; reportRef: ArtifactRef }>) {
+      const original = (previous.result.summary.modules as unknown as ModuleResult[]).find((item) => item.moduleId === summary.moduleId);
+      const set = evaluation.dependencies.store.get(summary.testSetId);
+      if (!original || !set || set.projectSnapshotId !== task.input.parameters.snapshotId || set.sourceRevision !== task.input.sourceRevision) throw new Error('REVISION_REPORT_BINDING_INVALID');
+      const cards = [];
+      for (const id of original.cardVersionIds) {
+        const card = repository.getKnowledgeVersion(id);
+        if (!card || !task.input.cardVersionIds.includes(id) || !await artifacts.verify(card.bodyRef)) throw new Error('REVISION_KNOWLEDGE_BINDING_INVALID');
+        cards.push({ cardId: String(card.metadata.cardId), versionId: id, bodyDigest: card.bodyRef.sha256, body: Buffer.from(await artifacts.get(card.bodyRef)).toString('utf8') });
+      }
+      const report = await this.load<Parameters<typeof nativeRevisionEvidence>[3]>(summary.reportRef);
+      const evidence = nativeRevisionEvidence(set, await this.load<NativeBehaviorSuite>(set.suiteRef),
+        await this.load<Parameters<typeof nativeRevisionEvidence>[2]>(set.oracleRef), report, cards);
+      modules.push({ moduleId: summary.moduleId, reportRef: summary.reportRef, suiteRef: set.suiteRef, oracleRef: set.oracleRef, ...evidence });
+    }
+    return { taskId, inputDigest: task.inputDigest, modules, revisionAuthorized: false };
   }
   async start(reconstructionTaskId: string) {
     return this.dependencies.stages.start(await this.prepare(reconstructionTaskId));

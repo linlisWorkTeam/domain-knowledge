@@ -1032,6 +1032,10 @@ test('操作中心从固定 Git 版本分析仓库，显示模块和环境且窄
     await expect(page.locator('[data-native-evaluation-panel] pre').filter({ hasText: '<script>diagnosticText()</script>' })).toBeVisible();
     await expect(page.locator('[data-native-evaluation-panel] script')).toHaveCount(0);
     await expect(page.locator('[data-native-evaluation-panel] [data-version-id]')).toBeVisible();
+    await page.getByRole('button', { name: '查看修订依据', exact: true }).click();
+    await expect(page.locator('.revision-evidence')).toContainText('失败本身不能证明知识错误');
+    await expect(page.locator('.revision-evidence')).toContainText('parseResult');
+
     await page.screenshot({ path: test.info().outputPath('repository-analysis-desktop.png'), fullPage: true });
     await page.setViewportSize({ width: 390, height: 844 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);

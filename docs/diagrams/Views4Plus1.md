@@ -256,3 +256,20 @@ flowchart LR
   Compare --> Evidence[差异与未解决项]
   Evidence --> Evaluation[独立可信行为门禁]
 ```
+
+评测结果的修订依据查询已接通；虚线后的自动角色执行尚未接通：
+
+```mermaid
+flowchart LR
+  Evaluation[固定成功评测记录] --> Load[Application 校验 CAS 与来源绑定]
+  Oracle[可信套件和参考观察] --> Load
+  Body[固定卡片正文] --> Load
+  Load --> Domain[Domain 重算行为差异与当前 H2 绑定]
+  Domain -->|行为失败且章节有效| Candidate[Review 候选章节及失败用例]
+  Domain -->|编译故障或旧章节| Unresolved[保留未解决诊断]
+  Domain -->|全部通过| None[没有行为失败驱动的修订]
+  Candidate --> UI[Console 只读修订依据]
+  Unresolved --> UI
+  None --> UI
+  Candidate -. 待实现 .-> Review[Review 归因与 DocGen 定点修订]
+```

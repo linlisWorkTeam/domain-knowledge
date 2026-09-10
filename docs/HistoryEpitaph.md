@@ -152,3 +152,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 - [2026-09-11-0153-trusted-gates.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/192ba38a2e3ff8e6dc3f199a47e5b5f099ee75b9/docs/epitaph/2026-09-11-0153-trusted-gates.md)：跨输入版本保留可信测试并集、冲突暂停、缓存失效规则；当时integration196/Console30通过。此后jsmn当前引擎31/31已验，旧TinyXML2仍待最终重验。原始门禁和历史证据保留，不以候选替换旧可信预期。
 
 - [2026-09-11-0233-persistent-pipeline.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/7c81fd0cdf99ef2012a87d1c05b40a0b0156b042/docs/epitaph/2026-09-11-0233-persistent-pipeline.md)：首版持久化一键流程、崩溃交接恢复及 jsmn 真实 31/31；后续契约已升级，旧流程只读。
+
+- [2026-09-11-0235-material-snapshots.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/a46a2d7b7bf30edd53d588034f8c077fb7569b52/docs/epitaph/2026-09-11-0235-material-snapshots.md)：显式本地/HTTPS外部材料快照、来源修订及CAS原文绑定；后续关联和修订诊断继续复用。
