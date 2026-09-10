@@ -50,10 +50,11 @@ Available 是已接线路由；Planned 路由不作为当前能力。Available /
 | `POST /api/v1/generations` | Available | snapshotId及可选scopes（以moduleId为键，entryPath/astFilter/symbols）；冻结模型配置，启动或复用C/C++ GENERATE任务，返回task。已有卡片可立即读取；任务状态、取消和同输入恢复共用stage-tasks。 |
 | `POST /api/v1/reconstructions` | Available | snapshotId、versionIds；冻结模型与实际工具链身份，启动或复用FLYWHEEL中的代码重建及接口比较。返回阶段任务，行为评测与知识修订仍未接线，结果不具有发布资格。 |
 | `GET /api/v1/stage-tasks/:taskId/artifacts/:sha256` | Available | 仅下载该任务结果或成功检查点直接引用的工件；无关系的CAS摘要返回404。沿用免登录或令牌访问规则，不提供任意CAS读取。 |
+| `POST /api/v1/native-evaluations` | Available | reconstructionTaskId；绑定成功重建的结果摘要、配置、工具链与卡片版本，启动或复用EVALUATE。候选参考失败以TEST_CANDIDATE_REJECTED结束，可同输入恢复生成新候选；行为失败保存报告，不授予发布资格。 |
 | `POST /api/v1/index-builds` | Available | 可选 versionIds，必须是当前版本；冻结输入后创建或复用 INDEX 任务。200 表示 reusedTask，202 表示已接受；restored 为恢复文件数。 |
 | `GET /api/v1/knowledge-index?q=` | Available | 摘要命中、原因、正文入口及 stale/missing 数量；不加载正文。 |
 | `GET /api/v1/knowledge-index/:cardId` | Available | YAML 预览、工件引用及 stale 标记。 |
-| `GET /api/v1/stage-tasks` | Available | projectId 筛选与分页；当前 GENERATE、INDEX 及FLYWHEEL重建部分接通公开启动。 |
+| `GET /api/v1/stage-tasks` | Available | projectId 筛选与分页；当前 GENERATE、INDEX、FLYWHEEL重建部分及EVALUATE行为部分接通公开启动。 |
 | `GET /api/v1/stage-tasks/:taskId` | Available | 冻结输入、状态、累计用量、检查点与审计事件。 |
 | `POST /api/v1/stage-tasks/:taskId/resume` | Available | inputDigest 必须匹配；旧契约/输入变化/预算耗尽返回409。 |
 | `POST /api/v1/stage-tasks/:taskId/cancel` | Available | 幂等请求取消；运行中清理完成前不释放槽位。 |

@@ -50,6 +50,7 @@ const assets = new Map([
   ['/RepositoryAnalysis.js', 'RepositoryAnalysis.js'],
   ['/KnowledgeGeneration.js', 'KnowledgeGeneration.js'],
   ['/KnowledgeReconstruction.js', 'KnowledgeReconstruction.js'],
+  ['/KnowledgeEvaluation.js', 'KnowledgeEvaluation.js'],
   ['/Styles.css', 'Styles.css'],
 ]);
 
@@ -269,7 +270,7 @@ function requireOnlyKeys(payload: Record<string, unknown>, allowed: readonly str
 export function mapHttpError(error: unknown, id = 'req_unknown'): { status: number; body: ApiErrorBody } {
   const message = error instanceof Error ? error.message : String(error);
   const code = message.split(':', 1)[0] || 'INTERNAL_ERROR';
-  if (['STAGE_CONTRACT_INCOMPATIBLE', 'STAGE_INPUT_CHANGED', 'STAGE_NOT_RESUMABLE', 'STAGE_BUDGET_EXHAUSTED', 'INDEX_VERSION_NOT_CURRENT'].includes(code)) return { status: 409, body: errorBody(code, message, id) };
+  if (['STAGE_CONTRACT_INCOMPATIBLE', 'STAGE_INPUT_CHANGED', 'STAGE_NOT_RESUMABLE', 'STAGE_BUDGET_EXHAUSTED', 'INDEX_VERSION_NOT_CURRENT', 'EVALUATION_RECONSTRUCTION_REQUIRED'].includes(code)) return { status: 409, body: errorBody(code, message, id) };
   if (['STAGE_OWNER_UNAVAILABLE', 'STAGE_SHUTDOWN'].includes(code)) return { status: 503, body: errorBody(code, message, id) };
   if (code.startsWith('REPOSITORY_')) return { status: 422, body: errorBody(code, code, id) };
   if (code.startsWith('PROJECT_')) return { status: 422, body: errorBody(code, code, id) };
@@ -359,7 +360,7 @@ export function createKnowledgeServer(input: {
       }
       // 目录、配置和写入仅允许直接本机访问，或携带远程访问令牌。
       const localClient = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(request.socket.remoteAddress ?? '');
-      const workbenchRoute = /^\/api\/v1\/(stage-tasks|index-builds|knowledge-index|repository-analyses|projects|generations|reconstructions)(\/|$)/.test(url.pathname);
+      const workbenchRoute = /^\/api\/v1\/(stage-tasks|index-builds|knowledge-index|repository-analyses|projects|generations|reconstructions|native-evaluations)(\/|$)/.test(url.pathname);
       const productRoute = url.pathname.startsWith('/api/v1/publications')
         || url.pathname === '/api/v1/server-directories' || url.pathname === '/api/v1/runs/markdown-lite';
       if (url.pathname.startsWith('/api/') && (!localClient || productRoute || workbenchRoute) && !authorized(request, writeToken, anonymousAccess)) {
@@ -368,6 +369,12 @@ export function createKnowledgeServer(input: {
         return;
       }
       if (workbenchRoute) {
+        if (request.method === 'POST' && url.pathname === '/api/v1/native-evaluations') {
+          const payload = await body(request); requireOnlyKeys(payload, ['reconstructionTaskId']);
+          if (typeof payload.reconstructionTaskId !== 'string') throw new Error('PAYLOAD_INVALID');
+          const task = await composition.apps.workbenchEvaluation.start(payload.reconstructionTaskId);
+          send(response, task.status === 'SUCCEEDED' ? 200 : 202, { task }); return;
+        }
         if (request.method === 'POST' && url.pathname === '/api/v1/reconstructions') {
           const payload = await body(request); requireOnlyKeys(payload, ['snapshotId', 'versionIds']);
           if (typeof payload.snapshotId !== 'string' || !Array.isArray(payload.versionIds) || payload.versionIds.some((id) => typeof id !== 'string')) throw new Error('PAYLOAD_INVALID');

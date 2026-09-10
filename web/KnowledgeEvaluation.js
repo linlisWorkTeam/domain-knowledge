@@ -1,0 +1,98 @@
+/**
+ * Copyright (c) 2026 linlisWorkTeam
+ * SPDX-License-Identifier: MIT
+ * 文件功能：显示参考验证、可信用例评测和失败章节，保留取消/恢复及下载入口。
+ */
+export function createKnowledgeEvaluationPanel({ root, request, escapeHtml: escape, isEditable, selection }) {
+  let task = null, checkpoints = [], events = [], busy = false, notice = '', timer = null, initialized = false, epoch = 0
+  const reportCache = new Map()
+  const host = () => root.querySelector('[data-native-evaluation-panel]')
+  const active = () => task && ['PENDING', 'RUNNING'].includes(task.status)
+  const labels = { PENDING: '排队中', RUNNING: '评测中', SUCCEEDED: '评测执行完成', FAILED: '执行失败', PAUSED: '已暂停', CANCELLED: '已取消' }
+  const reasons = {
+    TEST_CANDIDATE_REJECTED: '候选用例未通过参考实现，不能用于评测生成代码，也不能据此判定知识错误。可重新生成候选，累计用量保留。',
+    NATIVE_REFERENCE_BASELINE_FAILED: '参考实现基础构建或启动失败，请下载报告并检查构建参数和依赖。候选测试尚未生成。',
+    NATIVE_TEST_TOOLCHAIN_CHANGED: '工具链已变化，请按当前环境重新重建代码，再启动评测。',
+    PROVIDER_QUOTA_EXHAUSTED: '供应商额度不足，补充额度后可恢复。已完成用例保留。',
+    STAGE_PROCESS_EXITED: '上次进程已退出，已完成用例保留，可恢复原任务。',
+    WORKBENCH_RESOURCE_INSUFFICIENT: '内存或磁盘不足，释放资源后可恢复原任务。',
+  }
+  const download = (ref, text) => ref ? `<button class="secondary-button" type="button" data-download-artifact="/api/v1/stage-tasks/${escape(task.taskId)}/artifacts/${escape(ref.sha256)}">${text}</button>` : ''
+  const value = (item) => typeof item === 'object' ? JSON.stringify(item) : String(item ?? '未取得')
+  function caseHtml(item) {
+    const input = item.input ?? {}, actual = item.actual ?? item.observation?.actual
+    const expected = item.expected ?? input.expected ?? {}
+    return `<details><summary>${escape(input.caseId ?? item.caseId)} · ${escape(input.description ?? '')} · ${escape(item.status ?? item.observation?.status ?? '候选')}</summary>
+      <p>输入调用：${(input.calls ?? []).map((call) => `<code>${escape(call.function)}(${escape(call.arguments.map((arg) => value(arg.integer ?? arg.number ?? arg.boolean ?? arg.string ?? arg)).join(', '))})</code>`).join('；')}</p>
+      <table><thead><tr><th>观察项</th><th>预期</th><th>实际</th></tr></thead><tbody>${Object.entries(expected).map(([name, result]) => `<tr><td>${escape(name)}</td><td>${escape(value(result))}</td><td>${escape(value(actual?.[name]))}</td></tr>`).join('')}</tbody></table>
+      <p>${escape(item.reasonCode ?? item.observation?.reasonCode ?? '')}</p>
+      ${(item.sectionBindings ?? []).map((binding) => `<button class="text-button" type="button" data-version-id="${escape(binding.versionId)}">${escape(binding.sectionId)}${binding.matchesInput ? '' : '（历史章节）'}</button>`).join(' ')}
+      <details><summary>完整用例输入</summary><pre>${escape(JSON.stringify(input, null, 2))}</pre></details></details>`
+  }
+  function render() {
+    const panel = host(); if (!panel) return
+    const parent = selection(); if (!parent && !task) { panel.innerHTML = ''; return }
+    const rejected = checkpoints.filter((item) => item.key.startsWith('candidate-rejection:')).at(-1)?.result
+    const summaries = task?.result?.summary?.modules ?? [...checkpoints.filter((item) => item.key.startsWith('module-report:')).map((item) => item.result.summary), ...(task?.reasonCode === 'TEST_CANDIDATE_REJECTED' && rejected ? [rejected.summary] : [])]
+    const modules = summaries.map((module) => module.status === 'CANDIDATE_REJECTED' ? { ...module, ...(reportCache.get(module.reportRef?.sha256) ?? {}) } : { ...module, report: reportCache.get(module.reportRef?.sha256) })
+    const resume = task && ['FAILED', 'PAUSED', 'CANCELLED'].includes(task.status) && task.contractVersion === 'knowledge-workbench-v1'
+      && Object.entries(task.limits ?? {}).every(([key, limit]) => task.usage[key] < limit)
+    const progress = [...events].reverse().find((event) => event.kind === 'PROGRESS' && event.detail?.caseId)?.detail
+    panel.innerHTML = `<h3>知识评测</h3><p>候选先在参考实现验证，可信用例再检查重建代码。自动知识修订与发布门禁尚未接通。</p>
+      ${parent ? `<button class="primary-button" type="button" data-native-evaluation-action="start" ${busy || active() || !isEditable() ? 'disabled' : ''}>执行评测</button>` : ''}<p role="status">${escape(notice)}</p>
+      ${task ? `<p><b>${escape(task.cancelRequested && active() ? '正在取消' : labels[task.status] ?? '未知')}</b> · 尚未通过发布门禁</p><p>任务 ${escape(task.taskId)} · 累计模型调用 ${escape(task.usage.modelCalls)} 次</p>
+      ${progress && active() ? `<p>当前用例：${escape(progress.caseId)} · ${escape(progress.completed)}/${escape(progress.total)}</p>` : ''}
+      ${task.result?.summary ? `<p>已处理 ${escape(task.result.summary.completedModules)}/${escape(task.result.summary.requestedModules)} 个模块。</p>` : ''}
+      ${task.reasonCode ? `<p>${escape(reasons[task.reasonCode] ?? task.reasonCode)}</p>` : ''}
+      ${modules.map((module) => `<section><h4>${escape(module.moduleId)} · ${escape({ BEHAVIOR_PASSED: '可信用例全部通过', BEHAVIOR_FAILED: '可信用例存在失败', CANDIDATE_REJECTED: '候选未通过参考验证' }[module.status] ?? module.status)}</h4>
+      <p>新增 ${escape(module.proposed ?? 0)} 个候选；复用 ${escape(module.reused ?? 0)} 个用例${module.revalidated ? '，已重新验证参考实现' : ''}。</p>
+      ${module.report ? `<p>通过 ${escape(module.report.passed)}/${escape(module.report.total)}${module.interfaceCompatible === false ? '；公开接口存在差异' : ''}</p>` : ''}
+      ${download(module.reportRef, '下载评测报告')}${download(module.oracleRef, '下载参考验证')}
+      ${(module.report?.cases ?? module.cases ?? []).map(caseHtml).join('')}</section>`).join('')}
+      ${task.reasonCode === 'NATIVE_REFERENCE_BASELINE_FAILED' ? checkpoints.filter((item) => item.key.startsWith('reference-baseline:')).map((item) => download(item.result.artifactRefs[0], '下载参考构建报告')).join('') : ''}
+      ${active() ? `<button class="secondary-button" type="button" data-native-evaluation-action="cancel" ${busy || task.cancelRequested || !isEditable() ? 'disabled' : ''}>取消评测</button>` : ''}
+      ${resume ? `<button class="secondary-button" type="button" data-native-evaluation-action="resume" ${busy || !isEditable() ? 'disabled' : ''}>${task.reasonCode === 'TEST_CANDIDATE_REJECTED' ? '重新生成候选测试' : '恢复评测'}</button>` : ''}` : ''}`
+  }
+  async function observe() {
+    clearTimeout(timer); timer = null; if (!task || !host()) return
+    const id = task.taskId, current = epoch
+    try {
+      const detail = await request(`/api/v1/stage-tasks/${encodeURIComponent(id)}`)
+      if (current !== epoch || task?.taskId !== id) return
+      task = detail.task; checkpoints = detail.checkpoints ?? []; events = detail.events ?? []; notice = ''; render()
+      const summaries = task.result?.summary?.modules ?? checkpoints.filter((item) => item.key.startsWith('module-report:') || item.key.startsWith('candidate-rejection:')).map((item) => item.result.summary)
+      await Promise.all(summaries.map(async (module) => {
+        const ref = module.reportRef
+        if (!ref || reportCache.has(ref.sha256)) return
+        try { reportCache.set(ref.sha256, await request(`/api/v1/stage-tasks/${encodeURIComponent(id)}/artifacts/${ref.sha256}`)) }
+        catch { notice = '部分报告暂不可读，可通过下载重试；执行结果保留。' }
+      }))
+      if (current === epoch && task?.taskId === id) render()
+    } catch { if (current === epoch) { notice = '状态暂不可读，已完成用例仍保留。'; render() } }
+    if (active() && host()) timer = setTimeout(observe, 800)
+  }
+  root.addEventListener('click', async (event) => {
+    const action = event.target.closest('[data-native-evaluation-action]')?.dataset.nativeEvaluationAction
+    if (!action || busy || !isEditable()) return
+    const parent = selection(); if (action === 'start' && (!parent || active())) return
+    const current = ++epoch; busy = true; notice = ''; render()
+    try {
+      const path = action === 'start' ? '/api/v1/native-evaluations' : `/api/v1/stage-tasks/${encodeURIComponent(task.taskId)}/${action}`
+      const payload = action === 'start' ? { reconstructionTaskId: parent } : action === 'resume' ? { inputDigest: task.inputDigest } : {}
+      const result = await request(path, { method: 'POST', body: JSON.stringify(payload) })
+      if (current !== epoch) return
+      task = result.task; checkpoints = []; events = []; await observe()
+    } catch (error) { if (current === epoch) notice = reasons[error.code] ?? `评测操作未完成：${error.code ?? '连接失败'}` }
+    finally { if (current === epoch) { busy = false; render() } }
+  })
+  return { render, refresh() {
+    render(); if (!host() || !isEditable()) return
+    if (!initialized) {
+      initialized = true; const current = epoch
+      request('/api/v1/stage-tasks').then((result) => {
+        if (current !== epoch) return
+        task = result.items.find((item) => item.input.stage === 'EVALUATE') ?? null; return observe()
+      }).catch(() => { initialized = false })
+    } else if (active() && !timer) queueMicrotask(observe)
+  } }
+}

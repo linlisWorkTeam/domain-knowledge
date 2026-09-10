@@ -11,6 +11,7 @@ import { SqliteNativeTests } from '../../infrastructure/sqlite/SqliteNativeTests
 import { WorkbenchProjects } from '../../application/services/WorkbenchProjects.ts';
 import { WorkbenchGeneration } from '../../application/services/WorkbenchGeneration.ts';
 import { NativeToolchain } from '../../infrastructure/evaluation/project/NativeToolchain.ts';
+import { WorkbenchEvaluation } from '../../application/services/WorkbenchEvaluation.ts';
 import { WorkbenchReconstruction } from '../../application/services/WorkbenchReconstruction.ts';
 import { WorkbenchRoleExecution } from '../../application/services/WorkbenchRoleExecution.ts';
 import { materialModelExecution } from '../../infrastructure/agentAdapters/MaterialModelExecution.ts';
@@ -178,8 +179,9 @@ export function createComposition(input: {
   const knowledgeIndex = new KnowledgeIndexService(repository, artifacts, indexStore);
   let workbenchGeneration!: WorkbenchGeneration;
   let workbenchReconstruction!: WorkbenchReconstruction;
+  let workbenchEvaluation!: WorkbenchEvaluation;
   const workbenchStages = new WorkbenchStages(stageStore, { INDEX: (context) => knowledgeIndex.build(context), GENERATE: (context) => workbenchGeneration.generate(context),
-    FLYWHEEL: (context) => workbenchReconstruction.reconstruct(context) });
+    FLYWHEEL: (context) => workbenchReconstruction.reconstruct(context), EVALUATE: (context) => workbenchEvaluation.evaluate(context) });
   const scanner = new SourceScanner(repositoryRoot, repository);
   const knowledgeDiscoveryApp = new KnowledgeDiscoveryApp(scanner, undefined, {
     migrate: (legacyKnowledgeRoot) => migrateLegacyOkf({
@@ -398,6 +400,8 @@ export function createComposition(input: {
   workbenchReconstruction = new WorkbenchReconstruction({ projects: projectStore, repository, artifacts, native: new NativeToolchain(),
     snapshot: nativeFingerprint, configuration: runConfiguration, stages: workbenchStages,
     roles: new WorkbenchRoleExecution({ artifacts, contracts: new JsonSchemaAgentContractValidator(schemaRoot), model: workbenchGeneration.dependencies.model }) });
+  workbenchEvaluation = new WorkbenchEvaluation({ projects: projectStore, repository, artifacts, native: new NativeToolchain(),
+    configuration: runConfiguration, stages: workbenchStages, roles: workbenchReconstruction.dependencies.roles, evaluation: nativeEvaluation });
   const projectStages = () => {
       const auditDirectory = join(runtimeDir, 'demo');
       const auditPath = join(auditDirectory, 'agent-runs.jsonl');
@@ -554,6 +558,7 @@ export function createComposition(input: {
       workbenchGeneration,
       nativeEvaluation,
       workbenchReconstruction,
+      workbenchEvaluation,
       markdownLite: {
         start: async (directory: string, budgetMode?: 'provider-quota') => {
           // 固定模块入口只接受服务器目录；源码与模型设置在服务端验证。

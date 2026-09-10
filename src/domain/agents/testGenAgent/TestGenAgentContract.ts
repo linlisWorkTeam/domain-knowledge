@@ -70,7 +70,13 @@ export function validateOutput(output: Output, input: Input): void {
   const native = nativeContract(input);
   if (native) {
     if (output.oracleRequired !== true || output.suite || output.candidateCommands) throw new Error('TEST_ORACLE_REQUIRED');
-    assertNativeBehaviorSuite(output.nativeSuite, native); return;
+    assertNativeBehaviorSuite(output.nativeSuite, native);
+    const policy = input.materials.find(({ ref }) => ref.artifactId === input.payload.testPolicyRef.artifactId)?.content;
+    if (policy && typeof policy === 'object' && 'knowledge' in policy && Array.isArray(policy.knowledge)) {
+      const sections = new Set(policy.knowledge.flatMap((card: { sections?: string[] }) => card.sections ?? []));
+      if (output.nativeSuite.cases.some((test) => test.sections.some((section) => !sections.has(section)))) throw new Error('TEST_SECTION_INVALID');
+    }
+    return;
   }
   if (output.nativeSuite) throw new Error('TEST_NATIVE_CONTRACT_REQUIRED');
   if (output.suite) {

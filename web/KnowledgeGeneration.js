@@ -34,7 +34,7 @@ export function createKnowledgeGenerationPanel({ root, request, escapeHtml: esca
     const progress = [...events].reverse().find((event) => event.kind === 'PROGRESS' && ['card', 'interfaces'].includes(event.detail?.phase))?.detail
     const resume = ['FAILED', 'PAUSED', 'CANCELLED'].includes(task.status) && task.contractVersion === 'knowledge-workbench-v1'
       && Object.entries(task.limits ?? {}).every(([key, limit]) => task.usage[key] < limit)
-    return `<p><b>${escape(task.cancelRequested && active() ? '正在取消' : labels[task.status] ?? '未知')}</b> · 已生成 ${escape(cards.length)} 张 · 尚未行为评测</p>
+    return `<p><b>${escape(task.cancelRequested && active() ? '正在取消' : labels[task.status] ?? '未知')}</b> · 已生成 ${escape(cards.length)} 张 · 评测结果见后续阶段</p>
       ${active() && progress ? `<p>当前：${escape(progress.symbol ?? progress.module)}</p>` : ''}
       <ul>${cards.map((card) => `<li><button class="text-button" data-version-id="${escape(card.versionId)}" type="button">${escape(card.title)}</button> · ${escape(card.quality)}</li>`).join('')}</ul>
       ${task.reasonCode ? `<p>${escape(reasons[task.reasonCode] ?? task.reasonCode)}</p>` : ''}
