@@ -164,3 +164,5 @@ Track four stages here: DDD layout, individual Agent development, end-to-end ver
 
 - 功能 1：DocWorker 的 IO-09 结构契约、覆盖与证据路径校验、JSON 片段和未解决问题传递已实现。DocGen 保留子任务风险；更新执行版本以阻止旧 checkpoint 混用。
 - 验证：Node 24.13.0，typecheck、validate:specs 通过；DocGen/DocWorker 角色与组合测试 21 项通过。路径和结构验证不等于真实源码语义验收；未运行真实模型。
+
+- 功能 2：DocGen 必需关键词契约、框架 YAML 头、生产候选同文档入库与版本描述索引已实现；KnowledgeSearchApp 提供显式授权的描述/正文两阶段读取。Node 24 下 typecheck、validate:specs 通过，角色、DSH 受控传输、组合、索引及飞轮 Fixture 回归共 21 项通过；不代表真实供应商业务质量验收。

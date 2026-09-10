@@ -44,6 +44,22 @@ export class KnowledgeQueryService {
     this.repository = repository;
   }
 
+  /** 索引层只返回调用方已授权版本的描述，不读取正文工件。 */
+  describe(allowedVersionIds: readonly string[]): Record<string, unknown>[] {
+    return [...new Set(allowedVersionIds)].flatMap((id) => {
+      const version = this.repository.getKnowledgeVersion(id);
+      return version ? [{ versionId: version.versionId, moduleId: version.moduleId,
+        title: version.title, description: version.description, keywords: version.tags,
+        status: version.status, bodyRef: version.bodyRef }] : [];
+    });
+  }
+
+  /** 第二阶段仅加载本次明确授权的一份文档，索引不扩大材料权限。 */
+  async loadDocument(versionId: string, allowedVersionIds: readonly string[]): Promise<Record<string, unknown> | null> {
+    if (!allowedVersionIds.includes(versionId)) throw new Error('KNOWLEDGE_DOCUMENT_DENIED');
+    return this.get(versionId);
+  }
+
   /** 读取请求。 */
   async get(versionId: string): Promise<Record<string, unknown> | null> {
     const version = this.repository.getKnowledgeVersion(versionId);

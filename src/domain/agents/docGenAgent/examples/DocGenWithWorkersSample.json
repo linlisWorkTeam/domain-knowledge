@@ -52,7 +52,11 @@
   "modelOutput": {
     "body": "# Markdown diff\n\n## Purpose\nCompare two Markdown documents and report changed sections with line ranges.\n\n## Behavior\nIdentical inputs return empty hunks. CRLF is normalized before comparison. Insertions and deletions preserve the old and new line coordinates. The implementation uses bounded processing for large inputs.\n",
     "title": "Markdown diff",
-    "description": "Document comparison semantics"
+    "description": "Document comparison semantics",
+    "keywords": [
+      "Markdown",
+      "diff"
+    ]
   },
   "workerModelOutputs": {
     "worker-1": {

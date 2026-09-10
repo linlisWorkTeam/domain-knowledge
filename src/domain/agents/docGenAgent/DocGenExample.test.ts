@@ -56,7 +56,7 @@ test('DocGen example uses the shared production DSH stages, freezes prompts and 
     for await (const chunk of request) chunks.push(Buffer.from(chunk));
     const payload = Buffer.concat(chunks).toString('utf8');
     prompts.push(payload);
-    const text = JSON.stringify({ title: '受控 DocGen', description: '机制验证', body: body() });
+    const text = JSON.stringify({ title: '受控 DocGen', description: '机制验证', keywords: ['Markdown'], body: body() });
     response.writeHead(200, { 'content-type': 'text/event-stream' });
     response.write(`data: ${JSON.stringify({ id: 'example', object: 'chat.completion.chunk', created: 1, model: 'controlled', choices: [{ index: 0, delta: { role: 'assistant', content: text }, finish_reason: null }] })}\n\n`);
     response.write(`data: ${JSON.stringify({ id: 'example', object: 'chat.completion.chunk', created: 1, model: 'controlled', choices: [{ index: 0, delta: {}, finish_reason: 'stop' }], usage: { prompt_tokens: 73, completion_tokens: 31 } })}\n\n`);
@@ -89,7 +89,8 @@ test('DocGen example uses the shared production DSH stages, freezes prompts and 
     assert.match(await composition.runConfiguration.resolvePrompt(first.runId, 'doc-gen'), /original-example-instruction/);
     const bodyRef = first.result.payload['bodyRef'] as ArtifactRef;
     const document = first.outputs.find(({ ref }) => ref.artifactId === bodyRef.artifactId)?.content;
-    assert.equal(document, body());
+    assert.ok(document!.endsWith(body()));
+    assert.match(document!, /^---\ntitle:/);
     const command = JSON.parse(Buffer.from(await composition.artifacts.get(first.result.commandRef)).toString('utf8'));
     const sourceBytes = await composition.artifacts.get(command.payload.sourceRefs[0]);
     assert.equal(sha256(sourceBytes), DOCGEN_SOURCE_SHA256);

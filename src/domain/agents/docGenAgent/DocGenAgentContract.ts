@@ -39,13 +39,14 @@ export interface DocWorkerExecutionPort {
 /** 只有 DocGen 使用内部 Worker 执行能力。 */
 export interface DocGenContext extends ExecutionContext { docWorkers?: DocWorkerExecutionPort }
 /** 角色输出。 */
-export interface Output { body: string; title: string; description: string; }
+export interface Output { body: string; title: string; description: string; keywords: string[]; }
 /** 对外提供输出Schema，作为调用方使用的统一约定。 */
 export const outputSchema: Record<string, unknown> = {
-  type: 'object', required: ['body', 'title', 'description'], additionalProperties: false,
+  type: 'object', required: ['body', 'title', 'description', 'keywords'], additionalProperties: false,
   properties: {
-    body: { type: 'string', minLength: 200 }, title: { type: 'string', minLength: 1 },
-    description: { type: 'string', minLength: 1 },
+    body: { type: 'string', minLength: 200 }, title: { type: 'string', pattern: '\\S' },
+    description: { type: 'string', pattern: '\\S' },
+    keywords: { type: 'array', minItems: 1, uniqueItems: true, items: { type: 'string', pattern: '\\S' } },
   },
 };
 

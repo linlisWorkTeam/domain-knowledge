@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：加载工作流上下文与历史工件，协调角色执行、独立评测和发布。
  */
+import { renderKnowledgeDocument } from '../../domain/knowledge/KnowledgeDocument.ts';
 import type { Output as DocumentOutput } from '../../domain/agents/docGenAgent/DocGenAgentContract.ts';
 import type { Output as CodeOutput } from '../../domain/agents/codeAgent/CodeAgentContract.ts';
 import type { Output as CheckOutput } from '../../domain/agents/checkAgent/CheckAgentContract.ts';
@@ -266,11 +267,11 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
     }, async () => {
       const candidate = await this.flywheel.ingestCandidate({
         moduleId: scenario.moduleId,
-        body: document.body,
+        body: renderKnowledgeDocument(document),
         title: document.title,
         description: document.description,
         category: 'automated-project',
-        tags: ['langgraph'],
+        tags: document.keywords,
         provenance: scenario.sourcePaths.map((path) => ({
           path,
           commit: (input.context.snapshot as ProjectSnapshot).commit,

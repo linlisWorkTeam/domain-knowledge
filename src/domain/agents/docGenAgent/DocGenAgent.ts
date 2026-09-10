@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：实现文档生成角色的业务步骤与结构化结果转换。
  */
+import { renderKnowledgeDocument } from '../../knowledge/KnowledgeDocument.ts';
 import type { RoleResult, PendingArtifact } from '../AgentExecution.ts';
 import { assertActive, pending } from '../AgentExecution.ts';
 import { type Input, type Output, type DocGenContext, type DocWorkerTask, schemaFor, validateInput } from './DocGenAgentContract.ts';
@@ -46,7 +47,7 @@ export async function execute(input: Input, context: DocGenContext): Promise<Rol
   const document = output;
   // 这里只声明正文工件；实际 CAS 引用由 Application 保存后回填。
   const bodyRef = pending('body');
-  artifacts.push({ key: 'body', content: document.body, mediaType: 'text/markdown' });
+  artifacts.push({ key: 'body', content: renderKnowledgeDocument(document), mediaType: 'text/markdown' });
   const payload = {
     resultKind: 'knowledgeCandidate',
     bodyRef,

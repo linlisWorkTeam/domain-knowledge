@@ -121,7 +121,9 @@ test('generated result matches contract', () => assert.equal(calculate(), expect
     assert.equal(published.length, 1);
     assert.equal(published[0]?.moduleId, moduleId);
     assert.equal(published[0]?.category, 'automated-project');
-    assert.deepEqual(published[0]?.tags, ['langgraph']);
+    assert.deepEqual(published[0]?.tags, [moduleId]);
+    const storedBody = Buffer.from(await composition.artifacts.get(published[0]!.bodyRef)).toString('utf8');
+    assert.match(storedBody, /^---\ntitle:/);
     const projections = composition.repository.listWorkflowNodeProjections(handle.runId);
     assert.deepEqual([...new Set(projections.map((projection) => projection.agentId).filter(Boolean))].sort(), [
       'check', 'code', 'doc-gen', 'doc-worker', 'orchestrator', 'review', 'test-gen',

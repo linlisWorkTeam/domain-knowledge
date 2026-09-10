@@ -43,11 +43,11 @@ IO-10 的内部汇总算法继续保持暂定；“内容过大”的判断标�
 
 | 编号 | 议题 | 状态 | 记录 |
 | --- | --- | --- | --- |
-| IO-22 | 文档描述与索引生成职责 | 已确认（待实现） | 用户确认 DocGen 生成文档标题、摘要和关键词，框架负责写入 YAML 头并建立支持渐进式加载的索引，不新增 Agent。 |
+| IO-22 | 文档描述与索引生成职责 | 本轮实现，真实模型待验收 | 用户确认 DocGen 生成文档标题、摘要和关键词，框架负责写入 YAML 头并建立支持渐进式加载的索引，不新增 Agent。 |
 
 DocGen 在生成或修订单份知识文档时提供与正文一致的标题、摘要和关键词。框架校验这些描述，写入 YAML 头并更新索引；序列化、工件保存及索引维护不交给模型自行操作。渐进式加载先读取索引中的描述，再按任务需要加载对应正文，继续遵守角色既有的材料授权范围；索引不扩大 CodeAgent 可读取的文档范围。
 
-当前输出已有 body、title、description，关键词输出及完整的 YAML 写入、索引更新和渐进加载链路仍待实现。具体字段、索引格式、更新与读取接口由实现细化，不把标题和摘要字段已经存在当作索引能力已验收。框架侧知识管理规则见 [Knowledge](../../knowledge/Knowledge.md)。
+当前输出为 body、title、description、keywords；框架生成 YAML 头，生产入库将关键词写入版本 tags，渐进读取接口见本轮实现约定。具体字段、索引格式、更新与读取接口由实现细化，不把标题和摘要字段已经存在当作索引能力已验收。框架侧知识管理规则见 [Knowledge](../../knowledge/Knowledge.md)。
 
 ## 职责与当前输入输出
 
@@ -58,7 +58,7 @@ DocGen 在生成或修订单份知识文档时提供与正文一致的标题、�
 | 输入 | 模块标识 `moduleId`、源码 `sourceRefs`、公开接口 `publicInterfaceRefs` |
 | 内部执行参数 | `workerCount` 默认 1，允许 0～5；通过 DocGenContext.docWorkers 执行内部批次，非法数量在调用模型前失败 |
 | 可选修订材料 | Worker 片段 `workerFragmentRefs`、上一版 `baseKnowledgeRef`、纠正意见 `corrections`、质量反馈 `qualityFeedback` |
-| 模型输出 | `body`、`title`、`description`；正文至少 200 字符，标题与描述非空 |
+| 模型输出 | `body`、`title`、`description`、`keywords`；正文至少 200 字符，描述与关键词禁止纯空白 |
 | 交接输出 | `resultKind: knowledgeCandidate`，Markdown 正文工件 `bodyRef`、来源 `provenance`、变更路径、内部子任务 `workerResultRefs` 与未解决风险 |
 | 权限与限制 | 修订所需旧正文和纠正材料必须由 Application 显式提供；角色声明待保存工件，Application 保存并回填引用，角色不直接发布 |
 
@@ -79,3 +79,9 @@ Worker 的提交键绑定 Run、内部任务身份、源码输入和冻结提示
 固定源码样例为 [DocGenFixedSourceSample.json](../../../../../src/domain/agents/docGenAgent/examples/DocGenFixedSourceSample.json)，包含原始源码、公开接口和追加指令；[样例检查器](../../../../../src/domain/agents/docGenAgent/examples/DocGenReference.ts) 与 [样例测试](../../../../../src/domain/agents/docGenAgent/DocGenExample.test.ts) 由本角色目录维护。统一 agent:run 负责执行和提交，固定参考测试不作为生产角色阶段；操作方法见 [AgentDevelopment](../../../../AgentDevelopment.md)。
 
 开发步骤与证据统一记录在 [Status](../../../../Status.md)，独立运行方法见 [AgentDevelopment](../../../../AgentDevelopment.md)。
+
+## 本轮实现约定（2026-09-10）
+
+IO-22 输出增加必需 `keywords: string[]`（非空、不重复、元素去除首尾空白）；title、description 禁止纯空白。模型只生成正文和描述，框架使用 YAML 序列化器写入单份 Markdown 工件，拒绝模型自行提供 YAML 头，防止出现双重元数据。原始输出保留审计，知识候选保存同一份带 YAML 的文档，关键词写入版本 tags，标题及摘要写入既有版本索引。
+
+渐进式读取通过 KnowledgeSearchApp 的 `describe(allowedVersionIds)` 只读取授权版本描述及 bodyRef，`loadDocument(versionId, allowedVersionIds)` 才读取该份正文；每次调用显式携带授权版本列表，未授权请求在读取工件前失败。不改变既有全文检索，不新增 SearchAgent，也不把索引当作发布门禁。

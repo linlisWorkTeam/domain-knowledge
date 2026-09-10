@@ -63,7 +63,7 @@ export class FixtureProjectWorkflowStages {
     if (agentId === 'doc-gen') {
       output = {
         body: this.asset(input.iteration === 0 ? assets.knowledgeV1 : assets.knowledgeV2),
-        title: assets.title, description: assets.description,
+        title: assets.title, description: assets.description, keywords: [scenario.moduleId],
       };
     } else if (agentId === 'code') {
       output = { files: [{

@@ -52,3 +52,7 @@ Review 提炼问题及有价值的历史尝试，例如某轮修复问题 A 却�
 
 
 文档关系：[设计目录](../../README.md)负责代码与设计定位；[开发指南](../../../Development.md)说明修改和交付步骤。
+
+### IO-22 本轮接线（2026-09-10）
+
+DocGen 输出描述经 Domain 的 KnowledgeDocument 校验并使用 YAML 序列化为一份文档；Application 保存同一正文，标题、摘要及关键词分别写入既有 KnowledgeVersion 的 title、description、tags。每次版本入库更新版本索引，不新增数据库或 Agent。KnowledgeSearchApp 继承 QueryService 的 describe / loadDocument：前者只查调用方明确授权的版本描述，后者在相同授权列表内按需取正文。授权列表由调用方的既有角色材料规则决定；未授权版本在正文读取前拒绝。原有全文搜索接口行为不变。

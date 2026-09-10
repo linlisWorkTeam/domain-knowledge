@@ -44,7 +44,8 @@ test('doc-gen: revision includes previous body, worker fragments and correction 
   assert.match(sample.requests[0]!.prompt, /baseKnowledgeRef|workerFragmentRefs/);
   assert.match(sample.requests[0]!.prompt, /CRLF normalization mismatch/);
   assert.match(sample.requests[0]!.prompt, /COR-0001/);
-  assert.equal(result.artifacts[0]!.content, sample.output.body);
+  assert.ok(result.artifacts[0]!.content.endsWith(sample.output.body));
+  assert.match(result.artifacts[0]!.content, /^---\ntitle:/);
   assert.deepEqual(result.payload.bodyRef, { pendingArtifact: 'body' });
 });
 
