@@ -160,6 +160,12 @@
       "metadataLocation": "file-header"
     },
     {
+      "path": "docs/reports/AgentSpecRepairAndE2E.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "记录 Spec 缺口修复和保留产物的端到端报告。",
+      "metadataLocation": "file-header"
+    },
+    {
       "path": "docs/specs/README.md",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "设计规范目录。",
@@ -946,6 +952,12 @@
       "metadataLocation": "catalog"
     },
     {
+      "path": "src/domain/agents/testGenAgent/TestExecutionPlan.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "将生成测试清单绑定到受信原生编译与运行。",
+      "metadataLocation": "file-header"
+    },
+    {
       "path": "src/domain/agents/testGenAgent/TestGenAgent.test.ts",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "验证测试生成角色的行为、约束及失败场景。",
@@ -1240,6 +1252,12 @@
       "metadataLocation": "file-header"
     },
     {
+      "path": "tests/acceptance/AgentRevisionFlow.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "保留完整 SDK 测试修复和知识修订端到端产物。",
+      "metadataLocation": "file-header"
+    },
+    {
       "path": "tests/acceptance/AutomatedLanggraphFlow.test.ts",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "验证AutomatedLanggraphFlow的行为、约束及失败场景。",
@@ -1327,6 +1345,12 @@
       "path": "tests/integration/AgentExamples.test.ts",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "验证角色Examples的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/integration/AgentSpecRegression.test.mjs",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证九项 Agent Spec 缺口的修复。",
       "metadataLocation": "file-header"
     },
     {

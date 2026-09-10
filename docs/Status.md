@@ -9,6 +9,10 @@ SPDX-License-Identifier: MIT
 
 本文件统一维护当前任务、步骤、依赖、状态和证据索引。实现细节维护在所属模块设计，验收条件引用 [Verification](specs/totalRules/Verification.md)，历史记录见 [HistoryEpitaph](HistoryEpitaph.md)。旧 DEV-019 的 R0～R4 是历史计划，与下面的新四阶段不按编号对应，也不直接继承完成勾选。
 
+## 本轮 Spec 修复与可保留的端到端证据
+
+代码 `4c5c580` 修复上一轮九项审查问题：绑定测试编译执行、完整重建、共享修订定位、比较规则与双侧证据、超时 Gate 引用、测试修复正文、模块选择和历史治理交接。验证为全量 266/266、UI 14/14、TypeScript 和 Spec 校验通过。独立完整 SDK 流程覆盖测试修复及两轮知识修订，最终 PASS/VERIFIED，所有中间产物保留在工作区。详细过程、产物索引和原有共享能力待办见 [修复与端到端报告](reports/AgentSpecRepairAndE2E.md)。模型响应受控，S3 外部模型及 S4 公司 CLI 业务验收状态不因此改变。
+
 ## 四阶段总览
 
 当前处于 S2 实现审阅阶段。DocGen/DocWorker 已合入；TestGen、Code、Check、Review、Orchestrator 已按顺序完成本轮契约和生产接线，等待本轮 PR 审阅。S3 外部真实模型和 S4 公司 CLI 业务验收仍单独开展。
