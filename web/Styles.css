@@ -1281,3 +1281,12 @@ body.drawer-active { overflow: hidden; }
   .index-search { flex-direction: column; align-items: stretch; }
   .index-panel-body { padding: 0 12px 14px; }
 }
+
+.repository-panel { padding: 18px; margin-bottom: 20px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+.repository-panel form { display: flex; gap: 12px; align-items: end; }
+.repository-panel label { display: grid; gap: 6px; flex: 1; min-width: 0; }
+.repository-panel input { width: 100%; min-width: 0; }
+.repository-panel code, .repository-panel li { overflow-wrap: anywhere; }
+.repository-panel li small { display: block; color: var(--muted); }
+.repository-panel summary { cursor: pointer; margin-top: 12px; }
+@media (max-width: 720px) { .repository-panel form { flex-direction: column; align-items: stretch; } }

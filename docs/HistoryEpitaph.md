@@ -120,3 +120,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 
 - [2026-09-10-1141-mvp-v020-released.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/26e3b48d427ab5b0c1b98449d101f633bda99969/docs/epitaph/2026-09-10-1141-mvp-v020-released.md)：v0.2.0 发布和安装包来自94d431a，最终真实 Run da8de66a-cce3-4922-a5f5-0b3e62eadcaf 通过270/270并发布；保留模型凭据、固定源码、用户数据及原始失败账本，不因新工作台重复发布。发布当时任意语言/项目及复杂检索回退延期，当前新任务另行扩展 C/C++；旧版本验收不证明新闭环完成。完整记录可从上述固定 Git 对象读取。
 - [2026-09-10-1227-taste-console-live.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/26e3b48d427ab5b0c1b98449d101f633bda99969/docs/epitaph/2026-09-10-1227-taste-console-live.md)：独立 taste 工作树的七页导航、正文阅读和真实待办筛选重构，24项浏览器及定向复验；当时为只读预览，后由1433记录改为免登录。线上运行源码和隧道不属于本次工作台已部署证据；本任务不改写 v0.2.0。历史截图位于 domain-knowledge-releases/2026-09-10-taste-ui；ECS 重任务串行。
+
+- [2026-09-10-1433-console-direct-editing.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/0265f608a11026d3bdf7a4dd70b91020559f5447/docs/epitaph/2026-09-10-1433-console-direct-editing.md)：用户明确授权免登录，线上 Console 配置、目录及批次操作无需旧令牌；当时25项Console、19项服务与官网回归通过。后续工作台在独立工作树实现，线上未更新；原发布证据及 v0.2.0 不改写。

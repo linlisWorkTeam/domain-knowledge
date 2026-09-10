@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：提供app页面的展示、交互或样式资源。
  */
+import { createRepositoryAnalysisPanel } from './RepositoryAnalysis.js'
 import { createKnowledgeIndexPanel } from './KnowledgeIndex.js'
 import { renderKnowledgeMarkdown } from './KnowledgeMarkdown.js'
 
@@ -433,7 +434,10 @@ function setPageMeta(page) {
   }
 }
 
+const repositoryAnalysisPanel = createRepositoryAnalysisPanel({ root: content, request, escapeHtml, isEditable: () => Boolean(state.capabilities?.directEditing || state.token) })
+
 function renderOverview() {
+  const repositoryFocus = repositoryAnalysisPanel.focus()
   const focusedQueueFilter = document.activeElement?.dataset?.queueFilter
   const active = state.runs.filter(isRunActive)
   const attention = state.actionItems.filter((item) => item.status !== 'RESOLVED')
@@ -472,6 +476,7 @@ function renderOverview() {
     <button class="pulse-row" ${activity.runId ? `data-run-id="${escapeHtml(activity.runId)}"` : 'disabled'} type="button"><i class="${activity.severity === 'HIGH' ? 'warning' : 'success'}"></i><span><b>${escapeHtml(EVENT_LABELS[activity.type] ?? activity.summary)}</b><small>${escapeHtml(formatDate(activity.occurredAt))}</small></span></button>`).join('')
   content.innerHTML = `
     ${notices.length ? partialNotice(`${notices.map((key) => RESOURCE_LABELS[key] ?? key).join('、')}获取失败；其余区域仍展示已读取的服务端事实。`) : ''}
+    ${repositoryAnalysisPanel.html()}
     <section class="overview-summary-grid" aria-label="关键摘要">
       <article class="attention-summary">
         <span class="attention-orb"><i></i></span>
@@ -501,6 +506,7 @@ function renderOverview() {
         <article class="recent-pulse"><header><h3>最近动态</h3><span>${state.activityStream ? '实时连接' : '轮询更新'}</span></header>${pulseRows || '<div class="pulse-empty"><b>暂无动态</b><small>运行记录将在这里显示</small></div>'}</article>
       </aside>
     </div>`
+  repositoryAnalysisPanel.restore(repositoryFocus)
   // 轮询刷新不能打断正在使用分类按钮的键盘用户。
   if (focusedQueueFilter !== undefined) content.querySelector(`[data-queue-filter="${CSS.escape(focusedQueueFilter)}"]`)?.focus({ preventScroll: true })
 }

@@ -3,6 +3,8 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：提供Composition的外部入口、参数转换与响应处理。
  */
+import { RepositoryAnalysisService } from '../../application/services/RepositoryAnalysis.ts';
+import { GitRepositoryAnalyzer } from '../../infrastructure/source/GitRepositoryAnalyzer.ts';
 import { WorkbenchStages } from '../../application/services/WorkbenchStages.ts';
 import { KnowledgeIndexService } from '../../application/services/KnowledgeIndex.ts';
 import { SqliteStageTasks } from '../../infrastructure/sqlite/SqliteStageTasks.ts';
@@ -139,9 +141,9 @@ export function createComposition(input: {
   const runtimeDir = isAbsolute(configuredRuntime) ? configuredRuntime : join(componentRoot, configuredRuntime);
   const artifacts = new LocalCasArtifactStore(join(runtimeDir, 'cas'));
   const repository = new SQLiteFlywheelRepository(join(runtimeDir, 'registry.sqlite'));
-  const publisher = new LocalMarkdownPublisher({ runtimeDir,
-    directoryRoots: (process.env.WP_KNOWLEDGE_DIRECTORY_ROOTS ?? `${dirname(runtimeDir)}${delimiter}${dirname(repositoryRoot)}`)
-      .split(delimiter).filter(Boolean),
+  const directoryRoots = (process.env.WP_KNOWLEDGE_DIRECTORY_ROOTS ?? `${dirname(runtimeDir)}${delimiter}${dirname(repositoryRoot)}`).split(delimiter).filter(Boolean);
+  const repositoryAnalysis = new RepositoryAnalysisService(new GitRepositoryAnalyzer(directoryRoots, runtimeDir), artifacts);
+  const publisher = new LocalMarkdownPublisher({ runtimeDir, directoryRoots,
     defaultDirectory: process.env.WP_KNOWLEDGE_OUTPUT_DIRECTORY ?? join(runtimeDir, 'knowledge'),
   });
   const publicationOperations = new PublicationOperations(publisher);
@@ -508,6 +510,7 @@ export function createComposition(input: {
       publicationOperations,
       workbenchStages,
       knowledgeIndex,
+      repositoryAnalysis,
       markdownLite: {
         start: async (directory: string, budgetMode?: 'provider-quota') => {
           // 固定模块入口只接受服务器目录；源码与模型设置在服务端验证。

@@ -4,6 +4,7 @@
  * 文件功能：验证Console的行为、约束及失败场景。
  */
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { once } from 'node:events';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -919,4 +920,33 @@ test('知识索引可独立构建、试检索并预览 YAML，命中后才读取
   await hit.locator(`[data-version-id="${latestVersionId}"]`).click();
   await expect(page.getByRole('dialog')).toBeVisible();
   expect(bodies).toEqual([`/api/v1/knowledge/${latestVersionId}`]);
+});
+
+
+test('操作中心从固定 Git 版本分析仓库，显示模块和环境且窄屏可操作', async ({ page }) => {
+  const directory = mkdtempSync(join(tmpdir(), 'console-analysis-'));
+  const git = (args: string[]) => execFileSync('git', ['-c', 'user.name=Browser Test', '-c', 'user.email=browser@example.test', ...args], {
+    cwd: directory, encoding: 'utf8', env: { PATH: process.env.PATH, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null' },
+  }).trim();
+  try {
+    git(['init', '-q']); writeFileSync(join(directory, 'parser.c'), 'int parse(void) { return 1; }');
+    git(['add', '.']); git(['commit', '-qm', 'Fixed source']); const commit = git(['rev-parse', 'HEAD']);
+    await page.goto(baseUrl); await enterGovernance(page);
+    await page.getByLabel('服务器仓库目录', { exact: true }).fill(directory);
+    await page.getByLabel('源码版本', { exact: true }).fill(commit);
+    await page.getByRole('button', { name: '分析仓库', exact: true }).click();
+    await expect(page.locator('[data-repository-result]')).toContainText(commit);
+    await expect(page.locator('[data-repository-result]')).toContainText('parser');
+    await expect(page.locator('[data-repository-result]')).toContainText('gcc');
+    await expect(page.getByRole('heading', { name: '模块候选' })).toBeVisible();
+    await page.screenshot({ path: test.info().outputPath('repository-analysis-desktop.png'), fullPage: true });
+    await page.setViewportSize({ width: 390, height: 844 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await expect(page.getByRole('button', { name: '分析仓库', exact: true })).toBeVisible();
+    await page.screenshot({ path: test.info().outputPath('repository-analysis-mobile.png'), fullPage: true });
+    await page.getByLabel('源码版本', { exact: true }).fill('missing-commit-for-analysis');
+    await page.getByRole('button', { name: '分析仓库', exact: true }).click();
+    await expect(page.locator('[data-repository-panel] [role="status"]')).toContainText('无法读取这个源码版本');
+    await expect(page.locator('[data-repository-result]')).not.toContainText(commit);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
 });

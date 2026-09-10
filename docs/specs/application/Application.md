@@ -64,3 +64,6 @@ Console 通过应用边界读取发布设置、枚举服务器授权目录、读
 WorkbenchStages 通过 StageTaskStore 调度版本化任务；输入身份、恢复条件和预算规则位于 Domain [Workbench](../domainFunction/services/workbench/Workbench.md)。单阶段执行结果与检查点可独立等待，不复用 AgentExampleService 的每次新建 Run 行为。当前只有 INDEX handler 接通，其他阶段不得宣称已可运行。
 
 KnowledgeIndexService 读取冻结卡片版本，协调 YAML/Markdown 工件、增量索引、恢复与摘要查询。索引失败保留知识和已提交子步骤。查询只访问摘要和版本元数据，正文由详情按需加载；不调用模型、发布或外部搜索。
+
+
+RepositoryAnalysisService 调用 RepositoryAnalyzer 并将固定清单写入 CAS；动态资源、工具观测及请求的分支别名不进入源码 manifestRef，因此相同提交重复分析可复用源码身份。工具链摘要尚待编译阶段另行冻结，不能用源码清单摘要替代测试缓存中的工具链身份。

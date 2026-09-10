@@ -43,6 +43,7 @@ Available 是已接线路由；Planned 路由不作为当前能力。Available /
 | `GET /api/v1/activity` | Available | 跨 Run 审计活动列表，支持 type、runId、severity、时间和分页过滤。 |
 | `GET /api/v1/activity/stream` | Available | 跨 Run SSE 活动流，支持断线续传。 |
 | `GET /api/v1/knowledge/health?window=<window>` | Available | 返回有明确分子、分母、样本窗口和规则版本的 freshness、coverage、quality，以及仅在三项均可用时计算的 0–100 总分；不得输出模型臆测分数。 |
+| `POST /api/v1/repository-analyses` | Available | directory 与可选 revision（默认 HEAD）；只读固定 Git 提交，返回源码清单、模块候选、工具版本、资源和 CAS manifestRef。不启动生成。 |
 | `POST /api/v1/index-builds` | Available | 可选 versionIds，必须是当前版本；冻结输入后创建或复用 INDEX 任务。200 表示 reusedTask，202 表示已接受；restored 为恢复文件数。 |
 | `GET /api/v1/knowledge-index?q=` | Available | 摘要命中、原因、正文入口及 stale/missing 数量；不加载正文。 |
 | `GET /api/v1/knowledge-index/:cardId` | Available | YAML 预览、工件引用及 stale 标记。 |

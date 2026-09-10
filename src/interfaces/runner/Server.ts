@@ -47,6 +47,7 @@ const assets = new Map([
   ['/App.js', 'App.js'],
   ['/KnowledgeMarkdown.js', 'KnowledgeMarkdown.js'],
   ['/KnowledgeIndex.js', 'KnowledgeIndex.js'],
+  ['/RepositoryAnalysis.js', 'RepositoryAnalysis.js'],
   ['/Styles.css', 'Styles.css'],
 ]);
 
@@ -268,6 +269,8 @@ export function mapHttpError(error: unknown, id = 'req_unknown'): { status: numb
   const code = message.split(':', 1)[0] || 'INTERNAL_ERROR';
   if (['STAGE_CONTRACT_INCOMPATIBLE', 'STAGE_INPUT_CHANGED', 'STAGE_NOT_RESUMABLE', 'STAGE_BUDGET_EXHAUSTED', 'INDEX_VERSION_NOT_CURRENT'].includes(code)) return { status: 409, body: errorBody(code, message, id) };
   if (['STAGE_OWNER_UNAVAILABLE', 'STAGE_SHUTDOWN'].includes(code)) return { status: 503, body: errorBody(code, message, id) };
+  if (code.startsWith('REPOSITORY_')) return { status: 422, body: errorBody(code, code, id) };
+  if (code.startsWith('WORKBENCH_RESOURCE_')) return { status: 503, body: errorBody(code, '服务器资源不足，分析未启动。', id) };
   if (code === 'MODULE_BASELINE_MISMATCH') return { status: 422, body: errorBody(code, '所选仓库不包含本版固定的 markdownLite 源码、参考测试或依赖快照。', id) };
   if (code === 'MODULE_ISOLATION_UNAVAILABLE' || code === 'MODULE_ISOLATION_REQUIRED') return { status: 503, body: errorBody(code, '服务器的 Linux 隔离能力不可用，任务未启动。请检查 Bubblewrap 和内核命名空间配置。', id) };
   if (code === 'RUN_CONFIGURATION_INCOMPATIBLE' || code === 'PROVIDER_MIGRATION_REQUIRED' || code === 'DSH_CONFIGURATION_UNAVAILABLE') return { status: 409, body: errorBody(code, message, id) };
@@ -352,7 +355,7 @@ export function createKnowledgeServer(input: {
       }
       // 目录、配置和写入仅允许直接本机访问，或携带远程访问令牌。
       const localClient = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(request.socket.remoteAddress ?? '');
-      const workbenchRoute = /^\/api\/v1\/(stage-tasks|index-builds|knowledge-index)(\/|$)/.test(url.pathname);
+      const workbenchRoute = /^\/api\/v1\/(stage-tasks|index-builds|knowledge-index|repository-analyses)(\/|$)/.test(url.pathname);
       const productRoute = url.pathname.startsWith('/api/v1/publications')
         || url.pathname === '/api/v1/server-directories' || url.pathname === '/api/v1/runs/markdown-lite';
       if (url.pathname.startsWith('/api/') && (!localClient || productRoute || workbenchRoute) && !authorized(request, writeToken, anonymousAccess)) {
@@ -361,6 +364,16 @@ export function createKnowledgeServer(input: {
         return;
       }
       if (workbenchRoute) {
+        if (request.method === 'POST' && url.pathname === '/api/v1/repository-analyses') {
+          const payload = await body(request); requireOnlyKeys(payload, ['directory', 'revision']);
+          if (typeof payload.directory !== 'string' || (payload.revision !== undefined && typeof payload.revision !== 'string')) throw new Error('PAYLOAD_INVALID');
+          const controller = new AbortController();
+          const abort = () => { if (!response.writableEnded) controller.abort(); };
+          response.once('close', abort);
+          try { send(response, 200, await composition.apps.repositoryAnalysis.analyze(payload.directory, payload.revision as string | undefined, controller.signal)); }
+          finally { response.off('close', abort); }
+          return;
+        }
         const stages = composition.apps.workbenchStages;
         const index = composition.apps.knowledgeIndex;
         if (request.method === 'GET' && url.pathname === '/api/v1/stage-tasks') {
