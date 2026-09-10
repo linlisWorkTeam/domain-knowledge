@@ -599,21 +599,40 @@ test('component checks fail closed without side effects and monitor observations
   }
 });
 
-test('HTTP mutation API is disabled when no write token is configured', async () => {
-  const runtimeDir = mkdtempSync(join(tmpdir(), 'wp-server-disabled-'));
+test('本机无需令牌即可保存提示词，代理和跨站请求不能借用本机权限', async () => {
+  const runtimeDir = mkdtempSync(join(tmpdir(), 'wp-server-local-'));
   const instance = createKnowledgeServer({ runtimeDir });
   instance.server.listen(0, '127.0.0.1');
   await once(instance.server, 'listening');
   const address = instance.server.address();
   assert.ok(address && typeof address === 'object');
+  const base = `http://127.0.0.1:${address.port}`;
   try {
-    const capabilities = await (await fetch(`http://127.0.0.1:${address.port}/api/v1/system/capabilities`)).json();
-    assert.equal(capabilities.writeEnabled, false);
-    const response = await fetch(`http://127.0.0.1:${address.port}/api/v1/knowledge/candidates`, {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}',
+    const capabilities = await (await fetch(`${base}/api/v1/system/capabilities`)).json();
+    assert.equal(capabilities.writeEnabled, true);
+    assert.equal(capabilities.directEditing, true);
+    const saved = await fetch(`${base}/api/v1/agents/doc-gen/prompt`, {
+      method: 'PUT', headers: { 'content-type': 'application/json', origin: base },
+      body: JSON.stringify({ promptAddon: '使用简洁中文。' }),
     });
-    assert.equal(response.status, 503);
-    assert.equal((await response.json()).error.code, 'WRITE_API_DISABLED');
+    assert.equal(saved.status, 200);
+    assert.equal((await saved.json()).promptAddon, '使用简洁中文。');
+    const rejectedHeaders: Record<string, string>[] = [
+      { origin: 'https://untrusted.example' },
+      { 'sec-fetch-site': 'cross-site' },
+      { 'x-forwarded-for': '203.0.113.1' },
+      { forwarded: 'for=203.0.113.1' },
+      { 'cf-connecting-ip': '203.0.113.1' },
+    ];
+    for (const headers of rejectedHeaders) {
+      const denied = await fetch(`${base}/api/v1/agents/doc-gen/prompt`, {
+        method: 'PUT', headers: { 'content-type': 'application/json', ...headers },
+        body: JSON.stringify({ promptAddon: '不应保存。' }),
+      });
+      assert.equal(denied.status, 503, JSON.stringify(headers));
+      const directory = await fetch(`${base}/api/v1/server-directories`, { headers });
+      assert.equal(directory.status, 503, JSON.stringify(headers));
+    }
   } finally {
     instance.server.close();
     await once(instance.server, 'close');

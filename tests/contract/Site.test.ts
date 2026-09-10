@@ -259,7 +259,7 @@ test('site and Console expose the embedded workflow boundary and prompt-only Age
   assert.match(consoleHtml, /data-page="agent-settings"/);
   assert.match(consoleScript, /\/api\/v1\/agents/);
   assert.match(consoleScript, /promptAddon/);
-  assert.match(consoleScript, /Agent 可以调整表达，不能改变职责/);
+  assert.match(consoleScript, /补充 Agent 提示词/);
   assert.match(consoleScript, /workflowNodes/);
   assert.match(frontendSpec, /KF-UI-014/);
   assert.match(frontendSpec, /KF-UI-015/);
@@ -376,13 +376,13 @@ test('production Console implements the seven-page navigation and truthful F2-F5
   assert.match(consoleCss, /body,\s*button,\s*input,\s*select,\s*textarea,\s*svg text\s*\{\s*font-family:\s*var\(--font-ui\)/s);
 });
 
-test('write-token setup is discoverable while local secrets remain ignored', () => {
+test('direct editing avoids token setup prompts while local secrets remain ignored', () => {
   const consoleScript = readFileSync('web/App.js', 'utf8');
   const envExample = readFileSync('.env.example', 'utf8');
   const gitignore = readFileSync('.gitignore', 'utf8');
   const packageJson = JSON.parse(readFileSync('package.json', 'utf8')) as { scripts: Record<string, string> };
-  assert.match(consoleScript, /复制仓库根目录的 <code>\.env\.example<\/code> 为 <code>\.env\.local<\/code>/);
-  assert.match(consoleScript, /WP_KNOWLEDGE_WRITE_TOKEN=请替换为随机长令牌/);
+  assert.match(consoleScript, /directEditing/);
+  assert.doesNotMatch(consoleScript, /服务端写入尚未启用/);
   assert.match(envExample, /^WP_KNOWLEDGE_WRITE_TOKEN=/m);
   assert.match(gitignore, /^\.env\.local$/m);
   assert.match(packageJson.scripts['knowledge:serve'], /--env-file-if-exists=\.env\.local/);

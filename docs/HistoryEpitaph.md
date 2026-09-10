@@ -113,3 +113,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 ## 前台视觉重构前的历史交接
 
 - [2026-09-10-1020-fourth-real-risk-blocker.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/55661e054edabcb694f84565da41b3f262481171/docs/epitaph/2026-09-10-1020-fourth-real-risk-blocker.md)：第四次真实飞轮在三轮行为门禁通过后仍受未处置知识风险阻塞；当时仅授权四次、PR38 为草稿，传输与 H2 修订修复已有受控验证。后来用户追加额度授权，风险生命周期、真实发布及 v0.2.0 验收已经完成，见保留的 1047、1141 记录；旧失败证据与原账本不改写。此次归档只为保留最新三份交接，不重开已完成的 MVP 验收。
+
+- [2026-09-10-1047-risk-review-verified.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/94d431a86b7656ded4109c3a00ae93b182df2e6c/docs/epitaph/2026-09-10-1047-risk-review-verified.md)：风险生命周期修复与执行版本 v4，330 项本地、331 项整合 CI 和 22 项 Console 等受控验证；当时尚未获得后续真实预算，未正式发布。之后真实验收与 v0.2.0 发布已由 1141 记录覆盖，本次只归档历史交接。

@@ -209,7 +209,7 @@ test('工作流图由标准节点 API 支撑并保持只读', async ({ page }) =
   await page.getByRole('button', { name: /^工作流图$/ }).click();
   await expect(page.getByRole('heading', { name: '工作流图', level: 1 })).toBeVisible();
   await expect(page.getByLabel('只读 Agent 工作流图')).toBeVisible();
-  await expect(page.getByText(/只读 · 实时事件；断线后每 10 秒轮询/)).toBeVisible();
+  await expect(page.getByText(/仅查看 · 自动更新；断线后每 10 秒刷新/)).toBeVisible();
   await expect(page.locator('.workflow-graph')).toHaveCount(1);
   await expect(page.locator('.graph-node')).toHaveCount(7);
   await expect(page.locator('.graph-edge')).toHaveCount(7);
@@ -327,10 +327,10 @@ test('Provider 配置与验证通过真实 API fail closed，且密钥不回填�
   await page.goto(baseUrl);
   await enterGovernance(page);
   await navigateTo(page, 'Agent 设置');
-  await expect(page.getByRole('heading', { name: 'Agent 可以调整表达，不能改变职责' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '补充 Agent 提示词' })).toBeVisible();
   await expect(page.locator('.settings-list')).toContainText('DeepSeek Harness');
 
-  await expect(page.locator('.provider-card .form-note')).toContainText('一次最小生成请求');
+  await expect(page.locator('.provider-card .form-note')).toContainText('调用模型生成一段短文本');
   await expect(page.locator('.provider-card .form-note')).toContainText('不会自动重试');
   const form = page.locator('#provider-settings-form');
   await form.getByLabel('API 地址').fill('https://denied.example.test/v1');
@@ -341,7 +341,7 @@ test('Provider 配置与验证通过真实 API fail closed，且密钥不回填�
     new URL(response.url()).pathname === '/api/v1/provider-settings'
     && response.request().method() === 'PUT'
   ));
-  await form.getByRole('button', { name: '保存待验证配置' }).click();
+  await form.getByRole('button', { name: '保存配置' }).click();
   const rejectedSave = await rejectedSavePromise;
   assert.equal(rejectedSave.status(), 422);
   assert.doesNotMatch(await rejectedSave.text(), new RegExp(PROVIDER_SECRET));
@@ -359,7 +359,7 @@ test('Provider 配置与验证通过真实 API fail closed，且密钥不回填�
     new URL(response.url()).pathname === '/api/v1/provider-settings'
     && response.request().method() === 'PUT'
   ));
-  await form.getByRole('button', { name: '保存待验证配置' }).click();
+  await form.getByRole('button', { name: '保存配置' }).click();
   const saveResponse = await savePromise;
   assert.equal(saveResponse.status(), 200);
   const saveText = await saveResponse.text();
@@ -396,11 +396,11 @@ test('Provider 配置与验证通过真实 API fail closed，且密钥不回填�
   assert.equal(successfulPayload.status, 'VERIFIED');
   assert.equal(successfulPayload.enabled, true);
   assert.deepEqual(successfulPayload.checks, { modelList: 'PASSED', generation: 'PASSED' });
-  await expect(page.locator('.provider-checks')).toContainText('最小生成');
+  await expect(page.locator('.provider-checks')).toContainText('生成测试');
   await expect(page.locator('.provider-checks dd').last()).toHaveText('已通过');
   await expect(page.locator('#toast')).toHaveText('连接验证成功，新批次将默认使用 DSH。');
   await expect(page.locator('.settings-list')).toContainText('DeepSeek Harness');
-  await expect(page.locator('.reference-metrics').getByText('已作为新批次默认方式')).toBeVisible();
+  await expect(page.locator('.reference-metrics').getByText('新批次将使用此配置')).toBeVisible();
 
   const storedSettingsText = await (await fetch(`${baseUrl}/api/v1/provider-settings`)).text();
   assert.doesNotMatch(storedSettingsText, new RegExp(PROVIDER_SECRET));
@@ -421,7 +421,7 @@ test('Provider 配置与验证通过真实 API fail closed，且密钥不回填�
   await expect(workflowRetries).toContainText('2');
   const governance = page.locator('.governance-metrics');
   await expect(governance.locator('.compact-metrics > div').filter({ hasText: '首次修订通过率' })).toContainText('50%');
-  await expect(governance.locator('.compact-metrics > div').filter({ hasText: '三轮内收敛率' })).toContainText('75%');
+  await expect(governance.locator('.compact-metrics > div').filter({ hasText: '三轮内通过率' })).toContainText('75%');
   await expect(governance.locator('.compact-metrics > div').filter({ hasText: '人工介入比例' })).toContainText('25%');
   await expect(governance.locator('.compact-metrics > div').filter({ hasText: '短期复发率' })).toContainText('10%');
   await governance.getByText('查看指标口径').click();

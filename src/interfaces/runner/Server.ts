@@ -139,8 +139,31 @@ function keysetPage<T>(values: T[], url: URL, keyOf: (value: T) => string): {
   };
 }
 
-function authorized(request: IncomingMessage, token: string | undefined): boolean {
-  if (!token) return false;
+/** 本机浏览器或 SSH 转发无需额外令牌，校验 Host/Origin 防止跨站写入。 */
+function isDirectLocalRequest(request: IncomingMessage): boolean {
+  if (!['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(request.socket.remoteAddress ?? '')) return false;
+  if (Object.keys(request.headers).some((key) => key === 'forwarded' || key.startsWith('x-forwarded-') || key.startsWith('cf-'))) return false;
+  try {
+    const target = new URL(`http://${request.headers.host ?? ''}`);
+    if (!['localhost', '127.0.0.1', '[::1]'].includes(target.hostname)) return false;
+    if (request.headers.origin && request.headers.origin !== target.origin) return false;
+    if (request.headers['sec-fetch-site'] && !['same-origin', 'none'].includes(String(request.headers['sec-fetch-site']))) return false;
+    return true;
+  } catch { return false; }
+}
+
+/** 免登录仍拒绝其他网站从浏览器发起的写入。 */
+function sameSiteRequest(request: IncomingMessage): boolean {
+  if (request.headers['sec-fetch-site'] === 'cross-site') return false;
+  if (!request.headers.origin) return true;
+  try { return new URL(request.headers.origin).host === request.headers.host; }
+  catch { return false; }
+}
+
+function authorized(request: IncomingMessage, token: string | undefined, anonymousAccess = false): boolean {
+  // 单用户本地部署直接编辑；代理流量与跨站请求不能借用回环地址。
+  if (anonymousAccess) return sameSiteRequest(request);
+  if (!token) return isDirectLocalRequest(request);
   const supplied = request.headers.authorization?.replace(/^Bearer\s+/i, '') ?? '';
   const left = Buffer.from(supplied);
   const right = Buffer.from(token);
@@ -282,6 +305,7 @@ export function createKnowledgeServer(input: {
   runtimeDir?: string;
   clock?: () => string;
   writeToken?: string;
+  anonymousAccess?: boolean;
   providerSettingsStore?: ProviderSettingsStore;
   providerEndpointPolicy?: ProviderEndpointPolicy;
   sourceEndpointPolicy?: ProviderEndpointPolicy;
@@ -293,6 +317,7 @@ export function createKnowledgeServer(input: {
 } = {}) {
   const composition = createComposition(input);
   const writeToken = input.writeToken ?? process.env.WP_KNOWLEDGE_WRITE_TOKEN;
+  const anonymousAccess = input.anonymousAccess ?? process.env.WP_KNOWLEDGE_NO_LOGIN === '1';
   const productApps = composition.apps as typeof composition.apps & {
     publicationOperations: PublicationOperations;
     markdownLite: { start(repositoryRoot: string): Promise<unknown> };
@@ -321,11 +346,11 @@ export function createKnowledgeServer(input: {
         send(response, 200, { ok: true });
         return;
       }
-      // 远程 API 统一校验访问令牌；目录与发布设置即使在本机也必须认证。
+      // 目录、配置和写入仅允许直接本机访问，或携带远程访问令牌。
       const localClient = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(request.socket.remoteAddress ?? '');
       const productRoute = url.pathname.startsWith('/api/v1/publications')
         || url.pathname === '/api/v1/server-directories' || url.pathname === '/api/v1/runs/markdown-lite';
-      if (url.pathname.startsWith('/api/') && (!localClient || productRoute) && !authorized(request, writeToken)) {
+      if (url.pathname.startsWith('/api/') && (!localClient || productRoute) && !authorized(request, writeToken, anonymousAccess)) {
         send(response, writeToken ? 401 : 503, errorBody(writeToken ? 'UNAUTHORIZED' : 'WRITE_API_DISABLED',
           'A valid Bearer token is required for remote access and server directory operations.', currentRequestId));
         return;
@@ -423,7 +448,8 @@ export function createKnowledgeServer(input: {
         const sdkIsolation = activeProvider === 'deepseek-harness'
           && (process.env.WP_DSH_PROCESS_ISOLATION?.trim() || 'bubblewrap') === 'bubblewrap';
         send(response, 200, {
-          writeEnabled: Boolean(writeToken),
+          writeEnabled: anonymousAccess || Boolean(writeToken) || isDirectLocalRequest(request),
+          directEditing: anonymousAccess || (!writeToken && isDirectLocalRequest(request)),
           automatedWorkflow: true,
           langGraphInfrastructure: true,
           agentProvider: activeProvider,
@@ -439,7 +465,7 @@ export function createKnowledgeServer(input: {
           agentSourceIsolation: sdkIsolation ? 'bubblewrap' : 'not-proven',
           trustedProjectEvaluation: true,
           hostileCodeIsolation: false,
-          authentication: writeToken ? 'bearer' : 'disabled',
+          authentication: anonymousAccess ? 'none' : writeToken ? 'bearer' : isDirectLocalRequest(request) ? 'local' : 'disabled',
         });
         return;
       }
@@ -516,7 +542,7 @@ export function createKnowledgeServer(input: {
             .filter((entry): entry is [string, string] => entry[1] !== null && entry[1] !== ''),
         );
         const items = composition.apps.flywheel.listActionItems(filters).map((item) => (
-          authorized(request, writeToken) ? item : { ...item, allowedActions: [] }
+          authorized(request, writeToken, anonymousAccess) ? item : { ...item, allowedActions: [] }
         ));
         send(response, 200, keysetPage(
           items,
@@ -563,7 +589,7 @@ export function createKnowledgeServer(input: {
           return;
         }
         const item = composition.apps.flywheel.getActionItem(actionItemId);
-        const visible = item && !authorized(request, writeToken) ? { ...item, allowedActions: [] } : item;
+        const visible = item && !authorized(request, writeToken, anonymousAccess) ? { ...item, allowedActions: [] } : item;
         send(response, visible ? 200 : 404, visible ?? errorBody('NOT_FOUND', 'Resource not found.', currentRequestId));
         return;
       }
@@ -738,11 +764,11 @@ export function createKnowledgeServer(input: {
         /^\/api\/v1\/evaluations\/([^/]+)\/artifacts\/([^/]+)$/,
       );
       if (request.method === 'GET' && evaluationArtifact) {
-        if (!writeToken) {
+        if (!anonymousAccess && !writeToken && !isDirectLocalRequest(request)) {
           send(response, 503, errorBody('WRITE_API_DISABLED', 'Set WP_KNOWLEDGE_WRITE_TOKEN to authorize evidence downloads.', currentRequestId, true));
           return;
         }
-        if (!authorized(request, writeToken)) {
+        if (!authorized(request, writeToken, anonymousAccess)) {
           send(response, 401, errorBody('UNAUTHORIZED', 'A valid Bearer token is required.', currentRequestId));
           return;
         }
@@ -762,7 +788,7 @@ export function createKnowledgeServer(input: {
         const evaluationId = decodeURIComponent(evaluationArtifacts[1] ?? '');
         const value = composition.apps.contentGovernance.listEvaluationArtifacts(
           evaluationId,
-          authorized(request, writeToken),
+          authorized(request, writeToken, anonymousAccess),
         );
         send(response, value ? 200 : 404,
           value ?? errorBody('EVALUATION_NOT_FOUND', 'Resource not found.', currentRequestId));
@@ -835,11 +861,11 @@ export function createKnowledgeServer(input: {
       const isContentMutation = (request.method === 'PATCH' && (ruleUpdate !== null || sourceUpdate !== null))
         || (request.method === 'POST' && (url.pathname === '/api/v1/sources' || sourceRefresh !== null));
       if (isContentMutation) {
-        if (!writeToken) {
+        if (!anonymousAccess && !writeToken && !isDirectLocalRequest(request)) {
           send(response, 503, errorBody('WRITE_API_DISABLED', 'Set WP_KNOWLEDGE_WRITE_TOKEN to enable mutations.', currentRequestId, true));
           return;
         }
-        if (!authorized(request, writeToken)) {
+        if (!authorized(request, writeToken, anonymousAccess)) {
           send(response, 401, errorBody('UNAUTHORIZED', 'A valid Bearer token is required.', currentRequestId));
           return;
         }
@@ -890,11 +916,11 @@ export function createKnowledgeServer(input: {
       );
       const isControlMutation = actionItemCommand !== null || regenerationCommand !== null;
       if ((request.method === 'POST' || request.method === 'PUT') && (isMutationRoute || isControlMutation)) {
-        if (!writeToken) {
+        if (!anonymousAccess && !writeToken && !isDirectLocalRequest(request)) {
           send(response, 503, errorBody('WRITE_API_DISABLED', 'Set WP_KNOWLEDGE_WRITE_TOKEN to enable mutations.', currentRequestId, true));
           return;
         }
-        if (!authorized(request, writeToken)) {
+        if (!authorized(request, writeToken, anonymousAccess)) {
           send(response, 401, errorBody('UNAUTHORIZED', 'A valid Bearer token is required.', currentRequestId));
           return;
         }

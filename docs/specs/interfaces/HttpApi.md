@@ -12,7 +12,7 @@ SPDX-License-Identifier: MIT
 
 UiApi 启动本地服务；Server 解析请求并通过 Application App 执行用例，Composition 装配存储、模型、工作流与评测器。Preview 路由使用 system、runs、knowledge、evaluations、sources、graph、agents 资源组，新增字段与消费者在同一变更同步。
 
-内部 transition、evaluate、publish 不作为任意 HTTP 动作开放。写请求验证配置的令牌和请求来源，未配置时提供明确启用说明并拒绝写入。只读接口返回业务投影，不能泄漏凭据、Prompt 正文或 checkpoint 私有表。
+内部 transition、evaluate、publish 不作为任意 HTTP 动作开放。写请求在配置令牌时验证令牌；直接本机无令牌访问或显式免登录部署可直接写入，仍拒绝跨站浏览器请求。只读接口返回业务投影，不能泄漏凭据、Prompt 正文或 checkpoint 私有表。
 
 ## 资源目录
 
@@ -104,7 +104,7 @@ Run 列表及详情的 `run` 保留领域 `state`，额外返回 `executionStatu
 
 ## 本地发布与固定模块启动
 
-远程 `/api/` 请求统一要求 Bearer 访问令牌；以下产品路由即使从回环地址调用也要求认证。静态 Console 与 `/health` 可公开读取。所有写操作要求 `Idempotency-Key`，持久收据仅保存命令摘要和脱敏结果。
+`WP_KNOWLEDGE_NO_LOGIN=1` 显式启用单用户免登录部署，远程也直接编辑。默认直接本机且未配置令牌可编辑；其余远程 `/api/` 请求使用 Bearer 访问令牌。产品路由遵循同一规则，不额外要求本机登录。静态 Console 与 `/health` 可公开读取。所有写操作要求 `Idempotency-Key`，持久收据仅保存命令摘要和脱敏结果。
 
 | 方法和路由 | 输入与结果 |
 | --- | --- |

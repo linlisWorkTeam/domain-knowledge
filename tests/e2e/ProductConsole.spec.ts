@@ -39,7 +39,7 @@ async function openSettings(page: Page) {
   await page.goto(baseUrl);
   await enterGovernance(page);
   await page.getByRole('button', { name: /^Agent 设置$/ }).click();
-  await page.getByRole('button', { name: '读取发布设置' }).click();
+  await page.getByRole('button', { name: '查看发布设置' }).click();
   await expect(page.locator('#publication-settings-form')).toBeVisible();
   await expect(page.getByLabel('服务器知识目录')).toHaveValue(knowledgeDirectory);
 }
