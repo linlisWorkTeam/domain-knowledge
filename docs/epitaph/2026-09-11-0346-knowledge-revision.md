@@ -1,0 +1,28 @@
+<!--
+Copyright (c) 2026 linlisWorkTeam
+SPDX-License-Identifier: MIT
+文件功能：交接独立 Review/DocGen 修订、索引恢复及后续自动迭代工作。
+-->
+# 独立知识修订执行
+
+继续/tmp/domain-knowledge-workbench，feat/five-stage-workbench；本轮基线698d6d51cf3dd2ea4d4cec76493402a55c433634。完整目标active，未完成。原wxc、线上taste/4310、v0.2.0未改。Node24/384MiB，所有重验证串行且本轮已terminal。磁盘约228MiB，未删旧知识。本轮没有真实模型调用；不能把受控修订当作真实模型验收。
+
+新增WorkbenchKnowledgeRevision：FLYWHEEL中operation=KNOWLEDGE_REVISION/revisionContract=knowledge-revision-v1，与普通重建分别调度。冻结evaluationTaskId/evidenceRef/卡片/原配置。POST /api/v1/knowledge-revisions；标准stage接口读取/取消/同输入恢复。prepare复用已有相同评测修订任务，重复点击不生成第二份版本或重新调用模型。独立操作已接通，pipeline仍v3，没有自动多轮推进。
+
+Domain KnowledgeRevision决定意见范围、质量/未解决状态和来源尾注保护。Review只允许给当前可信候选H2提出意见；PASS且无需修改为UNCHANGED，不能将正确卡片硬改。阻塞但无意见/仍有风险为UNRESOLVED。有效意见交DocGen已有H2装配，保护其他章节。两角色接收固定参考源码CAS（模块总1MiB）和可信评测；Code/TestGen仍没有参考正文。新增finalizeKnowledgeRevision保留系统生成的固定来源提交尾注，再次validateRevision；来源尾注原本位于最后H2内，截图发现会丢失，已修复并断言。只有删除尾注的结果不算有效修订。文档模型原始输出与最终卡片因可信尾注装配可能不同，审计同时保留rawRef/前后bodyRef/sourceRef/heading；未来Gate需按此确定性变换绑定，不能假设二者原始sha相等。
+
+每卡revision-card检查点包含前后版本/正文、Review及DocGen工件、原因、质量。CandidateRequest内部可选expectedParentVersionId，在CAS写入后/SQLite提交前检查当前头，只允许原头或本次已完成版本幂等回放；并发更新不会被覆盖。历史正文重复但非当前头REVISION_NO_PROGRESS停止。保留cardId、metadata来源和provenance，更新revisionTaskId/baseVersionId/evaluationTaskId。成功卡片即使索引失败也保留。
+
+KnowledgeIndexService抽取buildInput(input,context)共享实际用例；修订先checkpoint保存派生索引输入，再同步刷新受影响项，不伪造context.task、不持槽等待子stage。恢复直接读模型/卡片检查点。结果区分REVISED_INDEXED、QUALITY_REJECTED、UNRESOLVED、NO_REVISION，始终verified=false；summary包含snapshotId/versionIds供重建完整新版本集合。质量拒绝保留弱项和候选，不能从UI继续重建。
+
+Console新增KnowledgeRevision.js面板，按原评测关联历史修订，可执行/取消/恢复、打开版本、下载或并排/窄屏上下查看原文，索引完成且无阻塞可「重建修订版本」。重建事件更新原重建面板并明确使用新卡片集合。普通FLY列表排除operation修订，EVALUATE拒绝把修订任务当代码输入。修订轮询在切页/父评测变动时重置，旧契约只读。自动多轮与最终发布仍显示待接通。
+
+验证：typecheck/Spec/architecture8/domain63通过，full integration203、Console30通过；随后固定参考材料、轮询和来源尾注修正后，受影响WorkbenchEvaluation integration及Console操作中心测试各自再次通过，其他路径未变。未改基线或放宽旧门禁。集成以真实gcc、受控Code/TestGen/Review/DocGen完成：错误知识导致减法→可信失败→修订行为→索引故障→关闭并重开composition→恢复索引无重复模型调用→新版本重建→原可信测试通过。额外断言稳定cardId、父版本并发保护、同输入复用、原测试预期不变。前台正向修订曾因质量不足被正确拒绝，补全受控样例的实际行为解释后通过，未降低质量阈值。
+
+证据/root/projects/domain-knowledge-releases/2026-09-10-workbench-progress/knowledge-revision/：Verification.json明确controlled与real边界，完整/最终受影响日志、Controlled-knowledge-revision-*-detail.png清晰展示保留来源尾注的前后正文。真实当前jsmn31/31、Tiny37/37只读查询仍通过；POST修订因无失败返回409 REVISION_NO_ELIGIBLE_FAILURE，整个stage列表不变、模型调用0。真实读取脚本/tmp/KnowledgeRevisionBrowser.ts。独立修订没有真实provider验收，当前原生引擎指纹未改，0316真实编号仍有效，但不是完整修订/发布验收。
+
+下一步优先：接通自动迭代协调与真实模型修订，避免再停在仅可手动执行。新pipeline需版本化轮次/子任务历史，不能改写v3固定children。修订后新版本输入、受影响索引和原可信门禁都保留；总用量按实际任务去重，不重复求和继承用量。Review认为知识正确但Code错误时，不强改知识；需要明确绑定失败评测的新Code尝试，现有同输入start/代码缓存会复用已接口成功的坏行为代码，必须加有版本的重建重试输入且不给Code隐藏测试。无行为进展连续若干次暂停，不恢复固定三轮总上限；单纯换措辞或提高文本相似度不算行为进展。
+
+真实模型修订可用隔离验收副本做明确故障注入：保护现有/tmp/workbench-native-acceptance-20260910，固定参考jsmn/Tiny提交和已有可信套件；人为错误知识/代码属于标注清楚的测试刺激，Review/DocGen及后续Code可走实际provider，不能声称故障注入是模型自然生成。当前两个真实目标都全通过，所以直接startRevision只会409；不要为促成修订降低/改写预期。复用已授权加密provider配置，勿输出密钥，重验证仍串行；需要空间时用户允许清理旧知识，但不能删当前CAS/证据。
+
+其余仍欠固定发布门禁及候选最终Review绑定、TS统一边界/markdownLite最终回归、编译参数实际应用、多项目范围面板与Stage评测血缘、最终双目标含修订全链路及网站更新。完整目标保持active，继续已授权实现，不需要再次询问范围。

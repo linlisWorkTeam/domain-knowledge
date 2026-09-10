@@ -20,6 +20,8 @@ import type {
 
 /** 定义候选请求的数据结构与类型约束。 */
 export interface CandidateRequest {
+  /** 定点修订提交时校验头版本；普通采集可省略。 */
+  expectedParentVersionId?: string | null;
   /** 提供模块标识信息，供调用方读取或传入。 */
   moduleId: string;
   /** 提供正文信息，供调用方读取或传入。 */
@@ -112,6 +114,11 @@ export class KnowledgeFlywheelService {
     }
     const bodyRef = await this.artifacts.put(Buffer.from(request.body, 'utf8'), 'text/markdown; charset=utf-8');
     const existing = this.repository.findKnowledgeVersionByBody(request.moduleId, bodyRef.artifactId);
+    if (request.expectedParentVersionId !== undefined) {
+      const head = this.repository.latestKnowledgeVersion(request.moduleId);
+      if ((head?.versionId ?? null) !== request.expectedParentVersionId
+        && !(existing && existing.versionId === head?.versionId && existing.parentVersionId === request.expectedParentVersionId)) throw new Error('CANDIDATE_PARENT_CHANGED');
+    }
     if (existing) {
       return {
         version: existing,

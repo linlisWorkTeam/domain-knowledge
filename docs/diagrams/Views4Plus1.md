@@ -257,7 +257,7 @@ flowchart LR
   Evidence --> Evaluation[独立可信行为门禁]
 ```
 
-评测结果的修订依据查询已接通；虚线后的自动角色执行尚未接通：
+评测结果的修订依据查询与独立修订执行已接通；多轮自动推进仍待接通：
 
 ```mermaid
 flowchart LR
@@ -271,5 +271,12 @@ flowchart LR
   Candidate --> UI[Console 只读修订依据]
   Unresolved --> UI
   None --> UI
-  Candidate -. 待实现 .-> Review[Review 归因与 DocGen 定点修订]
+  Candidate --> Review[Review 对当前章节归因]
+  Review -->|明确修订且无未解决风险| DocGen[DocGen 无损 H2 修订]
+  Review -->|代码问题或证据不足| Unresolved
+  DocGen --> Parent[提交前校验原卡片头版本]
+  Parent --> CandidateVersion[幂等保存新候选版本]
+  CandidateVersion --> Index[同一索引用例刷新受影响项]
+  Index --> Next[用户启动修订版本重建与评测]
+  Next -. 待接通自动多轮协调 .-> Evaluation
 ```

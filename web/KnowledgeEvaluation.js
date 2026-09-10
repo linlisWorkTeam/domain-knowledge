@@ -3,10 +3,12 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：显示参考验证、可信用例评测和失败章节，保留取消/恢复及下载入口。
  */
+import { createKnowledgeRevisionPanel } from './KnowledgeRevision.js'
 export function createKnowledgeEvaluationPanel({ root, request, escapeHtml: escape, isEditable, selection }) {
   let task = null, checkpoints = [], events = [], busy = false, notice = '', timer = null, initialized = false, epoch = 0
   const reportCache = new Map()
   const revisionCache = new Map()
+  const revision = createKnowledgeRevisionPanel({ root, request, escapeHtml: escape, isEditable, selection: () => task?.status === 'SUCCEEDED' ? task.taskId : null, evidence: () => revisionCache.get(task?.taskId) })
   const host = () => root.querySelector('[data-native-evaluation-panel]')
   const active = () => task && ['PENDING', 'RUNNING'].includes(task.status)
   const labels = { PENDING: '排队中', RUNNING: '评测中', SUCCEEDED: '评测执行完成', FAILED: '执行失败', PAUSED: '已暂停', CANCELLED: '已取消' }
@@ -58,7 +60,7 @@ export function createKnowledgeEvaluationPanel({ root, request, escapeHtml: esca
     const resume = task && ['FAILED', 'PAUSED', 'CANCELLED'].includes(task.status) && task.contractVersion === 'knowledge-workbench-v1'
       && Object.entries(task.limits ?? {}).every(([key, limit]) => task.usage[key] < limit)
     const progress = [...events].reverse().find((event) => event.kind === 'PROGRESS' && event.detail?.caseId)?.detail
-    panel.innerHTML = `<h3>知识评测</h3><p>候选先在参考实现验证，可信用例再检查重建代码。自动知识修订与发布门禁尚未接通。</p>
+    panel.innerHTML = `<h3>知识评测</h3><p>候选先在参考实现验证，可信用例再检查重建代码。可独立执行知识修订；自动多轮推进与发布门禁尚未接通。</p>
       ${parent ? `<button class="primary-button" type="button" data-native-evaluation-action="start" ${busy || active() || !isEditable() ? 'disabled' : ''}>执行评测</button>` : ''}<p role="status">${escape(notice)}</p>
       ${task ? `<p><b>${escape(task.cancelRequested && active() ? '正在取消' : labels[task.status] ?? '未知')}</b> · 尚未通过发布门禁</p><p>任务 ${escape(task.taskId)} · 累计模型调用 ${escape(task.usage.modelCalls)} 次</p>
       ${progress && active() ? `<p>当前用例：${escape(progress.caseId)} · ${escape(progress.completed)}/${escape(progress.total)}</p>` : ''}
@@ -69,10 +71,11 @@ export function createKnowledgeEvaluationPanel({ root, request, escapeHtml: esca
       ${module.report ? `<p>通过 ${escape(module.report.passed)}/${escape(module.report.total)}${module.interfaceCompatible === false ? '；公开接口存在差异' : ''}</p>` : ''}
       ${download(module.reportRef, '下载评测报告')}${download(module.oracleRef, '下载参考验证')}
       ${(module.report?.cases ?? module.cases ?? []).map(caseHtml).join('')}</section>`).join('')}
-      ${task.status === 'SUCCEEDED' ? '<button class="secondary-button" type="button" data-revision-evidence>查看修订依据</button>' : ''}${revisionHtml()}
+      ${task.status === 'SUCCEEDED' ? '<button class="secondary-button" type="button" data-revision-evidence>查看修订依据</button>' : ''}${revisionHtml()}<section data-knowledge-revision-panel></section>
       ${task.reasonCode === 'NATIVE_REFERENCE_BASELINE_FAILED' ? checkpoints.filter((item) => item.key.startsWith('reference-baseline:')).map((item) => download(item.result.artifactRefs[0], '下载参考构建报告')).join('') : ''}
       ${active() ? `<button class="secondary-button" type="button" data-native-evaluation-action="cancel" ${busy || task.cancelRequested || !isEditable() ? 'disabled' : ''}>取消评测</button>` : ''}
       ${resume ? `<button class="secondary-button" type="button" data-native-evaluation-action="resume" ${busy || !isEditable() ? 'disabled' : ''}>${task.reasonCode === 'TEST_CANDIDATE_REJECTED' ? '重新生成候选测试' : '恢复评测'}</button>` : ''}` : ''}`
+    revision.refresh()
   }
   async function observe() {
     clearTimeout(timer); timer = null; if (!task || !host()) return

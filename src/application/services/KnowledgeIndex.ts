@@ -47,12 +47,15 @@ export class KnowledgeIndexService {
     return restored;
   }
   async build(context: StageExecutionContext): Promise<StageResult> {
-    const { task } = context;
-    const prepared = this.prepare(task.input.cardVersionIds);
-    if (task.input.stage !== 'INDEX' || prepared.sourceDigest !== task.input.sourceDigest
-      || prepared.configurationDigest !== task.input.configurationDigest) throw new Error('STAGE_INPUT_CHANGED');
+    return this.buildInput(context.task.input, context);
+  }
+  /** 复用同一索引用例；调用方须持久化派生输入，不能占用执行槽等待子任务。 */
+  async buildInput(input: StageInput, context: StageExecutionContext): Promise<StageResult> {
+    const prepared = this.prepare(input.cardVersionIds);
+    if (input.stage !== 'INDEX' || prepared.sourceDigest !== input.sourceDigest
+      || prepared.configurationDigest !== input.configurationDigest) throw new Error('STAGE_INPUT_CHANGED');
     await this.recover(context.signal);
-    const cards = this.cards().filter((card) => task.input.cardVersionIds.includes(card.current.versionId));
+    const cards = this.cards().filter((card) => input.cardVersionIds.includes(card.current.versionId));
     const counts = { added: 0, updated: 0, reused: 0, failed: 0 };
     const artifactRefs: StageResult['artifactRefs'] = [];
     for (const card of cards) {

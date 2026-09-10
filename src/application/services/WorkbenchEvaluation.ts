@@ -59,7 +59,7 @@ export class WorkbenchEvaluation {
   async prepare(reconstructionTaskId: string): Promise<import('../../domain/services/workbench/StageTask.ts').StageInput> {
     const { stages, configuration } = this.dependencies;
     const previous = stages.get(reconstructionTaskId);
-    if (previous.contractVersion !== 'knowledge-workbench-v1' || previous.input.stage !== 'FLYWHEEL' || previous.status !== 'SUCCEEDED' || !previous.result) throw new Error('EVALUATION_RECONSTRUCTION_REQUIRED');
+    if (previous.contractVersion !== 'knowledge-workbench-v1' || previous.input.stage !== 'FLYWHEEL' || previous.input.parameters.operation !== undefined || previous.status !== 'SUCCEEDED' || !previous.result) throw new Error('EVALUATION_RECONSTRUCTION_REQUIRED');
     const configurationRef = previous.input.parameters.configurationRef as unknown as ArtifactRef;
     await configuration.assertStageCompatible(await this.load<StageModelConfiguration>(configurationRef));
     return { ...previous.input, stage: 'EVALUATE', parameters: { ...previous.input.parameters, reconstructionTaskId,

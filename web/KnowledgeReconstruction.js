@@ -33,7 +33,7 @@ export function createKnowledgeReconstructionPanel({ root, request, escapeHtml: 
     const generated = checkpoints.filter((item) => item.key.startsWith('role:code:'))
     const resume = task && task.input.parameters.comparisonContract === 'native-source-comparison-v1' && ['FAILED', 'PAUSED', 'CANCELLED'].includes(task.status) && task.contractVersion === 'knowledge-workbench-v1'
       && Object.entries(task.limits ?? {}).every(([key, limit]) => task.usage[key] < limit)
-    panel.innerHTML = `<h3>代码重建与接口检查</h3><p>使用已生成卡片和公开接口重建代码。重建后可执行行为评测。展示规范化函数差异及定位范围。自动知识修订尚未接通。</p>
+    panel.innerHTML = `<h3>代码重建与接口检查</h3><p>使用已生成卡片和公开接口重建代码。重建后可执行行为评测。展示规范化函数差异及定位范围。评测后可独立执行知识修订。</p>
       ${selected ? `<p>输入：${escape(selected.versionIds.length)} 个知识版本 · ${escape(selected.snapshotId)}</p><button class="primary-button" type="button" data-reconstruction-action="start" ${busy || active() || !isEditable() ? 'disabled' : ''}>执行代码重建</button>` : '<p>完成知识生成后可执行重建。</p>'}
       <p role="status">${escape(notice)}</p>${task ? `<p><b>${escape(task.cancelRequested && active() ? '正在取消' : labels[task.status] ?? '未知')}</b> · 重建结果不代表行为验证或发布</p>
       <p>任务 ${escape(task.taskId)} · 累计模型请求 ${escape(task.usage.modelCalls)} 次</p>
@@ -56,6 +56,7 @@ export function createKnowledgeReconstructionPanel({ root, request, escapeHtml: 
     } catch { if (current === epoch) { notice = '状态暂不可读，已保存的代码仍保留。'; render() } }
     if (active() && host()) timer = setTimeout(observe, 800)
   }
+  root.addEventListener('workbench-reconstruction-started', event => { epoch++; task = event.detail; checkpoints = []; notice = ''; render(); void observe() })
   root.addEventListener('click', async (event) => {
     const action = event.target.closest('[data-reconstruction-action]')?.dataset.reconstructionAction
     if (!action || busy || !isEditable()) return
@@ -76,7 +77,7 @@ export function createKnowledgeReconstructionPanel({ root, request, escapeHtml: 
       initialized = true; const current = epoch
       request('/api/v1/stage-tasks').then((result) => {
         if (current !== epoch) return
-        task = result.items.find((item) => item.input.stage === 'FLYWHEEL') ?? null
+        task = result.items.find((item) => item.input.stage === 'FLYWHEEL' && !item.input.parameters.operation) ?? null
         return observe()
       }).catch(() => { initialized = false })
     } else if (active() && !timer) queueMicrotask(observe)

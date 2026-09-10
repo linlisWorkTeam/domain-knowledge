@@ -21,7 +21,7 @@ test('native stage rejects bad candidates, resumes trusted cases after restart a
   git('init', '-q'); writeFileSync(join(root, 'math.h'), 'int add(int a,int b);');
   writeFileSync(join(root, 'math.c'), '#include "math.h"\n/* REFERENCE_PRIVATE */\nint add(int a,int b){return a+b;}');
   git('add', '.'); git('commit', '-qm', 'Fixed reference');
-  let composition = createComposition({ runtimeDir }); let testCalls = 0, codeCalls = 0, generatedRuns = 0;
+  let composition = createComposition({ runtimeDir }); let testCalls = 0, codeCalls = 0, generatedRuns = 0, reviewCalls = 0, revisionCalls = 0;
   let wrongCandidate = true, wrongCode = false, interrupt = true;
   const install = () => {
     const deps = composition.apps.workbenchReconstruction.dependencies;
@@ -34,7 +34,11 @@ test('native stage rejects bad candidates, resumes trusted cases after restart a
       return runner.execute(input, contract, sample, signal);
     } };
     deps.roles.dependencies.model = (_command, _configuration, usage) => ({ assertOutput: assertModelOutput, execute: async (request) => {
-      assert.deepEqual(request.readablePaths, []); assert.doesNotMatch(request.prompt, /REFERENCE_PRIVATE|return a\+b/);
+      assert.deepEqual(request.readablePaths, []);
+      if (['code', 'test-gen'].includes(request.role)) assert.doesNotMatch(request.prompt, /REFERENCE_PRIVATE|return a\+b/);
+      else assert.match(request.prompt, /REFERENCE_PRIVATE/, 'revision roles receive the pinned reference, never Code or TestGen');
+      if (request.role === 'review') { reviewCalls++; usage(`review-${reviewCalls}`, 3); return { blocking: true, recommendation: 'ITERATE', correction: { correctionId: 'COR-0001', knowledgePath: 'knowledge/unit-add.md#Behavior', criterion: 'Describe addition rather than subtraction according to the trusted sum observation.', risk: 'Incorrect arithmetic operation' }, unresolvedRisks: [] }; }
+      if (request.role === 'doc-gen') { revisionCalls++; usage(`revision-${revisionCalls}`, 4); assert.equal(request.stage, 'revision'); return { title: 'Addition', description: 'Representable sum', sections: [{ sectionId: 'section-1', body: 'The sum of the two arguments is returned, rather than their difference. For the fixed inputs 3 and 4, the expected result is 7. Inputs and result must be representable signed integers. Overflow and unsupported values remain outside the specified interface contract.\n\nAddition is required because the public operation combines both arguments, rather than computing an ordered difference. The trusted reference observation is evidence for the fixed sample; it does not establish that every possible integer input has been tested. Callers must still respect the signed integer range. Negative operands may affect the sign of the sum, but they do not change the arithmetic operation into subtraction. No memory allocation or persistent state is part of this interface.' }] }; }
       if (request.role === 'code') { codeCalls++; usage(`code-${codeCalls}`, 7);
         return { files: [{ path: 'math.h', content: 'int add(int a,int b);' }, { path: 'math.c', content: `#include "math.h"\nint add(int a,int b){return a${wrongCode ? '-' : '+'}b;}` }] }; }
       assert.equal(request.role, 'test-gen'); testCalls++; usage(`test-${testCalls}`, 5);
@@ -50,7 +54,7 @@ test('native stage rejects bad candidates, resumes trusted cases after restart a
     const api = await new NativeToolchain().publicInterface({ language: 'c', build: project.build, entryPath: 'math.h', files: [{ path: 'math.h', content: 'int add(int a,int b);' }] });
     const interfaceRef = await composition.artifacts.put(Buffer.from(JSON.stringify(api)), 'application/json');
     const input = { moduleId: 'unit-add', title: 'Addition', description: 'Representable sum',
-      body: '# Addition\n## Behavior\nThe sum of the two arguments is returned. Inputs and result must be representable signed integers.',
+      body: '# Addition\n## Behavior\nThe sum of the two arguments is returned. Inputs and result must be representable signed integers.\n## Limits\nNo overflow.',
       provenance: [{ path: 'math.c', commit: project.commit, pinned: true }], metadata: { cardId: 'card-add', language: 'c', sourceModule: 'math',
         projectSnapshotId: project.snapshotId, repositoryId: project.repositoryId, interfaceRef } };
     const candidate = await composition.apps.flywheel.ingestCandidate(input);
@@ -75,7 +79,7 @@ test('native stage rejects bad candidates, resumes trusted cases after restart a
     assert.equal((await composition.apps.workbenchEvaluation.start(code.taskId)).taskId, evaluation.taskId);
     assert.equal((await composition.apps.workbenchEvaluation.revisionEvidence(done.taskId)).modules[0]?.nextAction, 'NO_BEHAVIOR_REVISION_REQUIRED');
     wrongCode = true;
-    const revised = await composition.apps.flywheel.ingestCandidate({ ...input, body: input.body + '\nOverflow is excluded explicitly.' });
+    const revised = await composition.apps.flywheel.ingestCandidate({ ...input, body: input.body.replace('The sum', 'The difference') + '\nOverflow is excluded explicitly.' });
     const rebuilt = await composition.apps.workbenchReconstruction.start(project.snapshotId, [revised.version.versionId]);
     assert.equal((await composition.apps.workbenchStages.wait(rebuilt.taskId)).status, 'SUCCEEDED');
     const next = await composition.apps.workbenchEvaluation.start(rebuilt.taskId);
@@ -91,6 +95,33 @@ test('native stage rejects bad candidates, resumes trusted cases after restart a
     assert.deepEqual(evidence.modules[0]?.candidates[0]?.sections[0]?.caseIds, ['sum']);
     assert.equal(evidence.modules[0]?.knowledgeErrorProven, false, 'wrong generated code alone is not a knowledge error');
     assert.deepEqual(await composition.apps.workbenchEvaluation.revisionEvidence(next.taskId), evidence, 'read-only evidence is deterministic');
+    const indexWrite = composition.apps.knowledgeIndex.index.write.bind(composition.apps.knowledgeIndex.index); let indexFail = true;
+    composition.apps.knowledgeIndex.index.write = (...args) => { if (indexFail) throw new Error('TEST_INDEX_INTERRUPTION'); return indexWrite(...args); };
+    const revision = await composition.apps.workbenchKnowledgeRevision.start(next.taskId);
+    const partial = await composition.apps.workbenchStages.wait(revision.taskId);
+    assert.equal(partial.reasonCode, 'INDEX_BUILD_PARTIAL'); assert.equal(reviewCalls, 1); assert.equal(revisionCalls, 1);
+    const saved = composition.apps.workbenchStages.store.checkpoints(revision.taskId).find(item => item.key.startsWith('revision-card:'))!;
+    const correctedId = String(saved.result.summary.versionId);
+    const corrected = composition.repository.getKnowledgeVersion(correctedId)!;
+    assert.equal(corrected.metadata.cardId, 'card-add'); assert.equal(corrected.parentVersionId, revised.version.versionId);
+    const correctedBody = Buffer.from(await composition.artifacts.get(corrected.bodyRef)).toString('utf8');
+    assert.match(correctedBody, /The sum/); assert.ok(correctedBody.endsWith('## Limits\nNo overflow.\nOverflow is excluded explicitly.'));
+    await composition.close(); composition = createComposition({ runtimeDir }); install();
+    indexFail = false; composition.apps.workbenchStages.resume(revision.taskId, revision.inputDigest);
+    const revisionDone = await composition.apps.workbenchStages.wait(revision.taskId);
+    assert.equal(revisionDone.status, 'SUCCEEDED', revisionDone.reasonCode ?? ''); assert.equal(revisionDone.result!.summary.outcome, 'REVISED_INDEXED'); assert.equal(reviewCalls, 1); assert.equal(revisionCalls, 1);
+    assert.equal((await composition.apps.workbenchKnowledgeRevision.start(next.taskId)).taskId, revision.taskId);
+    assert.equal((await composition.apps.knowledgeIndex.preview('card-add')).versionId, correctedId);
+    await assert.rejects(composition.apps.flywheel.ingestCandidate({ ...input, body: input.body + '\nConcurrent stale write.', expectedParentVersionId: revised.version.versionId }), /CANDIDATE_PARENT_CHANGED/);
+    assert.equal(composition.repository.latestKnowledgeVersion(input.moduleId)?.versionId, correctedId);
+    assert.equal((await composition.apps.flywheel.ingestCandidate({ ...input, body: correctedBody, expectedParentVersionId: revised.version.versionId })).version.versionId, correctedId);
+    wrongCode = false;
+    const correctedCode = await composition.apps.workbenchReconstruction.start(project.snapshotId, [correctedId]);
+    assert.equal((await composition.apps.workbenchStages.wait(correctedCode.taskId)).status, 'SUCCEEDED');
+    const correctedEval = await composition.apps.workbenchEvaluation.start(correctedCode.taskId);
+    const correctedResult = await composition.apps.workbenchStages.wait(correctedEval.taskId);
+    assert.equal((correctedResult.result!.summary.modules as any[])[0].status, 'BEHAVIOR_PASSED');
+    assert.equal(testCalls, 2, 'knowledge revision preserves historical expected results');
     writeFileSync(join(root, 'math.c'), '#include "math.h"\nint add(int a,int b){return a+b+1;}');
     git('add', '.'); git('commit', '-qm', 'Changed reference behavior');
     const changedProject = await composition.apps.workbenchProjects.create({ directory: root, moduleIds: ['math'] });

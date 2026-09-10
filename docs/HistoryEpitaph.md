@@ -154,3 +154,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 - [2026-09-11-0233-persistent-pipeline.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/7c81fd0cdf99ef2012a87d1c05b40a0b0156b042/docs/epitaph/2026-09-11-0233-persistent-pipeline.md)：首版持久化一键流程、崩溃交接恢复及 jsmn 真实 31/31；后续契约已升级，旧流程只读。
 
 - [2026-09-11-0235-material-snapshots.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/a46a2d7b7bf30edd53d588034f8c077fb7569b52/docs/epitaph/2026-09-11-0235-material-snapshots.md)：显式本地/HTTPS外部材料快照、来源修订及CAS原文绑定；后续关联和修订诊断继续复用。
+
+- [2026-09-11-0249-external-relations.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/698d6d51cf3dd2ea4d4cec76493402a55c433634/docs/epitaph/2026-09-11-0249-external-relations.md)：外部材料关联、v2一键选材和真实jsmn45条关系验收，后续执行契约见新交接。

@@ -989,7 +989,15 @@ test('操作中心从固定 Git 版本分析仓库，显示模块和环境且窄
     reconstruction.snapshot = async (language, build) => ({ schemaVersion: 'native-toolchain-v1', language, build, architecture: 'test', files: [], digest: 'a'.repeat(64) });
     reconstruction.native = instance.composition.apps.workbenchGeneration.dependencies.native;
     reconstruction.roles.dependencies.model = (command) => ({ assertOutput: assertModelOutput, execute: async (request) => {
-      expect(request.readablePaths).toEqual([]); expect(request.prompt).not.toContain('return 1;');
+      expect(request.readablePaths).toEqual([]);
+      if (['code', 'test-gen'].includes(request.role)) expect(request.prompt).not.toContain('return 1;');
+      else expect(request.prompt).toContain('return 1;');
+      if (request.role === 'review') {
+        const criteria = JSON.parse(Buffer.from(await instance.composition.artifacts.get(command.payload.criteriaRef as any)).toString('utf8'));
+        const card = instance.composition.repository.getKnowledgeVersion(criteria.candidate.versionId)!;
+        return { blocking: true, recommendation: 'ITERATE', correction: { correctionId: 'COR-0001', knowledgePath: `knowledge/${card.moduleId}.md#Behavior`, criterion: 'Clarify the fixed integer return value.', risk: 'Unclear reconstruction guidance' }, unresolvedRisks: [] };
+      }
+      if (request.role === 'doc-gen') return { title: 'Parser generated card', description: 'The fixed parser interface.', sections: [{ sectionId: 'section-1', body: 'The parse function takes no arguments and always returns the integer one. Its public interface is int parse(void). The return value is exactly 1, not 0. The fixed source has no external dependencies or mutable state. This describes only the provided function; unsupported inputs and unrelated parsers are outside the scope. Behavioral verification of reconstructed code is still required.\n\nThis boundary matters because a generated implementation may compile with the correct signature while returning a different value. Callers should compare the returned integer with one; the presence of a callable function alone is insufficient. No allocation, callback, error code, or global configuration is part of this interface. These statements apply to the pinned source version and do not describe a general JSON parser.' }] };
       if (request.role === 'test-gen') {
         const ref = command.payload.testPolicyRef as Parameters<typeof instance.composition.artifacts.get>[0];
         const policy = JSON.parse(Buffer.from(await instance.composition.artifacts.get(ref)).toString('utf8'));
@@ -1063,6 +1071,27 @@ test('操作中心从固定 Git 版本分析仓库，显示模块和环境且窄
     await page.getByRole('button', { name: '分析仓库', exact: true }).click();
     await expect(page.locator('[data-repository-notice]')).toContainText('无法读取这个源码版本');
     await expect(page.locator('[data-repository-result]')).not.toContainText(commit);
+    await page.getByRole('button', { name: '查看修订依据', exact: true }).click();
+    await page.getByRole('button', { name: '执行知识修订', exact: true }).click();
+    await expect(page.locator('[data-knowledge-revision-panel]')).toContainText('受影响索引已刷新');
+    await page.getByRole('button', { name: '查看修订前后正文', exact: true }).click();
+    await expect(page.locator('[data-knowledge-revision-panel]')).toContainText('exactly 1, not 0');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await page.screenshot({ path: test.info().outputPath('knowledge-revision-mobile.png'), fullPage: true });
+    await page.locator('[data-knowledge-revision-panel]').screenshot({ path: test.info().outputPath('knowledge-revision-mobile-detail.png') });
+    await page.setViewportSize({ width: 1363, height: 936 });
+    await page.screenshot({ path: test.info().outputPath('knowledge-revision-desktop.png'), fullPage: true });
+    await page.locator('[data-knowledge-revision-panel]').screenshot({ path: test.info().outputPath('knowledge-revision-desktop-detail.png') });
+    const revisedTask = instance.composition.apps.workbenchStages.store.list().find(item => item.input.parameters.operation === 'KNOWLEDGE_REVISION')!;
+    expect(revisedTask.result!.summary.outcome).toBe('REVISED_INDEXED');
+    const updatedCard = instance.composition.repository.getKnowledgeVersion(String((revisedTask.result!.summary.updatedVersionIds as string[])[0]))!;
+    expect(Buffer.from(await instance.composition.artifacts.get(updatedCard.bodyRef)).toString('utf8')).toContain(`来源提交：\`${commit}\``);
+    await page.getByRole('button', { name: '重建修订版本', exact: true }).click();
+    await expect.poll(() => instance.composition.apps.workbenchStages.store.list().find(item => item.input.stage === 'FLYWHEEL' && !item.input.parameters.operation)?.input.cardVersionIds).toEqual(revisedTask.result!.summary.versionIds);
+    await expect(page.locator('[data-reconstruction-panel]')).toContainText('重建及接口检查完成');
+    const rebuiltTask = instance.composition.apps.workbenchStages.store.list().find(item => item.input.stage === 'FLYWHEEL' && !item.input.parameters.operation)!;
+    expect(rebuiltTask.input.cardVersionIds).toEqual(revisedTask.result!.summary.versionIds);
+
   } finally { nativeEvaluation.snapshot = originalEvaluation.snapshot; nativeEvaluation.runner = originalEvaluation.runner; instance.composition.apps.workbenchEvaluation.dependencies.native = originalEvaluation.native; reconstruction.roles.dependencies.model = originalReconstruction.model; reconstruction.snapshot = originalReconstruction.snapshot; reconstruction.native = originalReconstruction.native; instance.composition.apps.workbenchGeneration.dependencies.model = originalModel; instance.composition.apps.workbenchGeneration.dependencies.native = originalNative; rmSync(directory, { recursive: true, force: true }); }
 });
 

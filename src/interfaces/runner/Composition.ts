@@ -18,6 +18,8 @@ import { SqliteWorkbenchPipelines } from '../../infrastructure/sqlite/SqliteWork
 import { WorkbenchGeneration } from '../../application/services/WorkbenchGeneration.ts';
 import { NativeToolchain } from '../../infrastructure/evaluation/project/NativeToolchain.ts';
 import { WorkbenchAssociations } from '../../application/services/WorkbenchAssociations.ts';
+import { WorkbenchKnowledgeRevision } from '../../application/services/WorkbenchKnowledgeRevision.ts';
+import { KNOWLEDGE_REVISION_CONTRACT } from '../../domain/services/knowledge/KnowledgeRevision.ts';
 import { WorkbenchEvaluation } from '../../application/services/WorkbenchEvaluation.ts';
 import { WorkbenchReconstruction } from '../../application/services/WorkbenchReconstruction.ts';
 import { WorkbenchRoleExecution } from '../../application/services/WorkbenchRoleExecution.ts';
@@ -188,9 +190,10 @@ export function createComposition(input: {
   let workbenchGeneration!: WorkbenchGeneration;
   let workbenchReconstruction!: WorkbenchReconstruction;
   let workbenchEvaluation!: WorkbenchEvaluation;
+  let workbenchKnowledgeRevision!: WorkbenchKnowledgeRevision;
   let workbenchAssociations!: WorkbenchAssociations;
   const workbenchStages = new WorkbenchStages(stageStore, { INDEX: (context) => knowledgeIndex.build(context), GENERATE: (context) => workbenchGeneration.generate(context),
-    FLYWHEEL: (context) => workbenchReconstruction.reconstruct(context), EVALUATE: (context) => workbenchEvaluation.evaluate(context), ASSOCIATE: (context) => workbenchAssociations.build(context) }, (input) => input.stage !== 'FLYWHEEL' || input.parameters.comparisonContract === SOURCE_COMPARISON_CONTRACT);
+    FLYWHEEL: (context) => context.task.input.parameters.operation === 'KNOWLEDGE_REVISION' ? workbenchKnowledgeRevision.revise(context) : workbenchReconstruction.reconstruct(context), EVALUATE: (context) => workbenchEvaluation.evaluate(context), ASSOCIATE: (context) => workbenchAssociations.build(context) }, (input) => input.stage !== 'FLYWHEEL' || (input.parameters.operation === 'KNOWLEDGE_REVISION' ? input.parameters.revisionContract === KNOWLEDGE_REVISION_CONTRACT : input.parameters.operation === undefined && input.parameters.comparisonContract === SOURCE_COMPARISON_CONTRACT));
   const scanner = new SourceScanner(repositoryRoot, repository);
   const knowledgeDiscoveryApp = new KnowledgeDiscoveryApp(scanner, undefined, {
     migrate: (legacyKnowledgeRoot) => migrateLegacyOkf({
@@ -414,6 +417,7 @@ export function createComposition(input: {
     roles: new WorkbenchRoleExecution({ artifacts, contracts: new JsonSchemaAgentContractValidator(schemaRoot), model: workbenchGeneration.dependencies.model }) });
   workbenchEvaluation = new WorkbenchEvaluation({ projects: projectStore, repository, artifacts, native: new NativeToolchain(),
     configuration: runConfiguration, stages: workbenchStages, roles: workbenchReconstruction.dependencies.roles, evaluation: nativeEvaluation });
+  workbenchKnowledgeRevision = new WorkbenchKnowledgeRevision(workbenchEvaluation, flywheelApp, knowledgeIndex);
   const workbenchPipelines = new WorkbenchPipelines({ materials: workbenchMaterials.store, environment: async (snapshotId, signal) => {
     const project = projectStore.get(snapshotId); if (!project) throw new Error('PROJECT_INPUT_NOT_FOUND');
     const fingerprints = [];
@@ -582,6 +586,7 @@ export function createComposition(input: {
       nativeEvaluation,
       workbenchReconstruction,
       workbenchEvaluation,
+      workbenchKnowledgeRevision,
       markdownLite: {
         start: async (directory: string, budgetMode?: 'provider-quota') => {
           // 固定模块入口只接受服务器目录；源码与模型设置在服务端验证。
