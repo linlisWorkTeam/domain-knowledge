@@ -231,10 +231,10 @@ npm run knowledge -- set-agent-prompt --agent doc-gen --prompt "优先写清适�
 
 ### 8. 下一步
 
-- 想理解用户完整使用路径：阅读[用户用例与交互时序](specs/domainFunction/workflow/Workflow.md)。
+- 想理解用户完整使用路径：阅读[用户用例与交互时序](specs/domainFunction/services/workflow/Workflow.md)。
 - 想完成真实评测与发布：阅读[行为评测与发布](Operations.md)。
 - 想修改实现：阅读[开发指南](Development.md)。
-- 想理解为什么 Agent 不能自行发布：阅读[评测模型](specs/domainFunction/evaluation/Evaluation.md)和[发布门禁](specs/domainFunction/evaluation/Evaluation.md)。
+- 想理解为什么 Agent 不能自行发布：阅读[评测模型](specs/domainFunction/services/evaluation/Evaluation.md)和[发布门禁](specs/domainFunction/services/evaluation/Evaluation.md)。
 
 ## 路径 B：交给 Agent 配置和启动
 

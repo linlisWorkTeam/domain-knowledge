@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：加载工作流上下文与历史工件，协调角色执行、独立评测和发布。
  */
-import { assessRisks, collectRisks, type KnowledgeRisk } from '../../domain/knowledgeRisks/KnowledgeRisks.ts';
+import { assessRisks, collectRisks, type KnowledgeRisk } from '../../domain/services/knowledge/KnowledgeRisks.ts';
 import type { Output as DocumentOutput } from '../../domain/agents/docGenAgent/DocGenAgentContract.ts';
 import type { Output as CodeOutput } from '../../domain/agents/codeAgent/CodeAgentContract.ts';
 import type { Output as CheckOutput } from '../../domain/agents/checkAgent/CheckAgentContract.ts';

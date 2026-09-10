@@ -4,12 +4,12 @@
  * 文件功能：定义 Application 与存储、运行时、模型及外部能力之间的端口契约。
  */
 /** 统一引用 Domain 拥有的源码发现、工作空间和业务角色定义契约。 */
-import type { KnowledgeDiscoveryCandidate, KnowledgeDiscoveryPort } from '../../domain/sourceScan/SourceScan.ts';
-import type { AgentWorkspaceProvider, AgentWorkspaceView } from '../../domain/workspace/LocalAgentWorkspace.ts';
-import type { AgentDefinition } from '../../domain/workflow/AgentDefinitions.ts';
-export type { KnowledgeDiscoveryCandidate, KnowledgeDiscoveryPort } from '../../domain/sourceScan/SourceScan.ts';
-export type { AgentWorkspaceProvider, AgentWorkspaceView } from '../../domain/workspace/LocalAgentWorkspace.ts';
-export type { AgentDefinition } from '../../domain/workflow/AgentDefinitions.ts';
+import type { KnowledgeDiscoveryCandidate, KnowledgeDiscoveryPort } from '../../domain/services/sourceScan/SourceScan.ts';
+import type { AgentWorkspaceProvider, AgentWorkspaceView } from '../../domain/services/workspace/LocalAgentWorkspace.ts';
+import type { AgentDefinition } from '../../domain/services/workflow/AgentDefinitions.ts';
+export type { KnowledgeDiscoveryCandidate, KnowledgeDiscoveryPort } from '../../domain/services/sourceScan/SourceScan.ts';
+export type { AgentWorkspaceProvider, AgentWorkspaceView } from '../../domain/services/workspace/LocalAgentWorkspace.ts';
+export type { AgentDefinition } from '../../domain/services/workflow/AgentDefinitions.ts';
 import type { AgentId, AgentCommand, AgentResult } from '../../domain/agents/AgentContracts.ts';
 /** 统一导出本模块的公共符号，供其他层通过明确入口引用。 */
 export { AGENT_IDS, type AgentId, type AgentCommand, type AgentResult } from '../../domain/agents/AgentContracts.ts';

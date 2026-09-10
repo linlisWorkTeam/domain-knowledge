@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：验证Dsh项目Stages的行为、约束及失败场景。
  */
-import { NODE_BY_AGENT } from '../../src/domain/workflow/AgentDefinitions.ts';
+import { NODE_BY_AGENT } from '../../src/domain/services/workflow/AgentDefinitions.ts';
 import { modelExecutionFactory } from '../../src/infrastructure/agentAdapters/ModelExecution.ts';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -14,7 +14,7 @@ import test from 'node:test';
 import { ProjectWorkflowStages, type AutomatedProjectScenario } from '../../src/application/services/AutomatedProjectWorkflow.ts';
 import type { WorkflowStageInput } from '../../src/application/ports/ApplicationPorts.ts';
 import { DeepSeekHarnessSdkAgent, type DeepSeekHarnessAuditRecord } from '../../src/infrastructure/agentAdapters/deepSeekHarness/DeepSeekHarnessSdkAgent.ts';
-import { LocalAgentWorkspace } from '../../src/domain/workspace/LocalAgentWorkspace.ts';
+import { LocalAgentWorkspace } from '../../src/domain/services/workspace/LocalAgentWorkspace.ts';
 import { TrustedProjectEvaluator } from '../../src/infrastructure/evaluation/project/TrustedProjectEvaluator.ts';
 import { JsonSchemaAgentContractValidator } from '../../src/infrastructure/agentAdapters/contracts/JsonSchemaAgentContractValidator.ts';
 import { createComposition } from '../../src/interfaces/runner/Composition.ts';

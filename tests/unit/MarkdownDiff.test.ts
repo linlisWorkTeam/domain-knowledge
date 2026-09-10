@@ -5,7 +5,7 @@
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { structuredMarkdownDiff } from '../../src/domain/knowledge/MarkdownDiff.ts';
+import { structuredMarkdownDiff } from '../../src/domain/services/knowledge/MarkdownDiff.ts';
 
 test('Markdown diff keeps identical and empty documents unchanged', () => {
   for (const body of ['', '# 标题\n\n正文', 'one\ntwo\n']) {

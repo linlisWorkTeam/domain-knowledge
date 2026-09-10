@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：定义文档分块角色的输入输出契约、输出 Schema 与材料校验。
  */
-import { VERIFICATION_NEEDS, type VerificationNeed } from '../../knowledgeRisks/KnowledgeRisks.ts';
+import { VERIFICATION_NEEDS, type VerificationNeed } from '../../services/knowledge/KnowledgeRisks.ts';
 import type { ArtifactRef } from '../../Domain.ts';
 import type { RoleInput } from '../AgentExecution.ts';
 import { requireMaterials } from '../AgentExecution.ts';

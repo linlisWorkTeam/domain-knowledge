@@ -7,7 +7,7 @@ SPDX-License-Identifier: MIT
 
 目标版本为 `0.2.0`，环境限定 OpenCloudOS 9.4 x86_64，代表模块为 ohMyWorkPanel 的 `src/chat/markdownLite.ts`。当前已实现闭环及真实失败后的修复候选，最新结果见文末；用户追加一次授权后共使用 4/4 次真实启动，第四次完成七角色及三轮反馈修订，最终行为评测 315/315，但遗留知识风险阻止发布，不能视为已验收 MVP，也未创建正式 GitHub Release。历史单角色 live 记录不能替代本次七角色验收。
 
-操作见[Linux 安装指南](LinuxInstall.md)，工作流约定见[Workflow](specs/domainFunction/workflow/Workflow.md)、[LangGraph](specs/infrastructure/langgraph/LangGraph.md)，七角色设计见[Agents](specs/domainFunction/agents/Agents.md)。历史交接见[HistoryEpitaph](HistoryEpitaph.md)。
+操作见[Linux 安装指南](LinuxInstall.md)，工作流约定见[Workflow](specs/domainFunction/services/workflow/Workflow.md)、[LangGraph](specs/infrastructure/langgraph/LangGraph.md)，七角色设计见[Agents](specs/domainFunction/agents/Agents.md)。历史交接见[HistoryEpitaph](HistoryEpitaph.md)。
 
 ## 实现与取舍
 
@@ -113,6 +113,12 @@ ECS 约 3.6 GiB 内存、无 swap。模型与模块评测共享一个进程槽�
 
 已安装实例 `/root/.local/share/domain-knowledge-mvp` 在验收后停止，释放 ECS 内存；原 ohMyWorkPanel 仍为固定提交且干净。尚缺修复后的真实模型完整闭环：本轮新增调用 0，历史 3/3 启动、0 次通过、0 次发布不变。进一步真实验收必须追加用户授权，不能删除账本、另换目录或重写原失败证据绕过限制。正式 Release 仍不发布。
 
+## 2026-09-10 开发规范与领域服务结构
+
+`agents` 与 `services` 在 Domain 平级；角色选择通过 AgentExecutionService 封装，association/evaluation 等服务持有各自确定性规则。Spec、目录契约和调用方已同步，详见 [领域边界](specs/totalRules/DomainDrivenDesign.md)。开发 subagent 并行规范见 [CodeTaste](specs/totalRules/CodeTaste.md#开发过程中的-subagent-并行协作)，NFR-013 的实际双任务宿主验收尚未执行。
+
+本次类型、Spec、架构与目录契约通过；完整回归 325 项中 324 通过，唯一站点资产摘要失配已修复并通过站点 12/12 定向复测。未重复执行完整回归，也未运行浏览器、外网模型或重新构建安装包；前述真实 MVP 验收结论保持原有边界。具体交接见 [本次墓志铭](epitaph/2026-09-10-1017-domain-services-subagents.md)。
+
 
 ## 第四次真实验收（2026-09-10，最终 STOPPED）
 
@@ -139,7 +145,7 @@ ECS 约 3.6 GiB 内存、无 swap。模型与模块评测共享一个进程槽�
 
 ## 风险复核修复（2026-09-10，受控验证）
 
-用户同意修复后，新增 Domain `knowledgeRisks/KnowledgeRisks.ts`。风险记录绑定来源工件、稳定编号和原始声明；每轮形成独立的 OPEN / VERIFIED / OUT_OF_SCOPE 审计，绑定当前 run、知识版本和评测证据。原风险不删除，上一轮通过不会自动传递给下一轮。
+用户同意修复后，新增 Domain `services/knowledge/KnowledgeRisks.ts`。风险记录绑定来源工件、稳定编号和原始声明；每轮形成独立的 OPEN / VERIFIED / OUT_OF_SCOPE 审计，绑定当前 run、知识版本和评测证据。原风险不删除，上一轮通过不会自动传递给下一轮。
 
 DocWorker 可使用三个明确的 verificationNeeds：固定/晋升模块案例待验证、系统集成范围限制、公开类型外范围限制。声明文本由程序生成，不接受模型自定义“已解决”的内容。模块案例待验证仅在冻结模块契约内、当前可信评测非空且全部通过、稳定性 1 时成为 VERIFIED；两类范围限制按冻结模块契约记为 OUT_OF_SCOPE，不声称已验证。普通 unresolvedRisks 仍按缺证据阻塞，不通过自然语言分类或模型自评清除；需补齐材料后重新提取。
 

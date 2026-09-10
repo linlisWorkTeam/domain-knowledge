@@ -3,9 +3,9 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：为生产与独立开发统一执行角色、保存工件并提交结果信封。
  */
-import { agents } from '../../domain/agents/AgentRegistry.ts';
+import { executeAgent } from '../../domain/services/workflow/AgentExecutionService.ts';
 import type { AgentCommand, AgentResult, AgentId } from '../../domain/agents/AgentContracts.ts';
-import type { ExecutionContext, RoleInput, RoleResult, StageAttempt } from '../../domain/agents/AgentExecution.ts';
+import type { ExecutionContext, RoleInput, StageAttempt } from '../../domain/agents/AgentExecution.ts';
 import { assertActive } from '../../domain/agents/AgentExecution.ts';
 import { createEvent, type ArtifactRef } from '../../domain/Domain.ts';
 import type { AgentContractValidator } from '../ports/ApplicationPorts.ts';
@@ -42,10 +42,6 @@ export class RoleExecutionService {
       runId: command.runId, nodeId: request.nodeId, generationKey: command.generationKey,
       inputRefs: uniqueRefs([...request.inputRefs, ...input.materials.map(({ ref }) => ref), commandRef]),
     }, async () => {
-      // 版本化命令已验证角色与 payload 的对应关系，在唯一调度边界收窄为具体角色入口。
-      const execute = agents[command.agentType].execute as unknown as (
-        input: RoleInput<Record<string, unknown>>, context: ExecutionContext,
-      ) => Promise<RoleResult<unknown>>;
       const stageJournal: NonNullable<ExecutionContext['stageJournal']> = {
         read: async (stage) => {
           const latest = new Map<number, StageAttempt>();
@@ -67,7 +63,7 @@ export class RoleExecutionService {
           }, this.flywheel.clock()));
         },
       };
-      const roleResult = await execute(input, { ...context, stageJournal });
+      const roleResult = await executeAgent(input, { ...context, stageJournal });
       const rawRef = await this.flywheel.putArtifact(Buffer.from(JSON.stringify(roleResult.output, null, 2)), 'application/json');
       // 先保存标准化角色结果与声明工件；阶段模型原文已由 stageJournal 单独留证。
       const refs = new Map<string, ArtifactRef>([['raw', rawRef]]);

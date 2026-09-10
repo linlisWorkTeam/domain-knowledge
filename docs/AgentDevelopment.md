@@ -5,7 +5,7 @@ SPDX-License-Identifier: MIT
 -->
 # Agent 开发指南
 
-角色设计见 [Agents](specs/domainFunction/agents/Agents.md)，跨角色流程见 [Workflow](specs/domainFunction/workflow/Workflow.md)。本文件只说明如何定位、运行和修改角色，DocGen 的固定源码教程合并在后半部分。
+角色设计见 [Agents](specs/domainFunction/agents/Agents.md)，跨角色流程见 [Workflow](specs/domainFunction/services/workflow/Workflow.md)。本文件只说明如何定位、运行和修改角色，DocGen 的固定源码教程合并在后半部分。
 
 ## 定位代码
 

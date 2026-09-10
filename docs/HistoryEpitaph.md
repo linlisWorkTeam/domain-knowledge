@@ -97,4 +97,11 @@ This document summarizes older handoffs, milestones and architectural decisions 
 - [2026-09-09-1219-mvp-real-acceptance-budget-exhausted.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/cff8fc14a75b556dfce84598842caa7d2f895868/docs/epitaph/2026-09-09-1219-mvp-real-acceptance-budget-exhausted.md)：纠正遗漏历史凭据的判断，记录三次真实启动失败及 3/3 额度耗尽；当时 281 项回归通过，未有完整真实发布。后续仍需新预算，不改写原失败证据。
 - [2026-09-09-1225-mvp-live-final-evidence.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/cff8fc14a75b556dfce84598842caa7d2f895868/docs/epitaph/2026-09-09-1225-mvp-live-final-evidence.md)：1867025 安装包、281 项回归和 19 项 Console 通过；实际失败列表误显示 GENERATING 是当时未解决问题，现由阶段修复候选覆盖。真实预算仍耗尽，原取消节点和用量证据保持历史原样。
 
+
+## 开发并行规范与领域服务整理前的交接归档
+
+- [2026-09-09-1640-provider-generation-probe.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/51c2972e914c81bbeaf3577aa79b27e563f18ca0/docs/epitaph/2026-09-09-1640-provider-generation-probe.md)：将模型连接验证改为列表检查后执行生产 DSH 的一次 64 token 最小生成，30 秒总期限，保留隔离、失败关闭、取消清理与旧配置降级。当时受控探针 15 项、配置安全 7 项、挂起超时 1 项、token 上限 2 项及类型检查通过；不是外网模型或完整 MVP 验收。后续集成结果见保留的阶段修复交接，历史失败与已耗尽真实预算仍有效。
+
 - [2026-09-09-1640-provider-generation-probe.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/27ec9dfb3472f8a07327271470d8767efcebd4c7/docs/epitaph/2026-09-09-1640-provider-generation-probe.md)：生产 DSH 的一次 64 token 生成探针与受控取消/排队/输出限制验证；当时未调用真实提供方。后续第四次授权前已成功完成真实探针，完整飞轮仍受独立门禁约束。
+
+- [2026-09-09-1645-mvp-run-state.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/471dfc5fec5f4d37ce7f176ed3a07fe01c5e90f1/docs/epitaph/2026-09-09-1645-mvp-run-state.md)：新增执行状态投影与两阶段模型验证界面，失败不再伪装为 GENERATING；当时状态/HTTP 7 项、架构 7 项、Console 21 项及类型/Spec 通过，均为受控验证。未重建安装包或增加真实预算，后续集成与第四次真实验收分别见保留交接。合并开发结构分支时归档此记录，保留最近三份墓志铭。

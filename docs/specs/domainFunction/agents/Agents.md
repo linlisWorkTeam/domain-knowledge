@@ -8,6 +8,8 @@ SPDX-License-Identifier: MIT
 代码位置：[src/domain/agents/AgentRegistry.ts](../../../../src/domain/agents/AgentRegistry.ts)、[src/domain/agents/AgentExecution.ts](../../../../src/domain/agents/AgentExecution.ts)、[src/domain/agents/AgentContracts.ts](../../../../src/domain/agents/AgentContracts.ts)。
 
 
+领域外调用角色统一经过 `src/domain/services/workflow/AgentExecutionService.ts`；本目录拥有角色内部实现和共享契约。服务负责选择已注册角色，角色负责生成步骤，Application 负责材料与持久化。association / evaluation 的确定性规则归各自服务，详见 [领域边界](../../totalRules/DomainDrivenDesign.md)。开发时的 subagent 委派遵循 [并行协作规则](../../totalRules/CodeTaste.md#开发过程中的-subagent-并行协作)。
+
 ## 共同协议
 
 每个 XxxAgent 目录有入口、Contract、Prompt、测试和显式样例。`execute(input, context)` 的 input 使用角色专属 Payload 与已加载材料；context 注入模型 Port、promptAddon 与取消信号。入口依次检查取消和材料、构建 Prompt / Schema、按角色阶段调用模型、每阶段后再次检查取消并校验输出，最终返回 output / payload / artifacts。格式重试由 Adapter 负责；DocWorker/DocGen 的可定位语义错误由阶段执行器最多反馈修正一次，权限、材料、传输错误不自动重试。
@@ -67,7 +69,7 @@ Review 的提示材料由程序提取当前知识的唯一 H2 与完整 knowledg
 
 ## 知识风险的证据复核（执行版本 v4）
 
-代码：[KnowledgeRisks.ts](../../../../src/domain/knowledgeRisks/KnowledgeRisks.ts)。`seven-role-mvp-v4` 禁止旧 v3 检查点恢复；历史输出和失败记录继续可读，不重判旧门禁。`knowledge-risk-v1` 原始记录包含稳定 riskId、来源工件、种类与声明；`knowledge-risk-assessment-v1` 工件绑定 runId、versionId、iteration 和每项证据。报告独立使用 knowledgeRiskBlocking，原因 KNOWLEDGE_RISK_UNRESOLVED，不再混入 CHECK_BLOCKING。
+代码：[KnowledgeRisks.ts](../../../../src/domain/services/knowledge/KnowledgeRisks.ts)。`seven-role-mvp-v4` 禁止旧 v3 检查点恢复；历史输出和失败记录继续可读，不重判旧门禁。`knowledge-risk-v1` 原始记录包含稳定 riskId、来源工件、种类与声明；`knowledge-risk-assessment-v1` 工件绑定 runId、versionId、iteration 和每项证据。报告独立使用 knowledgeRiskBlocking，原因 KNOWLEDGE_RISK_UNRESOLVED，不再混入 CHECK_BLOCKING。
 
 普通 unresolvedRisks 是任意缺证据声明，始终 OPEN，不能靠 Review PASS、字符串分类或测试总分自动关闭。DocWorker 可以另外声明 verificationNeeds 的三个预定义编号；编号不接受自定义描述，由 Domain 生成精确范围声明：MODULE_BEHAVIOR_TESTS 只要求当前版本固定与晋升案例全部通过；SYSTEM_INTEGRATION 与 OUTSIDE_PUBLIC_TYPES 只在冻结 moduleContract 限定独立模块公开类型验收时记 OUT_OF_SCOPE，仍保留未验证限制。不能用预定义事项替换具体源码缺失、未知行为或安全缺陷。
 

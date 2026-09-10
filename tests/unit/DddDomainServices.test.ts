@@ -5,9 +5,9 @@
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { AssociationDomainService } from '../../src/domain/association/AssociationDomainService.ts';
-import { EvalRunnerDomainService } from '../../src/domain/evaluation/EvalRunnerDomainService.ts';
-import { FlywheelDomainService } from '../../src/domain/workflow/FlywheelDomainService.ts';
+import { AssociationDomainService } from '../../src/domain/services/association/AssociationDomainService.ts';
+import { EvalRunnerDomainService } from '../../src/domain/services/evaluation/EvalRunnerDomainService.ts';
+import { FlywheelDomainService } from '../../src/domain/services/workflow/FlywheelDomainService.ts';
 
 test('FlywheelDomainService owns lifecycle rules and keeps generation capabilities explicit', () => {
   const domain = new FlywheelDomainService();
@@ -17,7 +17,7 @@ test('FlywheelDomainService owns lifecycle rules and keeps generation capabiliti
   assert.deepEqual(domain.generationCapabilities(), ['doc-gen', 'test-gen', 'code']);
 });
 
-test('EvalRunnerDomainService exposes deterministic EvaluationAgent capability', () => {
+test('EvalRunnerDomainService exposes deterministic evaluation service capability', () => {
   const flywheel = new FlywheelDomainService();
   const evaluator = new EvalRunnerDomainService();
   const run = flywheel.createRun('module-a', 'policy-a', '2026-09-03T00:00:00.000Z');

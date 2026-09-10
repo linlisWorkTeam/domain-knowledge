@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：实现文档生成角色的业务步骤与结构化结果转换。
  */
-import { collectRisks } from '../../knowledgeRisks/KnowledgeRisks.ts';
+import { collectRisks } from '../../services/knowledge/KnowledgeRisks.ts';
 import type { ExecutionContext, RoleResult, PendingArtifact } from '../AgentExecution.ts';
 import { assertActive, pending } from '../AgentExecution.ts';
 import { type Input, type Output, type Outline, outlineSchema, validateInput } from './DocGenAgentContract.ts';

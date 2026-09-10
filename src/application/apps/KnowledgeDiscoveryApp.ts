@@ -9,7 +9,7 @@ import {
   type AssociationTarget,
   type ExternalExtractor,
   type ReverseMapper,
-} from '../../domain/association/AssociationDomainService.ts';
+} from '../../domain/services/association/AssociationDomainService.ts';
 
 /** 封装知识发现应用的对外操作与协作依赖。 */
 export class KnowledgeDiscoveryApp {
