@@ -172,3 +172,14 @@ Track four stages here: DDD layout, individual Agent development, end-to-end ver
 - 功能 4：DocGen 拆分建议使用 userDecisionRequired/proposalRef 保存，candidate_knowledge 不创建候选并沿既有 STOPPED 路由停止；独立入口展示原因与建议。显式 keep-single 答复绑定原模块与源码工件，后续任务只接受一份文档。角色与两轮飞轮原有测试 18 项通过，新增待决生产交接/独立入口测试 2 项通过；完整回归正在核对。
 
 - 功能 5：统一候选入库与路由反馈使用带 YAML 的同一正文，避免描述头引起两处结构评分不一致；新增生产阶段回归覆盖，并通过 3 项相关集成测试。
+
+### S2-03 最小链路收尾证据（2026-09-10）
+
+本轮功能提交：`d53c008` 单文档/章节修订；`c205e89` 拆分提案与显式答复；`005c470` 入库/反馈正文一致性。承接此前 `22995a2` 的描述及索引、`7388997` 的 Worker 结构化证据交接。
+
+- 环境：Node 24.13.0；typecheck、validate:specs（17 schemas / 7 commands / 8 results / 52 p0）、架构测试 7 项及 git diff --check 通过。
+- 最终完整回归：`npm test` 共 241 项，239 PASS、2 FAIL。失败为 Site.test.ts 的发布资产小写命名断言与 UiuxDesign 缺失 #080b10 色值，与上述历史已知问题一致；本分支相对起点 42736e6 未改动这些测试、站点资产或 UI 主题规范。首次回归发现的旧执行版本断言已同步为 v4，15 项独立入口/运行配置测试复验通过；最终回归不再出现这些失败。
+- agent:run 的 DocGenAgentSample（修订）、DocGenWithWorkersSample（2 个 Worker）、DocGenFixedSourceSample（固定源码）均 PASS；另以相同固定材料验证 splitProposal → 显式 keep-single → 单文档输出。已核对正文仅一份、YAML 描述可解析、修订血缘及 Worker 结果引用完整，待决场景没有 bodyRef。
+- 本机输出目录：`/tmp/docgen-final-revision`、`/tmp/docgen-final-workers`、`/tmp/docgen-final-source`、`/tmp/docgen-final-split`、`/tmp/docgen-final-resume`；最终测试日志 `/tmp/docgen-final-regression.log`。这些均为 fixture 或受控模型传输验证，S3 真实供应商调用尚未执行。
+
+S2-03 当前最小链路开发完成。IO-08 的分组预算、IO-10 的分批汇总仍按原 Spec 待细化；后续不将文件均分称为上下文预算方案。专用 Console 决策按钮、知识清理与历史最佳回退不计入本轮 DocGen 角色交付。
