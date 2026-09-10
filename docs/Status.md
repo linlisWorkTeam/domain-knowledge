@@ -38,15 +38,25 @@ SPDX-License-Identifier: MIT
 
 | 任务 | 角色 | 细化与验收重点 | 状态 | 当前证据 |
 | --- | --- | --- | --- | --- |
-| S2-01 | [Orchestrator](specs/domainFunction/agents/orchestratorAgent/OrchestratorAgent.md) | 计划输入、任务输出和失败处理；保持固定业务连接，不能由模型决定 Gate PASS | 待开发 | 已有结构；本阶段验收待补 |
+| S2-01 | [Orchestrator](specs/domainFunction/agents/orchestratorAgent/OrchestratorAgent.md) | 计划输入、任务输出和失败处理；保持固定业务连接，不能由模型决定 Gate PASS | 开发中（设计已确认，待实现） | IO-17 已确认业务目标、模块概况、项目配置与进度输入，以及本轮任务计划输出；机器契约与执行接线待落实 |
 | S2-02 | [DocWorker](specs/domainFunction/agents/docGenAgent/subAgents/docWorkerAgent/DocWorkerAgent.md) | 源码分块、片段覆盖、来源引用及材料不足处理 | 开发中 | PR #40 已实现 DocGen 内部 Worker；业务细化与本阶段验收待补 |
-| S2-03 | [DocGen](specs/domainFunction/agents/docGenAgent/DocGenAgent.md) | 正文与来源、旧版和 Correction 输入、质量反馈及定向修订 | 开发中 | PR #40 已实现内部拆分与汇总，并有组合 Fixture 证据；语义与业务质量验收待补 |
-| S2-04 | [TestGen](specs/domainFunction/agents/testGenAgent/TestGenAgent.md) | 确认输入与测试预期依据，再细化测试候选、oracle 声明和门禁接线 | 开发中（设计确认） | S2-04.a 的 IO-02 确认中，见 [TestGen 设计](specs/domainFunction/agents/testGenAgent/TestGenAgent.md)；尚未修改实现，验收待补 |
+| S2-03 | [DocGen](specs/domainFunction/agents/docGenAgent/DocGenAgent.md) | 单文档汇总、超大内容沟通、旧版和 Correction 输入及定向修订 | 开发中 | PR #40 已实现内部拆分与汇总；IO-18 已修正为默认合成一份文档，建议拆分须先与用户沟通并以用户意见为准，每次飞轮只修订输入的单份文档；沟通机制与边界验收待补，IO-10 汇总机制暂定，资料保留与结束规则已按 IO-19、20 确认，回退实现待落实 |
+| S2-04 | [TestGen](specs/domainFunction/agents/testGenAgent/TestGenAgent.md) | 确认输入与测试预期依据，再细化测试候选、oracle 声明和门禁接线 | 开发中（设计确认） | S2-04.a 的源码输入及不读取知识卡片已确认；IO-11 已确认测试源码、用例清单及执行分工，IO-12 暂时保留原始源码校验测试，IO-13 已确认源代码不变时复用已有测试，IO-21 已确认首次候选失败的有限修复与人工兜底，具体接线待实现，见 [TestGen 设计](specs/domainFunction/agents/testGenAgent/TestGenAgent.md)；尚未修改实现，验收待补 |
 | S2-05 | [CodeAgent](specs/domainFunction/agents/codeAgent/CodeAgent.md) | 知识卡片包含接口，项目配置提供 C/C++ 必要约束；本轮白名单与隔离限制读取，框架校验源码列表并落盘 | 开发中（设计已确认，待实现） | IO-03～06 已确认，见 [CodeAgent 设计](specs/domainFunction/agents/codeAgent/CodeAgent.md)；KF-SYS-044、045 为 Planned，代码未改，验收待补 |
-| S2-06 | [Check](specs/domainFunction/agents/checkAgent/CheckAgent.md) | 检查输入、判据、findings 可追溯性及只读边界 | 待开发 | 已有结构；本阶段验收待补 |
-| S2-07 | [Review](specs/domainFunction/agents/reviewAgent/ReviewAgent.md) | 评测证据、Check findings 接入与归因、Correction 及无须修订时的输出 | 待开发 | 当前未单独绑定 Check findings 明细；本阶段验收待补 |
+| S2-06 | [Check](specs/domainFunction/agents/checkAgent/CheckAgent.md) | 检查输入、判据、findings 可追溯性及只读边界 | 开发中（设计确认） | IO-14 已确认原始源码、生成代码及比较规则三项输入；IO-15 已确认输出比较结果及差异依据交后续 Review；规则与算法待论文调研，尚未修改实现 |
+| S2-07 | [Review](specs/domainFunction/agents/reviewAgent/ReviewAgent.md) | 评测证据、Check findings 接入与归因、Correction 及无须修订时的输出 | 开发中（设计确认） | IO-15 已确认联合读取比较结果与测试结果；IO-16 已确认修订意见列表交 DocGen 修改，无意见时空列表；当前未完整接入两项契约，验收待补 |
 
 每个角色依次执行下面四步，用任务号加后缀单独跟踪，例如 `S2-03.a`。启动角色任务时在本节追加该角色的步骤状态和证据，不为每个角色另建任务文档。
+
+S2-03 / S2-07 补充确认 [Knowledge IO-19](specs/domainFunction/knowledge/Knowledge.md)：运行期间保留单文档飞轮过程资料；达标后保留最终文档与验收记录，替换现用文档时保留上一版；需要人工治理时由 Review 提炼问题、Application 组织精简清单，后台暂存相关证据，治理完成后再按结果清理。用户已明确达标且最终文档及验收记录保存成功后立即清理中间资料，不设置一周或其他额外保留期；自动清理与治理材料交接尚未实现，未执行实际资料删除。
+
+飞轮结束条件补充确认 [Evaluation IO-20](specs/domainFunction/evaluation/Evaluation.md)：文档达到验收标准后立即结束本次飞轮，不追加轮次追求更高分。达标自动结束并交付、最大轮次未达标或预算耗尽转人工治理属于既有设计，用户本轮重申后已移除重复待确认标记；历史最佳及关键回归回滚同样已有目标要求。具体评分和阈值细节待细化，自动回退等实现缺口及达标后不再派发下一轮的验收待补。
+
+S2-04 补充确认 [TestGen IO-21](specs/domainFunction/agents/testGenAgent/TestGenAgent.md)：首次生成的候选测试在原始源码上校验失败时交 TestGen 有限修复，仍失败再转人工，仅作为异常兜底；正常通过不进入修复分支，不改变源码不变时已有测试不变的规则。原则已确认，错误分类、修复材料与重试配置待实现，尚未执行代码改动或行为验收。
+
+S2-03 补充确认 [DocGen IO-22](specs/domainFunction/agents/docGenAgent/DocGenAgent.md)：DocGen 生成标题、摘要和关键词，框架写入 YAML 头并建立渐进式加载索引，不新增 Agent。当前仅有 body、title、description 输出；关键词契约、YAML 写入与索引更新及加载链路待实现，本次只更新设计。
+
+范围调整 [Association IO-23](specs/domainFunction/association/Association.md)：用户明确外部知识关联当前阶段不实现，不作为 S2 开发及当前飞轮验收的前置条件。由用户提供文档或指定知识库的来源约定仅供后续参考，关联判断角色、材料契约及关联索引接线延期；DocGen 承担关联判断的建议未确认，不纳入当前职责。IO-22 的知识文档描述、YAML 头与渐进加载索引保持当前范围。
 
 | 后缀 | 具体步骤 | 交付与验收条件 |
 | --- | --- | --- |
@@ -55,7 +65,7 @@ SPDX-License-Identifier: MIT
 | c | 更新独立样例和有行为判定的测试 | 覆盖正常结果、材料不足、非法输出、执行失败和适用权限边界；按 AC-SCHEMA-001 及角色相关验收场景核对 |
 | d | 运行独立入口及相关回归，审查业务输出并记录证据 | 使用 [AgentDevelopment](AgentDevelopment.md) 的统一入口，记录版本、命令、结果及工件；区分 Fixture 与真实模型，完成后交给 S3 |
 
-当前正在逐项确认七角色输入输出：保留七个 Agent 已确认，五个业务阶段描述多 Agent 协作效果；S2-04.a 的 TestGen 输入与测试预期依据仍在确认中。S2-05.a 的目标已确认并写入设计，尚未开始实现；不是 CodeAgent 已验收。共享取消、重试、契约测试可复用，不要求七份重复测试。单角色入口结果为 `NOT_EVALUATED`，不自动执行 LangGraph、评测或发布，不能作为 S3 完整端到端通过证据。
+当前正在逐项确认七角色输入输出：保留七个 Agent 已确认，五个业务阶段描述多 Agent 协作效果；S2-04.a 的 TestGen 输入已确认是源代码，不读取知识卡片；IO-11 已确认输出 C/C++ 测试源码和用例清单，交后续执行器运行；IO-12 暂时保留先在原始源码上校验生成测试的流程，IO-13 已确认源代码不变时测试用例不变；首次候选失败按 IO-21 有限修复、仍失败转人工，相关实现待落实。S2-05.a 的目标已确认并写入设计，尚未开始实现；不是 CodeAgent 已验收。共享取消、重试、契约测试可复用，不要求七份重复测试。单角色入口结果为 `NOT_EVALUATED`，不自动执行 LangGraph、评测或发布，不能作为 S3 完整端到端通过证据。
 
 ### S2-05 当前步骤
 
@@ -94,8 +104,23 @@ SPDX-License-Identifier: MIT
 | --- | --- | --- | --- | --- |
 | 2026-09-10 | S1～S4 计划登记 | 基线 `96d277b` 加本次未提交文档改动；链接、验收编号、文件清单和 diff 静态检查通过，未执行角色或端到端测试 | NOT_RUN（开发任务验收） | 用户确认四阶段与本会话负责 S2；具体角色和逐项验收待推进 |
 | 2026-09-10 | S2-05.a | 基线 `96d277b` 加未提交设计改动；用户确认知识卡片、项目配置、隔离及框架落盘方案 | NOT_RUN（实现验收） | IO-03～06 已确认，新增 KF-SYS-044、045 与验收场景，实现和 C/C++ 运行证据待补；TestGen IO-02 保持确认中 |
+| 2026-09-10 | S2-04.a | 基线 `6dd595f` 加未提交文档改动；用户明确 TestGen 输入源代码，不要知识卡片 | NOT_RUN（实现验收） | IO-02 输入方向已确认，替代早期卡片输入方案；测试输出、预期结果与复用仍待细化 |
 
 ## 当前实现与能力边界
+
+### DocGen 最小链路验证与暂定方案
+
+2026-09-10，用户要求 DocGen 汇总的上下文控制先保留暂定设计、保证最小链路可运行，待论文调研后再定。[IO-10](specs/domainFunction/agents/docGenAgent/DocGenAgent.md) 保留分批汇总和按需补充方向，不标记最终确认；IO-07～09 已确认归属、拆分原则及 Worker 输出内容，目标实现仍待推进。
+
+在 `docs/agent-contract-confirmation`、代码基线 `6dd595f` 加未提交文档改动、Node 24 环境执行：
+
+```bash
+npm run agent:run -- --role doc-gen --input src/domain/agents/docGenAgent/examples/DocGenWithWorkersSample.json --output /tmp/docgen-minimal-loop-20260910
+```
+
+退出码 0。Run `b339070f-f122-4eca-9513-c7d373481608`，Provider 为 Fixture，DocGen 和两个 Worker 均为 SUCCEEDED；核对两份子任务结果及片段、322 字节正文的保存内容和摘要通过。结果与审计分别位于服务器 `/tmp/docgen-minimal-loop-20260910/doc-gen-PUpHs7/result.json` 和同目录 `audit.json`，属于临时运行证据。publication=NOT_EVALUATED；模型输出为样例预设，只证明现有角色执行、汇总交接和工件保存链路，不证明真实源码分析质量、分批汇总、上下文预算或完整飞轮验收。
+
+### 能力清单
 
 | 范围 | 当前事实 | 未完成或未验证部分 |
 | --- | --- | --- |
