@@ -295,12 +295,12 @@ test('old role execution versions remain readable but cannot resume; same versio
   try {
     const run = composition.apps.flywheel.createRun('role-version', 'local-v1');
     const snapshot = await composition.runConfiguration.capture(run.runId);
-    assert.equal(snapshot.roleExecutionVersion, 'domain-agents-v1');
+    assert.equal(snapshot.roleExecutionVersion, 'domain-agents-v2-docgen-subagents');
     await composition.runConfiguration.assertCompatible(run.runId);
     const original = composition.repository.getRunConfiguration.bind(composition.repository);
     composition.repository.getRunConfiguration = (runId) => {
       const result = original(runId);
-      if (result) delete result.roleExecutionVersion;
+      if (result) result.roleExecutionVersion = 'domain-agents-v1';
       return result;
     };
     assert.equal(composition.runConfiguration.get(run.runId)?.runId, run.runId);

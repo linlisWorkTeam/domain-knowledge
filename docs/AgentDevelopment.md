@@ -5,7 +5,7 @@ SPDX-License-Identifier: MIT
 -->
 # Agent 开发指南
 
-角色设计从 [Agents 索引](specs/domainFunction/agents/Agents.md) 进入各自独立文档，跨角色流程见 [Workflow](specs/domainFunction/services/workflow/Workflow.md)。本文件只说明如何定位、运行和修改角色，DocGen 的固定源码教程合并在后半部分。
+角色设计从 [Agents 索引](specs/domainFunction/agents/Agents.md) 进入各自独立文档，跨角色流程见 [Workflow](specs/domainFunction/workflow/Workflow.md)。本文件只说明如何定位、运行和修改角色，DocGen 的固定源码教程合并在后半部分。
 
 CodeAgent 的目标输入输出已于 2026-09-10 确认：知识卡片包含接口，项目配置提供 C/C++ 运行约束，框架冻结读取权限并校验源码输出，详见 [CodeAgent 目标设计](specs/domainFunction/agents/codeAgent/CodeAgent.md) 和 [S2-05 任务](Status.md)。以下命令与样例仍对应现有实现，尚未支持新的项目配置入口；原 TypeScript 样例不能用作 C/C++ 业务验收结论。
 
@@ -16,7 +16,7 @@ CodeAgent 的目标输入输出已于 2026-09-10 确认：知识卡片包含接�
 | 角色 ID | 目录 | 修改重点 |
 | --- | --- | --- |
 | orchestrator | `src/domain/agents/orchestratorAgent` | 当前轮固定业务计划 |
-| doc-worker | `src/domain/agents/docWorkerAgent` | 源码分块与来源片段 |
+| doc-worker | `src/domain/agents/docGenAgent/subAgents/docWorkerAgent` | 源码分块与来源片段 |
 | doc-gen | `src/domain/agents/docGenAgent` | 正文、修订材料与质量反馈 |
 | test-gen | `src/domain/agents/testGenAgent` | 测试候选，隔离候选知识 |
 | code | `src/domain/agents/codeAgent` | 路径白名单、重复路径与生成文件 |
@@ -74,3 +74,15 @@ npm run knowledge -- set-agent-prompt --agent doc-gen --prompt '每个行为结�
 Role directories use lowerCamelCase and files use PascalCase. Each role owns execution, contracts, prompts, tests and explicit examples. Standalone runs share production validation and artifact submission without starting the graph, evaluation or publication. The fixed-source DocGen materials and checks live beside the role and use the same agent:run entrypoint. Controlled output, live execution and semantic quality require distinct evidence.
 
 </details>
+
+## DocGen 内部 Worker
+
+DocGen 是外层知识生成入口，DocWorker 是其内部 subAgent。修改源码分块与汇总流程从 `docGenAgent/DocGenAgent.ts` 开始；修改单个片段的提取从 `docGenAgent/subAgents/docWorkerAgent/` 开始。Worker 仍可用 `--role doc-worker` 独立测试。
+
+组合样例：
+
+```bash
+npm run agent:run -- --role doc-gen --input src/domain/agents/docGenAgent/examples/DocGenWithWorkersSample.json --output /tmp/docgen-with-workers
+```
+
+这是 fixture 组合验证：运行两个内部 Worker，再运行 DocGen 汇总并保存子任务引用，不代表真实模型质量验收。`workerModelOutputs` 按 Worker 身份提供模拟输出；真实 DSH 模式忽略该字段。原汇总样例显式设置 `payload.workerCount=0`。生产默认一个 Worker，最大五个任务，执行器默认最多三个并发；修改并发配置定位 Composition 中的 ConcurrentTasks。

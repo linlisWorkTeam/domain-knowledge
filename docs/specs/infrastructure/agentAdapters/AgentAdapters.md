@@ -12,6 +12,10 @@ SPDX-License-Identifier: MIT
 
 modelExecutionFactory 为每个角色绑定 ModelExecutionPort。输入包括 Prompt、输出 Schema、授权工具和可读路径，Adapter 准备 Workspace，映射 AgentProvider 请求、会话和模型配置。JsonSchemaAgentContractValidator 校验公共命令/结果，DSH 负责授权工具自主调用，Domain 仍控制角色阶段。
 
+## 内部子任务的技术调度
+
+ConcurrentTasks 实现 Application 的 TaskBatchRunner，默认最多三个并发调用。DocGen 决定最多五个 Worker 任务的业务范围，执行器只控制启动与取消；任务失败时取消其余在途调用、停止启动排队任务，并等待所有已启动任务结束。结果保持输入任务顺序。内部 Worker 继续使用 modelExecutionFactory，每个任务拥有独立命令、授权源码路径及隔离工作区。
+
 ## Provider 与运行策略
 
 DSH 原生 SDK 是默认接入后端，Adapter 负责输出提取、闭合 Schema 校验、网络/格式修复重试、超时、取消和调用摘要。角色层不再重复网络重试。模型正常返回仍须检查取消，防止迟到输出提交。受控场景模型注入同一入口，不能通过继承覆盖业务步骤。

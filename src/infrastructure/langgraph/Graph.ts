@@ -10,7 +10,7 @@ import type {
   AgentId, AgentPromptResolver, WorkflowNodeProjection, WorkflowObserver,
   WorkflowStageExecutor,
 } from '../../application/ports/ApplicationPorts.ts';
-import { agentDefinition } from '../../domain/services/workflow/AgentDefinitions.ts';
+import { agentDefinition } from '../../domain/workflow/AgentDefinitions.ts';
 import {
   InfrastructureStateAnnotation, type InfrastructureState, type InfrastructureStateUpdate,
 } from './State.ts';
@@ -18,7 +18,7 @@ import {
 import {
   AGENT_BY_NODE, WORKFLOW_NODES, WORKFLOW_EDGES, orchestratorTasks,
   candidateDestination, evaluationDestination, workflowDestination, nextIteration,
-} from '../../domain/services/workflow/Workflow.ts';
+} from '../../domain/workflow/Workflow.ts';
 
 /** 保留既有运行时节点清单接口，节点集合由领域工作流定义。 */
 export const INFRASTRUCTURE_GRAPH_NODES = WORKFLOW_NODES;
@@ -59,13 +59,9 @@ function projection(
   };
 }
 
-function executionNodeId(state: InfrastructureState, nodeId: string): string {
-  return state.workerTask && nodeId === 'doc_worker' ? `${nodeId}:${state.workerTask.workerId}` : nodeId;
-}
-
 function createNode(deps: GraphDependencies, nodeId: string) {
   return async (state: InfrastructureState): Promise<InfrastructureStateUpdate> => {
-    const renderedNodeId = executionNodeId(state, nodeId);
+    const renderedNodeId = nodeId;
     const attemptKey = `${renderedNodeId}:${state.iteration}`;
     const stateAttempt = (state.attempts[attemptKey] ?? 0) + 1;
     const attempt = Math.max(
@@ -100,8 +96,6 @@ function createNode(deps: GraphDependencies, nodeId: string) {
         prompt,
         context: state.context,
         workerCount: state.workerCount,
-        ...(state.workerTask ? { workerId: state.workerTask.workerId } : {}),
-        ...(state.workerTask ? { workerIndex: state.workerTask.index } : {}),
         ...(deps.signalFor(state.runId) ? { signal: deps.signalFor(state.runId) } : {}),
       });
       const completedAt = deps.clock();
@@ -134,7 +128,6 @@ export function buildInfrastructureGraph(deps: GraphDependencies, checkpointer: 
     .addNode('orchestrator', async (state: InfrastructureState): Promise<InfrastructureStateUpdate> => ({
       ...await node('orchestrator')(state), route: null,
     }))
-    .addNode('doc_worker', node('doc_worker'))
     .addNode('doc_gen', node('doc_gen'))
     .addNode('test_gen', node('test_gen'))
     .addNode('candidate_knowledge', node('candidate_knowledge'))
@@ -157,8 +150,8 @@ export function buildInfrastructureGraph(deps: GraphDependencies, checkpointer: 
       executionStatus: 'STOPPED', currentNode: 'stopped', route: 'STOPPED',
     }))
     .addConditionalEdges('orchestrator', (state: InfrastructureState) =>
-      orchestratorTasks(state.workerCount).map(({ nodeId, workerTask }) =>
-        new Send(nodeId, { ...state, workerTask })), ['test_gen', 'doc_worker', 'doc_gen'])
+      orchestratorTasks().map(({ nodeId }) =>
+        new Send(nodeId, state)), ['test_gen', 'doc_gen'])
     .addConditionalEdges('candidate_knowledge', (state: InfrastructureState) =>
       candidateDestination(state.route), ['workflow_router', 'code'])
     .addConditionalEdges('evaluation', (state: InfrastructureState) =>

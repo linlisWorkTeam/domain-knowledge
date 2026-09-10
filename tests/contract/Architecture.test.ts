@@ -8,7 +8,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 import { AGENT_IDS } from '../../src/application/ports/ApplicationPorts.ts';
-import { DOMAIN_KNOWLEDGE_AGENT_DEFINITIONS } from '../../src/domain/services/workflow/AgentDefinitions.ts';
+import { DOMAIN_KNOWLEDGE_AGENT_DEFINITIONS } from '../../src/domain/workflow/AgentDefinitions.ts';
 
 function files(root: string): string[] {
   return readdirSync(root).flatMap((name) => {
@@ -65,13 +65,13 @@ test('LangGraph remains isolated in workflow infrastructure', () => {
   assert.doesNotMatch(infrastructure, /createServer|\/api\/v1/);
 });
 
-test('DDD application and domain-service boundaries are explicit without changing Agent topology', () => {
+test('DDD application and domain-service boundaries are explicit with explicit Agent identities', () => {
   for (const path of [
     'src/interfaces/uiApi/UiApi.ts',
     'src/application/apps/ApplicationApps.ts',
-    'src/domain/services/FlywheelDomainService.ts',
-    'src/domain/services/EvalRunnerDomainService.ts',
-    'src/domain/services/AssociationDomainService.ts',
+    'src/domain/workflow/FlywheelDomainService.ts',
+    'src/domain/evaluation/EvalRunnerDomainService.ts',
+    'src/domain/association/AssociationDomainService.ts',
     'src/infrastructure/redis/Redis.ts',
   ]) assert.equal(statSync(path).isFile(), true, `missing DDD boundary: ${path}`);
 
@@ -115,12 +115,12 @@ test('UI API and workflow executor use Application boundaries instead of concret
 test('each role owns execution, contract and prompt while application commits without role branches', () => {
   for (const role of AGENT_IDS) {
     const name = role.split('-').map((part) => part[0]!.toUpperCase() + part.slice(1)).join('') + 'Agent';
-  const directory = name[0]!.toLowerCase() + name.slice(1);
+  const directory = role === 'doc-worker' ? 'docGenAgent/subAgents/docWorkerAgent' : name[0]!.toLowerCase() + name.slice(1);
     for (const file of [`${name}.ts`, `${name}Contract.ts`, `${name}Prompt.ts`, `${name}.test.ts`, `examples/${name}Sample.json`]) {
       assert.ok(statSync(`src/domain/agents/${directory}/${file}`).isFile());
     }
     const agent = readFileSync(`src/domain/agents/${directory}/${name}.ts`, 'utf8');
-    assert.match(agent, /export async function execute\(input: Input, context: ExecutionContext\)/);
+    assert.match(agent, /export async function execute\(input: Input, context: (?:ExecutionContext|DocGenContext)\)/);
     assert.doesNotMatch(agent, /WorkflowStageInput|putArtifact|executeNode|repository\./);
   }
   const stages = readFileSync('src/application/services/AutomatedProjectWorkflow.ts', 'utf8');

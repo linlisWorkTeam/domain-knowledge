@@ -4,7 +4,7 @@
  * 文件功能：提供Composition的外部入口、参数转换与响应处理。
  */
 import { AgentExampleService } from '../../application/services/AgentExample.ts';
-import { NODE_BY_AGENT } from '../../domain/services/workflow/AgentDefinitions.ts';
+import { NODE_BY_AGENT } from '../../domain/workflow/AgentDefinitions.ts';
 import { assertModelOutput, modelExecutionFactory } from '../../infrastructure/agentAdapters/ModelExecution.ts';
 import { appendFile, mkdir } from 'node:fs/promises';
 import { readFileSync } from 'node:fs';
@@ -45,6 +45,7 @@ import {
   PublicHttpsEndpointPolicy,
 } from '../../infrastructure/agentAdapters/provider/ProviderSettings.ts';
 import { ConfiguredDshProvider, DSH_DEFAULT_CONTEXT_WINDOW, DSH_DEFAULT_MAX_SCHEMA_ATTEMPTS, DSH_DEFAULT_MAX_TOKENS } from '../../infrastructure/agentAdapters/deepSeekHarness/ConfiguredProvider.ts';
+import { ConcurrentTasks } from '../../infrastructure/agentAdapters/ConcurrentTasks.ts';
 import { FixtureProjectWorkflowStages } from '../../infrastructure/agentAdapters/scenario/ProjectWorkflowFixture.ts';
 import { writeOpenCodeGoPatch } from '../../infrastructure/agentAdapters/deepSeekHarness/OpencodeGo.ts';
 import { JsonSchemaAgentContractValidator } from '../../infrastructure/agentAdapters/contracts/JsonSchemaAgentContractValidator.ts';
@@ -411,6 +412,7 @@ export function createComposition(input: {
               })
             : undefined;
       const stageOptions: ConstructorParameters<typeof ProjectWorkflowStages>[0] = {
+        workerRuntime: { prompts: runConfiguration, observer: workflowObserver, tasks: new ConcurrentTasks() },
         nodeByAgent: NODE_BY_AGENT,
         flywheel: flywheelApp,
         evalRunner: evalRunnerApp,
@@ -446,6 +448,7 @@ export function createComposition(input: {
       return executor;
   };
   const agentExample = new AgentExampleService({
+    tasks: new ConcurrentTasks(),
     flywheel: flywheelApp, runConfiguration, evaluator: new TrustedProjectEvaluator(artifacts),
     contracts: new JsonSchemaAgentContractValidator(schemaRoot), observer: workflowObserver,
     nodeByAgent: NODE_BY_AGENT,

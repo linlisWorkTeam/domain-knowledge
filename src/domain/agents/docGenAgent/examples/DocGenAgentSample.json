@@ -53,7 +53,8 @@
         ],
         "risk": "False change reports for equivalent newlines"
       }
-    ]
+    ],
+    "workerCount": 0
   },
   "materials": {
     "source": {

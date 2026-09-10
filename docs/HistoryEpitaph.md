@@ -72,3 +72,14 @@ This document summarizes older handoffs, milestones and architectural decisions 
 删除 AGENTS、贡献指南、开发指南和 CodeTaste 中的固定账号规则，同时移除本次会话写入的仓库级 user.name / user.email。当前会话的 Git 身份通过单次命令配置，GitHub 身份通过单次进程凭据指定；不设跨会话账号约束。历史交接中把账号写成项目规则的表述是当时的误解，不作为后续协作指令。
 
 [2026-09-08-1158 目录审查](https://github.com/linlisWorkTeam/domain-knowledge/blob/260e7f1/docs/epitaph/2026-09-08-1158-agent-directory-review.md)：调整 Domain Workflow、资源模块和 Infrastructure 目录，新增版权与中文说明；当时只做类型与静态检查，未运行测试。
+
+## 设计与命名整理交接归档
+
+[2026-09-08-1216-specs-consolidation.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/1455ba9c6a84797a2ee22e9939f2542cd4dc7ed4/docs/epitaph/2026-09-08-1216-specs-consolidation.md)：设计集中到 docs/specs 并与代码对应，统一目录小驼峰、文件大驼峰，合并 4+1 视图与历史文档。仅做静态验证，未重跑测试。原记录中的项目级账号规则是误解，已纠正为仅当前会话适用。
+
+## PR #41 合并交接归档
+
+- [2026-09-08-1423-session-identity-scope.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/9e66776cfbadbb1ec56f60991ef01e7e43139cbd/docs/epitaph/2026-09-08-1423-session-identity-scope.md)：删除固定账号的项目规则，明确账号选择只属于原会话；当时只做文档、清单及 diff 检查，未改业务逻辑或运行测试，不得继承旧身份约束。
+- [2026-09-08-1442-domain-feature-layout.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/a79b385e16284ba8b4e76751f54c196b8fa7b33e/docs/epitaph/2026-09-08-1442-domain-feature-layout.md)：去掉 Domain services 分组与总导出，按 workflow、evaluation、association、knowledge 等功能组织，同步引用和设计；当时仅做类型、路径、Schema 与固定样例静态检查，未运行测试或模型。
+- [2026-09-10-1001-development-progress.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/9e66776cfbadbb1ec56f60991ef01e7e43139cbd/docs/epitaph/2026-09-10-1001-development-progress.md)：在 Status 登记四阶段、S2 子步骤、依赖及证据索引；当时通过文档链接、清单及 diff 静态核对，未运行角色或业务验收。CodeAgent 后续确认由 1038 交接补充，其他输入输出继续逐项确认。
+- [2026-09-10-1032-knowledge-generation-agent-baseline.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/a79b385e16284ba8b4e76751f54c196b8fa7b33e/docs/epitaph/2026-09-10-1032-knowledge-generation-agent-baseline.md)：记录知识生成分支的基线和数据流调研，独立 worktree bootstrap READY；当时未修改业务实现、未运行真实模型或端到端。全仓模块发现、TestGen oracle 晋升、Review findings 接入及业务质量仍待细化；Worker 归属随后由 1046 交接更新。

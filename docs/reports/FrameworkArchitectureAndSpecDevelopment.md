@@ -5,6 +5,9 @@ SPDX-License-Identifier: MIT
 -->
 # 项目架构与 Spec 驱动开发报告
 
+> 本文为 main@96d277b 的架构快照。后续 DocWorker 已调整为 DocGen 内部 subAgent；当前调用关系以 [Agent 设计](../specs/domainFunction/agents/Agents.md) 与 [工作流设计](../specs/domainFunction/workflow/Workflow.md) 为准。
+
+
 报告日期：2026-09-08。核对基线：[`a1453e066602c76ccfea9a875f39ca1ce265e495`](https://github.com/linlisWorkTeam/domain-knowledge/tree/a1453e066602c76ccfea9a875f39ca1ce265e495)。
 
 本报告先整理目录与 DDD 结构，再依次补充框架功能、Spec 开发模式、AI 实施方法和 Agent 编排。它是本次代码快照的阅读报告；后续行为约定以 [Spec 目录](../specs/README.md)为准，操作以[开发指南](../Development.md)和 [Agent 开发指南](../AgentDevelopment.md)为准。
@@ -60,21 +63,19 @@ domain-knowledge/
 │   │   │   ├── AgentExecution.ts            # 执行协议与版本
 │   │   │   ├── AgentRegistry.ts             # 显式角色注册
 │   │   │   ├── orchestratorAgent/
-│   │   │   ├── docWorkerAgent/
 │   │   │   ├── docGenAgent/
+│   │   │   │   └── subAgents/docWorkerAgent/
 │   │   │   ├── testGenAgent/
 │   │   │   ├── codeAgent/
 │   │   │   ├── checkAgent/
 │   │   │   └── reviewAgent/
-│   │   ├── services/
-│   │   │   ├── DomainServices.ts            # 公共导出
+│   │   ├── workflow/
 │   │   │   ├── FlywheelDomainService.ts
-│   │   │   ├── EvalRunnerDomainService.ts
-│   │   │   ├── AssociationDomainService.ts
-│   │   │   ├── MarkdownDiff.ts
-│   │   │   └── workflow/
-│   │   │       ├── Workflow.ts              # 固定业务连接与纯路由
-│   │   │       └── AgentDefinitions.ts      # 角色到节点的映射
+│   │   │   ├── Workflow.ts                 # 外层业务连接与纯路由
+│   │   │   └── AgentDefinitions.ts
+│   │   ├── evaluation/EvalRunnerDomainService.ts
+│   │   ├── association/AssociationDomainService.ts
+│   │   ├── knowledge/MarkdownDiff.ts
 │   │   ├── sourceScan/SourceScan.ts
 │   │   ├── workspace/LocalAgentWorkspace.ts
 │   │   └── migration/LegacyOkf.ts
@@ -174,7 +175,7 @@ flowchart LR
 
 ### 2.2 领域与应用服务如何合作
 
-`domain/agents/` 拥有角色步骤、Prompt 和输出契约；`domain/services/workflow/` 决定角色之间怎样流转。`FlywheelDomainService`、`EvalRunnerDomainService` 和 `Domain.ts` 提供生命周期、评测及 Gate 规则；`AssociationDomainService` 校验事实与关联目标关系。
+`domain/agents/` 拥有角色步骤、Prompt 和输出契约；`domain/workflow/` 决定角色之间怎样流转。`FlywheelDomainService`、`EvalRunnerDomainService` 和 `Domain.ts` 提供生命周期、评测及 Gate 规则；`AssociationDomainService` 校验事实与关联目标关系。
 
 `application/services/AutomatedProjectWorkflow.ts` 中的 `ProjectWorkflowStages` 按阶段加载可信材料、历史正文、纠正意见和质量反馈。`RoleExecution.ts` 调用角色，将待保存工件写入 CAS，再绑定引用并校验结果信封。角色不直接读历史数据库，也不直接提交发布事务。
 
@@ -251,17 +252,16 @@ docs/specs/
 │   ├── agents/
 │   │   ├── Agents.md                # 索引与共同协议
 │   │   ├── orchestratorAgent/OrchestratorAgent.md
-│   │   ├── docWorkerAgent/DocWorkerAgent.md
+│   │   ├── docGenAgent/subAgents/docWorkerAgent/DocWorkerAgent.md
 │   │   ├── docGenAgent/DocGenAgent.md
 │   │   ├── testGenAgent/TestGenAgent.md
 │   │   ├── codeAgent/CodeAgent.md
 │   │   ├── checkAgent/CheckAgent.md
 │   │   └── reviewAgent/ReviewAgent.md
-│   ├── services/
-│   │   ├── Knowledge.md             # 知识版本、来源、状态、关联和发布条件
-│   │   ├── Evaluation.md            # 根据评测事实判断通过、迭代或停止
-│   │   └── workflow/
-│   │       └── Workflow.md          # 角色的先后、并行、汇合和下一轮规则
+│   ├── knowledge/Knowledge.md       # 知识版本、来源和发布条件
+│   ├── association/Association.md   # 事实关联
+│   ├── evaluation/Evaluation.md     # 评测判定
+│   ├── workflow/Workflow.md         # 外层角色连接与路由
 │   ├── sourceScan/
 │   │   └── SourceScan.md            # 怎样扫描来源文件
 │   ├── workspace/
@@ -326,7 +326,7 @@ docs/specs/schemas/
 2. **准备开发环境。** 按 `docs/Development.md` 操作；新建工作树后执行 `npm run bootstrap:worktree`，得到 `status: READY` 再开始。
 3. **找到本次设计。** 打开 `docs/specs/README.md`，定位 `domainFunction/agents/docGenAgent/DocGenAgent.md`。
 4. **找到对应代码。** 读 Spec 中的代码链接，再到 `src/domain/agents/docGenAgent/` 看入口、Contract、Prompt 和测试。
-5. **按需补读。** 如果只是修改 DocGen 内部规则，就围绕该角色工作；如果要给它增加上游材料，再读 `application/Application.md`；如果要改变角色先后顺序，再读 `services/workflow/Workflow.md`。
+5. **按需补读。** 如果只是修改 DocGen 内部规则，就围绕该角色工作；如果要给它增加上游材料，再读 `application/Application.md`；如果要改变角色先后顺序，再读 `workflow/Workflow.md`。
 
 第一次涉及分层或目录调整时，也要读 `totalRules/Architecture.md`、`DomainDrivenDesign.md` 和 `CodeTaste.md`。每次任务只深入本次影响的模块。
 
@@ -468,10 +468,13 @@ npm run knowledge -- workflow-run --scenario /absolute/path/scenario.json --repo
 flowchart TD
     S([开始]) --> O[orchestrator]
     O --> T[test_gen]
-    O -->|workerCount 大于 0：并行分块| W[doc_worker × N]
-    O -->|workerCount 为 0| D[doc_gen]
-    W -->|汇合| D
-    D --> K[candidate_knowledge：候选与质量判断]
+    O --> D0
+    subgraph D[doc_gen：内部拆分与汇总]
+      D0[准备材料] -->|workerCount 大于 0| W[doc_worker × N]
+      D0 -->|workerCount 为 0| D1[汇总正文]
+      W -->|全部成功| D1
+    end
+    D1 --> K[candidate_knowledge：候选与质量判断]
     K -->|继续| C[code]
     K -->|ITERATE / STOPPED| R[workflow_router]
     C --> H[check]
@@ -492,7 +495,7 @@ flowchart TD
     X --> Z
 ```
 
-业务节点和路由由 [Workflow.ts](../../src/domain/services/workflow/Workflow.ts)定义，角色映射由 [AgentDefinitions.ts](../../src/domain/services/workflow/AgentDefinitions.ts)定义，执行图由 [Graph.ts](../../src/infrastructure/langgraph/Graph.ts)承接。图中的汇合菱形用于说明等待关系，不是新增运行节点。节点异常由引擎错误处理进入失败路径，取消由运行控制传递。
+业务节点和路由由 [Workflow.ts](../../src/domain/workflow/Workflow.ts)定义，角色映射由 [AgentDefinitions.ts](../../src/domain/workflow/AgentDefinitions.ts)定义，执行图由 [Graph.ts](../../src/infrastructure/langgraph/Graph.ts)承接。图中的汇合菱形用于说明等待关系，不是新增运行节点。节点异常由引擎错误处理进入失败路径，取消由运行控制传递。
 
 `candidate_knowledge`、`oracle_validation`、`evaluation`、`workflow_router`、`publication` 是业务阶段，不是新增模型角色。OrchestratorAgent 输出计划工件，但没有动态改写图拓扑的权限。
 
@@ -505,7 +508,7 @@ flowchart TD
 | 角色 ID | 目录与入口 | 输入材料与功能 | 主要输出或限制 |
 | --- | --- | --- | --- |
 | `orchestrator` | `orchestratorAgent/OrchestratorAgent.ts` | 策略、模块材料；生成当前轮固定业务计划 | 固定任务计划，不能改连接 |
-| `doc-worker` | `docWorkerAgent/DocWorkerAgent.ts` | 源码、公开接口和分块身份；提取文档片段 | 片段与来源引用，交 DocGen 汇总 |
+| `doc-worker` | `docGenAgent/subAgents/docWorkerAgent/DocWorkerAgent.ts` | 源码、公开接口和分块身份；提取文档片段 | 片段与来源引用，交 DocGen 汇总 |
 | `doc-gen` | `docGenAgent/DocGenAgent.ts` | 源码、接口、片段、旧正文、纠正和质量反馈 | 正文、标题、描述及来源；正文至少 200 字符 |
 | `test-gen` | `testGenAgent/TestGenAgent.ts` | 固定源码、接口、语言和测试策略 | 测试候选与 oracle 声明；不读取候选知识 |
 | `code` | `codeAgent/CodeAgent.ts` | 知识、接口、构建契约、允许生成路径 | 文件列表；拒绝越界和重复路径，不读取参考源码及门禁测试 |

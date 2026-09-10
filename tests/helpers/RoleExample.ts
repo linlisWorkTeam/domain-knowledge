@@ -12,7 +12,7 @@ import { assertModelOutput } from '../../src/infrastructure/agentAdapters/ModelE
 
 export function roleExamplePath(role: AgentId): string {
   const name = role.split('-').map((part) => part[0]!.toUpperCase() + part.slice(1)).join('') + 'Agent';
-  const directory = name[0]!.toLowerCase() + name.slice(1);
+  const directory = role === 'doc-worker' ? 'docGenAgent/subAgents/docWorkerAgent' : name[0]!.toLowerCase() + name.slice(1);
   return `src/domain/agents/${directory}/examples/${name}Sample.json`;
 }
 

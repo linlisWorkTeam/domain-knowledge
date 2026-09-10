@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：实现文档分块角色的业务步骤与结构化结果转换。
  */
-import type { ExecutionContext, RoleResult, PendingArtifact } from '../AgentExecution.ts';
-import { assertActive, pending } from '../AgentExecution.ts';
+import type { ExecutionContext, RoleResult, PendingArtifact } from '../../../AgentExecution.ts';
+import { assertActive, pending } from '../../../AgentExecution.ts';
 import { type Input, type Output, schemaFor, validateInput } from './DocWorkerAgentContract.ts';
 import { definition, buildPrompt, readablePaths } from './DocWorkerAgentPrompt.ts';
 

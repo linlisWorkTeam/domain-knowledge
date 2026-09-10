@@ -14,7 +14,7 @@ SPDX-License-Identifier: MIT
 | 角色 ID | 独立设计 | 职责 |
 | --- | --- | --- |
 | `orchestrator` | [OrchestratorAgent](orchestratorAgent/OrchestratorAgent.md) | 业务计划 |
-| `doc-worker` | [DocWorkerAgent](docWorkerAgent/DocWorkerAgent.md) | 知识片段提取 |
+| `doc-worker` | [DocWorkerAgent](docGenAgent/subAgents/docWorkerAgent/DocWorkerAgent.md) | 知识片段提取 |
 | `doc-gen` | [DocGenAgent](docGenAgent/DocGenAgent.md) | 知识正文生成与修订 |
 | `test-gen` | [TestGenAgent](testGenAgent/TestGenAgent.md) | 测试生成 |
 | `code` | [CodeAgent](codeAgent/CodeAgent.md) | 代码生成 |
@@ -25,13 +25,17 @@ SPDX-License-Identifier: MIT
 
 | 编号 | 议题 | 状态 | 记录 |
 | --- | --- | --- | --- |
-| IO-01 | Agent 划分与业务阶段 | 已确认 | 保留原有 Orchestrator、DocWorker、DocGen、TestGen、Code、Check、Review 七个 Agent。知识生成、知识检索、知识飞轮、知识评测、知识关联是多 Agent 协作的五个业务阶段，不分别改为五个独立 Agent。各阶段到角色的具体分工仍待逐项明确。 |
+| IO-01 | Agent 划分与业务阶段 | 已确认 | 保留原有 Orchestrator、DocWorker、DocGen、TestGen、Code、Check、Review 七种执行身份；当前 main 已将 DocWorker 收入 DocGen 内部，六个外层 Agent 由 LangGraph 调度。知识生成、知识检索、知识飞轮、知识评测、知识关联是多 Agent 协作的五个业务阶段，不分别改为五个独立 Agent。各阶段到角色的具体分工仍待逐项明确。 |
 
 输入输出确认记录随角色维护：[TestGen IO-02](testGenAgent/TestGenAgent.md)、[CodeAgent IO-03～06](codeAgent/CodeAgent.md)。未确认项不能作为修改代码、Schema 或材料权限的依据。
 
+## DocGen 与 DocWorker 的归属
+
+当前为六个外层 Agent 加 DocGen 内部的 DocWorker，共保留七种执行身份。具体拆分、汇总和复用规则见 [DocGenAgent](docGenAgent/DocGenAgent.md)，Worker 契约见 [DocWorkerAgent](docGenAgent/subAgents/docWorkerAgent/DocWorkerAgent.md)。
+
 ## 共同协议
 
-每个 XxxAgent 目录有入口、Contract、Prompt、测试和显式样例。`execute(input, context)` 的 input 使用角色专属 Payload 与已加载材料；context 注入模型 Port、promptAddon 与取消信号。入口依次检查取消和材料、构建 Prompt / Schema、调用一次模型、再次检查取消、校验输出、返回 output / payload / artifacts。格式及网络重试由 Adapter 负责，本轮角色不新增业务修订循环。
+每个 XxxAgent 目录有入口、Contract、Prompt、测试和显式样例；DocWorker 目录嵌套在 DocGen 内。`execute(input, context)` 的 input 使用角色专属 Payload 与已加载材料；context 注入模型 Port、promptAddon 与取消信号。入口依次检查取消和材料、构建 Prompt / Schema、调用一次模型、再次检查取消、校验输出、返回 output / payload / artifacts。格式及网络重试由 Adapter 负责，DocGen 在汇总模型调用前先完成内部 Worker 批次；其他角色仍为一次业务调用。
 
 `RoleResult` 中 pending 引用由 Application 保存正文后绑定，Domain 不操作 CAS 路径或信封事务。材料的可见范围由角色 Prompt 定义与载荷引用共同限制，不能把完整工作流上下文交给所有角色。
 

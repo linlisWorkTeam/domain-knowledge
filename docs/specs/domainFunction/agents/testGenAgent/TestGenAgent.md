@@ -29,6 +29,6 @@ SPDX-License-Identifier: MIT
 
 ## 待确认与验收重点
 
-对应 S2-04：先完成 IO-02，再确认输出究竟包含哪些测试文件、用例描述和执行信息，以及复用条件、测试执行和门禁接线。此处列出待讨论事项，不预设答案。执行与可信判定边界见 [Workflow](../../services/workflow/Workflow.md) 和 [Evaluation](../../services/Evaluation.md)。
+对应 S2-04：先完成 IO-02，再确认输出究竟包含哪些测试文件、用例描述和执行信息，以及复用条件、测试执行和门禁接线。此处列出待讨论事项，不预设答案。执行与可信判定边界见 [Workflow](../../workflow/Workflow.md) 和 [Evaluation](../../evaluation/Evaluation.md)。
 
 开发步骤与证据统一记录在 [Status](../../../../Status.md)，独立运行方法见 [AgentDevelopment](../../../../AgentDevelopment.md)。

@@ -5,19 +5,19 @@ SPDX-License-Identifier: MIT
 -->
 # 开发任务与当前进度
 
-更新日期：2026-09-10（北京时间）。代码基线：`96d277b`。四阶段顺序和本会话分工由用户确认；任务验收状态依据现有代码及记录填写，尚未逐项复验。
+更新日期：2026-09-10（北京时间）。代码基线：`a79b385`（已合入 PR #37、#40）。四阶段顺序和本会话分工由用户确认；任务验收状态依据现有代码及记录填写，尚未逐项复验。
 
 本文件统一维护当前任务、步骤、依赖、状态和证据索引。实现细节维护在所属模块设计，验收条件引用 [Verification](specs/totalRules/Verification.md)，历史记录见 [HistoryEpitaph](HistoryEpitaph.md)。旧 DEV-019 的 R0～R4 是历史计划，与下面的新四阶段不按编号对应，也不直接继承完成勾选。
 
 ## 四阶段总览
 
-当前处于阶段 1、2：DDD 目录重整已有主要实现，继续收尾验收；单个 Agent 进入细化开发。**2026-09-10 本会话由用户负责阶段 2**，具体先开发哪个角色尚未指定，其他阶段负责人未指定。
+当前处于阶段 1、2：DDD 目录重整已有主要实现，继续收尾验收；单个 Agent 进入细化开发。**2026-09-10 本会话由用户负责阶段 2**，CodeAgent 设计已确认，TestGen 仍在确认；main 另已合入 DocGen 内部 Worker 实现，其他阶段负责人未指定。
 
 | 阶段 | 目标 | 状态 | 依赖与完成条件 |
 | --- | --- | --- | --- |
-| S1 | 按 DDD 架构重新整理代码目录 | 待验收 | 主要迁移已合入 PR #36；核对分层、引用、入口和当前版本回归后完成 |
+| S1 | 按 DDD 架构重新整理代码目录 | 待验收 | 主要迁移已合入 PR #36、#37；核对分层、引用、入口和当前版本回归后完成 |
 | S2 | 单个 Agent 的细化开发 | 开发中 | 沿用 S1 已稳定的角色边界，可与 S1 收尾并行；七角色分别完成设计、实现、样例和相关验证 |
-| S3 | 在云端（本服务器）运行端到端测试 | 待开发 | 各角色完成 S2 后可逐个进行服务器真实调用检查；全部角色就绪后跑七角色完整工作流，留下端到端证据 |
+| S3 | 在云端（本服务器）运行端到端测试 | 待开发 | 各角色完成 S2 后可逐个进行服务器真实调用检查；全部角色就绪后跑包含内部 Worker 的完整工作流，留下端到端证据 |
 | S4 | 适配公司环境的 CodeAgent CLI，运行实际业务场景 | 待开发 | 以 S3 验收版本为基线，取得真实 CLI 协议、访问条件与业务场景后开展适配及业务验收 |
 
 状态使用：**待开发**（测试任务表示待准备/执行）、**开发中**、**待验收**（实现或材料已就绪，仍缺验收）、**已验收**、**阻塞**（写明具体原因和解除条件）。已有代码或测试文件不等于已验收。实际执行结果另记 `PASS / FAIL / BLOCKED / NOT_RUN`；只有对应版本的必需检查全部通过且证据可查，任务才能改为已验收。
@@ -39,8 +39,8 @@ SPDX-License-Identifier: MIT
 | 任务 | 角色 | 细化与验收重点 | 状态 | 当前证据 |
 | --- | --- | --- | --- | --- |
 | S2-01 | [Orchestrator](specs/domainFunction/agents/orchestratorAgent/OrchestratorAgent.md) | 计划输入、任务输出和失败处理；保持固定业务连接，不能由模型决定 Gate PASS | 待开发 | 已有结构；本阶段验收待补 |
-| S2-02 | [DocWorker](specs/domainFunction/agents/docWorkerAgent/DocWorkerAgent.md) | 源码分块、片段覆盖、来源引用及材料不足处理 | 待开发 | 已有结构；本阶段验收待补 |
-| S2-03 | [DocGen](specs/domainFunction/agents/docGenAgent/DocGenAgent.md) | 正文与来源、旧版和 Correction 输入、质量反馈及定向修订 | 待开发 | 固定源码样例及历史 live 记录可参考；本阶段验收待补 |
+| S2-02 | [DocWorker](specs/domainFunction/agents/docGenAgent/subAgents/docWorkerAgent/DocWorkerAgent.md) | 源码分块、片段覆盖、来源引用及材料不足处理 | 开发中 | PR #40 已实现 DocGen 内部 Worker；业务细化与本阶段验收待补 |
+| S2-03 | [DocGen](specs/domainFunction/agents/docGenAgent/DocGenAgent.md) | 正文与来源、旧版和 Correction 输入、质量反馈及定向修订 | 开发中 | PR #40 已实现内部拆分与汇总，并有组合 Fixture 证据；语义与业务质量验收待补 |
 | S2-04 | [TestGen](specs/domainFunction/agents/testGenAgent/TestGenAgent.md) | 确认输入与测试预期依据，再细化测试候选、oracle 声明和门禁接线 | 开发中（设计确认） | S2-04.a 的 IO-02 确认中，见 [TestGen 设计](specs/domainFunction/agents/testGenAgent/TestGenAgent.md)；尚未修改实现，验收待补 |
 | S2-05 | [CodeAgent](specs/domainFunction/agents/codeAgent/CodeAgent.md) | 知识卡片包含接口，项目配置提供 C/C++ 必要约束；本轮白名单与隔离限制读取，框架校验源码列表并落盘 | 开发中（设计已确认，待实现） | IO-03～06 已确认，见 [CodeAgent 设计](specs/domainFunction/agents/codeAgent/CodeAgent.md)；KF-SYS-044、045 为 Planned，代码未改，验收待补 |
 | S2-06 | [Check](specs/domainFunction/agents/checkAgent/CheckAgent.md) | 检查输入、判据、findings 可追溯性及只读边界 | 待开发 | 已有结构；本阶段验收待补 |
@@ -50,7 +50,7 @@ SPDX-License-Identifier: MIT
 
 | 后缀 | 具体步骤 | 交付与验收条件 |
 | --- | --- | --- |
-| a | 对照已有实现，明确输入、职责、输出、权限和失败行为 | 从 [角色索引](specs/domainFunction/agents/Agents.md) 进入并更新对应独立设计；列出本次缺口与验收场景，涉及业务接线时同步 [Workflow](specs/domainFunction/services/workflow/Workflow.md) |
+| a | 对照已有实现，明确输入、职责、输出、权限和失败行为 | 从 [角色索引](specs/domainFunction/agents/Agents.md) 进入并更新对应独立设计；列出本次缺口与验收场景，涉及业务接线时同步 [Workflow](specs/domainFunction/workflow/Workflow.md) |
 | b | 实现角色内部步骤，调整 Contract、Prompt 和必要的上下游交接 | 代码与设计一致；公共契约/材料变化同步 Schema、消费者及验收追踪；不能只改提示词代替强制校验 |
 | c | 更新独立样例和有行为判定的测试 | 覆盖正常结果、材料不足、非法输出、执行失败和适用权限边界；按 AC-SCHEMA-001 及角色相关验收场景核对 |
 | d | 运行独立入口及相关回归，审查业务输出并记录证据 | 使用 [AgentDevelopment](AgentDevelopment.md) 的统一入口，记录版本、命令、结果及工件；区分 Fixture 与真实模型，完成后交给 S3 |
@@ -99,15 +99,30 @@ SPDX-License-Identifier: MIT
 
 | 范围 | 当前事实 | 未完成或未验证部分 |
 | --- | --- | --- |
-| 七角色结构 | Domain 独立目录、专属契约、显式注册和公共提交链已实现；固定 DocGen 示例已合入角色样例 | 结构迁移不等于七角色真实效果验收 |
-| 跨角色流程 | Domain 定义业务连接，LangGraph 负责执行与 checkpoint | 不开放动态拓扑编辑 |
+| Agent 结构 | 六个外层 Agent；DocWorker 位于 DocGen/subAgents，保留独立执行身份、契约、提示词与提交记录；DocGen 组织源码拆分与汇总 | 本次结构与流程回归不代表真实模型生成质量验收 |
+| 跨角色流程 | Domain 定义业务连接，LangGraph 只调度外层角色；DocGen 内部 Worker 使用独立 Registry 提交与有界并发 | 旧 roleExecutionVersion 拒绝恢复；不开放动态拓扑编辑 |
+| Domain 组织 | 按领域功能平级组织，已移除 services 目录和总导出 | 共享实体仍位于 Domain.ts |
 | 模型接入 | DSH 原生 SDK、受控 Fixture、OpenCode Go 环境配置已实现 | 公司 CLI 真实协议未验收 |
 | 评测与发布 | 可信场景执行、确定性 Gate、幂等发布和审计已实现 | TestGen 候选 oracle 晋升、C++ 插件和敌对代码沙箱未实现 |
 | 查询与关联 | 现有查询、血缘、Diff、来源和关联领域能力 | SearchAgent 直接检索链仍为 Planned |
 | 资源模块 | SourceScan、Workspace、legacyOkf 已归入 Domain | 保留既有文件系统、Git 和 YAML 依赖 |
 | 文档组织 | 设计集中 docs/specs，按代码模块重写；4+1 视图集中一份 | 旧规范目录、独立 security 章节与重复任务模板已移除 |
 
+## PR #41 合并验证
+
+2026-09-10，docs/codeagent-contract-sop 合入 main@a79b385；相对 main 仅文档改动。typecheck、validate:specs（17 schemas / 7 commands / 8 results / 52 p0）、test:architecture（1 项）及文档本地链接检查通过。未重跑全量测试或真实模型；不改变各 Agent 业务验收状态。具体合并范围与未决事项见 [合并交接](epitaph/2026-09-10-1424-pr41-docs-merge.md)。
+
 ## 历史验证口径
+
+### DocGen 内部 Worker 重构的历史证据
+
+2026-09-10，feat/knowledge-generation-agent 基于 main@96d277b 完成 DocGen 内部 Worker 重构。Node 24.13.0 下 typecheck、validate:specs、git diff --check 通过；定向验证 35 项通过。全量 npm test 为 229 项，227 通过、2 失败。
+
+两项失败均已在未修改的 96d277b 独立源码快照中复现：Site 发布资产测试仍要求小写文件名，但资产为 ConsoleDev007Dev008.gif；主题测试要求 UiuxDesign.md 包含 #080b10 等颜色值，现有文档缺失。它们不是本次重构引入的问题，本分支未修改站点资源、主题规范或对应测试。
+
+新增 DocGenWithWorkersSample CLI 组合样例通过：fixture 模式下两个 Worker 提交片段后 DocGen 汇总成功，publication=NOT_EVALUATED。本轮未调用真实模型、未做浏览器验收。验证细节与后续边界见 [本次交接](epitaph/2026-09-10-1046-docgen-internal-workers.md)。
+
+### 更早记录与本会话范围
 
 2026-09-08 的目录与文档整理按当时用户要求未重新运行测试，只进行类型、路径、文档结构、Schema 字节一致性与 diff 静态检查。初版七角色提交曾通过 219 项测试和 14 项 Console 测试；结果属于该历史提交，不能作为当前版本的测试结论，也不构成后续任务不运行测试的约束。
 

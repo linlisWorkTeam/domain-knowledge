@@ -25,6 +25,6 @@ SPDX-License-Identifier: MIT
 
 对应 S2-07：确认评测证据、Check findings 接入与归因、Correction 及无须修订时的输出。目前未单独绑定 Check findings 明细，不能把提示词要求或结构迁移写成完整归因能力。
 
-知识修订由 [DocGenAgent](../docGenAgent/DocGenAgent.md) 接收 Application 显式提供的旧正文与纠正材料后执行；跨角色连接见 [Workflow](../../services/workflow/Workflow.md)。
+知识修订由 [DocGenAgent](../docGenAgent/DocGenAgent.md) 接收 Application 显式提供的旧正文与纠正材料后执行；跨角色连接见 [Workflow](../../workflow/Workflow.md)。
 
 开发步骤与证据统一记录在 [Status](../../../../Status.md)，独立运行方法见 [AgentDevelopment](../../../../AgentDevelopment.md)。
