@@ -78,6 +78,7 @@ export class ConsoleReadModel {
   listRunSummaries(states?: string[]): Record<string, unknown>[] {
     const rows = this.database.prepare(`
       SELECT runs.*,
+        (SELECT COUNT(DISTINCT version_id) FROM evaluations WHERE evaluations.run_id = runs.run_id) AS evaluated_version_count,
         (SELECT decision_json FROM gate_decisions AS decision
           WHERE decision.run_id = runs.run_id
           ORDER BY decision.rowid DESC LIMIT 1) AS latest_decision_json
@@ -87,6 +88,7 @@ export class ConsoleReadModel {
       .filter((row) => !states?.length || states.includes(String(row.state)))
       .map((row) => ({
         ...runFromRow(row),
+        evaluatedVersionCount: Number(row.evaluated_version_count),
         latestDecision: row.latest_decision_json === null
           ? null
           : parse<GateDecision>(row.latest_decision_json),

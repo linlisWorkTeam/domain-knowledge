@@ -503,17 +503,19 @@ function renderRuns() {
   }
   const active = state.runs.filter(isRunActive)
   const verified = state.runs.filter((run) => run.state === 'VERIFIED')
+  const evaluatedCount = state.runs.every(run => Number.isSafeInteger(run.evaluatedVersionCount))
+    ? state.runs.reduce((sum, run) => sum + run.evaluatedVersionCount, 0) : '—'
   const latest = state.runs[0]
   const rows = state.runs.map((run, index) => referenceRunRow(run, index === 0)).join('')
   content.innerHTML = `
-    <section class="reference-metrics"><article><small>运行中</small><b class="mint">${active.length}</b><p>来自工作流执行状态</p></article><article><small>已验证</small><b>${verified.length}</b><p>${state.runs.length} 个批次</p></article><article><small>需要处理</small><b>${state.runs.filter(needsAttention).length}</b><p>失败、低置信或已停止</p></article><article><small>知识版本</small><b>${state.runs.reduce((sum, run) => sum + (run.knowledgeVersionIds?.length ?? 0), 0)}</b><p>由批次事实汇总</p></article></section>
+    <section class="reference-metrics"><article><small>运行中</small><b class="mint">${active.length}</b><p>来自工作流执行状态</p></article><article><small>已验证</small><b>${verified.length}</b><p>${state.runs.length} 个批次</p></article><article><small>需要处理</small><b>${state.runs.filter(needsAttention).length}</b><p>失败、低置信或已停止</p></article><article><small>已评测版本</small><b>${evaluatedCount}</b><p>按批次去重汇总，缺数据不记为零</p></article></section>
     <div class="reference-runs-grid"><section class="reference-run-history"><header><h3>批次记录</h3><button class="on" data-run-filter="">全部</button><button data-run-filter="active">运行中</button><button data-run-filter="attention">需处理</button><button data-run-filter="failed">执行失败</button></header><div id="runs-list">${rows || emptyState('没有批次记录', '当前注册中还没有批次记录。')}</div></section>
     <aside class="reference-run-detail">${latest ? `<header><small>最新批次</small><b>${escapeHtml(shortId(latest.runId, 18))}</b></header><div class="orbit-mini"><span>${escapeHtml(runStatusLabel(latest))}<small>执行状态</small></span></div><p class="done">✓ <b>批次事实</b><small>${escapeHtml(latest.moduleId)}</small></p><p class="doing">⌁ <b>Agent 工作流图</b><small>查看真实节点投影</small></p><p>3 <b>评测</b><small>${escapeHtml(latest.latestDecision?.outcome ? displayLabel(latest.latestDecision.outcome) : '等待门禁')}</small></p><button class="wide" data-run-id="${escapeHtml(latest.runId)}">打开批次详情 →</button>` : emptyState('暂无批次', '创建批次后在这里查看。')}</aside></div>
     <form id="workflow-start-form" class="reference-start-form"><label>服务器项目目录<input name="repositoryRoot" placeholder="选择 ohMyWorkPanel 仓库的绝对路径" required></label><button class="secondary-button" data-browse-directory="repositoryRoot" type="button" ${state.operatorMode ? '' : 'disabled'}>浏览目录</button><p class="muted">代表模块 markdownLite · 七角色顺序执行 · 最多 3 轮 / 30 分钟</p><button class="new" type="submit" ${state.operatorMode ? '' : 'disabled'}>启动知识飞轮</button><div id="directory-browser" class="directory-browser"></div></form>`
 }
 
 function referenceRunRow(run, selected = false) {
-  return `<button class="reference-run-item ${selected ? 'selected' : ''}" data-run-id="${escapeHtml(run.runId)}" type="button"><i class="${isRunActive(run) ? 'run-live' : run.state === 'VERIFIED' ? 'run-ok' : 'run-bad'}">${run.state === 'VERIFIED' ? '✓' : needsAttention(run) ? '!' : ''}</i><span><b>${escapeHtml(shortId(run.runId, 18))}</b><small>${escapeHtml(run.moduleId)} · 第 ${escapeHtml(run.iteration + 1)} 轮</small></span><em>${escapeHtml(runStatusLabel(run))}</em><span>${escapeHtml(run.latestDecision?.outcome ? displayLabel(run.latestDecision.outcome) : '等待门禁')}</span><strong>${escapeHtml(run.knowledgeVersionIds?.length ?? 0)} 版本</strong><time>${escapeHtml(relativeTime(run.updatedAt))}</time></button>`
+  return `<button class="reference-run-item ${selected ? 'selected' : ''}" data-run-id="${escapeHtml(run.runId)}" type="button"><i class="${isRunActive(run) ? 'run-live' : run.state === 'VERIFIED' ? 'run-ok' : 'run-bad'}">${run.state === 'VERIFIED' ? '✓' : needsAttention(run) ? '!' : ''}</i><span><b>${escapeHtml(shortId(run.runId, 18))}</b><small>${escapeHtml(run.moduleId)} · 第 ${escapeHtml(run.iteration + 1)} 轮</small></span><em>${escapeHtml(runStatusLabel(run))}</em><span>${escapeHtml(run.latestDecision?.outcome ? displayLabel(run.latestDecision.outcome) : '等待门禁')}</span><strong>${Number.isSafeInteger(run.evaluatedVersionCount) ? run.evaluatedVersionCount : '—'} 已评测版本</strong><time>${escapeHtml(relativeTime(run.updatedAt))}</time></button>`
 }
 
 function renderRunWorkspace(snapshot) {
@@ -554,7 +556,7 @@ function renderRunWorkspace(snapshot) {
         ${latestDecision ? badge(latestDecision.outcome) : badge('CANDIDATE', '尚未判定')}
         <dl class="fact-list">
           <div><dt>当前轮次</dt><dd>${escapeHtml(run.iteration + 1)}</dd></div>
-          <div><dt>知识版本</dt><dd>${escapeHtml(versions.length)}</dd></div>
+          <div><dt>模块知识版本</dt><dd>${escapeHtml(versions.length)}</dd></div>
           <div><dt>评测次数</dt><dd>${escapeHtml(evaluations.length)}</dd></div>
           <div><dt>最佳版本</dt><dd title="${escapeHtml(run.bestVersionId)}">${escapeHtml(shortId(run.bestVersionId || '—'))}</dd></div>
         </dl>
