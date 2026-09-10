@@ -146,3 +146,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 - [2026-09-10-1913-jsmn-behavior.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/6e5e6d9bbc46f8bfe27985ead1363ff5270fc3f8/docs/epitaph/2026-09-10-1913-jsmn-behavior.md)：旧引擎jsmn16例真实参考与生成通过，补候选拒绝反馈；当时完整闭环未完成。历史测试套件保留，当前门禁继承规则见最新交接，不将旧报告当新执行器验收。
 
 - [2026-09-10-1931-associations-tinyxml.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/3d82c6a2255531cb3416a9e8b65918cb7b781daf/docs/epitaph/2026-09-10-1931-associations-tinyxml.md)：库内关联与早期 TinyXML2 运行交接；后续编译修复、可信门禁继承和真实结果见当前墓志铭。该时点不代表完整闭环或发布完成。
+
+- [2026-09-11-0143-native-repair-verified.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/525690a2d484a90aeec28edc9f5f9e739e348aa6/docs/epitaph/2026-09-11-0143-native-repair-verified.md)：编译反馈修复与旧引擎真实 TinyXML2 37/37、jsmn15/15。此后可信门禁引擎已更新；当前 jsmn 一键31/31见0233记录，TinyXML2最终引擎仍待重验。真实运行配置、固定仓库与证据位置保存在原记录，不将历史结果当完整发布证明。

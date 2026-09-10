@@ -1302,3 +1302,5 @@ body.drawer-active { overflow: hidden; }
 [data-generation-panel] fieldset { min-width: 0; }
 [data-generation-panel] label { display: block; margin-block: .6rem; }
 [data-generation-panel] textarea { width: 100%; box-sizing: border-box; }
+
+.material-identity { overflow-wrap: anywhere; }

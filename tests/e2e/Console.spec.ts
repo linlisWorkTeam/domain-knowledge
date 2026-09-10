@@ -623,6 +623,9 @@ test('Sources 显式 scan，真实 create/refresh/PATCH，scan 失败只形成 P
   await expect(sourceDrawer).toContainText(sourceId);
   await expect(sourceDrawer).toContainText('检测到漂移');
   await expect(sourceDrawer.getByLabel('确认修订')).not.toHaveValue('');
+  await sourceDrawer.getByLabel('材料适用条件').fill('仅用于控制台示例来源');
+  await sourceDrawer.getByRole('button', { name: '捕获材料快照' }).click();
+  await expect(sourceDrawer.locator('[data-material-result]')).toContainText('确认修订');
   await sourceDrawer.getByLabel('显示名称').fill('控制台来源（已确认）');
   page.once('dialog', (dialog) => dialog.accept('确认来源新修订'));
   const updatePromise = page.waitForResponse((response) => (
@@ -634,6 +637,21 @@ test('Sources 显式 scan，真实 create/refresh/PATCH，scan 失败只形成 P
   assert.equal(updateResponse.status(), 200);
   await expect(page.locator('#toast')).toHaveText('来源配置的新修订已保存。');
   await expect(page.locator('.source-card').filter({ hasText: '控制台来源（已确认）' })).toContainText('正常');
+  await page.locator(`[data-source-id="${sourceId}"]`).first().click();
+  await sourceDrawer.getByLabel('材料适用条件').fill('仅用于控制台示例来源');
+  await sourceDrawer.getByRole('button', { name: '捕获材料快照' }).click();
+  await expect(sourceDrawer.locator('[data-material-result]')).toContainText('材料已捕获');
+  await sourceDrawer.getByText('查看固定正文与标识', { exact: true }).click();
+  await expect(sourceDrawer.locator('[data-material-result]')).toContainText('来源内容已在 E2E 中发生漂移');
+  await page.screenshot({ path: test.info().outputPath('material-desktop.png'), fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await expect(sourceDrawer.getByRole('button', { name: '捕获材料快照' })).toBeVisible();
+  expect(await sourceDrawer.locator('[data-material-result]').evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+  await page.screenshot({ path: test.info().outputPath('material-mobile.png'), fullPage: true });
+  await page.setViewportSize({ width: 1363, height: 936 });
+  await page.keyboard.press('Escape');
+
 
   await page.route('**/api/v1/sources/scan', (route) => route.fulfill({
     status: 503,
@@ -642,7 +660,7 @@ test('Sources 显式 scan，真实 create/refresh/PATCH，scan 失败只形成 P
   }));
   await page.getByRole('button', { name: /^(?:扫描候选|重新扫描)$/ }).click();
   await expect(page.getByText('来源候选扫描失败；已登记的来源事实仍可查看和管理。')).toBeVisible();
-  await expect(page.getByText('控制台来源（已确认）')).toBeVisible();
+  await expect(page.locator('.source-card').getByText('控制台来源（已确认）', { exact: true })).toBeVisible();
   await expect(page.getByText('internal detail')).toHaveCount(0);
 });
 

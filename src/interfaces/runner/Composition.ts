@@ -3,6 +3,9 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：提供Composition的外部入口、参数转换与响应处理。
  */
+import { WorkbenchMaterials } from '../../application/services/WorkbenchMaterials.ts';
+import { SqliteExternalMaterials } from '../../infrastructure/sqlite/SqliteExternalMaterials.ts';
+import { MaterialText } from '../../infrastructure/source/MaterialText.ts';
 import { RepositoryAnalysisService } from '../../application/services/RepositoryAnalysis.ts';
 import { NativeSuiteEvaluation } from '../../application/services/NativeSuiteEvaluation.ts';
 import { NativeCaseExecutor } from '../../infrastructure/evaluation/project/NativeCaseExecutor.ts';
@@ -195,7 +198,7 @@ export function createComposition(input: {
       service: flywheelApp,
     }),
   });
-  const contentGovernance = new ContentGovernanceApp(new SQLiteContentGovernance({
+  const contentGovernanceStore = new SQLiteContentGovernance({
     database: repository.database,
     artifacts,
     repositoryRoot,
@@ -210,7 +213,9 @@ export function createComposition(input: {
       maxIterations: config.publicationGate.maxIterations,
     },
     clock: input.clock,
-  }));
+  });
+  const contentGovernance = new ContentGovernanceApp(contentGovernanceStore);
+  const workbenchMaterials = new WorkbenchMaterials(contentGovernanceStore, new SqliteExternalMaterials(repository.database), artifacts, new MaterialText());
   const metrics = input.operationalMetrics ?? new SQLiteOperationalMetrics(
     repository.database,
     () => new Date(input.clock?.() ?? Date.now()),
@@ -594,7 +599,7 @@ export function createComposition(input: {
       evalRunner: evalRunnerApp,
       knowledgeSearch: knowledgeSearchApp,
       knowledgeDiscovery: knowledgeDiscoveryApp,
-      contentGovernance,
+      contentGovernance, workbenchMaterials,
       providerOperations,
       operationalMetrics: operationalMetricsApp,
       orchestrator,

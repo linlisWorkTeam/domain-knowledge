@@ -44,3 +44,5 @@ Git fetch 后、任何 merge 前读取远端完整树，拒绝非允许路径和
 ## 工作台项目输入
 
 SqliteWorkbenchProjects在workbench.sqlite中保存wb_project_inputs。snapshot_id唯一，INSERT OR IGNORE后读取原记录，同输入并发请求不覆盖历史；project_id索引用于读取同仓库历史。正文在CAS，数据库只存固定清单、版本、参数和引用；与阶段任务共用文件但独立表。关闭Composition时关闭连接。
+
+`wb_external_materials` 按材料标识追加不可变快照，记录原文/正文 CAS 引用、来源修订、捕获时间和适用条件；重复插入保留首次记录。复用仓库数据库关闭生命周期，不单独关闭共享连接。

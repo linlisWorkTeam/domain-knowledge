@@ -145,3 +145,7 @@ PENDING、Git 关闭、Git 冲突及认证失败使用可定位的错误码。AP
 - `GET /api/v1/workbench-pipelines`：读取协调记录列表；`GET /api/v1/workbench-pipelines/:id`返回`pipeline`、按阶段排列的`tasks`、累计`usage`及`publicationVerified:false`。
 - `POST /api/v1/workbench-pipelines/:id/cancel {}`：取消协调和当前子任务；`POST .../resume {inputDigest}`只恢复同契约输入，累计子任务用量不重置。契约/输入冲突为409，不存在为404。
 - 所有入口使用现有匿名部署授权策略，无新增登录。旧契约可读，不能跨契约恢复。逐阶段状态、证据和下载继续复用stage-tasks接口。
+
+### 外部材料快照
+
+`POST /api/v1/external-materials` 接受已登记 `sourceId` 和非空 `applicability`，校验固定来源修订，捕获 UTF-8 文本/Markdown/HTML/JSON（正文上限 2 MiB）；返回 `material`。不搜索、不递归读取链接。`GET /api/v1/external-materials` 返回不可变快照列表，`GET /api/v1/external-materials/:id` 返回材料及转换正文。原始和转换工件保存于 CAS；同修订/条件重复捕获返回相同标识，来源变动需先确认新修订。来源限制沿用既有策略，材料格式/编码/容量错误为 422，不存在为 404。

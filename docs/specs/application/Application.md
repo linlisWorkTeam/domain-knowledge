@@ -90,3 +90,5 @@ NativeSuiteEvaluation 已实现原生候选的参考验证、生成实现独立�
 WorkbenchEvaluation 已接通：接受成功重建taskId，冻结其结果摘要、配置、工具链和卡片版本，复用TestGen及NativeSuiteEvaluation。参考baseline使用独立空main完成隔离构建/启动检查，失败保留报告并停止，不能把依赖错误算作候选或知识错误。TestGen只见知识、接口及源码快照元数据，不见参考正文/生成实现/隐藏预期。候选参考失败保存CANDIDATE_REJECTED，生成实现不运行；可信案例报告包含失败输入、预期、实际和章节版本映射。成功执行报告与行为成功分别标识，publicationVerified=false。当前阶段暂不执行自动知识修订或发布，不能当作完整评测飞轮交付。
 
 候选参考拒绝保存独立报告与检查点，任务以TEST_CANDIDATE_REJECTED失败；恢复使用递增候选修订键重新生成已拒绝候选，保留同任务累计消耗。尚在验证中发生资源中断的候选不重新生成。完整报告留CAS，阶段与模块检查点仅含计数/引用，避免大报告超过阶段状态的256KiB上限；后续模块失败不丢失前序模块报告。所有行为通过仍不等于完成发布门禁。
+
+外部材料捕获由 WorkbenchMaterials 协调：通过 ExternalMaterialReader 读取用户登记来源及固定修订，验证原文摘要，调用文本转换端口，写入原文/正文 CAS，再通过 ExternalMaterialStore 追加不可变快照。Domain 定义材料身份和适用条件约束，Application 不解析 HTML、不读文件或发 HTTP 请求。读取快照前验证两个工件完整性，失败不返回伪造正文。此捕获用例尚不自动生成关联，关联任务需显式选择材料。

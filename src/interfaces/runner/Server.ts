@@ -272,6 +272,8 @@ function requireOnlyKeys(payload: Record<string, unknown>, allowed: readonly str
 export function mapHttpError(error: unknown, id = 'req_unknown'): { status: number; body: ApiErrorBody } {
   const message = error instanceof Error ? error.message : String(error);
   const code = message.split(':', 1)[0] || 'INTERNAL_ERROR';
+  if (code === 'MATERIAL_NOT_FOUND') return { status: 404, body: errorBody(code, '材料不存在', id) };
+  if (code.startsWith('MATERIAL_')) return { status: 422, body: errorBody(code, code, id) };
   if (code === 'PIPELINE_NOT_FOUND') return { status: 404, body: errorBody(code, '流程不存在', id) };
   if (['PIPELINE_CONTRACT_INCOMPATIBLE', 'PIPELINE_INPUT_CHANGED', 'PIPELINE_NOT_RESUMABLE'].includes(code)) return { status: 409, body: errorBody(code, code, id) };
   if (['PIPELINE_SHUTDOWN', 'PIPELINE_OWNER_UNAVAILABLE'].includes(code)) return { status: 503, body: errorBody(code, code, id) };
@@ -366,7 +368,7 @@ export function createKnowledgeServer(input: {
       }
       // 目录、配置和写入仅允许直接本机访问，或携带远程访问令牌。
       const localClient = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(request.socket.remoteAddress ?? '');
-      const workbenchRoute = /^\/api\/v1\/(workbench-pipelines|stage-tasks|index-builds|knowledge-index|repository-analyses|projects|generations|reconstructions|native-evaluations|associations)(\/|$)/.test(url.pathname);
+      const workbenchRoute = /^\/api\/v1\/(external-materials|workbench-pipelines|stage-tasks|index-builds|knowledge-index|repository-analyses|projects|generations|reconstructions|native-evaluations|associations)(\/|$)/.test(url.pathname);
       const productRoute = url.pathname.startsWith('/api/v1/publications')
         || url.pathname === '/api/v1/server-directories' || url.pathname === '/api/v1/runs/markdown-lite';
       if (url.pathname.startsWith('/api/') && (!localClient || productRoute || workbenchRoute) && !authorized(request, writeToken, anonymousAccess)) {
@@ -375,6 +377,17 @@ export function createKnowledgeServer(input: {
         return;
       }
       if (workbenchRoute) {
+        const materials = composition.apps.workbenchMaterials;
+        if (url.pathname === '/api/v1/external-materials' && request.method === 'GET') {
+          send(response, 200, { items: materials.store.list() }); return;
+        }
+        if (url.pathname === '/api/v1/external-materials' && request.method === 'POST') {
+          const payload = await body(request); requireOnlyKeys(payload, ['sourceId', 'applicability']);
+          if (typeof payload.sourceId !== 'string' || typeof payload.applicability !== 'string') throw new Error('PAYLOAD_INVALID');
+          send(response, 201, { material: await materials.capture(payload.sourceId, payload.applicability) }); return;
+        }
+        const materialRoute = /^\/api\/v1\/external-materials\/([^/]+)$/.exec(url.pathname);
+        if (materialRoute && request.method === 'GET') { send(response, 200, await materials.read(decodeURIComponent(materialRoute[1]!))); return; }
         const pipelines = composition.apps.workbenchPipelines;
         if (url.pathname === '/api/v1/workbench-pipelines' && request.method === 'GET') {
           send(response, 200, { items: pipelines.dependencies.store.list() }); return;

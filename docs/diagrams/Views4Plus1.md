@@ -224,3 +224,16 @@ flowchart LR
   D -->|失败或部分成功| STOP[停止推进并保留全部前序结果]
   UI -->|取消或同输入恢复| P
 ```
+
+指定外部材料捕获链路（已实现快照，关联任务选材待接线）：
+
+```mermaid
+flowchart LR
+  UserSource[用户选择登记来源和适用条件] --> MaterialApp[WorkbenchMaterials]
+  MaterialApp --> SourceReader[来源读取端口]
+  SourceReader --> FixedInput[受限本地文件或指定 HTTPS]
+  MaterialApp --> RevisionCheck[固定修订校验]
+  RevisionCheck --> TextAdapter[UTF-8 正文转换]
+  TextAdapter --> MaterialCAS[原始字节及正文 CAS]
+  MaterialCAS --> MaterialRegistry[SQLite 不可变材料快照]
+```

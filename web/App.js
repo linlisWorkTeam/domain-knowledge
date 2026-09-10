@@ -1052,10 +1052,23 @@ async function openSource(sourceId, returnFocus) {
   drawerTitle.textContent = source.displayName ?? source.locator
   drawerContent.innerHTML = `<div class="drawer-badges">${badge(source.status)} ${source.drift ? badge('STALE', '检测到漂移') : ''}</div>
     <dl class="fact-grid"><div><dt>来源</dt><dd>${escapeHtml(source.sourceId)}</dd></div><div><dt>类型</dt><dd>${escapeHtml(displayLabel(source.kind))}</dd></div><div><dt>固定修订</dt><dd>${escapeHtml(source.revision ?? '—')}</dd></div><div><dt>观测修订</dt><dd>${escapeHtml(source.observedRevision ?? '—')}</dd></div><div><dt>最近同步</dt><dd>${escapeHtml(formatDate(source.lastSyncAt))}</dd></div></dl>
+    <section class="drawer-section"><h3>外部关联材料</h3><p>捕获已确认修订的文本。材料提供引用依据，尚未验证其适用性。</p><form id="source-material-form" data-source-id="${escapeHtml(source.sourceId)}"><label>材料适用条件<textarea name="applicability" required maxlength="2000" ${canEdit ? '' : 'disabled'} placeholder="例如：适用于 jsmn 的 JSON 分词接口"></textarea></label><button type="submit" class="secondary-button" ${canEdit ? '' : 'disabled'}>捕获材料快照</button></form><div data-material-result aria-live="polite"></div></section>
     <section class="drawer-section"><h3>关联知识</h3><pre class="json-view">${json(source.knowledge ?? {})}</pre></section>
     <section class="drawer-section"><h3>来源配置</h3><form id="source-update-form" data-source-id="${escapeHtml(source.sourceId)}" data-revision="${escapeHtml(source.recordRevision)}"><label>显示名称<input name="displayName" value="${escapeHtml(source.displayName ?? '')}" ${canEdit ? '' : 'disabled'}></label><label>路径或地址<input name="locator" value="${escapeHtml(source.locator)}" ${canEdit ? '' : 'disabled'}></label><label>确认修订<input name="revision" value="${escapeHtml(source.observedRevision ?? source.revision ?? '')}" ${canEdit ? '' : 'disabled'}></label><label class="inline-check"><input name="enabled" type="checkbox" ${source.status !== 'DISABLED' ? 'checked' : ''} ${canEdit ? '' : 'disabled'}> 启用来源</label><button class="secondary-button" type="submit" ${canEdit ? '' : 'disabled'}>保存新修订</button></form></section>
     <section class="drawer-section"><h3>审计记录</h3><pre class="json-view">${json(source.audit ?? [])}</pre></section>`
   openDrawer(returnFocus)
+}
+
+async function captureSourceMaterial(form) {
+  if (!state.capabilities?.writeEnabled) return
+  const button = form.querySelector('button'); button.disabled = true
+  const result = drawerContent.querySelector('[data-material-result]')
+  try {
+    const saved = await request('/api/v1/external-materials', { method: 'POST', body: JSON.stringify({ sourceId: form.dataset.sourceId, applicability: new FormData(form).get('applicability') }) })
+    const detail = await request(`/api/v1/external-materials/${encodeURIComponent(saved.material.materialId)}`)
+    if (result?.isConnected) result.innerHTML = `<p>材料已捕获：${escapeHtml(detail.material.title)}</p><details><summary>查看固定正文与标识</summary><p class="material-identity">${escapeHtml(detail.material.materialId)}</p><pre class="json-view">${escapeHtml(detail.text)}</pre></details>`
+  } catch (error) { if (result?.isConnected) result.textContent = userFacingError(error, `材料捕获失败：${error.code ?? '连接失败'}`) }
+  finally { button.disabled = false }
 }
 
 async function updateSource(form) {
@@ -1977,3 +1990,9 @@ async function resumeWorkflow(button) {
     throw error
   }
 }
+
+// 指定来源捕获不触发刷新、搜索或其他表单提交。
+drawerContent.addEventListener('submit', (event) => {
+  if (event.target.id !== 'source-material-form') return
+  event.preventDefault(); captureSourceMaterial(event.target)
+})
