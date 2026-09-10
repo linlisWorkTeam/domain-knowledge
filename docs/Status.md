@@ -183,3 +183,5 @@ Track four stages here: DDD layout, individual Agent development, end-to-end ver
 - 本机输出目录：`/tmp/docgen-final-revision`、`/tmp/docgen-final-workers`、`/tmp/docgen-final-source`、`/tmp/docgen-final-split`、`/tmp/docgen-final-resume`；最终测试日志 `/tmp/docgen-final-regression.log`。这些均为 fixture 或受控模型传输验证，S3 真实供应商调用尚未执行。
 
 S2-03 当前最小链路开发完成。IO-08 的分组预算、IO-10 的分批汇总仍按原 Spec 待细化；后续不将文件均分称为上下文预算方案。专用 Console 决策按钮、知识清理与历史最佳回退不计入本轮 DocGen 角色交付。
+
+2026-09-10 PR 范围确认：用户同意将业务分组、上下文预算、跨模块依赖及分批汇总等未定项留待下个版本确定，本次提交已完成的 DocGen/DocWorker 最小链路供审阅。

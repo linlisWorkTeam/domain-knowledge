@@ -53,3 +53,5 @@ Worker 交付以上知识片段或文档，由 DocGen 汇总、去重、处理�
 IO-09 采用必需字段 `analysisScope: { moduleId, files, symbols }`、`fragment`、`sourceEvidence: [{ claim, path, symbol? }]`、`unresolvedQuestions: string[]`；保留 workerId 和 provenance。files 必须精确覆盖分配源码（不能重复或越界），证据路径只允许分配源码及显式公开接口；每个覆盖文件至少有一项证据。symbols 可以为空，不伪造符号提取能力。结构校验及路径授权不证明结论与源码语义一致。
 
 片段工件保存完整 JSON，确保汇总收到范围、正文、依据和缺口；未解决问题进入结果 unresolvedRisks，并沿内部执行端传递给 DocGen，不能被固定空数组丢弃。缺依赖可以明确报告问题，不得编造依据；未覆盖任务文件则本次执行失败。上述字段与语义校验落地后由角色测试与组合回归验证。
+
+2026-09-10 用户确认：本次保留现有最小链路，IO-08 的业务模块/调用关系分组、上下文预算和跨模块依赖处理，以及 IO-10 的分批汇总等未定项留待下个版本确定，不作为本次 PR 的完成条件。
