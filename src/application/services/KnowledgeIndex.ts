@@ -4,7 +4,7 @@
  * 文件功能：协调冻结版本的增量索引、Markdown 恢复和按需正文检索。
  */
 import { sha256 } from '../../domain/Domain.ts';
-import { groupKnowledgeCards } from '../../domain/services/knowledge/KnowledgeCards.ts';
+import { groupKnowledgeCards, currentCardVersions } from '../../domain/services/knowledge/KnowledgeCards.ts';
 import { CARD_INDEX_VERSION, cardIndexHeader, cardIndexSourceDigest, matchCardIndex } from '../../domain/services/knowledge/KnowledgeIndex.ts';
 import type { StageInput, StageResult } from '../../domain/services/workbench/StageTask.ts';
 import type { ArtifactStore, FlywheelRepository } from '../ports/ApplicationPorts.ts';
@@ -21,6 +21,9 @@ export class KnowledgeIndexService {
   }
   private cards() {
     return groupKnowledgeCards(this.repository.listKnowledgeVersions(['CANDIDATE', 'VERIFIED', 'LOW_CONFIDENCE', 'SUPERSEDED']));
+  }
+  currentVersions(snapshotId: string, baseIds: string[]): string[] {
+    return currentCardVersions(this.repository.listKnowledgeVersions(['CANDIDATE', 'VERIFIED', 'LOW_CONFIDENCE', 'SUPERSEDED']), snapshotId, baseIds);
   }
   /** 确定目录后冻结具体版本；阶段执行期间卡片变化会要求建立新任务。 */
   prepare(versionIds?: string[]): StageInput {

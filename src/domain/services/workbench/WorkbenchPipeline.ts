@@ -5,23 +5,25 @@
  */
 import { sha256 } from '../../Domain.ts';
 import { canonicalJson, createStageTask, type StageInput, type StageTask, type StageStatus, type WorkbenchStage } from './StageTask.ts';
-export const PIPELINE_CONTRACT = 'knowledge-pipeline-v4';
+export const PIPELINE_CONTRACT = 'knowledge-pipeline-v5';
 export interface IterationProgress { failed: string[]; total: number; passed: number }
 export interface PipelineIteration { number: number; versionIds: string[]; reconstruction?: StageTask; evaluation?: StageTask; revision?: StageTask; progress?: IterationProgress }
 export interface WorkbenchPipeline {
-  iterations?: PipelineIteration[]; activeTaskId?: string;
+  iterations?: PipelineIteration[]; activeTaskId?: string; initialVersionIds?: string[];
   pipelineId: string; materialIds: string[]; environmentDigest: string; contractVersion: string; inputDigest: string;
   status: StageStatus; reasonCode: string | null; cancelRequested: boolean; resumeRequested: boolean;
   children: Partial<Record<WorkbenchStage, StageTask>>; completed: WorkbenchStage[];
   currentStage: WorkbenchStage; createdAt: string; updatedAt: string;
 }
-export function createPipeline(input: StageInput, now: string, environmentDigest: string, materialIds: string[] = []): WorkbenchPipeline {
+export function createPipeline(input: StageInput, now: string, environmentDigest: string, materialIds: string[] = [], initialVersionIds?: string[]): WorkbenchPipeline {
   if (!Array.isArray(materialIds) || materialIds.length > 32 || materialIds.some((id) => typeof id !== 'string' || !id) || new Set(materialIds).size !== materialIds.length) throw new Error('PIPELINE_INPUT_INVALID');
+  if (initialVersionIds && (!initialVersionIds.length || initialVersionIds.some(id => typeof id !== 'string' || !id) || new Set(initialVersionIds).size !== initialVersionIds.length)) throw new Error('PIPELINE_CARD_SELECTION_INVALID');
+  const selectedVersions = initialVersionIds ? [...initialVersionIds].sort() : null;
   const selectedMaterials = [...materialIds].sort();
   if (typeof environmentDigest !== 'string' || !environmentDigest || environmentDigest.length > 1024 || input.stage !== 'GENERATE') throw new Error('PIPELINE_INPUT_INVALID');
   const child = createStageTask(input, {}, now);
-  const digest = sha256(canonicalJson({ contract: PIPELINE_CONTRACT, generation: child.inputDigest, environmentDigest, materialIds: selectedMaterials }));
-  return { materialIds: selectedMaterials, pipelineId: `pipeline-${digest}`, environmentDigest, contractVersion: PIPELINE_CONTRACT, inputDigest: digest,
+  const digest = sha256(canonicalJson({ contract: PIPELINE_CONTRACT, generation: child.inputDigest, environmentDigest, materialIds: selectedMaterials, initialVersionIds: selectedVersions }));
+  return { ...(selectedVersions ? { initialVersionIds: selectedVersions } : {}), materialIds: selectedMaterials, pipelineId: `pipeline-${digest}`, environmentDigest, contractVersion: PIPELINE_CONTRACT, inputDigest: digest,
     iterations: [], status: 'PENDING', reasonCode: null, cancelRequested: false, resumeRequested: false, children: { GENERATE: child }, completed: [], currentStage: 'GENERATE', createdAt: now, updatedAt: now };
 }
 export function pipelineStageFailure(task: StageTask): string | null {

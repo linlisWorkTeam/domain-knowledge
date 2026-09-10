@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createArtifactRef, type KnowledgeVersion } from '../../src/domain/Domain.ts';
-import { groupKnowledgeCards } from '../../src/domain/services/knowledge/KnowledgeCards.ts';
+import { groupKnowledgeCards, currentCardVersions } from '../../src/domain/services/knowledge/KnowledgeCards.ts';
 import { KnowledgeQueryService } from '../../src/application/services/QueryService.ts';
 import type { ArtifactStore, FlywheelRepository } from '../../src/application/ports/ApplicationPorts.ts';
 
@@ -64,4 +64,16 @@ test('card directory filters current versions and never loads any body', () => {
   assert.equal(service.cards({ versionId: 'a' })[0].versionId, 'b');
   assert.deepEqual(service.cards({ versionId: 'missing' }), []);
   assert.deepEqual(service.cards({ query: 'absent' }), []);
+});
+
+test('current pipeline selection follows same-snapshot descendants without rewriting history', () => {
+  const metadata = { cardId: 'stable', projectSnapshotId: 'snapshot' };
+  const base = version('base', { metadata });
+  const child = version('child', { metadata, parentVersionId: base.versionId });
+  const before = JSON.stringify([base, child]);
+  assert.deepEqual(currentCardVersions([base, child], 'snapshot', ['base']), ['child']);
+  assert.equal(JSON.stringify([base, child]), before);
+  assert.throws(() => currentCardVersions([base, { ...child, metadata: { ...metadata, projectSnapshotId: 'other' } }], 'snapshot', ['base']), /PIPELINE_CARD_SNAPSHOT_CHANGED/);
+  assert.throws(() => currentCardVersions([base, { ...child, parentVersionId: null, createdAt: '2026-09-11T00:00:00Z' }], 'snapshot', ['base']), /PIPELINE_CARD_LINEAGE_CHANGED/);
+  assert.throws(() => currentCardVersions([base, child], 'snapshot', ['missing']), /PIPELINE_CARD_SNAPSHOT_CHANGED/);
 });

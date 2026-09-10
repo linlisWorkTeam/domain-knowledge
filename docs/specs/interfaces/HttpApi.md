@@ -143,7 +143,7 @@ PENDING、Git 关闭、Git 冲突及认证失败使用可定位的错误码。AP
 
 ### 五阶段一键执行
 
-- `POST /api/v1/workbench-pipelines {snapshotId, scopes?, materialIds?}`：冻结生成输入并创建或复用knowledge-pipeline-v4协调记录，返回`{pipeline}`，202或已成功时200。
+- `POST /api/v1/workbench-pipelines {snapshotId, scopes?, materialIds?}`：冻结生成输入并创建或复用knowledge-pipeline-v5协调记录，返回`{pipeline}`，202或已成功时200。
 - `GET /api/v1/workbench-pipelines`：读取协调记录列表；`GET /api/v1/workbench-pipelines/:id`返回`pipeline`、当前阶段及历史轮次去重后的`tasks`、累计`usage`及`publicationVerified:false`。
 - `POST /api/v1/workbench-pipelines/:id/cancel {}`：取消协调和当前子任务；`POST .../resume {inputDigest}`只恢复同契约输入，累计子任务用量不重置。契约/输入冲突为409，不存在为404。
 - 所有入口使用现有匿名部署授权策略，无新增登录。旧契约可读，不能跨契约恢复。逐阶段状态、证据和下载继续复用stage-tasks接口。
@@ -159,3 +159,6 @@ PENDING、Git 关闭、Git 冲突及认证失败使用可定位的错误码。AP
 `POST /api/v1/reconstructions` 可附加 `retryEvaluationTaskId`。必须是同项目、源码、配置和同一卡片集合的已完成失败行为评测；卡片版本允许修订。输入冻结 `native-reconstruction-retry-v1`、原评测输入和结果摘要，改变 Code 尝试身份，阻止复用上一轮失败代码。标识与隐藏报告不交给 Code。非法绑定返回 `RECONSTRUCTION_RETRY_INVALID`。
 
 v4 流程详情返回 `iterations` 与 `activeTaskId`，每轮包含冻结卡片版本、重建/评测/修订任务引用和可信行为进展。`tasks` 与累计用量按任务编号去重。`PIPELINE_NO_BEHAVIOR_PROGRESS`、`PIPELINE_REVISION_QUALITY_REJECTED`、`PIPELINE_REVISION_UNRESOLVED` 保留前序证据并停止后续关联；恢复不清空历史及额度。v3 及更早执行只读。
+
+
+v5 在已有生成结果存在时，冻结同源码快照内当前后代卡片版本；修订集合进入流程身份。详情 `initialVersionIds` 表示替代原生成版本的冻结集合，首次索引和重建均使用它。重复启动未变输入复用任务；恢复不读取新头。跨源码快照或无有效血缘分别返回409 `PIPELINE_CARD_SNAPSHOT_CHANGED` / `PIPELINE_CARD_LINEAGE_CHANGED`。v4及更早仅可读。

@@ -15,7 +15,7 @@ import { SqliteWorkbenchPipelines } from '../../src/infrastructure/sqlite/Sqlite
 import type { StageInput, StageResult, WorkbenchStage } from '../../src/domain/services/workbench/StageTask.ts';
 function fixture(target: number, stagnant = false) {
   const directory = mkdtempSync(join(tmpdir(), 'pipeline-rounds-')), db = join(directory, 'workbench.sqlite');
-  let blocked = false, revisionStarted = false, calls = 0;
+  let blocked = false, revisionStarted = false, calls = 0; let selectedVersions: string[] | undefined;
   const input = (stage: WorkbenchStage, round = 0, versionIds = ['v1'], operation?: string): StageInput => ({ projectId: 'p', stage, cardVersionIds: versionIds, configurationDigest: 'cfg', sourceRevision: 'fixed', sourceDigest: 'src', parameters: { snapshotId: 's', round, ...(operation ? { operation } : {}) } });
   const open = () => {
     const store = new SqliteWorkbenchPipelines(db), stageStore = new SqliteStageTasks(db);
@@ -36,10 +36,10 @@ function fixture(target: number, stagnant = false) {
       ASSOCIATE: async context => { calls++; context.account('call', { modelCalls: 1 }); return { artifactRefs: [], summary: { relations: 0 } }; },
     });
     const app = new WorkbenchPipelines({ store, stages, materials: { get: () => null }, environment: async () => 'environment',
-      generation: { prepare: async () => input('GENERATE') }, index: { prepare: versions => input('INDEX', 0, versions) },
+      generation: { prepare: async () => input('GENERATE') }, index: { prepare: versions => input('INDEX', 0, versions), currentVersions: (_snapshot, versions) => selectedVersions ?? versions },
       reconstruction: { prepare: async (_snapshot, versions, options) => {
         const round = options?.retryEvaluationTaskId ? Number(stages.get(options.retryEvaluationTaskId).input.parameters.round) + 1 : 1;
-        assert.deepEqual(versions, [`v${round}`]); return input('FLYWHEEL', round, versions);
+        assert.deepEqual(versions, selectedVersions ?? [`v${round}`]); return input('FLYWHEEL', round, versions);
       } },
       evaluation: { prepare: async codeId => { const code = stages.get(codeId); return input('EVALUATE', Number(code.input.parameters.round), code.input.cardVersionIds); },
         progress: async id => { const round = Number(stages.get(id).input.parameters.round); const failed = stagnant ? ['unchanged'] : Array.from({ length: Math.max(0, target - round) }, (_, i) => `case-${i}`); return { total: target, passed: target - failed.length, failed }; } },
@@ -48,7 +48,7 @@ function fixture(target: number, stagnant = false) {
     });
     return { app, store, stageStore, stages, close: async () => { await app.shutdown(); await stages.shutdown(); store.close(); stageStore.close(); } };
   };
-  return { open, directory, block: (value: boolean) => { blocked = value; }, started: () => revisionStarted, calls: () => calls };
+  return { open, directory, select: (ids: string[]) => { selectedVersions = ids; }, block: (value: boolean) => { blocked = value; }, started: () => revisionStarted, calls: () => calls };
 }
 test('automatic repair can exceed three rounds with behavior progress and preserves unique usage', async () => {
   const f = fixture(6), r = f.open();
@@ -86,5 +86,22 @@ test('cancellation reaches the revision task, and restart resumes it without los
     const done = await r.app.wait(value.pipelineId); assert.equal(done.status, 'SUCCEEDED', done.reasonCode ?? '');
     assert.equal(done.iterations![0]!.revision!.taskId, revisionId); assert.equal(r.stages.get(revisionId).usage.modelCalls, 2);
     assert.equal(done.iterations!.length, 2);
+  } finally { await r.close(); rmSync(f.directory, { recursive: true, force: true }); }
+});
+
+test('starting after a card revision freezes new input while preserving generation and prior pipeline', async () => {
+  const f = fixture(1), r = f.open();
+  try {
+    const first = await r.app.start('s'); assert.equal((await r.app.wait(first.pipelineId)).status, 'SUCCEEDED');
+    f.select(['v2']);
+    const second = await r.app.start('s'); assert.notEqual(second.pipelineId, first.pipelineId);
+    assert.deepEqual(second.initialVersionIds, ['v2']);
+    const done = await r.app.wait(second.pipelineId); assert.equal(done.status, 'SUCCEEDED', done.reasonCode ?? '');
+    assert.equal(done.children.GENERATE!.taskId, first.children.GENERATE!.taskId);
+    assert.deepEqual(done.children.INDEX!.input.cardVersionIds, ['v2']);
+    assert.deepEqual(done.iterations![0]!.versionIds, ['v2']);
+    assert.deepEqual(done.children.ASSOCIATE!.input.cardVersionIds, ['v2']);
+    assert.deepEqual(r.app.get(first.pipelineId).iterations![0]!.versionIds, ['v1']);
+    assert.equal((await r.app.start('s')).pipelineId, second.pipelineId);
   } finally { await r.close(); rmSync(f.directory, { recursive: true, force: true }); }
 });

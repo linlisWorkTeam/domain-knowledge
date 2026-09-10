@@ -279,7 +279,7 @@ export function mapHttpError(error: unknown, id = 'req_unknown'): { status: numb
   if (code.startsWith('MATERIAL_')) return { status: 422, body: errorBody(code, code, id) };
   if (code === 'PIPELINE_INPUT_INVALID') return { status: 422, body: errorBody(code, '流程输入无效', id) };
   if (code === 'PIPELINE_NOT_FOUND') return { status: 404, body: errorBody(code, '流程不存在', id) };
-  if (['PIPELINE_CONTRACT_INCOMPATIBLE', 'PIPELINE_INPUT_CHANGED', 'PIPELINE_NOT_RESUMABLE'].includes(code)) return { status: 409, body: errorBody(code, code, id) };
+  if (['PIPELINE_CARD_SELECTION_INVALID', 'PIPELINE_CARD_SNAPSHOT_CHANGED', 'PIPELINE_CARD_LINEAGE_CHANGED', 'PIPELINE_CONTRACT_INCOMPATIBLE', 'PIPELINE_INPUT_CHANGED', 'PIPELINE_NOT_RESUMABLE'].includes(code)) return { status: 409, body: errorBody(code, code, id) };
   if (['PIPELINE_SHUTDOWN', 'PIPELINE_OWNER_UNAVAILABLE'].includes(code)) return { status: 503, body: errorBody(code, code, id) };
   if (['STAGE_CONTRACT_INCOMPATIBLE', 'STAGE_INPUT_CHANGED', 'STAGE_NOT_RESUMABLE', 'STAGE_BUDGET_EXHAUSTED', 'INDEX_VERSION_NOT_CURRENT', 'EVALUATION_RECONSTRUCTION_REQUIRED', 'RECONSTRUCTION_RETRY_INVALID', 'REVISION_COMPLETED_EVALUATION_REQUIRED', 'REVISION_REFERENCE_NOT_TRUSTED', 'REVISION_REPORT_BINDING_INVALID', 'REVISION_KNOWLEDGE_BINDING_INVALID', 'REVISION_NO_ELIGIBLE_FAILURE', 'REVISION_CARD_CHANGED', 'REVISION_CORRECTION_OUTSIDE_EVIDENCE'].includes(code)) return { status: 409, body: errorBody(code, message, id) };
   if (['STAGE_OWNER_UNAVAILABLE', 'STAGE_SHUTDOWN'].includes(code)) return { status: 503, body: errorBody(code, message, id) };

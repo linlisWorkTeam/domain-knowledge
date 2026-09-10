@@ -16,7 +16,7 @@ import type { KnowledgeIndexService } from './KnowledgeIndex.ts';
 import type { WorkbenchAssociations } from './WorkbenchAssociations.ts';
 export class WorkbenchPipelines {
   readonly dependencies: { materials: Pick<ExternalMaterialStore, 'get'>; environment(snapshotId: string, signal?: AbortSignal): Promise<string>; store: WorkbenchPipelineStore; stages: WorkbenchStages; generation: Pick<WorkbenchGeneration, 'prepare'>;
-    reconstruction: Pick<WorkbenchReconstruction, 'prepare'>; evaluation: Pick<WorkbenchEvaluation, 'prepare'> & Partial<Pick<WorkbenchEvaluation, 'progress'>>; revision?: Pick<WorkbenchKnowledgeRevision, 'prepare'>; index: Pick<KnowledgeIndexService, 'prepare'>; associations: Pick<WorkbenchAssociations, 'prepare'> };
+    reconstruction: Pick<WorkbenchReconstruction, 'prepare'>; evaluation: Pick<WorkbenchEvaluation, 'prepare'> & Partial<Pick<WorkbenchEvaluation, 'progress'>>; revision?: Pick<WorkbenchKnowledgeRevision, 'prepare'>; index: Pick<KnowledgeIndexService, 'prepare'> & Partial<Pick<KnowledgeIndexService, 'currentVersions'>>; associations: Pick<WorkbenchAssociations, 'prepare'> };
   private readonly pending = new Map<string, Promise<void>>();
   private readonly controllers = new Map<string, AbortController>();
   private readonly errors = new Map<string, unknown>();
@@ -40,7 +40,14 @@ export class WorkbenchPipelines {
     const input = await this.dependencies.generation.prepare(snapshotId, scopes);
     const environment = await this.dependencies.environment(snapshotId);
     if (this.closing) throw new Error('PIPELINE_SHUTDOWN');
-    const value = this.dependencies.store.insert(createPipeline(input, new Date().toISOString(), environment, selectedMaterials));
+    const generated = this.dependencies.stages.store.get(createStageTask(input, {}, new Date().toISOString()).taskId);
+    let initialVersionIds: string[] | undefined;
+    if (generated?.status === 'SUCCEEDED' && this.dependencies.index.currentVersions) {
+      const baseIds = (generated.result!.summary.cards as Array<{ versionId: string }>).map(card => card.versionId).sort();
+      const selected = this.dependencies.index.currentVersions(snapshotId, baseIds);
+      if (JSON.stringify(selected) !== JSON.stringify(baseIds)) initialVersionIds = selected;
+    }
+    const value = this.dependencies.store.insert(createPipeline(input, new Date().toISOString(), environment, selectedMaterials, initialVersionIds));
     if (value.status === 'PENDING') this.schedule(value.pipelineId, false);
     return value;
   }
@@ -70,7 +77,7 @@ export class WorkbenchPipelines {
     const { stages, index, reconstruction, evaluation, associations } = this.dependencies;
     const generation = stages.get(value.children.GENERATE!.taskId);
     const cards = generation.result!.summary.cards as Array<{ versionId: string }>;
-    const versions = value.iterations?.at(-1)?.versionIds ?? cards.map((card) => card.versionId);
+    const versions = value.iterations?.at(-1)?.versionIds ?? value.initialVersionIds ?? cards.map((card) => card.versionId);
     if (stage === 'INDEX') return index.prepare(versions);
     if (stage === 'FLYWHEEL') return reconstruction.prepare(String(generation.input.parameters.snapshotId), versions, { configurationDigest: generation.input.configurationDigest, signal });
     if (stage === 'EVALUATE') return evaluation.prepare(value.children.FLYWHEEL!.taskId);
@@ -113,7 +120,7 @@ export class WorkbenchPipelines {
       if (!value.completed.includes('EVALUATE')) {
         const generation = stages.get(value.children.GENERATE!.taskId);
         const snapshotId = String(generation.input.parameters.snapshotId);
-        if (!value.iterations.length) { value.iterations.push({ number: 1, versionIds: (generation.result!.summary.cards as Array<{ versionId: string }>).map(card => card.versionId) }); store.save(value, lease.leaseId); }
+        if (!value.iterations.length) { value.iterations.push({ number: 1, versionIds: value.initialVersionIds ?? (generation.result!.summary.cards as Array<{ versionId: string }>).map(card => card.versionId) }); store.save(value, lease.leaseId); }
         for (;;) {
           check(); const round: PipelineIteration = value.iterations.at(-1)!;
           if (!round.reconstruction) {
