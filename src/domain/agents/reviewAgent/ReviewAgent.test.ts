@@ -6,6 +6,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { execute } from './ReviewAgent.ts';
+import { buildPrompt } from './ReviewAgentPrompt.ts';
 import type { Input } from './ReviewAgentContract.ts';
 import { roleExample } from '../../../../tests/helpers/RoleExample.ts';
 
@@ -78,4 +79,17 @@ test('review: fenced example headings cannot authorize a correction', async () =
   await assert.rejects(execute(sample.input, sample.context), /REVIEW_CORRECTION_SCOPE_INVALID/);
   sample.output.correction.knowledgePath = 'knowledge/markdown-diff.md#Behavior';
   await execute(sample.input, sample.context);
+});
+
+
+test('review: prompt lists exact existing H2 targets and does not authorize subheadings or fenced headings', () => {
+  const sample = roleExample<Input>('review');
+  const material = sample.input.materials.find(({ ref }) => ref.artifactId === sample.input.payload.knowledgeRef.artifactId)!;
+  material.content = '# Knowledge\n\n## Block syntax\n### Paragraphs\nRules\n```markdown\n## Fake heading\n```\n';
+  const prompt = buildPrompt(sample.input, sample.context);
+  const line = prompt.split('\n').find(x => x.startsWith('本次唯一允许的修订目标'))!;
+  assert.ok(line.includes('"heading":"Block syntax"'));
+  assert.ok(line.includes('knowledge/markdown-diff.md#Block syntax'));
+  assert.ok(!line.includes('"heading":"Paragraphs"'));
+  assert.ok(!line.includes('"heading":"Fake heading"'));
 });

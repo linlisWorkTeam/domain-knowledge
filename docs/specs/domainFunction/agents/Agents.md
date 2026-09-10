@@ -61,3 +61,5 @@ SearchAgent 不属于七角色枚举。目标是 KnowledgeSearchApp 直接调用
 Application 的 `RoleExecutionService` 在模型调用前保存 STARTED 次数，返回后保存 PASSED/REJECTED/FAILED 与原始模型输出到 CAS，并关联 `ArtifactCommitted(kind=role-stage-attempt)` 审计事件。失败尝试不进入成功角色信封；历史失败工件不覆盖。恢复重用已通过阶段，失败或中断尝试消耗额度，不因重启获得第三次尝试。阶段首次开始时间亦持久化，恢复不重置阶段截止时间。
 
 DocWorker extract：180 秒、最多 8192 输出 token；DocGen outline：90 秒、2048；body/revision：240 秒、12288。时间上限包含排队、格式重试及语义反馈，两次语义尝试共享同一截止时间，Provider 配置更低时取更低输出上限。取消/超时沿模型 Port 传给真实子进程，等待清理后返回。持久化失败不能触发额外模型调用。
+
+Review 的提示材料由程序提取当前知识的唯一 H2 与完整 knowledgePath 列表；H3/H4 和围栏示例不授权。模型必须选用已有 H2，严格范围校验保持不变，不能通过改写失败输出绕过。
