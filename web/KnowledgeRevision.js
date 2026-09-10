@@ -6,7 +6,7 @@
 export function createKnowledgeRevisionPanel({ root, request, escapeHtml: escape, isEditable, selection, evidence, source = false }) {
   const panelSelector = source ? '[data-source-revision-panel]' : '[data-knowledge-revision-panel]'
   const operation = source ? 'KNOWLEDGE_SOURCE_REVISION' : 'KNOWLEDGE_REVISION'
-  const contract = source ? 'knowledge-source-revision-v3' : 'knowledge-revision-v5'
+  const contract = source ? 'knowledge-source-revision-v4' : 'knowledge-revision-v5'
   const parentKey = source ? 'sourceVerificationTaskId' : 'evaluationTaskId'
   let task = null, checkpoints = [], events = [], loadedFor = null, timer = null, busy = false, notice = ''
   const bodies = new Map()

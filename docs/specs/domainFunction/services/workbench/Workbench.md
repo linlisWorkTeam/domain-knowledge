@@ -138,13 +138,13 @@ revision-v5 的修订后源码复核使用 `native-source-review-evidence-v1`：
 
 ## 独立整卡来源复核
 
-`knowledge-source-verification-v3` 是 EVALUATE 的独立操作，接受已完成的原生评测身份，不要求行为失败。冻结原评测的全部卡片、源码和配置，以固定源码及可信参考观察逐张检查全部 H2，包含此前未修改的卡片。Domain 判定 SOURCE_MATCHED、SOURCE_MISMATCH 或 UNRESOLVED；完整覆盖及精确正文版本绑定是聚合前提。每张卡片材料先落盘，成功检查点可复用，取消和恢复沿用阶段任务。来源匹配不等于 VERIFIED；来源意见驱动修订见下方独立契约；自动来源门禁见 pipeline-v11，最终发布事务仍待实现。
+`knowledge-source-verification-v4` 是 EVALUATE 的独立操作，接受已完成的原生评测身份，不要求行为失败。冻结原评测的全部卡片、源码和配置，以固定源码及可信参考观察逐张检查全部 H2，包含此前未修改的卡片。Domain 判定 SOURCE_MATCHED、SOURCE_MISMATCH 或 UNRESOLVED；完整覆盖及精确正文版本绑定是聚合前提。每张卡片材料先落盘，成功检查点可复用，取消和恢复沿用阶段任务。来源匹配不等于 VERIFIED；来源意见驱动修订见下方独立契约；自动来源门禁见 pipeline-v12，最终发布事务仍待实现。
 
 ## 来源意见驱动修订契约
 
-`knowledge-source-revision-v3` 以成功的整卡来源复核为独立输入，冻结该结果与原评测版本。只消费 SOURCE_MISMATCH，重新校验原 Review 命令/结果/原始输出和正文摘要，纠正意见必须指向既有 H2；保留其 PINNED_SOURCE_CONTRADICTION 来源，不能伪造失败用例。未知风险保留为未解决项。DocGen、修订后源码 Review、候选保存与增量索引复用行为修订能力；仅修订源依据变化，不修改可信预期。新版本需要重新重建、评测、整卡来源复核。接口接通后仍不授予发布资格。
+`knowledge-source-revision-v4` 以成功的整卡来源复核为独立输入，冻结该结果与原评测版本。只消费 SOURCE_MISMATCH，重新校验原 Review 命令/结果/原始输出和正文摘要，纠正意见必须指向既有 H2；保留其 PINNED_SOURCE_CONTRADICTION 来源，不能伪造失败用例。未知风险保留为未解决项。DocGen、修订后源码 Review、候选保存与增量索引复用行为修订能力；仅修订源依据变化，不修改可信预期。新版本需要重新重建、评测、整卡来源复核。接口接通后仍不授予发布资格。
 
-## 一键来源门禁与进展（pipeline-v11）
+## 一键来源门禁与进展（pipeline-v12）
 
 行为用例全部通过后，必须运行相同的独立整卡来源复核。来源匹配才进入关联；未知风险暂停；明确矛盾交给同一个来源修订入口，刷新索引后使用新版本重新重建、评测及整卡复核。轮次冻结 sourceVerification 子任务和来源修订结果，取消、重启、恢复及累计用量覆盖这些子任务。旧 v9 流程只读，不跨版本恢复。
 
@@ -165,3 +165,9 @@ revision-v5 的修订后源码复核使用 `native-source-review-evidence-v1`：
 ## 编译数据库构建候选
 
 仓库分析只读取固定 Git 对象中的 compile_commands.json，不运行其中的命令。按 Clang JSON Compilation Database 的 directory/file/arguments 或 command 结构提取逐编译单元候选；arguments 优先，command 仅词法解码，不进行 shell 展开。候选记录来源文件、记录序号、源码路径、可表达的编译器/标准/包含目录/定义及未支持项。绝对路径仅在固定仓库内转换为相对路径，仓库外依赖明确列为问题；不映射到任意宿主路径或自动下载。候选不自动覆盖现有构建参数：前台查看并应用到构建表单，再保存冻结项目输入。存在未支持参数时不提供一键应用，不能将部分解析称作完整构建配置。Make/CMake 的动态配置执行、生成依赖和逐模块不同参数仍需要后续实现。格式依据：https://clang.llvm.org/docs/JSONCompilationDatabase.html 。
+
+### 来源矛盾保留（v4）
+
+同一项目快照、源码与正文版本中，已有明确矛盾不能被之后一次 PASS 清除。新来源任务启动时冻结旧来源任务中已完成章节的明确纠正意见；逐项验证阶段输入摘要、原检查点、正文、Review命令/结果/原始输出及引用工件。允许读取旧v2/v3只读执行的证据，不恢复或修改旧执行。相同章节按最早有效意见稳定选择；继承记录不是新Review调用，显式记录originEvidence，完整来源聚合仍要求所有章节。后续来源修订重新验证原命令身份后消费同一纠正意见；修订后正文版本改变则不再继承旧正文意见，仍须重新重建、评测和源码核验。冻结的历史集合在恢复时不变。此输入与授权规则升版source-verification-v4/source-revision-v4/pipeline-v12，v3/v11及更早只读。
+
+来源v4仍按精确章节绑定提供完整case，但不丢弃其他章节观察：relatedObservations保留模块全部其他已验证案例的摘要（案例身份、描述、章节和实际观察），完整suite/oracle工件仍可审计。摘要不是完整输入定义；章节标签不作为事实适用范围的硬边界。此调整修复真实v3漏判已有字段语义矛盾的反例。

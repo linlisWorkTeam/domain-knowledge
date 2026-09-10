@@ -190,3 +190,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 [2026-09-11-0645-fixed-generated-acceptance.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/c15a9fdd55ba3f1a66bca871b25ba7f5cbdce589/docs/epitaph/2026-09-11-0645-fixed-generated-acceptance.md) 固定生成验收C11/11、C++40/40与错绑定拒绝通过；当时来源v2恢复仍未完成，后续第三次超时，已由v3替代。固定工作台独立阶段随后接通，最终发布未实现。
 
 [2026-09-11-0715-fixed-stage-ui.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/0889101d1c9d2468f5e20e48b1dc75c9da2c0fc7/docs/epitaph/2026-09-11-0715-fixed-stage-ui.md) 独立固定评测API/Console与真实C11/11、C++40/40通过，重复启动复用task/checkpoints/events。来源v2第三次超时，最终一键固定门禁与工作台发布仍未完成。
+
+[2026-09-11-0718-scoped-source-evidence.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/9569d94f6d96c7402cd757d2a61708a0a8dde2c8/docs/epitaph/2026-09-11-0718-scoped-source-evidence.md) 来源v3按精确章节缩减观察，定向测试通过，但真实恢复后漏判已有字段矛盾。v3已取消并只读；v4冻结历史矛盾、恢复相关观察摘要，不能将当时受控通过当作真实语义质量通过。

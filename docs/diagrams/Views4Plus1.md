@@ -307,7 +307,7 @@ flowchart LR
   Reindex --> Rebuild[新版本重建与再评测]
 ```
 
-一键 pipeline-v11 接通来源门禁：
+一键 pipeline-v12 接通来源门禁：
 
 ```mermaid
 flowchart LR
@@ -339,3 +339,5 @@ flowchart LR
   Generated --> Detail[逐案预期与实际 取消恢复与下载]
   Detail -.尚未接通.-> Publication[一键联合门禁与发布事务]
 ```
+
+来源v4在新任务启动时冻结同正文既有明确矛盾：原任务/检查点/Review命令与输出校验 → 继承来源意见（不调用模型）→ 完整章节聚合 → 定点修订 → 新正文重建与重新评测。旧执行只读，不跨版本恢复；未变更正文不能由另一次PASS清除历史矛盾。

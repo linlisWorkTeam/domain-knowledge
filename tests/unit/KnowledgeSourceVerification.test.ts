@@ -40,8 +40,10 @@ test('section evidence filters exact card bindings only after validating the com
   const selected = sourceSectionObservations(suite, oracle, 'card', 'Behavior');
   assert.deepEqual(selected.cases.map(item => item.input.caseId), ['one']);
   assert.equal(selected.coverage, 'DIRECT_BEHAVIOR_EVIDENCE');
+  assert.deepEqual(selected.relatedObservations.map(item => [item.caseId, item.actual]), [['other', { value: '7' }]]);
   const empty = sourceSectionObservations(suite, oracle, 'card', 'Sources');
   assert.deepEqual(empty.cases, []); assert.equal(empty.coverage, 'NO_DIRECT_BEHAVIOR_EVIDENCE');
+  assert.deepEqual(empty.relatedObservations.map(item => item.caseId), ['one', 'other']);
   assert.throws(() => sourceSectionObservations(suite, [oracle[0]!], 'card', 'Sources'), /REVISION_REFERENCE_NOT_TRUSTED/);
   assert.throws(() => sourceSectionObservations(suite, [oracle[0]!, { ...oracle[1]!, actual: { value: '9' } }], 'card', 'Behavior'), /REVISION_REFERENCE_NOT_TRUSTED/);
 });

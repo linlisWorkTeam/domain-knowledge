@@ -143,7 +143,7 @@ PENDING、Git 关闭、Git 冲突及认证失败使用可定位的错误码。AP
 
 ### 五阶段一键执行
 
-- `POST /api/v1/workbench-pipelines {snapshotId, scopes?, materialIds?}`：冻结生成输入并创建或复用knowledge-pipeline-v11协调记录，返回`{pipeline}`，202或已成功时200。
+- `POST /api/v1/workbench-pipelines {snapshotId, scopes?, materialIds?}`：冻结生成输入并创建或复用knowledge-pipeline-v12协调记录，返回`{pipeline}`，202或已成功时200。
 - `GET /api/v1/workbench-pipelines`：读取协调记录列表；`GET /api/v1/workbench-pipelines/:id`返回`pipeline`、当前阶段及历史轮次去重后的`tasks`、累计`usage`及`publicationVerified:false`。
 - `POST /api/v1/workbench-pipelines/:id/cancel {}`：取消协调和当前子任务；`POST .../resume {inputDigest}`只恢复同契约输入，累计子任务用量不重置。契约/输入冲突为409，不存在为404。
 - 所有入口使用现有匿名部署授权策略，无新增登录。旧契约可读，不能跨契约恢复。逐阶段状态、证据和下载继续复用stage-tasks接口。
@@ -164,7 +164,7 @@ v4 流程详情返回 `iterations` 与 `activeTaskId`，每轮包含冻结卡片
 v5 在已有生成结果存在时，冻结同源码快照内当前后代卡片版本；修订集合进入流程身份。详情 `initialVersionIds` 表示替代原生成版本的冻结集合，首次索引和重建均使用它。重复启动未变输入复用任务；恢复不读取新头。跨源码快照或无有效血缘分别返回409 `PIPELINE_CARD_SNAPSHOT_CHANGED` / `PIPELINE_CARD_LINEAGE_CHANGED`。v4及更早仅可读。
 
 
-当前修订执行使用 knowledge-revision-v5，流程使用 knowledge-pipeline-v11；v4及更早修订、v10及更早流程只读。Review 材料包含固定参考和生成代码，DocGen 只接收已标准化且绑定当前任务/原输出的纠正意见。前端风险状态仍不允许以未知归因或质量拒绝推进。
+当前修订执行使用 knowledge-revision-v5，流程使用 knowledge-pipeline-v12；v4及更早修订、v11及更早流程只读。Review 材料包含固定参考和生成代码，DocGen 只接收已标准化且绑定当前任务/原输出的纠正意见。前端风险状态仍不允许以未知归因或质量拒绝推进。
 
 修订源码复核拒绝以 `UNRESOLVED` 结果保留 `REVISION_SOURCE_REVIEW_REJECTED` 和 `draftRef`；不产生新版本，不刷新该草稿索引。成功版本 metadata 绑定 `sourceReviewResultRef`，仍不表示发布门禁已通过。
 
@@ -176,10 +176,12 @@ v5 在已有生成结果存在时，冻结同源码快照内当前后代卡片�
 
 `POST /api/v1/source-revisions` 接受 `{sourceVerificationTaskId}`，返回202独立 FLYWHEEL 任务（KNOWLEDGE_SOURCE_REVISION）。缺少明确来源矛盾返回409；原始角色证据失配拒绝执行。取消、恢复及产物下载沿用 stage-tasks。新版本重建以新版本集合直接启动，不冒充行为失败重试。
 
-当前独立来源执行使用 knowledge-source-verification-v3 与 knowledge-source-revision-v3；v2及更早只读。整卡结果包含逐H2结果与引用，恢复只继续未完成章节。一键v11轮次包含sourceVerification与sourceRepairs，来源未通过不能进入关联；阶段详情包含这些子任务和累计用量。
+当前独立来源执行使用 knowledge-source-verification-v4 与 knowledge-source-revision-v4；v3及更早只读。整卡结果包含逐H2结果与引用，恢复只继续未完成章节。一键v12轮次包含sourceVerification与sourceRepairs，来源未通过不能进入关联；阶段详情包含这些子任务和累计用量。
 
 `POST /api/v1/fixed-evaluations` 接收 reconstructionTaskId 与 suites（每项moduleId/suite），创建 fixed-native-evaluation-v1 独立评测任务。由现有stage-tasks接口读取进度/取消/同版本恢复，覆盖必须等于重建模块全集；参考失败返回质量拒绝，不授予知识或发布结论。免登录规则与其他工作台接口一致。
 
 来源材料 v3 与流程 v11 不跨版本恢复；v2/v10 及更早记录只读。逐章参考报告标明 EXACT_CARD_SECTION 和 DIRECT_BEHAVIOR_EVIDENCE / NO_DIRECT_BEHAVIOR_EVIDENCE，后者不代表该章节已通过源码核验。
 
 仓库分析响应可包含 `buildCandidates[]`：`origin`、`record`、`sourcePath`、`build`、`issues`，来自固定提交编译数据库。它是可审核候选，不自动改变项目快照；项目创建仍校验声明式 `build`。
+
+来源v4冻结priorFindingsRef；继承章节返回carriedForward与originEvidence（原任务、检查点、结果摘要），明确区分既有意见与本次模型执行。旧v3/v11只读。来源修订重新验证历史原命令与冻结证明后才能授权。

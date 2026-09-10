@@ -8,7 +8,7 @@ import { markdownSections } from './KnowledgeSections.ts';
 import type { NativeBehaviorSuite, NativeScalar } from '../evaluation/NativeBehaviorSuite.ts';
 import { nativeOracleTrusted } from '../evaluation/NativeTestCache.ts';
 import { knowledgeRevisionDecision } from './KnowledgeRevision.ts';
-export const SOURCE_VERIFICATION_CONTRACT = 'knowledge-source-verification-v3';
+export const SOURCE_VERIFICATION_CONTRACT = 'knowledge-source-verification-v4';
 export interface SourceCardBinding { cardId: string; versionId: string; moduleId: string; bodyDigest: string }
 export type SourceCardOutcome = 'SOURCE_MATCHED' | 'SOURCE_MISMATCH' | 'UNRESOLVED';
 export interface SourceCardResult extends SourceCardBinding { outcome: SourceCardOutcome }
@@ -62,6 +62,10 @@ export function sourceSectionObservations(suite: NativeBehaviorSuite, oracle: Ar
     const { caseId, status, actual } = oracle.find(item => item.caseId === test.caseId)!;
     return { input: test, observation: { caseId, status, actual } };
   });
-  return { observedImplementation: 'PINNED_REFERENCE' as const, scope: 'EXACT_CARD_SECTION' as const, sectionId,
+  const relatedObservations = suite.cases.filter(test => !test.sections.includes(sectionId)).map(test => {
+    const observation = oracle.find(item => item.caseId === test.caseId)!;
+    return { caseId: test.caseId, description: test.description, sections: test.sections, actual: observation.actual };
+  });
+  return { observedImplementation: 'PINNED_REFERENCE' as const, scope: 'EXACT_CARD_SECTION' as const, sectionId, relatedObservations,
     coverage: cases.length ? 'DIRECT_BEHAVIOR_EVIDENCE' as const : 'NO_DIRECT_BEHAVIOR_EVIDENCE' as const, cases };
 }

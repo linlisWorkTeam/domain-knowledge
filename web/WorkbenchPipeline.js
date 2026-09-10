@@ -9,7 +9,7 @@ export function createWorkbenchPipelinePanel({ root, request, escapeHtml: escape
   let materials = [], materialsLoaded = false, materialNotice = ''
   const selectedMaterials = new Set()
   const host = () => root.querySelector('[data-workbench-pipeline-panel]')
-  const active = () => pipeline && pipeline.contractVersion === 'knowledge-pipeline-v11' && ['PENDING', 'RUNNING'].includes(pipeline.status)
+  const active = () => pipeline && pipeline.contractVersion === 'knowledge-pipeline-v12' && ['PENDING', 'RUNNING'].includes(pipeline.status)
   const operationNames = { KNOWLEDGE_REVISION: '知识修订', KNOWLEDGE_SOURCE_REVISION: '来源修订', KNOWLEDGE_SOURCE_VERIFICATION: '整卡来源复核' }
   const names = { GENERATE: '知识库生成', INDEX: '知识索引', FLYWHEEL: '代码重建', EVALUATE: '知识评测', ASSOCIATE: '知识关联' }
   const statuses = { PENDING: '排队中', RUNNING: '执行中', SUCCEEDED: '执行完成', FAILED: '失败', PAUSED: '已暂停', CANCELLED: '已取消' }
@@ -22,14 +22,14 @@ export function createWorkbenchPipelinePanel({ root, request, escapeHtml: escape
     const panel = host(); if (!panel) return
     const selected = selection()
     if (!selected && !pipeline) { panel.innerHTML = ''; return }
-    const resumable = pipeline && ['FAILED', 'PAUSED', 'CANCELLED'].includes(pipeline.status) && pipeline.contractVersion === 'knowledge-pipeline-v11'
+    const resumable = pipeline && ['FAILED', 'PAUSED', 'CANCELLED'].includes(pipeline.status) && pipeline.contractVersion === 'knowledge-pipeline-v12'
     panel.innerHTML = `<h3>五阶段工作台</h3><p>生成卡片、建立索引、重建代码、执行评测，再建立关联。每一步仍可独立执行。</p>
       ${selected ? `<details><summary>一键流程的外部材料</summary><p>从来源页面捕获快照后选择；启动时冻结所选版本。</p><button type="button" class="secondary-button" data-pipeline-material-refresh>刷新材料</button><p>${escape(materialNotice)}</p>${materials.map((item) => `<label class="inline-check material-choice"><input type="checkbox" data-pipeline-material="${escape(item.materialId)}" ${selectedMaterials.has(item.materialId) ? 'checked' : ''} ${busy || active() ? 'disabled' : ''}><span>${escape(item.title)} · ${escape(item.applicability)}</span><small>${escape(item.sourceRevision)}</small></label>`).join('')}</details>` : ''}
       ${selected ? `<button class="primary-button" type="button" data-pipeline-action="start" ${busy || active() || !isEditable() ? 'disabled' : ''}>一键执行全部</button>` : '<p>先保存代码仓与模块输入，即可一键执行。</p>'}
       <p role="status">${escape(notice)}</p>${pipeline ? `<p><b>${escape(pipeline.cancelRequested && active() ? '正在取消' : statuses[pipeline.status] ?? '未知')}</b> · 当前：${escape(operationNames[tasks.find(item => item.taskId === pipeline.activeTaskId)?.input.parameters?.operation] ?? names[pipeline.currentStage] ?? '未知')}</p>
-      ${pipeline.contractVersion !== 'knowledge-pipeline-v11' ? '<p>旧执行契约，只读查看历史产物；请启动新流程。</p>' : ''}${pipeline.initialVersionIds ? '<p>本流程使用启动时冻结的修订版本，原生成产物保留。</p>' : ''}<p>固定外部材料 ${(pipeline.materialIds ?? []).length} 份</p>
+      ${pipeline.contractVersion !== 'knowledge-pipeline-v12' ? '<p>旧执行契约，只读查看历史产物；请启动新流程。</p>' : ''}${pipeline.initialVersionIds ? '<p>本流程使用启动时冻结的修订版本，原生成产物保留。</p>' : ''}<p>固定外部材料 ${(pipeline.materialIds ?? []).length} 份</p>
       <p>${escape(reasons[pipeline.reasonCode] ?? pipeline.reasonCode ?? '')}</p><p>累计模型调用 ${escape(usage?.modelCalls ?? 0)} 次；已报告 Token ${escape(usage?.tokens ?? 0)}。未报告的用量不视为零。</p>
-      <ol>${Object.entries(names).map(([stage, name]) => { const task = tasks.find((item) => pipeline.children[stage] ? item.taskId === pipeline.children[stage].taskId : pipeline.contractVersion !== 'knowledge-pipeline-v11' && item.input.stage === stage)
+      <ol>${Object.entries(names).map(([stage, name]) => { const task = tasks.find((item) => pipeline.children[stage] ? item.taskId === pipeline.children[stage].taskId : pipeline.contractVersion !== 'knowledge-pipeline-v12' && item.input.stage === stage)
         const summary = task?.result?.summary
         const saved = checkpoints[task?.taskId] ?? []
         const cards = Array.isArray(summary?.cards) ? summary.cards : saved.filter((item) => item.key.startsWith('card:')).map((item) => item.result.summary)

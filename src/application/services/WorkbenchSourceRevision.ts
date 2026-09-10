@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：消费独立来源复核的明确纠正意见，复用定点修订和增量索引。
  */
+import { WorkbenchSourceFindingHistory, type SourceFindingProof } from './WorkbenchSourceFindingHistory.ts';
 import { type ArtifactRef } from '../../domain/Domain.ts';
 import type { AgentCommand, AgentResult } from '../../domain/agents/AgentContracts.ts';
 import type { Output as ReviewOutput } from '../../domain/agents/reviewAgent/ReviewAgentContract.ts';
@@ -19,6 +20,7 @@ import type { StageExecutionContext } from './WorkbenchStages.ts';
 import { WorkbenchCardRevision } from './WorkbenchCardRevision.ts';
 const json = (value: unknown): JsonValue => JSON.parse(JSON.stringify(value));
 interface SourceFinding extends SourceCardResult {
+  originEvidence?: SourceFindingProof;
   reviewRef: ArtifactRef; reviewResultRef: ArtifactRef; referenceRef: ArtifactRef; referenceObservationsRef: ArtifactRef;
   unresolved?: string[];
 }
@@ -92,7 +94,15 @@ export class WorkbenchSourceRevision {
         const raw = await this.load<ReviewOutput>(finding.reviewRef), result = await this.load<AgentResult>(finding.reviewResultRef);
         roles.dependencies.contracts.assertResult(result);
         const command = await this.load<AgentCommand>(result.commandRef); roles.dependencies.contracts.assertCommand(command);
-        const instruction = authorizeSourceCorrection({ sourceTaskId: source.taskId, card: finding, body, raw, rawRef: finding.reviewRef, result, command });
+        let originTaskId = source.taskId;
+        if (finding.originEvidence) {
+          const frozenProofs = await this.load<SourceFindingProof[]>(source.input.parameters.priorFindingsRef as unknown as ArtifactRef);
+          if (!frozenProofs.some(proof => canonicalJson(proof) === canonicalJson(finding.originEvidence))) throw new Error('SOURCE_HISTORY_BINDING_INVALID');
+          const prior = await new WorkbenchSourceFindingHistory(this.evaluation).validate(finding.originEvidence, source.input);
+          if (prior.finding.reviewRef.sha256 !== finding.reviewRef.sha256 || prior.finding.reviewResultRef.sha256 !== finding.reviewResultRef.sha256) throw new Error('SOURCE_HISTORY_BINDING_INVALID');
+          originTaskId = finding.originEvidence.taskId;
+        }
+        const instruction = authorizeSourceCorrection({ sourceTaskId: originTaskId, card: finding, body, raw, rawRef: finding.reviewRef, result, command });
         const module = evaluationEvidence.modules.find(module => module.moduleId === card.metadata.sourceModule);
         if (!module) throw new Error('SOURCE_REVISION_BINDING_INVALID');
         const suite = await this.load<NativeBehaviorSuite>(module.suiteRef);

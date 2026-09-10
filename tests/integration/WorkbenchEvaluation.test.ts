@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：验证原生阶段的错误候选拒绝、可信用例恢复和知识修订后的失败定位。
  */
+import { WorkbenchSourceFindingHistory } from '../../src/application/services/WorkbenchSourceFindingHistory.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { execFileSync } from 'node:child_process';
@@ -22,7 +23,7 @@ for (const rejectSourceReview of [false, true]) test(`native stage rejects bad c
   writeFileSync(join(root, 'math.c'), '#include "math.h"\n/* REFERENCE_PRIVATE */\nint add(int a,int b){return a+b;}');
   git('add', '.'); git('commit', '-qm', 'Fixed reference');
   let composition = createComposition({ runtimeDir }); let testCalls = 0, codeCalls = 0, generatedRuns = 0, reviewCalls = 0, revisionCalls = 0, sourceReviewCalls = 0;
-  let interruptSourceSection = true; const sectionCalls = new Map<string, number>();
+  let acceptFalseSource = false; let interruptSourceSection = true; const sectionCalls = new Map<string, number>();
   let wrongCandidate = true, wrongCode = false, interrupt = true, reviewKeepsKnowledge = false;
   const install = () => {
     const deps = composition.apps.workbenchReconstruction.dependencies;
@@ -53,7 +54,7 @@ for (const rejectSourceReview of [false, true]) test(`native stage rejects bad c
         const sectionKey = `${_command.runId}:${criteria.section}`;
         sectionCalls.set(sectionKey, (sectionCalls.get(sectionKey) ?? 0) + 1);
         if (criteria.section === 'Limits' && interruptSourceSection) { interruptSourceSection = false; throw new Error('TEST_SOURCE_SECTION_INTERRUPTION'); }
-        return body.includes('The difference') && criteria.section === 'Behavior' ? { blocking: true, recommendation: 'ITERATE', correction: { correctionId: 'source-error', knowledgePath: 'knowledge/unit-add.md#Behavior', criterion: 'Pinned source adds the arguments.', risk: 'Incorrect operation.' }, unresolvedRisks: [] }
+        return !acceptFalseSource && body.includes('The difference') && criteria.section === 'Behavior' ? { blocking: true, recommendation: 'ITERATE', correction: { correctionId: 'source-error', knowledgePath: 'knowledge/unit-add.md#Behavior', criterion: 'Pinned source adds the arguments.', risk: 'Incorrect operation.' }, unresolvedRisks: [] }
           : { blocking: false, recommendation: 'PASS', correction: null, unresolvedRisks: [] };
       }
       if (request.role === 'review' && request.prompt.includes('REVISION_SOURCE_REVIEW')) { sourceReviewCalls++; const sourceRef = _command.payload.evaluationReportRef as any; const sourceReport = JSON.parse(Buffer.from(await composition.artifacts.get(sourceRef)).toString('utf8')); assert.equal(sourceReport.observedImplementation, 'PINNED_REFERENCE'); assert.ok(composition.apps.workbenchStages.store.checkpoints(_command.runId).some(row => row.key.startsWith('revision-source-materials:')), 'source review inputs persist before invoking the model'); assert.equal(sourceReport.cases[0].observation.actual.sum, '7'); assert.doesNotMatch(request.prompt, /\"sum\":\"-1\"/); usage('source-review', 3); if (rejectSourceReview) return { blocking: true, recommendation: 'ITERATE', correction: null, unresolvedRisks: ['Candidate contradicts the fixed source.'] }; return { blocking: false, recommendation: 'PASS', correction: null, unresolvedRisks: [] }; }
@@ -221,11 +222,27 @@ for (const rejectSourceReview of [false, true]) test(`native stage rejects bad c
     const lucky = await composition.apps.workbenchStages.wait(luckyTask.taskId);
     assert.equal((lucky.result!.summary.modules as any[])[0].status, 'BEHAVIOR_PASSED');
     assert.equal((await composition.apps.workbenchEvaluation.revisionEvidence(luckyTask.taskId)).modules[0]!.nextAction, 'NO_BEHAVIOR_REVISION_REQUIRED');
-    const falseSource = await composition.apps.workbenchSourceVerification.start(luckyTask.taskId);
+    let falseSource = await composition.apps.workbenchSourceVerification.start(luckyTask.taskId);
     const falseResult = await composition.apps.workbenchStages.wait(falseSource.taskId);
     assert.equal(falseResult.status, 'SUCCEEDED', falseResult.reasonCode ?? '');
     assert.equal(falseResult.result!.summary.outcome, 'SOURCE_MISMATCH');
     assert.equal(falseResult.result!.summary.publicationVerified, false);
+    const originalSourceTaskId = falseSource.taskId;
+    acceptFalseSource = true;
+    falseSource = await composition.apps.workbenchSourceVerification.start(luckyTask.taskId);
+    assert.notEqual(falseSource.taskId, originalSourceTaskId, 'new input freezes the existing contradiction');
+    const carried = await composition.apps.workbenchStages.wait(falseSource.taskId);
+    assert.equal(carried.status, 'SUCCEEDED', carried.reasonCode ?? '');
+    assert.equal(carried.result!.summary.outcome, 'SOURCE_MISMATCH', 'a later model PASS cannot erase a source contradiction in unchanged knowledge');
+    const carriedCard = (carried.result!.summary.cards as any[])[0];
+    assert.equal(carriedCard.originEvidence.taskId, originalSourceTaskId); assert.equal(carriedCard.carriedForward, true);
+    assert.equal(sectionCalls.get(`${falseSource.taskId}:Behavior`), undefined, 'carried finding is not represented as a fresh model call');
+    assert.equal((await composition.apps.workbenchSourceVerification.start(luckyTask.taskId)).taskId, falseSource.taskId, 'history selection is stable and ignores inherited copies');
+    const history = new WorkbenchSourceFindingHistory(composition.apps.workbenchEvaluation);
+    await assert.rejects(history.validate({ ...carriedCard.originEvidence, checkpointDigest: '0'.repeat(64) }, falseSource.input), /SOURCE_HISTORY_BINDING_INVALID/);
+    await assert.rejects(history.validate(carriedCard.originEvidence, { ...falseSource.input, cardVersionIds: [] }), /SOURCE_HISTORY_BINDING_INVALID/);
+    acceptFalseSource = false;
+
     const sourceIndexWrite = composition.apps.knowledgeIndex.index.write.bind(composition.apps.knowledgeIndex.index);
     composition.apps.knowledgeIndex.index.write = () => { throw new Error('TEST_SOURCE_INDEX_INTERRUPTION'); };
     const beforeSourceDocGen = revisionCalls;

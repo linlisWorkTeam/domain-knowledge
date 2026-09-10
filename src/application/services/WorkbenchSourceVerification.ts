@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：对全部冻结卡片执行独立来源复核，保留纠正意见而不伪造行为失败。
  */
+import { WorkbenchSourceFindingHistory, type SourceFindingProof } from './WorkbenchSourceFindingHistory.ts';
 import { sha256, type ArtifactRef } from '../../domain/Domain.ts';
 import { canonicalJson, type JsonValue, type StageInput } from '../../domain/services/workbench/StageTask.ts';
 import { markdownSections } from '../../domain/services/knowledge/KnowledgeSections.ts';
@@ -30,10 +31,11 @@ export class WorkbenchSourceVerification {
     const evidence = await this.evaluation.revisionEvidence(evaluationTaskId);
     const configurationRef = parent.input.parameters.configurationRef as unknown as ArtifactRef;
     await configuration.assertStageCompatible(await this.load<StageModelConfiguration>(configurationRef));
+    const priorFindingsRef = await artifacts.put(Buffer.from(JSON.stringify(await new WorkbenchSourceFindingHistory(this.evaluation).collect(parent))), 'application/json');
     const evidenceRef = await artifacts.put(Buffer.from(canonicalJson(evidence)), 'application/json');
     return { ...parent.input, parameters: { operation: 'KNOWLEDGE_SOURCE_VERIFICATION', verificationContract: SOURCE_VERIFICATION_CONTRACT,
       evaluationTaskId, evaluationDigest: sha256(canonicalJson(parent.result)), snapshotId: parent.input.parameters.snapshotId!,
-      evidenceRef: json(evidenceRef), configurationRef: json(configurationRef) } };
+      priorFindingsRef: json(priorFindingsRef), evidenceRef: json(evidenceRef), configurationRef: json(configurationRef) } };
   }
   async verify(context: StageExecutionContext) {
     const { stages, projects, repository, artifacts, roles, configuration } = this.evaluation.dependencies;
@@ -51,8 +53,18 @@ export class WorkbenchSourceVerification {
     const frozen = await this.load<StageModelConfiguration>(configRef); await configuration.assertStageCompatible(frozen);
     const project = projects.get(String(parameters.snapshotId));
     if (!project || project.snapshotId !== parent.input.parameters.snapshotId || project.commit !== context.task.input.sourceRevision || project.sourceDigest !== context.task.input.sourceDigest) throw new Error('STAGE_INPUT_CHANGED');
+    const priorFindingsRef = parameters.priorFindingsRef as unknown as ArtifactRef;
+    const proofs = await this.load<SourceFindingProof[]>(priorFindingsRef);
+    if (!Array.isArray(proofs) || proofs.length > 1000) throw new Error('SOURCE_HISTORY_BINDING_INVALID');
+    const history = new WorkbenchSourceFindingHistory(this.evaluation);
+    const preserved = new Map<string, { proof: SourceFindingProof; value: Awaited<ReturnType<WorkbenchSourceFindingHistory['validate']>> }>();
+    for (const proof of proofs) {
+      const value = await history.validate(proof, context.task.input); const key = canonicalJson([value.finding.versionId, value.finding.section]);
+      if (preserved.has(key)) throw new Error('SOURCE_HISTORY_BINDING_INVALID');
+      preserved.set(key, { proof, value });
+    }
     const expected: SourceCardBinding[] = [], results: Array<SourceCardResult & Record<string, unknown>> = [];
-    const refs: ArtifactRef[] = [parameters.evidenceRef as unknown as ArtifactRef];
+    const refs: ArtifactRef[] = [parameters.evidenceRef as unknown as ArtifactRef, priorFindingsRef];
     for (const versionId of context.task.input.cardVersionIds) {
       const card = repository.getKnowledgeVersion(versionId);
       if (!card || typeof card.metadata.cardId !== 'string' || card.metadata.projectSnapshotId !== project.snapshotId || !await artifacts.verify(card.bodyRef)) throw new Error('SOURCE_VERIFICATION_CARD_UNBOUND');
@@ -82,13 +94,17 @@ export class WorkbenchSourceVerification {
           context.progress({ phase: 'source-section', versionId, heading, completed: sectionIndex, total: headings.length });
           const sectionKey = sha256(heading).slice(0, 24);
           const section = await context.step(`source-section:${versionId}:${sectionKey}`, async () => {
-            const report = { schemaVersion: 'native-source-review-evidence-v2', sourceRevision: project.commit, sourceDigest: project.sourceDigest,
+            const prior = preserved.get(canonicalJson([versionId, heading]));
+            if (prior) return { artifactRefs: [...prior.value.result.artifactRefs, priorFindingsRef],
+              summary: { ...prior.value.result.summary, originEvidence: json(prior.proof), carriedForward: true } };
+
+            const report = { schemaVersion: 'native-source-review-evidence-v3', sourceRevision: project.commit, sourceDigest: project.sourceDigest,
               suiteRef: moduleEvidence.suiteRef, oracleRef: moduleEvidence.oracleRef,
               ...sourceSectionObservations(suite, oracle, binding.cardId, heading) };
             const reportRef = await artifacts.put(Buffer.from(JSON.stringify(report)), 'application/json');
             const criteria = { schemaVersion: SOURCE_VERIFICATION_CONTRACT, phase: 'FINAL_SOURCE_REVIEW', binding,
               applicationVerified: { artifactDigests: true, frozenVersionBindings: true }, section: heading, verifyPreamble: sectionIndex === 0, allowedKnowledgePaths: [`knowledge/${card.moduleId}.md#${heading}`],
-              instruction: '本次只独立核对 section 指定的 H2 与固定源码的一致性。完整正文提供上下文，其他 H2 由独立调用复核，不属于本次纠正范围或未知风险。必须核对该节全部事实、边界和例子。verifyPreamble为true时也须核对标题及首个H2之前的文本；若该区域有无法在授权H2修正的矛盾，保留未解决风险，不能放行或修改其他区域。应用已验证提供工件的摘要和冻结来源绑定；无需重新计算摘要或联网审计。仍须检查正文对来源和版本的文字断言是否与提供的绑定相符。参考观察仅包含精确绑定当前卡片章节的用例；NO_DIRECT_BEHAVIOR_EVIDENCE 表示没有直接行为用例，不能虚构覆盖，也不自动否定可由固定源码证明的事实。参考观察明确标记PINNED_REFERENCE，只证明对应参考用例；不能推断所有可能输入都已验证。逐项核对边界、状态、接口及示例。与固定源码直接矛盾的事实必须指出，即使重建代码通过了行为测试。上游失败归因PASS不代表正文正确。发现明确错误时指向已有H2；缺少证据则保留风险。仅在当前 H2 无矛盾、无未知风险时PASS；这不是发布授权。' };
+              instruction: '本次只独立核对 section 指定的 H2 与固定源码的一致性。完整正文提供上下文，其他 H2 由独立调用复核，不属于本次纠正范围或未知风险。必须核对该节全部事实、边界和例子。verifyPreamble为true时也须核对标题及首个H2之前的文本；若该区域有无法在授权H2修正的矛盾，保留未解决风险，不能放行或修改其他区域。应用已验证提供工件的摘要和冻结来源绑定；无需重新计算摘要或联网审计。仍须检查正文对来源和版本的文字断言是否与提供的绑定相符。cases包含精确绑定当前卡片章节的完整参考用例；relatedObservations保留模块其他已验证观察的摘要，章节标签不能作为源码事实适用范围的硬边界。相关摘要不是完整输入定义，不据此推断未覆盖输入，判断关联性仍以固定源码为准；NO_DIRECT_BEHAVIOR_EVIDENCE 表示没有直接行为用例，不能虚构覆盖，也不自动否定可由固定源码证明的事实。参考观察明确标记PINNED_REFERENCE，只证明对应参考用例；不能推断所有可能输入都已验证。逐项核对边界、状态、接口及示例。与固定源码直接矛盾的事实必须指出，即使重建代码通过了行为测试。上游失败归因PASS不代表正文正确。发现明确错误时指向已有H2；缺少证据则保留风险。仅在当前 H2 无矛盾、无未知风险时PASS；这不是发布授权。' };
             const criteriaRef = await artifacts.put(Buffer.from(JSON.stringify(criteria)), 'application/json');
             const inputRefs = [card.bodyRef, referenceRef, reportRef, criteriaRef, moduleEvidence.suiteRef, moduleEvidence.oracleRef];
             await context.step(`source-materials:${versionId}:${sectionKey}`, async () => ({ artifactRefs: inputRefs, summary: { versionId, heading } }));

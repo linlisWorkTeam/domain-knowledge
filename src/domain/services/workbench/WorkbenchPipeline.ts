@@ -7,7 +7,7 @@ import { SOURCE_VERIFICATION_CONTRACT, sourceVerificationOutcome, type SourceCar
 import { SOURCE_REVISION_CONTRACT } from '../knowledge/SourceRevision.ts';
 import { sha256 } from '../../Domain.ts';
 import { canonicalJson, createStageTask, type StageInput, type StageTask, type StageStatus, type WorkbenchStage } from './StageTask.ts';
-export const PIPELINE_CONTRACT = 'knowledge-pipeline-v11';
+export const PIPELINE_CONTRACT = 'knowledge-pipeline-v12';
 export interface IterationProgress { failed: string[]; total: number; passed: number }
 export interface PipelineIteration { number: number; versionIds: string[]; reconstruction?: StageTask; evaluation?: StageTask; revision?: StageTask; progress?: IterationProgress; sourceVerification?: StageTask; sourceRepairs?: string[] }
 export interface WorkbenchPipeline {
