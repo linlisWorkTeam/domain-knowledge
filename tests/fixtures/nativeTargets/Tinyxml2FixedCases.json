@@ -1,0 +1,1887 @@
+{
+  "schemaVersion": "native-cases-v1",
+  "cases": [
+    {
+      "caseId": "ToInt_negative",
+      "description": "ToInt negative",
+      "sections": [
+        "fixed-interface#ToInt"
+      ],
+      "variables": [
+        {
+          "name": "value",
+          "type": "int"
+        }
+      ],
+      "calls": [
+        {
+          "function": "tinyxml2::XMLUtil::ToInt",
+          "arguments": [
+            {
+              "string": "-42"
+            },
+            {
+              "address": {
+                "variable": "value"
+              }
+            }
+          ],
+          "result": "ok"
+        }
+      ],
+      "observations": [
+        {
+          "name": "ok",
+          "kind": "boolean",
+          "read": {
+            "variable": "ok"
+          }
+        },
+        {
+          "name": "value",
+          "kind": "integer",
+          "read": {
+            "variable": "value"
+          }
+        }
+      ],
+      "expected": {
+        "ok": true,
+        "value": "-42"
+      }
+    },
+    {
+      "caseId": "ToInt_hex",
+      "description": "ToInt hex",
+      "sections": [
+        "fixed-interface#ToInt"
+      ],
+      "variables": [
+        {
+          "name": "value",
+          "type": "int"
+        }
+      ],
+      "calls": [
+        {
+          "function": "tinyxml2::XMLUtil::ToInt",
+          "arguments": [
+            {
+              "string": "0x2a"
+            },
+            {
+              "address": {
+                "variable": "value"
+              }
+            }
+          ],
+          "result": "ok"
+        }
+      ],
+      "observations": [
+        {
+          "name": "ok",
+          "kind": "boolean",
+          "read": {
+            "variable": "ok"
+          }
+        },
+        {
+          "name": "value",
+          "kind": "integer",
+          "read": {
+            "variable": "value"
+          }
+        }
+      ],
+      "expected": {
+        "ok": true,
+        "value": "42"
+      }
+    },
+    {
+      "caseId": "ToInt_suffix",
+      "description": "ToInt suffix",
+      "sections": [
+        "fixed-interface#ToInt"
+      ],
+      "variables": [
+        {
+          "name": "value",
+          "type": "int"
+        }
+      ],
+      "calls": [
+        {
+          "function": "tinyxml2::XMLUtil::ToInt",
+          "arguments": [
+            {
+              "string": "12abc"
+            },
+            {
+              "address": {
+                "variable": "value"
+              }
+            }
+          ],
+          "result": "ok"
+        }
+      ],
+      "observations": [
+        {
+          "name": "ok",
+          "kind": "boolean",
+          "read": {
+            "variable": "ok"
+          }
+        },
+        {
+          "name": "value",
+          "kind": "integer",
+          "read": {
+            "variable": "value"
+          }
+        }
+      ],
+      "expected": {
+        "ok": true,
+        "value": "12"
+      }
+    },
+    {
+      "caseId": "ToInt_space",
+      "description": "ToInt space",
+      "sections": [
+        "fixed-interface#ToInt"
+      ],
+      "variables": [
+        {
+          "name": "value",
+          "type": "int"
+        }
+      ],
+      "calls": [
+        {
+          "function": "tinyxml2::XMLUtil::ToInt",
+          "arguments": [
+            {
+              "string": " 7"
+            },
+            {
+              "address": {
+                "variable": "value"
+              }
+            }
+          ],
+          "result": "ok"
+        }
+      ],
+      "observations": [
+        {
+          "name": "ok",
+          "kind": "boolean",
+          "read": {
+            "variable": "ok"
+          }
+        },
+        {
+          "name": "value",
+          "kind": "integer",
+          "read": {
+            "variable": "value"
+          }
+        }
+      ],
+      "expected": {
+        "ok": true,
+        "value": "7"
+      }
+    },
+    {
+      "caseId": "ToInt_empty",
+      "description": "ToInt empty",
+      "sections": [
+        "fixed-interface#ToInt"
+      ],
+      "variables": [
+        {
+          "name": "value",
+          "type": "int"
+        }
+      ],
+      "calls": [
+        {
+          "function": "tinyxml2::XMLUtil::ToInt",
+          "arguments": [
+            {
+              "string": ""
+            },
+            {
+              "address": {
+                "variable": "value"
+              }
+            }
+          ],
+          "result": "ok"
+        }
+      ],
+      "observations": [
+        {
+          "name": "ok",
+          "kind": "boolean",
+          "read": {
+            "variable": "ok"
+          }
+        }
+      ],
+      "expected": {
+        "ok": false
+      }
+    },
+    {
+      "caseId": "ToInt_invalid",
+      "description": "ToInt invalid",
+      "sections": [
+        "fixed-interface#ToInt"
+      ],
+      "variables": [
+        {
+          "name": "value",
+          "type": "int"
+        }
+      ],
+      "calls": [
+        {
+          "function": "tinyxml2::XMLUtil::ToInt",
+          "arguments": [
+            {
+              "string": "invalid"
+            },
+            {
+              "address": {
+                "variable": "value"
+              }
+            }
+          ],
+          "result": "ok"
+        }
+      ],
+      "observations": [
+        {
+          "name": "ok",
+          "kind": "boolean",
+          "read": {
+            "variable": "ok"
+          }
+        }
+      ],
+      "expected": {
+        "ok": false
+      }
+    },
+    {
+      "caseId": "ToUnsigned_decimal",
+      "description": "ToUnsigned decimal",
+      "sections": [
+        "fixed-interface#ToUnsigned"
+      ],
+      "variables": [
+        {
+          "name": "value",
+          "type": "unsigned"
+        }
+      ],
+      "calls": [
+        {
+          "function": "tinyxml2::XMLUtil::ToUnsigned",
+          "arguments": [
+            {
+              "string": "42"
+            },
+            {
+              "address": {
+                "variable": "value"
+              }
+            }
+          ],
+          "result": "ok"
+        }
+      ],
+      "observations": [
+        {
+          "name": "ok",
+          "kind": "boolean",
+          "read": {
+            "variable": "ok"
+          }
+        },
+        {
+          "name": "value",
+          "kind": "unsigned",
+          "read": {
+            "variable": "value"
+          }
+        }
+      ],
+      "expected": {
+        "ok": true,
+        "value": "42"
+      }
+    },
+    {
+      "caseId": "ToUnsigned_hex",
+      "description": "ToUnsigned hex",
+      "sections": [
+        "fixed-interface#ToUnsigned"
+      ],
+      "variables": [
+        {
+          "name": "value",
+          "type": "unsigned"
+        }
+      ],
+      "calls": [
+        {
+          "function": "tinyxml2::XMLUtil::ToUnsigned",
+          "arguments": [
+            {
+              "string": "0x2a"
+            },
+            {
+              "address": {
+                "variable": "value"
+              }
+            }
+          ],
+          "result": "ok"
+        }
+      ],
+      "observations": [
+        {
+          "name": "ok",
+          "kind": "boolean",
+          "read": {
+            "variable": "ok"
+          }
+        },
+        {
+          "name": "value",
+          "kind": "unsigned",
+          "read": {
+            "variable": "value"
+          }
+        }
+      ],
+      "expected": {
+        "ok": true,
+        "value": "42"
+      }
+    },
+    {
+      "caseId": "ToUnsigned_empty",
+      "description": "ToUnsigned empty",
+      "sections": [
+        "fixed-interface#ToUnsigned"
+      ],
+      "variables": [
+        {
+          "name": "value",
+          "type": "unsigned"
+        }
+      ],
+      "calls": [
+        {
+          "function": "tinyxml2::XMLUtil::ToUnsigned",
+          "arguments": [
+            {
+              "string": ""
+            },
+            {
+              "address": {
+                "variable": "value"
+              }
+            }
+          ],
+          "result": "ok"
+        }
+      ],
+      "observations": [
+        {
+          "name": "ok",
+          "kind": "boolean",
+          "read": {
+            "variable": "ok"
+          }
+        }
+      ],
+      "expected": {
+        "ok": false
+      }
+    },
+    {
+      "caseId": "ToUnsigned_invalid",
+      "description": "ToUnsigned invalid",
+      "sections": [
+        "fixed-interface#ToUnsigned"
+      ],
+      "variables": [
+        {
+          "name": "value",
+          "type": "unsigned"
+        }
+      ],
+      "calls": [
+        {
+          "function": "tinyxml2::XMLUtil::ToUnsigned",
+          "arguments": [
+            {
+              "string": "invalid"
+            },
+            {
+              "address": {
+                "variable": "value"
+              }
+            }
+          ],
+          "result": "ok"
+        }
+      ],
+      "observations": [
+        {
+          "name": "ok",
+          "kind": "boolean",
+          "read": {
+            "variable": "ok"
+          }
+        }
+      ],
+      "expected": {
+        "ok": false
+      }
+    },
+    {
+      "caseId": "ToInt64_min",
+      "description": "ToInt64 min",
+      "sections": [
+        "fixed-interface#ToInt64"
+      ],
+      "variables": [
+        {
+          "name": "value",
+          "type": "int64_t"
+        }
+      ],
+      "calls": [
+        {
+          "function": "tinyxml2::XMLUtil::ToInt64",
+          "arguments": [
+            {
+              "string": "-9223372036854775808"
+            },
+            {
+              "address": {
+                "variable": "value"
+              }
+            }
+          ],
+          "result": "ok"
+        }
+      ],
+      "observations": [
+        {
+          "name": "ok",
+          "kind": "boolean",
+          "read": {
+            "variable": "ok"
+          }
+        },
+        {
+          "name": "value",
+          "kind": "integer",
+          "read": {
+            "variable": "value"
+          }
+        }
+      ],
+      "expected": {
+        "ok": true,
+        "value": "-9223372036854775808"
+      }
+    },
+    {
+      "caseId": "ToInt64_max",
+      "description": "ToInt64 max",
+      "sections": [
+        "fixed-interface#ToInt64"
+      ],
+      "variables": [
+        {
+          "name": "value",
+          "type": "int64_t"
+        }
+      ],
+      "calls": [
+        {
+          "function": "tinyxml2::XMLUtil::ToInt64",
+          "arguments": [
+            {
+              "string": "9223372036854775807"
+            },
+            {
+              "address": {
+                "variable": "value"
+              }
+            }
+          ],
+          "result": "ok"
+        }
+      ],
+      "observations": [
+        {
+          "name": "ok",
+          "kind": "boolean",
+          "read": {
+            "variable": "ok"
+          }
+        },
+        {
+          "name": "value",
+          "kind": "integer",
+          "read": {
+            "variable": "value"
+          }
+        }
+      ],
+      "expected": {
+        "ok": true,
+        "value": "9223372036854775807"
+      }
+    },
+    {
+      "caseId": "ToInt64_empty",
+      "description": "ToInt64 empty",
+      "sections": [
+        "fixed-interface#ToInt64"
+      ],
+      "variables": [
+        {
+          "name": "value",
+          "type": "int64_t"
+        }
+      ],
+      "calls": [
+        {
+          "function": "tinyxml2::XMLUtil::ToInt64",
+          "arguments": [
+            {
+              "string": ""
+            },
+            {
+              "address": {
+                "variable": "value"
+              }
+            }
+          ],
+          "result": "ok"
+        }
+      ],
+      "observations": [
+        {
+          "name": "ok",
+          "kind": "boolean",
+          "read": {
+            "variable": "ok"
+          }
+        }
+      ],
+      "expected": {
+        "ok": false
+      }
+    },
+    {
+      "caseId": "ToInt64_invalid",
+      "description": "ToInt64 invalid",
+      "sections": [
+        "fixed-interface#ToInt64"
+      ],
+      "variables": [
+        {
+          "name": "value",
+          "type": "int64_t"
+        }
+      ],
+      "calls": [
+        {
+          "function": "tinyxml2::XMLUtil::ToInt64",
+          "arguments": [
+            {
+              "string": "invalid"
+            },
+            {
+              "address": {
+                "variable": "value"
+              }
+            }
+          ],
+          "result": "ok"
+        }
+      ],
+      "observations": [
+        {
+          "name": "ok",
+          "kind": "boolean",
+          "read": {
+            "variable": "ok"
+          }
+        }
+      ],
+      "expected": {
+        "ok": false
+      }
+    },
+    {
+      "caseId": "ToUnsigned64_max",
+      "description": "ToUnsigned64 max",
+      "sections": [
+        "fixed-interface#ToUnsigned64"
+      ],
+      "variables": [
+        {
+          "name": "value",
+          "type": "uint64_t"
+        }
+      ],
+      "calls": [
+        {
+          "function": "tinyxml2::XMLUtil::ToUnsigned64",
+          "arguments": [
+            {
+              "string": "18446744073709551615"
+            },
+            {
+              "address": {
+                "variable": "value"
+              }
+            }
+          ],
+          "result": "ok"
+        }
+      ],
+      "observations": [
+        {
+          "name": "ok",
+          "kind": "boolean",
+          "read": {
+            "variable": "ok"
+          }
+        },
+        {
+          "name": "value",
+          "kind": "unsigned",
+          "read": {
+            "variable": "value"
+          }
+        }
+      ],
+      "expected": {
+        "ok": true,
+        "value": "18446744073709551615"
+      }
+    },
+    {
+      "caseId": "ToUnsigned64_empty",
+      "description": "ToUnsigned64 empty",
+      "sections": [
+        "fixed-interface#ToUnsigned64"
+      ],
+      "variables": [
+        {
+          "name": "value",
+          "type": "uint64_t"
+        }
+      ],
+      "calls": [
+        {
+          "function": "tinyxml2::XMLUtil::ToUnsigned64",
+          "arguments": [
+            {
+              "string": ""
+            },
+            {
+              "address": {
+                "variable": "value"
+              }
+            }
+          ],
+          "result": "ok"
+        }
+      ],
+      "observations": [
+        {
+          "name": "ok",
+          "kind": "boolean",
+          "read": {
+            "variable": "ok"
+          }
+        }
+      ],
+      "expected": {
+        "ok": false
+      }
+    },
+    {
+      "caseId": "ToUnsigned64_invalid",
+      "description": "ToUnsigned64 invalid",
+      "sections": [
+        "fixed-interface#ToUnsigned64"
+      ],
+      "variables": [
+        {
+          "name": "value",
+          "type": "uint64_t"
+        }
+      ],
+      "calls": [
+        {
+          "function": "tinyxml2::XMLUtil::ToUnsigned64",
+          "arguments": [
+            {
+              "string": "invalid"
+            },
+            {
+              "address": {
+                "variable": "value"
+              }
+            }
+          ],
+          "result": "ok"
+        }
+      ],
+      "observations": [
+        {
+          "name": "ok",
+          "kind": "boolean",
+          "read": {
+            "variable": "ok"
+          }
+        }
+      ],
+      "expected": {
+        "ok": false
+      }
+    },
+    {
+      "caseId": "ToFloat_fraction",
+      "description": "ToFloat fraction",
+      "sections": [
+        "fixed-interface#ToFloat"
+      ],
+      "variables": [
+        {
+          "name": "value",
+          "type": "float"
+        }
+      ],
+      "calls": [
+        {
+          "function": "tinyxml2::XMLUtil::ToFloat",
+          "arguments": [
+            {
+              "string": "2.5"
+            },
+            {
+              "address": {
+                "variable": "value"
+              }
+            }
+          ],
+          "result": "ok"
+        }
+      ],
+      "observations": [
+        {
+          "name": "ok",
+          "kind": "boolean",
+          "read": {
+            "variable": "ok"
+          }
+        },
+        {
+          "name": "value",
+          "kind": "number",
+          "read": {
+            "variable": "value"
+          }
+        }
+      ],
+      "expected": {
+        "ok": true,
+        "value": 2.5
+      }
+    },
+    {
+      "caseId": "ToFloat_exponent",
+      "description": "ToFloat exponent",
+      "sections": [
+        "fixed-interface#ToFloat"
+      ],
+      "variables": [
+        {
+          "name": "value",
+          "type": "float"
+        }
+      ],
+      "calls": [
+        {
+          "function": "tinyxml2::XMLUtil::ToFloat",
+          "arguments": [
+            {
+              "string": "-1.25e2"
+            },
+            {
+              "address": {
+                "variable": "value"
+              }
+            }
+          ],
+          "result": "ok"
+        }
+      ],
+      "observations": [
+        {
+          "name": "ok",
+          "kind": "boolean",
+          "read": {
+            "variable": "ok"
+          }
+        },
+        {
+          "name": "value",
+          "kind": "number",
+          "read": {
+            "variable": "value"
+          }
+        }
+      ],
+      "expected": {
+        "ok": true,
+        "value": -125
+      }
+    },
+    {
+      "caseId": "ToFloat_empty",
+      "description": "ToFloat empty",
+      "sections": [
+        "fixed-interface#ToFloat"
+      ],
+      "variables": [
+        {
+          "name": "value",
+          "type": "float"
+        }
+      ],
+      "calls": [
+        {
+          "function": "tinyxml2::XMLUtil::ToFloat",
+          "arguments": [
+            {
+              "string": ""
+            },
+            {
+              "address": {
+                "variable": "value"
+              }
+            }
+          ],
+          "result": "ok"
+        }
+      ],
+      "observations": [
+        {
+          "name": "ok",
+          "kind": "boolean",
+          "read": {
+            "variable": "ok"
+          }
+        }
+      ],
+      "expected": {
+        "ok": false
+      }
+    },
+    {
+      "caseId": "ToFloat_invalid",
+      "description": "ToFloat invalid",
+      "sections": [
+        "fixed-interface#ToFloat"
+      ],
+      "variables": [
+        {
+          "name": "value",
+          "type": "float"
+        }
+      ],
+      "calls": [
+        {
+          "function": "tinyxml2::XMLUtil::ToFloat",
+          "arguments": [
+            {
+              "string": "invalid"
+            },
+            {
+              "address": {
+                "variable": "value"
+              }
+            }
+          ],
+          "result": "ok"
+        }
+      ],
+      "observations": [
+        {
+          "name": "ok",
+          "kind": "boolean",
+          "read": {
+            "variable": "ok"
+          }
+        }
+      ],
+      "expected": {
+        "ok": false
+      }
+    },
+    {
+      "caseId": "ToDouble_fraction",
+      "description": "ToDouble fraction",
+      "sections": [
+        "fixed-interface#ToDouble"
+      ],
+      "variables": [
+        {
+          "name": "value",
+          "type": "double"
+        }
+      ],
+      "calls": [
+        {
+          "function": "tinyxml2::XMLUtil::ToDouble",
+          "arguments": [
+            {
+              "string": "-0.125"
+            },
+            {
+              "address": {
+                "variable": "value"
+              }
+            }
+          ],
+          "result": "ok"
+        }
+      ],
+      "observations": [
+        {
+          "name": "ok",
+          "kind": "boolean",
+          "read": {
+            "variable": "ok"
+          }
+        },
+        {
+          "name": "value",
+          "kind": "number",
+          "read": {
+            "variable": "value"
+          }
+        }
+      ],
+      "expected": {
+        "ok": true,
+        "value": -0.125
+      }
+    },
+    {
+      "caseId": "ToDouble_exponent",
+      "description": "ToDouble exponent",
+      "sections": [
+        "fixed-interface#ToDouble"
+      ],
+      "variables": [
+        {
+          "name": "value",
+          "type": "double"
+        }
+      ],
+      "calls": [
+        {
+          "function": "tinyxml2::XMLUtil::ToDouble",
+          "arguments": [
+            {
+              "string": "1.5e2"
+            },
+            {
+              "address": {
+                "variable": "value"
+              }
+            }
+          ],
+          "result": "ok"
+        }
+      ],
+      "observations": [
+        {
+          "name": "ok",
+          "kind": "boolean",
+          "read": {
+            "variable": "ok"
+          }
+        },
+        {
+          "name": "value",
+          "kind": "number",
+          "read": {
+            "variable": "value"
+          }
+        }
+      ],
+      "expected": {
+        "ok": true,
+        "value": 150
+      }
+    },
+    {
+      "caseId": "ToDouble_empty",
+      "description": "ToDouble empty",
+      "sections": [
+        "fixed-interface#ToDouble"
+      ],
+      "variables": [
+        {
+          "name": "value",
+          "type": "double"
+        }
+      ],
+      "calls": [
+        {
+          "function": "tinyxml2::XMLUtil::ToDouble",
+          "arguments": [
+            {
+              "string": ""
+            },
+            {
+              "address": {
+                "variable": "value"
+              }
+            }
+          ],
+          "result": "ok"
+        }
+      ],
+      "observations": [
+        {
+          "name": "ok",
+          "kind": "boolean",
+          "read": {
+            "variable": "ok"
+          }
+        }
+      ],
+      "expected": {
+        "ok": false
+      }
+    },
+    {
+      "caseId": "ToDouble_invalid",
+      "description": "ToDouble invalid",
+      "sections": [
+        "fixed-interface#ToDouble"
+      ],
+      "variables": [
+        {
+          "name": "value",
+          "type": "double"
+        }
+      ],
+      "calls": [
+        {
+          "function": "tinyxml2::XMLUtil::ToDouble",
+          "arguments": [
+            {
+              "string": "invalid"
+            },
+            {
+              "address": {
+                "variable": "value"
+              }
+            }
+          ],
+          "result": "ok"
+        }
+      ],
+      "observations": [
+        {
+          "name": "ok",
+          "kind": "boolean",
+          "read": {
+            "variable": "ok"
+          }
+        }
+      ],
+      "expected": {
+        "ok": false
+      }
+    },
+    {
+      "caseId": "ToBool_true",
+      "description": "ToBool true",
+      "sections": [
+        "fixed-interface#ToBool"
+      ],
+      "variables": [
+        {
+          "name": "value",
+          "type": "bool"
+        }
+      ],
+      "calls": [
+        {
+          "function": "tinyxml2::XMLUtil::ToBool",
+          "arguments": [
+            {
+              "string": "true"
+            },
+            {
+              "address": {
+                "variable": "value"
+              }
+            }
+          ],
+          "result": "ok"
+        }
+      ],
+      "observations": [
+        {
+          "name": "ok",
+          "kind": "boolean",
+          "read": {
+            "variable": "ok"
+          }
+        },
+        {
+          "name": "value",
+          "kind": "boolean",
+          "read": {
+            "variable": "value"
+          }
+        }
+      ],
+      "expected": {
+        "ok": true,
+        "value": true
+      }
+    },
+    {
+      "caseId": "ToBool_capital",
+      "description": "ToBool capital",
+      "sections": [
+        "fixed-interface#ToBool"
+      ],
+      "variables": [
+        {
+          "name": "value",
+          "type": "bool"
+        }
+      ],
+      "calls": [
+        {
+          "function": "tinyxml2::XMLUtil::ToBool",
+          "arguments": [
+            {
+              "string": "True"
+            },
+            {
+              "address": {
+                "variable": "value"
+              }
+            }
+          ],
+          "result": "ok"
+        }
+      ],
+      "observations": [
+        {
+          "name": "ok",
+          "kind": "boolean",
+          "read": {
+            "variable": "ok"
+          }
+        },
+        {
+          "name": "value",
+          "kind": "boolean",
+          "read": {
+            "variable": "value"
+          }
+        }
+      ],
+      "expected": {
+        "ok": true,
+        "value": true
+      }
+    },
+    {
+      "caseId": "ToBool_upper",
+      "description": "ToBool upper",
+      "sections": [
+        "fixed-interface#ToBool"
+      ],
+      "variables": [
+        {
+          "name": "value",
+          "type": "bool"
+        }
+      ],
+      "calls": [
+        {
+          "function": "tinyxml2::XMLUtil::ToBool",
+          "arguments": [
+            {
+              "string": "FALSE"
+            },
+            {
+              "address": {
+                "variable": "value"
+              }
+            }
+          ],
+          "result": "ok"
+        }
+      ],
+      "observations": [
+        {
+          "name": "ok",
+          "kind": "boolean",
+          "read": {
+            "variable": "ok"
+          }
+        },
+        {
+          "name": "value",
+          "kind": "boolean",
+          "read": {
+            "variable": "value"
+          }
+        }
+      ],
+      "expected": {
+        "ok": true,
+        "value": false
+      }
+    },
+    {
+      "caseId": "ToBool_numeric",
+      "description": "ToBool numeric",
+      "sections": [
+        "fixed-interface#ToBool"
+      ],
+      "variables": [
+        {
+          "name": "value",
+          "type": "bool"
+        }
+      ],
+      "calls": [
+        {
+          "function": "tinyxml2::XMLUtil::ToBool",
+          "arguments": [
+            {
+              "string": "-2"
+            },
+            {
+              "address": {
+                "variable": "value"
+              }
+            }
+          ],
+          "result": "ok"
+        }
+      ],
+      "observations": [
+        {
+          "name": "ok",
+          "kind": "boolean",
+          "read": {
+            "variable": "ok"
+          }
+        },
+        {
+          "name": "value",
+          "kind": "boolean",
+          "read": {
+            "variable": "value"
+          }
+        }
+      ],
+      "expected": {
+        "ok": true,
+        "value": true
+      }
+    },
+    {
+      "caseId": "ToBool_zero",
+      "description": "ToBool zero",
+      "sections": [
+        "fixed-interface#ToBool"
+      ],
+      "variables": [
+        {
+          "name": "value",
+          "type": "bool"
+        }
+      ],
+      "calls": [
+        {
+          "function": "tinyxml2::XMLUtil::ToBool",
+          "arguments": [
+            {
+              "string": "0"
+            },
+            {
+              "address": {
+                "variable": "value"
+              }
+            }
+          ],
+          "result": "ok"
+        }
+      ],
+      "observations": [
+        {
+          "name": "ok",
+          "kind": "boolean",
+          "read": {
+            "variable": "ok"
+          }
+        },
+        {
+          "name": "value",
+          "kind": "boolean",
+          "read": {
+            "variable": "value"
+          }
+        }
+      ],
+      "expected": {
+        "ok": true,
+        "value": false
+      }
+    },
+    {
+      "caseId": "ToBool_empty",
+      "description": "ToBool empty",
+      "sections": [
+        "fixed-interface#ToBool"
+      ],
+      "variables": [
+        {
+          "name": "value",
+          "type": "bool"
+        }
+      ],
+      "calls": [
+        {
+          "function": "tinyxml2::XMLUtil::ToBool",
+          "arguments": [
+            {
+              "string": ""
+            },
+            {
+              "address": {
+                "variable": "value"
+              }
+            }
+          ],
+          "result": "ok"
+        }
+      ],
+      "observations": [
+        {
+          "name": "ok",
+          "kind": "boolean",
+          "read": {
+            "variable": "ok"
+          }
+        }
+      ],
+      "expected": {
+        "ok": false
+      }
+    },
+    {
+      "caseId": "ToBool_invalid",
+      "description": "ToBool invalid",
+      "sections": [
+        "fixed-interface#ToBool"
+      ],
+      "variables": [
+        {
+          "name": "value",
+          "type": "bool"
+        }
+      ],
+      "calls": [
+        {
+          "function": "tinyxml2::XMLUtil::ToBool",
+          "arguments": [
+            {
+              "string": "invalid"
+            },
+            {
+              "address": {
+                "variable": "value"
+              }
+            }
+          ],
+          "result": "ok"
+        }
+      ],
+      "observations": [
+        {
+          "name": "ok",
+          "kind": "boolean",
+          "read": {
+            "variable": "ok"
+          }
+        }
+      ],
+      "expected": {
+        "ok": false
+      }
+    },
+    {
+      "caseId": "ToStr_int",
+      "description": "ToStr int",
+      "sections": [
+        "fixed-interface#ToStr"
+      ],
+      "variables": [
+        {
+          "name": "value",
+          "type": "int",
+          "initial": {
+            "integer": "-42"
+          }
+        },
+        {
+          "name": "buffer",
+          "type": "char",
+          "arrayLength": 64
+        }
+      ],
+      "calls": [
+        {
+          "function": "tinyxml2::XMLUtil::ToStr",
+          "arguments": [
+            {
+              "read": {
+                "variable": "value"
+              }
+            },
+            {
+              "read": {
+                "variable": "buffer"
+              }
+            },
+            {
+              "integer": "64"
+            }
+          ]
+        }
+      ],
+      "observations": [
+        {
+          "name": "text",
+          "kind": "string",
+          "read": {
+            "variable": "buffer"
+          }
+        }
+      ],
+      "expected": {
+        "text": "-42"
+      }
+    },
+    {
+      "caseId": "ToStr_unsigned",
+      "description": "ToStr unsigned",
+      "sections": [
+        "fixed-interface#ToStr"
+      ],
+      "variables": [
+        {
+          "name": "value",
+          "type": "unsigned",
+          "initial": {
+            "integer": "42"
+          }
+        },
+        {
+          "name": "buffer",
+          "type": "char",
+          "arrayLength": 64
+        }
+      ],
+      "calls": [
+        {
+          "function": "tinyxml2::XMLUtil::ToStr",
+          "arguments": [
+            {
+              "read": {
+                "variable": "value"
+              }
+            },
+            {
+              "read": {
+                "variable": "buffer"
+              }
+            },
+            {
+              "integer": "64"
+            }
+          ]
+        }
+      ],
+      "observations": [
+        {
+          "name": "text",
+          "kind": "string",
+          "read": {
+            "variable": "buffer"
+          }
+        }
+      ],
+      "expected": {
+        "text": "42"
+      }
+    },
+    {
+      "caseId": "ToStr_int64",
+      "description": "ToStr int64",
+      "sections": [
+        "fixed-interface#ToStr"
+      ],
+      "variables": [
+        {
+          "name": "value",
+          "type": "int64_t",
+          "initial": {
+            "integer": "-9223372036854775808"
+          }
+        },
+        {
+          "name": "buffer",
+          "type": "char",
+          "arrayLength": 64
+        }
+      ],
+      "calls": [
+        {
+          "function": "tinyxml2::XMLUtil::ToStr",
+          "arguments": [
+            {
+              "read": {
+                "variable": "value"
+              }
+            },
+            {
+              "read": {
+                "variable": "buffer"
+              }
+            },
+            {
+              "integer": "64"
+            }
+          ]
+        }
+      ],
+      "observations": [
+        {
+          "name": "text",
+          "kind": "string",
+          "read": {
+            "variable": "buffer"
+          }
+        }
+      ],
+      "expected": {
+        "text": "-9223372036854775808"
+      }
+    },
+    {
+      "caseId": "ToStr_uint64",
+      "description": "ToStr uint64",
+      "sections": [
+        "fixed-interface#ToStr"
+      ],
+      "variables": [
+        {
+          "name": "value",
+          "type": "uint64_t",
+          "initial": {
+            "integer": "18446744073709551615"
+          }
+        },
+        {
+          "name": "buffer",
+          "type": "char",
+          "arrayLength": 64
+        }
+      ],
+      "calls": [
+        {
+          "function": "tinyxml2::XMLUtil::ToStr",
+          "arguments": [
+            {
+              "read": {
+                "variable": "value"
+              }
+            },
+            {
+              "read": {
+                "variable": "buffer"
+              }
+            },
+            {
+              "integer": "64"
+            }
+          ]
+        }
+      ],
+      "observations": [
+        {
+          "name": "text",
+          "kind": "string",
+          "read": {
+            "variable": "buffer"
+          }
+        }
+      ],
+      "expected": {
+        "text": "18446744073709551615"
+      }
+    },
+    {
+      "caseId": "ToStr_float",
+      "description": "ToStr float",
+      "sections": [
+        "fixed-interface#ToStr"
+      ],
+      "variables": [
+        {
+          "name": "value",
+          "type": "float",
+          "initial": {
+            "number": 2.5
+          }
+        },
+        {
+          "name": "buffer",
+          "type": "char",
+          "arrayLength": 64
+        }
+      ],
+      "calls": [
+        {
+          "function": "tinyxml2::XMLUtil::ToStr",
+          "arguments": [
+            {
+              "read": {
+                "variable": "value"
+              }
+            },
+            {
+              "read": {
+                "variable": "buffer"
+              }
+            },
+            {
+              "integer": "64"
+            }
+          ]
+        }
+      ],
+      "observations": [
+        {
+          "name": "text",
+          "kind": "string",
+          "read": {
+            "variable": "buffer"
+          }
+        }
+      ],
+      "expected": {
+        "text": "2.5"
+      }
+    },
+    {
+      "caseId": "ToStr_double",
+      "description": "ToStr double",
+      "sections": [
+        "fixed-interface#ToStr"
+      ],
+      "variables": [
+        {
+          "name": "value",
+          "type": "double",
+          "initial": {
+            "number": -0.125
+          }
+        },
+        {
+          "name": "buffer",
+          "type": "char",
+          "arrayLength": 64
+        }
+      ],
+      "calls": [
+        {
+          "function": "tinyxml2::XMLUtil::ToStr",
+          "arguments": [
+            {
+              "read": {
+                "variable": "value"
+              }
+            },
+            {
+              "read": {
+                "variable": "buffer"
+              }
+            },
+            {
+              "integer": "64"
+            }
+          ]
+        }
+      ],
+      "observations": [
+        {
+          "name": "text",
+          "kind": "string",
+          "read": {
+            "variable": "buffer"
+          }
+        }
+      ],
+      "expected": {
+        "text": "-0.125"
+      }
+    },
+    {
+      "caseId": "ToStr_bool",
+      "description": "ToStr bool",
+      "sections": [
+        "fixed-interface#ToStr"
+      ],
+      "variables": [
+        {
+          "name": "value",
+          "type": "bool",
+          "initial": {
+            "boolean": true
+          }
+        },
+        {
+          "name": "buffer",
+          "type": "char",
+          "arrayLength": 64
+        }
+      ],
+      "calls": [
+        {
+          "function": "tinyxml2::XMLUtil::ToStr",
+          "arguments": [
+            {
+              "read": {
+                "variable": "value"
+              }
+            },
+            {
+              "read": {
+                "variable": "buffer"
+              }
+            },
+            {
+              "integer": "64"
+            }
+          ]
+        }
+      ],
+      "observations": [
+        {
+          "name": "text",
+          "kind": "string",
+          "read": {
+            "variable": "buffer"
+          }
+        }
+      ],
+      "expected": {
+        "text": "true"
+      }
+    },
+    {
+      "caseId": "SetBoolSerialization_custom",
+      "description": "SetBoolSerialization custom",
+      "sections": [
+        "fixed-interface#SetBoolSerialization"
+      ],
+      "variables": [
+        {
+          "name": "buffer",
+          "type": "char",
+          "arrayLength": 16
+        }
+      ],
+      "calls": [
+        {
+          "function": "tinyxml2::XMLUtil::SetBoolSerialization",
+          "arguments": [
+            {
+              "string": "yes"
+            },
+            {
+              "string": "no"
+            }
+          ]
+        },
+        {
+          "function": "tinyxml2::XMLUtil::ToStr",
+          "arguments": [
+            {
+              "boolean": false
+            },
+            {
+              "read": {
+                "variable": "buffer"
+              }
+            },
+            {
+              "integer": "16"
+            }
+          ]
+        }
+      ],
+      "observations": [
+        {
+          "name": "text",
+          "kind": "string",
+          "read": {
+            "variable": "buffer"
+          }
+        }
+      ],
+      "expected": {
+        "text": "no"
+      }
+    }
+  ]
+}

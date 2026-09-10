@@ -56,3 +56,10 @@ TinyXML2 含 sanitizer 的参考构建实测超过原 1MiB 单文件限制。编
 生成接口编译失败的恢复：Domain NativeCodeRepair只将非超时、非输出超限、退出码1且无已知资源错误的编译诊断判为可修复代码。Application保存原生成文件和诊断为code-rejection检查点，同阶段按拒绝序号启动新Code候选，累计预算保持。Code仅获取自身旧代码和编译诊断；资源中断仍复用原候选，不改知识或可信测试。旧progress诊断须校验CAS并绑定原Code检查点后才能迁移为拒绝记录，原审计不改写。
 
 SQLite NativeTestStore按稳定卡片集合读取全部历史TRUSTED记录（含旧无gateDigest记录），不回写旧记录。Application验证每套旧CAS与oracle后，由Domain构建不可变门禁并集；新cacheKey绑定gateDigest，referenceKey仍用于当前参考分支的事务父链。新记录携带inheritedTestSetIds。NativeTrustedGates代码加入工具链执行器指纹，旧阶段不能跨此执行语义恢复。
+
+
+## 固定原生参考验收
+
+`RunNativeFixedCases.ts` 读取 Targets.json 冻结的提交、源码摘要与声明式固定用例摘要，使用已有 NativeToolchain / NativeCaseExecutor 隔离执行。jsmn 默认 C11 配置的固定观察覆盖初始化、token 类型/起止/大小、字符串结束引号、嵌套容器与错误码；TinyXML2 限定 XMLUtil 转换、各 ToStr 重载和布尔序列化。固定用例为人工冻结的行为输入与预期，不能根据生成实现结果修改预期。参考失败保留原观察并拒绝整套验收，不晋升为可信测试。
+
+该脚本从 Git 固定对象读取材料，不执行工作区 Makefile；原生端只输出逐字段观察，expected 留在宿主比较。报告绑定源码、用例、工具链指纹和实际逐案构建/执行，取消传播至整个隔离进程树。REFERENCE_VALIDATED 仅表示这套固定用例在该参考版本通过，不表示生成实现、知识正文或发布通过。当前工作台最终发布事务尚未消费本报告；Targets.json 的待验证状态不由脚本静默改写。jsmn 四个上游构建配置的既有参考观察单独保留，不能用默认配置的11案覆盖宣称全部配置验收。

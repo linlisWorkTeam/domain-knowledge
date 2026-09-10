@@ -176,3 +176,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 [2026-09-11-0509-role-attempt-audit.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/30aa16eadf23176cf831c75125cf98e2eae183b6/docs/epitaph/2026-09-11-0509-role-attempt-audit.md) 交付角色语义尝试审计和下载，类型/Spec/架构/集成208/Console通过。其对旧真实超时的DocGen归因不正确，0521及本文件的更正为准；实际为DocGen成功后独立源码Review超时。原始错误记录在固定提交保留供审计。
 
 [2026-09-11-0521-source-observation-subject.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/c3bc39a5352c3bbef488dfbf66fa47423039f344/docs/epitaph/2026-09-11-0521-source-observation-subject.md) 分离固定参考观察与旧生成失败，交付 revision-v5 / pipeline-v9。更正旧超时为 DocGen 成功后的源码 Review 超时；定向类型、Spec、架构和真实 gcc 受控测试通过。全部卡片来源门禁和真实发布当时未完成。
+
+[2026-09-11-0540-whole-card-source-verification.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/07d1c3148e8731d1e4bd4dd13597cd905298e7ed/docs/epitaph/2026-09-11-0540-whole-card-source-verification.md) 接通来源复核v1与Console，并保留行为通过但正文错误的实际gcc受控反例。后续全208集成通过。真实旧Code协议失败和待修坏parser卡片仍是当时限制；没有发布。仅清理npm缓存，未删知识。

@@ -21,7 +21,14 @@
         "test/test.h": "8896660fde7631bd514c431a06807a048c9ea37ad60548d70e32f76831e7ed1e",
         "test/testutil.h": "81c2e4a9ca467eed450a5b7845f874d0d1e59b4c363f5520625f9e62ee5f588a"
       },
-      "trustedSuiteStatus": "PENDING_REFERENCE_VALIDATION"
+      "trustedSuiteStatus": "PENDING_REFERENCE_VALIDATION",
+      "fixedSuite": {
+        "path": "JsmnFixedCases.json",
+        "sha256": "bf61494f3a04dd3002bfc8d62b060f1be034277017916c31989f013c027beab2",
+        "caseCount": 11,
+        "status": "PENDING_REFERENCE_VALIDATION",
+        "profile": "default-c11"
+      }
     },
     {
       "name": "tinyxml2",
@@ -45,7 +52,14 @@
         "xmltest.cpp": "86aeb878beeb5d5c075314fa977d39b74c24167de833f24f00123551726e4d5d",
         "CMakeLists.txt": "d93bf5b349fc93a9108e243675d3aabc2af38c24382fad4365db108bb3600a75"
       },
-      "trustedSuiteStatus": "PENDING_REFERENCE_VALIDATION"
+      "trustedSuiteStatus": "PENDING_REFERENCE_VALIDATION",
+      "fixedSuite": {
+        "path": "Tinyxml2FixedCases.json",
+        "sha256": "1fe8bddf338ee9996ccbf224282cb91b9c5f59016a5120013fd49762c89c056f",
+        "caseCount": 40,
+        "status": "PENDING_REFERENCE_VALIDATION",
+        "profile": "xmlutil-conversions-c++17"
+      }
     }
   ]
 }

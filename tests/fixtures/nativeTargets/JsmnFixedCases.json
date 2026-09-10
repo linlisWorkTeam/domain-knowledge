@@ -1,0 +1,1097 @@
+{
+  "schemaVersion": "native-cases-v1",
+  "cases": [
+    {
+      "caseId": "jsmn_init_reset",
+      "description": "jsmn init reset",
+      "sections": [
+        "fixed-interface#jsmn_init"
+      ],
+      "variables": [
+        {
+          "name": "parser",
+          "type": "jsmn_parser"
+        }
+      ],
+      "calls": [
+        {
+          "function": "jsmn_init",
+          "arguments": [
+            {
+              "address": {
+                "variable": "parser"
+              }
+            }
+          ]
+        }
+      ],
+      "observations": [
+        {
+          "name": "pos",
+          "kind": "unsigned",
+          "read": {
+            "variable": "parser",
+            "members": [
+              "pos"
+            ]
+          }
+        },
+        {
+          "name": "toknext",
+          "kind": "unsigned",
+          "read": {
+            "variable": "parser",
+            "members": [
+              "toknext"
+            ]
+          }
+        },
+        {
+          "name": "toksuper",
+          "kind": "integer",
+          "read": {
+            "variable": "parser",
+            "members": [
+              "toksuper"
+            ]
+          }
+        }
+      ],
+      "expected": {
+        "pos": "0",
+        "toknext": "0",
+        "toksuper": "-1"
+      }
+    },
+    {
+      "caseId": "jsmn_parse_object",
+      "description": "jsmn parse object",
+      "sections": [
+        "fixed-interface#jsmn_parse"
+      ],
+      "variables": [
+        {
+          "name": "parser",
+          "type": "jsmn_parser"
+        },
+        {
+          "name": "tokens",
+          "type": "jsmntok_t",
+          "arrayLength": 16
+        }
+      ],
+      "calls": [
+        {
+          "function": "jsmn_init",
+          "arguments": [
+            {
+              "address": {
+                "variable": "parser"
+              }
+            }
+          ]
+        },
+        {
+          "function": "jsmn_parse",
+          "arguments": [
+            {
+              "address": {
+                "variable": "parser"
+              }
+            },
+            {
+              "string": "{}"
+            },
+            {
+              "integer": "2"
+            },
+            {
+              "read": {
+                "variable": "tokens"
+              }
+            },
+            {
+              "integer": "16"
+            }
+          ],
+          "result": "count"
+        }
+      ],
+      "observations": [
+        {
+          "name": "count",
+          "kind": "integer",
+          "read": {
+            "variable": "count"
+          }
+        },
+        {
+          "name": "type",
+          "kind": "integer",
+          "read": {
+            "variable": "tokens",
+            "members": [
+              "type"
+            ],
+            "index": 0
+          }
+        },
+        {
+          "name": "start",
+          "kind": "integer",
+          "read": {
+            "variable": "tokens",
+            "members": [
+              "start"
+            ],
+            "index": 0
+          }
+        },
+        {
+          "name": "end",
+          "kind": "integer",
+          "read": {
+            "variable": "tokens",
+            "members": [
+              "end"
+            ],
+            "index": 0
+          }
+        },
+        {
+          "name": "size",
+          "kind": "integer",
+          "read": {
+            "variable": "tokens",
+            "members": [
+              "size"
+            ],
+            "index": 0
+          }
+        }
+      ],
+      "expected": {
+        "count": "1",
+        "type": "1",
+        "start": "0",
+        "end": "2",
+        "size": "0"
+      }
+    },
+    {
+      "caseId": "jsmn_parse_array",
+      "description": "jsmn parse array",
+      "sections": [
+        "fixed-interface#jsmn_parse"
+      ],
+      "variables": [
+        {
+          "name": "parser",
+          "type": "jsmn_parser"
+        },
+        {
+          "name": "tokens",
+          "type": "jsmntok_t",
+          "arrayLength": 16
+        }
+      ],
+      "calls": [
+        {
+          "function": "jsmn_init",
+          "arguments": [
+            {
+              "address": {
+                "variable": "parser"
+              }
+            }
+          ]
+        },
+        {
+          "function": "jsmn_parse",
+          "arguments": [
+            {
+              "address": {
+                "variable": "parser"
+              }
+            },
+            {
+              "string": "[]"
+            },
+            {
+              "integer": "2"
+            },
+            {
+              "read": {
+                "variable": "tokens"
+              }
+            },
+            {
+              "integer": "16"
+            }
+          ],
+          "result": "count"
+        }
+      ],
+      "observations": [
+        {
+          "name": "count",
+          "kind": "integer",
+          "read": {
+            "variable": "count"
+          }
+        },
+        {
+          "name": "type",
+          "kind": "integer",
+          "read": {
+            "variable": "tokens",
+            "members": [
+              "type"
+            ],
+            "index": 0
+          }
+        },
+        {
+          "name": "start",
+          "kind": "integer",
+          "read": {
+            "variable": "tokens",
+            "members": [
+              "start"
+            ],
+            "index": 0
+          }
+        },
+        {
+          "name": "end",
+          "kind": "integer",
+          "read": {
+            "variable": "tokens",
+            "members": [
+              "end"
+            ],
+            "index": 0
+          }
+        },
+        {
+          "name": "size",
+          "kind": "integer",
+          "read": {
+            "variable": "tokens",
+            "members": [
+              "size"
+            ],
+            "index": 0
+          }
+        }
+      ],
+      "expected": {
+        "count": "1",
+        "type": "2",
+        "start": "0",
+        "end": "2",
+        "size": "0"
+      }
+    },
+    {
+      "caseId": "jsmn_parse_string",
+      "description": "jsmn parse string",
+      "sections": [
+        "fixed-interface#jsmn_parse"
+      ],
+      "variables": [
+        {
+          "name": "parser",
+          "type": "jsmn_parser"
+        },
+        {
+          "name": "tokens",
+          "type": "jsmntok_t",
+          "arrayLength": 16
+        }
+      ],
+      "calls": [
+        {
+          "function": "jsmn_init",
+          "arguments": [
+            {
+              "address": {
+                "variable": "parser"
+              }
+            }
+          ]
+        },
+        {
+          "function": "jsmn_parse",
+          "arguments": [
+            {
+              "address": {
+                "variable": "parser"
+              }
+            },
+            {
+              "string": "\"abc\""
+            },
+            {
+              "integer": "5"
+            },
+            {
+              "read": {
+                "variable": "tokens"
+              }
+            },
+            {
+              "integer": "16"
+            }
+          ],
+          "result": "count"
+        }
+      ],
+      "observations": [
+        {
+          "name": "count",
+          "kind": "integer",
+          "read": {
+            "variable": "count"
+          }
+        },
+        {
+          "name": "type",
+          "kind": "integer",
+          "read": {
+            "variable": "tokens",
+            "members": [
+              "type"
+            ],
+            "index": 0
+          }
+        },
+        {
+          "name": "start",
+          "kind": "integer",
+          "read": {
+            "variable": "tokens",
+            "members": [
+              "start"
+            ],
+            "index": 0
+          }
+        },
+        {
+          "name": "end",
+          "kind": "integer",
+          "read": {
+            "variable": "tokens",
+            "members": [
+              "end"
+            ],
+            "index": 0
+          }
+        },
+        {
+          "name": "size",
+          "kind": "integer",
+          "read": {
+            "variable": "tokens",
+            "members": [
+              "size"
+            ],
+            "index": 0
+          }
+        }
+      ],
+      "expected": {
+        "count": "1",
+        "type": "4",
+        "start": "1",
+        "end": "4",
+        "size": "0"
+      }
+    },
+    {
+      "caseId": "jsmn_parse_escaped",
+      "description": "jsmn parse escaped",
+      "sections": [
+        "fixed-interface#jsmn_parse"
+      ],
+      "variables": [
+        {
+          "name": "parser",
+          "type": "jsmn_parser"
+        },
+        {
+          "name": "tokens",
+          "type": "jsmntok_t",
+          "arrayLength": 16
+        }
+      ],
+      "calls": [
+        {
+          "function": "jsmn_init",
+          "arguments": [
+            {
+              "address": {
+                "variable": "parser"
+              }
+            }
+          ]
+        },
+        {
+          "function": "jsmn_parse",
+          "arguments": [
+            {
+              "address": {
+                "variable": "parser"
+              }
+            },
+            {
+              "string": "\"a\\nb\""
+            },
+            {
+              "integer": "6"
+            },
+            {
+              "read": {
+                "variable": "tokens"
+              }
+            },
+            {
+              "integer": "16"
+            }
+          ],
+          "result": "count"
+        }
+      ],
+      "observations": [
+        {
+          "name": "count",
+          "kind": "integer",
+          "read": {
+            "variable": "count"
+          }
+        },
+        {
+          "name": "type",
+          "kind": "integer",
+          "read": {
+            "variable": "tokens",
+            "members": [
+              "type"
+            ],
+            "index": 0
+          }
+        },
+        {
+          "name": "start",
+          "kind": "integer",
+          "read": {
+            "variable": "tokens",
+            "members": [
+              "start"
+            ],
+            "index": 0
+          }
+        },
+        {
+          "name": "end",
+          "kind": "integer",
+          "read": {
+            "variable": "tokens",
+            "members": [
+              "end"
+            ],
+            "index": 0
+          }
+        },
+        {
+          "name": "size",
+          "kind": "integer",
+          "read": {
+            "variable": "tokens",
+            "members": [
+              "size"
+            ],
+            "index": 0
+          }
+        }
+      ],
+      "expected": {
+        "count": "1",
+        "type": "4",
+        "start": "1",
+        "end": "5",
+        "size": "0"
+      }
+    },
+    {
+      "caseId": "jsmn_parse_primitive",
+      "description": "jsmn parse primitive",
+      "sections": [
+        "fixed-interface#jsmn_parse"
+      ],
+      "variables": [
+        {
+          "name": "parser",
+          "type": "jsmn_parser"
+        },
+        {
+          "name": "tokens",
+          "type": "jsmntok_t",
+          "arrayLength": 16
+        }
+      ],
+      "calls": [
+        {
+          "function": "jsmn_init",
+          "arguments": [
+            {
+              "address": {
+                "variable": "parser"
+              }
+            }
+          ]
+        },
+        {
+          "function": "jsmn_parse",
+          "arguments": [
+            {
+              "address": {
+                "variable": "parser"
+              }
+            },
+            {
+              "string": "true"
+            },
+            {
+              "integer": "4"
+            },
+            {
+              "read": {
+                "variable": "tokens"
+              }
+            },
+            {
+              "integer": "16"
+            }
+          ],
+          "result": "count"
+        }
+      ],
+      "observations": [
+        {
+          "name": "count",
+          "kind": "integer",
+          "read": {
+            "variable": "count"
+          }
+        },
+        {
+          "name": "type",
+          "kind": "integer",
+          "read": {
+            "variable": "tokens",
+            "members": [
+              "type"
+            ],
+            "index": 0
+          }
+        },
+        {
+          "name": "start",
+          "kind": "integer",
+          "read": {
+            "variable": "tokens",
+            "members": [
+              "start"
+            ],
+            "index": 0
+          }
+        },
+        {
+          "name": "end",
+          "kind": "integer",
+          "read": {
+            "variable": "tokens",
+            "members": [
+              "end"
+            ],
+            "index": 0
+          }
+        },
+        {
+          "name": "size",
+          "kind": "integer",
+          "read": {
+            "variable": "tokens",
+            "members": [
+              "size"
+            ],
+            "index": 0
+          }
+        }
+      ],
+      "expected": {
+        "count": "1",
+        "type": "8",
+        "start": "0",
+        "end": "4",
+        "size": "0"
+      }
+    },
+    {
+      "caseId": "jsmn_parse_members",
+      "description": "jsmn parse members",
+      "sections": [
+        "fixed-interface#jsmn_parse"
+      ],
+      "variables": [
+        {
+          "name": "parser",
+          "type": "jsmn_parser"
+        },
+        {
+          "name": "tokens",
+          "type": "jsmntok_t",
+          "arrayLength": 16
+        }
+      ],
+      "calls": [
+        {
+          "function": "jsmn_init",
+          "arguments": [
+            {
+              "address": {
+                "variable": "parser"
+              }
+            }
+          ]
+        },
+        {
+          "function": "jsmn_parse",
+          "arguments": [
+            {
+              "address": {
+                "variable": "parser"
+              }
+            },
+            {
+              "string": "{\"a\":1}"
+            },
+            {
+              "integer": "7"
+            },
+            {
+              "read": {
+                "variable": "tokens"
+              }
+            },
+            {
+              "integer": "16"
+            }
+          ],
+          "result": "count"
+        }
+      ],
+      "observations": [
+        {
+          "name": "count",
+          "kind": "integer",
+          "read": {
+            "variable": "count"
+          }
+        },
+        {
+          "name": "type",
+          "kind": "integer",
+          "read": {
+            "variable": "tokens",
+            "members": [
+              "type"
+            ],
+            "index": 0
+          }
+        },
+        {
+          "name": "start",
+          "kind": "integer",
+          "read": {
+            "variable": "tokens",
+            "members": [
+              "start"
+            ],
+            "index": 0
+          }
+        },
+        {
+          "name": "end",
+          "kind": "integer",
+          "read": {
+            "variable": "tokens",
+            "members": [
+              "end"
+            ],
+            "index": 0
+          }
+        },
+        {
+          "name": "size",
+          "kind": "integer",
+          "read": {
+            "variable": "tokens",
+            "members": [
+              "size"
+            ],
+            "index": 0
+          }
+        },
+        {
+          "name": "keySize",
+          "kind": "integer",
+          "read": {
+            "variable": "tokens",
+            "index": 1,
+            "members": [
+              "size"
+            ]
+          }
+        },
+        {
+          "name": "keyEnd",
+          "kind": "integer",
+          "read": {
+            "variable": "tokens",
+            "index": 1,
+            "members": [
+              "end"
+            ]
+          }
+        }
+      ],
+      "expected": {
+        "count": "3",
+        "type": "1",
+        "start": "0",
+        "end": "7",
+        "size": "1",
+        "keySize": "1",
+        "keyEnd": "3"
+      }
+    },
+    {
+      "caseId": "jsmn_parse_elements",
+      "description": "jsmn parse elements",
+      "sections": [
+        "fixed-interface#jsmn_parse"
+      ],
+      "variables": [
+        {
+          "name": "parser",
+          "type": "jsmn_parser"
+        },
+        {
+          "name": "tokens",
+          "type": "jsmntok_t",
+          "arrayLength": 16
+        }
+      ],
+      "calls": [
+        {
+          "function": "jsmn_init",
+          "arguments": [
+            {
+              "address": {
+                "variable": "parser"
+              }
+            }
+          ]
+        },
+        {
+          "function": "jsmn_parse",
+          "arguments": [
+            {
+              "address": {
+                "variable": "parser"
+              }
+            },
+            {
+              "string": "[1,2]"
+            },
+            {
+              "integer": "5"
+            },
+            {
+              "read": {
+                "variable": "tokens"
+              }
+            },
+            {
+              "integer": "16"
+            }
+          ],
+          "result": "count"
+        }
+      ],
+      "observations": [
+        {
+          "name": "count",
+          "kind": "integer",
+          "read": {
+            "variable": "count"
+          }
+        },
+        {
+          "name": "type",
+          "kind": "integer",
+          "read": {
+            "variable": "tokens",
+            "members": [
+              "type"
+            ],
+            "index": 0
+          }
+        },
+        {
+          "name": "start",
+          "kind": "integer",
+          "read": {
+            "variable": "tokens",
+            "members": [
+              "start"
+            ],
+            "index": 0
+          }
+        },
+        {
+          "name": "end",
+          "kind": "integer",
+          "read": {
+            "variable": "tokens",
+            "members": [
+              "end"
+            ],
+            "index": 0
+          }
+        },
+        {
+          "name": "size",
+          "kind": "integer",
+          "read": {
+            "variable": "tokens",
+            "members": [
+              "size"
+            ],
+            "index": 0
+          }
+        }
+      ],
+      "expected": {
+        "count": "3",
+        "type": "2",
+        "start": "0",
+        "end": "5",
+        "size": "2"
+      }
+    },
+    {
+      "caseId": "jsmn_parse_partial",
+      "description": "jsmn parse partial",
+      "sections": [
+        "fixed-interface#jsmn_parse"
+      ],
+      "variables": [
+        {
+          "name": "parser",
+          "type": "jsmn_parser"
+        },
+        {
+          "name": "tokens",
+          "type": "jsmntok_t",
+          "arrayLength": 16
+        }
+      ],
+      "calls": [
+        {
+          "function": "jsmn_init",
+          "arguments": [
+            {
+              "address": {
+                "variable": "parser"
+              }
+            }
+          ]
+        },
+        {
+          "function": "jsmn_parse",
+          "arguments": [
+            {
+              "address": {
+                "variable": "parser"
+              }
+            },
+            {
+              "string": "\"abc"
+            },
+            {
+              "integer": "4"
+            },
+            {
+              "read": {
+                "variable": "tokens"
+              }
+            },
+            {
+              "integer": "16"
+            }
+          ],
+          "result": "count"
+        }
+      ],
+      "observations": [
+        {
+          "name": "count",
+          "kind": "integer",
+          "read": {
+            "variable": "count"
+          }
+        }
+      ],
+      "expected": {
+        "count": "-3"
+      }
+    },
+    {
+      "caseId": "jsmn_parse_invalid",
+      "description": "jsmn parse invalid",
+      "sections": [
+        "fixed-interface#jsmn_parse"
+      ],
+      "variables": [
+        {
+          "name": "parser",
+          "type": "jsmn_parser"
+        },
+        {
+          "name": "tokens",
+          "type": "jsmntok_t",
+          "arrayLength": 16
+        }
+      ],
+      "calls": [
+        {
+          "function": "jsmn_init",
+          "arguments": [
+            {
+              "address": {
+                "variable": "parser"
+              }
+            }
+          ]
+        },
+        {
+          "function": "jsmn_parse",
+          "arguments": [
+            {
+              "address": {
+                "variable": "parser"
+              }
+            },
+            {
+              "string": "[}"
+            },
+            {
+              "integer": "2"
+            },
+            {
+              "read": {
+                "variable": "tokens"
+              }
+            },
+            {
+              "integer": "16"
+            }
+          ],
+          "result": "count"
+        }
+      ],
+      "observations": [
+        {
+          "name": "count",
+          "kind": "integer",
+          "read": {
+            "variable": "count"
+          }
+        }
+      ],
+      "expected": {
+        "count": "-2"
+      }
+    },
+    {
+      "caseId": "jsmn_parse_nomem",
+      "description": "jsmn parse nomem",
+      "sections": [
+        "fixed-interface#jsmn_parse"
+      ],
+      "variables": [
+        {
+          "name": "parser",
+          "type": "jsmn_parser"
+        },
+        {
+          "name": "tokens",
+          "type": "jsmntok_t",
+          "arrayLength": 16
+        }
+      ],
+      "calls": [
+        {
+          "function": "jsmn_init",
+          "arguments": [
+            {
+              "address": {
+                "variable": "parser"
+              }
+            }
+          ]
+        },
+        {
+          "function": "jsmn_parse",
+          "arguments": [
+            {
+              "address": {
+                "variable": "parser"
+              }
+            },
+            {
+              "string": "[1,2]"
+            },
+            {
+              "integer": "5"
+            },
+            {
+              "read": {
+                "variable": "tokens"
+              }
+            },
+            {
+              "integer": "1"
+            }
+          ],
+          "result": "count"
+        }
+      ],
+      "observations": [
+        {
+          "name": "count",
+          "kind": "integer",
+          "read": {
+            "variable": "count"
+          }
+        }
+      ],
+      "expected": {
+        "count": "-1"
+      }
+    }
+  ]
+}
