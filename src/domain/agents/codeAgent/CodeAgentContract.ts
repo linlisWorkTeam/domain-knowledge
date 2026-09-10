@@ -11,12 +11,10 @@ import { requireMaterials } from '../AgentExecution.ts';
 export interface Payload {
   /** 提供知识引用信息，供调用方读取或传入。 */
   knowledgeRef: ArtifactRef;
-  /** 提供publicInterface引用列表信息，供调用方读取或传入。 */
-  publicInterfaceRefs: ArtifactRef[];
   /** 提供语言标识信息，供调用方读取或传入。 */
   languageId: string;
   /** 提供build契约引用信息，供调用方读取或传入。 */
-  buildContractRef: ArtifactRef;
+  projectConfigurationRef: ArtifactRef;
   /** 提供allowedGenerated路径列表信息，供调用方读取或传入。 */
   allowedGeneratedPaths: string[];
 }
@@ -46,7 +44,17 @@ export function schemaFor(input: Input): Record<string, unknown> {
 
 /** 检查本角色必需字段及所引用材料是否完整。 */
 export function validateInput(input: Input): void {
-  requireMaterials(input.payload, input.materials, ['knowledgeRef', 'publicInterfaceRefs', 'languageId', 'buildContractRef', 'allowedGeneratedPaths']);
+  requireMaterials(input.payload, input.materials, ['knowledgeRef', 'languageId', 'projectConfigurationRef', 'allowedGeneratedPaths']);
+  if (!['c', 'cpp'].includes(input.payload.languageId)) throw new Error('CODE_LANGUAGE_INVALID');
+  const config = input.materials.find(({ ref }) => ref.artifactId === input.payload.projectConfigurationRef.artifactId)?.content as Record<string, unknown>;
+  if (!config || Object.keys(config).some((key) => !['languageId', 'standard', 'dependencies', 'constraints', 'allowedGeneratedPaths'].includes(key))
+    || config.languageId !== input.payload.languageId || typeof config.standard !== 'string'
+    || ![config.dependencies, config.constraints].every((value) => Array.isArray(value) && value.every((item) => typeof item === 'string'))
+    || JSON.stringify(config.allowedGeneratedPaths) !== JSON.stringify(input.payload.allowedGeneratedPaths)) throw new Error('CODE_CONFIGURATION_INVALID');
+  for (const path of input.payload.allowedGeneratedPaths) {
+    if (!/^[a-zA-Z0-9_][a-zA-Z0-9_./-]*\.(c|cc|cpp|cxx|h|hpp)$/.test(path)
+      || path.split('/').some((part) => !part || part === '.' || part === '..')) throw new Error('CODE_PATH_INVALID');
+  }
 }
 
 /** 检查角色输出是否满足业务约束。 */

@@ -91,7 +91,7 @@ function validateAgentContracts(): [number, number] {
     command('doc-gen', { moduleId: 'example', sourceRefs: [refA], publicInterfaceRefs: [refB] }),
     command('doc-worker', { moduleId: 'example', sourceRefs: [refA], publicInterfaceRefs: [refB] }),
     command('test-gen', { moduleId: 'example', sourceSnapshotRef: refA, publicInterfaceRefs: [refB], languageId: 'cpp', testPolicyRef: refA, allowedTestPaths: ['tests/generated.cpp'] }),
-    command('code', { knowledgeRef: refA, publicInterfaceRefs: [refB], languageId: 'cpp', buildContractRef: refA }),
+    command('code', { knowledgeRef: refA, languageId: 'cpp', projectConfigurationRef: refB, allowedGeneratedPaths: ['src/out.cpp'] }),
     command('check', { diffRef: refA, criteriaRef: refB, publicInterfaceRefs: [refA] }),
     command('review', { knowledgeRef: refA, evaluationReportRef: refB, criteriaRef: refA }),
   ];

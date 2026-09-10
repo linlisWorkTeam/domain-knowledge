@@ -8,7 +8,7 @@ import { assertActive, pending } from '../AgentExecution.ts';
 import { type Input, type Output, schemaFor, validateInput, validateOutput } from './CodeAgentContract.ts';
 import { definition, buildPrompt, readablePaths } from './CodeAgentPrompt.ts';
 
-/** 只依据候选知识和公开接口生成实现，输出文件必须满足完整路径白名单。 */
+/** 只依据候选知识和项目编写配置生成实现，输出文件必须满足完整路径白名单。 */
 export async function execute(input: Input, context: ExecutionContext): Promise<RoleResult<Output>> {
   assertActive(context.signal);
   // 缺失材料应在调用模型之前失败，避免模型用猜测填补业务证据。

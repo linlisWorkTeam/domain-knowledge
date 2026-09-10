@@ -609,13 +609,12 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
     } else if (agentId === 'code') {
       const knowledgeRef = input.context[contextKey('candidateBodyRef', input.iteration)] as ArtifactRef | undefined;
       if (!knowledgeRef) throw new Error('AGENT_COMMAND_INPUT_MISSING: code.knowledgeRef');
-      payload = {
-        knowledgeRef,
-        publicInterfaceRefs,
-        languageId: this.scenarioLanguage(scenario),
-        buildContractRef: scenarioRef,
-        allowedGeneratedPaths: scenario.allowedGeneratedPaths,
-      };
+      validateProjectAgentConfiguration(scenario.agentConfiguration);
+      const { languageId, standard, dependencies, constraints } = scenario.agentConfiguration;
+      const projectConfigurationRef = await this.flywheel.putArtifact(Buffer.from(JSON.stringify({
+        languageId, standard, dependencies, constraints, allowedGeneratedPaths: scenario.allowedGeneratedPaths,
+      })), 'application/json');
+      payload = { knowledgeRef, languageId, projectConfigurationRef, allowedGeneratedPaths: scenario.allowedGeneratedPaths };
     } else if (agentId === 'check') {
       const codeResultRef = input.context[contextKey('code', input.iteration)] as ArtifactRef | undefined;
       if (!codeResultRef) throw new Error('AGENT_COMMAND_INPUT_MISSING: check.diffRef');

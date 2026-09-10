@@ -125,12 +125,11 @@
     },
     "codegenPayload": {
       "type": "object",
-      "required": ["knowledgeRef", "publicInterfaceRefs", "languageId", "buildContractRef"],
+      "required": ["knowledgeRef", "languageId", "projectConfigurationRef"],
       "properties": {
         "knowledgeRef": {"$ref": "#/$defs/artifactRef"},
-        "publicInterfaceRefs": {"$ref": "#/$defs/artifactRefArray"},
         "languageId": {"type": "string", "pattern": "^[a-z][a-z0-9+.-]*$"},
-        "buildContractRef": {"$ref": "#/$defs/artifactRef"},
+        "projectConfigurationRef": {"$ref": "#/$defs/artifactRef"},
         "allowedGeneratedPaths": {
           "type": "array",
           "minItems": 1,

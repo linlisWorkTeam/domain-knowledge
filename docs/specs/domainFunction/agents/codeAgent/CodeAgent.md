@@ -53,3 +53,7 @@ SPDX-License-Identifier: MIT
 对应 S2-05：设计已确认，实现、样例和业务验收待完成。关联 KF-SYS-003、044、045 与 AC-CODE-001、002、AC-CONFIG-001、AC-SEC-001；具体场景及追踪状态见 [Verification](../../../totalRules/Verification.md)。旧 TypeScript 样例不能作为 C/C++ 目标业务已验收的证据。
 
 开发步骤与证据统一记录在 [Status](../../../../Status.md)，独立运行方法见 [AgentDevelopment](../../../../AgentDevelopment.md)。
+
+## 本轮实施约定（2026-09-10）
+
+IO-03～06 移除 publicInterfaceRefs；模型只收到 knowledgeRef 和裁剪后的 buildContractRef（C/C++ 语言、标准、依赖、编写约束、输出路径），工具读取白名单为空，原源码/接口/测试不进入模型工作区。完整项目配置随场景冻结，完整编译测试命令只传执行器。返回文件路径必须是授权的规范 C/C++ 相对路径，拒绝重复、越界、空内容；由框架写入临时评测目录。
