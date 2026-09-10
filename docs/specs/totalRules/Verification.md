@@ -68,7 +68,7 @@ SPDX-License-Identifier: MIT
 
 ## 需求追踪矩阵
 
-实现和测试路径相对仓库根目录。AC-FLOW-003 的自动回滚、AC-FLOW-004 的完整冲突调度、AC-LANG-002 的 C++ 沙箱、AC-EVAL-001 的候选 oracle 晋升仍按 Partial / Planned 审查，不能根据场景措辞推定已实现。2026-09-10 新确认的 CodeAgent 输入和项目配置目标对应 KF-SYS-044、045，保持 Planned；KF-SYS-003 的现有测试只覆盖部分旧边界，不能证明新增接口隔离与 Prompt 材料裁剪已通过。
+实现和测试路径相对仓库根目录。AC-FLOW-003 的自动回滚、AC-FLOW-004 的完整冲突调度、AC-LANG-002 的 C++ 沙箱、AC-EVAL-001 的候选 oracle 晋升仍按 Partial / Planned 审查，不能根据场景措辞推定已实现。2026-09-10 KF-SYS-045 已有 C/C++ 契约、材料隔离和完整受控链路回归；KF-SYS-044 已实现冻结场景内的配置裁剪，独立项目配置文件管理仍为 Partial。真实业务模型质量仍交 S3 验收。
 
 | 需求 ID | 验收 | 状态 | 实现 | 测试 |
 | --- | --- | --- | --- | --- |
@@ -115,8 +115,8 @@ SPDX-License-Identifier: MIT
 | KF-SYS-041 | AC-API-010 | Implemented | `src/application/apps/ProviderOperationsApp.ts` + `src/infrastructure/agentAdapters/deepSeekHarness` + `src/interfaces/runner/Composition.ts` + `web/App.js` | `tests/security/ProviderSettings.test.ts` + `tests/integration/DshConfiguredProvider.test.ts` + `tests/acceptance/DshConfiguredFlow.test.ts` + `tests/e2e/Console.spec.ts` |
 | KF-SYS-042 | AC-OBS-004 | Implemented | `src/application/apps/OperationalMetricsApp.ts` + `src/infrastructure/observability/SqliteOperationalMetrics.ts` + `web/App.js` | `tests/integration/OperationalMetrics.test.ts` + `tests/integration/ProviderObservability.test.ts` + `tests/e2e/Console.spec.ts` |
 | KF-SYS-043 | AC-SEARCH-001 | Planned | — | — |
-| KF-SYS-044 | AC-CONFIG-001 | Planned | — | — |
-| KF-SYS-045 | AC-CODE-001、AC-CODE-002 | Planned | — | — |
+| KF-SYS-044 | AC-CONFIG-001 | Partial | `src/domain/agents/ProjectAgentConfiguration.ts`、`src/application/services/AutomatedProjectWorkflow.ts` | `tests/integration/TestGenExecution.test.ts`、`tests/integration/RunConfiguration.test.ts` |
+| KF-SYS-045 | AC-CODE-001、AC-CODE-002 | Implemented | `src/domain/agents/codeAgent/CodeAgentContract.ts` | `src/domain/agents/codeAgent/CodeAgent.test.ts`、`tests/acceptance/AutomatedLanggraphFlow.test.ts`、`tests/acceptance/DshConfiguredFlow.test.ts` |
 | KF-UI-001 | AC-UI-001 | Implemented | `web/App.js` + `src/interfaces/runner/Server.ts` | `tests/contract/Site.test.ts` + `tests/integration/Server.test.ts` |
 | KF-UI-002 | AC-UI-002 | Implemented | `web/App.js` + `src/interfaces/runner/ConsoleReadModel.ts` | `tests/contract/Site.test.ts` + `tests/integration/Server.test.ts` |
 | KF-UI-003 | AC-UI-003 | Implemented | `src/application/services/AutomatedProjectWorkflow.ts` + `web/App.js` | `tests/acceptance/AutomatedLanggraphFlow.test.ts` + `tests/contract/Site.test.ts` |

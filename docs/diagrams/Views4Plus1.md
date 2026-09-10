@@ -79,7 +79,7 @@ flowchart LR
   Server --> Harness[DSH SDK / 隔离工作空间]
   Harness --> Model[已配置模型 HTTPS API]
   Server --> Project[固定提交的参考与生成副本]
-  Project --> Processes[node / pnpm / cargo 子进程]
+  Project --> Processes[node / pnpm / cargo / gcc / g++ / 测试程序]
   Server -. 适配器已提供 .-> Redis[Redis 租约与上下文]
   Browser --> Static[同源 web 静态资源]
 ```
@@ -103,15 +103,24 @@ sequenceDiagram
   G->>R: 文档、候选测试、代码与检查
   R-->>A: 业务结果及待保存正文
   A->>S: 绑定工件和结果信封
-  A->>E: 参考检查与生成实现评测
+  A->>E: 在原始源码上编译运行候选测试
+  alt 首次测试失败且非环境故障
+    A->>R: TestGen 有限修复（独立尝试记录）
+    R-->>A: 修订后的测试文件及用例清单
+    A->>E: 再次参考校验
+  end
+  Note over A,E: 修复耗尽或环境故障停止，以下仅为参考通过分支
+  E-->>A: 参考校验通过
+  A->>S: 按源码内容身份固定测试集
+  A->>E: 同一测试集测评生成实现
   E-->>A: 测试失败证据
-  A->>R: Review 归因
-  R-->>A: 带评测证据的纠正意见
+  A->>R: Review 接收 Check 差异及测评报告
+  R-->>A: 多条位置、问题、建议及可信依据
   A->>D: 报告与策略
   D-->>A: ITERATE
   A-->>G: 路由下一轮
   G->>R: DocGen 修订、Code fresh 生成
-  A->>E: 新一轮独立评测
+  A->>E: 复用固定测试集进行新一轮评测
   E-->>A: 全部门禁事实
   A->>D: 重新判定
   D-->>A: PASS

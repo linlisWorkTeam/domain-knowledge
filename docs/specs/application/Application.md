@@ -33,9 +33,9 @@ DocWorkerExecutionService 实现 DocGen 的内部 Worker 执行端口，生产�
 
 DeterministicQualityPolicy 位于 Application：来源证据 30%、结构 25%、可验证性 20%、正文量 15%、可读性 10%，默认阈值 70。KnowledgeWritingGuide 报告模板化表达和超长段落；弱项形成反馈送回 DocGen。质量拒绝跳过 Code，质量通过不等于行为 Gate PASS。
 
-## 项目配置与角色材料分发（已确认，待实现）
+## 项目配置与角色材料分发
 
-每个业务项目由框架管理一份版本化项目配置，可采用 `ProjectProfile.json`；不同业务场景引用对应项目配置及场景差异。本节定义目标职责，当前没有该文件的加载入口或机器 Schema，具体存储目录在实现时确定，不创建空配置作为已支持证明。依赖和构建说明不写入知识卡片。
+当前配置保存在冻结场景的 agentConfiguration 中，由 ProjectAgentConfiguration 校验，场景与源码快照进入 CAS。Code 只收到 languageId、standard、dependencies、constraints 和 allowedGeneratedPaths，TestGen 只收到语言、标准和测试路径策略。运行中读取冻结场景；独立 ProjectProfile.json 文件加载仍属后续配置管理能力。依赖和构建说明不写入知识卡片。
 
 | 配置内容 | 用途与接收方 |
 | --- | --- |
@@ -62,3 +62,24 @@ RunConfiguration 冻结 Prompt、Schema、Provider 和 roleExecutionVersion 摘�
 
 
 文档关系：[设计目录](../README.md)负责代码与设计定位；[开发指南](../../Development.md)说明修改和交付步骤。
+
+### C/C++ 场景字段
+
+```json
+{
+  "agentConfiguration": {
+    "languageId": "cpp", "standard": "c++17",
+    "dependencies": [], "constraints": [],
+    "testPaths": ["tests/generated.cpp"], "maxTestRepairs": 1
+  },
+  "allowedGeneratedPaths": ["src/module.cpp"],
+  "comparisonRules": [{ "id": "behavior", "description": "比较公开函数的行为与返回值" }],
+  "businessGoal": "生成该模块的知识文档并验证",
+  "referenceCommands": [
+    { "tool": "g++", "purpose": "check", "args": ["-std=c++17", "src/module.cpp", "tests/generated.cpp", "-o", "test-bin"] },
+    { "tool": "binary", "purpose": "test", "args": ["test-bin"] }
+  ]
+}
+```
+
+finalCommands 使用同一套编译/测试入口测评生成代码；firstIterationCommands 仅保留为旧场景兼容字段，自动飞轮各轮均使用 finalCommands。编译命令放在 check 阶段；prepareCommands 用于环境准备，其失败不会触发 TestGen 改写测试。C 配置使用 languageId=c、例如 standard=c17 和 gcc。

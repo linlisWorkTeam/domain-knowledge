@@ -17,41 +17,28 @@ SPDX-License-Identifier: MIT
 
 | 编号 | 议题 | 状态 | 记录 |
 | --- | --- | --- | --- |
-| IO-16 | Review 修订意见及交接 | 已确认（待实现） | 2026-09-10 用户确认 Review 输出知识卡片修订意见列表，每项包含修订位置、问题说明、依据和修订建议；交给 DocGen 修改知识卡片，没有发现需要修订的问题时返回空列表。 |
+| IO-16 | Review 修订意见及交接 | 已实现，待业务验收 | 2026-09-10 用户确认 Review 输出知识卡片修订意见列表，每项包含修订位置、问题说明、依据和修订建议；交给 DocGen 修改知识卡片，没有发现需要修订的问题时返回空列表。 |
 
-## 目标输出（已确认，待实现）
+## 当前输入输出
 
-| 内容 | 约定 |
+IO-15、16 已实现。必需输入为 `knowledgeRef`、`evaluationReportRef`、`comparisonReportRef`；可选 `previousCorrectionRefs` 只加载 Application 显式提供的历史纠正记录。角色不获得原始仓库文件，`readablePaths` 为空。
+
+模型输出 `blocking` 与 `corrections` 数组。每条修订意见包含：
+
+| 字段 | 含义 |
 | --- | --- |
-| 修订位置 | 指出哪张知识卡片、哪个段落 |
-| 问题说明 | 说明知识缺失、错误或歧义 |
-| 依据 | 对应的代码差异或失败测试，来源于本轮可信输入 |
-| 修订建议 | 说明需要补充或纠正什么 |
+| correctionId | 本次意见标识；信封中统一规范为 COR 数字编号 |
+| knowledgePath | 本轮知识正文中已有的段落标题或原文定位片段 |
+| problem | 缺失、错误或歧义的说明 |
+| suggestion | 应补充或修改的内容 |
+| evidence | evaluation、comparison 或二者，选择本轮可信依据 |
 
-Review 输出修订意见列表，由 Application 将意见及原知识卡片交给 DocGen 执行修改；未发现需要修订的问题时返回空列表。空列表只表示没有提出修订意见，不替代测试结果或 Gate 的通过判定。具体机器字段、位置标识及多项意见与结果信封的映射在实现时明确。
+无意见时空数组合法；blocking 且无意见时记录 unresolvedRisks。Domain 拒绝重复意见标识和正文中不存在的位置。框架把依据选择映射为输入工件引用，模型不能自行指定其他 Run 的 ArtifactRef。
 
-[Knowledge IO-19](../../knowledge/Knowledge.md) 已确认人工治理的材料范围：Review 提供问题段落、说明、建议及失败用例或代码差异依据，由 Application 组织精简治理清单，必要时附上一版对比；不要求人工遍历全部文档版本和完整临时代码。Review 应从框架显式提供的历史证据中提炼有价值的尝试及退化，避免重复修复；不能自行查询全部历史或扩大其他角色的读取范围。完整相关证据暂存在后台，需要时展开，治理完成后按保留政策处理。治理清单及历史材料交接的机器契约待实现，Review 不直接删除工件。
+交给 DocGen 的信封沿用 `corrections`，将 problem 和 suggestion 合并为 criterion，将 problem 保存为 risk，并附可信 evidenceRefs。下一轮同时提供上一版正文，沿既有单文档修订规则执行。最终结果仍由测评、Check、Review 和 Gate 共同决定。
 
-## 职责与当前输入输出
+## 验证与保留边界
 
-依据知识与评测证据定位知识问题，提出纠正意见。以下描述当前实现；Check 与测试结果的联合输入方向已按 IO-15、修订意见输出已按 IO-16 确认，完整机器契约待落实。
+角色测试覆盖多条意见、两类依据绑定、无意见、位置越界与取消。完整 C++ 测试覆盖失败测评 → Review → DocGen 修订 → 再测评。意见的业务质量仍待真实模型验证。
 
-| 边界 | 当前实现 |
-| --- | --- |
-| 输入 | 知识 `knowledgeRef`、评测报告 `evaluationReportRef`、判据 `criteriaRef`；可选历史纠正 `previousCorrectionRefs` |
-| 模型输出 | `blocking`、`recommendation`（PASS 或 ITERATE）、一项 `correction` 或 null |
-| correction 内容 | `correctionId`、`knowledgePath`、`criterion`、`risk` |
-| 交接输出 | `resultKind: attribution`；统一编号并绑定可信评测引用的 `corrections` 数组，以及 `unresolvedRisks` |
-| 失败与限制 | 报告阻塞但无纠正项时记录未解决风险；模型不能自行捏造评测引用，不能直接刷新或发布知识 |
-
-## 待确认与验收重点
-
-对应 S2-07：按 IO-15 补齐 Check findings 与评测证据的联合输入，按 IO-16 实现带位置、问题、依据和建议的修订意见列表及无意见时的空列表。当前模型仅返回一项 correction 或 null，信封虽使用 corrections 数组，仍不等于目标列表和字段已经支持。目前未单独绑定 Check findings 明细，不能把提示词要求或结构迁移写成完整归因能力。
-
-知识修订由 [DocGenAgent](../docGenAgent/DocGenAgent.md) 接收 Application 显式提供的旧正文与纠正材料后执行；跨角色连接见 [Workflow](../../workflow/Workflow.md)。
-
-开发步骤与证据统一记录在 [Status](../../../../Status.md)，独立运行方法见 [AgentDevelopment](../../../../AgentDevelopment.md)。
-
-## 本轮实施约定（2026-09-10）
-
-IO-15 必需 comparisonReportRef，与 evaluationReportRef 同时进入可见材料。IO-16 输出 corrections 数组，每项包含 correctionId、knowledgePath、problem、suggestion、evidence（comparison/evaluation 的选择）；空数组合法。框架把依据选择绑定到受信引用，转换为 DocGen 现有 criterion/risk/evidenceRefs 契约，拒绝跨文档定位及伪造来源。Review 不读原始源码，不直接修改知识；Gate 继续消费 blocking。
+Knowledge IO-19 的完整人工治理清单、历史提炼和资料保留/清理属于独立治理能力，当前只保留结构化意见及证据，不执行自动删除。状态与验收依据见 [Status](../../../../Status.md)。
