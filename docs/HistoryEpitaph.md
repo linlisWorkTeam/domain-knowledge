@@ -96,3 +96,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 
 - [2026-09-09-1219-mvp-real-acceptance-budget-exhausted.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/cff8fc14a75b556dfce84598842caa7d2f895868/docs/epitaph/2026-09-09-1219-mvp-real-acceptance-budget-exhausted.md)：纠正遗漏历史凭据的判断，记录三次真实启动失败及 3/3 额度耗尽；当时 281 项回归通过，未有完整真实发布。后续仍需新预算，不改写原失败证据。
 - [2026-09-09-1225-mvp-live-final-evidence.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/cff8fc14a75b556dfce84598842caa7d2f895868/docs/epitaph/2026-09-09-1225-mvp-live-final-evidence.md)：1867025 安装包、281 项回归和 19 项 Console 通过；实际失败列表误显示 GENERATING 是当时未解决问题，现由阶段修复候选覆盖。真实预算仍耗尽，原取消节点和用量证据保持历史原样。
+
+- [2026-09-09-1640-provider-generation-probe.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/27ec9dfb3472f8a07327271470d8767efcebd4c7/docs/epitaph/2026-09-09-1640-provider-generation-probe.md)：生产 DSH 的一次 64 token 生成探针与受控取消/排队/输出限制验证；当时未调用真实提供方。后续第四次授权前已成功完成真实探针，完整飞轮仍受独立门禁约束。
