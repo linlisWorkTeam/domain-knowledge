@@ -98,3 +98,46 @@ test('one model process at a time and aborted queued work never starts', async (
   await Promise.all([first, last]);
   assert.equal(peak, 1);
 });
+
+
+test('explicit quota mode exceeds three rounds and preserves cancellation without a wall clock deadline', async () => {
+  const infrastructure = await createDomainKnowledgeInfrastructure({
+    checkpoint: { kind: 'memory' }, prompts: { getPromptAddon: () => '' }, observer: { record: () => {} },
+    executor: { execute: async input => {
+      await delay(2, undefined, { signal: input.signal });
+      return input.nodeId === 'workflow_router' ? { detail: 'quota loop', route: input.iteration < 4 ? 'ITERATE' : 'PASS' } : { detail: 'ok' };
+    } },
+  });
+  await infrastructure.engine.start({ runId: 'quota-rounds', budgetMode: 'provider-quota', maxIterations: Number.MAX_SAFE_INTEGER, maxDurationMs: 1, workerCount: 0 });
+  const result = await infrastructure.engine.wait('quota-rounds');
+  assert.equal(result.executionStatus, 'COMPLETED'); assert.equal(result.iteration, 4);
+  assert.equal(result.budget?.mode, 'provider-quota'); assert.equal(result.budget?.deadlineAt, '');
+  assert.equal(result.budget?.maxDurationMs, 0);
+});
+
+test('quota mode survives recovery without inventing a new deadline and still supports cancellation', async () => {
+  let first = true;
+  const infrastructure = await createDomainKnowledgeInfrastructure({
+    checkpoint: { kind: 'memory' }, prompts: { getPromptAddon: () => '' }, observer: { record: () => {} },
+    executor: { execute: async input => {
+      if (first) { first = false; throw new Error('CONTROLLED_INTERRUPTION'); }
+      if (input.nodeId === 'workflow_router') return { detail: 'ready', route: 'PASS' };
+      return { detail: 'ok' };
+    } },
+  });
+  await infrastructure.engine.start({ runId: 'quota-resume', budgetMode: 'provider-quota', maxIterations: Number.MAX_SAFE_INTEGER, workerCount: 0 });
+  const before = await infrastructure.engine.wait('quota-resume');
+  assert.equal(before.executionStatus, 'FAILED');
+  await infrastructure.engine.resume('quota-resume');
+  const after = await infrastructure.engine.wait('quota-resume');
+  assert.equal(after.executionStatus, 'COMPLETED');
+  assert.deepEqual(after.budget, before.budget);
+  let entered!: () => void; const ready = new Promise<void>(resolve => { entered = resolve; });
+  const cancelling = await createDomainKnowledgeInfrastructure({
+    checkpoint: { kind: 'memory' }, prompts: { getPromptAddon: () => '' }, observer: { record: () => {} },
+    executor: { execute: async input => { entered(); await delay(10_000, undefined, { signal: input.signal }); return { detail: 'never' }; } },
+  });
+  await cancelling.engine.start({ runId: 'quota-cancel', budgetMode: 'provider-quota', maxIterations: Number.MAX_SAFE_INTEGER, workerCount: 0 });
+  await ready; await cancelling.engine.cancel('quota-cancel');
+  assert.equal((await cancelling.engine.wait('quota-cancel')).executionStatus, 'CANCELLED');
+});

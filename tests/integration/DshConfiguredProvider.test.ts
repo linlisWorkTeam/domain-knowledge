@@ -345,3 +345,38 @@ test('native streaming separates bounded wire overhead from line buffers and exp
     } finally { upstream.closeAllConnections(); upstream.close(); await once(upstream, 'close'); rmSync(directory, { recursive: true, force: true }); }
   }
 });
+
+
+test('native quota rejection stops later provider instances without leaking upstream error text', async () => {
+  for (const scenario of [
+    { status: 429, body: '{"error":{"code":"insufficient_quota","message":"SECRET_REMOTE_ERROR"}}', expected: 'PROVIDER_QUOTA_EXHAUSTED', stops: true },
+    { status: 402, body: 'SECRET_REMOTE_ERROR', expected: 'PROVIDER_PAYMENT_REQUIRED', stops: true },
+    { status: 429, body: '{"error":{"message":"quota SECRET_REMOTE_ERROR"}}', expected: 'PROVIDER_RATE_LIMITED', stops: false },
+    { status: 429, body: 'x'.repeat(20_000), expected: 'PROVIDER_RATE_LIMITED', stops: false },
+  ]) {
+    const directory = mkdtempSync(join(tmpdir(), 'dsh-quota-')); let requests = 0;
+    const upstream = createServer(async (request, response) => {
+      requests++; for await (const _ of request) {}
+      response.writeHead(scenario.status, { 'content-type': 'application/json' }); response.end(scenario.body);
+    });
+    upstream.listen(0, '127.0.0.1'); await once(upstream, 'listening');
+    const address = upstream.address(); assert.ok(address && typeof address === 'object');
+    const apiUrl = `http://provider.invalid:${address.port}/v1/`;
+    const make = () => new ConfiguredDshProvider({
+      settings: { provider: 'deepseek-harness', apiUrl, apiKey: 'fixture-only', model: 'test-model', enabled: true,
+        revision: 1, verificationStatus: 'VERIFIED', verificationReasonCode: 'READY', lastVerifiedAt: null,
+        verifiedFingerprint: null, updatedAt: new Date().toISOString() },
+      dshHome: join(directory, 'dsh'), maxSchemaAttempts: 2, maxTokens: 64,
+      endpointPolicy: { validate: async () => ({ url: new URL(apiUrl), addresses: ['127.0.0.1'] }) },
+      runtime: { processIsolation: 'bubblewrap', allowedWorkspaceRoots: [directory], timeoutMs: 15_000, maxOutputBytes: 65_536 },
+    });
+    const request = { role: 'test-gen' as const, prompt: 'Return JSON.', authorizedTools: [], workspaceRoot: directory,
+      idempotencyKey: 'quota-test', outputSchema: { type: 'object', required: ['answer'], properties: { answer: { const: 'ok' } } } };
+    try {
+      await assert.rejects(make().run(request), (error: Error) => error.message === scenario.expected);
+      assert.equal(requests, 1, 'quota and rate errors must not trigger schema retries');
+      await assert.rejects(make().run(request), (error: Error) => error.message === scenario.expected);
+      assert.equal(requests, scenario.stops ? 1 : 2);
+    } finally { upstream.closeAllConnections(); upstream.close(); await once(upstream, 'close'); rmSync(directory, { recursive: true, force: true }); }
+  }
+});

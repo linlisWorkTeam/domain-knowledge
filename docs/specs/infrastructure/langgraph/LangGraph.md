@@ -22,3 +22,8 @@ Runtime 在首次运行持久化 `budgetStartedAt` 和 `budgetDeadlineAt`，每�
 
 
 文档关系：[设计目录](../../README.md)负责代码与设计定位；[开发指南](../../../Development.md)说明修改和交付步骤。
+
+
+## 显式提供方额度模式
+
+执行版本v5增加持久化quotaLimited状态，只有显式budgetMode=provider-quota才放开普通3轮/30分钟限制。普通入口限制不变。额度模式使用安全整数最大值作为内部计数哨兵，实际由PASS、提供方额度/支付拒绝、取消或执行错误终止；预算视图mode为provider-quota、deadlineAt为空、maxDurationMs为0，不把remainingMs的兼容哨兵解释为余额。恢复保持模式和原始开始时间，不重新授权。每个模型阶段和子进程的既有限额不变。源码、知识及门禁规则不随预算模式降低。

@@ -10,6 +10,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
+import { ProviderQuotaStop } from '../../src/infrastructure/agentAdapters/deepSeekHarness/ProviderQuota.ts';
 import { OpenAiCompatibleProviderProbe } from '../../src/infrastructure/agentAdapters/provider/ProviderConnectionProbe.ts';
 import { modelProcessLane } from '../../src/infrastructure/agentAdapters/ModelProcessLane.ts';
 
@@ -179,4 +180,18 @@ test('list failures and slow responses are bounded without spawning a generation
       } finally { await fixture.close(); }
     });
   }
+});
+
+
+test('production probe shares the persistent account quota stop and sends no discovery or generation request', async () => {
+  let requests = 0;
+  const fixture = await controlled((_request, response) => { requests++; response.end('{}'); });
+  try {
+    const quotaHome = join(fixture.directory, 'account-budget');
+    new ProviderQuotaStop(quotaHome, { apiUrl: fixture.input.endpoint.url.href, apiKey: fixture.input.apiKey }).record('PROVIDER_QUOTA_EXHAUSTED');
+    const result = await new OpenAiCompatibleProviderProbe(30_000, fixture.directory, quotaHome).verify(fixture.input);
+    assert.equal(result.status, 'FAILED');
+    assert.equal(result.reasonCode, 'MODEL_LIST_QUOTA_EXHAUSTED');
+    assert.equal(requests, 0);
+  } finally { await fixture.close(); }
 });

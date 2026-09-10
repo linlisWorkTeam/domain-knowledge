@@ -44,3 +44,10 @@ CompanyCodeAgentCliAdapter 保留进程调用和既有契约测试，真实公�
 文档关系：[设计目录](../../README.md)负责代码与设计定位；[开发指南](../../../Development.md)说明修改和交付步骤。
 
 业务 DSH 的 SSE 累计传输上限为 16 MiB，覆盖帧头、usage 快照和推理字段；该值不作为内存缓冲大小。单行未闭合缓冲仍限 2 Mi 字符，原生进程输出、token、阶段/总时间限制保持独立。显式连接探针仍限 64 KiB，不随业务默认值增大。大帧开销的小正文受控流必须通过；累计流、超长单行及探针超限仍拒绝，且不自动重试。
+
+
+## 提供方额度停止
+
+ConfiguredProvider有界读取最多16KiB错误JSON，仅以机器code/type识别insufficient_quota、quota_exceeded、credit_balance_too_low；不依据自然语言或全部429推测额度耗尽。402无明确机器码映射PROVIDER_PAYMENT_REQUIRED，其他429仍为PROVIDER_RATE_LIMITED。模型错误正文不进入报告。所有这些传输失败不进入Schema/阶段语义重试。
+
+ProviderQuotaStop按端点与凭据摘要在私有DSH目录留下停止状态。先创建停止目录，再写固定原因；原因不可读时拒绝调用。每次上游请求检查，同一凭据的配置revision或模型变化不自动清除。原始凭据不写入标记；临时限流不产生永久标记。新实例和进程重启必须保持停止。

@@ -50,6 +50,7 @@ export function presentRunExecution(
   const failed = view.executionStatus === 'FAILED';
   const nodeId = view.currentNode && /^[a-z0-9:_-]{1,128}$/i.test(view.currentNode) ? view.currentNode : null;
   const reasonCode = !failed ? 'EXECUTION_NOT_FAILED'
+    : ['PROVIDER_QUOTA_EXHAUSTED', 'PROVIDER_PAYMENT_REQUIRED', 'PROVIDER_QUOTA_STOP_UNAVAILABLE'].includes(failureCode(view.error)) ? 'PROVIDER_BUDGET_BLOCKED'
     : businessTerminal ? 'BUSINESS_TERMINAL'
     : !view.budget ? 'BUDGET_UNAVAILABLE'
     : !Number.isFinite(view.budget.remainingMs) || view.budget.remainingMs <= 0 ? 'BUDGET_EXHAUSTED'

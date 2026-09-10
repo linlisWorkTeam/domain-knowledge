@@ -210,7 +210,7 @@ export function createComposition(input: {
       new EncryptedFileProviderSettingsStore(join(runtimeDir, 'secrets', 'provider-settings.enc'), join(runtimeDir, 'secrets', 'provider-settings.key')),
     ),
     endpointPolicy: providerEndpointPolicy,
-    probe: input.providerProbe ?? new OpenAiCompatibleProviderProbe(),
+    probe: input.providerProbe ?? new OpenAiCompatibleProviderProbe(30_000, undefined, join(runtimeDir, 'provider-budget')),
     executionParameters: configuredExecutionParameters,
     clock: input.clock,
     audit: (event) => {
@@ -434,7 +434,7 @@ export function createComposition(input: {
           if (snapshot?.provider.kind !== 'deepseek-harness' || snapshot.provider.parametersSha256 === fallbackRunProvider.parametersSha256) return undefined;
           return new ConfiguredDshProvider({
             ...providerOperations.requireRuntimeConfiguration(snapshot.provider),
-            dshHome: join(runtimeDir, 'dsh-configured'),
+            dshHome: join(runtimeDir, 'dsh-configured'), quotaHome: join(runtimeDir, 'provider-budget'),
             runtime: { processIsolation, bubblewrapCommand, timeoutMs, maxOutputBytes, allowedWorkspaceRoots: [...allowedRoots, agentWorkspaceRoot] },
             onAudit: async (record) => {
               await mkdir(auditDirectory, { recursive: true });
@@ -499,7 +499,7 @@ export function createComposition(input: {
     apps: {
       publicationOperations,
       markdownLite: {
-        start: async (directory: string) => {
+        start: async (directory: string, budgetMode?: 'provider-quota') => {
           // 固定模块入口只接受服务器目录；源码与模型设置在服务端验证。
           const scenario = await createMarkdownLiteScenario(directory);
           if (processIsolation !== 'bubblewrap') throw new Error('MODULE_ISOLATION_REQUIRED');
@@ -508,7 +508,7 @@ export function createComposition(input: {
           }
           publisher.excludeSourceRoot(scenario.repositoryRoot);
           await publicationOperations.recover();
-          return (await workflow()).start(scenario, { ...config.publicationGate, maxIterations: 3, workerCount: 1 });
+          return (await workflow()).start(scenario, { ...config.publicationGate, ...(budgetMode ? { policyId: 'mvp-provider-quota-v1' } : {}), budgetMode, maxIterations: budgetMode ? Number.MAX_SAFE_INTEGER : 3, workerCount: 1 });
         },
       },
       agentExample,

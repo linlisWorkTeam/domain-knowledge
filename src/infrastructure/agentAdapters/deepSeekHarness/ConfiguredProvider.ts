@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：提供Configured提供方的基础设施实现与外部系统接入。
  */
+import { ProviderQuotaStop, providerErrorCode } from './ProviderQuota.ts';
 import { randomUUID } from 'node:crypto';
 import { once } from 'node:events';
 import { createServer } from 'node:http';
@@ -25,6 +26,8 @@ interface Options extends Partial<DshExecutionParameters> {
   settings: ProviderSettingsRecord;
   /** 提供dshHome信息，供调用方读取或传入。 */
   dshHome: string;
+  /** 账户额度停止状态独立于临时会话目录。 */
+  quotaHome?: string;
   /** 显式探针限制上游请求次数，防止原生工具往返产生额外费用。 */
   maxProviderRequests?: number;
   /** 限制上游响应字节，包含所有流帧及非内容字段。 */
@@ -63,6 +66,8 @@ export class ConfiguredDshProvider implements AgentProvider {
     if (signal?.aborted) throw new Error('AGENT_CANCELLED');
     if (!request.workspaceRoot) throw new Error('DSH_AGENT_WORKSPACE_REQUIRED');
     const settings = this.options.settings;
+    const quota = new ProviderQuotaStop(this.options.quotaHome ?? this.options.dshHome, settings);
+    quota.assertAvailable();
     const endpoint = await (this.options.endpointPolicy ?? new PublicHttpsEndpointPolicy()).validate(settings.apiUrl);
     const dispatcher = createPinnedHttpsDispatcher(endpoint, this.options.maxProviderResponseBytes ?? DSH_DEFAULT_MAX_WIRE_BYTES);
     const token = randomUUID();
@@ -90,6 +95,7 @@ export class ConfiguredDshProvider implements AgentProvider {
         }
         const target = new URL('chat/completions', endpoint.url.href.replace(/\/?$/, '/'));
         if (!sessionId) throw new Error('DSH_AGENT_SESSION_MISMATCH');
+        quota.assertAvailable();
         if (++providerRequests > (this.options.maxProviderRequests ?? Infinity)) throw new Error('PROVIDER_REQUEST_LIMIT');
         const response = await fetch(target, {
           method: 'POST', body: Buffer.concat(chunks), dispatcher, redirect: 'manual', signal: abort.signal,
@@ -102,10 +108,15 @@ export class ConfiguredDshProvider implements AgentProvider {
           throw new Error('PROVIDER_REDIRECT_DENIED');
         }
         if (!response.ok) {
-          await response.body?.cancel();
-          const codes: Record<number, string> = { 401: 'PROVIDER_AUTH_INVALID', 403: 'PROVIDER_AUTH_DENIED',
-            404: 'PROVIDER_ENDPOINT_UNSUPPORTED', 429: 'PROVIDER_RATE_LIMITED' };
-          throw new Error(codes[response.status] ?? 'DSH_PROVIDER_REQUEST_FAILED');
+          let errorBody = ''; let size = 0;
+          if (response.body) for await (const chunk of response.body) {
+            size += chunk.byteLength;
+            if (size > 16_384) { errorBody = ''; break; }
+            errorBody += Buffer.from(chunk).toString('utf8');
+          }
+          const code = providerErrorCode(response.status, errorBody);
+          quota.record(code);
+          throw new Error(code);
         }
         res.writeHead(200, { 'content-type': 'text/event-stream' });
         let pending = '';

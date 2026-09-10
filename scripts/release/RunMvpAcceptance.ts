@@ -29,13 +29,16 @@ export interface AcceptanceBackend {
 }
 export interface AcceptanceReport extends AcceptanceSummary {
   schemaVersion: 'mvp-real-acceptance-v1';
+  executionMode?: 'provider-quota';
   attempt: number; runId: string | null; outcome: 'PASSED' | 'FAILED' | 'CANCELLED'; reasonCode: string;
   provider: 'deepseek-harness'; model: 'deepseek-v4-flash'; roleExecutionVersion: string;
   source: typeof MARKDOWN_LITE_BASELINE; startedAt: string; completedAt: string; reportPath: string;
 }
 interface Attempt { ordinal: number; startedAt: string; status: 'STARTING' | 'RUNNING' | 'PASSED' | 'FAILED' | 'CANCELLED'; runId?: string; reportPath?: string; }
 interface AdditionalAuthorization { authorizationId: string; approvedAt: string; previousLedgerSha256: string; maximumAttempts: 4; }
-interface Ledger { schemaVersion: 'mvp-real-attempts-v1' | 'mvp-real-attempts-v2'; attempts: Attempt[];
+interface QuotaAuthorization { authorizationId: string; approvedAt: string; previousLedgerSha256: string; executionMode: 'provider-quota'; }
+interface Ledger { schemaVersion: 'mvp-real-attempts-v1' | 'mvp-real-attempts-v2' | 'mvp-real-attempts-v3';
+  quotaAuthorization?: QuotaAuthorization & { originalAttempts: number; originalAttemptsSha256: string }; attempts: Attempt[];
   authorization?: AdditionalAuthorization & { originalAttemptsSha256: string }; }
 const digest = (value: string) => createHash('sha256').update(value).digest('hex');
 function validAuthorization(value: AdditionalAuthorization): boolean {
@@ -46,21 +49,35 @@ function validAuthorization(value: AdditionalAuthorization): boolean {
 /** 只支持本次显式追加的一次启动；摘要绑定原账本，不能删旧记录或自动扩容。 */
 function authorizeAdditionalAttempt(ledger: Ledger, ledgerPath: string, authorizationPath?: string): Ledger {
   if (!authorizationPath) return ledger;
-  let authorization: AdditionalAuthorization;
+  let authorization: AdditionalAuthorization | QuotaAuthorization;
   try { authorization = JSON.parse(readFileSync(authorizationPath, 'utf8')); } catch { throw new Error('ACCEPTANCE_AUTHORIZATION_INVALID'); }
-  if (!validAuthorization(authorization) || Object.keys(authorization).sort().join(',') !== 'approvedAt,authorizationId,maximumAttempts,previousLedgerSha256') throw new Error('ACCEPTANCE_AUTHORIZATION_INVALID');
+  if (!authorization || typeof authorization !== 'object') throw new Error('ACCEPTANCE_AUTHORIZATION_INVALID');
+  if ('executionMode' in authorization && authorization.executionMode === 'provider-quota') {
+    if (Object.keys(authorization).sort().join(',') !== 'approvedAt,authorizationId,executionMode,previousLedgerSha256'
+      || !/^[a-zA-Z0-9_-]{1,100}$/.test(authorization.authorizationId) || !Number.isFinite(Date.parse(authorization.approvedAt))
+      || !/^[a-f0-9]{64}$/.test(authorization.previousLedgerSha256)) throw new Error('ACCEPTANCE_AUTHORIZATION_INVALID');
+    if (ledger.schemaVersion === 'mvp-real-attempts-v3') {
+      if (Object.keys(authorization).some(key => (authorization as any)[key] !== (ledger.quotaAuthorization as any)?.[key])) throw new Error('ACCEPTANCE_AUTHORIZATION_INVALID');
+      return ledger;
+    }
+    if (digest(readFileSync(ledgerPath, 'utf8')) !== authorization.previousLedgerSha256) throw new Error('ACCEPTANCE_AUTHORIZATION_INVALID');
+    const next: Ledger = { ...ledger, schemaVersion: 'mvp-real-attempts-v3', quotaAuthorization: { ...authorization,
+      originalAttempts: ledger.attempts.length, originalAttemptsSha256: digest(JSON.stringify(ledger.attempts)) } };
+    atomicJson(ledgerPath, next); return next;
+  }
+  if (!validAuthorization(authorization as AdditionalAuthorization) || Object.keys(authorization).sort().join(',') !== 'approvedAt,authorizationId,maximumAttempts,previousLedgerSha256') throw new Error('ACCEPTANCE_AUTHORIZATION_INVALID');
   if (ledger.schemaVersion === 'mvp-real-attempts-v2') {
-    if (Object.keys(authorization).some((key) => authorization[key as keyof AdditionalAuthorization] !== ledger.authorization?.[key as keyof AdditionalAuthorization])) throw new Error('ACCEPTANCE_AUTHORIZATION_INVALID');
+    if (Object.keys(authorization).some((key) => (authorization as AdditionalAuthorization)[key as keyof AdditionalAuthorization] !== ledger.authorization?.[key as keyof AdditionalAuthorization])) throw new Error('ACCEPTANCE_AUTHORIZATION_INVALID');
     return ledger;
   }
   if (ledger.attempts.length !== 3 || digest(readFileSync(ledgerPath, 'utf8')) !== authorization.previousLedgerSha256) throw new Error('ACCEPTANCE_AUTHORIZATION_INVALID');
   const next: Ledger = { schemaVersion: 'mvp-real-attempts-v2', attempts: ledger.attempts,
-    authorization: { ...authorization, originalAttemptsSha256: digest(JSON.stringify(ledger.attempts)) } };
+    authorization: { ...(authorization as AdditionalAuthorization), originalAttemptsSha256: digest(JSON.stringify(ledger.attempts)) } };
   atomicJson(ledgerPath, next);
   return next;
 }
 const reasons = new Set(['ACCEPTANCE_LOCKED', 'ACCEPTANCE_LEDGER_INVALID', 'ACCEPTANCE_LIMIT_REACHED',
-  'ACCEPTANCE_ARGUMENT_INVALID', 'ACCEPTANCE_AUTHORIZATION_INVALID', 'ACCEPTANCE_PROVIDER_REQUIRED', 'ACCEPTANCE_MODEL_REQUIRED',
+  'PROVIDER_QUOTA_EXHAUSTED', 'PROVIDER_PAYMENT_REQUIRED', 'PROVIDER_QUOTA_STOP_UNAVAILABLE', 'PROVIDER_RATE_LIMITED', 'ACCEPTANCE_ARGUMENT_INVALID', 'ACCEPTANCE_AUTHORIZATION_INVALID', 'ACCEPTANCE_PROVIDER_REQUIRED', 'ACCEPTANCE_MODEL_REQUIRED',
   'ACCEPTANCE_PUBLICATION_DIRECTORY_INVALID', 'ACCEPTANCE_CANCELLED', 'ACCEPTANCE_PUBLICATION_MISSING',
   'ACCEPTANCE_ROLE_COVERAGE_MISSING', 'DSH_CONFIGURATION_UNAVAILABLE', 'DSH_CONFIGURATION_CHANGED',
   'MODULE_BASELINE_MISMATCH', 'MODULE_ISOLATION_UNAVAILABLE', 'MODULE_ISOLATION_REQUIRED',
@@ -83,11 +100,16 @@ function loadLedger(path: string): Ledger {
   if (!existsSync(path)) return { schemaVersion: 'mvp-real-attempts-v1', attempts: [] };
   let value: Ledger;
   try { value = JSON.parse(readFileSync(path, 'utf8')); } catch { throw new Error('ACCEPTANCE_LEDGER_INVALID'); }
-  if (!value || typeof value !== 'object' || !['mvp-real-attempts-v1', 'mvp-real-attempts-v2'].includes(value.schemaVersion) || !Array.isArray(value.attempts) || value.attempts.length > (value.schemaVersion === 'mvp-real-attempts-v2' ? 4 : 3)
+  if (!value || typeof value !== 'object' || !['mvp-real-attempts-v1', 'mvp-real-attempts-v2', 'mvp-real-attempts-v3'].includes(value.schemaVersion) || !Array.isArray(value.attempts) || value.attempts.length > (value.schemaVersion === 'mvp-real-attempts-v3' ? Infinity : value.schemaVersion === 'mvp-real-attempts-v2' ? 4 : 3)
     || value.attempts.some((attempt, index) => !attempt || typeof attempt !== 'object' || attempt.ordinal !== index + 1 || typeof attempt.startedAt !== 'string'
       || !['STARTING', 'RUNNING', 'PASSED', 'FAILED', 'CANCELLED'].includes(attempt.status))) throw new Error('ACCEPTANCE_LEDGER_INVALID');
   if (value.schemaVersion === 'mvp-real-attempts-v2' && (!validAuthorization(value.authorization!)
     || value.attempts.length < 3 || value.authorization?.originalAttemptsSha256 !== digest(JSON.stringify(value.attempts.slice(0, 3))))) throw new Error('ACCEPTANCE_LEDGER_INVALID');
+  if (value.schemaVersion === 'mvp-real-attempts-v3' && (!value.quotaAuthorization
+    || value.quotaAuthorization.executionMode !== 'provider-quota'
+    || !Number.isSafeInteger(value.quotaAuthorization.originalAttempts) || value.quotaAuthorization.originalAttempts < 0
+    || value.quotaAuthorization.originalAttempts > value.attempts.length
+    || value.quotaAuthorization.originalAttemptsSha256 !== digest(JSON.stringify(value.attempts.slice(0, value.quotaAuthorization.originalAttempts))))) throw new Error('ACCEPTANCE_LEDGER_INVALID');
   return value;
 }
 function processIdentity(pid: number): string | undefined {
@@ -138,7 +160,7 @@ function contained(root: string, target: string): boolean {
 }
 
 /** 本地预检不请求模型，也不写入验收计数。 */
-function productionBackend(options: AcceptanceOptions): AcceptanceBackend {
+function productionBackend(options: AcceptanceOptions, budgetMode?: 'provider-quota'): AcceptanceBackend {
   const composition = createComposition({ runtimeDir: options.runtime, repositoryRoot: options.source });
   const workflow = () => composition.automatedWorkflow();
   return {
@@ -160,7 +182,7 @@ function productionBackend(options: AcceptanceOptions): AcceptanceBackend {
       await workflow();
     },
     async start(source) {
-      const handle = await composition.apps.markdownLite.start(source);
+      const handle = await composition.apps.markdownLite.start(source, budgetMode);
       const provider = composition.runConfiguration.get(handle.runId)?.provider;
       if (provider?.kind !== 'deepseek-harness' || provider.model !== 'deepseek-v4-flash') {
         const engine = await workflow();
@@ -214,8 +236,8 @@ export async function runMvpAcceptance(options: AcceptanceOptions, input: {
   };
   try {
     const ledger = authorizeAdditionalAttempt(loadLedger(ledgerPath), ledgerPath, options.authorization);
-    if (ledger.attempts.length >= (ledger.schemaVersion === 'mvp-real-attempts-v2' ? 4 : 3)) throw new Error('ACCEPTANCE_LIMIT_REACHED');
-    backend = (input.backend ?? (() => productionBackend(normalized)))();
+    if (ledger.attempts.length >= (ledger.schemaVersion === 'mvp-real-attempts-v3' ? Infinity : ledger.schemaVersion === 'mvp-real-attempts-v2' ? 4 : 3)) throw new Error('ACCEPTANCE_LIMIT_REACHED');
+    backend = (input.backend ?? (() => productionBackend(normalized, ledger.schemaVersion === 'mvp-real-attempts-v3' ? 'provider-quota' : undefined)))();
     await backend.preflight(normalized.source);
     if (input.signal?.aborted) throw new Error('ACCEPTANCE_CANCELLED');
     mkdirSync(normalized.evidence, { recursive: true, mode: 0o700 });
@@ -258,6 +280,7 @@ export async function runMvpAcceptance(options: AcceptanceOptions, input: {
       reasonCode = outcome === 'CANCELLED' ? 'ACCEPTANCE_CANCELLED' : acceptanceReason(error);
     }
     const report: AcceptanceReport = { schemaVersion: 'mvp-real-acceptance-v1', attempt: attempt.ordinal,
+      ...(ledger.schemaVersion === 'mvp-real-attempts-v3' ? { executionMode: 'provider-quota' as const } : {}),
       runId: runId ?? null, outcome, reasonCode, provider: 'deepseek-harness', model: 'deepseek-v4-flash',
       roleExecutionVersion: ROLE_EXECUTION_VERSION, source: MARKDOWN_LITE_BASELINE,
       startedAt: attempt.startedAt, completedAt: now(), reportPath, ...summary };

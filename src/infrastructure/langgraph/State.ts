@@ -37,6 +37,7 @@ export const InfrastructureStateAnnotation = Annotation.Root({
   currentNode: Annotation<string | null>({ reducer: replace, default: () => null }),
   iteration: Annotation<number>({ reducer: replace, default: () => 0 }),
   maxIterations: Annotation<number>({ reducer: replace, default: () => 3 }),
+  quotaLimited: Annotation<boolean>({ reducer: replace, default: () => false }),
   budgetStartedAt: Annotation<number>({ reducer: replace, default: () => 0 }),
   budgetDeadlineAt: Annotation<number>({ reducer: replace, default: () => 0 }),
   workerCount: Annotation<number>({ reducer: replace, default: () => 0 }),

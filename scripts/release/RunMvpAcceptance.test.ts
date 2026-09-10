@@ -156,3 +156,24 @@ test('real acceptance: explicit hash-bound authorization preserves three attempt
     await assert.rejects(runMvpAcceptance(fixture.paths, { backend: () => backend() }), /LEDGER_INVALID/);
   } finally { fixture.close(); }
 });
+
+
+test('explicit quota authorization binds existing ledger and preserves its prefix beyond previous start limits', async () => {
+  const fixture = options();
+  try {
+    for (let i = 0; i < 3; i++) await runMvpAcceptance(fixture.paths, { backend });
+    const path = join(fixture.paths.runtime, 'MvpAcceptanceLedger.json');
+    const before = ledger(fixture.paths);
+    const authorization = join(fixture.paths.runtime, 'QuotaAuthorization.json');
+    writeFileSync(authorization, JSON.stringify({ authorizationId: 'explicit-user-quota', approvedAt: new Date().toISOString(),
+      executionMode: 'provider-quota', previousLedgerSha256: createHash('sha256').update(readFileSync(path)).digest('hex') }));
+    for (let i = 0; i < 3; i++) {
+      const report = await runMvpAcceptance({ ...fixture.paths, authorization }, { backend });
+      assert.equal(report.executionMode, 'provider-quota');
+    }
+    const after = ledger(fixture.paths);
+    assert.equal(after.attempts.length, 6); assert.deepEqual(after.attempts.slice(0, 3), before.attempts);
+    after.attempts[0].status = 'PASSED'; writeFileSync(path, JSON.stringify(after));
+    await assert.rejects(runMvpAcceptance(fixture.paths, { backend }), /ACCEPTANCE_LEDGER_INVALID/);
+  } finally { fixture.close(); }
+});

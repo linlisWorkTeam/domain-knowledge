@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import { fetch } from 'undici';
 import type { ProviderConnectionProbe, ProviderEndpoint, ProviderProbeChecks, ProviderProbeResult } from '../../../application/ports/ApplicationPorts.ts';
 import { createPinnedHttpsDispatcher } from '../../http/PublicHttps.ts';
+import { ProviderQuotaStop } from '../deepSeekHarness/ProviderQuota.ts';
 import { ConfiguredDshProvider } from '../deepSeekHarness/ConfiguredProvider.ts';
 import { modelProcessLane } from '../ModelProcessLane.ts';
 
@@ -34,7 +35,7 @@ function reason(error: unknown, checks: ProviderProbeChecks, signal: AbortSignal
   if (error instanceof Error && error.cause && typeof error.cause === 'object'
     && 'code' in error.cause && error.cause.code === 'UND_ERR_RES_EXCEEDED_MAX_SIZE') return `${stage}_RESPONSE_LIMIT`;
   const safe = new Set(['PROVIDER_AUTH_INVALID', 'PROVIDER_AUTH_DENIED', 'PROVIDER_ENDPOINT_UNSUPPORTED',
-    'PROVIDER_RATE_LIMITED', 'PROVIDER_UNAVAILABLE', 'PROVIDER_REDIRECT_DENIED', 'PROVIDER_RESPONSE_INVALID',
+    'PROVIDER_QUOTA_EXHAUSTED', 'PROVIDER_PAYMENT_REQUIRED', 'PROVIDER_QUOTA_STOP_UNAVAILABLE', 'PROVIDER_RATE_LIMITED', 'PROVIDER_UNAVAILABLE', 'PROVIDER_REDIRECT_DENIED', 'PROVIDER_RESPONSE_INVALID',
     'PROVIDER_MODEL_UNAVAILABLE', 'PROVIDER_RESPONSE_LIMIT', 'PROVIDER_REQUEST_LIMIT']);
   if (code && safe.has(code)) return `${stage}_${code.replace(/^PROVIDER_/, '')}`;
   if (code === 'AGENT_TIMEOUT') return `${stage}_TIMEOUT`;
@@ -48,12 +49,14 @@ function reason(error: unknown, checks: ProviderProbeChecks, signal: AbortSignal
 export class OpenAiCompatibleProviderProbe implements ProviderConnectionProbe {
   readonly timeoutMs: number;
   readonly temporaryRoot: string;
+  readonly quotaHome?: string;
 
   /** 临时根目录仅供组合和受控测试配置，不来自 HTTP 或模型输入。 */
-  constructor(timeoutMs = 30_000, temporaryRoot = tmpdir()) {
+  constructor(timeoutMs = 30_000, temporaryRoot = tmpdir(), quotaHome?: string) {
     if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 30_000) throw new Error('PROVIDER_PROBE_TIMEOUT_INVALID');
     this.timeoutMs = timeoutMs;
     this.temporaryRoot = temporaryRoot;
+    this.quotaHome = quotaHome;
   }
 
   /** 一次显式操作最多一次上游生成；取消和总期限覆盖排队及两个验证阶段。 */
@@ -68,6 +71,7 @@ export class OpenAiCompatibleProviderProbe implements ProviderConnectionProbe {
     try {
       return await modelProcessLane.execute(async () => {
         signal.throwIfAborted();
+        if (this.quotaHome) new ProviderQuotaStop(this.quotaHome, { apiUrl: endpoint.url.href, apiKey: input.apiKey }).assertAvailable();
         model = await this.listModels({ ...input, endpoint }, signal);
         checks.modelList = 'PASSED';
         signal.throwIfAborted();
@@ -127,7 +131,7 @@ export class OpenAiCompatibleProviderProbe implements ProviderConnectionProbe {
           if (raw !== input.endpoint.url.href) throw new Error('PROVIDER_URL_DENIED');
           return input.endpoint;
         } },
-        dshHome: join(root, 'dsh'), maxTokens: 64, maxSchemaAttempts: 1,
+        quotaHome: this.quotaHome, dshHome: join(root, 'dsh'), maxTokens: 64, maxSchemaAttempts: 1,
         maxProviderRequests: 1, maxProviderResponseBytes: 65_536,
         runtime: { timeoutMs: this.timeoutMs, maxOutputBytes: 65_536, allowedWorkspaceRoots: [workspaceRoot] },
       });

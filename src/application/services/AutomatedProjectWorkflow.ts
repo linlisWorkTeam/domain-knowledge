@@ -866,6 +866,7 @@ export class AutomatedProjectWorkflowService {
   async start(
     scenario: AutomatedProjectScenario,
     input: GatePolicy & {
+      budgetMode?: 'provider-quota';
       workerCount?: number;
       governanceTrigger?: {
         parentRunId: string;
@@ -880,14 +881,14 @@ export class AutomatedProjectWorkflowService {
       && input.minimumStability >= 0 && input.minimumStability <= 1,
     'workflow minimumStability must be between zero and one');
     assertInvariant(typeof input.requireAllTests === 'boolean', 'workflow requireAllTests must be boolean');
-    assertInvariant(Number.isSafeInteger(input.maxIterations) && input.maxIterations >= 1 && input.maxIterations <= 3,
+    assertInvariant(Number.isSafeInteger(input.maxIterations) && input.maxIterations >= 1 && (input.budgetMode === 'provider-quota' || input.maxIterations <= 3),
       'workflow maxIterations must be 1..3');
     assertInvariant(Number.isSafeInteger(input.workerCount ?? 1) && (input.workerCount ?? 1) >= 0 && (input.workerCount ?? 1) <= 5,
       'workflow workerCount must be an integer from 0 to 5');
     const resolved = this.flywheel.resolveEvaluationPolicy({ policyId: input.policyId,
       minimumStability: input.minimumStability, requireAllTests: input.requireAllTests, maxIterations: input.maxIterations });
     const gatePolicy = { policyId: resolved.policyId, minimumStability: resolved.minimumStability,
-      requireAllTests: resolved.requireAllTests, maxIterations: Math.min(input.maxIterations, resolved.maxIterations, 3) };
+      requireAllTests: resolved.requireAllTests, maxIterations: Math.min(input.maxIterations, resolved.maxIterations, input.budgetMode === 'provider-quota' ? Number.MAX_SAFE_INTEGER : 3) };
     assertInvariant(gatePolicy.maxIterations >= 1, 'workflow maxIterations must be 1..3');
     const run = this.flywheel.createRun(scenario.moduleId, input.policyId);
     const configurationSnapshot = await this.runConfiguration.capture(run.runId, input.governanceTrigger);
@@ -898,6 +899,7 @@ export class AutomatedProjectWorkflowService {
     return this.workflow.start({
       runId: run.runId,
       maxIterations: gatePolicy.maxIterations,
+      budgetMode: input.budgetMode,
       workerCount: input.workerCount ?? 1,
       context: {
         scenario,

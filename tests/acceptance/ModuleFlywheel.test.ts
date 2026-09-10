@@ -34,7 +34,7 @@ function git(root: string, args: string[]): string {
   return result.stdout.trim();
 }
 
-interface Options { verificationNeeds?: boolean; defectiveFirst?: boolean; wrongOracle?: boolean; unresolvedSource?: boolean; maxIterations?: number; stageDefects?: boolean; }
+interface Options { quotaMode?: boolean; verificationNeeds?: boolean; defectiveFirst?: boolean; wrongOracle?: boolean; unresolvedSource?: boolean; maxIterations?: number; stageDefects?: boolean; }
 
 /** 只有参考仓库、模型夹具与门禁数据被构造；编译、进程隔离和宿主比较全部使用生产实现。 */
 async function runModule(options: Options, verify: (context: {
@@ -112,7 +112,7 @@ async function runModule(options: Options, verify: (context: {
       prompts: composition.runConfiguration, checkpoint: { kind: 'memory' } });
     const workflow = new AutomatedProjectWorkflowService(composition.service, infrastructure.engine, composition.runConfiguration);
     const handle = await workflow.start(scenario, { policyId: 'module-acceptance-v1', minimumStability: 1,
-      requireAllTests: true, maxIterations: options.maxIterations ?? 2, workerCount: 1 });
+      requireAllTests: true, budgetMode: options.quotaMode ? 'provider-quota' : undefined, maxIterations: options.quotaMode ? Number.MAX_SAFE_INTEGER : options.maxIterations ?? 2, workerCount: 1 });
     const result = await workflow.wait(handle.runId);
     // 授权角色视野与固定测试冻结必须在真实 Application 材料交接后仍成立。
     for (const { request } of requests) {
@@ -260,7 +260,7 @@ test('module flywheel: unresolved source evidence blocks publication even when a
 
 
 test('module flywheel: pending verification is audited across failed and corrected versions before publication', async () => {
-  await runModule({ verificationNeeds: true, defectiveFirst: true }, async ({ composition, result, runId }) => {
+  await runModule({ verificationNeeds: true, defectiveFirst: true, quotaMode: true }, async ({ composition, result, runId }) => {
     assert.equal(result.route, 'PASS');
     assert.equal(composition.apps.publicationOperations.list().length, 1);
     const audits: any[] = [];

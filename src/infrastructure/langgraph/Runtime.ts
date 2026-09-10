@@ -115,7 +115,7 @@ export async function createDomainKnowledgeInfrastructure(options: DomainKnowled
     /** 启动请求。 */
     async start(command: StartWorkflowCommand): Promise<WorkflowHandle> {
       const runId = command.runId || randomUUID();
-      if (!Number.isSafeInteger(command.maxIterations) || command.maxIterations < 1 || command.maxIterations > 3) {
+      if (!Number.isSafeInteger(command.maxIterations) || command.maxIterations < 1 || (command.budgetMode !== 'provider-quota' && command.maxIterations > 3)) {
         throw new Error('WORKFLOW_ARGUMENT_INVALID: maxIterations must be 1..3');
       }
       const duration = command.maxDurationMs ?? 1_800_000;
@@ -129,18 +129,20 @@ export async function createDomainKnowledgeInfrastructure(options: DomainKnowled
       const controller = new AbortController();
       controllers.set(runId, controller);
       const startedAt = Date.now();
-      this.armDeadline(runId, startedAt + duration, controller);
+      const quotaLimited = command.budgetMode === 'provider-quota';
+      if (!quotaLimited) this.armDeadline(runId, startedAt + duration, controller);
       const promise = this.graph.invoke({
         runId,
         executionStatus: 'PENDING',
         iteration: 0,
         maxIterations: command.maxIterations,
         budgetStartedAt: startedAt,
-        budgetDeadlineAt: startedAt + duration,
+        quotaLimited,
+        budgetDeadlineAt: quotaLimited ? 0 : startedAt + duration,
         workerCount: command.workerCount,
         context: command.context ?? {},
         readyAt: clock(),
-      }, graphConfig(runId, Math.max(100, command.maxIterations * 30), controller.signal)) as Promise<InfrastructureState>;
+      }, graphConfig(runId, Math.min(Number.MAX_SAFE_INTEGER, Math.max(100, command.maxIterations * 30)), controller.signal)) as Promise<InfrastructureState>;
       this.track(runId, promise);
       return { runId, executionStatus: 'RUNNING' };
     }
@@ -157,8 +159,8 @@ export async function createDomainKnowledgeInfrastructure(options: DomainKnowled
       }
       const controller = new AbortController();
       controllers.set(runId, controller);
-      this.armDeadline(runId, Date.parse(current.budget.deadlineAt), controller);
-      const recursionLimit = Math.max(100, current.maxIterations * 30);
+      if (current.budget.mode !== 'provider-quota') this.armDeadline(runId, Date.parse(current.budget.deadlineAt), controller);
+      const recursionLimit = Math.min(Number.MAX_SAFE_INTEGER, Math.max(100, current.maxIterations * 30));
       let config = graphConfig(runId, recursionLimit, controller.signal);
       if (current.executionStatus === 'FAILED' || (current.route === 'FAILED' && current.error)) {
         const failedCheckpoint = await this.failedCheckpoint(runId);
@@ -217,7 +219,9 @@ export async function createDomainKnowledgeInfrastructure(options: DomainKnowled
         maxIterations: state.maxIterations,
         route: state.route,
         error: state.error,
-        ...(state.budgetDeadlineAt ? { budget: {
+        ...(state.quotaLimited ? { budget: { mode: 'provider-quota' as const,
+          startedAt: new Date(state.budgetStartedAt).toISOString(), deadlineAt: '', maxDurationMs: 0, remainingMs: Number.MAX_SAFE_INTEGER,
+        } } : state.budgetDeadlineAt ? { budget: {
           startedAt: new Date(state.budgetStartedAt).toISOString(),
           deadlineAt: new Date(state.budgetDeadlineAt).toISOString(),
           maxDurationMs: state.budgetDeadlineAt - state.budgetStartedAt,
