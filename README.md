@@ -21,7 +21,7 @@ domain-knowledge is the executable Knowledge Flywheel repository. It owns orches
 | `domain-knowledge` | LangGraph 工作流、七类 Agent、Registry/CAS、评测、Gate、CLI、HTTP、Console、Spec 和测试 | 长期保存跨项目知识材料 |
 | [`wpKnowledge`](https://github.com/linlisWorkTeam/wpKnowledge) | 知识正文、研究、设计材料、治理证据和知识索引 | 运行服务、Agent 编排、数据库、前台代码 |
 
-SQLite Registry 与 CAS 是运行时事实源，默认写到本仓库 `.workpanel/`。需要扫描 `wpKnowledge` 时，通过 `WP_KNOWLEDGE_REPOSITORY` 指向它的本地检出。当前发布事务不会自动提交或推送 Git；知识文件进入 `wpKnowledge` 仍要走普通 PR 评审。
+SQLite Registry 与 CAS 是运行时事实源，默认写到本仓库 `.workpanel/`。需要扫描 `wpKnowledge` 时，通过 `WP_KNOWLEDGE_REPOSITORY` 指向它的本地检出。通过确定性门禁后，工作流自动把 Markdown 与来源记录写入独立的本地知识目录；Git 同步默认关闭，启用后由用户手动触发。
 
 ## 当前已实现
 
@@ -34,6 +34,8 @@ SQLite Registry 与 CAS 是运行时事实源，默认写到本仓库 `.workpane
 - 知识血缘与差异、评测证据与规则、来源注册与漂移、知识健康度和生成/治理观测；
 - CLI、资源化 HTTP API、DSH Adapter、双主题 Console 和项目网站；
 - 项目无关的场景输入、真实评测与脱敏演示证据。
+
+Linux 安装包的离线安装、启动、配置、升级和卸载见[安装指南](docs/LinuxInstall.md)。代表性模块的浏览器入口不要求编辑场景 JSON。当前验收状态与限制见[实施与验收记录](docs/Status.md)。
 
 ## 五分钟启动
 
@@ -70,7 +72,13 @@ domain-knowledge/
 ├── src/
 │   ├── domain/               # 领域模型与确定性规则
 │   │   ├── agents/           # 七角色步骤、契约、提示词
-│   │   └── services/         # 业务流程、生命周期与 Gate
+│   │   ├── workflow/         # 业务流程与生命周期
+│   │   ├── evaluation/       # 评测判定
+│   │   ├── association/      # 事实关联
+│   │   ├── knowledge/        # 知识正文差异
+│   │   ├── sourceScan/       # 来源扫描
+│   │   ├── workspace/        # 工作空间
+│   │   └── migration/        # 历史数据迁移
 │   ├── application/          # Apps、Port 与用例协调服务
 │   ├── infrastructure/       # LangGraph、Agent、DB/Redis Adapter 和评测
 │   └── interfaces/           # uiApi、CLI、Runner 与 DSH 接口

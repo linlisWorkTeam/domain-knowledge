@@ -6,7 +6,7 @@
 import type { AgentId } from '../AgentContracts.ts';
 import type { ExecutionContext, RoleResult, PendingArtifact } from '../AgentExecution.ts';
 import { assertActive } from '../AgentExecution.ts';
-import { type Input, type Output, schemaFor, validateInput } from './OrchestratorAgentContract.ts';
+import { type Input, type Output, schemaFor, validateInput, validatePlan } from './OrchestratorAgentContract.ts';
 import { definition, buildPrompt, readablePaths } from './OrchestratorAgentPrompt.ts';
 
 /** 根据策略形成当前轮业务计划；计划仅作为结果交接，不能改变工作流连接。 */
@@ -18,6 +18,7 @@ export async function execute(input: Input, context: ExecutionContext): Promise<
   // 角色决定本阶段的任务与能力范围；会话、工具执行和格式修复交给模型适配器。
   const raw = await context.model.execute({
     role: definition.agentId,
+    stage: 'plan',
     prompt: buildPrompt(input, context),
     outputSchema: schema,
     tools: definition.tools,
@@ -27,6 +28,7 @@ export async function execute(input: Input, context: ExecutionContext): Promise<
   assertActive(context.signal);
   context.model.assertOutput(raw, schema);
   const output = raw as unknown as Output;
+  validatePlan(output, input, context.iteration);
   const artifacts: PendingArtifact[] = [];
   // 保持迁移前的固定业务计划；符号化节点由接线层绑定，不在领域层写死图节点名称。
   const nodes: Array<[AgentId, AgentId[], string[], string[]]> = [

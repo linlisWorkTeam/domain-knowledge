@@ -7,7 +7,7 @@ import { Annotation } from '@langchain/langgraph';
 import type { AgentId } from '../../application/ports/ApplicationPorts.ts';
 
 /** 定义InfrastructureRoute的数据结构与类型约束。 */
-export type InfrastructureRoute = import('../../domain/services/workflow/Workflow.ts').WorkflowRoute;
+export type InfrastructureRoute = import('../../domain/workflow/Workflow.ts').WorkflowRoute;
 /** 定义Infrastructure执行状态的数据结构与类型约束。 */
 export type InfrastructureExecutionStatus = 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'STOPPED' | 'CANCELLED';
 
@@ -37,6 +37,8 @@ export const InfrastructureStateAnnotation = Annotation.Root({
   currentNode: Annotation<string | null>({ reducer: replace, default: () => null }),
   iteration: Annotation<number>({ reducer: replace, default: () => 0 }),
   maxIterations: Annotation<number>({ reducer: replace, default: () => 3 }),
+  budgetStartedAt: Annotation<number>({ reducer: replace, default: () => 0 }),
+  budgetDeadlineAt: Annotation<number>({ reducer: replace, default: () => 0 }),
   workerCount: Annotation<number>({ reducer: replace, default: () => 0 }),
   route: Annotation<InfrastructureRoute | null>({ reducer: replace, default: () => null }),
   error: Annotation<string | null>({ reducer: replace, default: () => null }),

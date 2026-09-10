@@ -42,7 +42,8 @@
       "content": {
         "path": "src/domain/services/markdown-diff.ts",
         "commit": "a743ffcb624b1aca47d0f8adb272582ecf0250d6",
-        "publicInterface": "structuredMarkdownDiff(before: string, after: string)"
+        "publicInterface": "structuredMarkdownDiff(before: string, after: string)",
+        "content": "export function structuredMarkdownDiff(before: string, after: string) {\n  const normalized = [before, after].map((text) => text.replaceAll('\\r\\n', '\\n'));\n  if (normalized[0] === normalized[1]) return { hunks: [], changedSections: [] };\n}\n"
       },
       "mediaType": "application/json"
     },
@@ -56,6 +57,68 @@
     "fragment": "CRLF is normalized before comparison; identical documents return no changed sections.",
     "provenance": [
       "src/domain/services/markdown-diff.ts"
+    ],
+    "facts": [
+      {
+        "kind": "interface",
+        "statement": "Exports structuredMarkdownDiff with two string arguments",
+        "sourcePath": "src/domain/services/markdown-diff.ts",
+        "startLine": 1,
+        "endLine": 1
+      },
+      {
+        "kind": "behavior",
+        "statement": "CRLF is normalized before comparison",
+        "sourcePath": "src/domain/services/markdown-diff.ts",
+        "startLine": 2,
+        "endLine": 2
+      },
+      {
+        "kind": "boundary",
+        "statement": "Equivalent normalized inputs return no changed sections",
+        "sourcePath": "src/domain/services/markdown-diff.ts",
+        "startLine": 3,
+        "endLine": 3
+      }
+    ],
+    "unresolvedRisks": [
+      "The supplied fragment does not prove the non-identical-input return behavior."
+    ]
+  },
+  "expectedOutput": {
+    "workerId": "worker-0",
+    "fragment": "CRLF is normalized before comparison; identical documents return no changed sections.",
+    "provenance": [
+      "src/domain/services/markdown-diff.ts"
+    ],
+    "facts": [
+      {
+        "kind": "interface",
+        "statement": "Exports structuredMarkdownDiff with two string arguments",
+        "sourcePath": "src/domain/services/markdown-diff.ts",
+        "startLine": 1,
+        "endLine": 1,
+        "quote": "export function structuredMarkdownDiff(before: string, after: string) {"
+      },
+      {
+        "kind": "behavior",
+        "statement": "CRLF is normalized before comparison",
+        "sourcePath": "src/domain/services/markdown-diff.ts",
+        "startLine": 2,
+        "endLine": 2,
+        "quote": "  const normalized = [before, after].map((text) => text.replaceAll('\\r\\n', '\\n'));"
+      },
+      {
+        "kind": "boundary",
+        "statement": "Equivalent normalized inputs return no changed sections",
+        "sourcePath": "src/domain/services/markdown-diff.ts",
+        "startLine": 3,
+        "endLine": 3,
+        "quote": "  if (normalized[0] === normalized[1]) return { hunks: [], changedSections: [] };"
+      }
+    ],
+    "unresolvedRisks": [
+      "The supplied fragment does not prove the non-identical-input return behavior."
     ]
   }
 }

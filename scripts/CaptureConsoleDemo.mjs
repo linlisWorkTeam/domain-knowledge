@@ -60,7 +60,7 @@ const instance = createKnowledgeServer({
   },
   providerProbe: {
     async verify({ model }) {
-      return { status: 'VERIFIED', reasonCode: 'READY', model: model ?? 'pi-governance-demo' };
+      return { status: 'VERIFIED', reasonCode: 'GENERATION_READY', checks: { modelList: 'PASSED', generation: 'PASSED' }, model: model ?? 'pi-governance-demo' };
     },
   },
 });

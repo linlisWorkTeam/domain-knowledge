@@ -11,6 +11,7 @@ import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
 import { createComposition } from './Composition.ts';
+import type { PublicationOperations } from '../../application/services/PublicationOperations.ts';
 import { parseProjectScenario } from '../../application/services/ProjectScenario.ts';
 import type {
   OperationalMetricsPort, ProviderConnectionProbe, ProviderEndpointPolicy, ProviderSettingsStore,
@@ -240,11 +241,19 @@ function requireOnlyKeys(payload: Record<string, unknown>, allowed: readonly str
 export function mapHttpError(error: unknown, id = 'req_unknown'): { status: number; body: ApiErrorBody } {
   const message = error instanceof Error ? error.message : String(error);
   const code = message.split(':', 1)[0] || 'INTERNAL_ERROR';
+  if (code === 'MODULE_BASELINE_MISMATCH') return { status: 422, body: errorBody(code, '所选仓库不包含本版固定的 markdownLite 源码、参考测试或依赖快照。', id) };
+  if (code === 'MODULE_ISOLATION_UNAVAILABLE' || code === 'MODULE_ISOLATION_REQUIRED') return { status: 503, body: errorBody(code, '服务器的 Linux 隔离能力不可用，任务未启动。请检查 Bubblewrap 和内核命名空间配置。', id) };
   if (code === 'RUN_CONFIGURATION_INCOMPATIBLE' || code === 'PROVIDER_MIGRATION_REQUIRED' || code === 'DSH_CONFIGURATION_UNAVAILABLE') return { status: 409, body: errorBody(code, message, id) };
+  if (['ACCEPTANCE_LIMIT_REACHED', 'WORKFLOW_BUDGET_EXHAUSTED', 'WORKFLOW_NOT_RECOVERABLE'].includes(code)) {
+    const messages: Record<string, string> = { ACCEPTANCE_LIMIT_REACHED: 'Real acceptance budget is exhausted; new authorization is required.', WORKFLOW_BUDGET_EXHAUSTED: 'The original execution budget is exhausted.', WORKFLOW_NOT_RECOVERABLE: 'No recoverable failed node is available.' };
+    return { status: 409, body: errorBody(code, messages[code]!, id) };
+  }
   if (code === 'INVALID_EVENT_CURSOR') return { status: 400, body: errorBody(code, message, id) };
   if (code === 'PAYLOAD_TOO_LARGE') return { status: 413, body: errorBody(code, 'Request payload is too large.', id) };
   if (code === 'METHOD_NOT_ALLOWED') return { status: 405, body: errorBody(code, 'Method not allowed.', id) };
   if (code.endsWith('_NOT_FOUND')) return { status: 404, body: errorBody(code, 'Resource not found.', id) };
+  if (code === 'PUBLICATION_NOT_FOUND') return { status: 404, body: errorBody(code, message, id) };
+  if (code.startsWith('GIT_') || code.startsWith('PUBLICATION_') || code === 'SYNC_IN_PROGRESS') return { status: 409, body: errorBody(code, message, id, true) };
   if (code === 'SOURCE_ACCESS_DENIED') return { status: 403, body: errorBody(code, 'Source access is outside the configured boundary.', id) };
   if (code === 'SOURCE_ALREADY_EXISTS' || code === 'SOURCE_DELETED') {
     return { status: 409, body: errorBody(code, message, id) };
@@ -283,6 +292,10 @@ export function createKnowledgeServer(input: {
 } = {}) {
   const composition = createComposition(input);
   const writeToken = input.writeToken ?? process.env.WP_KNOWLEDGE_WRITE_TOKEN;
+  const productApps = composition.apps as typeof composition.apps & {
+    publicationOperations: PublicationOperations;
+    markdownLite: { start(repositoryRoot: string): Promise<unknown> };
+  };
   const idempotencyResults = new Map<string, { fingerprint: string; status: number; value: unknown }>();
   const server = createHttpServer(async (request, response) => {
     const url = new URL(request.url ?? '/', 'http://127.0.0.1');
@@ -306,6 +319,67 @@ export function createKnowledgeServer(input: {
       if (request.method === 'GET' && url.pathname === '/health') {
         send(response, 200, { ok: true });
         return;
+      }
+      // 远程 API 统一校验访问令牌；目录与发布设置即使在本机也必须认证。
+      const localClient = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(request.socket.remoteAddress ?? '');
+      const productRoute = url.pathname.startsWith('/api/v1/publications')
+        || url.pathname === '/api/v1/server-directories' || url.pathname === '/api/v1/runs/markdown-lite';
+      if (url.pathname.startsWith('/api/') && (!localClient || productRoute) && !authorized(request, writeToken)) {
+        send(response, writeToken ? 401 : 503, errorBody(writeToken ? 'UNAUTHORIZED' : 'WRITE_API_DISABLED',
+          'A valid Bearer token is required for remote access and server directory operations.', currentRequestId));
+        return;
+      }
+      if (productRoute) {
+        if (!productApps.publicationOperations) throw new Error('PRODUCT_UNAVAILABLE: publication service is unavailable');
+        const app = productApps.publicationOperations;
+        if (request.method === 'GET' && url.pathname === '/api/v1/server-directories') {
+          send(response, 200, app.listDirectories(url.searchParams.get('path') ?? undefined)); return;
+        }
+        if (request.method === 'GET' && url.pathname === '/api/v1/publications/settings') {
+          send(response, 200, app.getSettings()); return;
+        }
+        if (request.method === 'GET' && url.pathname === '/api/v1/publications') {
+          send(response, 200, { items: app.list() }); return;
+        }
+        if (request.method === 'GET' && /^\/api\/v1\/publications\/[^/]+$/.test(url.pathname)) {
+          send(response, 200, app.get(decodeURIComponent(url.pathname.split('/').at(-1)!))); return;
+        }
+        if (request.method === 'POST' || request.method === 'PUT') {
+          const payload = await body(request);
+          const key = request.headers['idempotency-key'];
+          if (typeof key !== 'string' || !key.trim() || key.length > 256) throw new Error('IDEMPOTENCY_KEY_REQUIRED');
+          const scope = `product:${url.pathname}`;
+          const fingerprint = payloadFingerprint(payload);
+          const previous = composition.apps.flywheel.getCommandReceipt(scope, key);
+          if (previous && previous.fingerprint !== fingerprint) throw new Error('IDEMPOTENCY_CONFLICT');
+          if (previous) { send(response, previous.status, previous.value); return; }
+          let value: unknown;
+          let status = 200;
+          if (request.method === 'PUT' && url.pathname === '/api/v1/publications/settings') {
+            requireOnlyKeys(payload, ['directory', 'git']);
+            if (payload.directory !== undefined && typeof payload.directory !== 'string') throw new Error('DIRECTORY_INVALID');
+            if (payload.git !== undefined) {
+              if (!payload.git || typeof payload.git !== 'object' || Array.isArray(payload.git)) throw new Error('GIT_SETTINGS_INVALID');
+              const git = payload.git as Record<string, unknown>;
+              requireOnlyKeys(git, ['enabled', 'remote', 'branch', 'token', 'clearToken']);
+              if (typeof git.enabled !== 'boolean' || typeof git.remote !== 'string' || typeof git.branch !== 'string'
+                || (git.token !== undefined && typeof git.token !== 'string')
+                || (git.clearToken !== undefined && typeof git.clearToken !== 'boolean')) throw new Error('GIT_SETTINGS_INVALID');
+            }
+            value = app.putSettings(payload as Parameters<PublicationOperations['putSettings']>[0]);
+          } else if (request.method === 'POST' && url.pathname === '/api/v1/publications/sync') {
+            requireOnlyKeys(payload, []); value = await app.sync();
+          } else if (request.method === 'POST' && url.pathname === '/api/v1/publications/recover') {
+            requireOnlyKeys(payload, []); value = { items: await app.recover() };
+          } else if (request.method === 'POST' && url.pathname === '/api/v1/runs/markdown-lite') {
+            requireOnlyKeys(payload, ['repositoryRoot']);
+            if (typeof payload.repositoryRoot !== 'string' || !payload.repositoryRoot.trim()) throw new Error('ARGUMENT_REQUIRED: repositoryRoot');
+            value = await productApps.markdownLite.start(payload.repositoryRoot); status = 202;
+          } else { throw new Error('METHOD_NOT_ALLOWED'); }
+          composition.apps.flywheel.saveCommandReceipt({ scope, idempotencyKey: key, fingerprint, status, value });
+          send(response, status, value); return;
+        }
+        throw new Error('METHOD_NOT_ALLOWED');
       }
       // GET /api/v1/system/status：读取系统运行状态。
       if (request.method === 'GET' && url.pathname === '/api/v1/system/status') {
@@ -509,8 +583,15 @@ export function createKnowledgeServer(input: {
       // GET /api/v1/runs：读取运行记录和节点状态。
       if (request.method === 'GET' && url.pathname === '/api/v1/runs') {
         const states = (url.searchParams.get('status') ?? '').split(',').filter(Boolean);
-        const runs = composition.apps.flywheel.listRunSummaries(states.length ? states : undefined)
+        const summaries = composition.apps.flywheel.listRunSummaries(states.length ? states : undefined)
           .sort((left, right) => String(right.updatedAt ?? right.createdAt ?? '').localeCompare(String(left.updatedAt ?? left.createdAt ?? '')));
+        const executionStatuses = (url.searchParams.get('executionStatus') ?? '').split(',').filter(Boolean);
+        const runs: Record<string, unknown>[] = [];
+        // 顺序读取复用单个工作流实例，避免列表并发创建重运行时。
+        for (const run of summaries) {
+          const execution = await composition.apps.orchestrator.executionForRun({ runId: String(run.runId), state: String(run.state) });
+          if (!executionStatuses.length || executionStatuses.includes(execution.executionStatus)) runs.push({ ...run, ...execution });
+        }
         send(response, 200, page(runs, url));
         return;
       }
@@ -589,7 +670,9 @@ export function createKnowledgeServer(input: {
           send(response, 404, errorBody('NOT_FOUND', 'Resource not found.', currentRequestId));
           return;
         }
-        send(response, 200, snapshot);
+        const run = snapshot.run as { runId: string; state: string };
+        const execution = await composition.apps.orchestrator.executionForRun(run);
+        send(response, 200, { ...snapshot, run: { ...run, ...execution } });
         return;
       }
       // GET /api/v1/knowledge/health：读取知识健康度。
@@ -848,19 +931,23 @@ export function createKnowledgeServer(input: {
             send(response, previous.status, previous.value);
             return;
           }
-          const value = scope === 'provider-settings.verify'
-            ? await composition.apps.providerOperations.verify({
-                expectedRevision: payload.expectedRevision,
-                enable: payload.enable,
-              })
-            : await composition.apps.providerOperations.put({
-                provider: payload.provider,
-                apiUrl: payload.apiUrl,
-                apiKey: payload.apiKey,
-                clearApiKey: payload.clearApiKey,
-                model: payload.model,
-                expectedRevision: payload.expectedRevision,
-              });
+          let value;
+          if (scope === 'provider-settings.verify') {
+            const controller = new AbortController();
+            const disconnected = () => { if (!response.writableEnded) controller.abort(); };
+            response.once('close', disconnected);
+            if (response.destroyed) controller.abort();
+            try {
+              value = await composition.apps.providerOperations.verify({
+                expectedRevision: payload.expectedRevision, enable: payload.enable,
+              }, controller.signal);
+            } finally { response.off('close', disconnected); }
+          } else {
+            value = await composition.apps.providerOperations.put({
+              provider: payload.provider, apiUrl: payload.apiUrl, apiKey: payload.apiKey,
+              clearApiKey: payload.clearApiKey, model: payload.model, expectedRevision: payload.expectedRevision,
+            });
+          }
           composition.apps.flywheel.saveCommandReceipt({
             scope, idempotencyKey: normalizedKey, fingerprint, status: 200, value,
           });
@@ -1062,6 +1149,16 @@ export function startKnowledgeServer() {
   instance.server.listen(binding.port, binding.host, () => {
     process.stdout.write(`domain-knowledge dashboard: http://${binding.host}:${binding.port}\n`);
   });
+  let stopping = false;
+  const stop = async () => {
+    if (stopping) return;
+    stopping = true;
+    await instance.composition.shutdown();
+    instance.server.closeAllConnections();
+    instance.server.close();
+  };
+  process.once('SIGTERM', () => { void stop(); });
+  process.once('SIGINT', () => { void stop(); });
   return instance;
 }
 

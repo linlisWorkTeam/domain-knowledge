@@ -49,3 +49,33 @@ test('review: correction IDs are normalized and bound to evaluation evidence', a
   const blocked = await execute(sample.input, sample.context);
   assert.deepEqual(blocked.payload.unresolvedRisks, ['review reported a blocking condition without a correction']);
 });
+
+test('review: correction binds both evaluation and Check evidence and rejects unknown H2', async () => {
+  const sample = roleExample<Input>('review');
+  sample.input.payload.checkReportRef = sample.input.payload.criteriaRef;
+  const result = await execute(sample.input, sample.context);
+  assert.deepEqual((result.payload.corrections as { evidenceRefs: unknown[] }[])[0]!.evidenceRefs,
+    [sample.input.payload.evaluationReportRef, sample.input.payload.checkReportRef]);
+  sample.output.correction.knowledgePath = 'knowledge/markdown-diff.md#Missing';
+  await assert.rejects(execute(sample.input, sample.context), /REVIEW_CORRECTION_SCOPE_INVALID/);
+});
+
+test('review: replacement cannot introduce another H2 and PASS cannot hide unresolved risks', async () => {
+  const sample = roleExample<Input>('review');
+  sample.output.correction.replacementMarkdown = '## Behavior\nFix\n## Purpose\nChanged';
+  await assert.rejects(execute(sample.input, sample.context), /REVIEW_CORRECTION_RANGE_INVALID/);
+  sample.output.correction = null;
+  sample.output.recommendation = 'PASS';
+  sample.output.unresolvedRisks = ['missing evidence'];
+  await assert.rejects(execute(sample.input, sample.context), /REVIEW_PASS_CONTRADICTION/);
+});
+
+test('review: fenced example headings cannot authorize a correction', async () => {
+  const sample = roleExample<Input>('review');
+  const knowledge = sample.input.materials.find(({ ref }) => ref.artifactId === sample.input.payload.knowledgeRef.artifactId)!;
+  knowledge.content = '# Knowledge\n\n## Behavior\nReal section\n\n```markdown\n## Example only\n```\n';
+  sample.output.correction.knowledgePath = 'knowledge/markdown-diff.md#Example only';
+  await assert.rejects(execute(sample.input, sample.context), /REVIEW_CORRECTION_SCOPE_INVALID/);
+  sample.output.correction.knowledgePath = 'knowledge/markdown-diff.md#Behavior';
+  await execute(sample.input, sample.context);
+});

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：验证AutomatedLanggraphFlow的行为、约束及失败场景。
  */
-import { NODE_BY_AGENT } from '../../src/domain/services/workflow/AgentDefinitions.ts';
+import { NODE_BY_AGENT } from '../../src/domain/workflow/AgentDefinitions.ts';
 import { FixtureProjectWorkflowStages, type FixtureProjectScenario } from '../../src/infrastructure/agentAdapters/scenario/ProjectWorkflowFixture.ts';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -47,7 +47,7 @@ test('generated result matches contract', () => assert.equal(calculate(), expect
   writeFileSync(join(assetRoot, 'code-v1.js'), 'export const calculate = () => 3;\n');
   writeFileSync(join(assetRoot, 'code-v2.js'), 'export const calculate = () => 4;\n');
   writeFileSync(join(assetRoot, 'correction.json'), JSON.stringify({
-    correctionId: 'COR-AUTO-001', knowledgePath: '行为契约',
+    correctionId: 'COR-AUTO-001', knowledgePath: `knowledge/${moduleId}.md#行为契约`,
     criterion: '返回公开契约值 4', risk: '生成实现无法通过门禁',
   }));
   git(repositoryRoot, ['init']);

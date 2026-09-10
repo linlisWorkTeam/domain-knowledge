@@ -6,10 +6,10 @@
 /** 统一引用 Domain 拥有的源码发现、工作空间和业务角色定义契约。 */
 import type { KnowledgeDiscoveryCandidate, KnowledgeDiscoveryPort } from '../../domain/sourceScan/SourceScan.ts';
 import type { AgentWorkspaceProvider, AgentWorkspaceView } from '../../domain/workspace/LocalAgentWorkspace.ts';
-import type { AgentDefinition } from '../../domain/services/workflow/AgentDefinitions.ts';
+import type { AgentDefinition } from '../../domain/workflow/AgentDefinitions.ts';
 export type { KnowledgeDiscoveryCandidate, KnowledgeDiscoveryPort } from '../../domain/sourceScan/SourceScan.ts';
 export type { AgentWorkspaceProvider, AgentWorkspaceView } from '../../domain/workspace/LocalAgentWorkspace.ts';
-export type { AgentDefinition } from '../../domain/services/workflow/AgentDefinitions.ts';
+export type { AgentDefinition } from '../../domain/workflow/AgentDefinitions.ts';
 import type { AgentId, AgentCommand, AgentResult } from '../../domain/agents/AgentContracts.ts';
 /** 统一导出本模块的公共符号，供其他层通过明确入口引用。 */
 export { AGENT_IDS, type AgentId, type AgentCommand, type AgentResult } from '../../domain/agents/AgentContracts.ts';
@@ -325,6 +325,8 @@ export interface RunningStateStore {
 
 /** 定义角色请求的数据结构与类型约束。 */
 export interface AgentRequest {
+  /** 本次角色阶段的输出上限，只能收紧已配置的 Provider 限额。 */
+  maxTokens?: number;
   /** 提供authorized工具信息，供调用方读取或传入。 */
   authorizedTools?: readonly string[];
   /** 提供role信息，供调用方读取或传入。 */
@@ -375,6 +377,8 @@ export interface ProviderSettingsRecord {
   verificationStatus: ProviderVerificationStatus;
   /** 提供verification原因Code信息，供调用方读取或传入。 */
   verificationReasonCode: string;
+  /** 分别记录模型列表可访问性与生产生成协议；旧记录可缺省。 */
+  verificationChecks?: ProviderProbeChecks;
   /** 提供lastVerified时间信息，供调用方读取或传入。 */
   lastVerifiedAt: string | null;
   /** 提供verified指纹信息，供调用方读取或传入。 */
@@ -428,6 +432,14 @@ export interface ProviderEndpointPolicy {
 }
 
 /** 定义提供方Probe结果的数据结构与类型约束。 */
+export interface ProviderProbeChecks {
+  /** 模型列表预检结论；通过后才允许一次最小生成。 */
+  modelList: 'PASSED' | 'FAILED';
+  /** 实际生产 DSH 生成检查；列表通过本身不能启用模型。 */
+  generation: 'NOT_RUN' | 'PASSED' | 'FAILED';
+}
+
+/** 定义显式模型连接验证的安全结果。 */
 export interface ProviderProbeResult {
   /** 提供状态信息，供调用方读取或传入。 */
   status: 'VERIFIED' | 'FAILED';
@@ -435,6 +447,8 @@ export interface ProviderProbeResult {
   reasonCode: string;
   /** 提供模型信息，供调用方读取或传入。 */
   model: string | null;
+  /** 旧探针可以缺省，但缺少生成通过证据不得启用。 */
+  checks?: ProviderProbeChecks;
 }
 
 /** 定义提供方ConnectionProbe的数据结构与类型约束。 */
@@ -444,7 +458,7 @@ export interface ProviderConnectionProbe {
     endpoint: ProviderEndpoint;
     apiKey: string | null;
     model: string | null;
-  }): Promise<ProviderProbeResult>;
+  }, signal?: AbortSignal): Promise<ProviderProbeResult>;
 }
 
 /** 定义提供方InvocationRecord的数据结构与类型约束。 */
@@ -536,7 +550,7 @@ export interface LanguagePlugin {
 }
 
 /** 定义项目工具的数据结构与类型约束。 */
-export type ProjectTool = 'node' | 'pnpm' | 'cargo';
+export type ProjectTool = 'node' | 'pnpm' | 'cargo' | 'typescript';
 
 /** 定义项目命令的数据结构与类型约束。 */
 export interface ProjectCommand {
@@ -566,6 +580,9 @@ export interface GeneratedProjectFile {
 
 /** 项目快照。 */
 export interface ProjectSnapshot {
+  /** 只有获准读取源码的角色接收正文引用，公开接口材料单独分发。 */
+  sourceContentRefs?: ArtifactRef[];
+  publicInterfaceRefs?: ArtifactRef[];
   /** 提供仓库根目录信息，供调用方读取或传入。 */
   repositoryRoot: string;
   /** 提供远程信息，供调用方读取或传入。 */
@@ -660,6 +677,9 @@ export interface ProjectEvaluator {
     generatedFiles: GeneratedProjectFile[];
     prepareCommands: ProjectCommand[];
     commands: ProjectCommand[];
+    /** 受信宿主保管预期值，生成实现进程只收到函数调用参数。 */
+    moduleSuite?: import('../../domain/agents/testGenAgent/ModuleBehaviorSuite.ts').ModuleBehaviorSuite;
+    moduleContract?: { modulePath: string; exportName: string; signature: string };
   }, signal?: AbortSignal): Promise<ProjectEvaluation>;
 }
 
@@ -779,6 +799,8 @@ export interface WorkflowNodeProjection {
 
 /** 定义Start工作流命令的数据结构与类型约束。 */
 export interface StartWorkflowCommand {
+  /** 全运行墙钟预算，包含排队、重试和评测；恢复使用原截止时间。 */
+  maxDurationMs?: number;
   /** 提供运行标识信息，供调用方读取或传入。 */
   runId: string;
   /** 提供最大Iterations信息，供调用方读取或传入。 */
@@ -799,6 +821,8 @@ export interface WorkflowHandle {
 
 /** 定义工作流执行视图的数据结构与类型约束。 */
 export interface WorkflowExecutionView extends WorkflowHandle {
+  /** 已持久化的预算，不随重启或手动恢复重置。 */
+  budget?: { startedAt: string; deadlineAt: string; maxDurationMs: number; remainingMs: number };
   /** 提供current节点信息，供调用方读取或传入。 */
   currentNode: string | null;
   /** 提供轮次信息，供调用方读取或传入。 */
@@ -813,6 +837,8 @@ export interface WorkflowExecutionView extends WorkflowHandle {
 
 /** 定义工作流Engine的数据结构与类型约束。 */
 export interface WorkflowEngine {
+  /** 服务停止时取消活动执行，等待进程清理后再关闭持久化连接。 */
+  shutdown?(): Promise<void>;
   /** 启动请求。 */
   start(command: StartWorkflowCommand): Promise<WorkflowHandle>;
   /** 恢复请求。 */

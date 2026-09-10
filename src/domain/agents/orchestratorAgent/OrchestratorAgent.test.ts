@@ -38,3 +38,26 @@ test('orchestrator: cancellation before and during model execution cannot return
   await assert.rejects(execute(during.input, during.context), /AGENT_CANCELLED/);
   assert.deepEqual(during.phases, []);
 });
+
+test('orchestrator: model plan cannot omit tasks, change dependencies or authorize source access', async () => {
+  for (const [mutate, expected] of [
+    [(output: any) => { output.tasks[1].role = 'doc-worker'; }, /TASK_DUPLICATE/],
+    [(output: any) => { output.tasks[1].dependsOn = ['code']; }, /DEPENDENCY_INVALID/],
+    [(output: any) => { output.tasks[3].sourcePaths = ['src/domain/services/markdown-diff.ts']; }, /SOURCE_SCOPE_DENIED/],
+    [(output: any) => { output.tasks[0].sourcePaths = []; }, /SOURCE_SCOPE_INCOMPLETE/],
+    [(output: any) => { output.iteration = 2; }, /ITERATION_MISMATCH/],
+  ] as const) {
+    const sample = roleExample<Input>('orchestrator');
+    mutate(sample.output);
+    await assert.rejects(execute(sample.input, sample.context), expected);
+  }
+});
+
+test('orchestrator: accepted model plan preserves fixed symbolic graph connections', async () => {
+  const sample = roleExample<Input>('orchestrator');
+  const result = await execute(sample.input, sample.context);
+  assert.equal(sample.requests[0]!.stage, 'plan');
+  assert.equal(sample.requests[0]!.readablePaths.length, 0);
+  assert.equal((result.payload.nodes as unknown[]).length, 6);
+  assert.match(sample.requests[0]!.prompt, /固定依赖/);
+});

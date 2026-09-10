@@ -69,3 +69,30 @@ This document summarizes older handoffs, milestones and architectural decisions 
 删除 AGENTS、贡献指南、开发指南和 CodeTaste 中的固定账号规则，同时移除本次会话写入的仓库级 user.name / user.email。当前会话的 Git 身份通过单次命令配置，GitHub 身份通过单次进程凭据指定；不设跨会话账号约束。历史交接中把账号写成项目规则的表述是当时的误解，不作为后续协作指令。
 
 [2026-09-08-1158 目录审查](https://github.com/linlisWorkTeam/domain-knowledge/blob/260e7f1/docs/epitaph/2026-09-08-1158-agent-directory-review.md)：调整 Domain Workflow、资源模块和 Infrastructure 目录，新增版权与中文说明；当时只做类型与静态检查，未运行测试。
+
+## 设计与命名整理交接归档
+
+[2026-09-08-1216-specs-consolidation.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/1455ba9c6a84797a2ee22e9939f2542cd4dc7ed4/docs/epitaph/2026-09-08-1216-specs-consolidation.md)：设计集中到 docs/specs 并与代码对应，统一目录小驼峰、文件大驼峰，合并 4+1 视图与历史文档。仅做静态验证，未重跑测试。原记录中的项目级账号规则是误解，已纠正为仅当前会话适用。
+
+## MVP 并行实施交接归档
+
+- [2026-09-08-1420-docgen-example-consolidation.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/5190d50170bdbfbd921f6e109dc043ffaa86cc53/docs/epitaph/2026-09-08-1420-docgen-example-consolidation.md)：统一 DocGen 样例和公共角色入口，迁移参考检查；当时只做静态检查，没有七角色 live 验收。
+- [2026-09-08-1423-session-identity-scope.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/5190d50170bdbfbd921f6e109dc043ffaa86cc53/docs/epitaph/2026-09-08-1423-session-identity-scope.md)：纠正账号约定只属于当时会话，移除仓库级身份规则；只修改文档与配置。
+- [2026-09-08-1442-domain-feature-layout.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/5190d50170bdbfbd921f6e109dc043ffaa86cc53/docs/epitaph/2026-09-08-1442-domain-feature-layout.md)：Domain 按功能平级组织，移除 services 总分组；当时仅静态验证，后由 MVP 全量回归覆盖。
+- [2026-09-09-0212-mvp-product-handoff.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/5190d50170bdbfbd921f6e109dc043ffaa86cc53/docs/epitaph/2026-09-09-0212-mvp-product-handoff.md)：实现发布 outbox、目录、Git、Console 和安装脚本；当时仅定向测试，主 Agent 后续完成接线与实际安装验收。
+- [2026-09-09-0219-mvp-product-visual-handoff.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/5190d50170bdbfbd921f6e109dc043ffaa86cc53/docs/epitaph/2026-09-09-0219-mvp-product-visual-handoff.md)：补取消按钮、产品浏览器用例和工具链接校验；交接时未执行视觉、安装或真实模型。
+- [2026-09-09-1009-mvp-knowledge-roles.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/5190d50170bdbfbd921f6e109dc043ffaa86cc53/docs/epitaph/2026-09-09-1009-mvp-knowledge-roles.md)：实现任务依赖、源码事实、DocGen 两阶段和 H2 修订；27 项角色测试通过，语义正确性仍依赖独立门禁。
+- [2026-09-09-1013-mvp-controlled-role-fixtures.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/5190d50170bdbfbd921f6e109dc043ffaa86cc53/docs/epitaph/2026-09-09-1013-mvp-controlled-role-fixtures.md)：适配受控输出、rawOutputRef 和冻结材料；无真实模型调用，模块场景集成由主 Agent 验证。
+
+- [2026-09-09-1020-mvp-validation.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/f30f0c5/docs/epitaph/2026-09-09-1020-mvp-validation.md)：验证组完成声明式测试、隔离模块评测、Code/Check/Review 和共享重进程槽，定向 36/36；主 Agent 后续完成 280 项回归、真实 DSH 进程探针及离线安装，真实模型凭据仍阻塞。
+
+- [2026-09-09-1028-product-route-fixtures.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/3efa1c08ea591a1e71651e69aa95bb6a3e474554/docs/epitaph/2026-09-09-1028-product-route-fixtures.md)：产品组修复 Playwright 路由拦截与安装测试配置，当时仅静态复现，后由主 Agent 完成受控视觉和实际安装验收。
+
+- [2026-09-09-1033-bundled-runtime-libraries.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/186702547abadddf18c2cbeda4af4b2ad859f493/docs/epitaph/2026-09-09-1033-bundled-runtime-libraries.md)：增加经过路径校验的包内运行库传递及只读挂载，4 项定向测试通过；主 Agent 后续完成实际离线安装、评测及 DSH 隔离验证。
+
+- [2026-09-09-1125-seven-role-mvp-candidate.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/cff8fc1/docs/epitaph/2026-09-09-1125-seven-role-mvp-candidate.md)：交接七角色、Linux 离线安装与浏览器候选，当时 280 项回归和 Console 19 项通过，真实模型尚为 0/3 且凭据阻塞；后续 1225 记录已覆盖真实验收 3/3 失败，不能将旧候选记录作为发布授权或最新验收结果。
+
+## 真实验收失败与阶段修复交接归档
+
+- [2026-09-09-1219-mvp-real-acceptance-budget-exhausted.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/cff8fc14a75b556dfce84598842caa7d2f895868/docs/epitaph/2026-09-09-1219-mvp-real-acceptance-budget-exhausted.md)：纠正遗漏历史凭据的判断，记录三次真实启动失败及 3/3 额度耗尽；当时 281 项回归通过，未有完整真实发布。后续仍需新预算，不改写原失败证据。
+- [2026-09-09-1225-mvp-live-final-evidence.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/cff8fc14a75b556dfce84598842caa7d2f895868/docs/epitaph/2026-09-09-1225-mvp-live-final-evidence.md)：1867025 安装包、281 项回归和 19 项 Console 通过；实际失败列表误显示 GENERATING 是当时未解决问题，现由阶段修复候选覆盖。真实预算仍耗尽，原取消节点和用量证据保持历史原样。

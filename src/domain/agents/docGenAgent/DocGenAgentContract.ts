@@ -28,6 +28,19 @@ export interface Payload {
 export type Input = RoleInput<Payload>;
 /** 角色输出。 */
 export interface Output { body: string; title: string; description: string; }
+/** 首次生成先形成可审计概要，正文必须落实同一标题顺序。 */
+export interface Outline { title: string; description: string; sections: Array<{ heading: string; purpose: string }>; }
+/** 概要阶段不允许提前输出正文或调用其他角色。 */
+export const outlineSchema: Record<string, unknown> = {
+  type: 'object', required: ['title', 'description', 'sections'], additionalProperties: false,
+  properties: {
+    title: { type: 'string', minLength: 1 }, description: { type: 'string', minLength: 1 },
+    sections: { type: 'array', minItems: 1, maxItems: 20, items: {
+      type: 'object', required: ['heading', 'purpose'], additionalProperties: false,
+      properties: { heading: { type: 'string', minLength: 1 }, purpose: { type: 'string', minLength: 1 } },
+    } },
+  },
+};
 /** 对外提供输出Schema，作为调用方使用的统一约定。 */
 export const outputSchema: Record<string, unknown> = {
   type: 'object', required: ['body', 'title', 'description'], additionalProperties: false,

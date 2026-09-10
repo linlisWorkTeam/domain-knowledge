@@ -38,6 +38,13 @@ test('candidate becomes VERIFIED only after integrity-checked evidence and deter
       fixture.service.recordEvaluation({ ...evaluationInput, testsPassed: 11 }, fixture.config.publicationGate),
       /evaluation replay input collision/,
     );
+    // 取消发生在异步证据读取期间，也必须阻止最后的发布事务。
+    const controller = new AbortController();
+    const verify = fixture.artifacts.verify.bind(fixture.artifacts);
+    fixture.artifacts.verify = async (ref) => { const valid = await verify(ref); controller.abort(); return valid; };
+    await assert.rejects(fixture.service.publish(run.runId, candidate.version.versionId, decision.decisionId, controller.signal), { name: 'AbortError' });
+    assert.equal(fixture.service.status().publications, 0);
+    fixture.artifacts.verify = verify;
     const first = await fixture.service.publish(run.runId, candidate.version.versionId, decision.decisionId);
     const replay = await fixture.service.publish(run.runId, candidate.version.versionId, decision.decisionId);
     assert.equal(first.replayed, false);
@@ -51,6 +58,26 @@ test('candidate becomes VERIFIED only after integrity-checked evidence and deter
   } finally {
     fixture.dispose();
   }
+});
+
+test('a running workflow retains its frozen gate when managed policy is weakened', async () => {
+  const fixture = createTestComposition();
+  try {
+    const candidate = await acceptedCandidate(fixture);
+    const run = fixture.service.createRun(candidate.version.moduleId, 'local-v1');
+    const frozen = { ...fixture.config.publicationGate, requireAllTests: true, minimumStability: 1, maxIterations: 1 };
+    const policyRef = await fixture.service.putArtifact(Buffer.from(JSON.stringify(frozen)), 'application/json');
+    await fixture.service.executeNode({ runId: run.runId, nodeId: 'workflow-policy', generationKey: `${run.runId}:workflow-policy`, inputRefs: [policyRef] }, async () => [policyRef]);
+    for (const state of ['PLANNED', 'GENERATING', 'EVALUATING'] as const) fixture.service.transition(run.runId, state);
+    fixture.repository.resolveEvaluationPolicy = (policy) => ({ ...policy, requireAllTests: false, minimumStability: 0, maxIterations: 3 });
+    const evidence = await fixture.artifacts.put(Buffer.from('{"executed":2,"passed":1}'), 'application/json');
+    const { decision } = await fixture.service.recordEvaluation({ runId: run.runId, versionId: candidate.version.versionId,
+      evidenceRefs: [evidence], toolchainFingerprint: 'controlled-policy-regression', criticalFailures: 0,
+      testsPassed: 1, testsTotal: 2, stability: 0.5,
+    }, fixture.config.publicationGate);
+    assert.equal(decision.outcome, 'STOPPED');
+    assert.equal(fixture.service.status().publications, 0);
+  } finally { fixture.dispose(); }
 });
 
 test('failed behavior gate cannot publish knowledge', async () => {

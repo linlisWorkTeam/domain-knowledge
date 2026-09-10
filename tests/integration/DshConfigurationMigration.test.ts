@@ -14,7 +14,7 @@ import { EncryptedFileProviderSettingsStore } from '../../src/infrastructure/age
 
 const connection = {
   providerEndpointPolicy: { validate: async (raw: string) => ({ url: new URL(raw), addresses: ['1.1.1.1'] }) },
-  providerProbe: { verify: async ({ model }: { model: string | null }) => ({ status: 'VERIFIED' as const, reasonCode: 'READY', model }) },
+  providerProbe: { verify: async ({ model }: { model: string | null }) => ({ status: 'VERIFIED' as const, reasonCode: 'GENERATION_READY', checks: { modelList: 'PASSED' as const, generation: 'PASSED' as const }, model }) },
 };
 
 test('DSH is the default without CodeAgent installed and running configurations survive settings edits', async () => {

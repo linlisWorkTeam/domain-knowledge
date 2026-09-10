@@ -8,6 +8,8 @@ SPDX-License-Identifier: MIT
 代码位置：[src/domain/Domain.ts](../../../src/domain/Domain.ts)、[src/domain/agents/AgentExecution.ts](../../../src/domain/agents/AgentExecution.ts)、[src/application/services/RoleExecution.ts](../../../src/application/services/RoleExecution.ts)、[src/application/ports/ApplicationPorts.ts](../../../src/application/ports/ApplicationPorts.ts)。
 
 
+Domain 按领域功能组织：agents、workflow、evaluation、association、knowledge、sourceScan、workspace、migration 是同层级目录，不设置 services 分组或总导出文件。领域服务类放在所属功能目录；Domain.ts 保留共享实体与不变量。
+
 ## 聚合与边界
 
 FlywheelRun 管理批次身份、状态和当前轮次。KnowledgeVersion 关联正文、来源、父版本和治理状态。EvaluationReport 是独立执行产生的证据；GateDecision 是 Domain 对报告和策略的确定性解释；发布回执由存储事务生成。工件正文不嵌进跨阶段通用状态，使用 ArtifactRef 传递。

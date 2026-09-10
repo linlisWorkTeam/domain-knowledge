@@ -18,3 +18,18 @@ SqliteContentGovernance 提供来源、规则修订、血缘、Diff 和评测读
 
 
 文档关系：[设计目录](../../README.md)负责代码与设计定位；[开发指南](../../../Development.md)说明修改和交付步骤。
+
+## 可恢复 Markdown 发布
+
+`LocalMarkdownPublisher` 使用独立 `publications.sqlite`，表名 `local_publications_v1` 与输出信封 `schemaVersion: 1.0` 显式版本化。先将内容指纹、原始授权材料和 PENDING 收据以 SQLite FULL 同步持久化，再将 Markdown 与来源 JSON 写入同目录临时版本目录，fsync 后原子 rename，最后将收据改为 PUBLISHED。重试沿用原路径、时间、输入指纹与正文摘要；已存在的不同内容拒绝覆盖。
+
+恢复只处理已有授权的 PENDING 日志，不推断候选状态。知识目录只接受授权服务器根下独立的空目录，拒绝源码目录交叠和符号链接越界。Git 仓库必须属于该知识目录，仅精确 add 已发布文件，忽略无关未跟踪文件，拒绝包含无关跟踪文件的仓库。默认不同步，手动同步限制时长并禁止强推；冲突和认证失败不回滚本地发布。Git 令牌不出现在设置读取模型、日志或发行物中。
+
+Git fetch 后、任何 merge 前读取远端完整树，拒绝非允许路径和非普通文件模式，逐字节比较所有远端已发布正文/来源与本地已核验工件；共同祖先已有的发布文件不得在远端删除。本地新增发布尚未出现在远端可以继续同步。远端内容污染返回 `GIT_REMOTE_CONTENT_DENIED`，不快进、不覆盖本地文件，SQLite 发布状态保留；操作者恢复远端后可以重试。
+
+
+## 中断阶段的安全接管
+
+迁移版本 7 新增 `checkpoint_owners`，不改旧 checkpoint 信封。Linux 领取时记录宿主 boot ID、PID 和 `/proc/<pid>/stat` 启动时刻。恢复在同一事务内确认旧执行者已退出或 PID 已复用后，才可提前接管 RUNNING checkpoint；仍检查 generationKey、输入摘要和递增 retry fence。活着的旧执行者不能因新服务启动而被提前替换，身份不可读取和无身份的旧记录保留原租约行为。
+
+这使进程崩溃后的阶段能在 90–240 秒预算内使用剩余尝试，不必等待默认 15 分钟租约。阶段 journal 的首次开始时间和已占用次数保持不变；旧进程已完成的输出仍须以原有事务提交为准。角色和评测子进程的 Bubblewrap 保留 `--die-with-parent`。

@@ -8,7 +8,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 import { AGENT_IDS } from '../../src/application/ports/ApplicationPorts.ts';
-import { DOMAIN_KNOWLEDGE_AGENT_DEFINITIONS } from '../../src/domain/services/workflow/AgentDefinitions.ts';
+import { DOMAIN_KNOWLEDGE_AGENT_DEFINITIONS } from '../../src/domain/workflow/AgentDefinitions.ts';
 
 function files(root: string): string[] {
   return readdirSync(root).flatMap((name) => {
@@ -69,9 +69,9 @@ test('DDD application and domain-service boundaries are explicit without changin
   for (const path of [
     'src/interfaces/uiApi/UiApi.ts',
     'src/application/apps/ApplicationApps.ts',
-    'src/domain/services/FlywheelDomainService.ts',
-    'src/domain/services/EvalRunnerDomainService.ts',
-    'src/domain/services/AssociationDomainService.ts',
+    'src/domain/workflow/FlywheelDomainService.ts',
+    'src/domain/evaluation/EvalRunnerDomainService.ts',
+    'src/domain/association/AssociationDomainService.ts',
     'src/infrastructure/redis/Redis.ts',
   ]) assert.equal(statSync(path).isFile(), true, `missing DDD boundary: ${path}`);
 

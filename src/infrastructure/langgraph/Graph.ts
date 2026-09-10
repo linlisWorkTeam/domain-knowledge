@@ -10,7 +10,7 @@ import type {
   AgentId, AgentPromptResolver, WorkflowNodeProjection, WorkflowObserver,
   WorkflowStageExecutor,
 } from '../../application/ports/ApplicationPorts.ts';
-import { agentDefinition } from '../../domain/services/workflow/AgentDefinitions.ts';
+import { agentDefinition } from '../../domain/workflow/AgentDefinitions.ts';
 import {
   InfrastructureStateAnnotation, type InfrastructureState, type InfrastructureStateUpdate,
 } from './State.ts';
@@ -18,7 +18,7 @@ import {
 import {
   AGENT_BY_NODE, WORKFLOW_NODES, WORKFLOW_EDGES, orchestratorTasks,
   candidateDestination, evaluationDestination, workflowDestination, nextIteration,
-} from '../../domain/services/workflow/Workflow.ts';
+} from '../../domain/workflow/Workflow.ts';
 
 /** 保留既有运行时节点清单接口，节点集合由领域工作流定义。 */
 export const INFRASTRUCTURE_GRAPH_NODES = WORKFLOW_NODES;
@@ -28,6 +28,8 @@ interface GraphDependencies {
   executor: WorkflowStageExecutor;
   /** 提供observer信息，供调用方读取或传入。 */
   observer: WorkflowObserver;
+  /** 跟踪完整节点直到审计投影写完，避免图取消先于节点清理结束。 */
+  trackNode(runId: string, execute: () => Promise<InfrastructureStateUpdate>): Promise<InfrastructureStateUpdate>;
   /** 提供prompts信息，供调用方读取或传入。 */
   prompts: AgentPromptResolver;
   /** 提供 取消信号For 对应的取消信号For操作。 */
@@ -64,7 +66,11 @@ function executionNodeId(state: InfrastructureState, nodeId: string): string {
 }
 
 function createNode(deps: GraphDependencies, nodeId: string) {
-  return async (state: InfrastructureState): Promise<InfrastructureStateUpdate> => {
+  return (state: InfrastructureState): Promise<InfrastructureStateUpdate> => deps.trackNode(state.runId, async () => {
+    if (state.budgetDeadlineAt && Date.now() >= state.budgetDeadlineAt) {
+      throw new Error('WORKFLOW_BUDGET_EXHAUSTED');
+    }
+    if (deps.signalFor(state.runId)?.aborted) throw deps.signalFor(state.runId)?.reason;
     const renderedNodeId = executionNodeId(state, nodeId);
     const attemptKey = `${renderedNodeId}:${state.iteration}`;
     const stateAttempt = (state.attempts[attemptKey] ?? 0) + 1;
@@ -104,6 +110,7 @@ function createNode(deps: GraphDependencies, nodeId: string) {
         ...(state.workerTask ? { workerIndex: state.workerTask.index } : {}),
         ...(deps.signalFor(state.runId) ? { signal: deps.signalFor(state.runId) } : {}),
       });
+      if (deps.signalFor(state.runId)?.aborted) throw deps.signalFor(state.runId)?.reason;
       const completedAt = deps.clock();
       deps.observer.record(projection(
         state, renderedNodeId, agentId, attempt, 'COMPLETED', completedAt, readyAt, result.detail,
@@ -120,11 +127,11 @@ function createNode(deps: GraphDependencies, nodeId: string) {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       deps.observer.record(projection(
-        state, renderedNodeId, agentId, attempt, 'FAILED', deps.clock(), readyAt, '', message,
+        state, renderedNodeId, agentId, attempt, deps.signalFor(state.runId)?.aborted ? 'CANCELLED' : 'FAILED', deps.clock(), readyAt, '', message,
       ));
       throw error;
     }
-  };
+  });
 }
 
 /** 将领域工作流连接和分支规则映射为 LangGraph 节点、消息及检查点。 */
@@ -145,6 +152,9 @@ export function buildInfrastructureGraph(deps: GraphDependencies, checkpointer: 
     .addNode('review', node('review'))
     .addNode('workflow_router', async (state: InfrastructureState): Promise<InfrastructureStateUpdate> => {
       const update = await node('workflow_router')(state);
+      if (update.route === 'ITERATE' && state.iteration + 1 >= state.maxIterations) {
+        return { ...update, route: 'STOPPED', error: 'WORKFLOW_ITERATION_BUDGET_EXHAUSTED' };
+      }
       return { ...update, iteration: nextIteration(state.iteration, typeof update.route === 'string' ? update.route : null) };
     })
     .addNode('publication', async (state: InfrastructureState): Promise<InfrastructureStateUpdate> => ({
@@ -166,7 +176,7 @@ export function buildInfrastructureGraph(deps: GraphDependencies, checkpointer: 
     .addConditionalEdges('workflow_router', (state: InfrastructureState) =>
       workflowDestination(state.route), ['publication', 'orchestrator', 'failed', 'stopped'])
     .setNodeDefaults({
-      timeout: 600_000,
+      // 全局持久预算及各适配器超时均传递到子进程；不使用无法传递的图节点超时。
       errorHandler: (rawState: unknown, nodeError: NodeError) => {
         const state = rawState as InfrastructureState;
         return new Command({

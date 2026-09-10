@@ -23,9 +23,15 @@ SPDX-License-Identifier: MIT
 
 ## 角色提交链
 
-RoleExecutionService 为生产、Fixture 和 agent:run 共用生成键、命令工件、RoleResult 和结果信封。先验证可信材料，执行显式注册角色，写入原始输出及待保存正文，将 pending/角色节点/生成键符号绑定为实际引用，校验结果信封后提交 checkpoint、结果与事件。失败和取消保留失败记录，不能提交半份成功结果。
+RoleExecutionService 为生产、Fixture 和 agent:run 共用生成键、命令工件、RoleResult 和结果信封。先验证可信材料，执行显式注册角色，写入标准化角色结果及待保存正文，将 pending/角色节点/生成键符号绑定为实际引用，校验结果信封后提交 checkpoint、结果与事件。失败和取消保留失败记录，不能提交半份成功结果。DocWorker/DocGen 阶段 journal 在模型调用前保存占额，调用后把原始模型输出、字段定位和 PASSED/REJECTED/FAILED 单独写入不可变 CAS；事件只携带引用、次数与截止时间。恢复复用已通过阶段，不能重置次数或截止时间。失败阶段原文不进入下游成功结果信封。
 
 ProjectWorkflowStages 负责解析场景上下文、读取历史工件、构造各角色 Input，再调用公共角色服务。评测、候选保存和发布继续由应用服务协调，不能把 WorkflowStageInput 透传给 Domain 角色。
+
+## 执行状态展示
+
+Orchestrator.executionForRun 组合工作流执行事实和 RunConfiguration 兼容检查，RunExecutionPresentation 形成只读展示。业务 state 和执行 executionStatus 分开保留；可恢复失败不重写业务阶段。无执行记录或读取失败返回明确不可用状态，只有 RUNNING 执行计入活动并提供取消。恢复要求原有预算尚存、失败节点可定位和当前冻结配置兼容；命令仍由工作流执行最终预算与授权检查。展示仅输出安全错误码和节点，不输出模型原始异常。
+
+纯规则、真实注册表 API 与受控浏览器分别由 RunExecutionPresentation、RunExecutionHttp 和 RunExecutionConsole 测试覆盖；受控执行视图不声明真实模型验收。
 
 ## 当前内容质量策略
 
@@ -35,5 +41,19 @@ DeterministicQualityPolicy 位于 Application：来源证据 30%、结构 25%、
 
 RunConfiguration 冻结 Prompt、Schema、Provider 和 roleExecutionVersion 摘要，配置改变影响新 Run；旧版本拒绝恢复但不阻止查询历史。AgentExample 保存独立开发 Run、配置、工件与脱敏轨迹，不启动 LangGraph、评测或发布。所有角色样例均通过 AgentExample 执行，不再为 DocGen 提供专用应用服务。固定源码检查只在 DocGen 自己的样例测试中执行。
 
+ProviderOperationsApp 只在用户显式验证时调用 ProviderConnectionProbe，并贯穿 HTTP 取消信号。30 秒总期限从应用入口开始，覆盖配置修订队列和 DNS 校验；取消的队列项提前返回，但不能放行仍在前序操作后的其他配置修改。模型列表与最小生成均 PASSED、reasonCode 为 GENERATION_READY 才保存已验证指纹并启用；两阶段证据保存在设置和脱敏审计中。旧版 READY 记录可读，但对外显示 UNVERIFIED / GENERATION_VERIFICATION_REQUIRED，不能成为新 Run 的默认配置，读取时不触发生成或修改旧记录。配置修订号和 HTTP 幂等约束继续阻止重复操作产生额外调用。技术预算和临时空间见[模型适配设计](../infrastructure/agentAdapters/AgentAdapters.md#显式连接验证)。
+
 
 文档关系：[设计目录](../README.md)负责代码与设计定位；[开发指南](../../Development.md)说明修改和交付步骤。
+
+## 本地发布应用边界
+
+`PublicationOperations` 通过 `LocalPublicationPort` 承接已取得领域发布凭据的 Markdown 发布。输入必须包含 publicationKey、gateDecisionId、运行/版本标识、源码提交与摘要以及 evidenceRefs；HTTP 不提供绕过门禁的 publish 命令。工作流先完成确定性门禁和领域发布，再调用本地发布，失败保留待恢复日志。
+
+Console 通过应用边界读取发布设置、枚举服务器授权目录、读取正文与来源、恢复待完成发布及手动同步 Git。Git 默认关闭。模型配置和服务器目录操作不要求用户编辑场景 JSON。代表模块场景由受信工厂构建，并通过 `apps.markdownLite.start(repositoryRoot)` 启动。
+
+应用数据与安装版本分离；详见 [Linux 安装与本地发布](../../LinuxInstall.md)。
+
+失败执行的恢复展示同时检查阶段 journal：两次尝试耗尽或阶段截止时间已过时，不展示恢复按钮。此展示不代替阶段执行器、运行总预算和执行版本的最终校验。
+
+真实验收入口的默认三次账本可在显式用户追加一次授权后升级为 mvp-real-attempts-v2；授权文件绑定旧账本 SHA-256，持久化原三次内容摘要并只开放第四次。重放不得增加额度，原记录篡改或摘要不符时拒绝。该授权不改变每次飞轮三轮、三十分钟的业务预算。

@@ -31,6 +31,8 @@ export interface AgentCommand {
 
 /** 角色结果。 */
 export interface AgentResult {
+  /** 新执行版本显式区分原始角色结果与概要/案例等同类型工件；旧记录仍可读。 */
+  rawOutputRef?: ArtifactRef;
   /** 提供Schema版本信息，供调用方读取或传入。 */
   schemaVersion: '1.0';
   /** 提供命令标识信息，供调用方读取或传入。 */

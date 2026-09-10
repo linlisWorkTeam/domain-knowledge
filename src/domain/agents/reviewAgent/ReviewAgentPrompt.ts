@@ -18,7 +18,7 @@ export const definition = {
 
 /** 组合基础提示词和本角色可见的受信材料。 */
 export function buildPrompt(input: Input, context: ExecutionContext): string {
-  return `${context.effectivePrompt}\n\n受信 AgentCommand：\n${JSON.stringify(context.command)}\n\n命令引用工件（已校验内容摘要）：\n${JSON.stringify(materialsFor(input.payload, input.materials))}`;
+  return `${context.effectivePrompt}\n纠正意见必须定位唯一现有 H2：knowledge/${input.moduleId}.md#原样H2标题。criterion 写清该段应补充或纠正的行为和可复验要求；不得建议删除测试、改预期或复制参考实现。可选 targetHeading 必须与锚点相同，replacementMarkdown 只能包含该 H2 段。证据不足时 correction=null，并填写 unresolvedRisks；通过时 unresolvedRisks=[]。\n\n受信 AgentCommand：\n${JSON.stringify(context.command)}\n\n命令引用工件（已校验内容摘要）：\n${JSON.stringify(materialsFor(input.payload, input.materials))}`;
 }
 
 /** 确定本角色允许读取的文件路径。 */

@@ -5,10 +5,15 @@
  */
 import { readFileSync, realpathSync } from 'node:fs';
 import { isAbsolute, relative, resolve } from 'node:path';
-import type { AgentId, ProjectEvaluation, WorkflowStageInput } from '../../../application/ports/ApplicationPorts.ts';
+import type { ProjectEvaluation, WorkflowStageInput } from '../../../application/ports/ApplicationPorts.ts';
 import { ProjectWorkflowStages, type AutomatedProjectScenario } from '../../../application/services/AutomatedProjectWorkflow.ts';
 import { assertModelOutput } from '../ModelExecution.ts';
 import type { ArtifactRef } from '../../../domain/Domain.ts';
+import type { AgentCommand } from '../../../domain/agents/AgentContracts.ts';
+import type { ModelRequest } from '../../../domain/agents/AgentExecution.ts';
+import { taskDependencies } from '../../../domain/agents/orchestratorAgent/OrchestratorAgentContract.ts';
+import { markdownSections } from '../../../domain/agents/docGenAgent/DocGenRevision.ts';
+import { sourceTexts, type Input as WorkerInput } from '../../../domain/agents/docWorkerAgent/DocWorkerAgentContract.ts';
 
 /** 定义夹具项目Scenario的数据结构与类型约束。 */
 export interface FixtureProjectScenario extends AutomatedProjectScenario {
@@ -19,6 +24,8 @@ export interface FixtureProjectScenario extends AutomatedProjectScenario {
     codeV1: string;
     codeV2: string;
     correction: string;
+    /** 显式受控候选案例文件；固定隐藏门禁不作为 TestGen 输出来源。 */
+    testSuite?: string;
     generatedPath: string;
     title: string;
     description: string;
@@ -48,7 +55,7 @@ export class FixtureProjectWorkflowStages {
           return input.modelFactory(request);
         }
         return { assertOutput: assertModelOutput,
-          execute: async () => this.output(request.stage, request.scenario, request.command.agentType) };
+          execute: async (modelRequest) => this.output(request.stage, request.scenario, request.command, modelRequest) };
       },
     });
   }
@@ -56,15 +63,21 @@ export class FixtureProjectWorkflowStages {
   /** 执行当前角色或业务阶段并返回结构化结果。 */
   execute(input: WorkflowStageInput) { return this.executor.execute(input); }
 
-  private async output(input: WorkflowStageInput, scenario: AutomatedProjectScenario, agentId: AgentId): Promise<Record<string, unknown>> {
+  private async output(input: WorkflowStageInput, scenario: AutomatedProjectScenario, command: AgentCommand, modelRequest: ModelRequest): Promise<Record<string, unknown>> {
+    const agentId = command.agentType;
     const assets = (scenario as FixtureProjectScenario).assets;
     if (!assets) throw new Error('WORKFLOW_FIXTURE_ASSETS_REQUIRED');
     let output: Record<string, unknown>;
     if (agentId === 'doc-gen') {
-      output = {
-        body: this.asset(input.iteration === 0 ? assets.knowledgeV1 : assets.knowledgeV2),
-        title: assets.title, description: assets.description,
-      };
+      const body = this.asset(input.iteration === 0 ? assets.knowledgeV1 : assets.knowledgeV2);
+      output = modelRequest.stage?.split(':')[0] === 'outline'
+        ? { title: assets.title, description: assets.description,
+          sections: markdownSections(body).map(({ heading }) => ({ heading, purpose: `解释 ${heading} 的受控验收契约` })) }
+        : { title: assets.title, description: assets.description,
+          sections: markdownSections(body).map(({ heading, text }, index) => ({ sectionId: `section-${index + 1}`, heading, body: text.slice(text.indexOf('\n') + 1) }))
+            .filter(({ heading }) => modelRequest.stage?.split(':')[0] !== 'revision' || (command.payload.corrections as Array<{ knowledgePath: string }>).some(({ knowledgePath }) => knowledgePath === `knowledge/${scenario.moduleId}.md#${heading}`))
+            .map(({ heading: _heading, ...section }) => section),
+        };
     } else if (agentId === 'code') {
       output = { files: [{
         path: assets.generatedPath,
@@ -79,19 +92,44 @@ export class FixtureProjectWorkflowStages {
         correction: evaluation.passed ? null : JSON.parse(this.asset(assets.correction)),
       };
     } else if (agentId === 'test-gen') {
-      output = { candidateCommands: scenario.finalCommands, oracleRequired: true };
+      output = assets.testSuite
+        ? { suite: JSON.parse(this.asset(assets.testSuite)), oracleRequired: true }
+        : { candidateCommands: scenario.finalCommands, oracleRequired: true };
     } else if (agentId === 'check') {
       output = { blocking: false, findings: [], scope: scenario.allowedGeneratedPaths };
     } else if (agentId === 'doc-worker') {
+      const payload = command.payload as unknown as WorkerInput['payload'];
+      const materials = await Promise.all(payload.sourceRefs.map(async (ref) => {
+        const bytes = Buffer.from(await this.flywheel.getArtifact(ref)).toString('utf8');
+        return { ref, content: ref.mediaType === 'application/json' ? JSON.parse(bytes) : bytes };
+      }));
+      const assigned = payload.assignedSourcePaths ?? scenario.sourcePaths;
+      const sources = sourceTexts({ payload, materials, sourcePaths: assigned,
+        publicInterfacePaths: scenario.publicInterfacePaths, provenance: payload.sourceRefs, moduleId: scenario.moduleId });
+      const facts = [...sources].flatMap(([sourcePath, content]) => {
+        const lines = content.split(/\r?\n/);
+        const index = lines.findIndex((line) => line === 'export const calculate = () => 4;');
+        return index < 0 ? [] : [
+          { kind: 'interface', statement: 'The module exports calculate without parameters.' },
+          { kind: 'behavior', statement: 'calculate returns the number 4.' },
+          { kind: 'boundary', statement: 'The parameterless function returns 4 on every invocation.' },
+        ].map((fact) => ({ ...fact, sourcePath, startLine: index + 1, endLine: index + 1 }));
+      });
+      if (!sources.size) throw new Error('WORKFLOW_FIXTURE_SOURCE_TEXT_MISSING');
       output = {
-        workerId: input.workerId,
-        fragment: `Source partition ${input.workerId ?? 'default'} prepared for DocGen.`,
-        provenance: scenario.sourcePaths,
+        workerId: input.workerId ?? 'worker-1',
+        fragment: `Source partition ${input.workerId ?? 'default'} prepared with pinned source line evidence for DocGen.`,
+        provenance: [...new Set(facts.map((fact) => fact.sourcePath))], facts,
+        unresolvedRisks: facts.length ? [] : ['The controlled fixture has no semantic assertions for this source partition.'],
       };
     } else {
       output = {
         iteration: input.iteration, strategy: 'fixed-knowledge-flywheel-v1',
         parallel: ['documentation', 'test-generation'],
+        tasks: Object.entries(taskDependencies).map(([role, dependsOn]) => ({
+          role, objective: `Complete the ${role} task for ${scenario.moduleId}.`, dependsOn,
+          sourcePaths: ['doc-worker', 'doc-gen', 'test-gen'].includes(role) ? scenario.sourcePaths : [],
+        })),
       };
     }
     return output;

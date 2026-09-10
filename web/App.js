@@ -67,6 +67,7 @@ const UI_LABELS = {
   PASS: '通过', ITERATE: '继续迭代', ROLLBACK: '回滚', STOPPED: '已停止',
   PENDING: '等待中', RUNNING: '运行中', COMPLETED: '已完成', COMMITTED: '已提交',
   AVAILABLE: '可用', DEGRADED: '降级', UNAVAILABLE: '不可用', UNKNOWN: '未知',
+  NOT_RUN: '未执行', GENERATION_READY: '生成验证通过', GENERATION_VERIFICATION_REQUIRED: '需要生成验证',
   AUTHENTICATED: '已认证', NOT_CONFIGURED: '未配置', UNVERIFIED: '未验证',
   ACTIVE: '正常', STALE: '已过期', DISABLED: '已停用',
   OPEN: '待处理', ACKNOWLEDGED: '已接手', RESOLVED: '已解决',
@@ -126,6 +127,7 @@ const ERROR_LABELS = {
   UNSUPPORTED: '当前服务不支持这项操作。',
   METRICS_WINDOW_INVALID: '统计窗口无效，请重新选择。',
   VERIFICATION_REQUIRED: '当前配置尚未通过验证。',
+  GENERATION_VERIFICATION_REQUIRED: '尚未完成最小生成验证，请重新验证后启用。',
   EVALUATION_RULE_NOT_FOUND: '未找到这条评测规则。',
   EVALUATION_NOT_FOUND: '未找到这条评测记录。',
   EVALUATION_ARTIFACT_NOT_FOUND: '未找到这份评测证据。',
@@ -138,6 +140,10 @@ const ERROR_LABELS = {
   SOURCE_KIND_UNSUPPORTED: '当前不支持这种来源类型。',
   SOURCE_REVISION_INVALID: '确认修订与最新观测内容不一致，请先刷新来源。',
   SOURCE_URL_INVALID: '请输入有效的 HTTPS 来源地址。',
+  RUN_CONFIGURATION_INCOMPATIBLE: '此批次的执行版本或配置已变更，历史记录可读，不能恢复。',
+  WORKFLOW_NOT_RECOVERABLE: '缺少可恢复的失败节点，请查看执行证据。',
+  WORKFLOW_BUDGET_EXHAUSTED: '此批次的执行预算已耗尽，不能恢复。',
+  ACCEPTANCE_LIMIT_REACHED: '真实模型验收预算已用完，需要新的执行授权。',
 }
 
 const NODE_LABELS = {
@@ -199,6 +205,7 @@ const state = {
   sourceProject: '',
   providerStatus: null,
   providerSettings: null,
+  providerVerifying: false,
   runMetrics: null,
   governanceMetrics: null,
   metricsWindow: '7d',
@@ -226,8 +233,40 @@ function collection(payload, legacyKey) {
   return []
 }
 
+function isRunActive(run) {
+  return run?.executionStatus === 'RUNNING' && run.isActive === true
+}
+
+function runStatusLabel(run) {
+  if (run.executionStatus === 'FAILED') return '执行失败'
+  if (run.executionStatus === 'UNAVAILABLE') return '执行状态不可用'
+  if (run.executionStatus === 'CANCELLED') return '已取消'
+  if (run.executionStatus === 'STOPPED') return '已停止'
+  if (run.executionStatus === 'COMPLETED') return TERMINAL.has(run.state) ? displayLabel(run.state) : '执行已完成'
+  if (isRunActive(run)) return displayLabel(run.state)
+  if (TERMINAL.has(run.state)) return displayLabel(run.state)
+  return run.executionStatus === 'NOT_TRACKED' ? '未关联执行' : '执行状态未知'
+}
+
+function runStatusBadge(run) {
+  const tone = run.executionStatus === 'FAILED' ? 'FAILED'
+    : ['UNAVAILABLE', 'NOT_TRACKED'].includes(run.executionStatus) && !TERMINAL.has(run.state) ? 'UNKNOWN'
+    : run.executionStatus === 'CANCELLED' ? 'CANCELLED' : run.executionStatus === 'STOPPED' ? 'STOPPED' : run.state
+  return badge(tone, runStatusLabel(run))
+}
+
+function recoveryLabel(run) {
+  if (run.recovery?.canResume) return '可恢复；仍使用原有预算'
+  return ({ BUDGET_EXHAUSTED: '预算已耗尽，不能恢复', BUDGET_UNAVAILABLE: '缺少原始预算，不能恢复',
+    STAGE_ATTEMPTS_EXHAUSTED: '当前阶段修正次数已耗尽，不能恢复', STAGE_BUDGET_EXHAUSTED: '当前阶段时间预算已耗尽，不能恢复',
+    RUN_CONFIGURATION_INCOMPATIBLE: '执行版本或配置已变更，不能恢复', FAILED_NODE_UNAVAILABLE: '没有可恢复的失败节点',
+    BUSINESS_TERMINAL: '业务流程已结束，不能恢复', EXECUTION_UNAVAILABLE: '执行状态暂不可读取',
+    EXECUTION_NOT_TRACKED: '没有关联的工作流执行记录' })[run.recovery?.reasonCode] ?? '当前不可恢复'
+}
+
 function needsAttention(run) {
-  return ATTENTION.has(run.state) || run.latestDecision?.outcome === 'STOPPED'
+  return ['FAILED', 'STOPPED', 'UNAVAILABLE'].includes(run.executionStatus)
+    || ATTENTION.has(run.state) || run.latestDecision?.outcome === 'STOPPED'
 }
 
 const escapeHtml = (value) => String(value ?? '')
@@ -372,7 +411,7 @@ function healthEvidence(name) {
 function runRow(run, compact = false) {
   return `<button class="run-row" data-run-id="${escapeHtml(run.runId)}">
     <span class="run-identity"><b>${escapeHtml(run.moduleId)}</b><small>${escapeHtml(shortId(run.runId, 18))}</small></span>
-    ${badge(run.state)}
+    ${runStatusBadge(run)}
     <span class="iteration">第 ${escapeHtml(run.iteration + 1)} 轮</span>
     <span class="updated">${escapeHtml(relativeTime(run.updatedAt))}</span>
     ${compact ? '' : '<span class="row-arrow" aria-hidden="true">→</span>'}
@@ -385,7 +424,7 @@ function setPageMeta(page) {
 }
 
 function renderOverview() {
-  const active = state.runs.filter((run) => !TERMINAL.has(run.state))
+  const active = state.runs.filter(isRunActive)
   const attention = state.actionItems.filter((item) => item.status !== 'RESOLVED')
   const status = state.status ?? {}
   const verified = state.status ? status.verified : (state.resourceErrors.knowledge ? '不可用' : state.knowledge.filter((item) => item.status === 'VERIFIED').length)
@@ -442,8 +481,8 @@ function renderOverview() {
       <aside class="overview-rail">
         <article class="current-run-card">
           <header><small><i></i> 飞轮${active.length ? '运行中' : '状态'}</small><button class="text-button" data-page-link="runs">打开批次 ↗</button></header>
-          ${latestRun ? `<h3>${escapeHtml(shortId(latestRun.runId, 18))}</h3><p>${escapeHtml(latestRun.moduleId)} · ${escapeHtml(displayLabel(latestRun.state))}</p><div class="run-state-line"><i></i></div><div class="run-state-meta"><b>${escapeHtml(displayLabel(latestRun.state))}</b><span>暂不提供预计完成时间</span></div>` : emptyState('暂无批次', '注册中没有批次记录。')}
-          <ol class="flywheel-stages"><li class="observed"><i>1</i><span>发现<small>批次已登记</small></span></li><li class="observed"><i>2</i><span>生成<small>${latestRun ? escapeHtml(displayLabel(latestRun.state)) : '等待运行'}</small></span></li><li><i>3</i><span>评测<small>${state.latestProgress?.mode === 'DETERMINATE' ? `${state.latestProgress.completedUnits}/${state.latestProgress.totalUnits}` : '等待可证明进度'}</small></span></li><li><i>4</i><span>演进<small>发布状态待确认</small></span></li></ol>
+          ${latestRun ? `<h3>${escapeHtml(shortId(latestRun.runId, 18))}</h3><p>${escapeHtml(latestRun.moduleId)} · ${escapeHtml(runStatusLabel(latestRun))}</p><div class="run-state-line"><i></i></div><div class="run-state-meta"><b>${escapeHtml(runStatusLabel(latestRun))}</b><span>暂不提供预计完成时间</span></div>` : emptyState('暂无批次', '注册中没有批次记录。')}
+          <ol class="flywheel-stages"><li class="observed"><i>1</i><span>发现<small>批次已登记</small></span></li><li class="observed"><i>2</i><span>生成<small>${latestRun ? escapeHtml(runStatusLabel(latestRun)) : '等待运行'}</small></span></li><li><i>3</i><span>评测<small>${state.latestProgress?.mode === 'DETERMINATE' ? `${state.latestProgress.completedUnits}/${state.latestProgress.totalUnits}` : '等待可证明进度'}</small></span></li><li><i>4</i><span>演进<small>发布状态待确认</small></span></li></ol>
         </article>
         <article class="recent-pulse"><header><h3>最近动态</h3><span>${state.activityStream ? '实时连接' : '轮询更新'}</span></header>${pulseRows || '<div class="pulse-empty"><b>暂无真实活动</b><small>服务端尚未记录活动</small></div>'}</article>
       </aside>
@@ -459,19 +498,19 @@ function renderRuns() {
     renderRunWorkspace(state.selectedRun)
     return
   }
-  const active = state.runs.filter((run) => !TERMINAL.has(run.state))
+  const active = state.runs.filter(isRunActive)
   const verified = state.runs.filter((run) => run.state === 'VERIFIED')
   const latest = state.runs[0]
   const rows = state.runs.map((run, index) => referenceRunRow(run, index === 0)).join('')
   content.innerHTML = `
-    <section class="reference-metrics"><article><small>运行中</small><b class="mint">${active.length}</b><p>来自注册当前状态</p></article><article><small>已验证</small><b>${verified.length}</b><p>${state.runs.length} 个批次</p></article><article><small>需要处理</small><b>${state.runs.filter(needsAttention).length}</b><p>失败、低置信或已停止</p></article><article><small>知识版本</small><b>${state.runs.reduce((sum, run) => sum + (run.knowledgeVersionIds?.length ?? 0), 0)}</b><p>由批次事实汇总</p></article></section>
-    <div class="reference-runs-grid"><section class="reference-run-history"><header><h3>批次记录</h3><button class="on" data-run-filter="">全部</button><button data-run-filter="active">运行中</button><button data-run-filter="attention">需处理</button></header><div id="runs-list">${rows || emptyState('没有批次记录', '当前注册中还没有批次记录。')}</div></section>
-    <aside class="reference-run-detail">${latest ? `<header><small>最新批次</small><b>${escapeHtml(shortId(latest.runId, 18))}</b></header><div class="orbit-mini"><span>${escapeHtml(displayLabel(latest.state))}<small>批次状态</small></span></div><p class="done">✓ <b>批次事实</b><small>${escapeHtml(latest.moduleId)}</small></p><p class="doing">⌁ <b>Agent 工作流图</b><small>查看真实节点投影</small></p><p>3 <b>评测</b><small>${escapeHtml(latest.latestDecision?.outcome ? displayLabel(latest.latestDecision.outcome) : '等待门禁')}</small></p><button class="wide" data-run-id="${escapeHtml(latest.runId)}">打开批次详情 →</button>` : emptyState('暂无批次', '创建批次后在这里查看。')}</aside></div>
-    <form id="workflow-start-form" class="reference-start-form"><label>受信项目路径<input name="repositoryRoot" placeholder="请输入项目仓库的绝对路径" required></label><label>项目场景 JSON<textarea name="scenario" placeholder="粘贴场景：模块、材料路径、允许生成路径及测试命令" required></textarea></label><label>并行任务数<input name="workerCount" type="number" min="0" max="5" value="1"></label><button class="new" type="submit" ${state.operatorMode ? '' : 'disabled'}>启动项目流程</button></form>`
+    <section class="reference-metrics"><article><small>运行中</small><b class="mint">${active.length}</b><p>来自工作流执行状态</p></article><article><small>已验证</small><b>${verified.length}</b><p>${state.runs.length} 个批次</p></article><article><small>需要处理</small><b>${state.runs.filter(needsAttention).length}</b><p>失败、低置信或已停止</p></article><article><small>知识版本</small><b>${state.runs.reduce((sum, run) => sum + (run.knowledgeVersionIds?.length ?? 0), 0)}</b><p>由批次事实汇总</p></article></section>
+    <div class="reference-runs-grid"><section class="reference-run-history"><header><h3>批次记录</h3><button class="on" data-run-filter="">全部</button><button data-run-filter="active">运行中</button><button data-run-filter="attention">需处理</button><button data-run-filter="failed">执行失败</button></header><div id="runs-list">${rows || emptyState('没有批次记录', '当前注册中还没有批次记录。')}</div></section>
+    <aside class="reference-run-detail">${latest ? `<header><small>最新批次</small><b>${escapeHtml(shortId(latest.runId, 18))}</b></header><div class="orbit-mini"><span>${escapeHtml(runStatusLabel(latest))}<small>执行状态</small></span></div><p class="done">✓ <b>批次事实</b><small>${escapeHtml(latest.moduleId)}</small></p><p class="doing">⌁ <b>Agent 工作流图</b><small>查看真实节点投影</small></p><p>3 <b>评测</b><small>${escapeHtml(latest.latestDecision?.outcome ? displayLabel(latest.latestDecision.outcome) : '等待门禁')}</small></p><button class="wide" data-run-id="${escapeHtml(latest.runId)}">打开批次详情 →</button>` : emptyState('暂无批次', '创建批次后在这里查看。')}</aside></div>
+    <form id="workflow-start-form" class="reference-start-form"><label>服务器项目目录<input name="repositoryRoot" placeholder="选择 ohMyWorkPanel 仓库的绝对路径" required></label><button class="secondary-button" data-browse-directory="repositoryRoot" type="button" ${state.operatorMode ? '' : 'disabled'}>浏览目录</button><p class="muted">代表模块 markdownLite · 七角色顺序执行 · 最多 3 轮 / 30 分钟</p><button class="new" type="submit" ${state.operatorMode ? '' : 'disabled'}>启动知识飞轮</button><div id="directory-browser" class="directory-browser"></div></form>`
 }
 
 function referenceRunRow(run, selected = false) {
-  return `<button class="reference-run-item ${selected ? 'selected' : ''}" data-run-id="${escapeHtml(run.runId)}" type="button"><i class="${TERMINAL.has(run.state) ? (run.state === 'VERIFIED' ? 'run-ok' : 'run-bad') : 'run-live'}">${run.state === 'VERIFIED' ? '✓' : run.state === 'FAILED' ? '!' : ''}</i><span><b>${escapeHtml(shortId(run.runId, 18))}</b><small>${escapeHtml(run.moduleId)} · 第 ${escapeHtml(run.iteration + 1)} 轮</small></span><em>${escapeHtml(displayLabel(run.state))}</em><span>${escapeHtml(run.latestDecision?.outcome ? displayLabel(run.latestDecision.outcome) : '等待门禁')}</span><strong>${escapeHtml(run.knowledgeVersionIds?.length ?? 0)} 版本</strong><time>${escapeHtml(relativeTime(run.updatedAt))}</time></button>`
+  return `<button class="reference-run-item ${selected ? 'selected' : ''}" data-run-id="${escapeHtml(run.runId)}" type="button"><i class="${isRunActive(run) ? 'run-live' : run.state === 'VERIFIED' ? 'run-ok' : 'run-bad'}">${run.state === 'VERIFIED' ? '✓' : needsAttention(run) ? '!' : ''}</i><span><b>${escapeHtml(shortId(run.runId, 18))}</b><small>${escapeHtml(run.moduleId)} · 第 ${escapeHtml(run.iteration + 1)} 轮</small></span><em>${escapeHtml(runStatusLabel(run))}</em><span>${escapeHtml(run.latestDecision?.outcome ? displayLabel(run.latestDecision.outcome) : '等待门禁')}</span><strong>${escapeHtml(run.knowledgeVersionIds?.length ?? 0)} 版本</strong><time>${escapeHtml(relativeTime(run.updatedAt))}</time></button>`
 }
 
 function renderRunWorkspace(snapshot) {
@@ -481,7 +520,7 @@ function renderRunWorkspace(snapshot) {
   const currentIndex = primaryStates.indexOf(run.state)
   const steps = primaryStates.map((item, index) => {
     const completed = currentIndex >= 0 && index < currentIndex
-    const active = item === run.state
+    const active = item === run.state && isRunActive(run)
     return `<li class="${completed ? 'complete' : ''} ${active ? 'active' : ''}"><i>${completed ? '✓' : index + 1}</i><span>${displayLabel(item)}</span></li>`
   }).join('')
   const latestEvaluation = evaluations.at(-1)
@@ -490,10 +529,11 @@ function renderRunWorkspace(snapshot) {
       <button class="back-button" data-run-back>← 返回批次列表</button>
       <div class="run-title-row">
         <div><p class="eyebrow">${escapeHtml(shortId(run.runId, 28))}</p><h2>${escapeHtml(run.moduleId)}</h2><p class="subtitle">策略 ${escapeHtml(run.policyId)} · 更新于 ${escapeHtml(formatDate(run.updatedAt))}</p></div>
-        <div class="run-title-actions">${badge(run.state)}<a class="secondary-button" href="/api/v1/runs/${encodeURIComponent(run.runId)}/report" download>导出报告</a><button class="secondary-button" data-refresh-run="${escapeHtml(run.runId)}">刷新</button></div>
+        <div class="run-title-actions">${runStatusBadge(run)}<a class="secondary-button" href="/api/v1/runs/${encodeURIComponent(run.runId)}/report" download>导出报告</a><button class="secondary-button" data-refresh-run="${escapeHtml(run.runId)}">刷新</button>${run.canCancel === true && isRunActive(run) ? `<button class="secondary-button" data-cancel-run="${escapeHtml(run.runId)}" type="button" ${state.operatorMode ? '' : 'disabled'}>取消批次</button>` : ''}${run.recovery?.canResume ? `<button class="primary-button" data-resume-run="${escapeHtml(run.runId)}" type="button" ${state.operatorMode ? '' : 'disabled'}>恢复批次</button>` : ''}</div>
       </div>
       <ol class="run-stepper">${steps}</ol>
-      ${progress?.mode === 'DETERMINATE' ? `<div class="state-callout"><b>可证明进度：${escapeHtml(progress.completedUnits)} / ${escapeHtml(progress.totalUnits)}</b><span>当前阶段 ${escapeHtml(displayLabel(progress.currentStage))} · 不提供推测性的预计完成时间</span><progress class="progress" value="${escapeHtml(progress.completedUnits)}" max="${escapeHtml(progress.totalUnits)}"></progress></div>` : '<div class="state-callout"><b>进度暂不可确定</b><span>服务端没有完整冻结工作单元，不显示百分比或预计完成时间。</span></div>'}
+      ${progress?.mode === 'DETERMINATE' ? `<div class="state-callout"><b>可证明进度：${escapeHtml(progress.completedUnits)} / ${escapeHtml(progress.totalUnits)}</b><span>${isRunActive(run) ? `当前阶段 ${escapeHtml(displayLabel(progress.currentStage))}` : escapeHtml(runStatusLabel(run))} · 不提供推测性的预计完成时间</span><progress class="progress" value="${escapeHtml(progress.completedUnits)}" max="${escapeHtml(progress.totalUnits)}"></progress></div>` : '<div class="state-callout"><b>进度暂不可确定</b><span>服务端没有完整冻结工作单元，不显示百分比或预计完成时间。</span></div>'}
+      ${['FAILED', 'UNAVAILABLE', 'NOT_TRACKED'].includes(run.executionStatus) && !TERMINAL.has(run.state) ? `<div class="state-callout ${run.executionStatus === 'FAILED' ? 'failed' : ''}" data-execution-state><b>${escapeHtml(runStatusLabel(run))}</b><span>业务阶段保留：${escapeHtml(displayLabel(run.state))} · 当前没有活动执行</span><span>${escapeHtml(recoveryLabel(run))}</span>${run.executionFailure ? `<span>失败节点：${escapeHtml(NODE_LABELS[run.executionFailure.nodeId] ?? run.executionFailure.nodeId ?? '未记录')} · <code>${escapeHtml(run.executionFailure.code)}</code></span>` : ''}</div>` : ''}
       ${['ITERATING', 'ROLLING_BACK', 'LOW_CONFIDENCE', 'FAILED', 'CANCELLED'].includes(run.state) ? `<div class="state-callout ${run.state.toLowerCase().replaceAll('_', '-')}"><b>当前状态：${escapeHtml(displayLabel(run.state))}</b><span>第 ${escapeHtml(run.iteration + 1)} 轮 · 详情以事件与门禁证据为准</span></div>` : ''}
     </section>
     <div class="run-workspace-grid">
@@ -502,7 +542,7 @@ function renderRunWorkspace(snapshot) {
         <div class="node-list">${automationNodes.length ? automationNodes.map((node) => `
           <article class="node-card">
             <div><span class="node-icon">${['COMMITTED', 'COMPLETED'].includes(node.status) ? '✓' : node.status === 'FAILED' ? '!' : '●'}</span><div><b>${escapeHtml(NODE_LABELS[node.nodeId] ?? node.nodeId)}</b><small>${escapeHtml(node.agentId ? `${AGENT_LABELS[node.agentId] ?? node.agentId} · ${node.detail || '等待详情'}` : node.generationKey || node.detail || '确定性节点')}</small></div></div>
-            <div>${badge(node.status)}<small>第 ${escapeHtml((node.iteration ?? run.iteration) + 1)} 轮 · 第 ${escapeHtml(node.attempt ?? ((node.retryCount ?? 0) + 1))} 次尝试</small></div>
+            <div>${badge(node.status, node.status === 'RUNNING' && !isRunActive(run) ? '历史节点状态：运行中' : displayLabel(node.status))}<small>第 ${escapeHtml((node.iteration ?? run.iteration) + 1)} 轮 · 第 ${escapeHtml(node.attempt ?? ((node.retryCount ?? 0) + 1))} 次尝试</small></div>
           </article>`).join('') : emptyState('暂无节点记录', '这个批次可能由命令行创建，或者尚未执行 Agent 节点。')}</div>
       </section>
       <aside class="panel gate-summary">
@@ -673,7 +713,7 @@ function renderGovernance() {
       <div class="section-heading"><div><p class="eyebrow">待处理队列</p><h2>待治理运行</h2></div></div>
       <div class="governance-list">${items.length ? items.map((run) => `<article class="governance-card">
         <div><span class="risk-icon">!</span><div><b>${escapeHtml(run.moduleId)}</b><small>${escapeHtml(shortId(run.runId, 24))}</small></div></div>
-        <div>${badge(run.state)}${run.latestDecision?.outcome === 'STOPPED' ? badge('STOPPED') : ''}<span>第 ${escapeHtml(run.iteration + 1)} 轮</span><button class="secondary-button" data-run-id="${escapeHtml(run.runId)}">查看证据</button></div>
+        <div>${runStatusBadge(run)}${run.latestDecision?.outcome === 'STOPPED' ? badge('STOPPED') : ''}<span>第 ${escapeHtml(run.iteration + 1)} 轮</span><button class="secondary-button" data-run-id="${escapeHtml(run.runId)}">查看证据</button></div>
       </article>`).join('') : emptyState('治理队列为空', '当前没有低置信或失败的运行。')}</div>
     </section>`
 }
@@ -1028,13 +1068,16 @@ function renderAgents() {
   content.innerHTML = `
     ${operationErrorKeys.length ? partialNotice(`${operationErrorLabels}暂不可用；其他已读取数据仍可查看。`) : ''}
     <section class="reference-metrics"><article><small>Agent 数量</small><b class="mint">${state.agents.length}</b><p>固定角色定义</p></article><article><small>服务提供方</small><b>${escapeHtml(providerLabel)}</b><p>${escapeHtml(provider?.model ?? '未选择模型')}</p></article><article><small>配置状态</small><b>${escapeHtml(settings?.verification?.status ? displayLabel(settings.verification.status) : '未读取')}</b><p>${settings?.enabled ? '已作为新批次默认方式' : '尚未启用'}</p></article><article><small>观测样本</small><b>${formatNumber(runSamples)}</b><p>${escapeHtml(displayLabel(runs?.cohort?.kind ?? 'EMPTY'))}</p></article></section>
+    <section class="panel publication-panel"><div class="section-heading"><h2>本地发布与 Git 同步</h2><button class="secondary-button" data-load-publications type="button" ${canEdit ? '' : 'disabled'}>读取发布设置</button></div><p>知识通过确定性门禁后自动写入 Markdown。Git 同步默认关闭，由你手动发起。</p><div id="publication-settings"></div></section>
     <div class="provider-layout">
       <section class="panel provider-card"><div class="section-heading"><h2>模型服务配置</h2>${provider?.availability ? badge(provider.availability) : badge('UNKNOWN')}</div>
         ${state.capabilities?.writeEnabled ? '' : '<div class="notice"><b>服务端写入尚未启用。</b><p>复制仓库根目录的 <code>.env.example</code> 为 <code>.env.local</code>，设置 <code>WP_KNOWLEDGE_WRITE_TOKEN=请替换为随机长令牌</code>，然后重启服务。配置文件不会提交到版本库。</p></div>'}
         <dl class="settings-list"><div><dt>当前执行方式</dt><dd>${escapeHtml(executionProviderLabel)}</dd></div><div><dt>认证状态</dt><dd>${escapeHtml(displayLabel(provider?.authentication ?? 'UNKNOWN'))}</dd></div><div><dt>接口地址</dt><dd>${escapeHtml(settings?.apiUrlMasked ?? '未配置')}</dd></div><div><dt>模型</dt><dd>${escapeHtml(settings?.model ?? provider?.model ?? '未配置')}</dd></div><div><dt>最近验证</dt><dd>${escapeHtml(formatDate(settings?.verification?.checkedAt))}</dd></div></dl>
         <form id="provider-settings-form" data-revision="${escapeHtml(settings?.revision ?? 0)}"><label>API 地址<input name="apiUrl" type="url" required placeholder="${escapeHtml(settings?.apiUrlMasked ? `重新输入完整地址；当前 ${settings.apiUrlMasked}` : 'https://模型服务地址/v1')}" ${canEdit ? '' : 'disabled'}></label><label>API Key<input name="apiKey" type="password" autocomplete="new-password" placeholder="${settings?.apiKeyConfigured ? '留空表示保留现有密钥' : '输入服务密钥'}" ${canEdit ? '' : 'disabled'}></label><label>模型<input name="model" value="${escapeHtml(settings?.model ?? '')}" placeholder="模型标识" ${canEdit ? '' : 'disabled'}></label><label class="inline-check"><input name="clearApiKey" type="checkbox" ${canEdit ? '' : 'disabled'}> 清除已保存的 API Key</label><button class="secondary-button" type="submit" ${canEdit ? '' : 'disabled'}>保存待验证配置</button></form>
-        <button class="primary-button verify-provider" data-verify-provider type="button" ${canEdit && settings?.revision > 0 ? '' : 'disabled'}>验证并启用</button>
-        <p class="form-note">保存会使旧验证失效；只有无副作用验证成功后，新批次才会默认使用这项配置。</p>
+        <dl class="provider-checks"><div><dt>模型列表</dt><dd>${escapeHtml(displayLabel(settings?.verification?.checks?.modelList ?? 'NOT_RUN'))}</dd></div><div><dt>最小生成</dt><dd>${escapeHtml(displayLabel(settings?.verification?.checks?.generation ?? 'NOT_RUN'))}</dd></div></dl>
+        ${settings?.verification?.reasonCode === 'GENERATION_VERIFICATION_REQUIRED' ? '<p class="notice">尚未完成最小生成验证，请重新验证后启用。</p>' : ''}
+        <button class="primary-button verify-provider" data-verify-provider type="button" ${canEdit && settings?.revision > 0 && !state.providerVerifying ? '' : 'disabled'}>${state.providerVerifying ? '正在验证…' : '验证并启用'}</button>
+        <p class="form-note">验证会发送一次最小生成请求，最多 64 个输出 token，可能产生少量费用；不会自动重试。保存配置后需重新验证，验证通过后才能用于新批次。</p>
       </section>
       <section class="panel metrics-card"><div class="section-heading"><h2>运行观测</h2><label>统计窗口<select id="metrics-window"><option value="24h" ${state.metricsWindow === '24h' ? 'selected' : ''}>24 小时</option><option value="7d" ${state.metricsWindow === '7d' ? 'selected' : ''}>7 天</option><option value="30d" ${state.metricsWindow === '30d' ? 'selected' : ''}>30 天</option></select></label></div>
         <div class="compact-metrics"><div><span>批次耗时 P50 / P95</span><b>${formatDuration(runs?.runDurationMs?.p50)} / ${formatDuration(runs?.runDurationMs?.p95)}</b><small>${sampleHint(runs?.runDurationMs)}</small></div><div><span>节点耗时 P50 / P95</span><b>${formatDuration(runs?.nodeDurationMs?.p50)} / ${formatDuration(runs?.nodeDurationMs?.p95)}</b><small>${sampleHint(runs?.nodeDurationMs)}</small></div><div><span>排队耗时 P50 / P95</span><b>${formatDuration(runs?.queueDurationMs?.p50)} / ${formatDuration(runs?.queueDurationMs?.p95)}</b><small>${sampleHint(runs?.queueDurationMs)}</small></div><div><span>服务提供方调用</span><b>${sampledNumber(runs?.providerCalls)}</b><small>${sampleHint(runs?.providerCalls)}</small></div><div><span>Token</span><b>${sampledNumber(runs?.tokens)}</b><small>${sampleHint(runs?.tokens)}</small></div><div><span>估算成本</span><b>${Number(runs?.estimatedCostUsd?.sampleSize ?? 0) > 0 ? `$${formatNumber(runs.estimatedCostUsd.total, 4)}` : '—'}</b><small>${sampleHint(runs?.estimatedCostUsd)}</small></div><div><span>模型调用重试</span><b>${sampledNumber(runs?.providerCalls, 'retries')}</b><small>${sampleHint(runs?.providerCalls)}</small></div><div><span>工作流节点重试</span><b>${sampledNumber(runs?.workflowNodeRetries)}</b><small>${sampleHint(runs?.workflowNodeRetries)}</small></div></div>
@@ -1112,10 +1155,13 @@ async function saveProviderSettings(form) {
 }
 
 async function verifyProviderSettings() {
+  if (state.providerVerifying) return
   if (!state.operatorMode || !state.token || !state.providerSettings) {
     showToast('请先进入治理模式并保存配置。', 'warning')
     return
   }
+  state.providerVerifying = true
+  renderAgents()
   try {
     const verification = await request('/api/v1/provider-settings/verify', {
       method: 'POST',
@@ -1133,6 +1179,9 @@ async function verifyProviderSettings() {
     await loadAgentOperations(true)
     renderAgents()
     showToast(providerErrorMessage(error), 'danger')
+  } finally {
+    state.providerVerifying = false
+    if (state.page === 'agent-settings') renderAgents()
   }
 }
 
@@ -1327,12 +1376,10 @@ async function startWorkflow(form) {
     return
   }
   const data = new FormData(form)
-  const handle = await request('/api/v1/runs', {
+  const handle = await request('/api/v1/runs/markdown-lite', {
     method: 'POST',
     body: JSON.stringify({
-      scenario: JSON.parse(String(data.get('scenario') || '{}')),
       repositoryRoot: String(data.get('repositoryRoot') || ''),
-      workerCount: Number(data.get('workerCount') || 1),
     }),
   })
   state.runs = collection(await request('/api/v1/runs'), 'runs')
@@ -1381,6 +1428,19 @@ content.addEventListener('click', (event) => {
   if (event.target.closest('[data-load-evaluations]')) renderEvidence(true).catch((error) => showToast(userFacingError(error, '无法加载更多评测记录。'), 'danger'))
   if (event.target.closest('[data-load-sources]')) renderDiscovery(false, true).catch((error) => showToast(userFacingError(error, '无法加载更多来源。'), 'danger'))
   if (event.target.closest('[data-verify-provider]')) verifyProviderSettings()
+  const resumeRunButton = event.target.closest('[data-resume-run]')
+  if (resumeRunButton) resumeWorkflow(resumeRunButton).catch((error) => showToast(userFacingError(error, '无法恢复当前批次。'), 'danger'))
+  const cancelRunButton = event.target.closest('[data-cancel-run]')
+  if (cancelRunButton) cancelWorkflow(cancelRunButton).catch((error) => showToast(userFacingError(error, '无法取消当前批次。'), 'danger'))
+  if (event.target.closest('[data-load-publications]')) loadPublications().catch(productError)
+  if (event.target.closest('[data-sync-publications]')) syncPublications().catch(productError)
+  if (event.target.closest('[data-recover-publications]')) recoverPublications().catch(productError)
+  const browseDirectory = event.target.closest('[data-browse-directory]')
+  if (browseDirectory) browseServerDirectory(browseDirectory.dataset.browseDirectory, browseDirectory.dataset.path).catch(productError)
+  const selectDirectory = event.target.closest('[data-select-directory]')
+  if (selectDirectory) { document.querySelector(`[name="${selectDirectory.dataset.field}"]`).value = selectDirectory.dataset.selectDirectory; document.querySelector('#directory-browser').innerHTML = '' }
+  const publication = event.target.closest('[data-publication-key]')
+  if (publication) openPublication(publication.dataset.publicationKey).catch(productError)
   const lineageRun = event.target.closest('[data-lineage-run]')
   if (lineageRun) navigate('runs').then(() => openRun(lineageRun.dataset.lineageRun)).catch(showFatal)
   const knowledgeModule = event.target.closest('[data-knowledge-module]')
@@ -1456,6 +1516,10 @@ content.addEventListener('submit', (event) => {
   if (event.target.id === 'workflow-start-form') {
     event.preventDefault()
     startWorkflow(event.target).catch((error) => showToast(userFacingError(error, '无法创建新批次。'), 'danger'))
+  }
+  if (event.target.id === 'publication-settings-form') {
+    event.preventDefault()
+    savePublicationSettings(event.target).catch(productError)
   }
   if (event.target.id === 'provider-settings-form') {
     event.preventDefault()
@@ -1546,7 +1610,8 @@ content.addEventListener('click', (event) => {
 function filterRuns(filter) {
   const runs = state.runs.filter((run) => {
     if (!filter) return true
-    if (filter === 'active') return !TERMINAL.has(run.state)
+    if (filter === 'active') return isRunActive(run)
+    if (filter === 'failed') return run.executionStatus === 'FAILED'
     if (filter === 'attention') return needsAttention(run)
     return run.state === filter
   })
@@ -1752,3 +1817,86 @@ function connectActivityStreamFrom(after) {
 }
 
 boot().catch(showFatal)
+
+
+// 本地发布操作使用认证 API；目录内容属于服务器文件系统。
+function productError(error) {
+  const messages = {
+    GIT_DISABLED: '请先启用 Git 同步并保存配置。',
+    GIT_CONFLICT: '远端分支已发生变化。请在独立知识仓库处理冲突后重试；本地发布仍然保留。',
+    GIT_AUTHENTICATION_FAILED: 'Git 认证失败，请检查仓库地址与令牌。',
+    GIT_REMOTE_CONTENT_DENIED: '远端包含已发布知识的修改或无关文件，已停止同步。本地知识保持原样，请检查远端后重试。',
+    GIT_SYNC_FAILED: 'Git 同步失败，请检查网络和仓库地址后重试。本地发布仍然保留。',
+    DIRECTORY_DENIED: '此目录不在授权范围内，或不是独立的空知识目录。',
+    PUBLICATION_CONFLICT: '发布正文与审计摘要不一致，请检查发布目录。',
+    PUBLICATION_PENDING: '发布尚待恢复，请点击恢复待完成发布。',
+  }
+  showToast(messages[error.code] ?? userFacingError(error, '操作失败，请检查配置后重试。'), 'danger')
+}
+async function browseServerDirectory(field, path) {
+  const input = document.querySelector(`[name="${field}"]`)
+  const listing = await request(`/api/v1/server-directories${path || input?.value ? `?path=${encodeURIComponent(path || input.value)}` : ''}`)
+  const container = document.querySelector('#directory-browser')
+  container.innerHTML = `<p>服务器目录：<code>${escapeHtml(listing.path)}</code></p><div class="directory-options">${listing.parent ? `<button type="button" class="secondary-button" data-browse-directory="${escapeHtml(field)}" data-path="${escapeHtml(listing.parent)}">上一级</button>` : ''}<button type="button" class="primary-button" data-select-directory="${escapeHtml(listing.path)}" data-field="${escapeHtml(field)}">选择当前目录</button>${listing.directories.map((directory) => `<button type="button" class="secondary-button" data-browse-directory="${escapeHtml(field)}" data-path="${escapeHtml(directory)}">${escapeHtml(directory.split('/').at(-1))}/</button>`).join('')}</div>`
+}
+async function loadPublications() {
+  const settings = await request('/api/v1/publications/settings')
+  const publications = await request('/api/v1/publications')
+  document.querySelector('#publication-settings').innerHTML = `<form id="publication-settings-form" class="publication-form"><label>服务器知识目录<input name="directory" value="${escapeHtml(settings.directory)}" required></label><button class="secondary-button" data-browse-directory="directory" type="button">浏览服务器目录</button><div id="directory-browser" class="directory-browser"></div><label class="inline-check"><input type="checkbox" name="gitEnabled" ${settings.git.enabled ? 'checked' : ''}> 启用手动 Git 同步</label><label>目标仓库<input name="remote" value="${escapeHtml(settings.git.remote)}" placeholder="https://git.example/team/knowledge.git"></label><label>分支<input name="branch" value="${escapeHtml(settings.git.branch)}" required></label><label>HTTPS 访问令牌<input name="gitToken" type="password" autocomplete="new-password" placeholder="${settings.git.tokenConfigured ? '已配置；留空保留' : 'SSH 可使用服务器已有身份'}"></label><label class="inline-check"><input type="checkbox" name="clearToken"> 清除保存的 Git 令牌</label><button class="primary-button" type="submit">保存发布设置</button></form><div class="publication-actions"><button type="button" class="secondary-button" data-sync-publications ${settings.git.enabled ? '' : 'disabled'}>立即同步 Git</button><button type="button" class="secondary-button" data-recover-publications>恢复待完成发布</button></div><div class="publication-list">${publications.items.length ? publications.items.map((item) => `<button type="button" class="reference-doc" data-publication-key="${escapeHtml(item.publicationKey)}"><span><b>${escapeHtml(item.moduleId)}</b><small>${escapeHtml(item.versionId)}</small></span><span>${item.status === 'PUBLISHED' ? '已发布' : '待恢复'}</span><code>${escapeHtml(item.path)}</code></button>`).join('') : '<p>暂无通过门禁的本地发布。</p>'}</div>`
+}
+async function savePublicationSettings(form) {
+  const data = new FormData(form)
+  await request('/api/v1/publications/settings', { method: 'PUT', body: JSON.stringify({ directory: String(data.get('directory')), git: { enabled: data.get('gitEnabled') === 'on', remote: String(data.get('remote') || ''), branch: String(data.get('branch')), token: String(data.get('gitToken') || ''), clearToken: data.get('clearToken') === 'on' } }) })
+  form.reset()
+  await loadPublications()
+  showToast('发布设置已保存。', 'success')
+}
+async function syncPublications() {
+  const button = document.querySelector('[data-sync-publications]')
+  button.disabled = true
+  try { const result = await request('/api/v1/publications/sync', { method: 'POST', body: '{}' }); showToast(`已同步 ${result.publishedCount} 个本地发布。`, 'success') }
+  finally { button.disabled = false }
+}
+async function recoverPublications() {
+  await request('/api/v1/publications/recover', { method: 'POST', body: '{}' })
+  await loadPublications()
+  showToast('待完成发布已恢复。', 'success')
+}
+async function openPublication(key) {
+  const result = await request(`/api/v1/publications/${encodeURIComponent(key)}`)
+  const target = document.querySelector('#publication-settings')
+  target.innerHTML = `<button class="secondary-button" type="button" data-load-publications>返回发布列表</button><h3>${escapeHtml(result.metadata.title || result.receipt.moduleId)}</h3><p>版本 ${escapeHtml(result.receipt.versionId)} · 来源 ${escapeHtml(result.metadata.sourceCommit)}</p><pre class="publication-markdown">${escapeHtml(result.markdown)}</pre><details><summary>来源与门禁证据</summary><pre class="json-view">${json(result.metadata)}</pre></details>`
+}
+
+
+async function cancelWorkflow(button) {
+  if (!state.operatorMode || !state.token) return
+  button.disabled = true
+  button.textContent = '正在取消…'
+  try {
+    await request(`/api/v1/runs/${encodeURIComponent(button.dataset.cancelRun)}/cancel`, { method: 'POST', body: '{}' })
+    state.runs = collection(await request('/api/v1/runs'), 'runs')
+    await openRun(button.dataset.cancelRun)
+    showToast('批次已取消。已完成的运行证据仍然保留。', 'success')
+  } catch (error) {
+    button.disabled = false
+    button.textContent = '取消批次'
+    throw error
+  }
+}
+
+
+async function resumeWorkflow(button) {
+  if (!state.operatorMode || !state.token) return
+  button.disabled = true
+  button.textContent = '正在恢复…'
+  try {
+    const result = await request(`/api/v1/runs/${encodeURIComponent(button.dataset.resumeRun)}/resume`, { method: 'POST', body: '{}' })
+    state.runs = collection(await request('/api/v1/runs'), 'runs')
+    await openRun(button.dataset.resumeRun)
+    showToast(result.executionStatus === 'RUNNING' ? '批次已恢复，继续使用原有预算。' : '恢复请求已处理，请查看当前执行状态。', result.executionStatus === 'RUNNING' ? 'success' : 'warning')
+  } catch (error) {
+    await openRun(button.dataset.resumeRun).catch(() => {})
+    throw error
+  }
+}
