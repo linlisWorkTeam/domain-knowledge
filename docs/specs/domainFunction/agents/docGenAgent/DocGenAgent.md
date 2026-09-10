@@ -82,7 +82,7 @@ Worker 的提交键绑定 Run、内部任务身份、源码输入和冻结提示
 
 ## 本轮实现约定（2026-09-10）
 
-IO-22 输出增加必需 `keywords: string[]`（非空、不重复、元素去除首尾空白）；title、description 禁止纯空白。模型只生成正文和描述，框架使用 YAML 序列化器写入单份 Markdown 工件，拒绝模型自行提供 YAML 头，防止出现双重元数据。原始输出保留审计，知识候选保存同一份带 YAML 的文档，关键词写入版本 tags，标题及摘要写入既有版本索引。
+IO-22 输出增加必需 `keywords: string[]`（非空、不重复、元素去除首尾空白）；title、description 禁止纯空白。模型只生成正文和描述，框架使用固定字段的 YAML 1.2 序列化写入单份 Markdown 工件，拒绝模型自行提供 YAML 头，防止出现双重元数据。原始输出保留审计，知识候选保存同一份带 YAML 的文档，关键词写入版本 tags，标题及摘要写入既有版本索引。
 
 渐进式读取通过 KnowledgeSearchApp 的 `describe(allowedVersionIds)` 只读取授权版本描述及 bodyRef，`loadDocument(versionId, allowedVersionIds)` 才读取该份正文；每次调用显式携带授权版本列表，未授权请求在读取工件前失败。不改变既有全文检索，不新增 SearchAgent，也不把索引当作发布门禁。
 
@@ -95,3 +95,9 @@ IO-22 输出增加必需 `keywords: string[]`（非空、不重复、元素去�
 - 模型正常输出仍为 body/title/description/keywords；可附 unresolvedRisks，连同 Worker 问题交接。结果携带 baseKnowledgeRef 及 appliedCorrectionIds，绑定本轮修订依据；这里表示该次修订接收的意见，不替 Review 判定语义修复成功。
 - 模型认为不宜合为一份时输出独立的 `splitProposal: { reason, suggestedDocuments: string[] }`，不能混入 body。Domain 返回 `userDecisionRequired` 和 proposalRef，不生成正文。Application 在 candidate_knowledge 识别该结果，保存可读原因与建议，沿既有 STOPPED 路由停止；不进入 Code 或创建候选。
 - 独立入口在 result.json 和终端结果展示待决事项。决定继续合成一份时，调用方显式提供 `documentDecision: { action: 'keep-single', proposalRef }` 及该提案工件；如果用户选择拆分，调用方先按用户选择准备单份范围再启动新任务。本轮不新增 Console 决策按钮或自动多文档任务。没有答复不会恢复或默认拆分。
+
+### 收尾验收记录
+
+DocGen 正常输出、章节修订、输入错配拒绝、Worker 组合与风险交接、取消/恢复、拆分提案与显式 keep-single、描述索引和 YAML 入库均有角色/集成测试；固定源码、组合、修订、提案及答复后生成五个 agent:run 场景已执行。统一提交和既有多 Agent 测评编排保持接通；生成能力本身由 S2 验证，服务器真实模型调用按 S3 继续。当前最小链路开发完成。
+
+暂缓项保持原 Spec 决策：IO-08 的业务分组与具体上下文预算、IO-10 的分批摘要及补充分析循环，不将均分文件称为容量预算算法。文档范围的选择由调用方展示提案并收集用户答复；专用 Console 决策界面不在本轮角色收尾范围。知识版本清理/历史最佳回退仍属于 Knowledge 与 Evaluation 的后续实现。

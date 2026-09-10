@@ -32,7 +32,7 @@ SPDX-License-Identifier: MIT
 
 [TestGen IO-21](../agents/testGenAgent/TestGenAgent.md) 已确认首次候选测试校验失败的兜底：Application 将失败证据交回 TestGen，有限修复后由执行器重新校验，仍失败则转人工处理；正常校验通过直接固定测试集，不进入修复分支。该流程不改变已校验测试的源码不变则复用规则，具体接线与重试配置待实现。
 
-[DocGen IO-18](../agents/docGenAgent/DocGenAgent.md) 明确每次飞轮以一份知识文档为修订对象，后续轮次在这份文档基础上修改，不将多份 Worker 产出直接作为多文档输入。初次生成时由 DocGen 将 Worker 产出合成一份文档；内容过大而建议拆分时先与用户沟通，以用户意见为准。即使用户同意拆分，每次飞轮仍只选择一份文档。单文档约束针对知识输入范围，不移除 Check 的源代码输入、测试材料或项目配置。相关边界与用户沟通机制待实现及验收；资料保留与清理按 IO-19，达标结束按 IO-20；历史最佳与关键回归回滚已有目标要求，评分可比性和回退实现细节待落实。
+[DocGen IO-18](../agents/docGenAgent/DocGenAgent.md) 明确每次飞轮以一份知识文档为修订对象，后续轮次在这份文档基础上修改，不将多份 Worker 产出直接作为多文档输入。初次生成时由 DocGen 将 Worker 产出合成一份文档；内容过大而建议拆分时先与用户沟通，以用户意见为准。即使用户同意拆分，每次飞轮仍只选择一份文档。单文档约束针对知识输入范围，不移除 Check 的源代码输入、测试材料或项目配置。DocGen 已校验单文档修订范围，并通过 userDecisionRequired 提案与 STOPPED 路由交接用户决策；资料保留与清理按 IO-19，达标结束按 IO-20；历史最佳与关键回归回滚已有目标要求，评分可比性和回退实现细节待落实。
 
 2026-09-10 确认的 [IO-15](../agents/checkAgent/CheckAgent.md) 保持现有顺序：Check 与 oracle_validation 均完成后进入 evaluation，正常评测结果再进入 Review。Check 生成比较结果及差异依据，评测执行器生成测试结果；Application 将两类证据交给 Review，用于分析知识卡片的修订位置。差异结果不用于决定测试如何执行，Check 不直接跳到 Review。
 

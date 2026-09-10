@@ -301,7 +301,7 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
     if (!bodyRef) throw new Error('WORKFLOW_CANDIDATE_CHECKPOINT_EMPTY');
     const version = this.flywheel.findKnowledgeVersionByBody(scenario.moduleId, bodyRef.artifactId);
     if (!version) throw new Error('WORKFLOW_CANDIDATE_VERSION_MISSING');
-    const quality = this.flywheel.evaluateQuality(document.body, {
+    const quality = this.flywheel.evaluateQuality(renderKnowledgeDocument(document), {
       title: document.title,
       description: document.description,
       provenance: version.provenance,

@@ -66,3 +66,28 @@ test('standalone DocGen reports the user decision and never creates a body artif
     assert.equal(result.outputs.some((item) => item.ref.mediaType === 'text/markdown'), false);
   } finally { c.dispose(); }
 });
+
+test('candidate ingestion and route feedback assess the same serialized DocGen document', async () => {
+  const c = createTestComposition();
+  try {
+    const document = { title: 'Small candidate', description: 'Needs more explanation', keywords: ['small'], body: 'Source behavior. '.repeat(15) };
+    const stages = new ProjectWorkflowStages({ flywheel: c.service, evalRunner: c.apps.evalRunner,
+      evaluator: new TrustedProjectEvaluator(c.artifacts), nodeByAgent: NODE_BY_AGENT,
+      contracts: new JsonSchemaAgentContractValidator('docs/specs/schemas'),
+      modelFactory: ({ command }) => ({ assertOutput: assertModelOutput,
+        execute: async () => command.agentType === 'orchestrator' ? roleExample('orchestrator').output : document }),
+    });
+    const run = c.service.createRun(GENERIC_SCENARIO.moduleId, 'consistency-test');
+    const stage: WorkflowStageInput = { runId: run.runId, nodeId: 'orchestrator', agentId: 'orchestrator',
+      iteration: 0, attempt: 1, maxIterations: 1, workerCount: 0, prompt: 'Generate one document',
+      context: { scenario: GENERIC_SCENARIO, gatePolicy: { policyId: 'consistency-test', minimumStability: 1, requireAllTests: true, maxIterations: 1 } } };
+    Object.assign(stage.context, (await stages.execute(stage)).context);
+    Object.assign(stage.context, (await stages.execute({ ...stage, nodeId: 'doc_gen', agentId: 'doc-gen' })).context);
+    const candidate = await stages.execute({ ...stage, nodeId: 'candidate_knowledge' });
+    const version = c.service.listKnowledgeVersions()[0]!;
+    const feedback = candidate.context?.['qualityReport:0'] as { score: number; outcome: string };
+    assert.equal(candidate.route, 'ITERATE');
+    assert.equal(feedback.score, version.qualityScore);
+    assert.equal(feedback.outcome, version.qualityOutcome);
+  } finally { c.dispose(); }
+});

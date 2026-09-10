@@ -40,7 +40,7 @@ SPDX-License-Identifier: MIT
 | --- | --- | --- | --- | --- |
 | S2-01 | [Orchestrator](specs/domainFunction/agents/orchestratorAgent/OrchestratorAgent.md) | 计划输入、任务输出和失败处理；保持固定业务连接，不能由模型决定 Gate PASS | 开发中（设计已确认，待实现） | IO-17 已确认业务目标、模块概况、项目配置与进度输入，以及本轮任务计划输出；机器契约与执行接线待落实 |
 | S2-02 | [DocWorker](specs/domainFunction/agents/docGenAgent/subAgents/docWorkerAgent/DocWorkerAgent.md) | 源码分块、片段覆盖、来源引用及材料不足处理 | 开发中 | PR #40 已实现 DocGen 内部 Worker；业务细化与本阶段验收待补 |
-| S2-03 | [DocGen](specs/domainFunction/agents/docGenAgent/DocGenAgent.md) | 单文档汇总、超大内容沟通、旧版和 Correction 输入及定向修订 | 开发中 | PR #40 已实现内部拆分与汇总；IO-18 已修正为默认合成一份文档，建议拆分须先与用户沟通并以用户意见为准，每次飞轮只修订输入的单份文档；沟通机制与边界验收待补，IO-10 汇总机制暂定，资料保留与结束规则已按 IO-19、20 确认，回退实现待落实 |
+| S2-03 | [DocGen](specs/domainFunction/agents/docGenAgent/DocGenAgent.md) | 单文档汇总、拆分提案、旧版与 Correction 定向修订、描述索引 | 待验收（最小链路开发完成） | 已完成 Worker 汇总交接、单文档与章节范围校验、拆分提案及显式答复、YAML/关键词/版本索引；定向与独立入口证据见本轮开发记录。IO-08 预算分组、IO-10 分批汇总仍按原 Spec 待细化，S3 真实模型验收后续进行 |
 | S2-04 | [TestGen](specs/domainFunction/agents/testGenAgent/TestGenAgent.md) | 确认输入与测试预期依据，再细化测试候选、oracle 声明和门禁接线 | 开发中（设计确认） | S2-04.a 的源码输入及不读取知识卡片已确认；IO-11 已确认测试源码、用例清单及执行分工，IO-12 暂时保留原始源码校验测试，IO-13 已确认源代码不变时复用已有测试，IO-21 已确认首次候选失败的有限修复与人工兜底，具体接线待实现，见 [TestGen 设计](specs/domainFunction/agents/testGenAgent/TestGenAgent.md)；尚未修改实现，验收待补 |
 | S2-05 | [CodeAgent](specs/domainFunction/agents/codeAgent/CodeAgent.md) | 知识卡片包含接口，项目配置提供 C/C++ 必要约束；本轮白名单与隔离限制读取，框架校验源码列表并落盘 | 开发中（设计已确认，待实现） | IO-03～06 已确认，见 [CodeAgent 设计](specs/domainFunction/agents/codeAgent/CodeAgent.md)；KF-SYS-044、045 为 Planned，代码未改，验收待补 |
 | S2-06 | [Check](specs/domainFunction/agents/checkAgent/CheckAgent.md) | 检查输入、判据、findings 可追溯性及只读边界 | 开发中（设计确认） | IO-14 已确认原始源码、生成代码及比较规则三项输入；IO-15 已确认输出比较结果及差异依据交后续 Review；规则与算法待论文调研，尚未修改实现 |
@@ -54,7 +54,7 @@ S2-03 / S2-07 补充确认 [Knowledge IO-19](specs/domainFunction/knowledge/Know
 
 S2-04 补充确认 [TestGen IO-21](specs/domainFunction/agents/testGenAgent/TestGenAgent.md)：首次生成的候选测试在原始源码上校验失败时交 TestGen 有限修复，仍失败再转人工，仅作为异常兜底；正常通过不进入修复分支，不改变源码不变时已有测试不变的规则。原则已确认，错误分类、修复材料与重试配置待实现，尚未执行代码改动或行为验收。
 
-S2-03 补充确认 [DocGen IO-22](specs/domainFunction/agents/docGenAgent/DocGenAgent.md)：DocGen 生成标题、摘要和关键词，框架写入 YAML 头并建立渐进式加载索引，不新增 Agent。当前仅有 body、title、description 输出；关键词契约、YAML 写入与索引更新及加载链路待实现，本次只更新设计。
+S2-03 补充确认 [DocGen IO-22](specs/domainFunction/agents/docGenAgent/DocGenAgent.md)：DocGen 生成标题、摘要和关键词，框架写入 YAML 头并建立渐进式加载索引，不新增 Agent。本分支已实现 body、title、description、keywords，YAML 写入、版本描述索引及按授权列表渐进加载；见下方本轮开发证据。
 
 范围调整 [Association IO-23](specs/domainFunction/association/Association.md)：用户明确外部知识关联当前阶段不实现，不作为 S2 开发及当前飞轮验收的前置条件。由用户提供文档或指定知识库的来源约定仅供后续参考，关联判断角色、材料契约及关联索引接线延期；DocGen 承担关联判断的建议未确认，不纳入当前职责。IO-22 的知识文档描述、YAML 头与渐进加载索引保持当前范围。
 
@@ -170,3 +170,5 @@ Track four stages here: DDD layout, individual Agent development, end-to-end ver
 - 功能 3（DocGen 收尾）：强制绑定本轮单文档修订，拒绝模块/文档错配及缺失旧版；章节纠正保护范围外正文，结果携带基础引用和纠正编号，并保留汇总风险。Node 24 下 typecheck、validate:specs 通过，角色/内部 Worker/两轮飞轮修订定向测试 16 项通过。拆分提案为下一分项，暂定汇总算法继续按 Spec 保留。
 
 - 功能 4：DocGen 拆分建议使用 userDecisionRequired/proposalRef 保存，candidate_knowledge 不创建候选并沿既有 STOPPED 路由停止；独立入口展示原因与建议。显式 keep-single 答复绑定原模块与源码工件，后续任务只接受一份文档。角色与两轮飞轮原有测试 18 项通过，新增待决生产交接/独立入口测试 2 项通过；完整回归正在核对。
+
+- 功能 5：统一候选入库与路由反馈使用带 YAML 的同一正文，避免描述头引起两处结构评分不一致；新增生产阶段回归覆盖，并通过 3 项相关集成测试。
