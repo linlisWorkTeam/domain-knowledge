@@ -177,3 +177,5 @@ v5 在已有生成结果存在时，冻结同源码快照内当前后代卡片�
 `POST /api/v1/source-revisions` 接受 `{sourceVerificationTaskId}`，返回202独立 FLYWHEEL 任务（KNOWLEDGE_SOURCE_REVISION）。缺少明确来源矛盾返回409；原始角色证据失配拒绝执行。取消、恢复及产物下载沿用 stage-tasks。新版本重建以新版本集合直接启动，不冒充行为失败重试。
 
 当前独立来源执行使用 knowledge-source-verification-v2 与 knowledge-source-revision-v2；v1只读。整卡结果包含逐H2结果与引用，恢复只继续未完成章节。一键v10轮次包含sourceVerification与sourceRepairs，来源未通过不能进入关联；阶段详情包含这些子任务和累计用量。
+
+`POST /api/v1/fixed-evaluations` 接收 reconstructionTaskId 与 suites（每项moduleId/suite），创建 fixed-native-evaluation-v1 独立评测任务。由现有stage-tasks接口读取进度/取消/同版本恢复，覆盖必须等于重建模块全集；参考失败返回质量拒绝，不授予知识或发布结论。免登录规则与其他工作台接口一致。

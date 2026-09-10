@@ -1036,6 +1036,29 @@ test('操作中心从固定 Git 版本分析仓库，显示模块和环境且窄
     const download = page.waitForEvent('download');
     await page.getByRole('button', { name: '下载生成代码', exact: true }).click();
     expect((await download).suggestedFilename()).toBe('stage-evidence.json');
+    const fixedPanel = page.locator('[data-fixed-evaluation-panel]');
+    await fixedPanel.locator(':scope > details > summary').click();
+    await fixedPanel.locator('input[type=file]').setInputFiles({ name: 'FixedCases.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ schemaVersion: 'native-cases-v1', cases: [{
+      caseId: 'fixedParse', description: '固定解析结果', sections: ['fixed-interface#parse'], variables: [], calls: [{ function: 'parse', arguments: [], result: 'result' }],
+      observations: [{ name: 'result', kind: 'integer', read: { variable: 'result' } }], expected: { result: '1' },
+    }] })) });
+    await fixedPanel.getByRole('button', { name: '执行固定评测', exact: true }).click();
+    await expect(fixedPanel).toContainText('生成代码存在固定用例失败');
+    await fixedPanel.getByText('fixedParse · 生成失败', { exact: true }).click();
+    await expect(fixedPanel.locator('table tbody')).toContainText('result110');
+    await expect(fixedPanel.locator('script')).toHaveCount(0);
+    const fixedDownload = page.waitForEvent('download');
+    await fixedPanel.getByRole('button', { name: '下载固定评测报告', exact: true }).click();
+    expect((await fixedDownload).suggestedFilename()).toBe('stage-evidence.json');
+    const fixedViewport = page.viewportSize()!;
+    await page.screenshot({ path: test.info().outputPath('fixed-evaluation-desktop.png'), fullPage: true });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await fixedPanel.getByRole('button', { name: '下载固定评测报告', exact: true }).scrollIntoViewIfNeeded();
+    await expect(fixedPanel.getByRole('button', { name: '下载固定评测报告', exact: true })).toBeInViewport();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await page.screenshot({ path: test.info().outputPath('fixed-evaluation-mobile.png'), fullPage: true });
+    await page.setViewportSize(fixedViewport);
+    await fixedPanel.locator(':scope > details > summary').click();
     await page.getByRole('button', { name: '执行评测', exact: true }).click();
     await expect(page.locator('[data-native-evaluation-panel]')).toContainText('可信用例存在失败');
     await expect(page.locator('[data-native-evaluation-panel]')).toContainText('通过 0/1');

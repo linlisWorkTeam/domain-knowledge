@@ -24,6 +24,8 @@ import { WorkbenchSourceVerification } from '../../application/services/Workbenc
 import { SOURCE_VERIFICATION_CONTRACT } from '../../domain/services/knowledge/KnowledgeSourceVerification.ts';
 import { WorkbenchKnowledgeRevision } from '../../application/services/WorkbenchKnowledgeRevision.ts';
 import { KNOWLEDGE_REVISION_CONTRACT } from '../../domain/services/knowledge/KnowledgeRevision.ts';
+import { WorkbenchFixedEvaluation } from '../../application/services/WorkbenchFixedEvaluation.ts';
+import { FIXED_EVALUATION_CONTRACT } from '../../domain/services/evaluation/NativeFixedEvaluation.ts';
 import { WorkbenchEvaluation } from '../../application/services/WorkbenchEvaluation.ts';
 import { WorkbenchReconstruction } from '../../application/services/WorkbenchReconstruction.ts';
 import { WorkbenchRoleExecution } from '../../application/services/WorkbenchRoleExecution.ts';
@@ -194,12 +196,13 @@ export function createComposition(input: {
   let workbenchGeneration!: WorkbenchGeneration;
   let workbenchReconstruction!: WorkbenchReconstruction;
   let workbenchEvaluation!: WorkbenchEvaluation;
+  let workbenchFixedEvaluation!: WorkbenchFixedEvaluation;
   let workbenchSourceRevision!: WorkbenchSourceRevision;
   let workbenchSourceVerification!: WorkbenchSourceVerification;
   let workbenchKnowledgeRevision!: WorkbenchKnowledgeRevision;
   let workbenchAssociations!: WorkbenchAssociations;
   const workbenchStages = new WorkbenchStages(stageStore, { INDEX: (context) => knowledgeIndex.build(context), GENERATE: (context) => workbenchGeneration.generate(context),
-    FLYWHEEL: (context) => context.task.input.parameters.operation === 'KNOWLEDGE_SOURCE_REVISION' ? workbenchSourceRevision.revise(context) : context.task.input.parameters.operation === 'KNOWLEDGE_REVISION' ? workbenchKnowledgeRevision.revise(context) : workbenchReconstruction.reconstruct(context), EVALUATE: (context) => context.task.input.parameters.operation === 'KNOWLEDGE_SOURCE_VERIFICATION' ? workbenchSourceVerification.verify(context) : workbenchEvaluation.evaluate(context), ASSOCIATE: (context) => workbenchAssociations.build(context) }, (input) => input.stage === 'EVALUATE' ? (input.parameters.operation === undefined || (input.parameters.operation === 'KNOWLEDGE_SOURCE_VERIFICATION' && input.parameters.verificationContract === SOURCE_VERIFICATION_CONTRACT)) : input.stage !== 'FLYWHEEL' || (input.parameters.operation === 'KNOWLEDGE_SOURCE_REVISION' ? input.parameters.revisionContract === SOURCE_REVISION_CONTRACT : input.parameters.operation === 'KNOWLEDGE_REVISION' ? input.parameters.revisionContract === KNOWLEDGE_REVISION_CONTRACT : input.parameters.operation === undefined && input.parameters.comparisonContract === SOURCE_COMPARISON_CONTRACT));
+    FLYWHEEL: (context) => context.task.input.parameters.operation === 'KNOWLEDGE_SOURCE_REVISION' ? workbenchSourceRevision.revise(context) : context.task.input.parameters.operation === 'KNOWLEDGE_REVISION' ? workbenchKnowledgeRevision.revise(context) : workbenchReconstruction.reconstruct(context), EVALUATE: (context) => context.task.input.parameters.operation === 'FIXED_NATIVE_EVALUATION' ? workbenchFixedEvaluation.evaluate(context) : context.task.input.parameters.operation === 'KNOWLEDGE_SOURCE_VERIFICATION' ? workbenchSourceVerification.verify(context) : workbenchEvaluation.evaluate(context), ASSOCIATE: (context) => workbenchAssociations.build(context) }, (input) => input.stage === 'EVALUATE' ? (input.parameters.operation === undefined || (input.parameters.operation === 'FIXED_NATIVE_EVALUATION' && input.parameters.fixedEvaluationContract === FIXED_EVALUATION_CONTRACT) || (input.parameters.operation === 'KNOWLEDGE_SOURCE_VERIFICATION' && input.parameters.verificationContract === SOURCE_VERIFICATION_CONTRACT)) : input.stage !== 'FLYWHEEL' || (input.parameters.operation === 'KNOWLEDGE_SOURCE_REVISION' ? input.parameters.revisionContract === SOURCE_REVISION_CONTRACT : input.parameters.operation === 'KNOWLEDGE_REVISION' ? input.parameters.revisionContract === KNOWLEDGE_REVISION_CONTRACT : input.parameters.operation === undefined && input.parameters.comparisonContract === SOURCE_COMPARISON_CONTRACT));
   const scanner = new SourceScanner(repositoryRoot, repository);
   const knowledgeDiscoveryApp = new KnowledgeDiscoveryApp(scanner, undefined, {
     migrate: (legacyKnowledgeRoot) => migrateLegacyOkf({
@@ -425,6 +428,7 @@ export function createComposition(input: {
     configuration: runConfiguration, stages: workbenchStages, roles: workbenchReconstruction.dependencies.roles, evaluation: nativeEvaluation });
   workbenchSourceRevision = new WorkbenchSourceRevision(workbenchEvaluation, flywheelApp, knowledgeIndex);
   workbenchSourceVerification = new WorkbenchSourceVerification(workbenchEvaluation);
+  workbenchFixedEvaluation = new WorkbenchFixedEvaluation(workbenchEvaluation);
   workbenchKnowledgeRevision = new WorkbenchKnowledgeRevision(workbenchEvaluation, flywheelApp, knowledgeIndex);
   const workbenchPipelines = new WorkbenchPipelines({ materials: workbenchMaterials.store, environment: async (snapshotId, signal) => {
     const project = projectStore.get(snapshotId); if (!project) throw new Error('PROJECT_INPUT_NOT_FOUND');
@@ -594,6 +598,7 @@ export function createComposition(input: {
       nativeEvaluation,
       workbenchReconstruction,
       workbenchEvaluation,
+      workbenchFixedEvaluation,
       workbenchKnowledgeRevision,
       workbenchSourceVerification,
       workbenchSourceRevision,

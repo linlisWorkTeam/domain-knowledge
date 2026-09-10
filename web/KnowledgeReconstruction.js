@@ -3,11 +3,13 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：展示独立重建、检查点代码下载与恢复，区分接口检查和行为验证。
  */
+import { createFixedEvaluationPanel } from './FixedEvaluation.js'
 import { sourceComparisonHtml } from './SourceComparison.js'
 import { createKnowledgeEvaluationPanel } from './KnowledgeEvaluation.js'
 export function createKnowledgeReconstructionPanel({ root, request, escapeHtml: escape, isEditable, selection }) {
   let task = null, checkpoints = [], busy = false, notice = '', timer = null, initialized = false, epoch = 0
   const evaluation = createKnowledgeEvaluationPanel({ root, request, escapeHtml: escape, isEditable, selection: () => task?.status === 'SUCCEEDED' ? task.taskId : null })
+  const fixedEvaluation = createFixedEvaluationPanel({ root, request, escapeHtml: escape, isEditable, selection: () => task?.status === 'SUCCEEDED' ? task.taskId : null })
   const active = () => task && task.input.parameters.comparisonContract === 'native-source-comparison-v1' && ['PENDING', 'RUNNING'].includes(task.status)
   const host = () => root.querySelector('[data-reconstruction-panel]')
   const reasons = {
@@ -43,8 +45,8 @@ export function createKnowledgeReconstructionPanel({ root, request, escapeHtml: 
       ${checkpoints.filter((item) => !task?.result && item.key.startsWith('source-comparison:')).map((item) => download(item.result.artifactRefs[0], '下载源码比较')).join('')}
       ${checkpoints.filter((item) => item.key.startsWith('code-rejection:') || item.key.startsWith('generated-diagnostic:')).map((item) => download(item.result.artifactRefs[1], '下载生成代码诊断')).join('')}
       ${active() ? `<button class="secondary-button" type="button" data-reconstruction-action="cancel" ${busy || task.cancelRequested || !isEditable() ? 'disabled' : ''}>取消重建</button>` : ''}
-      ${resume ? `<button class="secondary-button" type="button" data-reconstruction-action="resume" ${busy || !isEditable() ? 'disabled' : ''}>恢复重建</button>` : ''}` : ''}<section data-native-evaluation-panel></section>`
-    evaluation.refresh()
+      ${resume ? `<button class="secondary-button" type="button" data-reconstruction-action="resume" ${busy || !isEditable() ? 'disabled' : ''}>恢复重建</button>` : ''}` : ''}<section data-native-evaluation-panel></section><section data-fixed-evaluation-panel></section>`
+    evaluation.refresh(); fixedEvaluation.refresh()
   }
   async function observe() {
     clearTimeout(timer); timer = null; if (!task || !host()) return

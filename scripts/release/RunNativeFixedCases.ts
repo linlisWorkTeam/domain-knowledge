@@ -108,7 +108,7 @@ try {
     const comparison = compareNativeInterfaces(api.declarations, generatedApi.declarations);
     report.interfaceComparison = comparison; save();
     if (!comparison.compatible) throw new Error('FIXED_RECONSTRUCTION_INTERFACE_MISMATCH');
-    const generatedContract = { ...contract, entryPaths: generatedInput.files.filter(file => /\.(c|cc|cpp|cxx)$/.test(file.path)).map(file => file.path) };
+    const generatedContract = { ...contract, entryPaths: generatedInput.files.filter(file => file.path !== contract.includePath && /\.(c|cc|cpp|cxx)$/.test(file.path)).map(file => file.path) };
     const generatedObservations: NativeCaseObservation[] = []; report.generatedObservations = generatedObservations;
     report.status = 'GENERATED_RUNNING'; save();
     for (const test of suite.cases) {

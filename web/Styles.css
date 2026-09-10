@@ -1312,3 +1312,9 @@ body.drawer-active { overflow: hidden; }
 .source-diff-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .source-comparison h4 { overflow-wrap: anywhere; }
 @media (max-width: 640px) { .source-diff-columns { grid-template-columns: minmax(0, 1fr); } }
+
+[data-fixed-evaluation-panel] { min-width: 0; overflow-wrap: anywhere; }
+[data-fixed-evaluation-panel] > details { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
+[data-fixed-evaluation-panel] table { width: 100%; table-layout: fixed; border-collapse: collapse; }
+[data-fixed-evaluation-panel] th, [data-fixed-evaluation-panel] td { text-align: left; vertical-align: top; padding: 6px; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
+[data-fixed-evaluation-panel] pre { white-space: pre-wrap; overflow: auto; max-width: 100%; }

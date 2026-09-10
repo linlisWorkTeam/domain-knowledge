@@ -55,6 +55,7 @@ const assets = new Map([
   ['/WorkbenchPipeline.js', 'WorkbenchPipeline.js'],
   ['/KnowledgeReconstruction.js', 'KnowledgeReconstruction.js'],
   ['/KnowledgeEvaluation.js', 'KnowledgeEvaluation.js'],
+  ['/FixedEvaluation.js', 'FixedEvaluation.js'],
   ['/KnowledgeAssociations.js', 'KnowledgeAssociations.js'],
   ['/Styles.css', 'Styles.css'],
 ]);
@@ -373,7 +374,7 @@ export function createKnowledgeServer(input: {
       }
       // 目录、配置和写入仅允许直接本机访问，或携带远程访问令牌。
       const localClient = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(request.socket.remoteAddress ?? '');
-      const workbenchRoute = /^\/api\/v1\/(external-materials|workbench-pipelines|stage-tasks|index-builds|knowledge-index|repository-analyses|projects|generations|reconstructions|native-evaluations|knowledge-revisions|source-verifications|source-revisions|associations)(\/|$)/.test(url.pathname);
+      const workbenchRoute = /^\/api\/v1\/(external-materials|workbench-pipelines|stage-tasks|index-builds|knowledge-index|repository-analyses|projects|generations|reconstructions|native-evaluations|fixed-evaluations|knowledge-revisions|source-verifications|source-revisions|associations)(\/|$)/.test(url.pathname);
       const productRoute = url.pathname.startsWith('/api/v1/publications')
         || url.pathname === '/api/v1/server-directories' || url.pathname === '/api/v1/runs/markdown-lite';
       if (url.pathname.startsWith('/api/') && (!localClient || productRoute || workbenchRoute) && !authorized(request, writeToken, anonymousAccess)) {
@@ -511,6 +512,11 @@ export function createKnowledgeServer(input: {
           const payload = await body(request); requireOnlyKeys(payload, ['sourceVerificationTaskId']);
           if (typeof payload.sourceVerificationTaskId !== 'string') throw new Error('PAYLOAD_INVALID');
           send(response, 202, { task: await composition.apps.workbenchSourceRevision.start(payload.sourceVerificationTaskId) }); return;
+        }
+        if (request.method === 'POST' && url.pathname === '/api/v1/fixed-evaluations') {
+          const payload = await body(request); requireOnlyKeys(payload, ['reconstructionTaskId', 'suites']);
+          if (typeof payload.reconstructionTaskId !== 'string' || !Array.isArray(payload.suites)) throw new Error('PAYLOAD_INVALID');
+          send(response, 202, { task: await composition.apps.workbenchFixedEvaluation.start(payload.reconstructionTaskId, payload.suites as unknown as import('../../application/services/WorkbenchFixedEvaluation.ts').FixedModuleSuite[]) }); return;
         }
         if (request.method === 'POST' && url.pathname === '/api/v1/source-verifications') {
           const payload = await body(request); requireOnlyKeys(payload, ['evaluationTaskId']);
