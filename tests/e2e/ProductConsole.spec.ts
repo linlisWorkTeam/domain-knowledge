@@ -234,6 +234,7 @@ test('新增发布知识阅读视觉基线展示来源与确定性门禁', async
   await page.addInitScript(() => localStorage.setItem('wp-knowledge-theme', 'light'));
   await openSettings(page);
   await page.locator(`[data-publication-key="${publicationKey}"]`).click();
+  await expect(page.locator('.publication-readable h3', { hasText: '公开接口' })).toBeVisible();
   await expect(page.locator('.publication-markdown')).toHaveText(markdown);
   const panel = page.locator('.publication-panel');
   await panel.scrollIntoViewIfNeeded();

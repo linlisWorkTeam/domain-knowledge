@@ -688,16 +688,17 @@ test('light and dark themes keep successful API states across all seven pages an
   await assertNoDarkSurfaces('Knowledge drawer');
 });
 
-test('Action Center preserves the reference header baseline and information structure at 1363 by 936', async ({ page }) => {
+test('Action Center preserves readable hierarchy and factual progress at 1363 by 936', async ({ page }) => {
   await page.setViewportSize({ width: 1363, height: 936 });
   await page.addInitScript(() => localStorage.setItem('wp-knowledge-theme', 'light'));
   await page.goto(baseUrl);
   await expect(page.getByRole('heading', { name: '操作中心', level: 1 })).toBeVisible();
   await expect(page.getByText('知识健康度')).toBeVisible();
   await expect(page.getByText('最近动态')).toBeVisible();
-  for (const [index, stage] of ['发现', '生成', '评测', '演进'].entries()) {
-    await expect(page.locator('.flywheel-stages > li > span').nth(index)).toContainText(stage);
-  }
+  await expect(page.locator('.latest-result')).toContainText('已记录进度');
+  await expect(page.locator('.latest-result strong')).not.toBeEmpty();
+  await expect(page.locator('.current-run-card .run-state-line')).toHaveCount(0);
+
 
   const geometry = await page.evaluate(() => {
     const topbar = document.querySelector('.topbar')!.getBoundingClientRect();
@@ -718,10 +719,10 @@ test('Action Center preserves the reference header baseline and information stru
     expect(family).toContain('Microsoft YaHei');
     expect(family).not.toMatch(/SimSun|宋体/);
   }
-  expect(geometry.topbar.height).toBe(103);
+  expect(geometry.topbar.height).toBe(88);
   expect(Math.abs(geometry.actions.center - geometry.topbar.center)).toBeLessThan(2);
-  expect(geometry.title.top).toBeGreaterThanOrEqual(39.5);
-  expect(geometry.title.top).toBeLessThanOrEqual(45);
+  expect(geometry.title.top).toBeGreaterThanOrEqual(32);
+  expect(geometry.title.top).toBeLessThanOrEqual(34);
   expect(geometry.actions.top).toBeGreaterThan(20);
 
   await expect(page).toHaveScreenshot('ActionCenter1363x936LightLinux.png', {
@@ -806,4 +807,44 @@ test('evaluation explains knowledge risk separately from code check failure', as
   await expect(page.getByRole('dialog').getByText('知识风险尚未解决', { exact: true })).toBeVisible();
   await expect(page.getByRole('dialog').getByText('代码检查存在阻塞', { exact: true })).toHaveCount(0);
   await page.screenshot({ path: test.info().outputPath('knowledge-risk.png'), fullPage: true });
+});
+
+
+test('知识阅读器提供正文目录、可展开证据和原文，窄屏不溢出', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(baseUrl);
+  await page.getByRole('button', { name: '打开主导航' }).click();
+  await page.getByRole('button', { name: '知识', exact: true }).click();
+  const card = page.locator(`[data-version-id="${latestVersionId}"]`).first();
+  await card.click();
+  await expect(page.locator('.knowledge-body h3').filter({hasText:'修订说明'})).toBeVisible();
+  await expect(page.locator('.reader-evidence')).not.toHaveAttribute('open', '');
+  await page.locator('.reader-toc summary').click();
+  await page.locator('.reader-toc a').filter({hasText:'修订说明'}).click();
+  await expect(page.locator('.knowledge-body h3').filter({hasText:'修订说明'})).toBeFocused();
+  await page.locator('.reader-source summary').click();
+  await expect(page.locator('.reader-source pre')).toHaveText(REVISED_BODY);
+  await page.locator('.reader-evidence summary').click();
+  await expect(page.locator('.reader-evidence')).toContainText(HEALTH_SOURCE_LOCATOR);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.keyboard.press('Escape');
+  await expect(card).toBeFocused();
+});
+
+test('操作中心分类筛选真实事项并允许恢复全部', async ({ page }) => {
+  await page.goto(baseUrl);
+  const all = page.locator('[data-queue-filter=""]');
+  await expect(all).toHaveAttribute('aria-pressed', 'true');
+  const count = await page.locator('.attention-row').count();
+  const source = page.locator('[data-queue-filter="SOURCE"]');
+  await source.click();
+  await expect(source).toHaveAttribute('aria-pressed', 'true');
+  const sourceCount = Number((await source.innerText()).match(/\d+$/)?.[0]);
+  await expect(page.locator('.attention-row')).toHaveCount(sourceCount);
+  await expect(page.locator('.attention-subject[data-action-source-id]')).toHaveCount(sourceCount);
+  await page.locator('[data-queue-filter="LOW_CONFIDENCE"]').click();
+  await expect(page.locator('.queue-partial-state')).toContainText('该分类暂无待处理事项');
+  await all.click();
+  await expect(page.locator('.attention-row')).toHaveCount(count);
+  await expect(all).toBeFocused();
 });

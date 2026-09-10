@@ -117,7 +117,7 @@ ECS 约 3.6 GiB 内存、无 swap。模型与模块评测共享一个进程槽�
 
 `agents` 与 `services` 在 Domain 平级；角色选择通过 AgentExecutionService 封装，association/evaluation 等服务持有各自确定性规则。Spec、目录契约和调用方已同步，详见 [领域边界](specs/totalRules/DomainDrivenDesign.md)。开发 subagent 并行规范见 [CodeTaste](specs/totalRules/CodeTaste.md#开发过程中的-subagent-并行协作)，NFR-013 的实际双任务宿主验收尚未执行。
 
-本次类型、Spec、架构与目录契约通过；完整回归 325 项中 324 通过，唯一站点资产摘要失配已修复并通过站点 12/12 定向复测。未重复执行完整回归，也未运行浏览器、外网模型或重新构建安装包；前述真实 MVP 验收结论保持原有边界。具体交接见 [本次墓志铭](epitaph/2026-09-10-1017-domain-services-subagents.md)。
+本次类型、Spec、架构与目录契约通过；完整回归 325 项中 324 通过，唯一站点资产摘要失配已修复并通过站点 12/12 定向复测。未重复执行完整回归，也未运行浏览器、外网模型或重新构建安装包；前述真实 MVP 验收结论保持原有边界。具体交接见 [本次墓志铭](https://github.com/linlisWorkTeam/domain-knowledge/blob/94d431a86b7656ded4109c3a00ae93b182df2e6c/docs/epitaph/2026-09-10-1017-domain-services-subagents.md)。
 
 
 ## 第四次真实验收（2026-09-10，最终 STOPPED）

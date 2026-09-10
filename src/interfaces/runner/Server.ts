@@ -45,6 +45,7 @@ const assets = new Map([
   ['/', 'index.html'],
   ['/index.html', 'index.html'],
   ['/App.js', 'App.js'],
+  ['/KnowledgeMarkdown.js', 'KnowledgeMarkdown.js'],
   ['/Styles.css', 'Styles.css'],
 ]);
 

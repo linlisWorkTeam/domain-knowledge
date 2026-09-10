@@ -109,3 +109,7 @@ This document summarizes older handoffs, milestones and architectural decisions 
 - [2026-09-09-1710-mvp-stage-repair-candidate.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/9e35adfe5523c156dcbd8d0e1dc1a0fe490d4358/docs/epitaph/2026-09-09-1710-mvp-stage-repair-candidate.md)：854ac9c 阶段修复候选的 321 回归、21 Console、离线安装与实际历史数据浏览器验证；当时真实预算为3/3。后续第四次已授权并失败，风险复核代码现为v4；旧安装与真实记录只作历史证据。
 
 - [2026-09-10-1017-domain-services-subagents.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/94d431a86b7656ded4109c3a00ae93b182df2e6c/docs/epitaph/2026-09-10-1017-domain-services-subagents.md)：开发 subagent 协作规范、Domain agents/services 平级迁移及 AgentExecutionService 入口；当时定向架构/类型/Spec 通过，全量唯一官网摘要失败复测通过，没有外网模型验收。后由 MVP 集成与 340 项最终回归覆盖；开发调度能力与产品动态派生 Agent 不混同。
+
+## 前台视觉重构前的历史交接
+
+- [2026-09-10-1020-fourth-real-risk-blocker.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/55661e054edabcb694f84565da41b3f262481171/docs/epitaph/2026-09-10-1020-fourth-real-risk-blocker.md)：第四次真实飞轮在三轮行为门禁通过后仍受未处置知识风险阻塞；当时仅授权四次、PR38 为草稿，传输与 H2 修订修复已有受控验证。后来用户追加额度授权，风险生命周期、真实发布及 v0.2.0 验收已经完成，见保留的 1047、1141 记录；旧失败证据与原账本不改写。此次归档只为保留最新三份交接，不重开已完成的 MVP 验收。

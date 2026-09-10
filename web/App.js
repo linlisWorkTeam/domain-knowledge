@@ -3,6 +3,8 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：提供app页面的展示、交互或样式资源。
  */
+import { renderKnowledgeMarkdown } from './KnowledgeMarkdown.js'
+
 const content = document.querySelector('#page-content')
 const nav = document.querySelector('#primary-nav')
 const title = document.querySelector('#page-title')
@@ -423,10 +425,15 @@ function runRow(run, compact = false) {
 
 function setPageMeta(page) {
   title.textContent = PAGE_META[page] ?? PAGE_META.overview
-  for (const item of nav.querySelectorAll('[data-page]')) item.classList.toggle('active', item.dataset.page === page)
+  for (const item of nav.querySelectorAll('[data-page]')) {
+    item.classList.toggle('active', item.dataset.page === page)
+    if (item.dataset.page === page) item.setAttribute('aria-current', 'page')
+    else item.removeAttribute('aria-current')
+  }
 }
 
 function renderOverview() {
+  const focusedQueueFilter = document.activeElement?.dataset?.queueFilter
   const active = state.runs.filter(isRunActive)
   const attention = state.actionItems.filter((item) => item.status !== 'RESOLVED')
   const status = state.status ?? {}
@@ -441,7 +448,9 @@ function renderOverview() {
     : health?.overall?.value
   const healthScore = healthOverall === null || healthOverall === undefined ? '—' : formatNumber(healthOverall)
   const healthAvailable = healthScore !== '—'
-  const runIssueRows = attention.length ? attention.slice(0, 5).map((item, index) => {
+  const queueMatches = (item, filter) => !filter || (filter === 'SOURCE' ? item.subject?.kind === 'SOURCE' : item.type === filter)
+  const visibleAttention = attention.filter((item) => queueMatches(item, state.queueFilter))
+  const runIssueRows = visibleAttention.length ? visibleAttention.map((item) => {
     const isSource = item.subject?.kind === 'SOURCE' && item.subject?.id
     const subjectId = item.runId || item.subject?.id || ''
     const subjectLink = item.runId
@@ -449,7 +458,7 @@ function renderOverview() {
       : isSource ? `data-action-source-id="${escapeHtml(item.subject.id)}"` : 'disabled'
     const subjectLabel = isSource ? '来源' : '批次'
     return `
-    <div class="attention-row ${index === 0 ? 'selected' : ''}">
+    <div class="attention-row">
       <i class="attention-dot ${item.severity === 'HIGH' ? 'danger' : 'warning'}" aria-hidden="true"></i>
       <button class="attention-subject" ${subjectLink} type="button"><b>${escapeHtml(item.summary)}</b><small>${subjectLabel} ${escapeHtml(shortId(subjectId, 26))} · ${escapeHtml(displayLabel(item.reasonCode))}</small></button>
       ${badge(item.status)}
@@ -457,7 +466,7 @@ function renderOverview() {
       <time>${escapeHtml(formatDate(item.updatedAt))}</time>
     </div>`
   }).join('') : ''
-  const queueRemainder = `<div class="queue-partial-state"><span aria-hidden="true">◇</span><div><b>${attention.length ? '暂无更多待办' : '目前没有待处理事项'}</b><small>${state.resourceErrors.actionItems ? '待处理事项读取失败' : '所有服务端治理事项均已处理'}</small></div><em>${state.resourceErrors.actionItems ? '读取失败' : '暂无数据'}</em></div>`
+  const queueRemainder = visibleAttention.length ? '' : `<div class="queue-partial-state"><div><b>${state.resourceErrors.actionItems ? '待处理事项读取失败' : state.queueFilter ? '该分类暂无待处理事项' : '目前没有待处理事项'}</b><small>${state.resourceErrors.actionItems ? '请重新连接后查看' : '可切换分类或查看全部批次'}</small></div></div>`
   const pulseRows = recent.slice(0, 3).map((activity) => `
     <button class="pulse-row" ${activity.runId ? `data-run-id="${escapeHtml(activity.runId)}"` : 'disabled'} type="button"><i class="${activity.severity === 'HIGH' ? 'warning' : 'success'}"></i><span><b>${escapeHtml(EVENT_LABELS[activity.type] ?? activity.summary)}</b><small>${escapeHtml(EVENT_LABELS[activity.type] ?? '系统活动')} · ${escapeHtml(formatDate(activity.occurredAt))}</small></span></button>`).join('')
   content.innerHTML = `
@@ -466,7 +475,7 @@ function renderOverview() {
       <article class="attention-summary">
         <span class="attention-orb"><i></i></span>
         <div><p class="eyebrow danger-text">需要处理</p><h2>${state.resourceErrors.actionItems ? '治理事项不可用' : `${attention.length} 项需要确认`}</h2><p>${state.resourceErrors.actionItems ? '无法读取治理事项' : '来自服务端持久化治理队列'}</p></div>
-        <footer><i></i><i></i><i></i></footer>
+
       </article>
       <article class="knowledge-summary">
         <header><p class="eyebrow">知识健康度</p><span>${healthAvailable ? `${escapeHtml(health.window?.key ?? health.window ?? '当前窗口')} · 规则 ${escapeHtml(health.ruleVersion ?? '—')}` : '暂无完整样本'}</span></header>
@@ -477,19 +486,22 @@ function renderOverview() {
     <div class="overview-workspace">
       <section class="attention-queue">
         <header><div><h2>需要处理</h2><small>由批次、门禁、组件与来源事实产生</small></div><button class="text-button" data-page-link="runs">查看批次 →</button></header>
-        <div class="queue-filters"><button class="active">全部　${attention.length}</button><button>批次失败　${attention.filter((item) => item.type === 'RUN_FAILED').length}</button><button>低置信　${attention.filter((item) => item.type === 'LOW_CONFIDENCE').length}</button><button>来源异常　${attention.filter((item) => item.subject?.kind === 'SOURCE').length}</button><span>${state.operatorMode ? '可执行治理操作' : '进入治理模式后可操作'}</span></div>
+        <div class="queue-filters" aria-label="待处理事项分类">${[['', '全部'], ['RUN_FAILED', '批次失败'], ['LOW_CONFIDENCE', '低置信'], ['SOURCE', '来源异常']].map(([filter, label]) => `<button type="button" data-queue-filter="${filter}" aria-pressed="${(state.queueFilter || '') === filter}" class="${(state.queueFilter || '') === filter ? 'active' : ''}">${label}　${attention.filter((item) => queueMatches(item, filter)).length}</button>`).join('')}</div>
         <div class="queue-labels"><span>事项</span><span>状态与操作</span><span>更新</span></div>
         <div class="queue-body">${runIssueRows}${queueRemainder}</div>
       </section>
       <aside class="overview-rail">
-        <article class="current-run-card">
+        <article class="current-run-card ${latestRun && needsAttention(latestRun) ? 'needs-attention' : ''}">
           <header><small><i></i> 飞轮${active.length ? '运行中' : '状态'}</small><button class="text-button" data-page-link="runs">打开批次 ↗</button></header>
-          ${latestRun ? `<h3>${escapeHtml(shortId(latestRun.runId, 18))}</h3><p>${escapeHtml(latestRun.moduleId)} · ${escapeHtml(runStatusLabel(latestRun))}</p><div class="run-state-line"><i></i></div><div class="run-state-meta"><b>${escapeHtml(runStatusLabel(latestRun))}</b><span>暂不提供预计完成时间</span></div>` : emptyState('暂无批次', '注册中没有批次记录。')}
-          <ol class="flywheel-stages"><li class="observed"><i>1</i><span>发现<small>批次已登记</small></span></li><li class="observed"><i>2</i><span>生成<small>${latestRun ? escapeHtml(runStatusLabel(latestRun)) : '等待运行'}</small></span></li><li><i>3</i><span>评测<small>${state.latestProgress?.mode === 'DETERMINATE' ? `${state.latestProgress.completedUnits}/${state.latestProgress.totalUnits}` : '等待可证明进度'}</small></span></li><li><i>4</i><span>演进<small>发布状态待确认</small></span></li></ol>
+          ${latestRun ? `<h3>${escapeHtml(shortId(latestRun.runId, 18))}</h3><p>${escapeHtml(latestRun.moduleId)} · ${escapeHtml(runStatusLabel(latestRun))}</p><div class="run-state-meta"><b>${escapeHtml(runStatusLabel(latestRun))}</b></div>` : emptyState('暂无批次', '注册中没有批次记录。')}
+          <div class="latest-result"><span>已记录进度</span><strong>${state.latestProgress?.mode === 'DETERMINATE' ? `${state.latestProgress.completedUnits} / ${state.latestProgress.totalUnits}` : '暂无可证明进度'}</strong><small>暂不提供预计完成时间</small><small>${latestRun?.latestDecision?.outcome ? `最近门禁：${escapeHtml(displayLabel(latestRun.latestDecision.outcome))}` : '打开批次查看评测与发布记录'}</small></div>
+          ${latestRun ? `<button class="wide" data-run-id="${escapeHtml(latestRun.runId)}">查看本次结果 →</button>` : ''}
         </article>
         <article class="recent-pulse"><header><h3>最近动态</h3><span>${state.activityStream ? '实时连接' : '轮询更新'}</span></header>${pulseRows || '<div class="pulse-empty"><b>暂无真实活动</b><small>服务端尚未记录活动</small></div>'}</article>
       </aside>
     </div>`
+  // 轮询刷新不能打断正在使用分类按钮的键盘用户。
+  if (focusedQueueFilter !== undefined) content.querySelector(`[data-queue-filter="${CSS.escape(focusedQueueFilter)}"]`)?.focus({ preventScroll: true })
 }
 
 function renderRuns() {
@@ -658,19 +670,21 @@ async function openKnowledge(versionId, returnFocus) {
   const relationCounts = lineage?.relations
     ? Object.entries(lineage.relations).map(([name, values]) => `${({ runs: '批次', evaluations: '评测', corrections: '修订', publications: '发布', provenance: '来源' })[name] ?? name} ${Array.isArray(values) ? values.length : 0}`).join(' · ')
     : ''
+  const rendered = renderKnowledgeMarkdown(item.body)
   drawerTitle.textContent = item.title || item.moduleId
   drawerContent.innerHTML = `
-    <div class="drawer-badges">${badge(item.status)} ${badge(item.qualityOutcome)}</div>
-    <p class="lead">${escapeHtml(item.description || '暂无描述')}</p>
-    <dl class="fact-grid">
-      <div><dt>模块</dt><dd>${escapeHtml(item.moduleId)}</dd></div>
-      <div><dt>版本</dt><dd>${escapeHtml(item.versionId)}</dd></div>
-      <div><dt>质量门禁</dt><dd>${escapeHtml(item.qualityScore)} / 100</dd></div>
-      <div><dt>行为门禁</dt><dd>${item.gateDecisionId ? escapeHtml(shortId(item.gateDecisionId, 22)) : '尚未通过，不可发布'}</dd></div>
-    </dl>
-    <section class="drawer-section"><h3>来源记录</h3><ul class="provenance-list">${item.provenance.map((source) => `<li><code>${escapeHtml(source.path)}</code>${source.commit ? `<small>@ ${escapeHtml(source.commit)}</small>` : ''}</li>`).join('')}</ul></section>
-    <section class="drawer-section"><h3>内容摘要</h3><button class="copy-value" data-copy="${escapeHtml(item.bodyRef.sha256)}"><code>${escapeHtml(item.bodyRef.sha256)}</code><span>复制</span></button></section>
-    <section class="drawer-section"><h3>正文</h3><pre class="knowledge-body">${escapeHtml(item.body)}</pre></section>
+    <div class="reader-status"><div class="drawer-badges">${badge(item.status)} ${badge(item.qualityOutcome)}</div><span>${escapeHtml(item.moduleId)} · 质量 ${escapeHtml(item.qualityScore)} / 100</span></div>
+    <details class="reader-evidence"><summary>版本、来源与内容摘要</summary>
+      <p class="lead">${escapeHtml(item.description || '暂无描述')}</p>
+      <dl class="fact-grid"><div><dt>版本</dt><dd>${escapeHtml(item.versionId)}</dd></div><div><dt>行为门禁</dt><dd>${item.gateDecisionId ? escapeHtml(item.gateDecisionId) : '尚未通过，不可发布'}</dd></div></dl>
+      <h3>来源记录</h3><ul class="provenance-list">${item.provenance.map((source) => `<li><code>${escapeHtml(source.path)}</code>${source.commit ? `<small>@ ${escapeHtml(source.commit)}</small>` : ''}</li>`).join('')}</ul>
+      <h3>内容摘要</h3><button class="copy-value" data-copy="${escapeHtml(item.bodyRef.sha256)}"><code>${escapeHtml(item.bodyRef.sha256)}</code><span>复制</span></button>
+    </details>
+    <section class="reader-section"><div class="reader-toolbar"><h3>正文</h3><button class="secondary-button" data-copy="${escapeHtml(item.body)}" type="button">复制 Markdown</button></div>
+      ${rendered.headings.length ? `<details class="reader-toc"><summary>文章目录 · ${rendered.headings.length} 节</summary><nav aria-label="文章目录">${rendered.headings.map((heading) => `<a href="#${heading.id}">${escapeHtml(heading.text)}</a>`).join('')}</nav></details>` : ''}
+      <article class="knowledge-body">${rendered.html || '<p>暂无正文</p>'}</article>
+      <details class="reader-source"><summary>查看 Markdown 原文</summary><pre>${escapeHtml(item.body)}</pre></details>
+    </section>
     <section class="drawer-section"><h3>版本血缘</h3>${lineage
       ? `<p class="lead">${escapeHtml(relationCounts || `${lineageNodes.length} 个关联版本`)}</p>${lineageRelationList(lineage)}${comparisonVersions.length ? `<form id="knowledge-diff-form" data-version="${escapeHtml(item.versionId)}"><label>对比版本<select name="against">${comparisonVersions.map((node) => `<option value="${escapeHtml(node.versionId)}" ${node.versionId === defaultAgainst ? 'selected' : ''}>${escapeHtml(shortId(node.versionId, 28))}${node.status ? ` · ${escapeHtml(displayLabel(node.status))}` : ''}</option>`).join('')}</select></label><button class="secondary-button" type="submit">比较版本</button></form><div id="knowledge-diff-result"></div>` : emptyState('暂无可比较版本', '当前血缘中只有这个知识版本。')}`
       : partialNotice(userFacingError(lineageResult.error, '版本血缘暂不可用。'))}</section>
@@ -1215,6 +1229,7 @@ async function navigate(page) {
     renderAgents()
   }
   closeNavigation()
+  window.scrollTo({ top: 0, behavior: 'instant' })
   content.focus({ preventScroll: true })
 }
 
@@ -1278,6 +1293,9 @@ function openDrawer(returnFocus = document.activeElement) {
   drawerReturnKey = returnFocus?.dataset?.versionId
     ? `[data-version-id="${CSS.escape(returnFocus.dataset.versionId)}"]`
     : null
+  drawer.classList.toggle('knowledge-reader', Boolean(drawerContent.querySelector('.reader-section')))
+  drawer.scrollTop = 0
+  document.body.classList.add('drawer-active')
   drawer.hidden = false
   drawer.setAttribute('aria-hidden', 'false')
   drawerBackdrop.hidden = false
@@ -1293,6 +1311,7 @@ function closeDrawer() {
   drawer.setAttribute('aria-hidden', 'true')
   drawerBackdrop.hidden = true
   drawer.hidden = true
+  document.body.classList.remove('drawer-active')
   requestAnimationFrame(() => {
     const returnTarget = document.contains(previousReturnFocus)
       ? previousReturnFocus
@@ -1399,6 +1418,13 @@ nav.addEventListener('click', (event) => {
 })
 
 content.addEventListener('click', (event) => {
+  const queueFilter = event.target.closest('[data-queue-filter]')
+  if (queueFilter) {
+    state.queueFilter = queueFilter.dataset.queueFilter
+    renderOverview()
+    content.querySelector(`[data-queue-filter="${CSS.escape(state.queueFilter)}"]`)?.focus()
+    return
+  }
   const pageLink = event.target.closest('[data-page-link]')
   if (pageLink) navigate(pageLink.dataset.pageLink).catch(showFatal)
   const runButton = event.target.closest('[data-run-id]')
@@ -1606,6 +1632,13 @@ drawerContent.addEventListener('click', (event) => {
 })
 
 content.addEventListener('click', (event) => {
+  const queueFilter = event.target.closest('[data-queue-filter]')
+  if (queueFilter) {
+    state.queueFilter = queueFilter.dataset.queueFilter
+    renderOverview()
+    content.querySelector(`[data-queue-filter="${CSS.escape(state.queueFilter)}"]`)?.focus()
+    return
+  }
   const filter = event.target.closest('[data-run-filter]')
   if (!filter) return
   for (const item of content.querySelectorAll('[data-run-filter]')) item.classList.toggle('active', item === filter)
@@ -1870,7 +1903,7 @@ async function recoverPublications() {
 async function openPublication(key) {
   const result = await request(`/api/v1/publications/${encodeURIComponent(key)}`)
   const target = document.querySelector('#publication-settings')
-  target.innerHTML = `<button class="secondary-button" type="button" data-load-publications>返回发布列表</button><h3>${escapeHtml(result.metadata.title || result.receipt.moduleId)}</h3><p>版本 ${escapeHtml(result.receipt.versionId)} · 来源 ${escapeHtml(result.metadata.sourceCommit)}</p><pre class="publication-markdown">${escapeHtml(result.markdown)}</pre><details><summary>来源与门禁证据</summary><pre class="json-view">${json(result.metadata)}</pre></details>`
+  target.innerHTML = `<button class="secondary-button" type="button" data-load-publications>返回发布列表</button><h3>${escapeHtml(result.metadata.title || result.receipt.moduleId)}</h3><p>版本 ${escapeHtml(result.receipt.versionId)} · 来源 ${escapeHtml(result.metadata.sourceCommit)}</p><article class="knowledge-body publication-readable">${renderKnowledgeMarkdown(result.markdown).html}</article><details class="reader-source"><summary>查看 Markdown 原文</summary><pre class="publication-markdown">${escapeHtml(result.markdown)}</pre></details><details><summary>来源与门禁证据</summary><pre class="json-view">${json(result.metadata)}</pre></details>`
 }
 
 
