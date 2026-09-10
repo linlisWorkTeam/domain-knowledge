@@ -2,9 +2,9 @@
 /**
  * Copyright (c) 2026 linlisWorkTeam
  * SPDX-License-Identifier: MIT
- * 文件功能：使用已验证运行配置执行至多三次真实 MVP 飞轮并持久化脱敏验收证据。
+ * 文件功能：使用已验证运行配置按原始三次及显式追加授权执行真实 MVP 飞轮并持久化脱敏验收证据。
  */
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, realpathSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -12,7 +12,7 @@ import { createComposition } from '../../src/interfaces/runner/Composition.ts';
 import { createMarkdownLiteScenario, MARKDOWN_LITE_BASELINE } from '../../src/infrastructure/evaluation/markdownLite/MarkdownLiteScenario.ts';
 import { ROLE_EXECUTION_VERSION } from '../../src/domain/agents/AgentExecution.ts';
 
-export interface AcceptanceOptions { source: string; runtime: string; evidence: string; }
+export interface AcceptanceOptions { source: string; runtime: string; evidence: string; authorization?: string; }
 export interface AcceptanceSummary {
   gates: Array<{ outcome: string; testsPassed: number; testsTotal: number; criticalFailures: number; toolchainFingerprint: string; evidenceRefs: string[] }>;
   publications: Array<{ publicationKey: string; versionId: string; path: string; bodySha256: string }>;
@@ -34,9 +34,33 @@ export interface AcceptanceReport extends AcceptanceSummary {
   source: typeof MARKDOWN_LITE_BASELINE; startedAt: string; completedAt: string; reportPath: string;
 }
 interface Attempt { ordinal: number; startedAt: string; status: 'STARTING' | 'RUNNING' | 'PASSED' | 'FAILED' | 'CANCELLED'; runId?: string; reportPath?: string; }
-interface Ledger { schemaVersion: 'mvp-real-attempts-v1'; attempts: Attempt[]; }
+interface AdditionalAuthorization { authorizationId: string; approvedAt: string; previousLedgerSha256: string; maximumAttempts: 4; }
+interface Ledger { schemaVersion: 'mvp-real-attempts-v1' | 'mvp-real-attempts-v2'; attempts: Attempt[];
+  authorization?: AdditionalAuthorization & { originalAttemptsSha256: string }; }
+const digest = (value: string) => createHash('sha256').update(value).digest('hex');
+function validAuthorization(value: AdditionalAuthorization): boolean {
+  return !!value && typeof value.authorizationId === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(value.authorizationId)
+    && typeof value.approvedAt === 'string' && Number.isFinite(Date.parse(value.approvedAt))
+    && /^[a-f0-9]{64}$/.test(value.previousLedgerSha256) && value.maximumAttempts === 4;
+}
+/** 只支持本次显式追加的一次启动；摘要绑定原账本，不能删旧记录或自动扩容。 */
+function authorizeAdditionalAttempt(ledger: Ledger, ledgerPath: string, authorizationPath?: string): Ledger {
+  if (!authorizationPath) return ledger;
+  let authorization: AdditionalAuthorization;
+  try { authorization = JSON.parse(readFileSync(authorizationPath, 'utf8')); } catch { throw new Error('ACCEPTANCE_AUTHORIZATION_INVALID'); }
+  if (!validAuthorization(authorization) || Object.keys(authorization).sort().join(',') !== 'approvedAt,authorizationId,maximumAttempts,previousLedgerSha256') throw new Error('ACCEPTANCE_AUTHORIZATION_INVALID');
+  if (ledger.schemaVersion === 'mvp-real-attempts-v2') {
+    if (Object.keys(authorization).some((key) => authorization[key as keyof AdditionalAuthorization] !== ledger.authorization?.[key as keyof AdditionalAuthorization])) throw new Error('ACCEPTANCE_AUTHORIZATION_INVALID');
+    return ledger;
+  }
+  if (ledger.attempts.length !== 3 || digest(readFileSync(ledgerPath, 'utf8')) !== authorization.previousLedgerSha256) throw new Error('ACCEPTANCE_AUTHORIZATION_INVALID');
+  const next: Ledger = { schemaVersion: 'mvp-real-attempts-v2', attempts: ledger.attempts,
+    authorization: { ...authorization, originalAttemptsSha256: digest(JSON.stringify(ledger.attempts)) } };
+  atomicJson(ledgerPath, next);
+  return next;
+}
 const reasons = new Set(['ACCEPTANCE_LOCKED', 'ACCEPTANCE_LEDGER_INVALID', 'ACCEPTANCE_LIMIT_REACHED',
-  'ACCEPTANCE_ARGUMENT_INVALID', 'ACCEPTANCE_PROVIDER_REQUIRED', 'ACCEPTANCE_MODEL_REQUIRED',
+  'ACCEPTANCE_ARGUMENT_INVALID', 'ACCEPTANCE_AUTHORIZATION_INVALID', 'ACCEPTANCE_PROVIDER_REQUIRED', 'ACCEPTANCE_MODEL_REQUIRED',
   'ACCEPTANCE_PUBLICATION_DIRECTORY_INVALID', 'ACCEPTANCE_CANCELLED', 'ACCEPTANCE_PUBLICATION_MISSING',
   'ACCEPTANCE_ROLE_COVERAGE_MISSING', 'DSH_CONFIGURATION_UNAVAILABLE', 'DSH_CONFIGURATION_CHANGED',
   'MODULE_BASELINE_MISMATCH', 'MODULE_ISOLATION_UNAVAILABLE', 'MODULE_ISOLATION_REQUIRED',
@@ -59,9 +83,11 @@ function loadLedger(path: string): Ledger {
   if (!existsSync(path)) return { schemaVersion: 'mvp-real-attempts-v1', attempts: [] };
   let value: Ledger;
   try { value = JSON.parse(readFileSync(path, 'utf8')); } catch { throw new Error('ACCEPTANCE_LEDGER_INVALID'); }
-  if (!value || typeof value !== 'object' || value.schemaVersion !== 'mvp-real-attempts-v1' || !Array.isArray(value.attempts) || value.attempts.length > 3
+  if (!value || typeof value !== 'object' || !['mvp-real-attempts-v1', 'mvp-real-attempts-v2'].includes(value.schemaVersion) || !Array.isArray(value.attempts) || value.attempts.length > (value.schemaVersion === 'mvp-real-attempts-v2' ? 4 : 3)
     || value.attempts.some((attempt, index) => !attempt || typeof attempt !== 'object' || attempt.ordinal !== index + 1 || typeof attempt.startedAt !== 'string'
       || !['STARTING', 'RUNNING', 'PASSED', 'FAILED', 'CANCELLED'].includes(attempt.status))) throw new Error('ACCEPTANCE_LEDGER_INVALID');
+  if (value.schemaVersion === 'mvp-real-attempts-v2' && (!validAuthorization(value.authorization!)
+    || value.attempts.length < 3 || value.authorization?.originalAttemptsSha256 !== digest(JSON.stringify(value.attempts.slice(0, 3))))) throw new Error('ACCEPTANCE_LEDGER_INVALID');
   return value;
 }
 function processIdentity(pid: number): string | undefined {
@@ -187,8 +213,8 @@ export async function runMvpAcceptance(options: AcceptanceOptions, input: {
     if (backend && runId && !cancellation) cancellation = backend.cancel(runId).catch(() => {});
   };
   try {
-    const ledger = loadLedger(ledgerPath);
-    if (ledger.attempts.length >= 3) throw new Error('ACCEPTANCE_LIMIT_REACHED');
+    const ledger = authorizeAdditionalAttempt(loadLedger(ledgerPath), ledgerPath, options.authorization);
+    if (ledger.attempts.length >= (ledger.schemaVersion === 'mvp-real-attempts-v2' ? 4 : 3)) throw new Error('ACCEPTANCE_LIMIT_REACHED');
     backend = (input.backend ?? (() => productionBackend(normalized)))();
     await backend.preflight(normalized.source);
     if (input.signal?.aborted) throw new Error('ACCEPTANCE_CANCELLED');
@@ -246,18 +272,18 @@ export async function runMvpAcceptance(options: AcceptanceOptions, input: {
   }
 }
 
-/** CLI 只接受三个目录选项，凭据始终由运行配置提供。 */
+/** CLI 接受三个目录及可选的追加授权文件，凭据始终由运行配置提供。 */
 export function parseAcceptanceArguments(args: string[]): AcceptanceOptions {
   const values: Record<string, string> = {};
   for (let index = 0; index < args.length; index += 2) {
     const name = args[index]; const value = args[index + 1];
-    if (!name || !['--source', '--runtime', '--evidence'].includes(name) || !value || value.startsWith('--') || values[name]) {
+    if (!name || !['--source', '--runtime', '--evidence', '--authorization'].includes(name) || !value || value.startsWith('--') || values[name]) {
       throw new Error('ACCEPTANCE_ARGUMENT_INVALID');
     }
     values[name] = value;
   }
   if (!values['--source'] || !values['--runtime'] || !values['--evidence']) throw new Error('ACCEPTANCE_ARGUMENT_INVALID');
-  return { source: values['--source'], runtime: values['--runtime'], evidence: values['--evidence'] };
+  return { source: values['--source'], runtime: values['--runtime'], evidence: values['--evidence'], ...values['--authorization'] ? { authorization: values['--authorization'] } : {} };
 }
 
 const direct = process.argv[1] && pathToFileURL(realpathSync(process.argv[1])).href === import.meta.url;

@@ -91,7 +91,9 @@ GOMAXPROCS=1 NODE_OPTIONS=--max-old-space-size=384 node \
   --evidence /srv/domain-knowledge-evidence
 ```
 
-预检核对已有配置验证状态、精确模型名称、固定源码及参考测试摘要、内核隔离、独立发布目录和证据目录可写性。预检不调用模型，失败不消耗启动次数。通过后，在调用生产 `markdownLite.start` 前先持久化 `MvpAcceptanceLedger.json` 占额；此后启动失败、取消、中断都保留已消耗次数，同一运行目录累计最多 3 次。不要删除账本或更换运行目录规避上限。每次仍受最多 3 轮、30 分钟预算约束；不要与打包、浏览器测试或其他飞轮并行运行。
+预检核对已有配置验证状态、精确模型名称、固定源码及参考测试摘要、内核隔离、独立发布目录和证据目录可写性。预检不调用模型，失败不消耗启动次数。通过后，在调用生产 `markdownLite.start` 前先持久化 `MvpAcceptanceLedger.json` 占额；此后启动失败、取消、中断都保留已消耗次数，同一运行目录默认累计最多 3 次。不要删除账本或更换运行目录规避上限。每次仍受最多 3 轮、30 分钟预算约束；不要与打包、浏览器测试或其他飞轮并行运行。
+
+追加授权必须来自用户明确同意；入口支持 `--authorization /绝对路径/Authorization.json`，文件包含 `authorizationId`、`approvedAt`、`previousLedgerSha256` 与 `maximumAttempts: 4`。只接受当前三次账本的精确 SHA-256，原子升级为 `mvp-real-attempts-v2` 并绑定前三次内容摘要，仅增加第四次额度；重放授权不能开放第五次。凭据不写入授权文件。旧 v1 账本保持可读。
 
 `SIGINT` / `SIGTERM` 会取消飞轮并等待子进程关闭后退出。`SIGKILL` 等非正常终止留下的 STARTING / RUNNING 记录继续计数；下次运行在核对 `/proc` 进程身份后可回收完整的死进程锁。不完整锁或残留清理锁会失败关闭，需要管理员确认进程已退出后只处理锁文件，保留账本。
 

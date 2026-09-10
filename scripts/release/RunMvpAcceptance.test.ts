@@ -4,6 +4,7 @@
  * 文件功能：用无模型端口验证真实验收入口的持久次数、互斥、预检与取消。
  */
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
@@ -125,5 +126,33 @@ test('real acceptance: CLI rejects credentials and source tree writes, and error
     writeFileSync(join(fixture.paths.runtime, 'MvpAcceptanceLedger.json'), 'null');
     await assert.rejects(runMvpAcceptance(fixture.paths, { backend: () => backend() }), /ACCEPTANCE_LEDGER_INVALID/);
     assert.equal(readFileSync(join(fixture.paths.runtime, 'MvpAcceptanceLedger.json'), 'utf8'), 'null');
+  } finally { fixture.close(); }
+});
+
+
+test('real acceptance: explicit hash-bound authorization preserves three attempts and allows only the fourth', async () => {
+  const fixture = options(); let starts = 0;
+  try {
+    for (let i = 0; i < 3; i++) await runMvpAcceptance(fixture.paths, { backend: () => backend() });
+    const path = join(fixture.paths.runtime, 'MvpAcceptanceLedger.json');
+    const before = readFileSync(path, 'utf8');
+    const authorization = join(fixture.paths.runtime, 'Authorization.json');
+    const grant = { authorizationId: 'user-approved-fourth', approvedAt: '2026-09-10T00:00:00Z',
+      previousLedgerSha256: createHash('sha256').update(before).digest('hex'), maximumAttempts: 4 };
+    writeFileSync(authorization, JSON.stringify({ ...grant, previousLedgerSha256: '0'.repeat(64) }));
+    await assert.rejects(runMvpAcceptance({ ...fixture.paths, authorization }, { backend: () => backend() }), /AUTHORIZATION_INVALID/);
+    assert.equal(readFileSync(path, 'utf8'), before);
+    writeFileSync(authorization, JSON.stringify(grant));
+    const report = await runMvpAcceptance({ ...fixture.paths, authorization }, { backend: () => backend({ start: async () => { starts++; return { runId: 'fourth' }; } }) });
+    assert.equal(report.attempt, 4);
+    assert.deepEqual(ledger(fixture.paths).attempts.slice(0, 3), JSON.parse(before).attempts);
+    assert.equal(ledger(fixture.paths).schemaVersion, 'mvp-real-attempts-v2');
+    for (const input of [fixture.paths, { ...fixture.paths, authorization }]) {
+      await assert.rejects(runMvpAcceptance(input, { backend: () => backend({ start: async () => { starts++; return { runId: 'fifth' }; } }) }), /LIMIT_REACHED/);
+    }
+    assert.equal(starts, 1);
+    const modified = ledger(fixture.paths); modified.attempts[0].status = 'PASSED';
+    writeFileSync(path, JSON.stringify(modified));
+    await assert.rejects(runMvpAcceptance(fixture.paths, { backend: () => backend() }), /LEDGER_INVALID/);
   } finally { fixture.close(); }
 });
