@@ -137,6 +137,7 @@ test('a minimum complete Run sends all seven governed nodes through the real nat
       publicInterfacePaths: [],
       allowedGeneratedPaths: ['src/module.cpp'], prepareCommands: [],
       referenceCommands: commands, firstIterationCommands: commands, finalCommands: commands,
+      comparisonRules: [{ id: 'behavior', description: 'Compare public return values' }],
       agentConfiguration: { languageId: 'cpp', standard: 'c++17', dependencies: [], constraints: [], testPaths: ['tests/generated.cpp'] },
     };
     const handle = await workflow.start(scenario, {

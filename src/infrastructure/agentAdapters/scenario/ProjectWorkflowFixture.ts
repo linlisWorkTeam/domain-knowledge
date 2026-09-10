@@ -78,6 +78,7 @@ export class FixtureProjectWorkflowStages {
       if (!ref) throw new Error('WORKFLOW_REVIEW_EVALUATION_MISSING');
       const evaluation = JSON.parse(Buffer.from(await this.flywheel.getArtifact(ref)).toString('utf8')) as ProjectEvaluation;
       output = {
+        historySummary: `Previous iteration evidence reviewed; current tests ${evaluation.testsPassed}/${evaluation.testsTotal}.`,
         blocking: false, corrections: evaluation.passed ? [] : [JSON.parse(this.asset(assets.correction))],
       };
     } else if (agentId === 'test-gen') {

@@ -87,7 +87,9 @@ export class KnowledgeFlywheelService {
   }
 
   recordReviewHandoff(runId: string, payload: Record<string, unknown>): void {
-    this.repository.recordOperationalEvent(createEvent(runId, 'ReviewHandoffPrepared', payload, this.clock()));
+    const event = createEvent(runId, 'ReviewHandoffPrepared', payload, this.clock());
+    event.eventId = `review-handoff:${sha256(`${runId}:${String(payload.decisionId)}`)}`;
+    this.repository.recordOperationalEvent(event);
   }
 
   /** 固定 Orchestrator 已校验计划选中的模块。 */

@@ -40,7 +40,7 @@ function target(input: { moduleId: string }, path: string): string | null {
 }
 
 /** 忽略代码围栏中的标题；同名标题有歧义时拒绝猜测。 */
-function section(body: string, title: string): [number, number] {
+function headingsOf(body: string) {
   const headings: { title: string; level: number; start: number }[] = [];
   let fence: string | undefined;
   for (const match of body.matchAll(/^.*(?:\r?\n|$)/gm)) {
@@ -55,6 +55,11 @@ function section(body: string, title: string): [number, number] {
     const heading = /^ {0,3}(#{1,6})\s+(.+?)\s*#*\s*$/.exec(line);
     if (heading) headings.push({ title: heading[2]!, level: heading[1]!.length, start: match.index! });
   }
+  return headings;
+}
+
+function section(body: string, title: string): [number, number] {
+  const headings = headingsOf(body);
   const matches = headings.filter((heading) => heading.title === title);
   if (matches.length !== 1) throw new Error(`DOCGEN_CORRECTION_SECTION_INVALID: ${title}`);
   const found = matches[0]!;
@@ -68,8 +73,7 @@ export function correctionTarget(body: string, moduleId: string, path: string): 
   try { section(body, title); return title; } catch (error) {
     const first = body.indexOf(path);
     if (first < 0 || body.indexOf(path, first + 1) >= 0) throw error;
-    const headings = [...body.matchAll(/^ {0,3}#{1,6}\s+(.+?)\s*#*\s*$/gm)];
-    const enclosing = headings.filter((match) => match.index! < first).at(-1)?.[1];
+    const enclosing = headingsOf(body).filter((heading) => heading.start < first).at(-1)?.title;
     if (!enclosing) throw error;
     section(body, enclosing);
     return enclosing;

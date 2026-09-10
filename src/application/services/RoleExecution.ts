@@ -60,7 +60,7 @@ export class RoleExecutionService {
       const bind = (value: unknown): unknown => {
         if (!value || typeof value !== 'object') return value;
         if ('agentNode' in value) return this.nodeByAgent[value.agentNode as AgentId];
-        if ('agentGeneration' in value) return `${command.runId}:${this.nodeByAgent[value.agentGeneration as AgentId]}:${context.iteration}:main:contract-v5`;
+        if ('agentGeneration' in value) return `${command.runId}:${this.nodeByAgent[value.agentGeneration as AgentId]}:${context.iteration}:main:contract-v6`;
         if ('pendingArtifact' in value) {
           const ref = refs.get(String(value.pendingArtifact));
           if (!ref) throw new Error('AGENT_PENDING_ARTIFACT_MISSING');
