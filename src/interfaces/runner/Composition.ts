@@ -11,6 +11,7 @@ import { SqliteNativeTests } from '../../infrastructure/sqlite/SqliteNativeTests
 import { WorkbenchProjects } from '../../application/services/WorkbenchProjects.ts';
 import { WorkbenchGeneration } from '../../application/services/WorkbenchGeneration.ts';
 import { NativeToolchain } from '../../infrastructure/evaluation/project/NativeToolchain.ts';
+import { WorkbenchAssociations } from '../../application/services/WorkbenchAssociations.ts';
 import { WorkbenchEvaluation } from '../../application/services/WorkbenchEvaluation.ts';
 import { WorkbenchReconstruction } from '../../application/services/WorkbenchReconstruction.ts';
 import { WorkbenchRoleExecution } from '../../application/services/WorkbenchRoleExecution.ts';
@@ -180,8 +181,10 @@ export function createComposition(input: {
   let workbenchGeneration!: WorkbenchGeneration;
   let workbenchReconstruction!: WorkbenchReconstruction;
   let workbenchEvaluation!: WorkbenchEvaluation;
+  let workbenchAssociations!: WorkbenchAssociations;
   const workbenchStages = new WorkbenchStages(stageStore, { INDEX: (context) => knowledgeIndex.build(context), GENERATE: (context) => workbenchGeneration.generate(context),
-    FLYWHEEL: (context) => workbenchReconstruction.reconstruct(context), EVALUATE: (context) => workbenchEvaluation.evaluate(context) });
+    FLYWHEEL: (context) => workbenchReconstruction.reconstruct(context), EVALUATE: (context) => workbenchEvaluation.evaluate(context), ASSOCIATE: (context) => workbenchAssociations.build(context) });
+  workbenchAssociations = new WorkbenchAssociations(repository, artifacts, knowledgeIndex, workbenchStages);
   const scanner = new SourceScanner(repositoryRoot, repository);
   const knowledgeDiscoveryApp = new KnowledgeDiscoveryApp(scanner, undefined, {
     migrate: (legacyKnowledgeRoot) => migrateLegacyOkf({
@@ -553,6 +556,7 @@ export function createComposition(input: {
       publicationOperations,
       workbenchStages,
       knowledgeIndex,
+      workbenchAssociations,
       repositoryAnalysis,
       workbenchProjects,
       workbenchGeneration,

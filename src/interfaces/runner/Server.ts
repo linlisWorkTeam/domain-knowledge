@@ -51,6 +51,7 @@ const assets = new Map([
   ['/KnowledgeGeneration.js', 'KnowledgeGeneration.js'],
   ['/KnowledgeReconstruction.js', 'KnowledgeReconstruction.js'],
   ['/KnowledgeEvaluation.js', 'KnowledgeEvaluation.js'],
+  ['/KnowledgeAssociations.js', 'KnowledgeAssociations.js'],
   ['/Styles.css', 'Styles.css'],
 ]);
 
@@ -360,7 +361,7 @@ export function createKnowledgeServer(input: {
       }
       // 目录、配置和写入仅允许直接本机访问，或携带远程访问令牌。
       const localClient = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(request.socket.remoteAddress ?? '');
-      const workbenchRoute = /^\/api\/v1\/(stage-tasks|index-builds|knowledge-index|repository-analyses|projects|generations|reconstructions|native-evaluations)(\/|$)/.test(url.pathname);
+      const workbenchRoute = /^\/api\/v1\/(stage-tasks|index-builds|knowledge-index|repository-analyses|projects|generations|reconstructions|native-evaluations|associations)(\/|$)/.test(url.pathname);
       const productRoute = url.pathname.startsWith('/api/v1/publications')
         || url.pathname === '/api/v1/server-directories' || url.pathname === '/api/v1/runs/markdown-lite';
       if (url.pathname.startsWith('/api/') && (!localClient || productRoute || workbenchRoute) && !authorized(request, writeToken, anonymousAccess)) {
@@ -369,6 +370,16 @@ export function createKnowledgeServer(input: {
         return;
       }
       if (workbenchRoute) {
+        if (request.method === 'POST' && url.pathname === '/api/v1/associations') {
+          const payload = await body(request); requireOnlyKeys(payload, ['versionIds']);
+          if (!Array.isArray(payload.versionIds) || payload.versionIds.some((id) => typeof id !== 'string')) throw new Error('PAYLOAD_INVALID');
+          const task = composition.apps.workbenchStages.start(composition.apps.workbenchAssociations.prepare(payload.versionIds as string[]));
+          send(response, task.status === 'SUCCEEDED' ? 200 : 202, { task }); return;
+        }
+        const associated = url.pathname.match(/^\/api\/v1\/associations\/([^/]+)$/);
+        if (request.method === 'GET' && associated) {
+          send(response, 200, await composition.apps.workbenchAssociations.candidates(decodeURIComponent(associated[1]!))); return;
+        }
         if (request.method === 'POST' && url.pathname === '/api/v1/native-evaluations') {
           const payload = await body(request); requireOnlyKeys(payload, ['reconstructionTaskId']);
           if (typeof payload.reconstructionTaskId !== 'string') throw new Error('PAYLOAD_INVALID');

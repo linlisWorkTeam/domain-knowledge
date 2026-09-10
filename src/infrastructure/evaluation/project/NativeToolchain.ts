@@ -59,7 +59,7 @@ export class NativeToolchain implements NativeLanguageToolchain {
         command: [input.language === 'c' ? build.cCompiler : build.cppCompiler, ...flags,
           ...(input.sanitizers ? ['-fsanitize=address,undefined', '-fno-sanitize-recover=all', '-fno-omit-frame-pointer'] : []),
           ...input.entryPaths.map((path) => `/workspace/source/${path}`), '-o', '/workspace/build/program'],
-        timeoutMs: 30_000, memoryBytes, processLimit: 32 }, signal);
+        timeoutMs: 30_000, memoryBytes, processLimit: 32, fileSizeBytes: 16_777_216 }, signal);
       if (compiled.exitCode !== 0 || compiled.timedOut || compiled.outputLimitExceeded) return { build: compiled, execution: null };
       const execution = await captureIsolated({ workspace: directory,
         command: [...(input.sanitizers ? ['env', 'ASAN_OPTIONS=detect_leaks=0:allocator_may_return_null=1'] : []), '/workspace/build/program', ...args],

@@ -103,3 +103,16 @@ test('native network namespace cannot reach a listening host socket', async () =
     assert.equal(result.build.exitCode, 0, result.build.stderr); assert.equal(result.execution?.exitCode, 0); assert.equal(connections, 0);
   } finally { server.close(); await once(server, 'close'); }
 });
+
+
+test('compiler can emit a bounded multi-megabyte artifact while execution file writes remain limited', async () => {
+  const result = await native.compileAndRun({ language: 'c', build, entryPaths: ['main.c'], files: [{ path: 'main.c',
+    content: 'static const unsigned char padding[2*1024*1024] = {1}; int main(void) { return padding[0]-1; }' }] });
+  assert.equal(result.build.exitCode, 0, result.build.stderr); assert.equal(result.execution?.exitCode, 0);
+  const directory = mkdtempSync('/tmp/native-file-size-');
+  try {
+    const command = { workspace: directory, command: ['/usr/bin/dd', 'if=/dev/zero', 'of=/tmp/large', 'bs=1048576', 'count=2'], timeoutMs: 3000, memoryBytes: 134_217_728, processLimit: 16 };
+    const limited = await captureIsolated(command); assert.notEqual(limited.exitCode, 0);
+    await assert.rejects(captureIsolated({ ...command, fileSizeBytes: 16_777_216 }), /PROJECT_RESOURCE_LIMIT_INVALID/);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});

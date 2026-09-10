@@ -136,3 +136,5 @@ Run 列表及详情的 `run` 保留领域 `state`，额外返回 `executionStatu
 PENDING、Git 关闭、Git 冲突及认证失败使用可定位的错误码。API 不暴露手工将候选升级为本地发布的入口。操作说明见 [Linux 安装与本地发布](../../LinuxInstall.md)。
 
 上述工作台路由复用 directEditing / Bearer 边界；免登录仍拒绝跨站浏览器写入。当前未开放通用 JSON 阶段启动入口，后续代码仓界面将通过服务端分析构造其他阶段输入。
+
+`POST /api/v1/associations {versionIds}` 启动冻结卡片的 ASSOCIATE 阶段，沿用阶段状态/取消/恢复和工件下载。`GET /api/v1/associations/:cardId` 读取与当前卡片有关的有效关系、引用证据及失效任务数。当前 scope=INTERNAL_ONLY、externalMaterials=0；符号提及关系不保证可替代性。外部材料接口仍待实现。

@@ -48,3 +48,7 @@ publicInterface输入明确入口和符号选择，可用astFilter限制类范�
 原生行为harness强制AddressSanitizer与UndefinedBehaviorSanitizer，并在首个错误停止，以拒绝参考端越界或未定义行为的候选。ASan需要巨大虚拟影子地址，原生案例运行显式允许128TiB虚拟地址空间，但128MiB真实内存和16进程仍由强制cgroup控制；只有存在该资源组时才能使用虚拟地址覆盖。普通原生调用与TypeScript原有RLIMIT_AS不变。关闭LeakSanitizer（这里检查行为/越界，不用泄漏判定知识），不移除地址/UB检查；编译、超时、输出与namespace边界保持。
 
 虚拟地址限制依据[Clang AddressSanitizer官方限制说明](https://clang.llvm.org/docs/AddressSanitizer.html#limitations)：64位ASan映射超过16TB影子地址，普通ulimit语义不能代替真实内存限制。这里的隔离仍由namespace和cgroup承担，sanitizer只是测试中的缺陷检测器。
+
+原生 Code 重建材料以选定 declarations 和卡片限定功能范围，文件路径白名单只限定位置，不要求整库复制。TinyXML2 真实首轮 Code 因扩展为整库而输出截断；增加明确的所选模块边界，仍保留原接口和行为门禁。
+
+TinyXML2 含 sanitizer 的参考构建实测超过原 1MiB 单文件限制。编译阶段单文件上限调整为 16MiB，只有声明 buildOutput 且启用进程组资源限制的受信调用才能使用；执行阶段仍为 1MiB。内存512MiB、单进程编译、30秒及隔离不变，临时文件总量仍受内存cgroup约束。引擎摘要随之变化，旧工具链任务只能读，不能跨摘要恢复；需按新摘要重建和重新验证可信测试。

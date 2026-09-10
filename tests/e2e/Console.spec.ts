@@ -1022,3 +1022,28 @@ test('操作中心从固定 Git 版本分析仓库，显示模块和环境且窄
     await expect(page.locator('[data-repository-result]')).not.toContainText(commit);
   } finally { nativeEvaluation.snapshot = originalEvaluation.snapshot; nativeEvaluation.runner = originalEvaluation.runner; instance.composition.apps.workbenchEvaluation.dependencies.native = originalEvaluation.native; reconstruction.roles.dependencies.model = originalReconstruction.model; reconstruction.snapshot = originalReconstruction.snapshot; reconstruction.native = originalReconstruction.native; instance.composition.apps.workbenchGeneration.dependencies.model = originalModel; instance.composition.apps.workbenchGeneration.dependencies.native = originalNative; rmSync(directory, { recursive: true, force: true }); }
 });
+
+test('关联阶段可独立执行并在卡片详情查看真实引用候选', async ({ page }) => {
+  const add = (symbol: string, body: string) => instance.composition.apps.flywheel.ingestCandidate({ moduleId: `association-${symbol.toLowerCase()}`,
+    title: `Association ${symbol}`, description: 'Association browser acceptance', body, tags: ['c'],
+    provenance: [{ path: 'api.h', commit: 'association-commit', pinned: true }],
+    metadata: { cardId: `card-association-${symbol}`, repositoryId: 'association-repo', symbol, sourceModule: 'api', language: 'c' } });
+  const source = await add('Parse', '# Parse\n## Behavior\nUse Result for output.');
+  await add('Result', '# Result\n## Layout\nContains an integer value.');
+  await page.goto(baseUrl); await enterGovernance(page); await navigateTo(page, '知识');
+  await page.getByText('知识索引与试检索', { exact: true }).click();
+  await page.getByRole('button', { name: '更新索引', exact: true }).click();
+  await expect(page.locator('[data-index-task]')).toContainText('已完成');
+  await page.getByRole('button', { name: '建立关联', exact: true }).click();
+  await expect(page.locator('[data-association-panel]')).toContainText('关联完成');
+  await expect(page.getByRole('button', { name: '下载关系索引' })).toBeVisible();
+  await page.locator(`[data-version-id="${source.version.versionId}"]`).first().click();
+  await page.getByRole('button', { name: '当前卡片不适用' }).click();
+  await expect(page.locator('[data-card-relations]')).toContainText('正文第 3 行引用 Result');
+  await expect(page.locator('[data-card-relations]')).toContainText('候选未验证可替代性');
+  await page.screenshot({ path: test.info().outputPath('associations-desktop.png'), fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.getByRole('button', { name: '查看关联卡片' })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: test.info().outputPath('associations-mobile.png'), fullPage: true });
+});

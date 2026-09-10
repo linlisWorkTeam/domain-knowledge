@@ -700,6 +700,7 @@ async function openKnowledge(versionId, returnFocus) {
     <section class="drawer-section"><h3>版本血缘</h3>${comparisonVersions.length ? `<details><summary>历史版本 · ${comparisonVersions.length}</summary>${comparisonVersions.map((version) => `<button class="text-button" data-version-id="${escapeHtml(version.versionId)}">${escapeHtml(version.title || version.versionId)} · ${escapeHtml(displayLabel(version.status))}</button>`).join('')}</details>` : ''}${lineage
       ? `<p class="lead">${escapeHtml(relationCounts || `${lineageNodes.length} 个关联版本`)}</p>${lineageRelationList(lineage)}${comparisonVersions.length ? `<form id="knowledge-diff-form" data-version="${escapeHtml(item.versionId)}"><label>对比版本<select name="against">${comparisonVersions.map((node) => `<option value="${escapeHtml(node.versionId)}" ${node.versionId === defaultAgainst ? 'selected' : ''}>${escapeHtml(shortId(node.versionId, 28))}${node.status ? ` · ${escapeHtml(displayLabel(node.status))}` : ''}</option>`).join('')}</select></label><button class="secondary-button" type="submit">比较版本</button></form><div id="knowledge-diff-result"></div>` : emptyState('暂无可比较版本', '当前血缘中只有这个知识版本。')}`
       : partialNotice(userFacingError(lineageResult.error, '版本血缘暂不可用。'))}</section>
+    ${collection(cardResult, 'cards')[0]?.cardId ? `<section class="drawer-section"><h3>知识关联</h3><button class="secondary-button" type="button" data-card-alternatives="${escapeHtml(collection(cardResult, 'cards')[0].cardId)}">当前卡片不适用</button><div data-card-relations></div></section>` : ''}
     <section class="drawer-section feedback-section"><h3>使用反馈</h3><p>反馈会进入后续治理流程，但不会直接修改知识或门禁判定。</p>
       <form id="feedback-form" data-version="${escapeHtml(item.versionId)}">
         <div class="feedback-actions"><label><input type="radio" name="action" value="hit" checked>有帮助</label><label><input type="radio" name="action" value="rate">评分</label><label><input type="radio" name="action" value="correct">需要纠正</label></div>
@@ -1622,6 +1623,17 @@ drawerContent.addEventListener('submit', (event) => {
 })
 
 drawerContent.addEventListener('click', (event) => {
+  const alternatives = event.target.closest('[data-card-alternatives]')
+  if (alternatives) {
+    const cardId = alternatives.dataset.cardAlternatives, panel = drawerContent.querySelector('[data-card-relations]')
+    panel.textContent = '正在读取已有关联…'
+    request(`/api/v1/associations/${encodeURIComponent(cardId)}`).then((result) => {
+      if (!panel.isConnected) return
+      panel.innerHTML = `<p>仅库内关联；候选未验证可替代性。${result.staleTasks ? '部分关系已失效，请重新建立关联。' : ''}</p>${result.relations.length ? result.relations.map((relation) => `<article><button class="text-button" type="button" data-version-id="${escapeHtml(relation.fromCardId === cardId ? relation.toVersionId : relation.fromVersionId)}">查看关联卡片</button><p>${escapeHtml(relation.reason)}</p><blockquote>${escapeHtml(relation.evidence.excerpt)}</blockquote><p>适用条件：${escapeHtml(relation.fromCardId === cardId ? relation.applicability : relation.fromApplicability ?? '未提供适用条件')}</p></article>`).join('') : '<p>没有有效关联。可先更新索引并建立关联，或直接检索其他卡片。</p>'}`
+    }).catch(() => { if (panel.isConnected) panel.textContent = '关联暂不可读取，请重试。' })
+    return
+  }
+
   const download = event.target.closest('[data-download-artifact]')
   if (download) {
     downloadArtifact(download.dataset.downloadArtifact).catch((error) => showToast(userFacingError(error, '无法下载评测证据。'), 'danger'))

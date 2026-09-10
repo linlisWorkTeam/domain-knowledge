@@ -16,7 +16,7 @@ export interface IsolatedCommandResult {
 /** 每个案例独占一个 PID / 网络 / 文件系统命名空间，取消或输出超限均杀死整组子进程。 */
 export async function captureIsolated(input: {
   workspace: string; command: string[]; compilerRoot?: string; buildOutput?: string; timeoutMs: number; memoryBytes: number;
-  processLimit?: number; outputBytes?: number; addressSpaceBytes?: number;
+  processLimit?: number; outputBytes?: number; addressSpaceBytes?: number; fileSizeBytes?: number;
 }, signal?: AbortSignal): Promise<IsolatedCommandResult> {
   if (signal?.aborted) throw new Error('PROJECT_EVALUATION_CANCELLED');
   if (process.platform !== 'linux') throw new Error('PROJECT_ISOLATION_UNAVAILABLE: Linux namespaces required');
@@ -24,9 +24,12 @@ export async function captureIsolated(input: {
   if (!Number.isSafeInteger(maxOutputBytes) || maxOutputBytes < 1 || maxOutputBytes > 8_388_608) throw new Error('PROJECT_RESOURCE_LIMIT_INVALID');
   if (input.addressSpaceBytes !== undefined && (input.processLimit === undefined || !Number.isSafeInteger(input.addressSpaceBytes)
     || input.addressSpaceBytes < input.memoryBytes || input.addressSpaceBytes > 140737488355328)) throw new Error('PROJECT_RESOURCE_LIMIT_INVALID');
+  const fileSizeBytes = input.fileSizeBytes ?? 1_048_576;
+  if (!Number.isSafeInteger(fileSizeBytes) || fileSizeBytes < 1 || fileSizeBytes > 16_777_216
+    || (fileSizeBytes > 1_048_576 && (!input.buildOutput || input.processLimit === undefined))) throw new Error('PROJECT_RESOURCE_LIMIT_INVALID');
   const mounts = ['/usr', '/lib', '/lib64', '/etc/alternatives'].filter(existsSync).flatMap((path) => ['--ro-bind', path, path]);
   const args = [
-    `--as=${input.addressSpaceBytes ?? input.memoryBytes}`, '--cpu=15', '--nofile=96', '--fsize=1048576', '--',
+    `--as=${input.addressSpaceBytes ?? input.memoryBytes}`, '--cpu=15', '--nofile=96', `--fsize=${fileSizeBytes}`, '--',
     process.env.WP_EVALUATION_BWRAP_COMMAND ?? 'bwrap',
     ...(input.processLimit === undefined ? ['--unshare-all'] : ['--unshare-user', '--unshare-ipc', '--unshare-pid', '--unshare-net', '--unshare-uts', '--unshare-cgroup']), '--die-with-parent', '--new-session', '--cap-drop', 'ALL',
     ...mounts, '--proc', '/proc', '--dev', '/dev', '--tmpfs', '/tmp',

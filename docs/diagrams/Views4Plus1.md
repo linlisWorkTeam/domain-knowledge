@@ -151,4 +151,44 @@ sequenceDiagram
   U->>A: 后续独立INDEX操作
 ```
 
-上图描述已接通的 C/C++ 生成入口，INDEX由KnowledgeIndexService执行。新阶段有自己的冻结输入、尝试审计和恢复记录，不借用旧Run的发布状态；FLYWHEEL、EVALUATE和ASSOCIATE尚未接通该新链路。
+上图描述已接通的 C/C++ 生成入口，INDEX由KnowledgeIndexService执行。新阶段有自己的冻结输入、尝试审计和恢复记录，不借用旧Run的发布状态；FLYWHEEL、EVALUATE和ASSOCIATE已有独立应用入口；持久化一键编排和自动知识修订仍未接通。
+
+
+```mermaid
+sequenceDiagram
+  actor U as Console用户
+  participant W as WorkbenchStages
+  participant R as WorkbenchReconstruction
+  participant E as WorkbenchEvaluation
+  participant A as WorkbenchAssociations
+  participant D as 领域角色与关联规则
+  participant N as 隔离原生执行器
+  participant S as SQLite与CAS
+  U->>W: 启动FLYWHEEL（冻结卡片与工具链）
+  W->>R: 分派重建
+  R->>D: Code只获取卡片、公开接口和所选范围
+  D-->>R: 所选模块代码
+  R->>N: 独立接口投影与比较
+  R->>S: 保存代码和接口比较
+  U->>W: 启动EVALUATE
+  W->>E: 分派评测
+  E->>N: 参考实现基础构建
+  E->>D: TestGen提出候选（可附未可信拒绝反馈）
+  E->>N: 参考验证候选
+  alt 候选全部通过
+    E->>S: 保存不可变可信用例
+    E->>N: 评测重建实现
+    E->>S: 保存结果与章节版本
+  else 参考拒绝
+    E->>S: 保存未可信候选和拒绝证据
+    E-->>U: 停止，可恢复重新提出候选
+  end
+  U->>W: 索引完成后独立启动ASSOCIATE
+  W->>A: 固定卡片版本
+  A->>D: 依据正文明确符号引用建立关系
+  A->>S: 保存带版本和引用行的JSON关系索引
+  U->>A: 当前卡片不适用
+  A-->>U: 有效关系及适用条件，排除受版本变更影响的关系
+```
+
+图中各阶段由同一持久化阶段服务承载，仍须分别启动；行为通过不自动赋予发布资格。关系是可审计的引用事实，不保证可替代性；外部材料、一键编排和自动修订为剩余实现范围。

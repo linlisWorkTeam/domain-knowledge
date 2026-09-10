@@ -3,8 +3,10 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：提供索引构建、阶段恢复与摘要试检索的可操作界面。
  */
+import { createKnowledgeAssociationsPanel } from './KnowledgeAssociations.js'
 export function createKnowledgeIndexPanel({ root, request, escapeHtml: escape, isEditable }) {
   let task = null
+  const associations = createKnowledgeAssociationsPanel({ root, request, escapeHtml: escape, isEditable, selection: () => task?.status === 'SUCCEEDED' ? task.input.cardVersionIds : null })
   let events = []
   let timer = null
   let query = ''
@@ -52,6 +54,7 @@ export function createKnowledgeIndexPanel({ root, request, escapeHtml: escape, i
     panel.querySelector('[data-index-notice]').textContent = notice
     panel.querySelector('[data-index-results]').innerHTML = resultsHtml()
     panel.querySelector('[data-index-action="build"]').disabled = busy || active() || !isEditable()
+    associations.refresh()
     if (action) panel.querySelector(`[data-index-action="${action}"]`)?.focus({ preventScroll: true })
   }
   function fail(error) { notice = reasons[error?.code] ?? '索引操作未完成，请重试。'; render() }
@@ -114,6 +117,6 @@ export function createKnowledgeIndexPanel({ root, request, escapeHtml: escape, i
       <div class="section-heading"><h2>知识索引</h2><button class="secondary-button" data-index-action="build" ${!isEditable() ? 'disabled' : ''} type="button">更新索引</button></div>
       <div data-index-task aria-live="polite">${taskHtml()}</div><p data-index-notice role="status">${escape(notice)}</p>
       <form class="index-search" data-index-search><label>试检索<input name="query" type="text" value="${escape(query)}" placeholder="输入问题、用途或接口名称" maxlength="1024" required></label><button class="secondary-button" type="submit">检索索引</button></form>
-      <div data-index-results>${resultsHtml()}</div><div data-index-preview></div></div></details>`,
+      <div data-index-results>${resultsHtml()}</div><div data-index-preview></div><section data-association-panel></section></div></details>`,
   }
 }

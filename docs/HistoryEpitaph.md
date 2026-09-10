@@ -138,3 +138,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 - [2026-09-10-1822-native-trusted-tests.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/42f6e74aebc26c3212aa1bf886303a7cf42f53e2/docs/epitaph/2026-09-10-1822-native-trusted-tests.md)：原生候选用例协议与缓存接线，参考门禁拒绝错误候选，详细验证和未完成边界保留于固定提交；最新真实模型结果见1908交接。
 
 - [2026-09-10-1833-workbench-reconstruction.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/ab46aa5a0f51fc4b23b808a662cf1cf5c45f6f58/docs/epitaph/2026-09-10-1833-workbench-reconstruction.md)：接通原生重建、隔离接口比较与恢复，尚未通过真实模型验收；后续真实jsmn结果见1913交接。
+
+- [2026-09-10-1850-workbench-evaluation.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/bdc8b1dc63aab1706cbb93add422d296e1d58e6c/docs/epitaph/2026-09-10-1850-workbench-evaluation.md)：接通原生评测和失败用例界面，原验证integration189/Console29；完整目标尚缺自动修订、关联、固定门禁和真实双目标验收。后续真实jsmn与关联结果见1913和1931交接。
