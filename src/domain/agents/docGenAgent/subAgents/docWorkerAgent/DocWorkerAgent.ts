@@ -5,7 +5,7 @@
  */
 import type { ExecutionContext, RoleResult, PendingArtifact } from '../../../AgentExecution.ts';
 import { assertActive, pending } from '../../../AgentExecution.ts';
-import { type Input, type Output, schemaFor, validateInput } from './DocWorkerAgentContract.ts';
+import { type Input, type Output, schemaFor, validateInput, validateOutput } from './DocWorkerAgentContract.ts';
 import { definition, buildPrompt, readablePaths } from './DocWorkerAgentPrompt.ts';
 
 /** 从分配给本 Worker 的源码中提取知识片段，保留证据来源供 DocGen 汇总。 */
@@ -26,15 +26,16 @@ export async function execute(input: Input, context: ExecutionContext): Promise<
   assertActive(context.signal);
   context.model.assertOutput(raw, schema);
   const output = raw as unknown as Output;
+  validateOutput(input, output);
   const artifacts: PendingArtifact[] = [];
-  const fragment = String(output.fragment);
+  const fragment = JSON.stringify(output, null, 2);
   const chunkRef = pending('chunk');
-  artifacts.push({ key: 'chunk', content: fragment, mediaType: 'text/plain' });
+  artifacts.push({ key: 'chunk', content: fragment, mediaType: 'application/json' });
   const payload = {
     resultKind: 'knowledgeChunk',
     chunkRef,
     provenance: input.provenance,
-    unresolvedRisks: [],
+    unresolvedRisks: output.unresolvedQuestions,
   };
   return { output, payload, artifacts };
 }

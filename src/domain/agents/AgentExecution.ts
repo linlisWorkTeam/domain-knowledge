@@ -7,7 +7,7 @@ import type { ArtifactRef } from '../Domain.ts';
 import type { AgentCommand, AgentId } from './AgentContracts.ts';
 
 // 执行语义改变时更新版本，阻止旧 checkpoint 在不同角色实现下继续运行。
-export const ROLE_EXECUTION_VERSION = 'domain-agents-v2-docgen-subagents';
+export const ROLE_EXECUTION_VERSION = 'domain-agents-v3-docworker-evidence';
 /** 受信材料。 */
 export interface Material { ref: ArtifactRef; content: unknown }
 /** Application 已加载并校验的角色材料；不包含通用工作流状态或存储实现。 */

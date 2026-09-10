@@ -31,7 +31,7 @@ export type Input = RoleInput<Payload>;
 /** DocGen 决定任务边界，执行端只负责运行和提交。 */
 export interface DocWorkerTask { workerId: string; sourcePaths: string[] }
 /** 已提交的 Worker 结果及可供汇总的片段。 */
-export interface DocWorkerFragment { workerId: string; resultRef: ArtifactRef; material: Material }
+export interface DocWorkerFragment { workerId: string; resultRef: ArtifactRef; material: Material; unresolvedRisks?: string[] }
 /** 技术执行端承接有界任务批次，失败或取消不能返回部分成功。 */
 export interface DocWorkerExecutionPort {
   run(tasks: DocWorkerTask[], signal?: AbortSignal): Promise<DocWorkerFragment[]>;

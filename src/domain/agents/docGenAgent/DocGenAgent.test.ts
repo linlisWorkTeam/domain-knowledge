@@ -58,10 +58,12 @@ test('doc-gen owns nonempty source partitions and waits for all fragments before
     assert.deepEqual(tasks.map((task) => task.workerId), ['worker-1', 'worker-2']);
     seen.push(...tasks.map((task) => task.sourcePaths));
     return tasks.map((task) => ({ workerId: task.workerId, resultRef: sample.input.provenance[0]!,
+      unresolvedRisks: ['Missing dependency'],
       material: { ref: sample.input.provenance[0]!, content: `extracted ${task.sourcePaths[0]}` } })).reverse();
   } } };
   const result = await execute(sample.input, context);
   assert.deepEqual(seen, [['a.ts'], ['b.ts']]);
+  assert.deepEqual(result.payload.unresolvedRisks, ['Missing dependency']);
   assert.deepEqual(sample.phases, ['model', 'validate']);
   assert.match(sample.requests[0]!.prompt, /extracted a.ts/);
   assert.match(sample.requests[0]!.prompt, /extracted b.ts/);

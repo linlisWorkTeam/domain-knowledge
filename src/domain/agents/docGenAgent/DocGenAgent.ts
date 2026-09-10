@@ -53,7 +53,7 @@ export async function execute(input: Input, context: DocGenContext): Promise<Rol
     ...(ordered.length ? { workerResultRefs: ordered.map(({ resultRef }) => resultRef) } : {}),
     provenance: input.provenance,
     changedPaths: [`knowledge/${input.moduleId}.md`],
-    unresolvedRisks: [],
+    unresolvedRisks: [...new Set(ordered.flatMap((item) => item.unresolvedRisks ?? []))],
   };
   return { output, payload, artifacts };
 }

@@ -39,6 +39,9 @@ function agentOutput(agentType: string): Record<string, unknown> {
         workerId: 'worker-1',
         fragment: 'The public contract returns the fixed value four and is covered by a behavior test.',
         provenance: ['src/module.js', 'src/module.test.js'],
+        analysisScope: { moduleId: 'dsh-module', files: ['src/module.js', 'src/module.test.js'], symbols: [] },
+        sourceEvidence: ['src/module.js', 'src/module.test.js'].map((path) => ({ claim: 'Returns four', path })),
+        unresolvedQuestions: [],
       };
     case 'doc-gen':
       return {

@@ -15,11 +15,11 @@ SPDX-License-Identifier: MIT
 | --- | --- | --- | --- |
 | IO-07 | DocWorker 的归属与存在目的 | 已确认 | 2026-09-10 用户确认 DocWorker 是 DocGen 内部子 Agent，用于拆分源码分析工作，控制单次分析的上下文大小。具体拆分依据、上下文预算、片段格式与汇总容量仍待逐项确认；当前按文件列表均分不等于已实现按上下文容量拆分。 |
 | IO-08 | Worker 任务拆分原则与输入范围 | 已确认（待实现） | 2026-09-10 用户确认先按业务模块和调用关系分组，再按上下文预算拆小。每个 Worker 接收任务范围、相关源码和必要依赖信息。具体预算、跨模块依赖处理和分组算法尚未确定；当前文件数量均分实现需要后续调整。 |
-| IO-09 | Worker 输出与 DocGen 汇总职责 | 已确认（待实现） | 2026-09-10 用户确认 Worker 返回分析范围、知识正文、源码依据和未解决问题。DocGen 汇总片段、消除重复和矛盾并组织成最终知识卡片；具体机器字段与汇总实现待落实。 |
+| IO-09 | Worker 输出与 DocGen 汇总职责 | 结构契约已实现，语义待验收 | 2026-09-10 用户确认 Worker 返回分析范围、知识正文、源码依据和未解决问题。DocGen 汇总片段、消除重复和矛盾并组织成最终知识卡片；具体机器字段与汇总实现待落实。 |
 
 IO-07 中的拆分依据已由 IO-08 补充确认，片段输出由 IO-09 补充确认；具体上下文预算与汇总容量继续讨论。
 
-## 目标输出（已确认，待实现）
+## 目标输出（结构契约已实现）
 
 | 内容 | 约定 |
 | --- | --- |
@@ -28,7 +28,7 @@ IO-07 中的拆分依据已由 IO-08 补充确认，片段输出由 IO-09 补充
 | 源码依据 | 将结论对应到文件、符号或代码位置，供 DocGen 追溯核对 |
 | 未解决问题 | 明确缺少的依赖、无法确定的行为，交后续处理 |
 
-Worker 交付以上知识片段或文档，由 DocGen 汇总、去重、处理矛盾并默认合成一份知识文档，遵守 [DocGen IO-18](../../DocGenAgent.md)。Worker 产出数量不决定最终文档数量；内容过大而建议拆分时，由 DocGen 先与用户沟通，以用户意见为准。每次飞轮只处理一份知识文档。字段名、来源校验、缺口处理与矛盾解决机制仍需细化；当前 fragment 字符串、模型 provenance 列表及固定为空的 unresolvedRisks 尚未完整实现此目标。
+Worker 交付以上知识片段或文档，由 DocGen 汇总、去重、处理矛盾并默认合成一份知识文档，遵守 [DocGen IO-18](../../DocGenAgent.md)。Worker 产出数量不决定最终文档数量；内容过大而建议拆分时，由 DocGen 先与用户沟通，以用户意见为准。每次飞轮只处理一份知识文档。字段名、来源校验、缺口处理与矛盾解决机制仍需细化；当前已保存完整结构化片段并传递未解决问题；源码语义与矛盾消解仍需真实模型验收。
 
 ## 职责与当前输入输出
 
@@ -38,8 +38,8 @@ Worker 交付以上知识片段或文档，由 DocGen 汇总、去重、处理�
 | --- | --- |
 | 输入 | 模块标识 `moduleId`、源码 `sourceRefs`、公开接口 `publicInterfaceRefs`；可选分配路径 `assignedSourcePaths` 和依赖材料 `dependencyRefs` |
 | 可读文件 | 分配的源码路径（未提供时使用 input.sourcePaths）及公开接口路径 |
-| 模型输出 | `workerId`、`fragment`、`provenance`；片段至少 20 字符，模型来源列表至少一项 |
-| 交接输出 | `resultKind: knowledgeChunk`，片段工件 `chunkRef`、受信输入的 `provenance`、`unresolvedRisks` |
+| 模型输出 | `workerId`、`fragment`、`provenance`、`analysisScope`、`sourceEvidence`、`unresolvedQuestions`；片段至少 20 字符，覆盖与证据路径校验 |
+| 交接输出 | `resultKind: knowledgeChunk`，JSON 片段工件 `chunkRef`、受信输入的 `provenance`、`unresolvedRisks` |
 | 权限与限制 | 只提取片段，不发布知识或决定门禁；交接来源使用 input.provenance，不直接信任模型自报来源 |
 
 ## 待确认与验收重点
@@ -47,3 +47,9 @@ Worker 交付以上知识片段或文档，由 DocGen 汇总、去重、处理�
 对应 S2-02：分块原则按 IO-08、输出内容按 IO-09 实现，具体上下文预算、跨模块依赖处理、覆盖与来源校验和材料不足后的处理仍需细化。验证片段结构与实际覆盖分别进行，不能把满足最小长度当作知识完整。
 
 开发步骤与证据统一记录在 [Status](../../../../../../Status.md)，独立运行方法见 [AgentDevelopment](../../../../../../AgentDevelopment.md)。
+
+## 本轮实现约定（2026-09-10）
+
+IO-09 采用必需字段 `analysisScope: { moduleId, files, symbols }`、`fragment`、`sourceEvidence: [{ claim, path, symbol? }]`、`unresolvedQuestions: string[]`；保留 workerId 和 provenance。files 必须精确覆盖分配源码（不能重复或越界），证据路径只允许分配源码及显式公开接口；每个覆盖文件至少有一项证据。symbols 可以为空，不伪造符号提取能力。结构校验及路径授权不证明结论与源码语义一致。
+
+片段工件保存完整 JSON，确保汇总收到范围、正文、依据和缺口；未解决问题进入结果 unresolvedRisks，并沿内部执行端传递给 DocGen，不能被固定空数组丢弃。缺依赖可以明确报告问题，不得编造依据；未覆盖任务文件则本次执行失败。上述字段与语义校验落地后由角色测试与组合回归验证。

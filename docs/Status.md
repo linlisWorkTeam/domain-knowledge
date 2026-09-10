@@ -159,3 +159,8 @@ DSH 单 DocGen 范例的历史 live 验证见 [历史汇总](HistoryEpitaph.md)�
 Track four stages here: DDD layout, individual Agent development, end-to-end verification on this server, and company CodeAgent CLI adaptation with real business scenarios. Work is currently in stages 1 and 2; the user owns stage 2 in the 2026-09-10 session. Each task records steps, dependencies, acceptance references and revision-specific evidence. Existing code, fixtures and historical live runs do not establish current acceptance.
 
 </details>
+
+### S2-02 / S2-03 本轮开发（2026-09-10）
+
+- 功能 1：DocWorker 的 IO-09 结构契约、覆盖与证据路径校验、JSON 片段和未解决问题传递已实现。DocGen 保留子任务风险；更新执行版本以阻止旧 checkpoint 混用。
+- 验证：Node 24.13.0，typecheck、validate:specs 通过；DocGen/DocWorker 角色与组合测试 21 项通过。路径和结构验证不等于真实源码语义验收；未运行真实模型。
