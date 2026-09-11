@@ -3,39 +3,47 @@ Copyright (c) 2026 linlisWorkTeam
 SPDX-License-Identifier: MIT
 文件功能：CheckAgent 的职责、输入输出与确认状态。
 -->
-# CheckAgent：只读检查
+# CheckAgent：找出新旧代码中需要关注的差异
+
+Check 按项目提供的比较规则，阅读原始源码和 Code 生成的实现，指出有依据的差异。它只读代码，不修改实现，也不运行测试。
+
+## 比较什么，交付什么
+
+输入是原始源码、生成代码和比较规则。例如规则要求检查公开函数的返回行为：原始代码是 `return 4;`，生成代码是 `return 3;`，Check 应指出对应文件、两段原文和为什么需要关注。
+
+每条差异要能回答：用了哪条规则、两边代码在哪里、具体差在哪里、是否阻塞通过。没有发现差异时可以返回空列表，但必须先拿到合法规则并完成比较。
+
+## 框架怎样检查报告
+
+框架要求报告覆盖所有生成文件，并逐条检查规则编号和文件路径。报告引用的原始片段必须在冻结源码中存在，生成片段必须在对应的新文件中存在。
+
+这能拦住虚构的原文引用。至于“这段差异是否真的意味着业务错误”，仍然依赖模型判断，当前没有证明两段程序行为等价的算法。
+
+规则未配置、规则内容为空或编号重复时，在调用模型前就失败。报告范围不完整、引用不存在的片段，或者阻塞标记与差异严重程度不一致时，也会拒绝结果。
+
+## 报告交给谁
+
+Check 完成后，还要等参考测试校验完成，再进入实际评测。Review 同时收到比较报告和评测报告，分析文档需要改哪里。Check 的差异不能代替测试结果，也不能指定测试应该怎样执行。
+
+## 目前做到哪
+
+IO-14 的输入范围及 IO-15 的比较报告交接已实现。测试覆盖缺规则、伪造规则/双方片段、越界位置、覆盖不完整和阻塞标记不一致；完整流程验证报告进入 Review 和 Gate。
+
+具体业务比较规则的适用性仍需验收。相似度算法、评分、权重和阈值按 2026-09-10 的决定留待研究，当前不虚构评分，也不把相似度当发布依据。
+
+<details>
+<summary>开发对照：报告字段和提示词</summary>
+
+角色 ID 为 `check`。输入为 sourceSnapshotRef、generatedCodeRef、comparisonRulesRef；规则来自场景 `comparisonRules: [{ id, description }]`。原源码及接口按固定提交的白名单提供，生成文件以内联材料提供。
+
+输出包括 scope、findings、blocking。scope 必须列全生成文件；每条 finding 包含 ruleId、sourcePath、path、original、generated、message、severity。severity 为 BLOCKER 或 INFO；blocking 必须等于是否存在 BLOCKER。
+
+缺规则时抛出 CHECK_RULES_REQUIRED；非法范围、证据和阻塞标记分别拒绝。结果保存原始结构化报告，并映射为 findingId、severity、criterionId、evidenceLocation 和说明。Application 把真实原始报告作为 Review 的 comparisonReportRef，Gate 读取 check.blocking。
+
+Prompt 要求只读、按规则比较并引用两边原文，禁止虚构算法和阈值。共同执行约定见 [Agents](../Agents.md)。
+
+</details>
+
+## 代码与样例
 
 代码位置：[执行入口](../../../../../src/domain/agents/checkAgent/CheckAgent.ts)、[输入输出契约](../../../../../src/domain/agents/checkAgent/CheckAgentContract.ts)、[提示词与读取范围](../../../../../src/domain/agents/checkAgent/CheckAgentPrompt.ts)、[角色测试](../../../../../src/domain/agents/checkAgent/CheckAgent.test.ts)、[独立样例](../../../../../src/domain/agents/checkAgent/examples/CheckAgentSample.json)。
-
-角色 ID：`check`。共同执行、失败和交接协议见 [Agents](../Agents.md)。
-
-## 输入输出确认记录
-
-| 编号 | 议题 | 状态 | 记录 |
-| --- | --- | --- | --- |
-| IO-14 | CheckAgent 输入与比较依据 | 输入范围已确认；规则与算法待论文调研 | 2026-09-10 用户确认输入为原始源码、CodeAgent 生成的临时代码和比较规则。原始源码作为比较基准，临时代码作为待检查对象，规则规定比较范围及关注的差异；具体规则和相似度算法待论文调研后确定。 |
-| IO-15 | Check 输出及评测、Review 的结果交接 | 已实现，待业务验收 | 2026-09-10 用户确认 Check 输出比较结果及差异依据，评测负责输出测试结果，之后 Review 同时读取两者，分析知识卡片需要修订的位置。保持 Check 后进入评测、再到 Review 的流程，不将差异结果误作测试执行指令。 |
-
-## 当前输入输出
-
-IO-14、15 的契约和交接已实现。输入为 `sourceSnapshotRef`、`generatedCodeRef`、`comparisonRulesRef`。原始源码通过固定提交的源码/接口文件白名单只读访问，生成实现通过内联工件提供。比较规则来自场景 `comparisonRules: [{ id, description }]`。
-
-模型输出：
-
-- `scope`：实际生成文件的完整路径集合。
-- `findings`：每项包含 ruleId、sourcePath、path、original、generated、message、severity（BLOCKER / INFO）。original 和 generated 是对应的原文片段。
-- `blocking`：必须与 findings 中是否存在 BLOCKER 一致。
-
-Domain 校验范围覆盖全部生成文件、每项 ruleId 来自配置、sourcePath 属于授权源码/接口范围，path 属于生成文件；original 必须出现在冻结源码清单对应文件的正文中，generated 必须出现在对应生成文件中。片段存在性由代码核验，差异是否具有所述业务含义仍需模型判断，不等于 AST 等价证明。结果信封将每项独立映射到 findingId、severity、criterionId、evidenceLocation 和说明，保留原始结构化输出引用。
-
-Application 将真实 Check 原始报告作为 Review 的 `comparisonReportRef`，与测评报告一起加载。评测器运行配置指定的命令；Gate 继续读取 check.blocking。
-
-## 延后事项与验证
-
-相似度算法、评分、权重和阈值仍属下一版本研究范围。当前不内置这些判据；规则为空、内容为空或标识重复时，在模型调用前以 CHECK_RULES_REQUIRED 拒绝，不能把缺配置当作无差异。只有提供合法规则并完成比较后，才允许返回空 findings。
-
-角色回归覆盖规则伪造、生成片段伪造、越界位置和 blocking 不一致。完整 C++ 流程验证 Check 报告进入 Review，报告引用进入最终 Gate 输入。
-
-## 本轮缺口修复验收
-
-比较规则必须非空且标识唯一；缺少配置必须停止，不能返回无差异。original 和 generated 证据都必须在冻结原文及生成文件中核验。

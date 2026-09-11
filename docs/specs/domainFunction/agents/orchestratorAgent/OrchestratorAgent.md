@@ -3,25 +3,41 @@ Copyright (c) 2026 linlisWorkTeam
 SPDX-License-Identifier: MIT
 文件功能：OrchestratorAgent 的职责、输入输出与确认状态。
 -->
-# OrchestratorAgent：业务计划
+# OrchestratorAgent：决定本轮先做哪个模块
 
-代码位置：[执行入口](../../../../../src/domain/agents/orchestratorAgent/OrchestratorAgent.ts)、[输入输出契约](../../../../../src/domain/agents/orchestratorAgent/OrchestratorAgentContract.ts)、[提示词与读取范围](../../../../../src/domain/agents/orchestratorAgent/OrchestratorAgentPrompt.ts)、[角色测试](../../../../../src/domain/agents/orchestratorAgent/OrchestratorAgent.test.ts)、[独立样例](../../../../../src/domain/agents/orchestratorAgent/examples/OrchestratorAgentSample.json)。
+Orchestrator 根据业务目标和已有进度，从允许处理的模块中选一个，说明选择原因，再列出本轮各 Agent 需要的材料。执行顺序由工作流固定，模型不能跳过评测或批准发布。
 
-角色 ID：`orchestrator`。共同执行、失败和交接协议见 [Agents](../Agents.md)。
+## 接收什么，交出什么
 
-## 输入输出确认记录
+输入包括业务目标、候选模块说明、项目配置、当前轮次和上一轮进度。模块概况说明源码、接口路径及相关配置，不给模型任意浏览整个仓库的权限。
 
-| 编号 | 议题 | 状态 | 记录 |
-| --- | --- | --- | --- |
-| IO-17 | Orchestrator 职责与输入输出 | 已实现，待业务验收 | 2026-09-10 用户确认 Orchestrator 负责确定本轮要处理的任务。输入为本次业务目标、代码仓模块概况、项目配置及已有任务进度；输出本轮任务计划，说明处理哪些模块、交给哪个 Agent、使用哪些输入材料。 |
+输出是一份任务计划：本次选哪个模块，为什么选它，DocGen、TestGen、Code、Check、Review 分别用哪些材料。暂时还没生成的文档或报告，先按材料类型分配，等上游完成再由框架填入真实内容。
 
-## 当前输入输出
+例如，授权列表有“价格计算”和“日志输出”两个模块，目标是补齐价格规则文档。Orchestrator 可以选择价格计算，并解释它与目标的关系。选择被框架保存后，下一轮仍处理价格计算，不能转去日志模块。
 
-IO-17 当前实现有界的模块选择：场景可提供最多 32 个授权候选模块，每个 Run 依据目标选择一个模块并保持到结束。未提供候选列表时按原单模块输入执行。输入为 policyRef、moduleRefs、businessGoalRef、projectConfigurationRef、progressRef。模块概况包括各模块说明、源码与接口路径和项目配置，选中后以同一提交冻结源码快照；业务目标来自场景 businessGoal（未填时使用模块知识生成与测评目标）；进度包含本轮序号、Run 状态和上一轮质量报告。
+## 执行规则
 
-模型输出 strategy、iteration、tasks。tasks 中五类外层角色 DocGen、TestGen、Code、Check、Review 各一次，每项含 agentType、moduleId、materials。Domain 拒绝未授权模块、同一批次混用模块、错轮次、重复/缺失角色和角色越权材料。
+1. 每次 Run 只选一个模块，当前最多接收 32 个授权候选；未传候选列表时使用原单模块场景。
+2. 五类下游任务各出现一次，不漏派、不重复，也不把不同模块混进同一批次。
+3. DocWorker 由 DocGen 内部安排；测试是否复用由框架根据源码判断。
+4. 计划通过校验后，框架将模块、同一提交的源码快照和任务材料绑定到 Run。后续轮次沿用该选择。
 
-| 角色 | 本轮材料槽位 |
+选了未授权模块、填错轮次、遗漏角色或分配越权材料时，计划被拒绝，不照着错误计划继续运行。最大轮次由框架检查，不能由模型要求额外增加。
+
+## 目前做到哪
+
+IO-17 已实现：业务输入、模块选择、任务计划和材料范围校验都已接入流程。角色测试覆盖非法模块、错轮次、不完整计划和越权材料，完整回归验证选中的模块确实成为处理和发布对象。
+
+真实模型能否选出最有价值的模块，仍需业务验收。当前没有跨模块自动发现或任意任务图编排。
+
+<details>
+<summary>开发对照：字段、材料和提示词</summary>
+
+角色 ID 为 `orchestrator`，不开放工具，`readablePaths` 为空。输入引用为 policyRef、moduleRefs、businessGoalRef、projectConfigurationRef、progressRef。未提供 businessGoal 时使用模块知识生成与测评目标。
+
+模型返回 strategy、iteration、tasks；每个 task 包含 agentType、moduleId、materials。
+
+| 下游角色 | 可分配的材料槽位 |
 | --- | --- |
 | DocGen | source、interfaces |
 | TestGen | source、interfaces、testPolicy |
@@ -29,12 +45,12 @@ IO-17 当前实现有界的模块选择：场景可提供最多 32 个授权候�
 | Check | source、generatedCode、comparisonRules |
 | Review | knowledge、evaluation、comparison |
 
-尚未生成的工件用业务材料槽位描述，Application 在上游完成后绑定真实引用。纠正、历史记录等迭代补充材料由各角色的明确契约提供。Application 按计划核验每个角色任务，结果信封保留模块及材料槽位，固定五类节点和依赖不接受模型改写；DocWorker 由 DocGen 内部调用，测试复用由框架按源码内容处理。
+历史、纠正意见和质量反馈由各角色契约补充。框架核对任务后才加载材料，模型不能用槽位扩大权限或改动固定拓扑。
 
-## 验证与边界
+Prompt 要求说明模块选择依据、五类任务及授权材料；禁止安排 DocWorker 或决定 Gate。共同执行和失败规则见 [Agents](../Agents.md)，轮次和恢复见 [Workflow](../../workflow/Workflow.md)。
 
-角色测试覆盖非法模块、材料泄漏、不完整计划及错轮次。完整 C++ 流程覆盖两轮执行与固定拓扑，原生 DSH SDK 受控请求覆盖计划进入生产 Adapter。Application 消费模型选中的模块，绑定 Run 归属和后续任务，补充材料仍按各角色契约确定。当前一次 Run 处理一个模块，不声称实现跨模块自动发现或任意 DAG 编排。
+</details>
 
-## 本轮缺口修复验收
+## 代码与样例
 
-业务规划依据目标、明确模块概览及进展选择本批次模块和任务输入。Application 消费选定模块并绑定任务材料；固定拓扑及独立测评/发布门禁不可跳过。
+代码位置：[执行入口](../../../../../src/domain/agents/orchestratorAgent/OrchestratorAgent.ts)、[输入输出契约](../../../../../src/domain/agents/orchestratorAgent/OrchestratorAgentContract.ts)、[提示词与读取范围](../../../../../src/domain/agents/orchestratorAgent/OrchestratorAgentPrompt.ts)、[角色测试](../../../../../src/domain/agents/orchestratorAgent/OrchestratorAgent.test.ts)、[独立样例](../../../../../src/domain/agents/orchestratorAgent/examples/OrchestratorAgentSample.json)。
