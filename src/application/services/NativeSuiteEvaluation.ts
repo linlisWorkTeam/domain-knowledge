@@ -8,12 +8,13 @@ import { canonicalJson } from '../../domain/services/workbench/StageTask.ts';
 import { buildConstraints } from '../../domain/services/workbench/WorkbenchProject.ts';
 import { markdownSections } from '../../domain/services/knowledge/KnowledgeSections.ts';
 import { assertNativeBehaviorSuite, type NativeBehaviorSuite, type NativeContract } from '../../domain/services/evaluation/NativeBehaviorSuite.ts';
-import { nativeTrustedGates } from '../../domain/services/evaluation/NativeTrustedGates.ts';
+import { nativeTrustedGates, nativeSupplementGates } from '../../domain/services/evaluation/NativeTrustedGates.ts';
 import { nativeTestKeys, nativeOracleTrusted, type NativeTestSet } from '../../domain/services/evaluation/NativeTestCache.ts';
 import type { ArtifactStore } from '../ports/ApplicationPorts.ts';
 import type { NativeCaseRunner, NativeSnapshotter, NativeTestStore, NativeCaseObservation } from '../ports/NativeEvaluationPorts.ts';
 import type { NativeToolchainInput } from '../ports/LanguageToolchainPorts.ts';
 import type { StageExecutionContext } from './WorkbenchStages.ts';
+type Prepared = { set: NativeTestSet; reused: number; proposed: number; revalidated: boolean; rejection: 'TRUSTED_GATE_CONFLICT' | 'CANDIDATE_REJECTED' | null };
 type Context = Partial<Pick<StageExecutionContext, 'signal' | 'step' | 'progress'>>;
 export class NativeSuiteEvaluation {
   readonly dependencies: { artifacts: ArtifactStore; runner: NativeCaseRunner; snapshot: NativeSnapshotter; store: NativeTestStore };
@@ -58,32 +59,60 @@ export class NativeSuiteEvaluation {
     projectSnapshotId: string; sourceRevision: string; cardIds: string[]; versionIds: string[]; bodyRefs: ArtifactRef[];
     reference: NativeToolchainInput; contract: NativeContract; policyDigest: string;
     propose: () => Promise<NativeBehaviorSuite>; expectedToolchainDigest?: string;
-  }, context: Context = {}) {
+    supplement?: { schemaVersion: 'native-supplement-v1'; demandDigest: string };
+  }, context: Context = {}): Promise<Prepared> {
     const { artifacts, snapshot, store } = this.dependencies;
     if (!input.versionIds.length || input.versionIds.length !== input.bodyRefs.length || input.cardIds.length !== input.bodyRefs.length || new Set(input.versionIds).size !== input.versionIds.length) throw new Error('NATIVE_TEST_BINDING_INVALID');
     for (const ref of input.bodyRefs) if (!await artifacts.verify(ref)) throw new Error('NATIVE_TEST_ARTIFACT_CORRUPT');
     const fingerprint = await snapshot(input.reference.language, input.reference.build, context.signal);
     if (input.expectedToolchainDigest && input.expectedToolchainDigest !== fingerprint.digest) throw new Error('NATIVE_TEST_TOOLCHAIN_CHANGED');
+    if (input.supplement && (input.supplement.schemaVersion !== 'native-supplement-v1' || !/^[a-f0-9]{64}$/.test(input.supplement.demandDigest))) throw new Error('NATIVE_SUPPLEMENT_INVALID');
     const reference = await this.manifest(input.reference);
     const binding = { cardIds: [...input.cardIds], knowledgeBodyDigests: input.bodyRefs.map((ref) => ref.sha256), referenceDigest: sha256(JSON.stringify(reference)),
-      interfaceDigest: sha256(canonicalJson(input.contract)), policyDigest: input.policyDigest, toolchainDigest: fingerprint.digest };
+      interfaceDigest: sha256(canonicalJson(input.contract)), policyDigest: input.supplement ? sha256(canonicalJson({ policyDigest: input.policyDigest, supplement: input.supplement })) : input.policyDigest, toolchainDigest: fingerprint.digest };
     const inherited = store.lineage(input.cardIds);
     const historicalSuites: NativeBehaviorSuite[] = [];
     for (const set of inherited) {
       if (set.binding.interfaceDigest !== binding.interfaceDigest) throw new Error('NATIVE_TRUSTED_INTERFACE_CHANGED');
       historicalSuites.push(await this.verifiedSuite(set, input.contract));
     }
-    const proposedSuite = inherited.length ? null : await input.propose();
+    let reused = inherited.length ? nativeTrustedGates(historicalSuites).suite.cases.length : 0;
+    if (input.supplement) {
+      // Only an exact completed demand may skip proposal. A new demand first revalidates historical gates.
+      const completed = inherited.find((set) => {
+        const { gateDigest: _gate, ...previous } = set.binding;
+        return canonicalJson(previous) === canonicalJson(binding) && set.binding.gateDigest === nativeTrustedGates(historicalSuites).digest;
+      });
+      if (completed) {
+        const suite = await this.verifiedSuite(completed, input.contract);
+        return { set: completed, reused: suite.cases.length, proposed: 0, revalidated: false, rejection: null };
+      }
+      if (!inherited.length) throw new Error('NATIVE_SUPPLEMENT_TRUSTED_REQUIRED');
+      const { supplement: _supplement, ...ordinary } = input;
+      const historical = await this.prepare({ ...ordinary, propose: async () => { throw new Error('NATIVE_SUPPLEMENT_TRUSTED_REQUIRED'); } }, context);
+      if (historical.set.status !== 'TRUSTED') return historical;
+      reused = historical.reused;
+    }
+    const proposedSuite = inherited.length && !input.supplement ? null : await input.propose();
     if (proposedSuite) assertNativeBehaviorSuite(proposedSuite, input.contract);
-    const gates = nativeTrustedGates(proposedSuite ? [proposedSuite] : historicalSuites);
+    let candidateObservations: NativeCaseObservation[] | undefined;
+    let candidateRejected = false;
+    if (input.supplement && proposedSuite) {
+      nativeSupplementGates(historicalSuites, proposedSuite);
+      const ref = await this.put(proposedSuite);
+      candidateObservations = await this.cases('reference', `supplement:${sha256(canonicalJson(binding))}:${ref.sha256}`, input.reference, input.contract, proposedSuite, context);
+      candidateRejected = !nativeOracleTrusted(proposedSuite, candidateObservations);
+    }
+    const gates = input.supplement && proposedSuite && !candidateRejected
+      ? nativeSupplementGates(historicalSuites, proposedSuite) : nativeTrustedGates(proposedSuite ? [proposedSuite] : historicalSuites);
     const bound = { ...binding, gateDigest: gates.digest };
     const keys = nativeTestKeys(bound); const cached = store.trusted(keys.cacheKey);
     if (cached) { if (cached.cacheKey !== keys.cacheKey) throw new Error('NATIVE_TEST_CACHE_CORRUPT');
-      const suite = await this.verifiedSuite(cached, input.contract); return { set: cached, reused: suite.cases.length, proposed: 0, revalidated: false }; }
+      const suite = await this.verifiedSuite(cached, input.contract); return { set: cached, reused: suite.cases.length, proposed: 0, revalidated: false, rejection: null }; }
     const parent = store.head(keys.referenceKey);
     if (parent && parent.referenceKey !== keys.referenceKey) throw new Error('NATIVE_TEST_CACHE_CORRUPT');
     // 输入变化只令缓存失效；所有历史可信输入和预期原样再次验证，不交给模型重写。
-    const suite = proposedSuite ?? gates.suite;
+    const suite = input.supplement && !candidateRejected ? gates.suite : proposedSuite ?? gates.suite;
     assertNativeBehaviorSuite(suite, input.contract);
     const available = new Map<string, string>();
     for (let index = 0; index < input.bodyRefs.length; index++) {
@@ -101,13 +130,14 @@ export class NativeSuiteEvaluation {
       return { sectionId, versionId: current ?? historical!.versionId, matchesInput: Boolean(current) };
     });
     const suiteRef = await this.put(suite);
-    const observations = await this.cases('reference', `${keys.cacheKey}:${suiteRef.sha256}`, input.reference, input.contract, suite, context);
+    const observations = candidateRejected ? candidateObservations! : await this.cases('reference', `${keys.cacheKey}:${suiteRef.sha256}`, input.reference, input.contract, suite, context);
     if ((await snapshot(input.reference.language, input.reference.build, context.signal)).digest !== fingerprint.digest) throw new Error('NATIVE_TEST_TOOLCHAIN_CHANGED');
     const oracleRef = await this.put(observations); const referenceRef = await this.put(reference); const fingerprintRef = await this.put(fingerprint);
     const set = store.save({ testSetId: `native-tests-${sha256(`${keys.cacheKey}:${suiteRef.sha256}:${oracleRef.sha256}`)}`, ...keys,
       parentTestSetId: parent?.testSetId ?? null, originVersionIds: [...input.versionIds], projectSnapshotId: input.projectSnapshotId, sourceRevision: input.sourceRevision,
       binding: bound, inheritedTestSetIds: inherited.map((item) => item.testSetId), sectionBindings, status: nativeOracleTrusted(suite, observations) ? 'TRUSTED' : 'REJECTED', suiteRef, oracleRef, referenceRef, fingerprintRef, createdAt: new Date().toISOString() });
-    return { set, reused: inherited.length ? suite.cases.length : 0, proposed: inherited.length ? 0 : suite.cases.length, revalidated: Boolean(inherited.length) };
+    return { set, reused, proposed: proposedSuite?.cases.length ?? 0, revalidated: Boolean(inherited.length),
+      rejection: set.status === 'TRUSTED' ? null : candidateRejected || !inherited.length ? 'CANDIDATE_REJECTED' : 'TRUSTED_GATE_CONFLICT' };
   }
   async evaluate(testSetId: string, generated: NativeToolchainInput, contract: NativeContract, context: Context = {}) {
     const { snapshot, store } = this.dependencies;

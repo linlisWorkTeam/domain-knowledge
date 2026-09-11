@@ -254,3 +254,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 [2026-09-11-0928-mixed-source-corrections.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/595ad4bb64f204d43b6e2a4fb59f37376bd0333b/docs/epitaph/2026-09-11-0928-mixed-source-corrections.md) 独立混合风险章节选择完成，后续v16一键推进已接并定向通过；新原生混合风险测试准备完成但排队。真实来源仍运行，最终验收部署未完成。
 
 [2026-09-11-0932-mixed-pipeline.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/d324b7adc78da01782dc63a7b779b96be1769943/docs/epitaph/2026-09-11-0932-mixed-pipeline.md) v16混合风险推进通过定向验证，随后原生三场景和相关浏览器两项通过。来源826fed已结束仍有矛盾/未知，新修订c32f运行；发现可信库无法增补新例，设计已写Spec待实现。最终发布部署未完成。
+
+- 2026-09-11-0934：新增第三项原生混合风险应用场景，当时仅类型检查；后来实际3/3通过见0944记录。旧source826fed当时运行，随后已完成。原记录：[固定提交](https://github.com/linlisWorkTeam/domain-knowledge/blob/227a4414cbf87862bed2261245dd16ee0cf3ca3d/docs/epitaph/2026-09-11-0934-mixed-application-test.md)。
