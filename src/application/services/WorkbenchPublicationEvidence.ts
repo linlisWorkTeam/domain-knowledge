@@ -3,6 +3,9 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：从持久化任务和卡片准备可审计发布证据，不授予已发布状态。
  */
+import { assertFixedPublicationObservations } from '../../domain/services/evaluation/NativeFixedEvaluation.ts';
+import type { NativeBehaviorSuite } from '../../domain/services/evaluation/NativeBehaviorSuite.ts';
+import { canonicalJson } from '../../domain/services/workbench/StageTask.ts';
 import type { ArtifactRef } from '../../domain/Domain.ts';
 import type { ArtifactStore, FlywheelRepository } from '../ports/ApplicationPorts.ts';
 import type { StageTask } from '../../domain/services/workbench/StageTask.ts';
@@ -57,6 +60,22 @@ export class WorkbenchPublicationEvidence {
       if (bytes > 128 * 1024 * 1024) throw new Error('PUBLICATION_ARTIFACT_GRAPH_LIMIT');
       if (!await artifacts.verify(ref)) throw new Error('PUBLICATION_ARTIFACT_CORRUPT');
       if (ref.mediaType === 'application/json') collect(JSON.parse(Buffer.from(await artifacts.get(ref)).toString('utf8')));
+    }
+    const load = async <T>(ref: ArtifactRef): Promise<T> => {
+      if (!ref || !await artifacts.verify(ref)) throw new Error('PUBLICATION_ARTIFACT_CORRUPT');
+      return JSON.parse(Buffer.from(await artifacts.get(ref)).toString('utf8')) as T;
+    };
+    for (const module of fixedEvaluation.result!.summary.modules as Array<Record<string, unknown>>) {
+      const reportRef = module.reportRef as ArtifactRef;
+      if (!fixedEvaluation.result!.artifactRefs.some(ref => ref.sha256 === reportRef?.sha256)) throw new Error('PUBLICATION_FIXED_REPORT_UNBOUND');
+      const report = await load<Parameters<typeof assertFixedPublicationObservations>[1] & {
+        moduleId: string; reconstructionTaskId: string; snapshotId: string; sourceDigest: string; suiteRef: ArtifactRef;
+      }>(reportRef);
+      const suiteRef = fixedSuites.find(item => item.moduleId === module.moduleId)!.suiteRef;
+      if (report.moduleId !== module.moduleId || report.reconstructionTaskId !== reconstruction.taskId
+        || report.snapshotId !== reconstruction.input.parameters.snapshotId || report.sourceDigest !== reconstruction.input.sourceDigest
+        || canonicalJson(report.suiteRef) !== canonicalJson(suiteRef)) throw new Error('PUBLICATION_FIXED_REPORT_BINDING_CHANGED');
+      assertFixedPublicationObservations(await load<NativeBehaviorSuite>(suiteRef), report, Number(module.total));
     }
     const prepared = { schemaVersion: 'workbench-publication-preparation-v1', state: 'PREPARED', evidence,
       verifiedArtifactRefs: queue.sort((a, b) => a.sha256.localeCompare(b.sha256)), publicationVerified: false };

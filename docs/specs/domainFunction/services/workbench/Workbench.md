@@ -187,3 +187,5 @@ revision-v5 的修订后源码复核使用 `native-source-review-evidence-v1`：
 Domain返回的联合证据凭据只表示记录交叉校验通过；Application仍须校验引用CAS和原始报告、执行SQLite发布审计与可恢复Markdown发布事务后才能授予VERIFIED。此轮先实现并验证联合证据规则，不修改旧发布状态、不把凭据当作已发布记录。
 
 发布证据准备由Application重读四任务和不可变卡片，核对cardId/moduleId/bodyDigest及快照，再遍历输入、结果和卡片正文引用的CAS图，逐件验证摘要和大小。引用图重复项只读取一次，JSON引用继续展开，超限或缺失立即拒绝；通过后把联合凭据和已验证引用清单写入CAS，返回PREPARED/publicationVerified=false。准备不产生已发布版本，原始报告的行为/来源语义复算与SQLite/Markdown发布提交仍是后续必需步骤。
+
+固定报告原始观察校验已接入准备服务：报告必须属于固定阶段result.artifactRefs，绑定模块、重建任务、源码快照/摘要及启动冻结suite；Domain按原suite重新比较参考和生成两侧逐案actual，且编译/执行退出码为0、无超时/输出截断，案例完整无重复。合法CAS摘要和FIXED_PASSED标签不能替代重算。可信测试集及来源逐章原始报告的语义校验仍待接通，不授予VERIFIED。

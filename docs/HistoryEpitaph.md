@@ -200,3 +200,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 [2026-09-11-0735-source-finding-history.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/fb3f28b8d2949af64da2303abef9b2bd477992d5/docs/epitaph/2026-09-11-0735-source-finding-history.md) 来源v4冻结同正文历史明确矛盾，修订重新验证原始意见；新600秒策略真实运行仍保留这些矛盾。未完成最终发布。
 
 [2026-09-11-0746-fixed-pipeline.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/f07e4aa74a6d352f9a6ad7a42ec6190acc344924/docs/epitaph/2026-09-11-0746-fixed-pipeline.md) pipeline-v13接通每轮固定suite，旧快照复用验证通过；来源180秒持续推理超时，后续600秒策略已越过旧失败章节，仍未完成发布。
+
+[2026-09-11-0754-source-review-policy.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/c29fab2e56910ed885b94c5474acf68d8b1d4b30/docs/epitaph/2026-09-11-0754-source-review-policy.md) 冻结来源600秒策略，旧输入保持180秒与原审计。真实新任务已启动并越过旧失败章节，仍运行，未发布。

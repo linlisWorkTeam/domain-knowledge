@@ -26,3 +26,13 @@ export function fixedCardCoverage(expected: string[], actual: string[]): void {
   if (!expected.length || new Set(expected).size !== expected.length || new Set(actual).size !== actual.length
     || expected.length !== actual.length || expected.some(id => !actual.includes(id))) throw new Error('FIXED_KNOWLEDGE_COVERAGE_INVALID');
 }
+
+/** 发布前重算原始固定观察，不能仅信任汇总status或通过计数。 */
+export function assertFixedPublicationObservations(suite: NativeBehaviorSuite, report: {
+  schemaVersion: string; status: string; reference: FixedNativeObservation[]; generated: FixedNativeObservation[];
+}, expectedTotal: number): void {
+  if (report.schemaVersion !== FIXED_EVALUATION_CONTRACT || report.status !== 'FIXED_PASSED'
+    || suite.schemaVersion !== 'native-cases-v1' || !Number.isSafeInteger(expectedTotal) || expectedTotal < 1
+    || suite.cases.length !== expectedTotal || new Set(suite.cases.map(item => item.caseId)).size !== expectedTotal
+    || !fixedNativePassed(suite, report.reference) || !fixedNativePassed(suite, report.generated)) throw new Error('PUBLICATION_FIXED_OBSERVATIONS_REJECTED');
+}

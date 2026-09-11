@@ -17,10 +17,19 @@ async function setup() {
   };
   const bodyRef = await put(Buffer.from('body'), 'text/markdown');
   const nestedRef = await put(Buffer.from('audit'), 'text/plain');
-  const suiteRef = await put(Buffer.from(JSON.stringify({ schemaVersion: 'fixture', nestedRef })), 'application/json');
+  const suite = { schemaVersion: 'native-cases-v1', cases: ['a', 'b'].map(caseId => ({ caseId, description: 'value', sections: ['card#value'], variables: [], calls: [],
+    observations: [{ name: 'value', kind: 'integer', read: { variable: 'value' } }], expected: { value: '1' } })) };
+  const suiteRef = await put(Buffer.from(JSON.stringify(suite)), 'application/json');
   input.fixedSuites[0]!.suiteRef = suiteRef; input.fixedEvaluation.input.parameters.suiteRefs = { module: { ...suiteRef } };
   const identity = createStageTask(input.fixedEvaluation.input, input.fixedEvaluation.limits, 'now');
   input.fixedEvaluation.taskId = identity.taskId; input.fixedEvaluation.inputDigest = identity.inputDigest;
+  const observations = suite.cases.map(test => ({ caseId: test.caseId, status: 'PASSED', actual: { value: '1' },
+    report: { build: { exitCode: 0, timedOut: false, outputLimitExceeded: false }, execution: { exitCode: 0, timedOut: false, outputLimitExceeded: false } } }));
+  const report = { schemaVersion: 'fixed-native-evaluation-v1', status: 'FIXED_PASSED', moduleId: 'module', reconstructionTaskId: input.reconstruction.taskId,
+    snapshotId: 'snapshot', sourceDigest: input.reconstruction.input.sourceDigest, suiteRef, reference: observations, generated: structuredClone(observations), nestedRef };
+  const reportRef = await put(Buffer.from(JSON.stringify(report)), 'application/json');
+  input.fixedEvaluation.result!.artifactRefs = [reportRef];
+  (input.fixedEvaluation.result!.summary.modules as Array<Record<string, unknown>>)[0]!.reportRef = reportRef;
   const records = [input.reconstruction, input.evaluation, input.fixedEvaluation, input.sourceVerification];
   const card = { versionId: 'version', bodyRef, metadata: { cardId: 'card', sourceModule: 'module', projectSnapshotId: 'snapshot' } } as unknown as KnowledgeVersion;
   const service = new WorkbenchPublicationEvidence({ stages: { get(id) { const task = records.find(task => task.taskId === id); assert.ok(task); return structuredClone(task); } },
@@ -30,12 +39,12 @@ async function setup() {
     } });
   puts = 0;
   const ids = { reconstruction: input.reconstruction.taskId, evaluation: input.evaluation.taskId, fixedEvaluation: input.fixedEvaluation.taskId, sourceVerification: input.sourceVerification.taskId };
-  return { service, ids, input, contents, nestedRef, card, puts: () => puts };
+  return { service, ids, input, contents, nestedRef, card, report, put, puts: () => puts };
 }
 test('preparation checks recursive CAS graph, binds body and is content-idempotent', async () => {
   const f = await setup(); const prepared = await f.service.prepare(f.ids, f.input.fixedSuites);
   assert.equal(prepared.state, 'PREPARED'); assert.equal(prepared.publicationVerified, false);
-  assert.equal(prepared.verifiedArtifactRefs.length, 3);
+  assert.equal(prepared.verifiedArtifactRefs.length, 4);
   assert.equal((await f.service.prepare(f.ids, f.input.fixedSuites)).artifactRef.sha256, prepared.artifactRef.sha256);
 });
 test('corrupt nested artifact and changed persistent body reject before writing preparation', async () => {
@@ -43,4 +52,14 @@ test('corrupt nested artifact and changed persistent body reject before writing 
   await assert.rejects(f.service.prepare(f.ids, f.input.fixedSuites), /PUBLICATION_ARTIFACT_CORRUPT/); assert.equal(f.puts(), 0);
   const g = await setup(); g.card.bodyRef.sha256 = sha256('changed');
   await assert.rejects(g.service.prepare(g.ids, g.input.fixedSuites)); assert.equal(g.puts(), 0);
+});
+
+test('a correctly hashed report cannot hide wrong generated observations behind FIXED_PASSED', async () => {
+  const f = await setup(); f.report.generated[0]!.actual.value = '9';
+  const ref = await f.put(Buffer.from(JSON.stringify(f.report)), 'application/json');
+  f.input.fixedEvaluation.result!.artifactRefs = [ref];
+  (f.input.fixedEvaluation.result!.summary.modules as Array<Record<string, unknown>>)[0]!.reportRef = ref;
+  const before = f.puts();
+  await assert.rejects(f.service.prepare(f.ids, f.input.fixedSuites), /PUBLICATION_FIXED_OBSERVATIONS_REJECTED/);
+  assert.equal(f.puts(), before);
 });
