@@ -6,7 +6,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { sha256, type ArtifactRef } from '../../src/domain/Domain.ts';
-import { authorizeSourceCorrection } from '../../src/domain/services/knowledge/SourceRevision.ts';
+import { authorizeSourceCorrection, sourceCorrectionCandidates, SOURCE_CORRECTION_POLICY } from '../../src/domain/services/knowledge/SourceRevision.ts';
 const body = '# Parser\n## Behavior\nReturn the difference.\n';
 const ref = (digest: string): ArtifactRef => ({ artifactId: digest, sha256: digest, mediaType: 'application/json', size: 1 });
 const correction = { correctionId: 'provider-label', knowledgePath: 'knowledge/parser.md#Behavior', criterion: 'Return the sum shown by fixed source.', risk: 'Wrong operation.' };
@@ -29,4 +29,22 @@ test('unknown risks, unrequested edits and unmatched normalized corrections are 
   assert.throws(() => authorizeSourceCorrection({ ...input, raw: { ...input.raw, unresolvedRisks: ['Unknown'] } }), /SOURCE_REVISION_EXPLICIT_CORRECTION_REQUIRED/);
   assert.throws(() => authorizeSourceCorrection({ ...input, raw: { recommendation: 'PASS', blocking: false, correction: null } }), /SOURCE_REVISION_EXPLICIT_CORRECTION_REQUIRED/);
   assert.throws(() => authorizeSourceCorrection({ ...input, result: { ...input.result, payload: { corrections: [{ ...correction, correctionId: 'COR-0001', criterion: 'Injected edit' }] } } }), /SOURCE_REVISION_BINDING_INVALID/);
+});
+
+test('mixed whole-card risks retain their block while only bound explicit sections are selected', () => {
+  type Finding = typeof input.card & { unresolved?: string[]; section?: string; sections?: Finding[] };
+  const section = { ...input.card, unresolved: [] as string[], section: 'Behavior' };
+  const unknown = { ...section, outcome: 'UNRESOLVED' as const, unresolved: ['Missing evidence'], section: 'Sources' };
+  const card = { ...input.card, outcome: 'UNRESOLVED' as const, unresolved: ['Missing evidence'], sections: [unknown, section] };
+  const before = JSON.stringify(card);
+  assert.deepEqual(sourceCorrectionCandidates<Finding>([card]), []);
+  assert.deepEqual(sourceCorrectionCandidates<Finding>([card], SOURCE_CORRECTION_POLICY), [section]);
+  assert.equal(JSON.stringify(card), before);
+  assert.equal(authorizeSourceCorrection({ ...input, card: section }).heading, 'Behavior');
+  assert.deepEqual(sourceCorrectionCandidates<Finding>([{ ...card, sections: [unknown] }], SOURCE_CORRECTION_POLICY), []);
+  assert.deepEqual(sourceCorrectionCandidates<Finding>([{ ...card, sections: [{ ...section, unresolved: ['Unproven correction'] }] }], SOURCE_CORRECTION_POLICY), []);
+  for (const key of ['cardId', 'versionId', 'moduleId', 'bodyDigest']) {
+    assert.throws(() => sourceCorrectionCandidates<Finding>([{ ...card, sections: [{ ...section, [key]: 'other' }] }], SOURCE_CORRECTION_POLICY), /SOURCE_CORRECTION_SECTION_BINDING_INVALID/);
+  }
+  assert.throws(() => sourceCorrectionCandidates<Finding>([card], 'unknown'), /SOURCE_CORRECTION_POLICY_INVALID/);
 });

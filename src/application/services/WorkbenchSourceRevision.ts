@@ -10,7 +10,7 @@ import type { AgentCommand, AgentResult } from '../../domain/agents/AgentContrac
 import type { Output as ReviewOutput } from '../../domain/agents/reviewAgent/ReviewAgentContract.ts';
 import { canonicalJson, type JsonValue, type StageInput } from '../../domain/services/workbench/StageTask.ts';
 import { SOURCE_VERIFICATION_CONTRACT, sourceVerificationOutcome, type SourceCardResult } from '../../domain/services/knowledge/KnowledgeSourceVerification.ts';
-import { SOURCE_REVISION_CONTRACT, authorizeSourceCorrection } from '../../domain/services/knowledge/SourceRevision.ts';
+import { SOURCE_REVISION_CONTRACT, SOURCE_CORRECTION_POLICY, sourceCorrectionCandidates, authorizeSourceCorrection } from '../../domain/services/knowledge/SourceRevision.ts';
 import { knowledgeRevisionOutcome } from '../../domain/services/knowledge/KnowledgeRevision.ts';
 import type { NativeBehaviorSuite } from '../../domain/services/evaluation/NativeBehaviorSuite.ts';
 import type { StageModelConfiguration } from '../ports/WorkbenchGenerationPorts.ts';
@@ -23,7 +23,7 @@ const json = (value: unknown): JsonValue => JSON.parse(JSON.stringify(value));
 interface SourceFinding extends SourceCardResult {
   originEvidence?: SourceFindingProof;
   reviewRef: ArtifactRef; reviewResultRef: ArtifactRef; referenceRef: ArtifactRef; referenceObservationsRef: ArtifactRef;
-  unresolved?: string[];
+  unresolved?: string[]; sections?: SourceFinding[];
 }
 export class WorkbenchSourceRevision {
   readonly evaluation: WorkbenchEvaluation; readonly index: KnowledgeIndexService; readonly cardRevision: WorkbenchCardRevision;
@@ -45,10 +45,10 @@ export class WorkbenchSourceRevision {
   async prepare(sourceVerificationTaskId: string): Promise<StageInput> {
     const { stages, configuration, artifacts, repository } = this.evaluation.dependencies;
     const existing = stages.store.list().find(task => task.input.parameters.operation === 'KNOWLEDGE_SOURCE_REVISION'
-      && task.input.parameters.revisionContract === SOURCE_REVISION_CONTRACT && task.input.parameters.sourceVerificationTaskId === sourceVerificationTaskId);
+      && task.input.parameters.revisionContract === SOURCE_REVISION_CONTRACT && task.input.parameters.sourceCorrectionPolicy === SOURCE_CORRECTION_POLICY && task.input.parameters.sourceVerificationTaskId === sourceVerificationTaskId);
     if (existing) return existing.input;
     const source = this.source(sourceVerificationTaskId);
-    if (!(source.result!.summary.cards as unknown as SourceFinding[]).some(card => card.outcome === 'SOURCE_MISMATCH')) throw new Error('SOURCE_REVISION_NO_CORRECTION');
+    if (!sourceCorrectionCandidates(source.result!.summary.cards as unknown as SourceFinding[], SOURCE_CORRECTION_POLICY).length) throw new Error('SOURCE_REVISION_NO_CORRECTION');
     for (const versionId of source.input.cardVersionIds) {
       const card = repository.getKnowledgeVersion(versionId);
       if (!card || repository.latestKnowledgeVersion(card.moduleId)?.versionId !== versionId) throw new Error('REVISION_CARD_CHANGED');
@@ -57,7 +57,7 @@ export class WorkbenchSourceRevision {
     await configuration.assertStageCompatible(await this.load<StageModelConfiguration>(configurationRef));
     const sourceReviewPolicy = readSourceReviewPolicy(source.input.parameters.sourceReviewPolicy);
     const evidenceRef = await artifacts.put(Buffer.from(canonicalJson(source.result)), 'application/json');
-    return { ...source.input, stage: 'FLYWHEEL', parameters: { operation: 'KNOWLEDGE_SOURCE_REVISION', revisionContract: SOURCE_REVISION_CONTRACT,
+    return { ...source.input, stage: 'FLYWHEEL', parameters: { operation: 'KNOWLEDGE_SOURCE_REVISION', revisionContract: SOURCE_REVISION_CONTRACT, sourceCorrectionPolicy: SOURCE_CORRECTION_POLICY,
       ...(sourceReviewPolicy ? { sourceReviewPolicy: json(sourceReviewPolicy) } : {}), sourceVerificationTaskId, evaluationTaskId: source.input.parameters.evaluationTaskId!, evidenceRef: json(evidenceRef), configurationRef: json(configurationRef) } };
   }
   async revise(context: StageExecutionContext) {
@@ -88,7 +88,7 @@ export class WorkbenchSourceRevision {
     sourceVerificationOutcome(expected, findings);
     const refs: ArtifactRef[] = [evidenceRef], results: JsonValue[] = [], updatedIds: string[] = [];
     const unresolved: JsonValue[] = findings.filter(card => card.outcome === 'UNRESOLVED').map(card => json({ cardId: card.cardId, unresolved: card.unresolved ?? ['SOURCE_REVIEW_UNRESOLVED'] }));
-    for (const finding of findings.filter(card => card.outcome === 'SOURCE_MISMATCH')) {
+    for (const finding of sourceCorrectionCandidates(findings, parameters.sourceCorrectionPolicy)) {
       const card = repository.getKnowledgeVersion(finding.versionId)!;
       const output = await context.step(`revision-card:${card.versionId}`, async () => {
         const latest = repository.latestKnowledgeVersion(card.moduleId);

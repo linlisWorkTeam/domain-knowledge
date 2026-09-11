@@ -28,3 +28,19 @@ export function authorizeSourceCorrection(input: {
   return { origin: 'PINNED_SOURCE_CONTRADICTION' as const, sourceTaskId, cardId: card.cardId, versionId: card.versionId,
     bodyDigest: card.bodyDigest, heading: decision.heading, correction: { correctionId: correction.correctionId, knowledgePath: correction.knowledgePath, criterion: correction.criterion, risk: correction.risk } };
 }
+
+/** 选择可独立修正的章节，不改变整卡风险；原始角色授权仍由authorizeSourceCorrection校验。 */
+export const SOURCE_CORRECTION_POLICY = 'source-correction-selection-v1';
+export function sourceCorrectionCandidates<T extends SourceCardResult & { unresolved?: string[]; sections?: T[] }>(cards: T[], policy?: unknown): T[] {
+  if (policy !== undefined && policy !== SOURCE_CORRECTION_POLICY) throw new Error('SOURCE_CORRECTION_POLICY_INVALID');
+  return cards.flatMap(card => {
+    if (card.outcome === 'SOURCE_MISMATCH') return [card];
+    if (policy === undefined || card.outcome !== 'UNRESOLVED' || !card.sections) return [];
+    if (!Array.isArray(card.sections)) throw new Error('SOURCE_CORRECTION_SECTION_BINDING_INVALID');
+    for (const section of card.sections) {
+      if (!section || ['cardId', 'versionId', 'moduleId', 'bodyDigest'].some(key => section[key as keyof SourceCardResult] !== card[key as keyof SourceCardResult])) throw new Error('SOURCE_CORRECTION_SECTION_BINDING_INVALID');
+    }
+    const selected = card.sections.find(section => section.outcome === 'SOURCE_MISMATCH' && Array.isArray(section.unresolved) && section.unresolved.length === 0);
+    return selected ? [selected] : [];
+  });
+}
