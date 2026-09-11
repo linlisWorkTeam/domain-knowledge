@@ -915,7 +915,7 @@ async function openEvaluation(evaluationId, returnFocus) {
 }
 
 async function downloadArtifact(path) {
-  if ((!state.token && !state.capabilities?.directEditing) || !/^\/api\/v1\/(?:evaluations\/[^/]+\/artifacts\/[^/?#]+|(?:stage-tasks|external-materials)\/[^/]+\/artifacts\/[a-f0-9]{64})$/.test(String(path))) {
+  if ((!state.token && !state.capabilities?.directEditing) || !/^\/api\/v1\/(?:evaluations\/[^/]+\/artifacts\/[^/?#]+|(?:stage-tasks|external-materials|workbench-publications)\/[^/]+\/artifacts\/[a-f0-9]{64})$/.test(String(path))) {
     showToast('请先进入治理模式。', 'warning')
     return
   }

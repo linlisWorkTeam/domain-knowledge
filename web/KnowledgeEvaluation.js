@@ -62,7 +62,7 @@ export function createKnowledgeEvaluationPanel({ root, request, escapeHtml: esca
     const resume = task && ['FAILED', 'PAUSED', 'CANCELLED'].includes(task.status) && task.contractVersion === 'knowledge-workbench-v1'
       && Object.entries(task.limits ?? {}).every(([key, limit]) => task.usage[key] < limit)
     const progress = [...events].reverse().find((event) => event.kind === 'PROGRESS' && event.detail?.caseId)?.detail
-    panel.innerHTML = `<h3>知识评测</h3><p>候选先在参考实现验证，可信用例再检查重建代码。可独立执行知识修订；一键流程可自动多轮推进；最终发布门禁尚未接通。</p>
+    panel.innerHTML = `<h3>知识评测</h3><p>候选先在参考实现验证，可信用例再检查重建代码。可独立执行知识修订；一键流程可自动多轮推进；可信评测、固定用例及整卡来源复核通过后，可在下方验证并发布。</p>
       ${parent ? `<button class="primary-button" type="button" data-native-evaluation-action="start" ${busy || active() || !isEditable() ? 'disabled' : ''}>执行评测</button>` : ''}<p role="status">${escape(notice)}</p>
       ${task ? `<p><b>${escape(task.cancelRequested && active() ? '正在取消' : labels[task.status] ?? '未知')}</b> · 尚未通过发布门禁</p><p>任务 ${escape(task.taskId)} · 累计模型调用 ${escape(task.usage.modelCalls)} 次</p>
       ${progress && active() ? `<p>当前用例：${escape(progress.caseId)} · ${escape(progress.completed)}/${escape(progress.total)}</p>` : ''}
