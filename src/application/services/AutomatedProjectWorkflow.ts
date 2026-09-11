@@ -4,6 +4,7 @@
  * 文件功能：加载工作流上下文与历史工件，协调角色执行、独立评测和发布。
  */
 import type { Output as PlanOutput } from '../../domain/agents/orchestratorAgent/OrchestratorAgentContract.ts';
+import { hasExecutableCases, TEST_CASE_PROTOCOL } from '../../domain/agents/testGenAgent/TestGenAgentContract.ts';
 import type { Output as TestOutput } from '../../domain/agents/testGenAgent/TestGenAgentContract.ts';
 import { canStartIteration, canContinueIteration } from '../../domain/workflow/IterationBudget.ts';
 import { sourceIdentity, testValidationAction } from '../../domain/agents/testGenAgent/TestSuitePolicy.ts';
@@ -191,6 +192,19 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
     scenario: AutomatedProjectScenario,
     agentId: AgentId,
   ): Promise<WorkflowStageResult> {
+    if (agentId === 'test-gen') {
+      const cachedRef = this.flywheel.getValidatedTestSuite(await this.testSourceKey(input, scenario));
+      if (cachedRef) {
+        const cached = await this.readJson<{ output: TestOutput; protocolVersion?: string }>(cachedRef);
+        if (cached.protocolVersion !== TEST_CASE_PROTOCOL || !hasExecutableCases(cached.output)) {
+          const evidenceRef = await this.flywheel.putArtifact(Buffer.from(JSON.stringify({
+            configurationFailure: 'TEST_CASE_PROTOCOL_INCOMPATIBLE', candidateRef: cachedRef,
+            requiredProtocol: TEST_CASE_PROTOCOL, action: '请人工迁移或清除旧测试缓存后重新运行；同源测试不会自动重新生成。',
+          })), 'application/json');
+          return { route: 'STOPPED', detail: '旧测试协议需要人工迁移', context: { testValidationRequired: { candidateRef: cachedRef, evidenceRef, repairs: 0, infrastructureFailure: true } } };
+        }
+      }
+    }
     const tasks = input.context.taskPlan as PlanOutput['tasks'] | undefined;
     if (tasks && !tasks.some((task) => task.agentType === agentId && task.moduleId === scenario.moduleId)) throw new Error('WORKFLOW_TASK_NOT_PLANNED');
     const ref = await this.runRole(input, scenario, agentId);
@@ -355,6 +369,7 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
   }
 
   private async validateOracle(input: WorkflowStageInput, scenario: AutomatedProjectScenario): Promise<WorkflowStageResult> {
+    if (input.context.testValidationRequired) return { route: 'STOPPED', detail: '测试参考校验等待人工处理' };
     validateProjectAgentConfiguration(scenario.agentConfiguration);
     const snapshot = input.context.snapshot as ProjectSnapshot;
     const sourceKey = await this.testSourceKey(input, scenario);
@@ -366,7 +381,7 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
     let output = cached ? (await this.readJson<{ output: TestOutput }>(cached)).output : await this.readAgentOutput<TestOutput>(candidateRef, 'test-gen', roleStage);
     for (let repairs = 0; ; repairs++) {
       const checked = await this.flywheel.executeNode({ runId: input.runId, nodeId: 'oracle_validation',
-        generationKey: `${input.runId}:oracle_validation:${input.iteration}:${repairs}:${sha256(JSON.stringify(output))}:${fixedSuiteRef?.sha256 ?? 'candidate'}:tests-v1`, inputRefs: [fixedSuiteRef ?? candidateRef, snapshot.manifestRef] }, async () => {
+        generationKey: `${input.runId}:oracle_validation:${input.iteration}:${repairs}:${sha256(JSON.stringify(output))}:${fixedSuiteRef?.sha256 ?? 'candidate'}:tests-v2`, inputRefs: [fixedSuiteRef ?? candidateRef, snapshot.manifestRef] }, async () => {
         const evaluation = await this.evaluator.evaluate({ label: `test-reference-${input.iteration}-${repairs}`, snapshot,
           generatedFiles: output.files, prepareCommands: scenario.prepareCommands, commands: scenario.referenceCommands, testSuite: output }, input.signal);
         return [evaluation.evidenceRef];
@@ -376,7 +391,7 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
       const action = testValidationAction({ passed: evaluation.passed, infrastructureFailure: evaluation.infrastructureFailure,
         reused: Boolean(fixedSuiteRef), repairs, maxRepairs: scenario.agentConfiguration.maxTestRepairs ?? 1 });
       if (action === 'ACCEPT') {
-        const suiteRef = await this.flywheel.putArtifact(Buffer.from(JSON.stringify({ sourceKey, output, validationEvidenceRef: evidenceRef })), 'application/json');
+        const suiteRef = await this.flywheel.putArtifact(Buffer.from(JSON.stringify({ protocolVersion: TEST_CASE_PROTOCOL, sourceKey, output, validationEvidenceRef: evidenceRef })), 'application/json');
         const fixed = await this.flywheel.saveValidatedTestSuite(sourceKey, suiteRef);
         const winner = await this.readJson<{ output: TestOutput }>(fixed);
         if (JSON.stringify(winner.output) !== JSON.stringify(output)) {
@@ -749,7 +764,7 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
   }
 
   private agentGenerationKey(input: WorkflowStageInput, agentId: AgentId): string {
-    return `${input.runId}:${input.nodeId}:${input.iteration}:${input.workerId ?? 'main'}:contract-v6`;
+    return `${input.runId}:${input.nodeId}:${input.iteration}:${input.workerId ?? 'main'}:contract-v7`;
   }
 
   private agentInputRefs(input: WorkflowStageInput, agentId: AgentId): ArtifactRef[] {

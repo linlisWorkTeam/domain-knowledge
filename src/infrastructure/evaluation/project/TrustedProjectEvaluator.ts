@@ -3,8 +3,10 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：提供Trusted项目Evaluator的基础设施实现与外部系统接入。
  */
-import { createHash } from 'node:crypto';
-import { nativeTestBindings } from '../../../domain/agents/testGenAgent/TestExecutionPlan.ts';
+import { createHash, randomBytes } from 'node:crypto';
+import { caseRunner, readCaseRecords, type CaseRecord } from './CaseRunner.ts';
+import { hasExecutableCases, TEST_CASE_PROTOCOL } from '../../../domain/agents/testGenAgent/TestGenAgentContract.ts';
+import { nativeTestBindings, type NativeTestBinding } from '../../../domain/agents/testGenAgent/TestExecutionPlan.ts';
 import { spawn, spawnSync } from 'node:child_process';
 import {
   existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync,
@@ -382,15 +384,25 @@ export class TrustedProjectEvaluator implements ProjectEvaluator {
     const workspace = join(tempRoot, 'workspace');
     const archivePath = join(tempRoot, 'snapshot.tar');
     const generatedFileDigests: Record<string, string> = {};
+    let bindings: NativeTestBinding[] = [];
+    const commands = input.commands.map(command => ({ ...command, args: [...command.args] }));
+    const caseExecution = input.testSuite ? { version: TEST_CASE_PROTOCOL, nonce: randomBytes(24).toString('hex'),
+      manifestSha256: digest(JSON.stringify(input.testSuite.cases)), cases: input.testSuite.cases,
+      records: [] as (CaseRecord & { commandIndex: number; attempt: number })[], failures: [] as string[] } : undefined;
     try {
       if (input.testSuite) {
-        try { nativeTestBindings(input.commands, input.testSuite); }
+        try {
+          if (!hasExecutableCases(input.testSuite)) throw new Error('TEST_CASE_PROTOCOL_INCOMPATIBLE');
+          for (const file of input.testSuite.files) if (!input.generatedFiles.some(g => g.path === file.path && g.content === file.content))
+            throw new Error('TEST_CASE_SOURCE_BINDING_INVALID');
+          bindings = nativeTestBindings(commands, input.testSuite);
+        }
         catch (error) {
           const evidence = { label: input.label, commit: input.snapshot.commit, passed: false,
             testsPassed: 0, testsTotal: input.testSuite.cases.length, stability: 0, infrastructureFailure: true,
             configurationFailure: String(error), toolchainFingerprint: 'configuration-not-executed',
             generatedFileDigests: Object.fromEntries(input.generatedFiles.map(file => [file.path, digest(file.content)])), results: [],
-            sourceManifestRef: input.snapshot.manifestRef };
+            sourceManifestRef: input.snapshot.manifestRef, caseExecution };
           if (this.retainedWorkspaceRoot) writeFileSync(join(tempRoot, 'evidence.json'), JSON.stringify(evidence, null, 2));
           const evidenceRef = await this.artifacts.put(Buffer.from(JSON.stringify(evidence, null, 2)), 'application/json');
           return { ...evidence, evidenceRef };
@@ -407,6 +419,7 @@ export class TrustedProjectEvaluator implements ProjectEvaluator {
       }
       for (const file of input.generatedFiles) {
         const normalized = safeRelativePath(file.path);
+        if (input.testSuite && normalized.startsWith('.flywheel/')) throw new Error('PROJECT_RUNNER_PATH_RESERVED');
         assertNoSymlink(workspace, normalized);
         const target = pathInside(workspace, normalized);
         mkdirSync(dirname(target), { recursive: true });
@@ -414,6 +427,17 @@ export class TrustedProjectEvaluator implements ProjectEvaluator {
         generatedFileDigests[normalized] = digest(file.content);
       }
 
+      for (const binding of bindings) {
+        const compiler = commands[binding.compileIndex]!;
+        const runnerPath = `.flywheel/CaseRunner-${binding.compileIndex}.${compiler.tool === 'gcc' ? 'c' : 'cpp'}`;
+        assertNoSymlink(workspace, runnerPath);
+        mkdirSync(dirname(pathInside(workspace, runnerPath)), { recursive: true });
+        const runner = caseRunner(input.testSuite!.cases.filter(c => binding.testPaths.includes(c.testPath)), caseExecution!.nonce);
+        writeFileSync(pathInside(workspace, runnerPath), runner);
+        generatedFileDigests[runnerPath] = digest(runner);
+        // 文件在受信临时目录内；绝对路径保证项目 cwd 不改变 runner 的位置。
+        compiler.args.push(pathInside(workspace, runnerPath));
+      }
       const declaredTools = new Set([...input.prepareCommands, ...input.commands].map((command) => command.tool));
       const toolchain: Record<string, string> = {
         platform: `${process.platform}-${process.arch}`,
@@ -470,7 +494,17 @@ export class TrustedProjectEvaluator implements ProjectEvaluator {
           return { exitCode: null, timedOut: false, outputLimitExceeded: false, durationMs: 0,
             stdout: '', stderr: `PROJECT_EXECUTABLE_UNAVAILABLE: ${error.code}` };
         });
-        const counts = command.purpose === 'test'
+        const commandIndex = commands.indexOf(command);
+        const binding = phase === 'gate' ? bindings.find(b => b.runIndices.includes(commandIndex)) : undefined;
+        const completion = binding ? readCaseRecords(captured.stdout,
+          input.testSuite!.cases.filter(c => binding.testPaths.includes(c.testPath)), caseExecution!.nonce) : undefined;
+        if (completion) {
+          caseExecution!.records.push(...completion.records.map(record => ({ ...record, commandIndex, attempt })));
+          caseExecution!.failures.push(...completion.failures.map(failure => `${commandIndex}:${attempt}: ${failure}`));
+        }
+        const counts = completion ? { passed: completion.passed,
+          total: input.testSuite!.cases.filter(c => binding!.testPaths.includes(c.testPath)).length, parsed: completion.complete }
+          : command.purpose === 'test'
           ? parseTestCounts(`${captured.stdout}\n${captured.stderr}`)
           : { passed: 0, total: 0, parsed: false };
         return {
@@ -489,13 +523,13 @@ export class TrustedProjectEvaluator implements ProjectEvaluator {
           break;
         }
       }
-      const generatedFilesIntact = Object.entries(generatedFileDigests).every(([path, expectedDigest]) => {
+      const filesIntact = () => Object.entries(generatedFileDigests).every(([path, expectedDigest]) => {
         const generatedPath = pathInside(workspace, path);
         return existsSync(generatedPath) && digest(readFileSync(generatedPath)) === expectedDigest;
       });
-      if (!generatedFilesIntact) prepareFailed = true;
+      if (!filesIntact()) prepareFailed = true;
       if (!prepareFailed) {
-        for (const command of input.commands) {
+        for (const command of commands) {
           const repetitions = command.repetitions ?? 1;
           if (!Number.isSafeInteger(repetitions) || repetitions < 1 || repetitions > 10) {
             throw new Error(`PROJECT_REPETITION_INVALID: ${repetitions}`);
@@ -510,12 +544,15 @@ export class TrustedProjectEvaluator implements ProjectEvaluator {
         }
       }
 
+      const generatedFilesIntact = filesIntact();
+      if (!generatedFilesIntact) prepareFailed = true;
       const infrastructureFailure = prepareFailed || results.some((result) =>
         result.exitCode === null || result.timedOut || result.outputLimitExceeded,
       );
-      const expectedExecutions = input.commands.reduce((sum, command) => sum + (command.repetitions ?? 1), 0);
+      const expectedExecutions = commands.reduce((sum, command) => sum + (command.repetitions ?? 1), 0);
       const gateResults = results.filter((result) => result.phase === 'gate');
       const testResults = gateResults.filter((result) => result.purpose === 'test');
+      const boundRuns = new Set(bindings.flatMap(b => b.runIndices));
       const passedExecutions = gateResults.filter((result) =>
         result.exitCode === 0 && !result.timedOut && !result.outputLimitExceeded,
       ).length;
@@ -523,8 +560,11 @@ export class TrustedProjectEvaluator implements ProjectEvaluator {
         && gateResults.every((result) => result.exitCode === 0 && !result.timedOut && !result.outputLimitExceeded)
         && testResults.length > 0
         && testResults.every((result) => result.testCountsParsed && result.testsTotal > 0 && result.testsPassed === result.testsTotal);
-      const testsPassed = testResults.reduce((sum, result) => sum + result.testsPassed, 0);
-      const testsTotal = testResults.reduce((sum, result) => sum + result.testsTotal, 0);
+      const testsPassed = caseExecution ? caseExecution.records.filter(r => r.status === 'PASS').length
+        : testResults.reduce((sum, result) => sum + result.testsPassed, 0);
+      const testsTotal = caseExecution ? [...boundRuns].reduce((sum, index) => sum
+        + input.testSuite!.cases.filter(c => bindings.find(b => b.runIndices.includes(index))!.testPaths.includes(c.testPath)).length
+          * (commands[index]!.repetitions ?? 1), 0) : testResults.reduce((sum, result) => sum + result.testsTotal, 0);
       const stability = expectedExecutions > 0 ? Math.min(1, passedExecutions / expectedExecutions) : 0;
       const evidence = {
         schemaVersion: '1.0', label: input.label, commit: input.snapshot.commit,
@@ -534,7 +574,7 @@ export class TrustedProjectEvaluator implements ProjectEvaluator {
         },
         toolchain,
         toolchainFingerprint: `sha256:${digest(JSON.stringify(toolchain))}`,
-        generatedFileDigests, generatedFilesIntact,
+        generatedFileDigests, generatedFilesIntact, sourceManifestRef: input.snapshot.manifestRef, caseExecution,
         passed, testsPassed, testsTotal, stability, infrastructureFailure, results,
       };
       if (this.retainedWorkspaceRoot) writeFileSync(join(tempRoot, 'evidence.json'), JSON.stringify(evidence, null, 2));

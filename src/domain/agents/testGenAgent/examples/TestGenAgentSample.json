@@ -59,7 +59,7 @@
     "files": [
       {
         "path": "tests/generated.cpp",
-        "content": "#include <cassert>\n#include <cstdio>\nint calculate();\nint main() { assert(calculate() == 4); puts(\"1..1\\nok 1 - result\"); }\n"
+        "content": "int calculate();\nint test_public_result(void) { return calculate() == 4 ? 0 : 1; }\n"
       }
     ],
     "cases": [
@@ -71,7 +71,8 @@
         "expected": "4",
         "sourceEvidence": [
           "tests/fixtures/cpp/Module.cpp"
-        ]
+        ],
+        "entryPoint": "test_public_result"
       }
     ]
   }

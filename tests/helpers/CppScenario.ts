@@ -10,8 +10,8 @@ import { execFileSync } from 'node:child_process';
 import type { AutomatedProjectScenario } from '../../src/application/services/AutomatedProjectWorkflow.ts';
 
 export function cppTestOutput(expected = 4) {
-  return { files: [{ path: 'tests/generated.cpp', content: `#include <cassert>\n#include <cstdio>\nint calculate();\nint main() { assert(calculate() == ${expected}); puts("1..1\\nok 1 - result"); }\n` }],
-    cases: [{ caseId: 'case-1', testPath: 'tests/generated.cpp', target: 'Return the public result', input: 'calculate()', expected: String(expected), sourceEvidence: ['src/module.cpp'] }] };
+  return { files: [{ path: 'tests/generated.cpp', content: `int calculate();\nint test_public_result(void) { return calculate() == ${expected} ? 0 : 1; }\n` }],
+    cases: [{ caseId: 'case-1', entryPoint: 'test_public_result', testPath: 'tests/generated.cpp', target: 'Return the public result', input: 'calculate()', expected: String(expected), sourceEvidence: ['src/module.cpp'] }] };
 }
 export function cppScenario() {
   const root = mkdtempSync(join(tmpdir(), 'cpp-agents-'));

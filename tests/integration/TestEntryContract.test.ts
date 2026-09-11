@@ -29,7 +29,7 @@ test('AC-AGENT-101: helper headers need no invented case and compile with their 
   try {
     const evaluator = new TrustedProjectEvaluator(c.artifacts);
     const snapshot = await evaluator.inspect(f.scenario);
-    const result = await evaluator.evaluate({ label: 'entry-and-helper', snapshot, generatedFiles: output.files,
+    const result = await evaluator.evaluate({ label: 'entry-and-helper', snapshot, generatedFiles: output.files, testSuite: output,
       prepareCommands: [], commands: f.scenario.referenceCommands });
     assert.equal(result.passed, true);
   } finally { c.dispose(); f.cleanup(); }
