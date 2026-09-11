@@ -10,13 +10,13 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { createComposition, componentRoot } from '../../../interfaces/runner/Composition.ts';
-import { checkDocGenDocument, DOCGEN_SOURCE_COMMIT, DOCGEN_SOURCE_SHA256, prepareDocGenReference } from './examples/DocGenReference.ts';
-import { structuredMarkdownDiff } from '../../knowledge/MarkdownDiff.ts';
-import { executeDevelopmentStage } from '../../../application/services/AgentDevelopmentObserver.ts';
-import type { AgentExampleInput } from '../../../application/services/AgentExample.ts';
-import { sha256, type ArtifactRef } from '../../Domain.ts';
-import type { WorkflowStageInput } from '../../../application/ports/ApplicationPorts.ts';
+import { createComposition, componentRoot } from '../../src/interfaces/runner/Composition.ts';
+import { checkDocGenDocument, DOCGEN_SOURCE_COMMIT, DOCGEN_SOURCE_SHA256, prepareDocGenReference } from '../../src/domain/agents/docGenAgent/examples/DocGenReference.ts';
+import { structuredMarkdownDiff } from '../../src/domain/knowledge/MarkdownDiff.ts';
+import { executeDevelopmentStage } from '../../src/application/services/AgentDevelopmentObserver.ts';
+import type { AgentExampleInput } from '../../src/application/services/AgentExample.ts';
+import { sha256, type ArtifactRef } from '../../src/domain/Domain.ts';
+import type { WorkflowStageInput } from '../../src/application/ports/ApplicationPorts.ts';
 
 function body() {
   return '# structuredMarkdownDiff\n\n证据 src/domain/services/markdown-diff.ts:L142-L150\n\n```json\n' + JSON.stringify({ examples: [
@@ -40,7 +40,7 @@ test('DocGen reference preflight checks the pinned source and seven real tests',
     const reference = await prepareDocGenReference(componentRoot, root);
     assert.equal(reference.evidence.testsPassed, 7);
     assert.equal(reference.evidence.commit, DOCGEN_SOURCE_COMMIT);
-    const sample = JSON.parse(readFileSync(new URL('./examples/DocGenFixedSourceSample.json', import.meta.url), 'utf8'));
+    const sample = JSON.parse(readFileSync(new URL('../../src/domain/agents/docGenAgent/examples/DocGenFixedSourceSample.json', import.meta.url), 'utf8'));
     assert.equal(sha256(sample.materials.source.content), DOCGEN_SOURCE_SHA256);
     assert.equal(checkDocGenDocument(body(), reference.diff, reference.sourceLines).status, 'PASS');
   } finally { rmSync(root, { recursive: true, force: true }); }
@@ -72,7 +72,7 @@ test('DocGen example uses the shared production DSH stages, freezes prompts and 
   try {
     await composition.apps.providerOperations.put({ provider: 'deepseek-harness', apiUrl: 'https://model.invalid/v1/', apiKey: 'controlled-secret', model: 'controlled', expectedRevision: 0 });
     await composition.apps.providerOperations.verify({ expectedRevision: 1 });
-    const sample = JSON.parse(readFileSync(new URL('./examples/DocGenFixedSourceSample.json', import.meta.url), 'utf8')) as AgentExampleInput;
+    const sample = JSON.parse(readFileSync(new URL('../../src/domain/agents/docGenAgent/examples/DocGenFixedSourceSample.json', import.meta.url), 'utf8')) as AgentExampleInput;
     sample.provider = 'dsh';
     sample.scenario.repositoryRoot = componentRoot;
     // 本用例验证已保存的提示词冻结；专用样例的追加指令不覆盖测试设置。

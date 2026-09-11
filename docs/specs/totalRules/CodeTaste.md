@@ -20,7 +20,7 @@ Domain 按领域功能组织：agents、workflow、evaluation、association、kn
 
 ## 注释和文件说明
 
-可注释文件包含 copyright、MIT 标识和中文功能说明。公共接口、输入输出、失败语义和核心业务步骤使用中文注释，解释原因与约束，避免只重复符号名称。JSON、锁文件及图像等不能加注释的格式统一登记到 `docs/FileCatalog.json`。
+可注释文件包含 copyright、MIT 标识和中文功能说明。公共接口、输入输出、失败语义和核心业务步骤使用中文注释，解释原因与约束，避免只重复符号名称。`docs/FileCatalog.json` 只补充不能在文件内携带说明的 JSON 和二进制资源，不是全仓库文件镜像；Markdown、TS、可注释配置、SVG 和时间戳交接不重复登记。清单顶层元数据适用于未单独描述的此类文件；仅需要额外用途或来源说明时维护条目，不要求逐文件覆盖或为普通文档任务同步清单。
 
 ## 设计与指南
 
@@ -30,7 +30,7 @@ Domain 按领域功能组织：agents、workflow、evaluation、association、kn
 
 ## 验证
 
-正常开发按 Development 中的检查清单验证；用户明确要求跳过测试时必须记录未执行项，不能把旧结果标为本轮通过。禁止删除失败断言来掩盖行为回归。
+按 [AGENTS.md](../../../AGENTS.md) 的 Verification Governance 和 Development 的影响范围选择验证；命名和文案约定通过 review 落实，不自动成为永久测试。用户明确要求跳过测试时记录未执行项，不能把旧结果标为本轮通过。失效断言应删除，但禁止借清理掩盖行为回归。
 
 
 文档关系：[设计目录](../README.md)负责代码与设计定位；[开发指南](../../Development.md)说明修改和交付步骤。

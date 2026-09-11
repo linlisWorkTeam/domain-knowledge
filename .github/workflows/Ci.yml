@@ -1,14 +1,12 @@
 # Copyright (c) 2026 linlisWorkTeam
 # SPDX-License-Identifier: MIT
-# 文件功能：维护ci相关的项目配置与工程说明。
+# 文件功能：按变更范围运行验证，昂贵验收使用独立环境。
 name: CI
 
 on:
   pull_request:
-    # Skip prose-only PRs; schemas, code and configuration still trigger CI.
-    paths-ignore:
-      - '*.md'
-      - 'docs/**/*.md'
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -22,55 +20,81 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    outputs:
+      acceptance: ${{ steps.changes.outputs.acceptance }}
     steps:
-      - name: Check out repository
+      - name: Check out tested revision and its first parent
         uses: actions/checkout@v7
         with:
-          # DocGen integration tests evaluate a pinned historical source commit.
-          fetch-depth: 0
+          fetch-depth: 2
 
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
           node-version: 24
-          cache: npm
+
+      - name: Fetch previous main tip for multi-commit pushes
+        if: github.event_name == 'push'
+        env:
+          VERIFICATION_BASE: ${{ github.event.before }}
+        run: |
+          git fetch --no-tags --depth=1 origin "$VERIFICATION_BASE"
+          echo "VERIFICATION_BASE=$VERIFICATION_BASE" >> "$GITHUB_ENV"
 
       - name: Select checks for changed files
         id: changes
-        run: |
-          node --input-type=module <<'NODE'
-          import { execFileSync } from 'node:child_process';
-          import { appendFileSync } from 'node:fs';
-          // PR checkout is the merge commit; its first parent is the tested base.
-          const files = process.env.GITHUB_EVENT_NAME === 'pull_request'
-            ? execFileSync('git', ['diff', '--no-renames', '--name-only', '-z', 'HEAD^1', 'HEAD'], { encoding: 'utf8' }).split('\0').filter(Boolean)
-            : [];
-          const docsOnly = files.length > 0 && files.every((file) => /^(?:[^/]+\.md|docs\/.*\.md)$/.test(file));
-          appendFileSync(process.env.GITHUB_OUTPUT, `docs-only=${docsOnly}\n`);
-          NODE
+        run: node scripts/VerificationRouter.ts
 
-      - name: Install dependencies
+      - name: Static document and specification lint
+        run: npm run spec:lint
+
+      - name: Install dependencies for runtime checks
+        if: steps.changes.outputs.runtime == 'true'
         run: npm ci
 
       - name: Type-check
-        if: steps.changes.outputs.docs-only != 'true'
+        if: steps.changes.outputs.runtime == 'true'
         run: npm run typecheck
 
-      - name: Validate specifications
-        run: npm run validate:specs
+      - name: Validate machine schema fixtures
+        if: steps.changes.outputs.contracts == 'true'
+        run: node scripts/ValidateContracts.ts
 
-      - name: Check documentation contracts
-        if: steps.changes.outputs.docs-only == 'true'
-        run: node --test tests/contract/*.test.ts
+      - name: Run scoped checks
+        env:
+          VERIFICATION_SCOPES: ${{ steps.changes.outputs.scopes }}
+        # Acceptance runs below in its own environment.
+        run: node scripts/VerificationRouter.ts --run "${VERIFICATION_SCOPES//,acceptance/}"
 
-      - name: Run test suite
-        if: steps.changes.outputs.docs-only != 'true'
-        run: npm test
-
-      - name: Install browser for Console tests
-        if: steps.changes.outputs.docs-only != 'true'
+      - name: Install browser for affected UI
+        if: steps.changes.outputs.web == 'true'
         run: npx playwright install --with-deps chromium
 
       - name: Run Console browser tests
-        if: steps.changes.outputs.docs-only != 'true'
+        if: steps.changes.outputs.web == 'true'
         run: npm run test:ui
+
+  acceptance:
+    needs: verify
+    if: needs.verify.outputs.acceptance == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Fetch only the DocGen reference source and test commits
+        run: |
+          node --input-type=module <<'NODE'
+          import { execFileSync } from 'node:child_process';
+          import { DOCGEN_SOURCE_COMMIT, DOCGEN_REFERENCE_TEST_COMMIT } from './src/domain/agents/docGenAgent/examples/DocGenReference.ts';
+          for (const commit of new Set([DOCGEN_SOURCE_COMMIT, DOCGEN_REFERENCE_TEST_COMMIT])) {
+            execFileSync('git', ['fetch', '--no-tags', '--depth=1', 'origin', commit], { stdio: 'inherit' });
+          }
+          NODE
+      - run: npm run test:acceptance

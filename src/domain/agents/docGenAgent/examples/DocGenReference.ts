@@ -12,6 +12,8 @@ import { sha256 } from '../../../Domain.ts';
 
 /** 固定参考源码的 Git 提交，不跟随工作树修改。 */
 export const DOCGEN_SOURCE_COMMIT = '3f999204f988697cc5bb9473c5a10ad5b4fc1f78';
+/** 参考测试与源码分别固定，当前单元测试的合法重构不会改变历史样例。 */
+export const DOCGEN_REFERENCE_TEST_COMMIT = '75d22094ad8e946a6118d441bb7a7c8258140639';
 // 固定提交中的路径属于历史证据，不能随当前工作树的文件重命名而改变。
 export const DOCGEN_SOURCE_PATH = 'src/domain/services/markdown-diff.ts';
 /** 固定源码的正文摘要，防止材料静默改变。 */
@@ -57,8 +59,11 @@ export async function prepareDocGenReference(repositoryRoot: string, outputRoot:
     if (unpack.status !== 0) throw new Error('DOCGEN_REFERENCE_EXPORT_FAILED');
     const source = readFileSync(join(directory, DOCGEN_SOURCE_PATH));
     assert.equal(sha256(source), DOCGEN_SOURCE_SHA256, 'DOCGEN_REFERENCE_SOURCE_CHANGED');
-    // 当前测试只改了模块路径；还原为历史导入后校验原摘要，并在固定源码副本中执行。
-    const referenceTest = Buffer.from(readFileSync(join(repositoryRoot, 'tests/unit/MarkdownDiff.test.ts'), 'utf8')
+    // 从不可变提交读取参考测试，不以 SHA 冻结当前工作树的测试实现。
+    const archivedTest = spawnSync('git', ['show', `${DOCGEN_REFERENCE_TEST_COMMIT}:tests/unit/MarkdownDiff.test.ts`],
+      { cwd: repositoryRoot, encoding: 'utf8', maxBuffer: 1024 * 1024 });
+    if (archivedTest.status !== 0) throw new Error('DOCGEN_REFERENCE_TEST_COMMIT_MISSING');
+    const referenceTest = Buffer.from(archivedTest.stdout
       .replace(/^\/\*\*\n \* Copyright \(c\) 2026 linlisWorkTeam[\s\S]*?\*\/\n/, '')
       .replace('../../src/domain/knowledge/MarkdownDiff.ts', '../../src/domain/services/markdown-diff.ts'));
     assert.equal(sha256(referenceTest), REFERENCE_TEST_SHA256, 'DOCGEN_REFERENCE_TEST_CHANGED');

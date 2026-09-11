@@ -13,8 +13,8 @@ SPDX-License-Identifier: MIT
 
 | ID | 场景 |
 | --- | --- |
-| AC-SPEC-001 | Given 本规范集，When 执行 spec lint，Then 每个 SYS/UI/NFR P0 ID 在追踪矩阵中恰有一行且关联验收场景；非 Planned 行的实现和测试路径非空。 |
-| AC-SCHEMA-001 | Given 七类 Agent 的合法/非法 fixture 和已冻结的 Run 配置，When 运行真实节点契约边界，Then 合法 AgentCommand/AgentResult 通过，未知字段、缺字段、错误版本和角色错配在 Provider 或下游执行前失败；同一 Run 始终使用启动时的配置快照。 |
+| AC-SPEC-001 | Given 本规范集，When 执行 spec lint，Then 每个 SYS/UI/NFR P0 ID 在追踪矩阵中恰有一行且关联验收场景；非 Planned 行的实现路径有效；已登记自动化证据路径有效，review-only 约定允许无永久测试。 |
+| AC-SCHEMA-001 | Given 已注册 Agent 的合法/非法 fixture 和已冻结的 Run 配置，When 运行真实节点契约边界，Then 合法 AgentCommand/AgentResult 通过，未知字段、缺字段、错误版本和角色错配在 Provider 或下游执行前失败；同一 Run 始终使用启动时的配置快照。 |
 | AC-FLOW-001 | Given 一个受支持模块，When 执行 Run，Then 状态按定义顺序完成两条独立生成链并以确定性 Gate 到达终态。 |
 | AC-FLOW-002 | Given 一个可归因失败，When Review 完成，Then Correction 含路径、判据、证据，DocGen 仅改影响范围且 Code fresh 重生成。 |
 | AC-FLOW-003 | Given critical regression 或预算耗尽，When Gate 决策，Then 分别回滚 historical best 或产生 LOW_CONFIDENCE 治理包。 |
@@ -36,7 +36,7 @@ SPDX-License-Identifier: MIT
 | AC-ARCH-001 | Given 替代假 Provider/Store/Workflow Adapter，When 跑契约套件，Then Domain/Application 不变且测试通过。 |
 | AC-ARCH-002 | Given 内嵌 domain-knowledge LangGraph runtime，When 扫描依赖并执行图，Then SDK 只存在于 infrastructure，且 Run、知识、评测和发布事实只写 Knowledge Registry。 |
 | AC-ARCH-003 | Given 两个仓库的默认分支，When 检查目录和入口，Then domain-knowledge 拥有唯一运行时、Spec、测试与前台，wpKnowledge 只含知识内容和仓库说明。 |
-| AC-ARCH-004 | Given uiApi、八个 Application App 和三个 Domain Service，When 扫描依赖与组合根，Then UI 只调用 App、App 只依赖 Domain/Port、Domain 不导入 SDK/数据库，七个 Agent 节点保持完整，Provider 设置、指标与 Redis 边界不成为第二业务事实源。 |
+| AC-ARCH-004 | Given Interface、Application 和 Domain，When 扫描依赖与组合根，Then UI 经 App 调用业务用例、App 只依赖 Domain/Port、Domain 不导入 SDK/数据库，已注册角色与机器契约一致，Provider 设置、指标与 Redis 边界不成为第二业务事实源。 |
 | AC-OBS-002 | Given 一个自动 Run，When LangGraph 节点开始、完成或失败，Then Console 可按 runId 读取节点、角色、轮次、尝试和时间投影，且不读取 graph checkpoint。 |
 | AC-OBS-003 | Given 一个成功或失败的自动 Run，When 执行 `workflow-report --run`，Then 报告按 runId 导出 Registry 事实、脱敏 Agent 摘要并逐一校验引用的 CAS Artifact，且注入审计文件的 Prompt/凭据字段不会出现在报告中。 |
 | AC-AGENT-003 | Given 七个固定 Agent，When 查看和修改配置，Then 全部契约可查，只有受信操作者能改 `promptAddon`，任何职责、Schema、拓扑、输入输出或工具字段均拒绝。 |
@@ -60,7 +60,7 @@ SPDX-License-Identifier: MIT
 | AC-SEARCH-001 | Given 同时存在已发布 VERIFIED、仅 Quality ACCEPTED 的候选、LOW_CONFIDENCE、SUPERSEDED 和缺少发布回执的版本，When 用户经 Application / KnowledgeSearchApp 调用 SearchAgent，Then 仅合法已发布文档能进入 Agent 上下文和结果，且每项包含可验证的版本、provenance 和正文 Artifact 引用；显式请求其他状态或直接读取候选 versionId 同样不能绕过限制。 |
 | AC-DOC-001 | Given DocGenAgent 首次生成或按 Correction 修订中文知识，When Orchestrator 发送生成请求并执行 Quality Gate，Then 两轮 Prompt 都包含自然写作约束，模板化填充、无来源宣传词和超长段落会降低 `humanReadability` 并形成 weak point；任何润色都不得改变事实、来源、验收条件或安全边界。 |
 | AC-DOC-002 | Given 一个跨层大规模特性，When 准备合入，Then Console、GitHub Pages、工程文档、Spec、追踪矩阵和自动化验收均已更新或在 PR 中明确说明不适用。 |
-| AC-DOC-003 | Given 仓库中已跟踪的 Markdown 和关键入口文档，When 执行文档契约测试，Then 每份文档都有中文说明，关键入口包含相邻的结构化 English summary，代码标识符和协议值仍可与源码直接互查。 |
+| AC-DOC-003 | Given 仓库中已跟踪的 Markdown 和关键入口文档，When 审阅文档，Then 中文说明和适用的 English summary 便于目标读者理解，不以字数或固定 HTML 模板作为永久门禁，代码标识符和协议值仍可与源码直接互查。 |
 | AC-DOC-004 | Given 官网和控制台，When 检查静态文案、状态标签和运行时投影，Then 除品牌、项目名、`Agent`、API/协议缩写、代码字段、枚举原值和技术标识符外，用户看到的栏目、状态与说明均为自然中文；`Registry` 显示为“注册”，名词 `Run` 显示为“批次”。 |
 | AC-CONFIG-001 | Given 两个项目配置、同项目不同场景及知识卡片版本，When 选择项目/场景并启动任务、随后修改配置及恢复旧任务，Then 依赖/构建说明留在项目配置，角色只收到必要字段；同项目只换卡片可复用配置，不同项目使用各自配置；本轮卡片/配置版本与摘要、实际生效场景、可读白名单及输出根目录固定可查，旧任务不随修改漂移，冻结版本不可用则明确失败。 |
 | AC-CODE-001 | Given 含公开接口的知识卡片和合法项目配置，When 组装并执行 CodeAgent，Then 无须独立 publicInterfaceRefs 或原仓库接口文件，只接收卡片与裁剪出的 C/C++ 标准、依赖和允许输出路径；不传整份场景、参考测试或答案，完整构建配置仅交执行器，返回包含源码 path/content 的 files 列表。 |
@@ -82,7 +82,7 @@ SPDX-License-Identifier: MIT
 | KF-SYS-008 | AC-FLOW-003 | Partial | `src/domain/Domain.ts` | `tests/unit/Domain.test.ts` |
 | KF-SYS-009 | AC-PUB-001 | Implemented | `src/application/services/ApplicationServices.ts` + `src/infrastructure/sqlite/SqliteCas.ts` | `tests/acceptance/PublicationFlow.test.ts` |
 | KF-SYS-010 | AC-REC-001 | Partial | `src/application/services/ApplicationServices.ts`、`src/application/services/AutomatedProjectWorkflow.ts`、`src/infrastructure/sqlite/SqliteCas.ts` | `tests/integration/SqliteCas.test.ts`、`tests/integration/WorkflowRouterReplay.test.ts` |
-| KF-SYS-011 | AC-SCHEMA-001 | Implemented | `docs/specs/schemas` + `src/application/ports` + `src/infrastructure/agentAdapters/contracts` + `src/application/services/AutomatedProjectWorkflow.ts` | `scripts/ValidateSpecs.ts` + `tests/integration/AgentContracts.test.ts` + `tests/acceptance/AutomatedLanggraphFlow.test.ts` |
+| KF-SYS-011 | AC-SCHEMA-001 | Implemented | `docs/specs/schemas` + `src/application/ports` + `src/infrastructure/agentAdapters/contracts` + `src/application/services/AutomatedProjectWorkflow.ts` | `scripts/ValidateContracts.ts` + `tests/integration/AgentContracts.test.ts` + `tests/acceptance/AutomatedLanggraphFlow.test.ts` |
 | KF-SYS-012 | AC-LANG-001 | Implemented | `src/application/ports/ApplicationPorts.ts` | `tests/contract/Architecture.test.ts` |
 | KF-SYS-013 | AC-SEC-002 | Partial | `src/interfaces/runner/Server.ts` | `tests/integration/Server.test.ts` |
 | KF-SYS-014 | AC-LANG-002 | Planned | — | — |
@@ -92,16 +92,16 @@ SPDX-License-Identifier: MIT
 | KF-SYS-018 | AC-DOC-001 | Implemented | `src/application/services/KnowledgeWritingGuide.ts` + `src/application/services/QualityPolicy.ts` + `src/application/services/ProjectFlow.ts` | `tests/unit/QualityPolicy.test.ts` + `tests/acceptance/RealSourceFlow.test.ts` |
 | KF-SYS-019 | AC-ARCH-002 | Implemented | `src/infrastructure/langgraph` + `src/interfaces/runner/Composition.ts` | `tests/contract/Architecture.test.ts` + `tests/integration/LanggraphInfrastructure.test.ts` |
 | KF-SYS-020 | AC-OBS-002 | Implemented | `src/application/services/WorkflowControl.ts` + `src/interfaces/runner/ConsoleReadModel.ts` | `tests/integration/LanggraphInfrastructure.test.ts` + `tests/acceptance/AutomatedLanggraphFlow.test.ts` |
-| KF-SYS-021 | AC-AGENT-003 | Implemented | `src/domain/workflow/AgentDefinitions.ts` + `src/application/services/WorkflowControl.ts` + `web/App.js` | `tests/integration/Server.test.ts` + `tests/contract/Site.test.ts` |
+| KF-SYS-021 | AC-AGENT-003 | Implemented | `src/domain/workflow/AgentDefinitions.ts` + `src/application/services/WorkflowControl.ts` + `web/App.js` | `tests/integration/Server.test.ts` + `tests/e2e/Console.spec.ts` |
 | KF-SYS-022 | AC-E2E-002 | Implemented | `src/application/services/AutomatedProjectWorkflow.ts` + `src/infrastructure/langgraph/Graph.ts` | `tests/acceptance/AutomatedLanggraphFlow.test.ts` |
-| KF-SYS-023 | AC-DOC-002 | Implemented | `web` + `site` + `docs` + `docs/specs` | `tests/contract/Site.test.ts` + `tests/contract/ComponentLayout.test.ts` |
-| KF-SYS-024 | AC-DOC-003 | Implemented | `docs/specs/totalRules/CodeTaste.md` + `README.md` + `CONTRIBUTING.md` | `tests/contract/ComponentLayout.test.ts` + `tests/contract/Site.test.ts` |
+| KF-SYS-023 | AC-DOC-002 | Implemented | `web` + `site` + `docs` + `docs/specs` | — |
+| KF-SYS-024 | AC-DOC-003 | Implemented | `docs/specs/totalRules/CodeTaste.md` + `README.md` + `CONTRIBUTING.md` | — |
 | KF-SYS-025 | AC-E2E-003 | Implemented | `src/infrastructure/agentAdapters/deepSeekHarness` + `src/application/services/AutomatedProjectWorkflow.ts` | `tests/integration/DeepseekHarnessAgent.test.ts` + `tests/integration/OpencodeGoConfig.test.ts` |
 | KF-SYS-026 | AC-FLOW-005 | Implemented | `src/application/services/AutomatedProjectWorkflow.ts` + `src/infrastructure/langgraph/Graph.ts` | `tests/integration/LanggraphInfrastructure.test.ts` |
 | KF-SYS-027 | AC-OBS-003 | Implemented | `src/interfaces/runner/DemoReport.ts` + `src/interfaces/runner/Cli.ts` | `tests/integration/DemoReport.test.ts` |
-| KF-SYS-028 | AC-DOC-004 | Implemented | `site/index.html` + `site/App.js` + `web/index.html` + `web/App.js` | `tests/contract/Site.test.ts` |
-| KF-SYS-029 | AC-SEC-004 | Implemented | `.env.example` + `package.json` + `web/App.js` | `tests/contract/Site.test.ts` + `tests/integration/Server.test.ts` |
-| KF-SYS-030 | AC-ARCH-003 | Implemented | `docs/HistoryEpitaph.md` + `docs/specs/totalRules/Architecture.md` | `tests/contract/ComponentLayout.test.ts` |
+| KF-SYS-028 | AC-DOC-004 | Implemented | `site/index.html` + `site/App.js` + `web/index.html` + `web/App.js` | — |
+| KF-SYS-029 | AC-SEC-004 | Implemented | `.env.example` + `package.json` + `web/App.js` | `tests/e2e/Console.spec.ts` + `tests/integration/Server.test.ts` |
+| KF-SYS-030 | AC-ARCH-003 | Implemented | `docs/HistoryEpitaph.md` + `docs/specs/totalRules/Architecture.md` | — |
 | KF-SYS-031 | AC-ARCH-004 | Implemented | `src/domain` + `src/application/apps` + `src/interfaces/uiApi` + `src/infrastructure/redis` | `tests/contract/Architecture.test.ts` + `tests/unit/DddDomainServices.test.ts` + `tests/integration/RedisRuntimeState.test.ts` |
 | KF-SYS-032 | AC-API-001 | Implemented | `src/interfaces/runner/Server.ts` + `src/interfaces/dsh/Dsh.ts` + `web/App.js` | `tests/integration/Server.test.ts` + `tests/integration/DshAdapter.test.ts` + `tests/e2e/Console.spec.ts` |
 | KF-SYS-033 | AC-API-002 | Partial | `src/application/services/ApplicationServices.ts` + `src/infrastructure/sqlite/SqliteActionItems.ts` + `src/infrastructure/sqlite/SqliteCas.ts` + `src/infrastructure/sqlite/SqliteContentGovernance.ts` + `src/interfaces/runner/Server.ts` + `web/App.js` | `tests/integration/Server.test.ts` + `tests/integration/ContentGovernance.test.ts` + `tests/e2e/Console.spec.ts` |
@@ -117,25 +117,25 @@ SPDX-License-Identifier: MIT
 | KF-SYS-043 | AC-SEARCH-001 | Planned | — | — |
 | KF-SYS-044 | AC-CONFIG-001 | Partial | `src/domain/agents/ProjectAgentConfiguration.ts`、`src/application/services/AutomatedProjectWorkflow.ts` | `tests/integration/TestGenExecution.test.ts`、`tests/integration/RunConfiguration.test.ts` |
 | KF-SYS-045 | AC-CODE-001、AC-CODE-002 | Implemented | `src/domain/agents/codeAgent/CodeAgentContract.ts` | `src/domain/agents/codeAgent/CodeAgent.test.ts`、`tests/acceptance/AutomatedLanggraphFlow.test.ts`、`tests/acceptance/DshConfiguredFlow.test.ts` |
-| KF-UI-001 | AC-UI-001 | Implemented | `web/App.js` + `src/interfaces/runner/Server.ts` | `tests/contract/Site.test.ts` + `tests/integration/Server.test.ts` |
-| KF-UI-002 | AC-UI-002 | Implemented | `web/App.js` + `src/interfaces/runner/ConsoleReadModel.ts` | `tests/contract/Site.test.ts` + `tests/integration/Server.test.ts` |
-| KF-UI-003 | AC-UI-003 | Implemented | `src/application/services/AutomatedProjectWorkflow.ts` + `web/App.js` | `tests/acceptance/AutomatedLanggraphFlow.test.ts` + `tests/contract/Site.test.ts` |
-| KF-UI-004 | AC-UI-004 | Implemented | `web/App.js` | `tests/contract/Site.test.ts` |
+| KF-UI-001 | AC-UI-001 | Implemented | `web/App.js` + `src/interfaces/runner/Server.ts` | `tests/e2e/Console.spec.ts` + `tests/integration/Server.test.ts` |
+| KF-UI-002 | AC-UI-002 | Implemented | `web/App.js` + `src/interfaces/runner/ConsoleReadModel.ts` | `tests/e2e/Console.spec.ts` + `tests/integration/Server.test.ts` |
+| KF-UI-003 | AC-UI-003 | Implemented | `src/application/services/AutomatedProjectWorkflow.ts` + `web/App.js` | `tests/acceptance/AutomatedLanggraphFlow.test.ts` + `tests/e2e/Console.spec.ts` |
+| KF-UI-004 | AC-UI-004 | Implemented | `web/App.js` | `tests/e2e/Console.spec.ts` |
 | KF-UI-005 | AC-UI-005 | Implemented | `web/App.js` + `src/infrastructure/sqlite/SqliteContentGovernance.ts` | `tests/integration/ContentGovernance.test.ts` + `tests/e2e/Console.spec.ts` |
 | KF-UI-006 | AC-UI-006 | Implemented | `web/App.js` + `src/infrastructure/sqlite/SqliteCas.ts` | `tests/integration/Server.test.ts` + `tests/e2e/Console.spec.ts` |
-| KF-UI-007 | AC-UI-007 | Implemented | `web/App.js` + `src/interfaces/runner/Server.ts` | `tests/contract/Site.test.ts` + `tests/integration/Server.test.ts` |
-| KF-UI-008 | AC-UI-008 | Partial | `web/App.js` + `src/interfaces/runner/Server.ts` | `tests/contract/Site.test.ts` + `tests/integration/Server.test.ts` |
+| KF-UI-007 | AC-UI-007 | Implemented | `web/App.js` + `src/interfaces/runner/Server.ts` | `tests/e2e/Console.spec.ts` + `tests/integration/Server.test.ts` |
+| KF-UI-008 | AC-UI-008 | Partial | `web/App.js` + `src/interfaces/runner/Server.ts` | `tests/e2e/Console.spec.ts` + `tests/integration/Server.test.ts` |
 | KF-UI-009 | AC-UI-009 | Implemented | `src/domain/knowledge/MarkdownDiff.ts` + `web/App.js` | `tests/integration/ContentGovernance.test.ts` + `tests/e2e/Console.spec.ts` |
 | KF-UI-010 | AC-UI-010 | Implemented | `web/App.js` + `src/interfaces/runner/Server.ts` | `tests/integration/Server.test.ts` + `tests/e2e/Console.spec.ts` |
-| KF-UI-011 | AC-UI-011 | Implemented | `web/App.js` + `src/application/apps/KnowledgeSearchApp.ts` | `tests/contract/Site.test.ts` + `tests/integration/Server.test.ts` |
-| KF-UI-012 | AC-UI-012 | Implemented | `web/index.html` + `web/Styles.css` + `web/App.js` | `tests/contract/Site.test.ts` + `tests/e2e/Console.spec.ts` |
-| KF-UI-013 | AC-UI-013 | Implemented | `web/App.js` + `web/Styles.css` + `site/App.js` | `tests/contract/Site.test.ts` |
-| KF-UI-014 | AC-UI-014 | Implemented | `web/App.js` + `src/domain/workflow/AgentDefinitions.ts` | `tests/contract/Site.test.ts` + `tests/integration/Server.test.ts` |
-| KF-UI-015 | AC-UI-015 | Implemented | `web/App.js` + `src/interfaces/runner/Server.ts` | `tests/contract/Site.test.ts` + `tests/integration/Server.test.ts` |
-| KF-UI-016 | AC-UI-016 | Implemented | `web/App.js` + `src/interfaces/runner/ConsoleReadModel.ts` | `tests/contract/Site.test.ts` + `tests/acceptance/AutomatedLanggraphFlow.test.ts` |
-| KF-UI-017 | AC-UI-017 | Implemented | `web/index.html` + `web/App.js` + `site/index.html` + `site/App.js` | `tests/contract/Site.test.ts` |
-| KF-UI-018 | AC-UI-018 | Implemented | `.env.example` + `web/App.js` | `tests/contract/Site.test.ts` + `tests/integration/Server.test.ts` |
-| KF-UI-019 | AC-UI-019 | Implemented | `web/index.html` + `web/Styles.css` + `web/App.js` | `tests/contract/Site.test.ts` + `tests/e2e/Console.spec.ts` |
+| KF-UI-011 | AC-UI-011 | Implemented | `web/App.js` + `src/application/apps/KnowledgeSearchApp.ts` | `tests/e2e/Console.spec.ts` + `tests/integration/Server.test.ts` |
+| KF-UI-012 | AC-UI-012 | Implemented | `web/index.html` + `web/Styles.css` + `web/App.js` | `tests/e2e/Console.spec.ts` |
+| KF-UI-013 | AC-UI-013 | Implemented | `web/App.js` + `web/Styles.css` + `site/App.js` | `tests/e2e/Console.spec.ts` |
+| KF-UI-014 | AC-UI-014 | Implemented | `web/App.js` + `src/domain/workflow/AgentDefinitions.ts` | `tests/e2e/Console.spec.ts` + `tests/integration/Server.test.ts` |
+| KF-UI-015 | AC-UI-015 | Implemented | `web/App.js` + `src/interfaces/runner/Server.ts` | `tests/e2e/Console.spec.ts` + `tests/integration/Server.test.ts` |
+| KF-UI-016 | AC-UI-016 | Implemented | `web/App.js` + `src/interfaces/runner/ConsoleReadModel.ts` | `tests/e2e/Console.spec.ts` + `tests/acceptance/AutomatedLanggraphFlow.test.ts` |
+| KF-UI-017 | AC-UI-017 | Implemented | `web/index.html` + `web/App.js` + `site/index.html` + `site/App.js` | — |
+| KF-UI-018 | AC-UI-018 | Implemented | `.env.example` + `web/App.js` | `tests/e2e/Console.spec.ts` + `tests/integration/Server.test.ts` |
+| KF-UI-019 | AC-UI-019 | Implemented | `web/index.html` + `web/Styles.css` + `web/App.js` | `tests/e2e/Console.spec.ts` |
 | KF-UI-020 | AC-UI-023 | Planned | — | — |
 | KF-UI-021 | AC-UI-024 | Implemented | `src/application/apps/ProviderOperationsApp.ts` + `src/infrastructure/agentAdapters/deepSeekHarness` + `web/App.js` | `tests/security/ProviderSettings.test.ts` + `tests/integration/ProviderObservability.test.ts` + `tests/acceptance/DshConfiguredFlow.test.ts` + `tests/e2e/Console.spec.ts` |
 | NFR-001 | AC-SEC-002 | Partial | `src/interfaces/runner/Server.ts` | `tests/integration/Server.test.ts` |
@@ -143,14 +143,14 @@ SPDX-License-Identifier: MIT
 | NFR-003 | AC-REC-002 | Implemented | `src/application/services/ApplicationServices.ts` + `src/infrastructure/sqlite/SqliteCas.ts` | `tests/integration/SqliteCas.test.ts` + `tests/acceptance/PublicationFlow.test.ts` |
 | NFR-004 | AC-OBS-001 | Partial | `src/infrastructure/sqlite/SqliteCas.ts` | `tests/acceptance/PublicationFlow.test.ts` |
 | NFR-005 | AC-ARCH-001 | Implemented | `src/domain` + `src/application/ports` | `tests/contract/Architecture.test.ts` |
-| NFR-006 | AC-SCHEMA-001 | Partial | `docs/specs/schemas` + `src/infrastructure/agentAdapters/contracts` + `src/infrastructure/sqlite/SqliteCas.ts` | `scripts/ValidateSpecs.ts` + `tests/contract/SpecValidator.test.ts` + `tests/integration/AgentContracts.test.ts` |
+| NFR-006 | AC-SCHEMA-001 | Partial | `docs/specs/schemas` + `src/infrastructure/agentAdapters/contracts` + `src/infrastructure/sqlite/SqliteCas.ts` | `scripts/ValidateContracts.ts` + `tests/contract/SpecValidator.test.ts` + `tests/integration/AgentContracts.test.ts` |
 | NFR-007 | AC-LANG-002 | Planned | — | — |
 | NFR-008 | AC-EVAL-003 | Implemented | `src/domain/Domain.ts` + `src/infrastructure/evaluation/project/TrustedProjectEvaluator.ts` | `tests/acceptance/RealSourceFlow.test.ts` |
 | NFR-009 | AC-SEC-003 | Partial | `src/infrastructure/agentAdapters/deepSeekHarness` + `src/infrastructure/agentAdapters/companyCodeAgent` + `src/interfaces/runner/DemoReport.ts` | `tests/integration/DeepseekHarnessAgent.test.ts` + `tests/integration/CompanyCodeagentCli.test.ts` + `tests/integration/DemoReport.test.ts` |
 | NFR-010 | AC-FLOW-004 | Planned | — | — |
 | NFR-011 | AC-E2E-001 | Implemented | `src/application/services/ProjectFlow.ts` + `src/infrastructure/sqlite/SqliteCas.ts` | `tests/acceptance/RealSourceFlow.test.ts` |
-| NFR-012 | AC-UI-012 | Implemented | `web/index.html` + `web/Styles.css` + `web/App.js` | `tests/contract/Site.test.ts` + `tests/e2e/Console.spec.ts` |
+| NFR-012 | AC-UI-012 | Implemented | `web/index.html` + `web/Styles.css` + `web/App.js` | `tests/e2e/Console.spec.ts` |
 
 ## 执行方式
 
-正常变更依次执行 `npm run typecheck`、`npm run validate:specs`、相关测试、完整回归和受影响 Console 检查。规范校验脚本位于 `scripts/ValidateSpecs.ts`，保留 Schema 正反例、引用、需求唯一性和追踪证据存在性校验。测试路径存在不代表当前通过，实际结果见 [当前状态](../../Status.md)。
+按 [Development](../../Development.md) 的变更路由选择检查；永久验证遵循 [AGENTS.md](../../../AGENTS.md#verification-governance)。`spec:lint` 静态检查 JSON、引用、需求唯一性和追踪证据路径；`contract:test` 在 `scripts/ValidateContracts.ts` 与 AgentContracts 中验证 Schema 正反例和运行时契约。review-only 的命名、文案和目录约定不要求永久自动化测试，测试列可记为“—”；链接存在性不冻结链接目标的旧名称。测试路径存在不代表当前通过，实际结果见 [当前状态](../../Status.md)。
