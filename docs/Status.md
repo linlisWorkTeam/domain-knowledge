@@ -216,3 +216,5 @@ Release 包为 177979475 字节，SHA-256 `ea2949fbe9e5962c70475e405459fe57f2dda
 真实工件补充审计：source correction08294...的两张卡各仅改动获准H2（配套接口与调用契约、公共接口与数据结构），其余H2及前言字节一致，恰好2个index检查点且均updated。可信eval19c898...与eb581...的31个输入/预期逐案一致，新知识绑定生成新testSet且revalidated=true，0新候选，31案实际结果等于预期。证据ScopeAudit.json、TrustedReuseAudit.json及可复验脚本保存在相应真实运行目录；均非最终发布证明。
 
 新增阻碍发现：真实来源826fed中的错误码卡片仍缺tokens=NULL错误路径直接用例，而NativeSuiteEvaluation有inherited时不再propose，当前不能补充新可信测试。来源缺证据的补充测试设计已写入Workbench Spec并明确待实现；必须保留旧可信输入/预期及独立候选拒绝，不能通过清除风险或绕过来源门禁完成验收。
+
+最新验证：混合风险原生WorkbenchEvaluation三场景3/3通过（32528ms），相关操作中心/一键重载浏览器2/2通过。真实source826fed...已完成UNRESOLVED：5卡明确矛盾、2卡未知，44calls/842651tokens/1054423ms；新source-correction-selection-v1修订c32f...已启动，尚无结果。当前仍需补充测试实现及最终全回归/双目标发布部署。
