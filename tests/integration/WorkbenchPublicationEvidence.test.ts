@@ -9,13 +9,13 @@ import { sha256, type ArtifactRef, type KnowledgeVersion } from '../../src/domai
 import { WorkbenchPublicationEvidence } from '../../src/application/services/WorkbenchPublicationEvidence.ts';
 import { JsonSchemaAgentContractValidator } from '../../src/infrastructure/agentAdapters/contracts/JsonSchemaAgentContractValidator.ts';
 import { publicationFixture, publicationBody, publicationConfiguration, publicationApi } from '../helpers/WorkbenchPublicationFixture.ts';
-import { buildConstraints, type WorkbenchProjectSnapshot } from '../../src/domain/services/workbench/WorkbenchProject.ts';
+import { buildConstraints, createProjectSnapshot, type WorkbenchProjectSnapshot } from '../../src/domain/services/workbench/WorkbenchProject.ts';
 import { sourceSectionObservations } from '../../src/domain/services/knowledge/KnowledgeSourceVerification.ts';
 import type { NativeBehaviorSuite } from '../../src/domain/services/evaluation/NativeBehaviorSuite.ts';
 import { nativeTestKeys, type NativeTestSet } from '../../src/domain/services/evaluation/NativeTestCache.ts';
 import { canonicalJson, createStageTask } from '../../src/domain/services/workbench/StageTask.ts';
 async function setup() {
-  const input = publicationFixture(); const contents = new Map<string, Buffer>(); let puts = 0;
+  const seed = publicationFixture(); const contents = new Map<string, Buffer>(); let puts = 0;
   const put = async (data: Uint8Array, mediaType: string): Promise<ArtifactRef> => {
     puts++; const buffer = Buffer.from(data); const digest = sha256(buffer); contents.set(digest, buffer);
     return { artifactId: `sha256:${digest}`, sha256: digest, size: buffer.length, mediaType };
@@ -24,13 +24,14 @@ async function setup() {
   await put(Buffer.from(canonicalJson(publicationConfiguration)), 'application/json');
   await put(Buffer.from(JSON.stringify(publicationApi)), 'application/json');
   const fingerprintRef = await put(Buffer.from(JSON.stringify({ digest: sha256('toolchain') })), 'application/json');
-  const manifestRef = await put(Buffer.from(JSON.stringify({ sourceDigest: input.reconstruction.input.sourceDigest })), 'application/json');
-  const project = { schemaVersion: 'workbench-project-v1', projectId: 'project', snapshotId: 'snapshot', repositoryId: 'repository', directory: '/reference',
-    commit: 'commit', sourceDigest: input.reconstruction.input.sourceDigest, modules: [], build: buildConstraints(), sourceFiles: [], manifestRef, createdAt: 'now' } as WorkbenchProjectSnapshot;
-  const sourceContent = 'int value = 1;';
+  const sourceContent = 'int value(void) { return 1; }';
   const sourceRef = await put(Buffer.from(sourceContent), 'text/plain');
-  project.modules = [{ moduleId: 'module', language: 'c', sourcePaths: ['module.c'], testPaths: [], selectedByDefault: true, reasons: [] }];
-  project.sourceFiles = [{ path: 'module.c', objectId: 'object', kind: 'source', ref: sourceRef }];
+  const module = { moduleId: 'module', language: 'c' as const, sourcePaths: ['module.c'], testPaths: [], selectedByDefault: true, reasons: [] };
+  const manifestRef = await put(Buffer.from(JSON.stringify({ schemaVersion: 'repository-analysis-v1', repositoryId: 'repository', directory: '/reference', commit: 'commit',
+    sourceDigest: seed.reconstruction.input.sourceDigest, modules: [module], files: [{ path: 'module.c', objectId: 'object', size: sourceRef.size, language: 'c', kind: 'source' }] })), 'application/json');
+  const project = createProjectSnapshot({ repositoryId: 'repository', directory: '/reference', commit: 'commit', sourceDigest: seed.reconstruction.input.sourceDigest,
+    modules: [module], build: buildConstraints(), sourceFiles: [{ path: 'module.c', objectId: 'object', kind: 'source', ref: sourceRef }], manifestRef }, 'now');
+  const input = publicationFixture({ projectId: project.projectId, snapshotId: project.snapshotId });
   const bodyRef = await put(Buffer.from(publicationBody), 'text/markdown');
   const nestedRef = await put(Buffer.from('audit'), 'text/plain');
   const suite = { schemaVersion: 'native-cases-v1', cases: ['a', 'b'].map(caseId => ({ caseId, description: 'value', sections: ['card#value'], variables: [], calls: [{ function: 'value', arguments: [], result: 'value' }],
@@ -42,7 +43,7 @@ async function setup() {
   const observations = suite.cases.map(test => ({ caseId: test.caseId, status: 'PASSED', actual: { value: '1' },
     report: { build: { exitCode: 0, timedOut: false, outputLimitExceeded: false }, execution: { exitCode: 0, timedOut: false, outputLimitExceeded: false } } }));
   const report = { schemaVersion: 'fixed-native-evaluation-v1', status: 'FIXED_PASSED', moduleId: 'module', reconstructionTaskId: input.reconstruction.taskId,
-    snapshotId: 'snapshot', sourceDigest: input.reconstruction.input.sourceDigest, suiteRef, fingerprintRef, manifestRef,
+    snapshotId: project.snapshotId, sourceDigest: input.reconstruction.input.sourceDigest, suiteRef, fingerprintRef, manifestRef,
     codeRef: (input.reconstruction.result!.summary.modules as Array<Record<string, unknown>>)[0]!.codeRef,
     cardVersionIds: ['version'], cards: [{ cardId: 'card', versionId: 'version', bodyRef }], reference: observations, generated: structuredClone(observations), nestedRef };
   const reportRef = await put(Buffer.from(JSON.stringify(report)), 'application/json');
@@ -55,7 +56,7 @@ async function setup() {
     policyDigest: sha256(canonicalJson({ schemaVersion: 'native-test-policy-v1', prompt: publicationConfiguration.agents[0]!.effectivePromptSha256, roleExecutionVersion: publicationConfiguration.roleExecutionVersion, contracts: publicationConfiguration.contracts, provider: publicationConfiguration.provider })), toolchainDigest: sha256('toolchain') };
   const keys = nativeTestKeys(binding);
   const set: NativeTestSet = { ...keys, binding, testSetId: `native-tests-${sha256(`${keys.cacheKey}:${suiteRef.sha256}:${oracleRef.sha256}`)}`,
-    parentTestSetId: null, originVersionIds: ['version'], projectSnapshotId: 'snapshot', sourceRevision: 'commit', status: 'TRUSTED',
+    parentTestSetId: null, originVersionIds: ['version'], projectSnapshotId: project.snapshotId, sourceRevision: 'commit', status: 'TRUSTED',
     suiteRef, oracleRef, referenceRef, fingerprintRef, sectionBindings: [], createdAt: 'now' };
   const generatedRef = await put(Buffer.from(JSON.stringify({ language: 'c', build: project.build, files: [], sanitizers: true })), 'application/json');
   const trustedReport = { schemaVersion: 'native-evaluation-v1', testSetId: set.testSetId, generatedRef, generatedDigest: generatedRef.sha256,
@@ -83,7 +84,7 @@ async function setup() {
   (input.sourceVerification.result!.summary.cards as Array<Record<string, unknown>>)[0]!.sections = sourceSections;
   input.sourceVerification.result!.artifactRefs = [rawRef, resultRef, sourceReferenceRef, observationsRef, criteriaRef];
   const records = [input.reconstruction, input.evaluation, input.fixedEvaluation, input.sourceVerification];
-  const card = { versionId: 'version', moduleId: 'knowledge-unit', bodyRef, metadata: { cardId: 'card', sourceModule: 'module', projectSnapshotId: 'snapshot' } } as unknown as KnowledgeVersion;
+  const card = { versionId: 'version', moduleId: 'knowledge-unit', bodyRef, metadata: { cardId: 'card', sourceModule: 'module', projectSnapshotId: project.snapshotId } } as unknown as KnowledgeVersion;
   const service = new WorkbenchPublicationEvidence({ contracts: new JsonSchemaAgentContractValidator('docs/specs/schemas'), projects: { get: () => structuredClone(project) }, tests: { get: id => id === set.testSetId ? structuredClone(set) : null }, stages: { get(id) { const task = records.find(task => task.taskId === id); assert.ok(task); return structuredClone(task); } },
     repository: { getKnowledgeVersion: () => structuredClone(card) }, artifacts: {
       put, get: async ref => { const value = contents.get(ref.sha256); assert.ok(value); return value; },
@@ -157,7 +158,7 @@ test('a new valid manifest digest cannot substitute another generated implementa
 
 test('publication preparation rejects changed project build parameters and snapshot source', async () => {
   const f = await setup(); f.project.build.definitions = ['DIFFERENT=1'];
-  await assert.rejects(f.service.prepare(f.ids, f.input.fixedSuites), /PUBLICATION_PROJECT_IMPLEMENTATION_CHANGED/);
+  await assert.rejects(f.service.prepare(f.ids, f.input.fixedSuites), /PUBLICATION_PROJECT_IDENTITY_CHANGED/);
   assert.equal(f.puts(), 0);
   const g = await setup(); g.project.sourceDigest = sha256('other source');
   await assert.rejects(g.service.prepare(g.ids, g.input.fixedSuites), /PUBLICATION_PROJECT_BINDING_CHANGED/);

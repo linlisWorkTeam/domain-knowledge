@@ -14,6 +14,7 @@ import type { WorkbenchProjectStore } from '../ports/WorkbenchProjectPorts.ts';
 import { buildConstraints } from '../../domain/services/workbench/WorkbenchProject.ts';
 import type { NativeTestStore } from '../ports/NativeEvaluationPorts.ts';
 import type { FixedNativeObservation } from '../../domain/services/evaluation/NativeFixedEvaluation.ts';
+import { assertProjectPublication, type ProjectPublicationManifest } from '../../domain/services/workbench/ProjectPublication.ts';
 import { WorkbenchSourcePublication } from './WorkbenchSourcePublication.ts';
 import type { AgentContractValidator, ArtifactStore, FlywheelRepository } from '../ports/ApplicationPorts.ts';
 import type { StageTask } from '../../domain/services/workbench/StageTask.ts';
@@ -88,6 +89,7 @@ export class WorkbenchPublicationEvidence {
       if (!ref || !await artifacts.verify(ref)) throw new Error('PUBLICATION_ARTIFACT_CORRUPT');
       return JSON.parse(Buffer.from(await artifacts.get(ref)).toString('utf8')) as T;
     };
+    assertProjectPublication(project, await load<ProjectPublicationManifest>(project.manifestRef));
     const configurationRef = reconstruction.input.parameters.configurationRef as unknown as ArtifactRef;
     if (!configurationRef || configurationRef.sha256 !== reconstruction.input.configurationDigest) throw new Error('PUBLICATION_CONFIGURATION_CHANGED');
     const frozen = await load<StageModelConfiguration>(configurationRef);
@@ -163,7 +165,7 @@ export class WorkbenchPublicationEvidence {
       assertTrustedPublicationObservations(set, suite, await load<FixedNativeObservation[]>(set.oracleRef), report);
     }
     await new WorkbenchSourcePublication({ artifacts, contracts: this.dependencies.contracts }).verify(sourceVerification, cards.map((card, index) => ({ ...card, bodyRef: bodies[index]! })), project, sourceModules, (evaluation.result!.summary.modules as Array<Record<string, unknown>>).map(module => ({ moduleId: String(module.moduleId), set: trustedSets.find(set => set.testSetId === module.testSetId)! })));
-    const prepared = { schemaVersion: 'workbench-publication-preparation-v7', state: 'PREPARED', evidence, trustedSets, projectSnapshot: project,
+    const prepared = { schemaVersion: 'workbench-publication-preparation-v8', state: 'PREPARED', evidence, trustedSets, projectSnapshot: project,
       verifiedArtifactRefs: queue.sort((a, b) => a.sha256.localeCompare(b.sha256)), publicationVerified: false };
     const artifactRef = await artifacts.put(Buffer.from(JSON.stringify(prepared)), 'application/json');
     return { ...prepared, artifactRef };
