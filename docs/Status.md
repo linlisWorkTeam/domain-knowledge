@@ -18,7 +18,7 @@ SPDX-License-Identifier: MIT
 | AC-AGENT-101 | 测试入口与辅助文件区分 | 已验收：专用 2 项及角色 7 项通过，typecheck 通过 |
 | AC-AGENT-102 | 项目原生构建参数绑定 | 待实现 |
 | AC-AGENT-103 | 每个用例的执行及证据完整性 | 待实现 |
-| AC-AGENT-104 | Worker 全通道材料授权 | 待实现 |
+| AC-AGENT-104 | Worker 全通道材料授权 | 已验收：并发/重试/复用、CAS/提示词及工作区共 9 项通过，typecheck 通过 |
 | AC-AGENT-105 | 统一业务轮次上限 | 待实现 |
 | AC-AGENT-106 | 所有人工停止分支的有效交接 | 待实现 |
 
