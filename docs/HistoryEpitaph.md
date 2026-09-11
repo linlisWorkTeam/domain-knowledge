@@ -208,3 +208,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 [2026-09-11-0800-publication-preparation.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/142d83331034b881d284484e14f6dc2f76e1f4e2/docs/epitaph/2026-09-11-0800-publication-preparation.md) 发布准备递归验证CAS，后续增加固定观察与代码/正文/工具链绑定；可信及来源语义和最终发布事务仍未接完。
 
 [2026-09-11-0802-publication-fixed-observations.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/55c21441000209fad5042e1928c5fe3894958b0f/docs/epitaph/2026-09-11-0802-publication-fixed-observations.md) 固定报告原始观察重算已接发布准备，真实C11/CPP40报告通过；后续补代码/正文/工具链绑定。最终发布仍未完成。
+
+[2026-09-11-0804-fixed-publication-binding.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/aa2c1a7827aa3390ca97d79805a66ccf3a9ed223/docs/epitaph/2026-09-11-0804-fixed-publication-binding.md) 固定报告绑定代码/卡片正文/工具链，替换字段反例拒绝。后续可信原始观察与持久化测试集已接准备，最终发布仍未实现。
