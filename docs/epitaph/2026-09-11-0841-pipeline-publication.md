@@ -1,0 +1,13 @@
+# 一键流程最终发布接通
+
+/tmp/domain-knowledge-workbench，feat/five-stage-workbench，实现提交462eb061ba3bc103f2da2ee48626c28c2691146c。原工作区与旧部署保留，未删知识；Node24/384MiB，重任务串行，目标active未完成。上一轮为实际代码/测试进展。
+
+Pipeline升knowledge-pipeline-v15，旧v14只读。有冻结fixedSuites时，在ASSOCIATE成功后校验末轮fixed子任务suiteRefs与流程冻结refs完全一致，调用同一WorkbenchPublications.publishFromTasks，Domain assertPipelinePublication验证COMMITTED/项目/末轮完整版本/原publicationId绑定，然后保存publicationId。发布错误暂停并保留已完成五阶段，恢复复用发布身份；没有固定用例保持未验证。Composition注入publications。detail返回publication及真实publicationVerified。
+
+Console一键面板v15显示提交后已验证并发布及导出文件下载，未提交明确提示，旧v14恢复禁用。独立发布面板上一轮已接。RunNativeWorkbench升native-workbench-acceptance-v4，pipeline/steps都在完整门禁及文件verify后才写VERIFIED_PUBLISHED、published=true和publicationId；不能把脚本更新当作真实成功。现有v3历史证据不修改。
+
+验证：18流程回归PASS；另一组18门禁/事务/架构PASS（有重叠，勿相加作唯一数）；2项模拟DOM页面状态测试PASS；类型/Spec/diff检查通过。固定pipeline集成新增发布已COMMITTED但返回丢失，SQLite重开resume后复用记录且不重跑Code/固定/source。该集成publisher为受控替身，真实SQLite/files事务另有既有测试；不是实际模型发布验收。Domain负例覆盖PREPARED、其他版本、错误ID、缺fixed、旧契约。证据real-knowledge-revision/pipeline-publication。
+
+真实来源恢复attempt2仍活跃：PID2451866/session24433，task stage-3ac5a7c55407b750e1205020b04657f09b5e4d4590903f6e5592bf3ab3967b48，日志/tmp/RealWholeSourcePolicyV1-attempt2.log。当前36章节/4卡（总7卡），33modelCalls/780514tokens，reserved2830982；继续同task，勿并发模型/浏览器/编译重任务。原attempt1非JSON失败详情见0838墓志铭，已保留证据。尚无完整来源通过或真实最终发布。
+
+下一步不要再重复发布准备绑定小检查。等待现有来源任务结束，真实SOURCE_MISMATCH走WorkbenchSourceRevision→刷新index→新Code→可信/固定/source复测，再发布。先查看原task frozen输入和sourceRevision prepare，使用已有runtime配置，勿暴露密钥。两目标真实新版一键/独立链路仍待验收。新增UI必须浏览器桌面/窄屏截图（当前仅模拟DOM）。继续完整原目标其余缺口：Make/CMake模块构建参数与依赖提示、TS完整分析/公开接口/历史选择、全回归markdownLite、真实运行报告和部署当前站点（旧v0.2.0不改写）。模型任务活跃期间可做静态/轻量服务端开发，但重资源串行。

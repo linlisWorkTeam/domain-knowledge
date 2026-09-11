@@ -224,3 +224,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 [2026-09-11-0818-source-materials-binding.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/e8f626c98c77da49c88c7ee1fb7a28dd9e0d60be/docs/epitaph/2026-09-11-0818-source-materials-binding.md) 来源原始源码/观察投影匹配，修复知识单元和源码moduleId混用；之后全部准备门禁接齐，真实来源仍未整体结束。
 
 [2026-09-11-0821-publication-test-policy.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/7b6f67631b79c47b0425b9143b289b81a359b07a/docs/epitaph/2026-09-11-0821-publication-test-policy.md) 接口/策略/固定与可信用例门禁及真实报告只读校验通过，随后完成发布事务和HTTP入口。真实来源仍未全卡通过，一键最终发布和部署未完成。
+
+[2026-09-11-0824-publication-project-identity.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/462eb061ba3bc103f2da2ee48626c28c2691146c/docs/epitaph/2026-09-11-0824-publication-project-identity.md) 项目身份/manifest门禁和真实报告校验通过，后续已实现独立事务、HTTP/Console及一键发布。真实全卡来源与发布验收仍未完成。
