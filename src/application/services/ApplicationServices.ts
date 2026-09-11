@@ -86,6 +86,21 @@ export class KnowledgeFlywheelService {
     return run;
   }
 
+  recordReviewHandoff(runId: string, payload: Record<string, unknown>): void {
+    const event = createEvent(runId, 'ReviewHandoffPrepared', payload, this.clock());
+    event.eventId = `review-handoff:${sha256(`${runId}:${String(payload.handoffKey ?? payload.decisionId)}`)}`;
+    this.repository.recordOperationalEvent(event);
+  }
+
+  /** 固定 Orchestrator 已校验计划选中的模块。 */
+  selectRunModule(runId: string, moduleId: string): void {
+    const run = this.requireRun(runId);
+    if (run.moduleId === moduleId) return;
+    const now = this.clock();
+    const updated = this.flywheelDomain.selectModule(run, moduleId, now);
+    this.repository.updateRun(updated, createEvent(runId, 'RunModuleSelected', { previousModuleId: run.moduleId, moduleId }, now));
+  }
+
   /** 迁移请求。 */
   transition(runId: string, next: RunState): FlywheelRun {
     const current = this.requireRun(runId);
@@ -161,7 +176,7 @@ export class KnowledgeFlywheelService {
     assertInvariant(input.toolchainFingerprint.trim().length > 0, 'toolchain fingerprint is required');
     assertInvariant(Number.isSafeInteger(input.criticalFailures) && input.criticalFailures >= 0, 'criticalFailures must be a non-negative integer');
     assertInvariant(Number.isSafeInteger(input.testsPassed) && Number.isSafeInteger(input.testsTotal), 'test totals must be integers');
-    assertInvariant(input.testsTotal > 0 && input.testsPassed >= 0 && input.testsTotal >= input.testsPassed, 'behavioral evaluation must execute at least one test');
+    assertInvariant(input.testsTotal >= 0 && (input.testsTotal > 0 || input.criticalFailures > 0 || input.infrastructureFailure === true) && input.testsPassed >= 0 && input.testsTotal >= input.testsPassed, 'behavioral evaluation must execute at least one test');
     assertInvariant(input.stability >= 0 && input.stability <= 1, 'stability must be between 0 and 1');
     const inputRefs = input.inputRefs ?? [version.bodyRef];
     for (const ref of inputRefs) {
@@ -172,9 +187,8 @@ export class KnowledgeFlywheelService {
       assertArtifactRef(ref);
       assertInvariant(await this.artifacts.verify(ref), `evaluation evidence failed integrity verification: ${ref.artifactId}`);
     }
-    if (run.state === 'REVIEWING') {
-      const existing = this.repository.getEvaluationAndDecision(run.runId, version.versionId);
-      assertInvariant(existing !== null, 'reviewing run is missing its evaluation decision');
+    const existing = this.repository.getEvaluationAndDecision(run.runId, version.versionId);
+    if (existing) {
       const sameRefs = (left: ArtifactRef[], right: ArtifactRef[]) =>
         left.map((ref) => ref.artifactId).join('\0') === right.map((ref) => ref.artifactId).join('\0');
       assertInvariant(
@@ -262,6 +276,19 @@ export class KnowledgeFlywheelService {
   }
 
   /** 按生成键执行节点并幂等提交结果。 */
+  /** 读取已校验源码测试集的不可变引用。 */
+  getValidatedTestSuite(sourceKey: string): ArtifactRef | null { return this.repository.getValidatedTestSuite(sourceKey); }
+  /** 仅接受已保存且身份一致的测试集工件，再以首次成功值固定索引。 */
+  async saveValidatedTestSuite(sourceKey: string, suiteRef: ArtifactRef): Promise<ArtifactRef> {
+    assertInvariant(await this.artifacts.verify(suiteRef), 'validated test suite integrity mismatch');
+    const suite = JSON.parse(Buffer.from(await this.artifacts.get(suiteRef)).toString('utf8'));
+    assertInvariant(suite.sourceKey === sourceKey && suite.validationEvidenceRef, 'validated test suite source mismatch');
+    assertInvariant(await this.artifacts.verify(suite.validationEvidenceRef), 'validated test evidence integrity mismatch');
+    const evidence = JSON.parse(Buffer.from(await this.artifacts.get(suite.validationEvidenceRef)).toString('utf8'));
+    assertInvariant(evidence.passed === true && evidence.infrastructureFailure === false && evidence.testsTotal > 0, 'test suite must pass reference validation');
+    return this.repository.saveValidatedTestSuite(sourceKey, suiteRef);
+  }
+
   async executeNode(
     input: Omit<NodeCheckpoint, 'status' | 'outputRefs' | 'retryCount' | 'updatedAt'>,
     /** 提供 operation 对应的operation操作。 */

@@ -1,3 +1,4 @@
+import type { Output as TestSuite } from '../../domain/agents/testGenAgent/TestGenAgentContract.ts';
 /**
  * Copyright (c) 2026 linlisWorkTeam
  * SPDX-License-Identifier: MIT
@@ -109,6 +110,9 @@ export interface FlywheelRepository {
   listEvents(runId: string): DomainEvent[];
   /** 读取检查点。 */
   getCheckpoint(generationKey: string): NodeCheckpoint | null;
+  /** 已校验测试集按源码身份保存，与 Run 和模型配置无关。 */
+  getValidatedTestSuite(sourceKey: string): ArtifactRef | null;
+  saveValidatedTestSuite(sourceKey: string, suiteRef: ArtifactRef): ArtifactRef;
   /** 申请检查点。 */
   claimCheckpoint(checkpoint: NodeCheckpoint): NodeCheckpoint;
   /** 提供 提交Checkpoint 对应的提交检查点操作。 */
@@ -536,7 +540,7 @@ export interface LanguagePlugin {
 }
 
 /** 定义项目工具的数据结构与类型约束。 */
-export type ProjectTool = 'node' | 'pnpm' | 'cargo';
+export type ProjectTool = 'node' | 'pnpm' | 'cargo' | 'gcc' | 'g++' | 'binary';
 
 /** 定义项目命令的数据结构与类型约束。 */
 export interface ProjectCommand {
@@ -634,6 +638,7 @@ export interface ProjectEvaluation {
   stability: number;
   /** 提供infrastructureFailure信息，供调用方读取或传入。 */
   infrastructureFailure: boolean;
+  configurationFailure?: string;
   /** 提供工具链指纹信息，供调用方读取或传入。 */
   toolchainFingerprint: string;
   /** 提供generated文件Digests信息，供调用方读取或传入。 */
@@ -658,6 +663,8 @@ export interface ProjectEvaluator {
     label: string;
     snapshot: ProjectSnapshot;
     generatedFiles: GeneratedProjectFile[];
+    replaceSourcePaths?: string[];
+    testSuite?: TestSuite;
     prepareCommands: ProjectCommand[];
     commands: ProjectCommand[];
   }, signal?: AbortSignal): Promise<ProjectEvaluation>;

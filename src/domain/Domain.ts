@@ -4,6 +4,7 @@
  * 文件功能：定义Domain的领域数据与确定性业务规则。
  */
 import { createHash, randomUUID } from 'node:crypto';
+import { canContinueIteration } from './workflow/IterationBudget.ts';
 
 /** 对外提供STATES，作为调用方使用的统一约定。 */
 export const RUN_STATES = [
@@ -26,7 +27,7 @@ export type QualityOutcome = 'ACCEPTED' | 'REJECTED';
 export const DOMAIN_EVENT_TYPES = [
   'RunCreated', 'RunStateChanged', 'ArtifactCommitted', 'GateDecided',
   'KnowledgePublished', 'NodeCompleted', 'NodeFailed', 'AgentPromptConfigured',
-  'WorkflowNodeStateChanged', 'RunConfigurationCaptured', 'ComponentStatusChanged',
+  'WorkflowNodeStateChanged', 'RunConfigurationCaptured', 'ComponentStatusChanged', 'ReviewHandoffPrepared', 'RunModuleSelected',
 ] as const;
 /** 定义Domain事件类型的数据结构与类型约束。 */
 export type DomainEventType = typeof DOMAIN_EVENT_TYPES[number];
@@ -271,23 +272,23 @@ export function decideGate(
     reasons.push('INFRASTRUCTURE_FAILURE');
   }
   if (report.checkBlocking) {
-    if (outcome !== 'STOPPED') outcome = run.iteration >= policy.maxIterations ? 'STOPPED' : 'ITERATE';
+    if (outcome !== 'STOPPED') outcome = !canContinueIteration(run.iteration, policy.maxIterations) ? 'STOPPED' : 'ITERATE';
     reasons.push('CHECK_BLOCKING');
   }
   if (report.reviewBlocking) {
-    if (outcome !== 'STOPPED') outcome = run.iteration >= policy.maxIterations ? 'STOPPED' : 'ITERATE';
+    if (outcome !== 'STOPPED') outcome = !canContinueIteration(run.iteration, policy.maxIterations) ? 'STOPPED' : 'ITERATE';
     reasons.push('REVIEW_BLOCKING');
   }
   if (report.criticalFailures > 0) {
-    if (outcome !== 'STOPPED') outcome = run.iteration >= policy.maxIterations ? 'STOPPED' : 'ITERATE';
+    if (outcome !== 'STOPPED') outcome = !canContinueIteration(run.iteration, policy.maxIterations) ? 'STOPPED' : 'ITERATE';
     reasons.push('CRITICAL_TEST_FAILURE');
   }
   if (policy.requireAllTests && report.testsPassed !== report.testsTotal) {
-    if (outcome !== 'STOPPED') outcome = run.iteration >= policy.maxIterations ? 'STOPPED' : 'ITERATE';
+    if (outcome !== 'STOPPED') outcome = !canContinueIteration(run.iteration, policy.maxIterations) ? 'STOPPED' : 'ITERATE';
     reasons.push('TESTS_INCOMPLETE');
   }
   if (report.stability < policy.minimumStability) {
-    if (outcome !== 'STOPPED') outcome = run.iteration >= policy.maxIterations ? 'STOPPED' : 'ITERATE';
+    if (outcome !== 'STOPPED') outcome = !canContinueIteration(run.iteration, policy.maxIterations) ? 'STOPPED' : 'ITERATE';
     reasons.push('STABILITY_BELOW_THRESHOLD');
   }
   if (outcome === 'PASS') reasons.push('ALL_DETERMINISTIC_GATES_PASSED');

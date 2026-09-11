@@ -18,6 +18,7 @@ import { LocalAgentWorkspace } from '../../src/domain/workspace/LocalAgentWorksp
 import { TrustedProjectEvaluator } from '../../src/infrastructure/evaluation/project/TrustedProjectEvaluator.ts';
 import { JsonSchemaAgentContractValidator } from '../../src/infrastructure/agentAdapters/contracts/JsonSchemaAgentContractValidator.ts';
 import { createComposition } from '../../src/interfaces/runner/Composition.ts';
+import { orchestratorOutput } from '../helpers/CppScenario.ts';
 import { GOOD_BODY } from '../helpers/Fixture.ts';
 
 function git(root: string, args: string[]): string {
@@ -71,7 +72,7 @@ for (const [moduleId, sourcePath] of [['formatter', 'lib/format.mjs'], ['normali
               return {
                 sessionId: runOptions!.sessionId!, events: [], notifications: [],
                 finalResponse: JSON.stringify(planning
-                  ? { strategy: 'document the selected module', iteration: 0, parallel: ['documentation'] }
+                  ? orchestratorOutput(moduleId)
                   : { title: moduleId, description: 'Pinned source documentation.', keywords: [moduleId], body: GOOD_BODY }),
               };
             },

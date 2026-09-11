@@ -11,7 +11,7 @@ import type { ExecutionContext } from '../AgentExecution.ts';
 export const definition = {
     agentId: 'check', displayName: '检查智能体',
     responsibility: '以只读方式检查生成实现、差异和确定性判据，不能修改代码。',
-    basePrompt: '以只读方式检查提示上下文中内联的生成代码工件与确定性判据，不得修改实现。生成代码不会写入你的公开接口工作区，不能把当前目录缺少生成文件当作缺陷。只报告由内联代码或证据直接支持的阻塞项。',
+    basePrompt: '只读比较原始源码和内联生成代码，严格使用 comparisonRulesRef 的规则。每条 findings 包含 ruleId、sourcePath（原始文件）、path（生成文件）、original 原文片段、generated 原文片段、message 和 severity。scope 列全生成文件。blocking 必须等于是否存在 BLOCKER。无差异返回空 findings；不得虚构相似度算法、评分或阈值。',
     inputContract: ['生成文件', '代码差异', '判定标准'],
     outputContract: ['结构化检查报告'], tools: ['read_material'], customizableFields: ['promptAddon'],
   } as const;
@@ -22,4 +22,4 @@ export function buildPrompt(input: Input, context: ExecutionContext): string {
 }
 
 /** 确定本角色允许读取的文件路径。 */
-export function readablePaths(input: Input): string[] { return input.publicInterfacePaths; }
+export function readablePaths(input: Input): string[] { return [...new Set([...input.sourcePaths, ...input.publicInterfacePaths])]; }

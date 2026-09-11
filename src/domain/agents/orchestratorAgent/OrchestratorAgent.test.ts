@@ -38,3 +38,15 @@ test('orchestrator: cancellation before and during model execution cannot return
   await assert.rejects(execute(during.input, during.context), /AGENT_CANCELLED/);
   assert.deepEqual(during.phases, []);
 });
+
+test('orchestrator: reject foreign modules, source leakage and incomplete plans', async () => {
+  for (const mutate of [
+    (output: any) => { output.tasks[0].moduleId = 'foreign'; },
+    (output: any) => { output.tasks[2].materials = ['source', 'tests']; },
+    (output: any) => { output.tasks[1] = output.tasks[0]; },
+    (output: any) => { output.iteration = 99; },
+  ]) {
+    const sample = roleExample<Input>('orchestrator'); mutate(sample.output);
+    await assert.rejects(execute(sample.input, sample.context), /ORCHESTRATOR_(TASK_SCOPE|PLAN|MODULE_SELECTION)_INVALID/);
+  }
+});

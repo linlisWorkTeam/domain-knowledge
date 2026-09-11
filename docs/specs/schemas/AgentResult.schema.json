@@ -11,6 +11,7 @@
     "runId": {"type": "string", "minLength": 1},
     "agentType": {"enum": ["orchestrator", "doc-gen", "doc-worker", "test-gen", "code", "check", "review"]},
     "status": {"enum": ["SUCCEEDED", "FAILED"]},
+    "rawOutputRef": {"$ref": "https://wpknowledge.local/schemas/artifact-ref/v1"},
     "outputRefs": {
       "type": "array",
       "items": {"$ref": "https://wpknowledge.local/schemas/artifact-ref/v1"}
@@ -93,6 +94,8 @@
             "required": ["nodeId", "agentType", "dependsOn", "generationKey", "inputSchema", "outputSchema", "resourceClaims", "artifactExpectations"],
             "properties": {
               "nodeId": {"type": "string", "minLength": 1},
+              "moduleId": {"type": "string", "minLength": 1},
+              "materials": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
               "agentType": {"enum": ["doc-gen", "test-gen", "code", "check", "review"]},
               "dependsOn": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
               "generationKey": {"type": "string", "minLength": 16},

@@ -4,11 +4,14 @@
  * 文件功能：提供Trusted项目Evaluator的基础设施实现与外部系统接入。
  */
 import { createHash } from 'node:crypto';
+import { caseRunner, readSupervisedReturn, type CaseRecord } from './CaseRunner.ts';
+import { hasExecutableCases, TEST_CASE_PROTOCOL } from '../../../domain/agents/testGenAgent/TestGenAgentContract.ts';
+import { commandPath, nativeTestBindings, type NativeTestBinding } from '../../../domain/agents/testGenAgent/TestExecutionPlan.ts';
 import { spawn, spawnSync } from 'node:child_process';
 import {
   existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync,
 } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { constants, tmpdir } from 'node:os';
 import {
   delimiter, dirname, isAbsolute, join, resolve, sep,
 } from 'node:path';
@@ -18,6 +21,7 @@ import type {
 } from '../../../application/ports/ApplicationPorts.ts';
 
 interface ResolvedTool {
+  supervised?: boolean;
   /** 提供executable信息，供调用方读取或传入。 */
   executable: string;
   /** 提供prefixArgs信息，供调用方读取或传入。 */
@@ -27,6 +31,7 @@ interface ResolvedTool {
 }
 
 interface CapturedProcess {
+  supervision?: string;
   /** 提供exitCode信息，供调用方读取或传入。 */
   exitCode: number | null;
   /** 提供timedOut信息，供调用方读取或传入。 */
@@ -126,6 +131,7 @@ function installedPnpmStore(script: string): string | null {
 }
 
 function resolveTool(tool: ProjectTool, usePackageStore = false): ResolvedTool {
+  if (tool === 'gcc' || tool === 'g++') return { executable: tool, prefixArgs: [] };
   if (tool === 'node') return { executable: process.execPath, prefixArgs: [] };
   if (tool === 'pnpm') {
     const script = pnpmScript();
@@ -227,7 +233,12 @@ async function capture(
       shell: false,
       windowsHide: true,
       detached: process.platform !== 'win32',
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: ['ignore', 'pipe', 'pipe', ...(tool.supervised ? ['pipe' as const] : [])],
+    });
+    let supervision = '';
+    if (tool.supervised) child.stdio[3]?.on('data', (chunk: Buffer) => {
+      supervision += chunk.toString('utf8');
+      if (supervision.length > 4096) terminateProcessTree(child.pid);
     });
     let stdout: Buffer<ArrayBufferLike> = Buffer.alloc(0);
     let stderr: Buffer<ArrayBufferLike> = Buffer.alloc(0);
@@ -241,11 +252,11 @@ async function capture(
       if (chunk.byteLength > remaining) outputLimitExceeded = true;
       return remaining > 0 ? Buffer.concat([current, chunk.subarray(0, remaining)]) : current;
     };
-    child.stdout.on('data', (chunk: Buffer) => {
+    child.stdout!.on('data', (chunk: Buffer) => {
       stdout = append(stdout, chunk);
       if (outputLimitExceeded) terminateProcessTree(child.pid);
     });
-    child.stderr.on('data', (chunk: Buffer) => {
+    child.stderr!.on('data', (chunk: Buffer) => {
       stderr = append(stderr, chunk);
       if (outputLimitExceeded) terminateProcessTree(child.pid);
     });
@@ -265,7 +276,7 @@ async function capture(
       signal?.removeEventListener('abort', abort);
       reject(error);
     });
-    child.once('close', (exitCode) => {
+    child.once('close', (exitCode, terminationSignal) => {
       if (settled) return;
       settled = true;
       clearTimeout(timeout);
@@ -275,7 +286,8 @@ async function capture(
         return;
       }
       resolvePromise({
-        exitCode,
+        supervision,
+        exitCode: exitCode ?? (terminationSignal ? 128 + constants.signals[terminationSignal] : null),
         timedOut,
         outputLimitExceeded,
         durationMs: Date.now() - startedAt,
@@ -309,6 +321,13 @@ export function parseTestCounts(output: string): { passed: number; total: number
   if (nodeTotal && nodePassed) {
     return { passed: Number(nodePassed[1]), total: Number(nodeTotal[1]), parsed: true };
   }
+  const tapPlan = output.match(/^1\.\.(\d+)\s*$/m);
+  if (tapPlan) {
+    const passed = [...output.matchAll(/^ok\s+\d+\b/gm)].length;
+    const failed = [...output.matchAll(/^not ok\s+\d+\b/gm)].length;
+    const total = Number(tapPlan[1]);
+    if (passed + failed === total) return { passed, total, parsed: true };
+  }
   return { passed: 0, total: 0, parsed: false };
 }
 
@@ -318,8 +337,11 @@ export class TrustedProjectEvaluator implements ProjectEvaluator {
   readonly artifacts: ArtifactStore;
 
   /** 注入协作依赖并初始化实例状态。 */
-  constructor(artifacts: ArtifactStore) {
+  readonly retainedWorkspaceRoot?: string;
+
+  constructor(artifacts: ArtifactStore, retainedWorkspaceRoot?: string) {
     this.artifacts = artifacts;
+    this.retainedWorkspaceRoot = retainedWorkspaceRoot;
   }
 
   /** 检查请求。 */
@@ -349,7 +371,7 @@ export class TrustedProjectEvaluator implements ProjectEvaluator {
       });
       if (bytes.error) throw bytes.error;
       if (bytes.status !== 0 || !bytes.stdout) throw new Error(`PROJECT_SOURCE_MISSING: ${path}`);
-      return { path, sha256: digest(bytes.stdout), size: bytes.stdout.byteLength };
+      return { path, sha256: digest(bytes.stdout), size: bytes.stdout.byteLength, content: bytes.stdout.toString('utf8') };
     });
     const remote = syncText('git', ['config', '--get', 'remote.origin.url'], repositoryRoot, true);
     const dirty = syncText('git', ['status', '--porcelain=v1'], repositoryRoot, true).length > 0;
@@ -362,24 +384,60 @@ export class TrustedProjectEvaluator implements ProjectEvaluator {
   }
 
   /** 评估请求。 */
-  async evaluate(input: {
-    label: string;
-    snapshot: ProjectSnapshot;
-    generatedFiles: GeneratedProjectFile[];
-    prepareCommands: ProjectCommand[];
-    commands: ProjectCommand[];
-  }, signal?: AbortSignal): Promise<ProjectEvaluation> {
+  async evaluate(input: Parameters<ProjectEvaluator['evaluate']>[0], signal?: AbortSignal): Promise<ProjectEvaluation> {
     if (input.commands.length === 0) throw new Error('PROJECT_GATE_EMPTY');
-    const tempRoot = mkdtempSync(join(tmpdir(), 'wp-project-eval-'));
+    if (this.retainedWorkspaceRoot) mkdirSync(this.retainedWorkspaceRoot, { recursive: true });
+    const tempRoot = mkdtempSync(join(this.retainedWorkspaceRoot ?? tmpdir(), 'wp-project-eval-'));
+    if (this.retainedWorkspaceRoot) writeFileSync(join(tempRoot, 'input.json'), JSON.stringify(input, null, 2));
     const workspace = join(tempRoot, 'workspace');
     const archivePath = join(tempRoot, 'snapshot.tar');
     const generatedFileDigests: Record<string, string> = {};
+    let bindings: NativeTestBinding[] = [];
+    const commands = input.commands.map(command => ({ ...command, args: [...command.args] }));
+    const caseExecution = input.testSuite ? { version: TEST_CASE_PROTOCOL,
+      manifestSha256: digest(JSON.stringify(input.testSuite.cases)), cases: input.testSuite.cases,
+      records: [] as (CaseRecord & { commandIndex: number; attempt: number; process: CapturedProcess })[], failures: [] as string[] } : undefined;
+    let supervisor = '';
+    let supervisorDigest = '';
     try {
+      if (input.testSuite) {
+        try {
+          if (!hasExecutableCases(input.testSuite)) throw new Error('TEST_CASE_PROTOCOL_INCOMPATIBLE');
+          for (const file of input.testSuite.files) if (!input.generatedFiles.some(g => g.path === file.path && g.content === file.content))
+            throw new Error('TEST_CASE_SOURCE_BINDING_INVALID');
+          bindings = nativeTestBindings(commands, input.testSuite);
+          if (process.platform !== 'linux' || process.arch !== 'x64') throw new Error('SUPERVISOR_PLATFORM_UNSUPPORTED');
+          const source = readFileSync(new URL('./NativeCaseSupervisor.c', import.meta.url));
+          const sourcePath = join(tempRoot, 'NativeCaseSupervisor.c');
+          supervisor = join(tempRoot, 'NativeCaseSupervisor');
+          writeFileSync(sourcePath, source);
+          syncText('gcc', ['-std=c17', '-O2', sourcePath, '-o', supervisor], tempRoot);
+          supervisorDigest = digest(source);
+
+        }
+        catch (error) {
+          const evidence = { label: input.label, commit: input.snapshot.commit, passed: false,
+            testsPassed: 0, testsTotal: input.testSuite.cases.length, stability: 0, infrastructureFailure: true,
+            configurationFailure: String(error), toolchainFingerprint: 'configuration-not-executed',
+            generatedFileDigests: Object.fromEntries(input.generatedFiles.map(file => [file.path, digest(file.content)])), results: [],
+            sourceManifestRef: input.snapshot.manifestRef, caseExecution };
+          if (this.retainedWorkspaceRoot) writeFileSync(join(tempRoot, 'evidence.json'), JSON.stringify(evidence, null, 2));
+          const evidenceRef = await this.artifacts.put(Buffer.from(JSON.stringify(evidence, null, 2)), 'application/json');
+          return { ...evidence, evidenceRef };
+        }
+      }
       mkdirSync(workspace, { recursive: true });
       syncText('git', ['-C', input.snapshot.repositoryRoot, 'archive', '--format=tar', `--output=${archivePath}`, input.snapshot.commit], tempRoot);
       syncText('tar', ['-xf', archivePath, '-C', workspace], tempRoot);
+      for (const path of input.replaceSourcePaths ?? []) {
+        const normalized = safeRelativePath(path);
+        if (!input.generatedFiles.some((file) => file.path === normalized)) throw new Error(`PROJECT_RECONSTRUCTION_INCOMPLETE: ${normalized}`);
+        assertNoSymlink(workspace, normalized);
+        rmSync(pathInside(workspace, normalized), { force: true });
+      }
       for (const file of input.generatedFiles) {
         const normalized = safeRelativePath(file.path);
+        if (input.testSuite && normalized.startsWith('.flywheel/')) throw new Error('PROJECT_RUNNER_PATH_RESERVED');
         assertNoSymlink(workspace, normalized);
         const target = pathInside(workspace, normalized);
         mkdirSync(dirname(target), { recursive: true });
@@ -387,13 +445,35 @@ export class TrustedProjectEvaluator implements ProjectEvaluator {
         generatedFileDigests[normalized] = digest(file.content);
       }
 
+      for (const binding of bindings) {
+        const compiler = commands[binding.compileIndex]!;
+        const runnerPath = `.flywheel/CaseRunner-${binding.compileIndex}.${compiler.tool === 'gcc' ? 'c' : 'cpp'}`;
+        assertNoSymlink(workspace, runnerPath);
+        mkdirSync(dirname(pathInside(workspace, runnerPath)), { recursive: true });
+        const runner = caseRunner(input.testSuite!.cases.filter(c => binding.testPaths.includes(c.testPath)));
+        writeFileSync(pathInside(workspace, runnerPath), runner);
+        generatedFileDigests[runnerPath] = digest(runner);
+        // 文件在受信临时目录内；绝对路径保证项目 cwd 不改变 runner 的位置。
+        compiler.args.push(pathInside(workspace, runnerPath));
+      }
       const declaredTools = new Set([...input.prepareCommands, ...input.commands].map((command) => command.tool));
+      if (supervisor) declaredTools.add('gcc');
       const toolchain: Record<string, string> = {
         platform: `${process.platform}-${process.arch}`,
+        ...(supervisorDigest ? { supervisor: supervisorDigest } : {}),
         node: process.version,
         git: syncText('git', ['--version'], workspace),
         tar: syncText('tar', ['--version'], workspace).split('\n')[0],
       };
+      for (const compiler of ['gcc', 'g++'] as const) {
+        if (declaredTools.has(compiler)) {
+          try { toolchain[compiler] = syncText(compiler, ['--version'], workspace).split('\n')[0]!; }
+          catch (error) {
+            if (!['ENOENT', 'EACCES'].includes((error as NodeJS.ErrnoException).code ?? '')) throw error;
+            toolchain[compiler] = 'unavailable';
+          }
+        }
+      }
       if (declaredTools.has('pnpm')) toolchain.pnpm = syncText(process.execPath, [pnpmScript(), '--version'], workspace);
       if (declaredTools.has('cargo')) {
         toolchain.cargo = syncText('cargo', ['--version'], workspace);
@@ -415,16 +495,64 @@ export class TrustedProjectEvaluator implements ProjectEvaluator {
         if (!Number.isSafeInteger(maxOutputBytes) || maxOutputBytes < 1 || maxOutputBytes > 16_777_216) {
           throw new Error(`PROJECT_OUTPUT_LIMIT_INVALID: ${maxOutputBytes}`);
         }
-        const commandCwd = command.cwd ? pathInside(workspace, command.cwd) : workspace;
-        if (command.cwd) assertNoSymlink(workspace, command.cwd);
-        const captured = await capture(
-          resolveTool(command.tool, phase === 'prepare'), command.args, commandCwd,
-          timeoutMs, maxOutputBytes,
-          redactionRoots, tempRoot, signal,
-        );
-        const counts = command.purpose === 'test'
-          ? parseTestCounts(`${captured.stdout}\n${captured.stderr}`)
-          : { passed: 0, total: 0, parsed: false };
+        const relativeCwd = commandPath(undefined, command.cwd ?? '.');
+        const commandCwd = relativeCwd === '.' ? workspace : pathInside(workspace, relativeCwd);
+        if (relativeCwd !== '.') assertNoSymlink(workspace, relativeCwd);
+        let tool: ResolvedTool;
+        let args = command.args;
+        if (command.tool === 'binary') {
+          const executable = safeRelativePath(commandPath(command.cwd, args[0] ?? ''));
+          assertNoSymlink(workspace, executable);
+          tool = { executable: pathInside(workspace, executable), prefixArgs: [] };
+          args = args.slice(1);
+        } else tool = resolveTool(command.tool, phase === 'prepare');
+        const commandIndex = commands.indexOf(command);
+        const binding = phase === 'gate' ? bindings.find(b => b.runIndices.includes(commandIndex)) : undefined;
+        let captured: CapturedProcess;
+        let counts: {passed: number; total: number; parsed: boolean};
+        if (binding) {
+          const cases = input.testSuite!.cases.filter(c => binding.testPaths.includes(c.testPath));
+          let symbols: string[] = [];
+          let symbolFailure = 'SUPERVISOR_ENTRY_SYMBOL_MISSING';
+          try { symbols = syncText('nm', ['--defined-only', '-C', '-P', tool.executable], commandCwd, true).split('\n'); }
+          catch { symbolFailure = 'SUPERVISOR_SYMBOL_TOOL_UNAVAILABLE'; }
+          const deadline = Date.now() + timeoutMs;
+          captured = { exitCode: 0, timedOut: false, outputLimitExceeded: false, durationMs: 0, stdout: '', stderr: '' };
+          counts = { passed: 0, total: cases.length, parsed: true };
+          for (const [index, item] of cases.entries()) {
+            const symbol = symbols.find(line => line.startsWith(`${item.entryPoint} T `) || line.startsWith(`${item.entryPoint}() T `));
+            let observed: CapturedProcess;
+            if (!symbol) observed = {exitCode: null, timedOut: false, outputLimitExceeded: false, durationMs: 0,
+              stdout: '', stderr: symbolFailure};
+            else observed = await capture({ executable: supervisor, prefixArgs: [], supervised: true },
+              [tool.executable, symbol.split(' ')[2]!, String(index), ...args], commandCwd,
+              Math.max(1, deadline - Date.now()), Math.max(1, maxOutputBytes - Buffer.byteLength(captured.stdout + captured.stderr)),
+              redactionRoots, tempRoot, signal);
+            const completion = readSupervisedReturn(observed.supervision ?? '');
+            const passed = observed.exitCode === 0 && !observed.timedOut && !observed.outputLimitExceeded
+              && completion.returned && completion.value === 0;
+            caseExecution!.records.push({ ...completion, caseId: item.caseId, status: passed ? 'PASS' : 'FAIL', commandIndex, attempt, process: observed });
+            if (passed) counts.passed++;
+            else caseExecution!.failures.push(`${commandIndex}:${attempt}:${item.caseId}: ${completion.reason}`);
+            const unavailable = completion.reason.startsWith('SUPERVISOR_') || completion.reason === 'DENIED_SYSCALL';
+            if (unavailable || observed.exitCode === null) captured.exitCode = null;
+            else if (!passed && captured.exitCode !== null) captured.exitCode = 1;
+            captured.timedOut ||= observed.timedOut;
+            captured.outputLimitExceeded ||= observed.outputLimitExceeded;
+            captured.durationMs += observed.durationMs;
+            captured.stdout += observed.stdout;
+            captured.stderr += observed.stderr;
+          }
+        } else {
+          captured = await capture(tool, args, commandCwd, timeoutMs, maxOutputBytes, redactionRoots, tempRoot, signal)
+            .catch((error: NodeJS.ErrnoException): CapturedProcess => {
+              if (!['ENOENT', 'EACCES'].includes(error.code ?? '')) throw error;
+              return { exitCode: null, timedOut: false, outputLimitExceeded: false, durationMs: 0,
+                stdout: '', stderr: `PROJECT_EXECUTABLE_UNAVAILABLE: ${error.code}` };
+            });
+          counts = command.purpose === 'test' ? parseTestCounts(`${captured.stdout}\n${captured.stderr}`)
+            : {passed: 0, total: 0, parsed: false};
+        }
         return {
           phase, tool: command.tool, purpose: command.purpose,
           args: redactArgs(command.args, redactionRoots), cwd: command.cwd ?? '.', attempt,
@@ -441,13 +569,13 @@ export class TrustedProjectEvaluator implements ProjectEvaluator {
           break;
         }
       }
-      const generatedFilesIntact = Object.entries(generatedFileDigests).every(([path, expectedDigest]) => {
+      const filesIntact = () => Object.entries(generatedFileDigests).every(([path, expectedDigest]) => {
         const generatedPath = pathInside(workspace, path);
         return existsSync(generatedPath) && digest(readFileSync(generatedPath)) === expectedDigest;
       });
-      if (!generatedFilesIntact) prepareFailed = true;
+      if (!filesIntact()) prepareFailed = true;
       if (!prepareFailed) {
-        for (const command of input.commands) {
+        for (const command of commands) {
           const repetitions = command.repetitions ?? 1;
           if (!Number.isSafeInteger(repetitions) || repetitions < 1 || repetitions > 10) {
             throw new Error(`PROJECT_REPETITION_INVALID: ${repetitions}`);
@@ -462,21 +590,27 @@ export class TrustedProjectEvaluator implements ProjectEvaluator {
         }
       }
 
+      const generatedFilesIntact = filesIntact();
+      if (!generatedFilesIntact) prepareFailed = true;
       const infrastructureFailure = prepareFailed || results.some((result) =>
         result.exitCode === null || result.timedOut || result.outputLimitExceeded,
       );
-      const expectedExecutions = input.commands.reduce((sum, command) => sum + (command.repetitions ?? 1), 0);
+      const expectedExecutions = commands.reduce((sum, command) => sum + (command.repetitions ?? 1), 0);
       const gateResults = results.filter((result) => result.phase === 'gate');
       const testResults = gateResults.filter((result) => result.purpose === 'test');
+      const boundRuns = new Set(bindings.flatMap(b => b.runIndices));
       const passedExecutions = gateResults.filter((result) =>
         result.exitCode === 0 && !result.timedOut && !result.outputLimitExceeded,
       ).length;
       const passed = !prepareFailed && gateResults.length >= expectedExecutions
         && gateResults.every((result) => result.exitCode === 0 && !result.timedOut && !result.outputLimitExceeded)
         && testResults.length > 0
-        && testResults.every((result) => result.testCountsParsed && result.testsTotal > 0);
-      const testsPassed = testResults.reduce((sum, result) => sum + result.testsPassed, 0);
-      const testsTotal = testResults.reduce((sum, result) => sum + result.testsTotal, 0);
+        && testResults.every((result) => result.testCountsParsed && result.testsTotal > 0 && result.testsPassed === result.testsTotal);
+      const testsPassed = caseExecution ? caseExecution.records.filter(r => r.status === 'PASS').length
+        : testResults.reduce((sum, result) => sum + result.testsPassed, 0);
+      const testsTotal = caseExecution ? [...boundRuns].reduce((sum, index) => sum
+        + input.testSuite!.cases.filter(c => bindings.find(b => b.runIndices.includes(index))!.testPaths.includes(c.testPath)).length
+          * (commands[index]!.repetitions ?? 1), 0) : testResults.reduce((sum, result) => sum + result.testsTotal, 0);
       const stability = expectedExecutions > 0 ? Math.min(1, passedExecutions / expectedExecutions) : 0;
       const evidence = {
         schemaVersion: '1.0', label: input.label, commit: input.snapshot.commit,
@@ -486,9 +620,10 @@ export class TrustedProjectEvaluator implements ProjectEvaluator {
         },
         toolchain,
         toolchainFingerprint: `sha256:${digest(JSON.stringify(toolchain))}`,
-        generatedFileDigests, generatedFilesIntact,
+        generatedFileDigests, generatedFilesIntact, sourceManifestRef: input.snapshot.manifestRef, caseExecution,
         passed, testsPassed, testsTotal, stability, infrastructureFailure, results,
       };
+      if (this.retainedWorkspaceRoot) writeFileSync(join(tempRoot, 'evidence.json'), JSON.stringify(evidence, null, 2));
       const evidenceRef = await this.artifacts.put(Buffer.from(JSON.stringify(evidence, null, 2)), 'application/json');
       return {
         label: input.label, commit: input.snapshot.commit, passed, testsPassed, testsTotal,
@@ -497,7 +632,7 @@ export class TrustedProjectEvaluator implements ProjectEvaluator {
         generatedFileDigests, results, evidenceRef,
       };
     } finally {
-      rmSync(tempRoot, { recursive: true, force: true });
+      if (!this.retainedWorkspaceRoot) rmSync(tempRoot, { recursive: true, force: true });
     }
   }
 }

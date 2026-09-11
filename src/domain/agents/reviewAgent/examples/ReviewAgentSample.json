@@ -28,13 +28,13 @@
     "evaluationReportRef": {
       "material": "evaluation"
     },
-    "criteriaRef": {
-      "material": "policy"
+    "comparisonReportRef": {
+      "material": "comparison"
     }
   },
   "materials": {
     "knowledge": {
-      "content": "# Markdown diff\n\n## Purpose\nCompare two Markdown documents and report changed sections with line ranges.\n\n## Behavior\nIdentical inputs return empty hunks. CRLF is normalized before comparison. Insertions and deletions preserve the old and new line coordinates. The implementation uses bounded processing for large inputs.\n",
+      "content": "# Public behavior\nThe documented result is 3.\n",
       "mediaType": "text/markdown"
     },
     "evaluation": {
@@ -54,16 +54,30 @@
         "maxIterations": 1
       },
       "mediaType": "application/json"
+    },
+    "comparison": {
+      "mediaType": "application/json",
+      "content": {
+        "blocking": false,
+        "findings": [],
+        "scope": [
+          "src/module.cpp"
+        ]
+      }
     }
   },
   "modelOutput": {
     "blocking": false,
-    "recommendation": "ITERATE",
-    "correction": {
-      "correctionId": "COR-0001",
-      "knowledgePath": "knowledge/markdown-diff.md",
-      "criterion": "Document CRLF normalization with an example",
-      "risk": "False change reports for equivalent newlines"
-    }
+    "corrections": [
+      {
+        "correctionId": "result-failure",
+        "knowledgePath": "Public behavior",
+        "problem": "Reference tests expect 4",
+        "suggestion": "Document return value 4",
+        "evidence": [
+          "evaluation"
+        ]
+      }
+    ]
   }
 }

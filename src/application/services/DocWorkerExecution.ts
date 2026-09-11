@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：提交 DocGen 内部子任务，保存独立命令、片段和执行记录。
  */
+import { scopedWorkerSource } from '../../domain/agents/docGenAgent/subAgents/docWorkerAgent/WorkerMaterials.ts';
 import { sha256, type ArtifactRef } from '../../domain/Domain.ts';
 import type { AgentCommand, AgentId, AgentResult } from '../../domain/agents/AgentContracts.ts';
 import { materialsFor, type ModelExecutionPort } from '../../domain/agents/AgentExecution.ts';
@@ -31,22 +32,28 @@ export class DocWorkerExecutionService implements DocWorkerExecutionPort {
         || task.sourcePaths.some((path) => !paths.has(path)))) throw new Error('SUBAGENT_TASK_INVALID');
     const prompt = await prompts.resolvePrompt(stage.runId, 'doc-worker');
     return this.dependencies.tasks.run(tasks.map((task) => async (taskSignal) => {
-      const payload = { moduleId: parent.moduleId, sourceRefs: parent.payload.sourceRefs,
-        publicInterfaceRefs: parent.payload.publicInterfaceRefs, assignedSourcePaths: task.sourcePaths };
+      const parentSources = materialsFor({ sourceRefs: parent.payload.sourceRefs, publicInterfaceRefs: parent.payload.publicInterfaceRefs }, parent.materials);
+      const scoped = await Promise.all([task.sourcePaths, parent.publicInterfacePaths].map(async (paths) => {
+        const content = scopedWorkerSource(parentSources, paths);
+        const ref = await flywheel.putArtifact(Buffer.from(JSON.stringify(content)), 'application/json');
+        return { ref, content };
+      }));
+      const payload = { moduleId: parent.moduleId, sourceRefs: [scoped[0]!.ref],
+        publicInterfaceRefs: [scoped[1]!.ref], assignedSourcePaths: task.sourcePaths };
       // 同一 Run 的固定源码任务跨正文修订复用；任务范围或冻结提示词变化产生不同提交键。
-      const generationKey = `${stage.runId}:doc_gen/doc_worker:${task.workerId}:${sha256(JSON.stringify({ payload, prompt }))}:subagent-v2`;
+      const generationKey = `${stage.runId}:doc_gen/doc_worker:${task.workerId}:${sha256(JSON.stringify({ payload, prompt }))}:subagent-v3`;
       const command: AgentCommand = { schemaVersion: '1.0', runId: stage.runId, agentType: 'doc-worker',
         generationKey, commandId: `cmd:${sha256(`${generationKey}:${JSON.stringify(payload)}`)}`, payload };
       const nodeId = `${nodeByAgent['doc-worker']}:${task.workerId}`;
       const childStage: WorkflowStageInput = { ...stage, nodeId, agentId: 'doc-worker', workerId: task.workerId,
         attempt: observer.nextAttempt?.(stage.runId, nodeId, stage.iteration) ?? 1, prompt, signal: taskSignal };
-      const materials = materialsFor(payload, parent.materials);
+      const materials = scoped;
       const service = new RoleExecutionService(flywheel, contracts, nodeByAgent);
       let resultRef!: ArtifactRef;
       await executeDevelopmentStage(childStage, { execute: async () => {
         resultRef = await service.execute({ command, nodeId, inputRefs: materials.map(({ ref }) => ref),
           input: { payload, materials, sourcePaths: task.sourcePaths, publicInterfacePaths: parent.publicInterfacePaths,
-            provenance: parent.provenance, moduleId: parent.moduleId },
+            provenance: scoped.map(({ref}) => ref), moduleId: parent.moduleId },
           context: { model: this.dependencies.model(command, childStage), command, effectivePrompt: prompt,
             iteration: stage.iteration, signal: taskSignal },
         });

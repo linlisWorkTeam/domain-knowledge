@@ -3,17 +3,14 @@
   "scenario": {
     "schemaVersion": "1.0",
     "name": "single-role-development",
-    "moduleId": "markdown-diff",
+    "moduleId": "cpp-module",
     "repositoryRoot": ".",
-    "expectedCommit": "a743ffcb624b1aca47d0f8adb272582ecf0250d6",
     "sourcePaths": [
-      "src/domain/services/markdown-diff.ts"
+      "tests/fixtures/cpp/Module.cpp"
     ],
-    "publicInterfacePaths": [
-      "examples/docgen/markdown-diff.d.ts"
-    ],
+    "publicInterfacePaths": [],
     "allowedGeneratedPaths": [
-      "src/domain/services/markdown-diff.ts"
+      "tests/fixtures/cpp/Module.cpp"
     ],
     "prepareCommands": [],
     "referenceCommands": [],
@@ -22,49 +19,64 @@
   },
   "iteration": 0,
   "payload": {
-    "diffRef": {
+    "sourceSnapshotRef": {
+      "material": "source"
+    },
+    "generatedCodeRef": {
       "material": "code"
     },
-    "criteriaRef": {
-      "material": "policy"
-    },
-    "publicInterfaceRefs": [
-      {
-        "material": "interface"
-      }
-    ]
+    "comparisonRulesRef": {
+      "material": "rules"
+    }
   },
   "materials": {
-    "code": {
+    "source": {
       "content": {
         "files": [
           {
-            "path": "src/domain/services/markdown-diff.ts",
-            "content": "export function structuredMarkdownDiff(before: string, after: string) { return { hunks: [], changedSections: [] }; }"
+            "path": "tests/fixtures/cpp/Module.cpp",
+            "content": "int calculate() { return 4; }"
           }
         ]
       },
       "mediaType": "application/json"
     },
-    "policy": {
+    "code": {
       "content": {
-        "policyId": "development",
-        "minimumStability": 1,
-        "requireAllTests": true,
-        "maxIterations": 1
+        "files": [
+          {
+            "path": "tests/fixtures/cpp/Module.cpp",
+            "content": "int calculate() { return 3; }"
+          }
+        ]
       },
       "mediaType": "application/json"
     },
-    "interface": {
-      "content": "/** Public API of the CPU example pinned in the runner; no implementation or oracle. */\nexport declare function structuredMarkdownDiff(beforeBody: string, afterBody: string): {\n  hunks: Array<{\n    oldStart: number; oldCount: number; newStart: number; newCount: number;\n    lines: Array<{ type: 'CONTEXT' | 'REMOVE' | 'ADD'; oldLine: number | null; newLine: number | null; text: string }>;\n  }>;\n  changedSections: string[];\n  rangeValidation: {\n    status: 'PASS'; scope: 'FULL_DOCUMENT'; oldLines: number; newLines: number;\n    algorithm: 'LCS' | 'BOUNDED_FALLBACK'; validated: true;\n  };\n};\n",
-      "mediaType": "text/plain"
+    "rules": {
+      "content": [
+        {
+          "id": "behavior",
+          "description": "Compare public return values"
+        }
+      ],
+      "mediaType": "application/json"
     }
   },
   "modelOutput": {
-    "blocking": false,
-    "findings": [],
+    "blocking": true,
     "scope": [
-      "src/domain/services/markdown-diff.ts"
+      "tests/fixtures/cpp/Module.cpp"
+    ],
+    "findings": [
+      {
+        "ruleId": "behavior",
+        "path": "tests/fixtures/cpp/Module.cpp",
+        "original": "return 4;",
+        "generated": "return 3;",
+        "message": "Public result differs",
+        "severity": "BLOCKER",
+        "sourcePath": "tests/fixtures/cpp/Module.cpp"
+      }
     ]
   }
 }

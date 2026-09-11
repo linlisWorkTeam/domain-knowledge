@@ -14,38 +14,28 @@ SPDX-License-Identifier: MIT
 | 编号 | 议题 | 状态 | 记录 |
 | --- | --- | --- | --- |
 | IO-14 | CheckAgent 输入与比较依据 | 输入范围已确认；规则与算法待论文调研 | 2026-09-10 用户确认输入为原始源码、CodeAgent 生成的临时代码和比较规则。原始源码作为比较基准，临时代码作为待检查对象，规则规定比较范围及关注的差异；具体规则和相似度算法待论文调研后确定。 |
-| IO-15 | Check 输出及评测、Review 的结果交接 | 已确认（待实现） | 2026-09-10 用户确认 Check 输出比较结果及差异依据，评测负责输出测试结果，之后 Review 同时读取两者，分析知识卡片需要修订的位置。保持 Check 后进入评测、再到 Review 的流程，不将差异结果误作测试执行指令。 |
+| IO-15 | Check 输出及评测、Review 的结果交接 | 已实现，待业务验收 | 2026-09-10 用户确认 Check 输出比较结果及差异依据，评测负责输出测试结果，之后 Review 同时读取两者，分析知识卡片需要修订的位置。保持 Check 后进入评测、再到 Review 的流程，不将差异结果误作测试执行指令。 |
 
-## 目标输入（已确认，待实现）
+## 当前输入输出
 
-| 输入 | 用途 |
-| --- | --- |
-| 原始源码 | 比较基准 |
-| CodeAgent 生成的临时代码 | 待检查对象 |
-| 比较规则 | 规定比较范围及关注的差异，具体内容待论文调研 |
+IO-14、15 的契约和交接已实现。输入为 `sourceSnapshotRef`、`generatedCodeRef`、`comparisonRulesRef`。原始源码通过固定提交的源码/接口文件白名单只读访问，生成实现通过内联工件提供。比较规则来自场景 `comparisonRules: [{ id, description }]`。
 
-本次确认输入范围，不预设相似度算法、分数尺度、权重或通过阈值。源码及临时代码的材料传递方式、文件读取白名单、规则配置字段和输出报告结构仍待细化。CheckAgent 的比较材料授权不改变 CodeAgent 禁止读取原始源码的边界。
+模型输出：
 
-## 目标输出与下游用途（已确认，待实现）
+- `scope`：实际生成文件的完整路径集合。
+- `findings`：每项包含 ruleId、sourcePath、path、original、generated、message、severity（BLOCKER / INFO）。original 和 generated 是对应的原文片段。
+- `blocking`：必须与 findings 中是否存在 BLOCKER 一致。
 
-Check 输出机器可读取的比较结果及差异依据，供后续 Review 结合测试结果分析知识问题；具体报告字段、比较规则及相似度算法尚未确定。评测执行器负责运行测试，不依靠差异报告决定怎样执行测试。节点顺序和证据传递见 [Workflow](../../workflow/Workflow.md)。
+Domain 校验范围覆盖全部生成文件、每项 ruleId 来自配置、sourcePath 属于授权源码/接口范围，path 属于生成文件；original 必须出现在冻结源码清单对应文件的正文中，generated 必须出现在对应生成文件中。片段存在性由代码核验，差异是否具有所述业务含义仍需模型判断，不等于 AST 等价证明。结果信封将每项独立映射到 findingId、severity、criterionId、evidenceLocation 和说明，保留原始结构化输出引用。
 
-当前评测节点将 Check 结果引用作为输入依赖保存，测试执行未使用差异明细；最终 Gate 判定使用 check.blocking，Review 尚未加载 Check 明细。实现 IO-15 时需补齐可信材料加载、Review 契约与证据引用，不能只保存报告而不消费其内容。
+Application 将真实 Check 原始报告作为 Review 的 `comparisonReportRef`，与测评报告一起加载。评测器运行配置指定的命令；Gate 继续读取 check.blocking。
 
-## 职责与当前输入输出
+## 延后事项与验证
 
-根据差异与判据输出只读检查意见。以下描述当前实现；目标输入范围已按 IO-14、输出及下游用途按 IO-15 确认，尚未同步改入角色契约与材料加载。
+相似度算法、评分、权重和阈值仍属下一版本研究范围。当前不内置这些判据；规则为空、内容为空或标识重复时，在模型调用前以 CHECK_RULES_REQUIRED 拒绝，不能把缺配置当作无差异。只有提供合法规则并完成比较后，才允许返回空 findings。
 
-| 边界 | 当前实现 |
-| --- | --- |
-| 输入 | 差异 `diffRef`、判据 `criteriaRef`、公开接口 `publicInterfaceRefs` |
-| 模型输出 | `blocking`、字符串列表 `findings`、检查范围 `scope` |
-| 交接输出 | `resultKind: findings`；每项带 findingId、severity、criterionId、evidenceLocation、message |
-| 转换规则 | 严重程度按 blocking 统一映射为 BLOCKER 或 INFO；criterionId 当前固定为 deterministic-check，证据位置使用 scope 第一项或工作流角色位置 |
-| 权限与限制 | 只给检查意见，不修代码；模型意见不能冒充确定性测试执行事实 |
+角色回归覆盖规则伪造、生成片段伪造、越界位置和 blocking 不一致。完整 C++ 流程验证 Check 报告进入 Review，报告引用进入最终 Gate 输入。
 
-## 待确认与验收重点
+## 本轮缺口修复验收
 
-对应 S2-06：按 IO-14 落实两份源码与比较规则的输入，按 IO-15 补齐比较结果及差异依据到 Review 的交接；比较规则及相似度算法待论文调研后确定。验收关注 findings 可追溯性、检查范围和只读边界；当前固定判据及统一证据位置不能视为完整归因或已确定的相似度算法。
-
-开发步骤与证据统一记录在 [Status](../../../../Status.md)，独立运行方法见 [AgentDevelopment](../../../../AgentDevelopment.md)。
+比较规则必须非空且标识唯一；缺少配置必须停止，不能返回无差异。original 和 generated 证据都必须在冻结原文及生成文件中核验。

@@ -19,6 +19,7 @@ import { TrustedProjectEvaluator } from '../../src/infrastructure/evaluation/pro
 import { JsonSchemaAgentContractValidator } from '../../src/infrastructure/agentAdapters/contracts/JsonSchemaAgentContractValidator.ts';
 import { createDomainKnowledgeInfrastructure } from '../../src/infrastructure/langgraph/LangGraph.ts';
 import { createComposition } from '../../src/interfaces/runner/Composition.ts';
+import { cppTestOutput } from '../helpers/CppScenario.ts';
 import { GOOD_BODY } from '../helpers/Fixture.ts';
 
 function git(root: string, args: string[]): string {
@@ -27,29 +28,21 @@ function git(root: string, args: string[]): string {
   return result.stdout.trim();
 }
 
-for (const [moduleId, layout, testName] of [['formatter', 'lib', 'format.test.js'], ['normalizer', 'components/nested', 'normalize.test.js']]) {
+for (const [moduleId, layout, testName] of [['formatter', 'lib', 'format.test.cpp'], ['normalizer', 'components/nested', 'normalize.test.cpp']]) {
 test(`generic ${moduleId} scenario runs all LangGraph nodes and independent test commands`, async () => {
   const repositoryRoot = mkdtempSync(join(tmpdir(), 'wp-automated-source-'));
   const assetRoot = mkdtempSync(join(tmpdir(), 'wp-automated-assets-'));
   const runtimeDir = mkdtempSync(join(tmpdir(), 'wp-automated-runtime-'));
   mkdirSync(join(repositoryRoot, layout), { recursive: true });
-  writeFileSync(join(repositoryRoot, 'package.json'), '{"name":"automated-source","type":"module"}\n');
-  writeFileSync(join(repositoryRoot, layout, 'contract.js'), 'export const expected = 4;\n');
-  writeFileSync(join(repositoryRoot, layout, 'module.js'), 'export const calculate = () => 4;\n');
-  writeFileSync(join(repositoryRoot, layout, testName), `
-import assert from 'node:assert/strict';
-import test from 'node:test';
-import { expected } from './contract.js';
-import { calculate } from './module.js';
-test('generated result matches contract', () => assert.equal(calculate(), expected));
-`.trimStart());
+  writeFileSync(join(repositoryRoot, layout, 'module.cpp'), 'int calculate() { return 4; }\n');
+  writeFileSync(join(assetRoot, 'test.cpp'), cppTestOutput().files[0]!.content);
   writeFileSync(join(assetRoot, 'knowledge-v1.md'), `${GOOD_BODY}\n\n## 行为契约\n\n第一轮没有固定精确结果。`);
   writeFileSync(join(assetRoot, 'knowledge-v2.md'), `${GOOD_BODY}\n\n## 行为契约\n\n修订后必须返回公开契约固定的数值 4。`);
-  writeFileSync(join(assetRoot, 'code-v1.js'), 'export const calculate = () => 3;\n');
-  writeFileSync(join(assetRoot, 'code-v2.js'), 'export const calculate = () => 4;\n');
+  writeFileSync(join(assetRoot, 'code-v1.cpp'), 'int calculate() { return 3; }\n');
+  writeFileSync(join(assetRoot, 'code-v2.cpp'), 'int calculate() { return 4; }\n');
   writeFileSync(join(assetRoot, 'correction.json'), JSON.stringify({
     correctionId: 'COR-AUTO-001', knowledgePath: '行为契约',
-    criterion: '返回公开契约值 4', risk: '生成实现无法通过门禁',
+    problem: '生成实现无法通过门禁', suggestion: '返回公开契约值 4', evidence: ['evaluation'],
   }));
   git(repositoryRoot, ['init']);
   git(repositoryRoot, ['config', 'user.email', 'acceptance@example.invalid']);
@@ -87,20 +80,24 @@ test('generated result matches contract', () => assert.equal(calculate(), expect
       observedPolicies.push(structuredClone(policy));
       return recordEvaluation(evaluation, policy);
     };
-    const command = (args: string[]) => ({ tool: 'node' as const, purpose: 'test' as const, args });
+    const commands = [{ tool: 'g++' as const, purpose: 'check' as const, args: ['-std=c++17', `${layout}/module.cpp`, `${layout}/${testName}`, '-o', 'test-bin'] },
+      { tool: 'binary' as const, purpose: 'test' as const, args: ['test-bin'] }];
     const scenario: FixtureProjectScenario = {
       schemaVersion: '1.0', name: 'automated-two-iteration', moduleId,
       repositoryRoot, expectedCommit: commit,
-      sourcePaths: [`${layout}/module.js`, `${layout}/${testName}`],
-      publicInterfacePaths: [`${layout}/contract.js`, 'package.json'],
-      allowedGeneratedPaths: [`${layout}/module.js`], prepareCommands: [],
-      referenceCommands: [command(['--test', `${layout}/${testName}`])],
-      firstIterationCommands: [command(['--test', `${layout}/${testName}`])],
-      finalCommands: [command(['--test', `${layout}/${testName}`])],
+      sourcePaths: [`${layout}/module.cpp`],
+      publicInterfacePaths: [],
+      allowedGeneratedPaths: [`${layout}/module.cpp`], prepareCommands: [],
+      referenceCommands: commands,
+      firstIterationCommands: commands,
+      finalCommands: commands,
+      comparisonRules: [{ id: 'behavior', description: 'Compare public return values' }],
+      agentConfiguration: { languageId: 'cpp', standard: 'c++17', dependencies: [], constraints: [], testPaths: [`${layout}/${testName}`] },
       assets: {
+        testSource: 'test.cpp', testPath: `${layout}/${testName}`,
         knowledgeV1: 'knowledge-v1.md', knowledgeV2: 'knowledge-v2.md',
-        codeV1: 'code-v1.js', codeV2: 'code-v2.js', correction: 'correction.json',
-        generatedPath: `${layout}/module.js`, title: 'Automated module',
+        codeV1: 'code-v1.cpp', codeV2: 'code-v2.cpp', correction: 'correction.json',
+        generatedPath: `${layout}/module.cpp`, title: 'Automated module',
         description: 'LangGraph-driven knowledge verification fixture.',
       },
     };
@@ -131,12 +128,12 @@ test('generated result matches contract', () => assert.equal(calculate(), expect
     assert.equal(projections.some((projection) => projection.nodeId === 'publication' && projection.status === 'COMPLETED'), true);
     assert.equal(composition.repository.listEvents(handle.runId).at(-1)?.eventType, 'WorkflowNodeStateChanged');
     const resultCheckpoints = [
-      [`${handle.runId}:orchestrator:1:main:contract-v5`, 'orchestrator'],
-      [`${handle.runId}:doc_gen:1:main:contract-v5`, 'doc-gen'],
-      [`${handle.runId}:test_gen:stable-source:contract-v5`, 'test-gen'],
-      [`${handle.runId}:code:1:main:contract-v5`, 'code'],
-      [`${handle.runId}:check:1:main:contract-v5`, 'check'],
-      [`${handle.runId}:review:1:main:contract-v5`, 'review'],
+      [`${handle.runId}:orchestrator:1:main:contract-v8`, 'orchestrator'],
+      [`${handle.runId}:doc_gen:1:main:contract-v8`, 'doc-gen'],
+      [`${handle.runId}:test_gen:1:main:contract-v8`, 'test-gen'],
+      [`${handle.runId}:code:1:main:contract-v8`, 'code'],
+      [`${handle.runId}:check:1:main:contract-v8`, 'check'],
+      [`${handle.runId}:review:1:main:contract-v8`, 'review'],
     ] as const;
     for (const [generationKey, agentType] of resultCheckpoints) {
       const resultRef = composition.repository.getCheckpoint(generationKey)?.outputRefs[0];
@@ -149,12 +146,12 @@ test('generated result matches contract', () => assert.equal(calculate(), expect
       assert.equal(envelope.agentType, agentType);
       assert.equal(envelope.status, 'SUCCEEDED');
     }
-    const docRef = composition.repository.getCheckpoint(`${handle.runId}:doc_gen:1:main:contract-v5`)!.outputRefs[0]!;
+    const docRef = composition.repository.getCheckpoint(`${handle.runId}:doc_gen:1:main:contract-v8`)!.outputRefs[0]!;
     const docResult = JSON.parse(Buffer.from(await composition.artifacts.get(docRef)).toString('utf8'));
     assert.equal(docResult.payload.workerResultRefs.length, 1);
     const workerResult = JSON.parse(Buffer.from(await composition.artifacts.get(docResult.payload.workerResultRefs[0])).toString('utf8'));
     assert.equal(workerResult.agentType, 'doc-worker');
-    const firstDocRef = composition.repository.getCheckpoint(`${handle.runId}:doc_gen:0:main:contract-v5`)!.outputRefs[0]!;
+    const firstDocRef = composition.repository.getCheckpoint(`${handle.runId}:doc_gen:0:main:contract-v8`)!.outputRefs[0]!;
     const firstDocResult = JSON.parse(Buffer.from(await composition.artifacts.get(firstDocRef)).toString('utf8'));
     assert.deepEqual(docResult.payload.workerResultRefs, firstDocResult.payload.workerResultRefs, 'revision reuses committed source fragments');
     assert.ok(projections.some((projection) => projection.nodeId === 'doc_gen/doc_worker:worker-1'));
@@ -171,11 +168,12 @@ test('generated result matches contract', () => assert.equal(calculate(), expect
     assert.deepEqual(observedPolicies, observedPolicies.map(() => policy));
     assert.equal(finalGate?.report.checkBlocking, false);
     assert.equal(finalGate?.report.reviewBlocking, false);
+    const gateJson = await Promise.all(finalGate!.report.inputRefs.filter((ref) => ref.mediaType === 'application/json').map(async (ref) => JSON.parse(Buffer.from(await composition.artifacts.get(ref)).toString('utf8'))));
+    assert.ok(gateJson.some((item) => item.label === 'test-reference-1-0' && item.passed === true));
     const finalInputIds = new Set(finalGate?.report.inputRefs.map((ref) => ref.artifactId));
     for (const [generationKey, outputIndex] of [
-      [`${handle.runId}:oracle_validation:1`, 0],
-      [`${handle.runId}:check:1:main:contract-v5`, 0],
-      [`${handle.runId}:review:1:main:contract-v5`, 0],
+      [`${handle.runId}:check:1:main:contract-v8`, 0],
+      [`${handle.runId}:review:1:main:contract-v8`, 0],
     ] as const) {
       const outputRef = composition.repository.getCheckpoint(generationKey)?.outputRefs[outputIndex];
       assert.ok(outputRef, `checkpoint output missing: ${generationKey}`);

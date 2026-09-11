@@ -208,7 +208,7 @@ npm run knowledge -- workflow-run --scenario /path/to/scenario.json --repository
 
 命令创建 `FlywheelRun`，由 LangGraph 调度角色、独立评测和发布。默认执行框架是 DSH，显式 `WP_FLYWHEEL_AGENT_PROVIDER=fixture` 仅用于带 Fixture Adapter 的自动化验收。通用场景禁止夹具答案字段，不能把预写资产当成真实模型输入。
 
-运行 DSH 需要 Linux/Bubblewrap 及有效模型配置，来源目录须在 `WP_DSH_ALLOWED_ROOTS` 中；部署步骤见 [DSH 部署说明](Runtime.md)。R1 自动化使用受控模型服务，真实模型范例由 R2 单独验收。
+运行 DSH 需要 Linux/Bubblewrap 及有效模型配置，来源目录须在 `WP_DSH_ALLOWED_ROOTS` 中；部署步骤见 [DSH 部署说明](Runtime.md)。当前七角色受控 SDK 两轮流程已经验收；真实模型质量由 S3 单独验收，旧 R1/R2 记录不作为当前业务质量结论。C/C++ 自动评测还需要 Linux x86_64、gcc/nm、未剥离的测试入口符号及可用 ptrace；配置与故障处理见 [原生评测要求](Runtime.md)。
 
 公司 CodeAgent CLI 不是当前外部第一版的启动前提。现有 `company-codeagent-cli` 选项和 [`.env.example`](../.env.example) 记录的是 Adapter 的协议假设，不是已验证的真实 CLI 使用说明；用户反馈与其启动参数、认证字段、session 格式存在差异。后置的 DEV-010 必须先取得实际版本的帮助信息和脱敏输入输出，修正适配并验证后再提供可用步骤。不能仅配置开关就宣称接入成功。
 

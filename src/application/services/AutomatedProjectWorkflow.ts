@@ -3,6 +3,12 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：加载工作流上下文与历史工件，协调角色执行、独立评测和发布。
  */
+import type { Output as PlanOutput } from '../../domain/agents/orchestratorAgent/OrchestratorAgentContract.ts';
+import { hasExecutableCases, TEST_CASE_PROTOCOL } from '../../domain/agents/testGenAgent/TestGenAgentContract.ts';
+import type { Output as TestOutput } from '../../domain/agents/testGenAgent/TestGenAgentContract.ts';
+import { canStartIteration, canContinueIteration } from '../../domain/workflow/IterationBudget.ts';
+import { sourceIdentity, testValidationAction } from '../../domain/agents/testGenAgent/TestSuitePolicy.ts';
+import { validateProjectAgentConfiguration } from '../../domain/agents/ProjectAgentConfiguration.ts';
 import { renderKnowledgeDocument } from '../../domain/knowledge/KnowledgeDocument.ts';
 import type { Output as DocumentOutput } from '../../domain/agents/docGenAgent/DocGenAgentContract.ts';
 import type { Output as CodeOutput } from '../../domain/agents/codeAgent/CodeAgentContract.ts';
@@ -117,6 +123,7 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
   async execute(input: WorkflowStageInput): Promise<WorkflowStageResult> {
     const scenario = input.context.scenario as AutomatedProjectScenario | undefined;
     if (!scenario || scenario.schemaVersion !== '1.0') throw new Error('WORKFLOW_SCENARIO_INVALID');
+    if (input.nodeId === 'review' && input.context.testValidationRequired) return { route: 'STOPPED', detail: '测试参考校验未通过，等待人工处理' };
     switch (input.nodeId) {
       case 'orchestrator': return this.orchestrate(input, scenario);
       case 'doc_gen':
@@ -138,13 +145,12 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
     input: WorkflowStageInput,
     scenario: AutomatedProjectScenario,
   ): Promise<WorkflowStageResult> {
+    assertInvariant(canStartIteration(input.iteration, input.maxIterations), 'WORKFLOW_ITERATION_LIMIT_EXCEEDED');
     const current = this.flywheel.getRun(input.runId);
     if (!current) throw new Error(`WORKFLOW_RUN_NOT_FOUND: ${input.runId}`);
     if (current.state === 'CREATED') this.flywheel.transition(input.runId, 'PLANNED');
     const planned = this.flywheel.getRun(input.runId);
-    if (planned?.state === 'PLANNED' || planned?.state === 'ITERATING' || planned?.state === 'ROLLING_BACK') {
-      this.flywheel.transition(input.runId, 'GENERATING');
-    }
+
     let snapshot = input.context.snapshot as ProjectSnapshot | undefined;
     let scenarioRef = input.context.scenarioRef as ArtifactRef | undefined;
     if (!snapshot) {
@@ -160,6 +166,16 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
     }
     const commandInput = { ...input, context: { ...input.context, snapshot, scenarioRef } };
     const agent = await this.runRole(commandInput, scenario, 'orchestrator');
+    const plan = await this.readAgentOutput<PlanOutput>(agent, 'orchestrator', commandInput);
+    const moduleId = plan.tasks[0]!.moduleId;
+    const selected = scenario.modules?.find((module) => module.moduleId === moduleId) ?? scenario;
+    if (selected !== scenario) {
+      snapshot = await this.evaluator.inspect({ ...selected, repositoryRoot: snapshot.repositoryRoot, expectedCommit: snapshot.commit });
+      scenario = { ...selected, businessGoal: scenario.businessGoal, repositoryRoot: snapshot.repositoryRoot, expectedCommit: snapshot.commit };
+      scenarioRef = await this.flywheel.putArtifact(Buffer.from(JSON.stringify(scenario)), 'application/json');
+    }
+    this.flywheel.selectRunModule(input.runId, moduleId);
+    if (planned?.state === 'PLANNED' || planned?.state === 'ITERATING' || planned?.state === 'ROLLING_BACK') this.flywheel.transition(input.runId, 'GENERATING');
     if (input.signal?.aborted) throw new Error('AGENT_CANCELLED');
     await this.flywheel.executeNode({
       runId: input.runId, nodeId: 'project-scenario', generationKey: `${input.runId}:project-scenario`,
@@ -167,7 +183,7 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
     }, async () => [scenarioRef!]);
     return {
       detail: `planned iteration ${input.iteration}`,
-      context: { snapshot, scenarioRef, [contextKey(input.nodeId, input.iteration)]: agent },
+      context: { snapshot, scenarioRef, scenario, taskPlan: plan.tasks, [contextKey(input.nodeId, input.iteration)]: agent },
     };
   }
 
@@ -176,10 +192,26 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
     scenario: AutomatedProjectScenario,
     agentId: AgentId,
   ): Promise<WorkflowStageResult> {
+    if (agentId === 'test-gen') {
+      const cachedRef = this.flywheel.getValidatedTestSuite(await this.testSourceKey(input, scenario));
+      if (cachedRef) {
+        const cached = await this.readJson<{ output: TestOutput; protocolVersion?: string }>(cachedRef);
+        if (cached.protocolVersion !== TEST_CASE_PROTOCOL || !hasExecutableCases(cached.output)) {
+          const evidenceRef = await this.flywheel.putArtifact(Buffer.from(JSON.stringify({
+            configurationFailure: 'TEST_CASE_PROTOCOL_INCOMPATIBLE', candidateRef: cachedRef,
+            requiredProtocol: TEST_CASE_PROTOCOL, action: '请人工迁移或清除旧测试缓存后重新运行；同源测试不会自动重新生成。',
+          })), 'application/json');
+          return { route: 'STOPPED', detail: '旧测试协议需要人工迁移', context: { testValidationRequired: { candidateRef: cachedRef, evidenceRef, repairs: 0, infrastructureFailure: true } } };
+        }
+      }
+    }
+    const tasks = input.context.taskPlan as PlanOutput['tasks'] | undefined;
+    if (tasks && !tasks.some((task) => task.agentType === agentId && task.moduleId === scenario.moduleId)) throw new Error('WORKFLOW_TASK_NOT_PLANNED');
     const ref = await this.runRole(input, scenario, agentId);
     return {
       detail: `${agentId} produced schema-validated role output`,
-      context: { [contextKey(input.nodeId, input.iteration, input.workerId)]: ref },
+      context: { [contextKey(input.nodeId, input.iteration, input.workerId)]: ref,
+        ...(agentId === 'test-gen' ? { testGenPrompt: input.prompt } : {}) },
     };
   }
 
@@ -204,6 +236,9 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
       ref, content: await this.readArtifact(ref),
     })));
     const snapshot = input.context.snapshot as ProjectSnapshot;
+    const cachedSuite = agentId === 'test-gen' && !input.context.testRepair
+      ? this.flywheel.getValidatedTestSuite(await this.testSourceKey(input, scenario)) : null;
+    const cached = cachedSuite ? await this.readJson<{ output: TestOutput }>(cachedSuite) : undefined;
     return new RoleExecutionService(this.flywheel, this.contracts, this.nodeByAgent).execute({
       command, nodeId: input.workerId ? `${input.nodeId}:${input.workerId}` : input.nodeId,
       inputRefs: this.agentInputRefs(input, agentId),
@@ -216,6 +251,7 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
       context: {
         model: this.modelFactory({ provider: this.agentForRun(input.runId), command, stage: input, scenario }),
         command, effectivePrompt: input.prompt, iteration: input.iteration, signal: input.signal,
+        ...(cached ? { validatedOutput: cached.output } : {}),
         ...(agentId === 'doc-gen' && this.workerRuntime ? { docWorkers: new DocWorkerExecutionService({
           ...this.workerRuntime, stage: input, flywheel: this.flywheel, contracts: this.contracts, nodeByAgent: this.nodeByAgent,
           parent: { payload: command.payload as unknown as DocGenInput['payload'], materials,
@@ -326,38 +362,62 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
     };
   }
 
-  private async validateOracle(
-    input: WorkflowStageInput,
-    scenario: AutomatedProjectScenario,
-  ): Promise<WorkflowStageResult> {
+  private async testSourceKey(input: WorkflowStageInput, scenario: AutomatedProjectScenario): Promise<string> {
     const snapshot = input.context.snapshot as ProjectSnapshot;
-    const scenarioRef = input.context.scenarioRef as ArtifactRef;
-    const checkpoint = await this.flywheel.executeNode({
-      runId: input.runId,
-      nodeId: input.nodeId,
-      generationKey: `${input.runId}:${input.nodeId}:${input.iteration}`,
-      inputRefs: [scenarioRef, snapshot.manifestRef],
-    }, async () => {
-      const evaluation = await this.evaluator.evaluate({
-        label: `reference-oracle-${input.iteration}`,
-        snapshot,
-        generatedFiles: [],
-        prepareCommands: scenario.prepareCommands,
-        commands: scenario.referenceCommands,
-      }, input.signal);
-      if (!evaluation.passed) throw new Error(`REFERENCE_GATE_FAILED: ${evaluation.evidenceRef.artifactId}`);
-      return [evaluation.evidenceRef];
-    });
-    return {
-      detail: 'reference oracle passed',
-      context: { [contextKey('oracleEvidenceRef', input.iteration)]: checkpoint.outputRefs[0] },
-    };
+    const manifest = await this.readJson<{ files: { path: string; sha256: string }[] }>(snapshot.manifestRef);
+    return sourceIdentity(scenario.moduleId, [...scenario.sourcePaths, ...scenario.publicInterfacePaths], manifest.files);
+  }
+
+  private async validateOracle(input: WorkflowStageInput, scenario: AutomatedProjectScenario): Promise<WorkflowStageResult> {
+    if (input.context.testValidationRequired) return { route: 'STOPPED', detail: '测试参考校验等待人工处理' };
+    validateProjectAgentConfiguration(scenario.agentConfiguration);
+    const snapshot = input.context.snapshot as ProjectSnapshot;
+    const sourceKey = await this.testSourceKey(input, scenario);
+    const cached = this.flywheel.getValidatedTestSuite(sourceKey);
+    let fixedSuiteRef = cached;
+    let candidateRef = input.context[contextKey('test_gen', input.iteration)] as ArtifactRef;
+    if (!candidateRef) throw new Error('TEST_CANDIDATE_MISSING');
+    let roleStage = { ...input, nodeId: 'test_gen', agentId: 'test-gen' as const };
+    let output = cached ? (await this.readJson<{ output: TestOutput }>(cached)).output : await this.readAgentOutput<TestOutput>(candidateRef, 'test-gen', roleStage);
+    for (let repairs = 0; ; repairs++) {
+      const checked = await this.flywheel.executeNode({ runId: input.runId, nodeId: 'oracle_validation',
+        generationKey: `${input.runId}:oracle_validation:${input.iteration}:${repairs}:${sha256(JSON.stringify(output))}:${fixedSuiteRef?.sha256 ?? 'candidate'}:tests-v3`, inputRefs: [fixedSuiteRef ?? candidateRef, snapshot.manifestRef] }, async () => {
+        const evaluation = await this.evaluator.evaluate({ label: `test-reference-${input.iteration}-${repairs}`, snapshot,
+          generatedFiles: output.files, prepareCommands: scenario.prepareCommands, commands: scenario.referenceCommands, testSuite: output }, input.signal);
+        return [evaluation.evidenceRef];
+      });
+      const evidenceRef = checked.outputRefs[0]!;
+      const evaluation = await this.readJson<ProjectEvaluation>(evidenceRef);
+      const action = testValidationAction({ passed: evaluation.passed, infrastructureFailure: evaluation.infrastructureFailure,
+        reused: Boolean(fixedSuiteRef), repairs, maxRepairs: scenario.agentConfiguration.maxTestRepairs ?? 1 });
+      if (action === 'ACCEPT') {
+        const suiteRef = await this.flywheel.putArtifact(Buffer.from(JSON.stringify({ protocolVersion: TEST_CASE_PROTOCOL, sourceKey, output, validationEvidenceRef: evidenceRef })), 'application/json');
+        const fixed = await this.flywheel.saveValidatedTestSuite(sourceKey, suiteRef);
+        const winner = await this.readJson<{ output: TestOutput }>(fixed);
+        if (JSON.stringify(winner.output) !== JSON.stringify(output)) {
+          output = winner.output; fixedSuiteRef = fixed;
+          continue; // 另一 Run 已固定同源测试：重新校验胜出的集合，不能把本次证据错绑给它。
+        }
+        return { detail: `source tests validated${cached ? ' and reused' : ''}`, context: {
+          [contextKey('oracleEvidenceRef', input.iteration)]: evidenceRef,
+          [contextKey('validatedTestSuiteRef', input.iteration)]: fixed,
+        } };
+      }
+      if (action === 'MANUAL') return { detail: '生成测试需要人工处理', route: 'STOPPED',
+        context: { testValidationRequired: { candidateRef, evidenceRef, repairs, infrastructureFailure: evaluation.infrastructureFailure } } };
+      roleStage = { ...roleStage, workerId: `repair-${repairs + 1}`, attempt: repairs + 2,
+        context: { ...input.context, testRepair: { candidateRef, failureRef: evidenceRef } },
+        prompt: input.context.testGenPrompt as string ?? input.prompt };
+      candidateRef = await this.runRole(roleStage, scenario, 'test-gen');
+      output = await this.readAgentOutput<TestOutput>(candidateRef, 'test-gen', roleStage);
+    }
   }
 
   private async evaluate(
     input: WorkflowStageInput,
     scenario: AutomatedProjectScenario,
   ): Promise<WorkflowStageResult> {
+    if (input.context.testValidationRequired) return { route: 'STOPPED', detail: '测试参考校验未通过，等待人工处理' };
     const snapshot = input.context.snapshot as ProjectSnapshot;
     const scenarioRef = input.context.scenarioRef as ArtifactRef;
     const codeRef = input.context[contextKey('code', input.iteration)] as ArtifactRef | undefined;
@@ -369,6 +429,10 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
       throw new Error('WORKFLOW_EVALUATION_INPUT_MISSING');
     }
     const code = await this.readAgentOutput<CodeOutput>(codeRef, 'code', input);
+    const suiteRef = input.context[contextKey('validatedTestSuiteRef', input.iteration)] as ArtifactRef | undefined;
+    if (!suiteRef) throw new Error('VALIDATED_TEST_SUITE_MISSING');
+    const suite = await this.readJson<{ output: TestOutput }>(suiteRef);
+    validateProjectAgentConfiguration(scenario.agentConfiguration);
     for (const file of code.files) {
       if (!scenario.allowedGeneratedPaths.includes(file.path)) throw new Error(`PROJECT_PATH_DENIED: ${file.path}`);
     }
@@ -376,14 +440,15 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
       runId: input.runId,
       nodeId: input.nodeId,
       generationKey: `${input.runId}:${input.nodeId}:${input.iteration}`,
-      inputRefs: [scenarioRef, snapshot.manifestRef, bodyRef, codeRef, oracleRef, checkRef],
+      inputRefs: [scenarioRef, snapshot.manifestRef, bodyRef, codeRef, oracleRef, checkRef, suiteRef],
     }, async () => {
       const evaluation = await this.evaluator.evaluate({
         label: `generated-iteration-${input.iteration}`,
         snapshot,
-        generatedFiles: code.files,
+        generatedFiles: [...code.files, ...suite.output.files],
         prepareCommands: scenario.prepareCommands,
-        commands: input.iteration === 0 ? scenario.firstIterationCommands : scenario.finalCommands,
+        commands: scenario.finalCommands, testSuite: suite.output,
+        replaceSourcePaths: scenario.sourcePaths.filter((path) => !scenario.publicInterfacePaths.includes(path)),
       }, input.signal);
       return [evaluation.evidenceRef];
     });
@@ -393,7 +458,7 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
     const run = this.flywheel.getRun(input.runId);
     if (run?.state === 'GENERATING') this.flywheel.transition(input.runId, 'EVALUATING');
     if (evaluation.infrastructureFailure) {
-      const decision = await this.recordGateDecision(input, evaluation);
+      const decision = await this.recordGateDecision({ ...input, context: { ...input.context, [contextKey('evaluationEvidenceRef', input.iteration)]: evidenceRef } }, evaluation);
       return {
         detail: `evaluation infrastructure failed; gate ${decision.outcome}`,
         context: {
@@ -410,22 +475,41 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
   }
 
   private async route(input: WorkflowStageInput): Promise<WorkflowStageResult> {
-    if (input.context.docGenDecisionRequired) {
-      const run = this.flywheel.getRun(input.runId);
-      if (run?.state === 'GENERATING') this.flywheel.transition(input.runId, 'LOW_CONFIDENCE');
-      return { route: 'STOPPED', detail: 'DocGen 等待用户决定文档范围',
-        context: { docGenDecisionRequired: input.context.docGenDecisionRequired } };
+    // 固定判定先于迁移，避免 Registry 已推进而 Graph 仍重放旧输入时重新作决定。
+    const requestRef = await this.flywheel.putArtifact(Buffer.from(JSON.stringify({
+      iteration: input.iteration, maxIterations: input.maxIterations, gatePolicy: input.context.gatePolicy,
+      quality: input.context[contextKey('qualityReport', input.iteration)],
+      candidateVersion: input.context[contextKey('candidateVersionId', input.iteration)],
+      docGenDecisionRequired: input.context.docGenDecisionRequired, testValidationRequired: input.context.testValidationRequired,
+    })), 'application/json');
+    const refs = Object.entries(input.context).filter(([key]) => !key.startsWith('gateDecision:'))
+      .flatMap(([,value]) => this.artifactRefsIn(value));
+    const checkpoint = await this.flywheel.executeNode({runId: input.runId, nodeId: 'workflow_router',
+      generationKey: `${input.runId}:workflow_router:${input.iteration}:route-v2`,
+      inputRefs: this.uniqueRefs([requestRef, ...refs]) }, async () => {
+        const result = await this.decideRoute(input);
+        return [await this.flywheel.putArtifact(Buffer.from(JSON.stringify(result)), 'application/json')];
+      });
+    const result = await this.readJson<WorkflowStageResult>(checkpoint.outputRefs[0]!);
+    const run = this.flywheel.getRun(input.runId);
+    if (!run) throw new Error(`WORKFLOW_RUN_NOT_FOUND: ${input.runId}`);
+    if (run.iteration === input.iteration && ['GENERATING', 'REVIEWING'].includes(run.state)) {
+      if (result.route === 'ITERATE') this.flywheel.transition(input.runId, 'ITERATING');
+      else if (result.route === 'STOPPED') this.flywheel.transition(input.runId, 'LOW_CONFIDENCE');
+    }
+    if (result.route === 'STOPPED') await this.recordGovernance(input,
+      result.context?.[contextKey('gateDecision', input.iteration)] as GateDecision | undefined);
+    return result;
+  }
+
+  private async decideRoute(input: WorkflowStageInput): Promise<WorkflowStageResult> {
+    if (input.context.docGenDecisionRequired || input.context.testValidationRequired) {
+      return { route: 'STOPPED', detail: input.context.testValidationRequired ? '测试参考校验未通过，等待人工处理' : 'DocGen 等待用户决定文档范围',
+        context: { docGenDecisionRequired: input.context.docGenDecisionRequired, testValidationRequired: input.context.testValidationRequired } };
     }
     const quality = input.context[contextKey('qualityReport', input.iteration)] as QualityReport | undefined;
     if (quality?.outcome === 'REJECTED') {
-      const run = this.flywheel.getRun(input.runId);
-      if (!run) throw new Error(`WORKFLOW_RUN_NOT_FOUND: ${input.runId}`);
-      const exhausted = run.iteration >= input.maxIterations;
-      if (exhausted && run.state === 'GENERATING') {
-        this.flywheel.transition(input.runId, 'LOW_CONFIDENCE');
-      } else if (!exhausted && run.state === 'GENERATING') {
-        this.flywheel.transition(input.runId, 'ITERATING');
-      }
+      const exhausted = !canContinueIteration(input.iteration, input.maxIterations);
       return {
         detail: `knowledge quality ${quality.score}; ${exhausted ? 'stopped' : 'iterate'}: ${quality.weakPoints.join('; ')}`,
         route: exhausted ? 'STOPPED' : 'ITERATE',
@@ -438,17 +522,36 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
     const evaluation = await this.readJson<ProjectEvaluation>(evaluationRef);
     const decision = existing ?? await this.recordGateDecision(input, evaluation);
     const route = routeFor(decision.outcome);
-    const run = this.flywheel.getRun(input.runId);
-    if (route === 'ITERATE' && run?.state === 'REVIEWING') {
-      this.flywheel.transition(input.runId, 'ITERATING');
-    } else if (route === 'STOPPED' && run?.state === 'REVIEWING') {
-      this.flywheel.transition(input.runId, 'LOW_CONFIDENCE');
-    }
     return {
       detail: `workflow route ${route}`,
       route,
       context: { [contextKey('gateDecision', input.iteration)]: decision },
     };
+  }
+
+  private async recordGovernance(input: WorkflowStageInput, decision?: GateDecision): Promise<void> {
+    const reviewRefs = Object.keys(input.context).filter(key => /^review:\d+$/.test(key))
+      .sort((a, b) => Number(b.split(':')[1]) - Number(a.split(':')[1]));
+    const latestKey = reviewRefs[0];
+    const review = latestKey ? await this.readAgentOutput<ReviewOutput>(input.context[latestKey] as ArtifactRef,
+      'review', { ...input, iteration: Number(latestKey.split(':')[1]) }) : undefined;
+    const quality = input.context[contextKey('qualityReport', input.iteration)] as QualityReport | undefined;
+    const proposal = input.context.docGenDecisionRequired as { reason: string; suggestedDocuments: string[] } | undefined;
+    const test = input.context.testValidationRequired as { repairs: number; infrastructureFailure: boolean } | undefined;
+    const reason = test ? 'TEST_VALIDATION_REQUIRED' : proposal ? 'DOCUMENT_SCOPE_REQUIRED' : quality ? 'QUALITY_BUDGET_EXHAUSTED' : 'GATE_STOPPED';
+    const summary = test
+      ? `测试参考校验未通过，已修复 ${test.repairs} 次。请检查测试候选与失败日志${test.infrastructureFailure ? '，修正构建配置或执行环境' : '，确认用例预期和原始实现'}后重新运行。`
+      : proposal ? `文档范围待决定：${proposal.reason}。建议：${proposal.suggestedDocuments.join('；')}。请确认本次单文档范围。`
+      : quality ? `文档质量 ${quality.score}，总轮次预算已用完：${quality.weakPoints.join('；')}。请补充对应内容或调整任务后重新运行。`
+      : review?.corrections.length ? review.corrections.map(item => `${item.knowledgePath}：${item.problem}；建议：${item.suggestion}`).join('\n')
+      : `测评停止：${decision?.reasonCodes.join('、')}。请检查评测日志后决定修订或重新运行。`;
+    const evidenceRefs = this.artifactRefsIn(input.context);
+    if (quality) evidenceRefs.push(await this.flywheel.putArtifact(Buffer.from(JSON.stringify(quality)), 'application/json'));
+    const handoff = { summary, historySummary: review?.historySummary ?? '', evidenceRefs: this.uniqueRefs(evidenceRefs),
+      reason, iteration: input.iteration, decisionId: decision?.decisionId,
+      handoffKey: `${input.iteration}:${reason}:${decision?.decisionId ?? 'early'}` };
+    const handoffRef = await this.flywheel.putArtifact(Buffer.from(JSON.stringify(handoff, null, 2)), 'application/json');
+    this.flywheel.recordReviewHandoff(input.runId, { ...handoff, handoffRef });
   }
 
   private async recordGateDecision(
@@ -523,7 +626,17 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
       const policyRef = await this.flywheel.putArtifact(
         Buffer.from(JSON.stringify(gatePolicy, null, 2)), 'application/json',
       );
-      payload = { policyRef, moduleRefs: [scenarioRef, snapshot.manifestRef] };
+      const businessGoalRef = await this.flywheel.putArtifact(Buffer.from(scenario.businessGoal ?? `Generate and evaluate knowledge for ${scenario.moduleId}`), 'text/plain');
+      const projectConfigurationRef = await this.flywheel.putArtifact(Buffer.from(JSON.stringify(scenario.agentConfiguration ?? {})), 'application/json');
+      const progressRef = await this.flywheel.putArtifact(Buffer.from(JSON.stringify({ iteration: input.iteration,
+        state: input.iteration === 0 ? 'PLANNED' : 'ITERATING', selectedModuleId: input.iteration > 0 ? scenario.moduleId : null,
+        previousDecision: input.context[contextKey('gateDecision', input.iteration - 1)] ?? null, previousQuality: input.context[contextKey('qualityReport', input.iteration - 1)] ?? null,
+      })), 'application/json');
+      const moduleOverviewRef = await this.flywheel.putArtifact(Buffer.from(JSON.stringify({ modules: (scenario.modules ?? [scenario]).map((module) => ({
+        moduleId: module.moduleId, description: module.businessGoal ?? module.name, sourcePaths: module.sourcePaths,
+        publicInterfacePaths: module.publicInterfacePaths, projectConfiguration: module.agentConfiguration,
+      })) })), 'application/json');
+      payload = { policyRef, moduleRefs: [moduleOverviewRef], businessGoalRef, projectConfigurationRef, progressRef };
     } else if (agentId === 'doc-gen') {
       payload = {
         moduleId: scenario.moduleId,
@@ -564,23 +677,31 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
         }
       }
     } else if (agentId === 'test-gen') {
+      validateProjectAgentConfiguration(scenario.agentConfiguration);
+      const cachedRef = this.flywheel.getValidatedTestSuite(await this.testSourceKey(input, scenario));
+      const cachedPaths = cachedRef ? (await this.readJson<{ output: TestOutput }>(cachedRef)).output.files.map((file) => file.path) : [];
+      const allowedTestPaths = [...new Set([...scenario.agentConfiguration.testPaths, ...cachedPaths])];
+      const testPolicyRef = await this.flywheel.putArtifact(Buffer.from(JSON.stringify({ languageId: scenario.agentConfiguration.languageId, standard: scenario.agentConfiguration.standard, allowedTestPaths })), 'application/json');
+      const repair = input.context.testRepair as { candidateRef: ArtifactRef; failureRef: ArtifactRef } | undefined;
       payload = {
         moduleId: scenario.moduleId,
         sourceSnapshotRef: snapshot.manifestRef,
         publicInterfaceRefs,
         languageId: this.scenarioLanguage(scenario),
-        testPolicyRef: scenarioRef,
+        testPolicyRef,
+        allowedTestPaths,
+        ...(repair ? { previousCandidateRef: (await this.readJson<AgentResult>(repair.candidateRef)).rawOutputRef!, validationFailureRef: repair.failureRef } : {}),
       };
     } else if (agentId === 'code') {
       const knowledgeRef = input.context[contextKey('candidateBodyRef', input.iteration)] as ArtifactRef | undefined;
       if (!knowledgeRef) throw new Error('AGENT_COMMAND_INPUT_MISSING: code.knowledgeRef');
-      payload = {
-        knowledgeRef,
-        publicInterfaceRefs,
-        languageId: this.scenarioLanguage(scenario),
-        buildContractRef: scenarioRef,
-        allowedGeneratedPaths: scenario.allowedGeneratedPaths,
-      };
+      validateProjectAgentConfiguration(scenario.agentConfiguration);
+      const { languageId, standard, dependencies, constraints } = scenario.agentConfiguration;
+      const projectConfigurationRef = await this.flywheel.putArtifact(Buffer.from(JSON.stringify({
+        languageId, standard, dependencies, constraints, allowedGeneratedPaths: scenario.allowedGeneratedPaths,
+      })), 'application/json');
+      payload = { knowledgeRef, languageId, projectConfigurationRef, allowedGeneratedPaths: scenario.allowedGeneratedPaths,
+        requiredGeneratedPaths: scenario.sourcePaths.filter((path) => !scenario.publicInterfacePaths.includes(path)) };
     } else if (agentId === 'check') {
       const codeResultRef = input.context[contextKey('code', input.iteration)] as ArtifactRef | undefined;
       if (!codeResultRef) throw new Error('AGENT_COMMAND_INPUT_MISSING: check.diffRef');
@@ -592,14 +713,35 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
       );
       const diffRef = codeResult.payload['codeRef'] as ArtifactRef | undefined;
       if (!diffRef) throw new Error('AGENT_COMMAND_INPUT_MISSING: check.diffRef');
-      payload = { diffRef, criteriaRef: scenarioRef, publicInterfaceRefs };
+      const comparisonRulesRef = await this.flywheel.putArtifact(Buffer.from(JSON.stringify(scenario.comparisonRules ?? [])), 'application/json');
+      payload = { sourceSnapshotRef: snapshot.manifestRef, generatedCodeRef: diffRef, comparisonRulesRef };
     } else {
       const knowledgeRef = input.context[contextKey('candidateBodyRef', input.iteration)] as ArtifactRef | undefined;
       const evaluationReportRef = input.context[contextKey('evaluationEvidenceRef', input.iteration)] as ArtifactRef | undefined;
       if (!knowledgeRef || !evaluationReportRef) {
         throw new Error('AGENT_COMMAND_INPUT_MISSING: review');
       }
-      payload = { knowledgeRef, evaluationReportRef, criteriaRef: scenarioRef };
+      const checkResultRef = input.context[contextKey('check', input.iteration)] as ArtifactRef | undefined;
+      if (!checkResultRef) throw new Error('AGENT_COMMAND_INPUT_MISSING: review.comparisonReportRef');
+      const checkResult = await this.readAgentResult(checkResultRef, 'check', input.runId, this.expectedAgentGenerationKey(input, 'check', input.iteration));
+      if (!checkResult.rawOutputRef) throw new Error('AGENT_RESULT_RAW_OUTPUT_MISSING: check');
+      const history: ArtifactRef[] = [];
+      for (let iteration = 0; iteration < input.iteration; iteration++) {
+        const documentRef = input.context[contextKey('candidateBodyRef', iteration)] as ArtifactRef | undefined;
+        const evaluationRef = input.context[contextKey('evaluationEvidenceRef', iteration)] as ArtifactRef | undefined;
+        const comparisonRef = input.context[contextKey('check', iteration)] as ArtifactRef | undefined;
+        const reviewRef = input.context[contextKey('review', iteration)] as ArtifactRef | undefined;
+        if (!documentRef) continue;
+        const refs = [documentRef, evaluationRef, comparisonRef, reviewRef].filter((ref): ref is ArtifactRef => Boolean(ref));
+        const loaded = await Promise.all(refs.map(async (ref) => {
+          const result = await this.readArtifact(ref);
+          const raw = (result as AgentResult)?.rawOutputRef;
+          return { ref, content: raw ? await this.readArtifact(raw) : result };
+        }));
+        history.push(await this.flywheel.putArtifact(Buffer.from(JSON.stringify({ iteration, evidence: loaded })), 'application/json'));
+      }
+      payload = { knowledgeRef, evaluationReportRef, comparisonReportRef: checkResult.rawOutputRef,
+        ...(history.length ? { previousCorrectionRefs: history } : {}) };
     }
     const generationKey = this.agentGenerationKey(input, agentId);
     return {
@@ -626,13 +768,13 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
   }
 
   private scenarioLanguage(scenario: AutomatedProjectScenario): string {
+    if (scenario.agentConfiguration) return scenario.agentConfiguration.languageId;
     const tool = scenario.finalCommands[0]?.tool ?? scenario.referenceCommands[0]?.tool ?? 'node';
     return tool === 'cargo' ? 'rust' : 'typescript';
   }
 
   private agentGenerationKey(input: WorkflowStageInput, agentId: AgentId): string {
-    if (agentId === 'test-gen') return `${input.runId}:test_gen:stable-source:contract-v5`;
-    return `${input.runId}:${input.nodeId}:${input.iteration}:${input.workerId ?? 'main'}:contract-v5`;
+    return `${input.runId}:${input.nodeId}:${input.iteration}:${input.workerId ?? 'main'}:contract-v8`;
   }
 
   private agentInputRefs(input: WorkflowStageInput, agentId: AgentId): ArtifactRef[] {
@@ -676,9 +818,9 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
       ref,
       expectedAgent,
       input.runId,
-      this.expectedAgentGenerationKey(input, expectedAgent, input.iteration),
+      this.expectedAgentGenerationKey(input, expectedAgent, input.iteration, input.workerId),
     );
-    const rawRef = result.outputRefs.find((outputRef) => outputRef.mediaType === 'application/json');
+    const rawRef = result.rawOutputRef ?? result.outputRefs.find((outputRef) => outputRef.mediaType === 'application/json');
     if (!rawRef) throw new Error(`AGENT_RESULT_RAW_OUTPUT_MISSING: ${expectedAgent}`);
     return this.readJson<T>(rawRef);
   }
@@ -775,7 +917,7 @@ export class AutomatedProjectWorkflowService {
       maxIterations: input.maxIterations,
       workerCount: input.workerCount ?? 1,
       context: {
-        scenario,
+        scenario: structuredClone(scenario),
         configurationSnapshot,
         gatePolicy: {
           policyId: input.policyId,

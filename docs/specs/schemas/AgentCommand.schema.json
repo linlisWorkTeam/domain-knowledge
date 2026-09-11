@@ -51,11 +51,13 @@
     },
     "orchestratorPayload": {
       "type": "object",
-      "required": ["policyRef", "moduleRefs"],
+      "required": ["policyRef", "moduleRefs", "businessGoalRef", "projectConfigurationRef", "progressRef"],
       "properties": {
         "policyRef": {"$ref": "#/$defs/artifactRef"},
         "moduleRefs": {"$ref": "#/$defs/artifactRefArray"},
-        "latestReportRef": {"$ref": "#/$defs/artifactRef"}
+        "businessGoalRef": {"$ref": "#/$defs/artifactRef"},
+        "projectConfigurationRef": {"$ref": "#/$defs/artifactRef"},
+        "progressRef": {"$ref": "#/$defs/artifactRef"}
       },
       "additionalProperties": false
     },
@@ -110,24 +112,27 @@
     },
     "testgenPayload": {
       "type": "object",
-      "required": ["moduleId", "sourceSnapshotRef", "publicInterfaceRefs", "languageId", "testPolicyRef"],
+      "required": ["moduleId", "sourceSnapshotRef", "publicInterfaceRefs", "languageId", "testPolicyRef", "allowedTestPaths"],
       "properties": {
         "moduleId": {"type": "string", "minLength": 1},
         "sourceSnapshotRef": {"$ref": "#/$defs/artifactRef"},
         "publicInterfaceRefs": {"$ref": "#/$defs/artifactRefArray"},
         "languageId": {"type": "string", "pattern": "^[a-z][a-z0-9+.-]*$"},
-        "testPolicyRef": {"$ref": "#/$defs/artifactRef"}
+        "testPolicyRef": {"$ref": "#/$defs/artifactRef"},
+        "allowedTestPaths": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "previousCandidateRef": {"$ref": "#/$defs/artifactRef"},
+        "validationFailureRef": {"$ref": "#/$defs/artifactRef"}
       },
       "additionalProperties": false
     },
     "codegenPayload": {
       "type": "object",
-      "required": ["knowledgeRef", "publicInterfaceRefs", "languageId", "buildContractRef"],
+      "required": ["knowledgeRef", "languageId", "projectConfigurationRef", "allowedGeneratedPaths"],
       "properties": {
         "knowledgeRef": {"$ref": "#/$defs/artifactRef"},
-        "publicInterfaceRefs": {"$ref": "#/$defs/artifactRefArray"},
         "languageId": {"type": "string", "pattern": "^[a-z][a-z0-9+.-]*$"},
-        "buildContractRef": {"$ref": "#/$defs/artifactRef"},
+        "projectConfigurationRef": {"$ref": "#/$defs/artifactRef"},
+        "requiredGeneratedPaths": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
         "allowedGeneratedPaths": {
           "type": "array",
           "minItems": 1,
@@ -139,21 +144,21 @@
     },
     "checkPayload": {
       "type": "object",
-      "required": ["diffRef", "criteriaRef", "publicInterfaceRefs"],
+      "required": ["sourceSnapshotRef", "generatedCodeRef", "comparisonRulesRef"],
       "properties": {
-        "diffRef": {"$ref": "#/$defs/artifactRef"},
-        "criteriaRef": {"$ref": "#/$defs/artifactRef"},
-        "publicInterfaceRefs": {"$ref": "#/$defs/artifactRefArray"}
+        "sourceSnapshotRef": {"$ref": "#/$defs/artifactRef"},
+        "generatedCodeRef": {"$ref": "#/$defs/artifactRef"},
+        "comparisonRulesRef": {"$ref": "#/$defs/artifactRef"}
       },
       "additionalProperties": false
     },
     "reviewPayload": {
       "type": "object",
-      "required": ["knowledgeRef", "evaluationReportRef", "criteriaRef"],
+      "required": ["knowledgeRef", "evaluationReportRef", "comparisonReportRef"],
       "properties": {
         "knowledgeRef": {"$ref": "#/$defs/artifactRef"},
         "evaluationReportRef": {"$ref": "#/$defs/artifactRef"},
-        "criteriaRef": {"$ref": "#/$defs/artifactRef"},
+        "comparisonReportRef": {"$ref": "#/$defs/artifactRef"},
         "previousCorrectionRefs": {"$ref": "#/$defs/artifactRefArray"}
       },
       "additionalProperties": false

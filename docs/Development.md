@@ -36,6 +36,14 @@ SPDX-License-Identifier: MIT
 
 新增 HTTP 能力先在 Application App 确认用例和端口，随后接 Server 路由和 Console；不要让接口绕过 App 调用数据库。新增角色必须显式更新 AgentContracts、AgentRegistry、Domain Workflow、可信输入加载和版本化契约。
 
+## 修改代码后同步现有文档
+
+以本次 PR 的实际 base 到 HEAD 差异定位受影响模块；未提交修改也纳入核对。先对照模块 Spec 更新行为、输入输出、不变量、失败与恢复，再同步跨模块 Workflow、4+1 视图、使用指南及 Status/验收追踪。删除的是已经失效的当前状态描述；尚未实现的目标、用户延期事项和历史证据保留并明确标记，不能按代码现状缩减目标。
+
+在 PR 里写明更新了哪些对应文档；无需更新的部分说明理由。`validate:specs` 校验 Schema、链接和追踪关系，不能证明描述与实现语义一致，需按实际代码和验收证据 review。当前没有保存代码后自动回写 Spec 的命令，也没有按代码差异强制匹配文档的 CI 门禁；PR 模板的同步项仍依赖开发者落实。
+
+本仓库工程 Spec 的同步与 DocGen 生成业务知识是两项工作。业务源码更新后，先提交需要分析的源码，更新场景 expectedCommit（如已固定）、路径和构建配置，再用 `workflow-run` 发起新 Run；新源码身份产生新测试集合，未变的选定模块仍复用原集合。新知识必须重新评测并经 Gate PASS 后发布。`workflow-resume` 恢复旧快照，不会切换源码或覆盖本仓库的设计文档；入口与配置见 [Runtime](Runtime.md)。
+
 ## 验证清单
 
 GitHub CI 自动检查代码、配置、Schema 及混合改动的 PR。仅修改仓库根目录 Markdown 或 `docs/` 下 Markdown 的 PR 不自动触发 CI；本地仍按改动范围执行文档检查。需要时可在 Actions 中手动运行 CI，手动运行不受文档路径过滤影响。网站部署使用独立工作流，不随本规则变更。

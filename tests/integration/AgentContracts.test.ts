@@ -31,7 +31,7 @@ test('versioned AgentCommand schema rejects unknown fields and role payload mism
   const command: AgentCommand = {
     schemaVersion: '1.0', commandId: 'command-1', runId: 'run-1',
     agentType: 'orchestrator', generationKey: 'generation-key-0001',
-    payload: { policyRef: artifactRef, moduleRefs: [artifactRef] },
+    payload: { policyRef: artifactRef, moduleRefs: [artifactRef], businessGoalRef: artifactRef, projectConfigurationRef: artifactRef, progressRef: artifactRef },
   };
   contracts.assertCommand(command);
   assert.throws(() => contracts.assertCommand({
@@ -90,7 +90,7 @@ test('command validation runs before checkpoint dispatch and provider invocation
 test('AgentResult binding rejects cross-Run and wrong-command reuse', () => {
   const command: AgentCommand = {
     schemaVersion: '1.0', commandId: 'command-1', runId: 'run-1',
-    agentType: 'code', generationKey: 'run-1:code:0:main:contract-v5',
+    agentType: 'code', generationKey: 'run-1:code:0:main:contract-v8',
     payload: {
       knowledgeRef: artifactRef, publicInterfaceRefs: [artifactRef], languageId: 'typescript',
       buildContractRef: artifactRef, allowedGeneratedPaths: ['src/out.ts'],

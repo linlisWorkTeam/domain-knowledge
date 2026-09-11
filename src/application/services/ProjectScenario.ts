@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：协调项目Scenario用例及其依赖的领域规则与端口。
  */
+import { validateProjectAgentConfiguration } from '../../domain/agents/ProjectAgentConfiguration.ts';
 import type { RealSourceScenario } from './ProjectFlow.ts';
 
 /** Validate task data before creating a Run. Tool execution stays in the trusted evaluator. */
@@ -38,7 +39,7 @@ export function parseProjectScenario(value: unknown, repositoryRoot?: string): R
     result[key] = commands.map((command: unknown) => {
       if (!command || typeof command !== 'object' || Array.isArray(command)) return fail();
       const c = command as Record<string, unknown>;
-      if (!['node', 'pnpm', 'cargo'].includes(String(c.tool)) || !['setup', 'test', 'check'].includes(String(c.purpose))
+      if (!['node', 'pnpm', 'cargo', 'gcc', 'g++', 'binary'].includes(String(c.tool)) || !['setup', 'test', 'check'].includes(String(c.purpose))
         || !Array.isArray(c.args) || !c.args.every((arg) => typeof arg === 'string' && !arg.includes('\0'))
         || (c.cwd !== undefined && !path(c.cwd))) return fail();
       const allowed = ['tool', 'purpose', 'args', 'cwd', 'repetitions', 'timeoutMs', 'maxOutputBytes'];
@@ -48,6 +49,26 @@ export function parseProjectScenario(value: unknown, repositoryRoot?: string): R
       }
       return structuredClone(c);
     });
+  }
+  if (item.agentConfiguration !== undefined) {
+    validateProjectAgentConfiguration(item.agentConfiguration);
+    result.agentConfiguration = structuredClone(item.agentConfiguration);
+  }
+  if (item.comparisonRules !== undefined) {
+    if (!Array.isArray(item.comparisonRules) || !item.comparisonRules.length
+      || item.comparisonRules.some((rule) => !rule || typeof rule.id !== 'string' || !rule.id.trim() || typeof rule.description !== 'string' || !rule.description.trim())) return fail();
+    result.comparisonRules = structuredClone(item.comparisonRules);
+  }
+  if (item.businessGoal !== undefined) {
+    if (typeof item.businessGoal !== 'string' || !item.businessGoal.trim()) return fail();
+    result.businessGoal = item.businessGoal;
+  }
+  if (item.modules !== undefined) {
+    if (!Array.isArray(item.modules) || !item.modules.length || item.modules.length > 32) return fail();
+    const modules = item.modules.map((module) => parseProjectScenario(module, result.repositoryRoot as string));
+    if (modules.some((module) => module.modules || module.expectedCommit !== result.expectedCommit)
+      || new Set(modules.map((module) => module.moduleId)).size !== modules.length) return fail();
+    result.modules = modules;
   }
   // Fixture assets and unknown fields cannot enter the public role contract.
   if (Object.keys(item).some((key) => !(key in result))) return fail();

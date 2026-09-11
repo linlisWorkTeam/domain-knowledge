@@ -15,7 +15,7 @@ SPDX-License-Identifier: MIT
 - Domain Workflow 定义跨角色流转，LangGraph 执行固定图，DSH 执行角色内部授权工具。
 - 质量合格、行为门禁通过和已发布是三个不同事实；候选不能通过模型自评或人工标记成为 VERIFIED。
 - 对外只开放用例级动作；运行状态、知识版本、评测和回执只有一套业务存储。
-- LanguagePlugin、C++ 专用插件、SearchAgent 及完整 oracle 晋升流程尚未实现，详见对应模块设计。回滚枚举为兼容保留，当前 Gate 不产生自动回滚决定。
+- LanguagePlugin、C++ 专用插件及 SearchAgent 尚未实现；C/C++ 候选测试的参考校验、固定集合与外部逐入口执行已接通，更广泛的 oracle 质量机制仍未实现，详见对应模块设计。回滚枚举为兼容保留，当前 Gate 不产生自动回滚决定。
 
 ## 功能需求
 

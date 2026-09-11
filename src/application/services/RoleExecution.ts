@@ -7,6 +7,7 @@ import { roleExecutors } from '../../domain/agents/AgentRegistry.ts';
 import type { AgentCommand, AgentResult, AgentId } from '../../domain/agents/AgentContracts.ts';
 import type { ExecutionContext, RoleInput, RoleResult } from '../../domain/agents/AgentExecution.ts';
 import { assertActive } from '../../domain/agents/AgentExecution.ts';
+import type { TestGenContext } from '../../domain/agents/testGenAgent/TestGenAgentContract.ts';
 import type { DocGenContext } from '../../domain/agents/docGenAgent/DocGenAgentContract.ts';
 import type { ArtifactRef } from '../../domain/Domain.ts';
 import type { AgentContractValidator } from '../ports/ApplicationPorts.ts';
@@ -27,7 +28,7 @@ export class RoleExecutionService {
   /** 执行当前角色或业务阶段并返回结构化结果。 */
   async execute(request: {
     command: AgentCommand; nodeId: string; inputRefs: ArtifactRef[];
-    input: RoleInput<Record<string, unknown>>; context: DocGenContext;
+    input: RoleInput<Record<string, unknown>>; context: DocGenContext & TestGenContext;
   }): Promise<ArtifactRef> {
     const { command, context, input } = request;
     assertActive(context.signal);
@@ -59,7 +60,7 @@ export class RoleExecutionService {
       const bind = (value: unknown): unknown => {
         if (!value || typeof value !== 'object') return value;
         if ('agentNode' in value) return this.nodeByAgent[value.agentNode as AgentId];
-        if ('agentGeneration' in value) return `${command.runId}:${this.nodeByAgent[value.agentGeneration as AgentId]}:${context.iteration}:contract-v5`;
+        if ('agentGeneration' in value) return `${command.runId}:${this.nodeByAgent[value.agentGeneration as AgentId]}:${context.iteration}:main:contract-v8`;
         if ('pendingArtifact' in value) {
           const ref = refs.get(String(value.pendingArtifact));
           if (!ref) throw new Error('AGENT_PENDING_ARTIFACT_MISSING');
@@ -69,7 +70,7 @@ export class RoleExecutionService {
         return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, bind(item)]));
       };
       const result: AgentResult = {
-        schemaVersion: '1.0', commandId: command.commandId, commandRef,
+        schemaVersion: '1.0', commandId: command.commandId, commandRef, rawOutputRef: rawRef,
         runId: command.runId, agentType: command.agentType, status: 'SUCCEEDED',
         outputRefs: uniqueRefs([...refs.values()]), payload: bind(roleResult.payload) as Record<string, unknown>,
       };

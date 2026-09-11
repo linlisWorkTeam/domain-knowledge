@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：提供项目工作流夹具的基础设施实现与外部系统接入。
  */
+import { taskMaterials } from '../../../domain/agents/orchestratorAgent/OrchestratorAgentContract.ts';
 import { readFileSync, realpathSync } from 'node:fs';
 import { isAbsolute, relative, resolve } from 'node:path';
 import type { AgentId, ProjectEvaluation, WorkflowStageInput } from '../../../application/ports/ApplicationPorts.ts';
@@ -16,6 +17,8 @@ export interface FixtureProjectScenario extends AutomatedProjectScenario {
   assets: {
     knowledgeV1: string;
     knowledgeV2: string;
+    testSource: string;
+    testPath: string;
     codeV1: string;
     codeV2: string;
     correction: string;
@@ -75,11 +78,12 @@ export class FixtureProjectWorkflowStages {
       if (!ref) throw new Error('WORKFLOW_REVIEW_EVALUATION_MISSING');
       const evaluation = JSON.parse(Buffer.from(await this.flywheel.getArtifact(ref)).toString('utf8')) as ProjectEvaluation;
       output = {
-        blocking: false, recommendation: evaluation.passed ? 'PASS' : 'ITERATE',
-        correction: evaluation.passed ? null : JSON.parse(this.asset(assets.correction)),
+        historySummary: `Previous iteration evidence reviewed; current tests ${evaluation.testsPassed}/${evaluation.testsTotal}.`,
+        blocking: false, corrections: evaluation.passed ? [] : [JSON.parse(this.asset(assets.correction))],
       };
     } else if (agentId === 'test-gen') {
-      output = { candidateCommands: scenario.finalCommands, oracleRequired: true };
+      output = { files: [{ path: assets.testPath, content: this.asset(assets.testSource) }],
+        cases: [{ caseId: 'public-result', entryPoint: 'test_public_result', testPath: assets.testPath, target: 'Public behavior', input: 'calculate()', expected: '4', sourceEvidence: scenario.sourcePaths }] };
     } else if (agentId === 'check') {
       output = { blocking: false, findings: [], scope: scenario.allowedGeneratedPaths };
     } else if (agentId === 'doc-worker') {
@@ -94,7 +98,7 @@ export class FixtureProjectWorkflowStages {
     } else {
       output = {
         iteration: input.iteration, strategy: 'fixed-knowledge-flywheel-v1',
-        parallel: ['documentation', 'test-generation'],
+        tasks: Object.entries(taskMaterials).map(([agentType, materials]) => ({ agentType, materials, moduleId: scenario.moduleId })),
       };
     }
     return output;

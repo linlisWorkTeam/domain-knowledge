@@ -5,7 +5,7 @@
  */
 import type { ExecutionContext, RoleResult, PendingArtifact } from '../AgentExecution.ts';
 import { assertActive } from '../AgentExecution.ts';
-import { type Input, type Output, schemaFor, validateInput } from './CheckAgentContract.ts';
+import { type Input, type Output, schemaFor, validateInput, validateOutput } from './CheckAgentContract.ts';
 import { definition, buildPrompt, readablePaths } from './CheckAgentPrompt.ts';
 
 /** 只读检查生成文件与确定性判据，将模型发现转换为可定位的检查报告。 */
@@ -26,16 +26,17 @@ export async function execute(input: Input, context: ExecutionContext): Promise<
   assertActive(context.signal);
   context.model.assertOutput(raw, schema);
   const output = raw as unknown as Output;
+  validateOutput(output, input);
   const artifacts: PendingArtifact[] = [];
   const check = output;
   const payload = {
     resultKind: 'findings',
-    findings: check.findings.map((message, index) => ({
+    findings: check.findings.map((finding, index) => ({
       findingId: `finding-${index + 1}`,
-      severity: check.blocking ? 'BLOCKER' : 'INFO',
-      criterionId: 'deterministic-check',
-      evidenceLocation: check.scope[0] ?? `workflow:${context.command.agentType}`,
-      message,
+      severity: finding.severity,
+      criterionId: finding.ruleId,
+      evidenceLocation: `${finding.sourcePath} -> ${finding.path}`,
+      message: `${finding.message}\nOriginal: ${finding.original}\nGenerated: ${finding.generated}`,
     })),
   };
   return { output, payload, artifacts };

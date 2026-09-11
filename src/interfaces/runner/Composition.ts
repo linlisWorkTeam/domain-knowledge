@@ -119,6 +119,7 @@ export function createComposition(input: {
   fixtureAssetRoot?: string;
   agentProviderMode?: 'fixture' | 'deepseek-harness' | 'company-codeagent-cli';
   runtimeDir?: string;
+  evaluationArtifactsDirectory?: string;
   clock?: () => string;
   providerSettingsStore?: ProviderSettingsStore;
   providerEndpointPolicy?: ProviderEndpointPolicy;
@@ -416,7 +417,7 @@ export function createComposition(input: {
         nodeByAgent: NODE_BY_AGENT,
         flywheel: flywheelApp,
         evalRunner: evalRunnerApp,
-        evaluator: new TrustedProjectEvaluator(artifacts),
+        evaluator: new TrustedProjectEvaluator(artifacts, input.evaluationArtifactsDirectory),
         contracts: new JsonSchemaAgentContractValidator(schemaRoot),
         ...(agent ? { agent } : {}),
         agentResolver: (runId) => {
@@ -449,7 +450,7 @@ export function createComposition(input: {
   };
   const agentExample = new AgentExampleService({
     tasks: new ConcurrentTasks(),
-    flywheel: flywheelApp, runConfiguration, evaluator: new TrustedProjectEvaluator(artifacts),
+    flywheel: flywheelApp, runConfiguration, evaluator: new TrustedProjectEvaluator(artifacts, input.evaluationArtifactsDirectory),
     contracts: new JsonSchemaAgentContractValidator(schemaRoot), observer: workflowObserver,
     nodeByAgent: NODE_BY_AGENT,
     configurePrompt: (role, addon) => { agents.updatePromptAddon(role, addon); },

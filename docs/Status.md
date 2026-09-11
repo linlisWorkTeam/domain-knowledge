@@ -5,13 +5,48 @@ SPDX-License-Identifier: MIT
 -->
 # 开发任务与当前进度
 
-更新日期：2026-09-10（北京时间）。代码基线：`a79b385`（已合入 PR #37、#40）。四阶段顺序和本会话分工由用户确认；任务验收状态依据现有代码及记录填写，尚未逐项复验。
+更新日期：2026-09-11（北京时间）。本轮开发基线：`c33787b`（已合入 DocGen/DocWorker 和站点失效断言清理）。四阶段顺序和本会话分工由用户确认；任务验收状态依据现有代码及记录填写，具体回归证据见文末。
 
 本文件统一维护当前任务、步骤、依赖、状态和证据索引。实现细节维护在所属模块设计，验收条件引用 [Verification](specs/totalRules/Verification.md)，历史记录见 [HistoryEpitaph](HistoryEpitaph.md)。旧 DEV-019 的 R0～R4 是历史计划，与下面的新四阶段不按编号对应，也不直接继承完成勾选。
 
+## PR #46 独立复审修复
+
+四项问题已按补充 Spec 分别修复并提交：`2ab6f14` / `acfd714` 外部用例监督及断言失败修复、`cb104f6` router 崩溃恢复、`0fb6188` cwd 绑定、`3029d7a` PR 差异格式。原复现已拒绝伪造的 3/3，通过真实 LangGraph 故障注入及 resume 验收。最后一次原生断言修复定向 32/32、全量 314/314、浏览器 14/14、独立完整 SDK 端到端 PASS/VERIFIED。下方旧结果保留为历史，本次完整证据以 [报告首节](reports/AgentSpecRepairAndE2E.md) 为准。
+
+交付检查必须运行 `git diff --check c33787b...HEAD` 覆盖整个 PR；干净工作区的无范围检查不能替代。
+
+## 2026-09-11 文档与实现同步
+
+以 PR base `c33787b` 到文档前 HEAD `e45dff4` 的实际代码差异为范围，核对七角色契约与材料、原生评测监督、cwd 绑定、路由恢复和停止交接。现有模块 Spec、Workflow/4+1 图、运行/开发指南及追踪矩阵已同步；清除 Check 空规则可通过、Review 契约待实现、旧输出计数评测和 C/C++ 配置未支持等失效描述。
+
+本次仅修改文档。Node 24 的 Spec 校验通过（17 schemas / 7 commands / 8 results / 52 p0），文档及架构契约 28/28 通过；本轮差异和整个 PR 格式检查通过。语义按生产代码、定向用例和保留日志核对，未重新运行模型、全量业务或浏览器测试。最后代码 `acfd714` 的 314/314、浏览器 14/14 和受控 SDK PASS 仍是之前的执行证据，不记作本次重跑。
+
+Worker 业务分组/预算/依赖、分批汇总、相似度研究、独立配置管理、资料清理、历史最优回退及 S3/S4 外部验收仍保留原目标和未完成状态。完整记录见 [报告](reports/AgentSpecRepairAndE2E.md)。
+
+## 历史：2026-09-11 第一轮强制约束清单
+
+下列各项先按对应 Spec 编写失败场景，再实现并验收；每项验收通过后单独提交。之前 266 项回归仅为历史证据，不关闭这些新增验收条件。
+
+| 编号 | 功能/缺陷 | 状态 |
+| --- | --- | --- |
+| AC-AGENT-101 | 测试入口与辅助文件区分 | 已验收：专用 2 项及角色 7 项通过，typecheck 通过 |
+| AC-AGENT-102 | 项目原生构建参数绑定 | 已验收：参数保留/不可绑定停止及测试修复复用 11 项通过，typecheck 通过 |
+| AC-AGENT-103 | 每个用例的执行及证据完整性 | 已验收：逐项/C/C++/伪记录/旧缓存及相关回归 33 项通过，typecheck、Spec 校验通过 |
+| AC-AGENT-104 | Worker 全通道材料授权 | 已验收：并发/重试/复用、CAS/提示词及工作区共 9 项通过，typecheck 通过 |
+| AC-AGENT-105 | 统一业务轮次上限 | 已验收：总轮次/质量分支/入口恢复及领域服务 7 项通过，typecheck 通过 |
+| AC-AGENT-106 | 所有人工停止分支的有效交接 | 已验收：四种停止交接及轮次回归 8 项通过，typecheck 通过 |
+
+六项均已按 Spec 验收并分别提交；代码 `9f34a85` 全量回归 292/292，独立保留产物 SDK 端到端 PASS/VERIFIED。详细记录见 [报告](reports/AgentSpecRepairAndE2E.md)。
+
+本轮处理六项复现缺陷；原有共享能力待办与用户明确延后事项继续在所属 Spec 保持未完成状态，不以本轮验收替代。
+
+## 历史：2026-09-10 Spec 修复与端到端证据
+
+代码 `4c5c580` 修复上一轮九项审查问题：绑定测试编译执行、完整重建、共享修订定位、比较规则与双侧证据、超时 Gate 引用、测试修复正文、模块选择和历史治理交接。验证为全量 266/266、UI 14/14、TypeScript 和 Spec 校验通过。独立完整 SDK 流程覆盖测试修复及两轮知识修订，最终 PASS/VERIFIED，所有中间产物保留在工作区。详细过程、产物索引和原有共享能力待办见 [修复与端到端报告](reports/AgentSpecRepairAndE2E.md)。模型响应受控，S3 外部模型及 S4 公司 CLI 业务验收状态不因此改变。
+
 ## 四阶段总览
 
-当前处于阶段 1、2：DDD 目录重整已有主要实现，继续收尾验收；单个 Agent 进入细化开发。**2026-09-10 本会话由用户负责阶段 2**，CodeAgent 设计已确认，TestGen 仍在确认；main 另已合入 DocGen 内部 Worker 实现，其他阶段负责人未指定。
+当前处于 S2 实现审阅阶段。DocGen/DocWorker 已合入；TestGen、Code、Check、Review、Orchestrator 已按顺序完成本轮契约和生产接线，等待本轮 PR 审阅。S3 外部真实模型和 S4 公司 CLI 业务验收仍单独开展。
 
 | 阶段 | 目标 | 状态 | 依赖与完成条件 |
 | --- | --- | --- | --- |
@@ -34,25 +69,25 @@ SPDX-License-Identifier: MIT
 
 ## S2：单个 Agent 细化开发（本会话）
 
-每个角色已有目录、Contract、Prompt、测试和样例，本阶段在其基础上核对业务缺口并细化。下表的“待开发”指细化任务尚未逐项启动记录，不表示角色从零开始。表格行序不是已确定的开发优先级。
+每个角色已有目录、Contract、Prompt、测试和样例，本阶段在其基础上核对业务缺口并细化。下表记录当前交付范围及仍保留的扩展目标；角色契约和受控验收与 S3 真实模型验收分开，不因本轮通过而取消延期目标。
 
 | 任务 | 角色 | 细化与验收重点 | 状态 | 当前证据 |
 | --- | --- | --- | --- | --- |
-| S2-01 | [Orchestrator](specs/domainFunction/agents/orchestratorAgent/OrchestratorAgent.md) | 计划输入、任务输出和失败处理；保持固定业务连接，不能由模型决定 Gate PASS | 开发中（设计已确认，待实现） | IO-17 已确认业务目标、模块概况、项目配置与进度输入，以及本轮任务计划输出；机器契约与执行接线待落实 |
-| S2-02 | [DocWorker](specs/domainFunction/agents/docGenAgent/subAgents/docWorkerAgent/DocWorkerAgent.md) | 源码分块、片段覆盖、来源引用及材料不足处理 | 开发中 | PR #40 已实现 DocGen 内部 Worker；业务细化与本阶段验收待补 |
+| S2-01 | [Orchestrator](specs/domainFunction/agents/orchestratorAgent/OrchestratorAgent.md) | 计划输入、任务输出和失败处理；保持固定业务连接，不能由模型决定 Gate PASS | 待审阅（本轮已实现） | IO-17 已实现当前模块五类任务、轮次及材料范围校验；见 Orchestrator 角色测试和完整流程回归 |
+| S2-02 | [DocWorker](specs/domainFunction/agents/docGenAgent/subAgents/docWorkerAgent/DocWorkerAgent.md) | 源码分块、片段覆盖、来源引用及材料不足处理 | 待审阅（当前范围已验收） | 内部 Worker、覆盖/证据路径、未解决问题交接、裁剪 CAS/Prompt/工作区及并发重试复用已有角色与 WorkerMaterialBoundary 回归；业务分组、预算和跨模块依赖继续延期 |
 | S2-03 | [DocGen](specs/domainFunction/agents/docGenAgent/DocGenAgent.md) | 单文档汇总、拆分提案、旧版与 Correction 定向修订、描述索引 | 待验收（最小链路开发完成） | 已完成 Worker 汇总交接、单文档与章节范围校验、拆分提案及显式答复、YAML/关键词/版本索引；定向与独立入口证据见本轮开发记录。IO-08 预算分组、IO-10 分批汇总仍按原 Spec 待细化，S3 真实模型验收后续进行 |
-| S2-04 | [TestGen](specs/domainFunction/agents/testGenAgent/TestGenAgent.md) | 确认输入与测试预期依据，再细化测试候选、oracle 声明和门禁接线 | 开发中（设计确认） | S2-04.a 的源码输入及不读取知识卡片已确认；IO-11 已确认测试源码、用例清单及执行分工，IO-12 暂时保留原始源码校验测试，IO-13 已确认源代码不变时复用已有测试，IO-21 已确认首次候选失败的有限修复与人工兜底，具体接线待实现，见 [TestGen 设计](specs/domainFunction/agents/testGenAgent/TestGenAgent.md)；尚未修改实现，验收待补 |
-| S2-05 | [CodeAgent](specs/domainFunction/agents/codeAgent/CodeAgent.md) | 知识卡片包含接口，项目配置提供 C/C++ 必要约束；本轮白名单与隔离限制读取，框架校验源码列表并落盘 | 开发中（设计已确认，待实现） | IO-03～06 已确认，见 [CodeAgent 设计](specs/domainFunction/agents/codeAgent/CodeAgent.md)；KF-SYS-044、045 为 Planned，代码未改，验收待补 |
-| S2-06 | [Check](specs/domainFunction/agents/checkAgent/CheckAgent.md) | 检查输入、判据、findings 可追溯性及只读边界 | 开发中（设计确认） | IO-14 已确认原始源码、生成代码及比较规则三项输入；IO-15 已确认输出比较结果及差异依据交后续 Review；规则与算法待论文调研，尚未修改实现 |
-| S2-07 | [Review](specs/domainFunction/agents/reviewAgent/ReviewAgent.md) | 评测证据、Check findings 接入与归因、Correction 及无须修订时的输出 | 开发中（设计确认） | IO-15 已确认联合读取比较结果与测试结果；IO-16 已确认修订意见列表交 DocGen 修改，无意见时空列表；当前未完整接入两项契约，验收待补 |
+| S2-04 | [TestGen](specs/domainFunction/agents/testGenAgent/TestGenAgent.md) | 确认输入与测试预期依据，再细化测试候选、oracle 声明和门禁接线 | 待审阅（本轮已实现） | IO-11～13、21 已实现 C/C++ 测试文件、参考校验、源码内容绑定复用及有限修复；见 TestGenExecution 和完整流程回归 |
+| S2-05 | [CodeAgent](specs/domainFunction/agents/codeAgent/CodeAgent.md) | 知识卡片包含接口，项目配置提供 C/C++ 必要约束；本轮白名单与隔离限制读取，框架校验源码列表并落盘 | 待审阅（本轮已实现） | IO-03～06 已实现知识与配置裁剪、空仓库读取视图、C/C++ 输出校验；KF-SYS-044 仍保留独立配置管理的 Partial 范围 |
+| S2-06 | [Check](specs/domainFunction/agents/checkAgent/CheckAgent.md) | 检查输入、判据、findings 可追溯性及只读边界 | 待审阅（本轮已实现） | IO-14、15 已实现源码/生成代码/规则输入及结构化差异报告；相似度算法继续延期 |
+| S2-07 | [Review](specs/domainFunction/agents/reviewAgent/ReviewAgent.md) | 评测证据、Check findings 接入与归因、Correction 及无须修订时的输出 | 待审阅（本轮已实现） | IO-15、16 已实现两类报告输入、多条修订意见和可信证据绑定；STOPPED 精简 CAS 交接及幂等事件已验收，完整治理展示与资料清理仍待开发 |
 
 每个角色依次执行下面四步，用任务号加后缀单独跟踪，例如 `S2-03.a`。启动角色任务时在本节追加该角色的步骤状态和证据，不为每个角色另建任务文档。
 
-S2-03 / S2-07 补充确认 [Knowledge IO-19](specs/domainFunction/knowledge/Knowledge.md)：运行期间保留单文档飞轮过程资料；达标后保留最终文档与验收记录，替换现用文档时保留上一版；需要人工治理时由 Review 提炼问题、Application 组织精简清单，后台暂存相关证据，治理完成后再按结果清理。用户已明确达标且最终文档及验收记录保存成功后立即清理中间资料，不设置一周或其他额外保留期；自动清理与治理材料交接尚未实现，未执行实际资料删除。
+S2-03 / S2-07 补充确认 [Knowledge IO-19](specs/domainFunction/knowledge/Knowledge.md)：运行期间保留单文档飞轮过程资料；达标后保留最终文档与验收记录，替换现用文档时保留上一版；需要人工治理时由 Review 提炼问题、Application 组织精简清单，后台暂存相关证据，治理完成后再按结果清理。用户已明确达标且最终文档及验收记录保存成功后立即清理中间资料，不设置一周或其他额外保留期；治理材料交接已由 AC-AGENT-106 四类停止回归验收；自动清理仍未实现，本次按用户要求完整保留证据，未执行实际资料删除。
 
-飞轮结束条件补充确认 [Evaluation IO-20](specs/domainFunction/evaluation/Evaluation.md)：文档达到验收标准后立即结束本次飞轮，不追加轮次追求更高分。达标自动结束并交付、最大轮次未达标或预算耗尽转人工治理属于既有设计，用户本轮重申后已移除重复待确认标记；历史最佳及关键回归回滚同样已有目标要求。具体评分和阈值细节待细化，自动回退等实现缺口及达标后不再派发下一轮的验收待补。
+飞轮结束条件补充确认 [Evaluation IO-20](specs/domainFunction/evaluation/Evaluation.md)：文档达到验收标准后立即结束本次飞轮，不追加轮次追求更高分。达标自动结束并交付、最大轮次未达标或预算耗尽转人工治理属于既有设计，用户本轮重申后已移除重复待确认标记；历史最佳及关键回归回滚同样已有目标要求。具体评分和阈值细节待细化，自动回退、成本及停滞策略仍有实现缺口；达标后不再派发下一轮和总轮次上限已由受控 SDK 及轮次回归验证。
 
-S2-04 补充确认 [TestGen IO-21](specs/domainFunction/agents/testGenAgent/TestGenAgent.md)：首次生成的候选测试在原始源码上校验失败时交 TestGen 有限修复，仍失败再转人工，仅作为异常兜底；正常通过不进入修复分支，不改变源码不变时已有测试不变的规则。原则已确认，错误分类、修复材料与重试配置待实现，尚未执行代码改动或行为验收。
+S2-04 的首次候选有限修复、源码不变复用和环境故障不修复已实现；默认一次修复，最多可配三次，验证证据见文末。
 
 S2-03 补充确认 [DocGen IO-22](specs/domainFunction/agents/docGenAgent/DocGenAgent.md)：DocGen 生成标题、摘要和关键词，框架写入 YAML 头并建立渐进式加载索引，不新增 Agent。本分支已实现 body、title、description、keywords，YAML 写入、版本描述索引及按授权列表渐进加载；见下方本轮开发证据。
 
@@ -65,16 +100,16 @@ S2-03 补充确认 [DocGen IO-22](specs/domainFunction/agents/docGenAgent/DocGen
 | c | 更新独立样例和有行为判定的测试 | 覆盖正常结果、材料不足、非法输出、执行失败和适用权限边界；按 AC-SCHEMA-001 及角色相关验收场景核对 |
 | d | 运行独立入口及相关回归，审查业务输出并记录证据 | 使用 [AgentDevelopment](AgentDevelopment.md) 的统一入口，记录版本、命令、结果及工件；区分 Fixture 与真实模型，完成后交给 S3 |
 
-当前正在逐项确认七角色输入输出：保留七个 Agent 已确认，五个业务阶段描述多 Agent 协作效果；S2-04.a 的 TestGen 输入已确认是源代码，不读取知识卡片；IO-11 已确认输出 C/C++ 测试源码和用例清单，交后续执行器运行；IO-12 暂时保留先在原始源码上校验生成测试的流程，IO-13 已确认源代码不变时测试用例不变；首次候选失败按 IO-21 有限修复、仍失败转人工，相关实现待落实。S2-05.a 的目标已确认并写入设计，尚未开始实现；不是 CodeAgent 已验收。共享取消、重试、契约测试可复用，不要求七份重复测试。单角色入口结果为 `NOT_EVALUATED`，不自动执行 LangGraph、评测或发布，不能作为 S3 完整端到端通过证据。
+七角色本轮输入输出与生产接线已实现，具体边界见各角色设计和文末验证。单角色入口继续返回 NOT_EVALUATED；外部真实模型质量验收属于 S3，不能用受控输出代替。
 
 ### S2-05 当前步骤
 
 | 步骤 | 当前进度 | 交付与后续验收 |
 | --- | --- | --- |
 | S2-05.a | 设计已确认并落稿 | [CodeAgent](specs/domainFunction/agents/codeAgent/CodeAgent.md)、[Application](specs/application/Application.md)、[Workspace](specs/domainFunction/workspace/Workspace.md) 定义输入、项目配置、读写范围和输出；TestGen 输入不在本次结论内 |
-| S2-05.b | 待开发 | 调整角色契约、Prompt、Schema 与材料加载；移除独立接口输入及授权，按项目/场景裁剪配置并冻结，按本轮权限准备工作区和落盘 |
-| S2-05.c | 待开发 | 补 C/C++ 样例和配置切换、材料隔离、输出拒绝场景，覆盖 AC-CODE-001、002、AC-CONFIG-001、AC-SEC-001；机器字段与兼容策略随实现明确 |
-| S2-05.d | 待开发 | 执行相关回归及受控隔离验证，保存版本、命令、结果和工件；本服务器真实调用交 S3，公司 CLI 真实隔离交 S4，不能用旧 TypeScript 样例替代 |
+| S2-05.b | 已实现 | Code 仅获得 knowledgeRef 和 projectConfigurationRef，原始接口/源码不进入 Prompt 或角色工作区 |
+| S2-05.c | 已实现 | C/C++ 配置、路径与材料隔离回归，真实 g++ / gcc 执行覆盖，见文末 |
+| S2-05.d | 本地回归完成，待真实业务验收 | DSH SDK 受控请求与完整 C++ 飞轮回归；外部真实模型、公司 CLI 分别交 S3 / S4 |
 
 ## S3：本服务器端到端测试
 
@@ -108,11 +143,11 @@ S2-03 补充确认 [DocGen IO-22](specs/domainFunction/agents/docGenAgent/DocGen
 
 ## 当前实现与能力边界
 
-### CI 文档改动触发范围
+### CI 文档改动触发范围（当前规则与历史验证）
 
-基于 `f11362f` 在 `chore/ci-trigger-policy` 调整 CI：只修改根目录 Markdown 或 `docs/` 下 Markdown 的 PR 跳过自动运行；代码、配置、Schema 和混合改动继续触发，保留手动运行入口。Node 24.13.0 工作树 bootstrap 为 READY；YAML 解析与路径场景检查通过（3 个纯文档场景跳过，6 个代码/配置/Schema/混合场景保留），相关文档契约测试 5 项通过，`npm run validate:specs` 与 `git diff --check` 通过。未重跑完整业务及浏览器测试，GitHub 事件过滤的线上验证待配置合入后的新 PR；下方已知 Site 基线失败未在本任务修复。
+基于 `f11362f` 在 `chore/ci-trigger-policy` 调整 CI：只修改根目录 Markdown 或 `docs/` 下 Markdown 的 PR 跳过自动运行；代码、配置、Schema 和混合改动继续触发，保留手动运行入口。Node 24.13.0 工作树 bootstrap 为 READY；YAML 解析与路径场景检查通过（3 个纯文档场景跳过，6 个代码/配置/Schema/混合场景保留），相关文档契约测试 5 项通过，`npm run validate:specs` 与 `git diff --check` 通过。未重跑完整业务及浏览器测试，GitHub 事件过滤的线上验证待配置合入后的新 PR；该段记录当时验证；旧 Site 基线问题随后已处理，当前检查结果以本文首节为准。
 
-### DocGen 最小链路验证与暂定方案
+### 历史：DocGen 最小链路验证与暂定方案
 
 2026-09-10，用户要求 DocGen 汇总的上下文控制先保留暂定设计、保证最小链路可运行，待论文调研后再定。[IO-10](specs/domainFunction/agents/docGenAgent/DocGenAgent.md) 保留分批汇总和按需补充方向，不标记最终确认；IO-07～09 已确认归属、拆分原则及 Worker 输出内容，目标实现仍待推进。
 
@@ -132,7 +167,7 @@ npm run agent:run -- --role doc-gen --input src/domain/agents/docGenAgent/exampl
 | 跨角色流程 | Domain 定义业务连接，LangGraph 只调度外层角色；DocGen 内部 Worker 使用独立 Registry 提交与有界并发 | 旧 roleExecutionVersion 拒绝恢复；不开放动态拓扑编辑 |
 | Domain 组织 | 按领域功能平级组织，已移除 services 目录和总导出 | 共享实体仍位于 Domain.ts |
 | 模型接入 | DSH 原生 SDK、受控 Fixture、OpenCode Go 环境配置已实现 | 公司 CLI 真实协议未验收 |
-| 评测与发布 | 可信场景执行、确定性 Gate、幂等发布和审计已实现 | TestGen 候选 oracle 晋升、C++ 插件和敌对代码沙箱未实现 |
+| 评测与发布 | 候选参考校验、同源固定测试、外部逐入口监督、确定性 Gate、幂等发布和审计已实现 | 通用 oracle 质量扩展、C++ 插件、完整敌对代码沙箱和自动历史最优回退未实现 |
 | 查询与关联 | 现有查询、血缘、Diff、来源和关联领域能力 | SearchAgent 直接检索链仍为 Planned |
 | 资源模块 | SourceScan、Workspace、legacyOkf 已归入 Domain | 保留既有文件系统、Git 和 YAML 依赖 |
 | 文档组织 | 设计集中 docs/specs，按代码模块重写；4+1 视图集中一份 | 旧规范目录、独立 security 章节与重复任务模板已移除 |
@@ -193,3 +228,16 @@ S2-03 当前最小链路开发完成。IO-08 的分组预算、IO-10 的分批�
 ### 站点失效断言清理（2026-09-10）
 
 按用户要求移除 Site.test.ts 中资源文件名必须全小写、设计文档必须包含全部主题十六进制色值的断言。继续保留资源存在性/摘要/格式、实际主题色、切换行为、可读性及其他站点检查。CI 工作流未关闭。Node 24.13.0 下 site:check 12 项通过、validate:specs 通过，完整 npm test 241 项全部通过，消除了此前记录的两项站点失败。
+
+### 后续五角色开发
+
+用户授权按顺序完成 TestGen、Code、Check、Review、Orchestrator，每个独立功能验证后提交，全部完成统一 PR。实现范围为已确认契约和生产交接；DocGen/DocWorker 分组预算、Check 相似度算法等既有调研项不在本轮确定。
+
+
+本轮功能提交：85f5b82（TestGen）、727f420（Code）、8961290（Check）、f18811e（Review）、e954652（Orchestrator）。集成收尾补充 C++ 两轮飞轮、原生 DSH SDK 受控 HTTP 接线、编译失败/崩溃的零计数失败记录、跨 Run 固定测试集与中断恢复。
+
+新增回归覆盖：源码测试首次通过不修复、断言或编译失败有限修复、耗尽停止、环境故障与缺失执行文件不修复、配置/测试路径变化复用、同 Run 重入、gcc C 与 g++ C++ 实际执行。零测试且没有失败证据的结果不能进入通过判定。Check 原始报告和测评报告同时交给 Review，多条意见绑定可信输入并进入 DocGen 单文档修订。
+
+外部模型的真实业务质量、公司 CLI 访问、DocWorker 语义分组/预算、Check 相似度算法、完整治理与资料清理仍未在本轮验收。
+
+本轮最终本地证据（Node 24.13.0，代码提交 40742d6）：`npm test` 256/256 通过；`npm run test:ui` 最终整轮 14/14 通过；`npm run typecheck`、`npm run validate:specs`（17 schemas / 7 commands / 8 results / 52 P0）、`git diff --check` 通过。最后补充的契约/架构检查 13/13 通过，原生编译及计数检查 11/11 通过。浏览器首轮 Sources 刷新按钮可点击等待超时，单项重跑与最终完整重跑均通过，未修改或删除该测试。远端 CI 以本轮 PR checks 为准。

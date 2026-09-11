@@ -160,6 +160,12 @@
       "metadataLocation": "file-header"
     },
     {
+      "path": "docs/reports/AgentSpecRepairAndE2E.md",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "记录 Spec 缺口修复和保留产物的端到端报告。",
+      "metadataLocation": "file-header"
+    },
+    {
       "path": "docs/specs/README.md",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "设计规范目录。",
@@ -880,6 +886,12 @@
       "metadataLocation": "file-header"
     },
     {
+      "path": "src/domain/agents/docGenAgent/subAgents/docWorkerAgent/WorkerMaterials.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "从父级材料提取 Worker 获准读取的文件，拒绝隐式传递其他正文。",
+      "metadataLocation": "file-header"
+    },
+    {
       "path": "src/domain/agents/docGenAgent/subAgents/docWorkerAgent/examples/DocWorkerAgentSample.json",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "保存DocWorker角色样例的结构化配置、样例或元数据。",
@@ -944,6 +956,12 @@
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "保存Review角色样例的结构化配置、样例或元数据。",
       "metadataLocation": "catalog"
+    },
+    {
+      "path": "src/domain/agents/testGenAgent/TestExecutionPlan.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "将生成测试清单绑定到受信原生编译与运行。",
+      "metadataLocation": "file-header"
     },
     {
       "path": "src/domain/agents/testGenAgent/TestGenAgent.test.ts",
@@ -1015,6 +1033,12 @@
       "path": "src/domain/workflow/FlywheelDomainService.ts",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "定义FlywheelDomain服务的领域数据与确定性业务规则。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/domain/workflow/IterationBudget.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "统一零基轮次与包含首轮的总轮次预算。",
       "metadataLocation": "file-header"
     },
     {
@@ -1105,6 +1129,18 @@
       "path": "src/infrastructure/agentAdapters/scenario/Scenario.ts",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "提供Scenario的基础设施实现与外部系统接入。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/infrastructure/evaluation/project/CaseRunner.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "生成独立用例驱动程序并核对逐用例完成记录。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/infrastructure/evaluation/project/NativeCaseSupervisor.c",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "在被测地址空间之外监督一个 Linux x86_64 用例入口与返回，独立 FD 3 写结果。",
       "metadataLocation": "file-header"
     },
     {
@@ -1240,6 +1276,12 @@
       "metadataLocation": "file-header"
     },
     {
+      "path": "tests/acceptance/AgentRevisionFlow.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "保留完整 SDK 测试修复和知识修订端到端产物。",
+      "metadataLocation": "file-header"
+    },
+    {
       "path": "tests/acceptance/AutomatedLanggraphFlow.test.ts",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "验证AutomatedLanggraphFlow的行为、约束及失败场景。",
@@ -1306,6 +1348,12 @@
       "metadataLocation": "catalog"
     },
     {
+      "path": "tests/helpers/AgentScenario.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "用受控角色响应驱动真实 LangGraph 和 C++ 测评以验收边界。",
+      "metadataLocation": "file-header"
+    },
+    {
       "path": "tests/helpers/Fixture.ts",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "维护夹具相关的项目配置与工程说明。",
@@ -1327,6 +1375,12 @@
       "path": "tests/integration/AgentExamples.test.ts",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "验证角色Examples的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/integration/AgentSpecRegression.test.mjs",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验证九项 Agent Spec 缺口的修复。",
       "metadataLocation": "file-header"
     },
     {
@@ -1414,6 +1468,12 @@
       "metadataLocation": "file-header"
     },
     {
+      "path": "tests/integration/NativeCaseSupervisor.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验收外部原生监督器，不让被测进程伪造其他入口或函数返回。",
+      "metadataLocation": "file-header"
+    },
+    {
       "path": "tests/integration/OpencodeGoConfig.test.ts",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "验证OpencodeGoConfig的行为、约束及失败场景。",
@@ -1459,6 +1519,48 @@
       "path": "tests/integration/SqliteCas.test.ts",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "验证SqliteCas的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/integration/StoppedHandoff.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验收 AC-AGENT-106 所有人工停止路径的持久交接与幂等。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/integration/TestBuildBinding.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验收 AC-AGENT-102 项目编译参数保留及不可绑定配置的人工停止。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/integration/TestCaseExecution.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验收 AC-AGENT-103 固定清单逐用例执行，拒绝汇总冒充或提前退出。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/integration/TestEntryContract.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验收 AC-AGENT-101 的测试入口与辅助文件契约。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/integration/WorkerMaterialBoundary.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验收 AC-AGENT-104 的 Worker 提示词、CAS 和真实工作区权限。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/integration/WorkflowIterationLimit.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验收 AC-AGENT-105 的总轮次上限、质量分支与恢复入口。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/integration/WorkflowRouterReplay.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验收 Registry 已提交而 LangGraph 尚未保存路由时的故障恢复。",
       "metadataLocation": "file-header"
     },
     {

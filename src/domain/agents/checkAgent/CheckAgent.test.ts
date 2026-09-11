@@ -38,3 +38,13 @@ test('check: cancellation before and during model execution cannot return succes
   await assert.rejects(execute(during.input, during.context), /AGENT_CANCELLED/);
   assert.deepEqual(during.phases, []);
 });
+
+test('check: differences require actual generated evidence and configured rules', async () => {
+  for (const change of [{ ruleId: 'invented-score' }, { generated: 'not in code' }, { path: '../escape' }]) {
+    const sample = roleExample<Input>('check');
+    Object.assign(sample.output.findings[0], change);
+    await assert.rejects(execute(sample.input, sample.context), /CHECK_EVIDENCE_INVALID/);
+  }
+  const sample = roleExample<Input>('check'); sample.output.blocking = false;
+  await assert.rejects(execute(sample.input, sample.context), /CHECK_BLOCKING_INCONSISTENT/);
+});

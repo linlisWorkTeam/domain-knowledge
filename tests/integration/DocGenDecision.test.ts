@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { createTestComposition, GENERIC_SCENARIO } from '../helpers/Fixture.ts';
-import { roleExample } from '../helpers/RoleExample.ts';
+import { orchestratorOutput } from '../helpers/CppScenario.ts';
 import { ProjectWorkflowStages } from '../../src/application/services/AutomatedProjectWorkflow.ts';
 import { NODE_BY_AGENT } from '../../src/domain/workflow/AgentDefinitions.ts';
 import { candidateDestination, workflowDestination } from '../../src/domain/workflow/Workflow.ts';
@@ -28,7 +28,7 @@ test('DocGen proposal stops before candidate creation and exposes its saved reas
       contracts: new JsonSchemaAgentContractValidator('docs/specs/schemas'),
       modelFactory: ({ command }) => ({ assertOutput: assertModelOutput, execute: async () => {
         calls.push(command.agentType);
-        return command.agentType === 'orchestrator' ? roleExample('orchestrator').output : proposal;
+        return command.agentType === 'orchestrator' ? orchestratorOutput(GENERIC_SCENARIO.moduleId) : proposal;
       } }),
     });
     const run = c.service.createRun(GENERIC_SCENARIO.moduleId, 'decision-test');
@@ -75,7 +75,7 @@ test('candidate ingestion and route feedback assess the same serialized DocGen d
       evaluator: new TrustedProjectEvaluator(c.artifacts), nodeByAgent: NODE_BY_AGENT,
       contracts: new JsonSchemaAgentContractValidator('docs/specs/schemas'),
       modelFactory: ({ command }) => ({ assertOutput: assertModelOutput,
-        execute: async () => command.agentType === 'orchestrator' ? roleExample('orchestrator').output : document }),
+        execute: async () => command.agentType === 'orchestrator' ? orchestratorOutput(GENERIC_SCENARIO.moduleId) : document }),
     });
     const run = c.service.createRun(GENERIC_SCENARIO.moduleId, 'consistency-test');
     const stage: WorkflowStageInput = { runId: run.runId, nodeId: 'orchestrator', agentId: 'orchestrator',
