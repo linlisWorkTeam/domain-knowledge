@@ -13,7 +13,7 @@ export interface Payload {
   languageId: string; testPolicyRef: ArtifactRef; allowedTestPaths: string[];
   previousCandidateRef?: ArtifactRef; validationFailureRef?: ArtifactRef;
 }
-export const TEST_CASE_PROTOCOL = 'native-cases-v1';
+export const TEST_CASE_PROTOCOL = 'native-cases-v2-supervised';
 export type Input = RoleInput<Payload>;
 /** 用例与生成文件、源码依据一一建立可审计关系。 */
 export interface Output {

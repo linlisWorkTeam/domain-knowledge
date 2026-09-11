@@ -381,7 +381,7 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
     let output = cached ? (await this.readJson<{ output: TestOutput }>(cached)).output : await this.readAgentOutput<TestOutput>(candidateRef, 'test-gen', roleStage);
     for (let repairs = 0; ; repairs++) {
       const checked = await this.flywheel.executeNode({ runId: input.runId, nodeId: 'oracle_validation',
-        generationKey: `${input.runId}:oracle_validation:${input.iteration}:${repairs}:${sha256(JSON.stringify(output))}:${fixedSuiteRef?.sha256 ?? 'candidate'}:tests-v2`, inputRefs: [fixedSuiteRef ?? candidateRef, snapshot.manifestRef] }, async () => {
+        generationKey: `${input.runId}:oracle_validation:${input.iteration}:${repairs}:${sha256(JSON.stringify(output))}:${fixedSuiteRef?.sha256 ?? 'candidate'}:tests-v3`, inputRefs: [fixedSuiteRef ?? candidateRef, snapshot.manifestRef] }, async () => {
         const evaluation = await this.evaluator.evaluate({ label: `test-reference-${input.iteration}-${repairs}`, snapshot,
           generatedFiles: output.files, prepareCommands: scenario.prepareCommands, commands: scenario.referenceCommands, testSuite: output }, input.signal);
         return [evaluation.evidenceRef];
@@ -774,7 +774,7 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
   }
 
   private agentGenerationKey(input: WorkflowStageInput, agentId: AgentId): string {
-    return `${input.runId}:${input.nodeId}:${input.iteration}:${input.workerId ?? 'main'}:contract-v7`;
+    return `${input.runId}:${input.nodeId}:${input.iteration}:${input.workerId ?? 'main'}:contract-v8`;
   }
 
   private agentInputRefs(input: WorkflowStageInput, agentId: AgentId): ArtifactRef[] {

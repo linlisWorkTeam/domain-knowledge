@@ -20,7 +20,7 @@ for (const role of AGENT_IDS) test(`standalone ${role} sample commits through th
     assert.equal(saved.result.agentType, role);
     assert.equal(saved.result.status, 'SUCCEEDED');
     assert.equal(saved.configuration.provider.kind, 'fixture');
-    assert.equal(saved.configuration.roleExecutionVersion, 'domain-agents-v7-case-execution');
+    assert.equal(saved.configuration.roleExecutionVersion, 'domain-agents-v8-supervised-routing');
     assert.equal(saved.publication, 'NOT_EVALUATED');
     assert.ok(saved.outputs.length >= 1);
     const audit = readFileSync(join(result.outputDirectory, 'audit.json'), 'utf8');

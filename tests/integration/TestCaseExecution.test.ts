@@ -22,7 +22,7 @@ for (const kind of ['complete','legacy-counts','early-exit','missing-entry','fai
     const result=await evaluator.evaluate({label:`case-${kind}`,snapshot,generatedFiles:suite.files,testSuite:suite,prepareCommands:[],commands:f.scenario.referenceCommands});
     assert.equal(result.passed,kind==='complete');
     const evidence=JSON.parse(Buffer.from(await c.artifacts.get(result.evidenceRef)).toString());
-    assert.equal(evidence.caseExecution.version,'native-cases-v1');
+    assert.equal(evidence.caseExecution.version,'native-cases-v2-supervised');
     assert.deepEqual(evidence.caseExecution.cases,manifest);
     assert.ok(evidence.caseExecution.manifestSha256);
     if(kind==='complete') {
@@ -30,7 +30,7 @@ for (const kind of ['complete','legacy-counts','early-exit','missing-entry','fai
       assert.equal(evidence.caseExecution.records.length,6);
       assert.deepEqual(new Set(evidence.caseExecution.records.map((r:any)=>r.caseId)),new Set(manifest.map(c=>c.caseId)));
     }
-    if(kind==='early-exit') assert.ok(evidence.caseExecution.failures.some((f:string)=>f.includes('missing')));
+    if(kind==='early-exit') assert.ok(evidence.caseExecution.failures.some((f:string)=>f.includes('EXIT_BEFORE_RETURN')));
     if(kind==='failure') assert.equal(evidence.caseExecution.records.length,3,'runner must call remaining cases after an ordinary failure return');
   }finally{f.cleanup();c.dispose();}
 });
@@ -51,15 +51,13 @@ test('AC-AGENT-103: native C runner executes separate entries with helper header
   }finally{f.cleanup();c.dispose();}
 });
 
-import { readCaseRecords } from '../../src/infrastructure/evaluation/project/CaseRunner.ts';
-for (const fault of ['duplicate','unknown','nonce','missing'] as const) test(`AC-AGENT-103: ${fault} completion record is rejected`,()=>{
-  const lines=manifest.map(c=>`WP_CASE abc123 ${c.caseId} PASS`);
-  if(fault==='duplicate') lines.push(lines[0]!);
-  if(fault==='unknown') lines.push('WP_CASE abc123 invented PASS');
-  if(fault==='nonce') lines[1]='WP_CASE def456 case-2 PASS';
-  if(fault==='missing') lines.pop();
-  assert.equal(readCaseRecords(lines.join('\n'),manifest,'abc123').complete,false);
-});
+import { readSupervisedReturn } from '../../src/infrastructure/evaluation/project/CaseRunner.ts';
+for (const channel of ['', '{}', '{"entered":false,"returned":true,"value":0,"reason":"RETURNED"}',
+  '{"entered":true,"returned":true,"value":0,"reason":"RETURNED"}\n{"entered":true,"returned":true,"value":0,"reason":"RETURNED"}']) {
+  test('AC-AGENT-103-R1: missing, invalid or duplicate supervision channel fails closed',()=>{
+    assert.equal(readSupervisedReturn(channel).returned,false);
+  });
+}
 
 import { agentScenario } from '../helpers/AgentScenario.ts';
 import { cppTestOutput } from '../helpers/CppScenario.ts';

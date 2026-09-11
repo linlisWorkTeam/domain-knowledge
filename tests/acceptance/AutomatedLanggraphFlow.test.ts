@@ -128,12 +128,12 @@ test(`generic ${moduleId} scenario runs all LangGraph nodes and independent test
     assert.equal(projections.some((projection) => projection.nodeId === 'publication' && projection.status === 'COMPLETED'), true);
     assert.equal(composition.repository.listEvents(handle.runId).at(-1)?.eventType, 'WorkflowNodeStateChanged');
     const resultCheckpoints = [
-      [`${handle.runId}:orchestrator:1:main:contract-v7`, 'orchestrator'],
-      [`${handle.runId}:doc_gen:1:main:contract-v7`, 'doc-gen'],
-      [`${handle.runId}:test_gen:1:main:contract-v7`, 'test-gen'],
-      [`${handle.runId}:code:1:main:contract-v7`, 'code'],
-      [`${handle.runId}:check:1:main:contract-v7`, 'check'],
-      [`${handle.runId}:review:1:main:contract-v7`, 'review'],
+      [`${handle.runId}:orchestrator:1:main:contract-v8`, 'orchestrator'],
+      [`${handle.runId}:doc_gen:1:main:contract-v8`, 'doc-gen'],
+      [`${handle.runId}:test_gen:1:main:contract-v8`, 'test-gen'],
+      [`${handle.runId}:code:1:main:contract-v8`, 'code'],
+      [`${handle.runId}:check:1:main:contract-v8`, 'check'],
+      [`${handle.runId}:review:1:main:contract-v8`, 'review'],
     ] as const;
     for (const [generationKey, agentType] of resultCheckpoints) {
       const resultRef = composition.repository.getCheckpoint(generationKey)?.outputRefs[0];
@@ -146,12 +146,12 @@ test(`generic ${moduleId} scenario runs all LangGraph nodes and independent test
       assert.equal(envelope.agentType, agentType);
       assert.equal(envelope.status, 'SUCCEEDED');
     }
-    const docRef = composition.repository.getCheckpoint(`${handle.runId}:doc_gen:1:main:contract-v7`)!.outputRefs[0]!;
+    const docRef = composition.repository.getCheckpoint(`${handle.runId}:doc_gen:1:main:contract-v8`)!.outputRefs[0]!;
     const docResult = JSON.parse(Buffer.from(await composition.artifacts.get(docRef)).toString('utf8'));
     assert.equal(docResult.payload.workerResultRefs.length, 1);
     const workerResult = JSON.parse(Buffer.from(await composition.artifacts.get(docResult.payload.workerResultRefs[0])).toString('utf8'));
     assert.equal(workerResult.agentType, 'doc-worker');
-    const firstDocRef = composition.repository.getCheckpoint(`${handle.runId}:doc_gen:0:main:contract-v7`)!.outputRefs[0]!;
+    const firstDocRef = composition.repository.getCheckpoint(`${handle.runId}:doc_gen:0:main:contract-v8`)!.outputRefs[0]!;
     const firstDocResult = JSON.parse(Buffer.from(await composition.artifacts.get(firstDocRef)).toString('utf8'));
     assert.deepEqual(docResult.payload.workerResultRefs, firstDocResult.payload.workerResultRefs, 'revision reuses committed source fragments');
     assert.ok(projections.some((projection) => projection.nodeId === 'doc_gen/doc_worker:worker-1'));
@@ -172,8 +172,8 @@ test(`generic ${moduleId} scenario runs all LangGraph nodes and independent test
     assert.ok(gateJson.some((item) => item.label === 'test-reference-1-0' && item.passed === true));
     const finalInputIds = new Set(finalGate?.report.inputRefs.map((ref) => ref.artifactId));
     for (const [generationKey, outputIndex] of [
-      [`${handle.runId}:check:1:main:contract-v7`, 0],
-      [`${handle.runId}:review:1:main:contract-v7`, 0],
+      [`${handle.runId}:check:1:main:contract-v8`, 0],
+      [`${handle.runId}:review:1:main:contract-v8`, 0],
     ] as const) {
       const outputRef = composition.repository.getCheckpoint(generationKey)?.outputRefs[outputIndex];
       assert.ok(outputRef, `checkpoint output missing: ${generationKey}`);

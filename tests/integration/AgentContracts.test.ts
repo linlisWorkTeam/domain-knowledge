@@ -90,7 +90,7 @@ test('command validation runs before checkpoint dispatch and provider invocation
 test('AgentResult binding rejects cross-Run and wrong-command reuse', () => {
   const command: AgentCommand = {
     schemaVersion: '1.0', commandId: 'command-1', runId: 'run-1',
-    agentType: 'code', generationKey: 'run-1:code:0:main:contract-v7',
+    agentType: 'code', generationKey: 'run-1:code:0:main:contract-v8',
     payload: {
       knowledgeRef: artifactRef, publicInterfaceRefs: [artifactRef], languageId: 'typescript',
       buildContractRef: artifactRef, allowedGeneratedPaths: ['src/out.ts'],

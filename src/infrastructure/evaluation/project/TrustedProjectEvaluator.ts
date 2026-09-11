@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：提供Trusted项目Evaluator的基础设施实现与外部系统接入。
  */
-import { createHash, randomBytes } from 'node:crypto';
-import { caseRunner, readCaseRecords, type CaseRecord } from './CaseRunner.ts';
+import { createHash } from 'node:crypto';
+import { caseRunner, readSupervisedReturn, type CaseRecord } from './CaseRunner.ts';
 import { hasExecutableCases, TEST_CASE_PROTOCOL } from '../../../domain/agents/testGenAgent/TestGenAgentContract.ts';
 import { commandPath, nativeTestBindings, type NativeTestBinding } from '../../../domain/agents/testGenAgent/TestExecutionPlan.ts';
 import { spawn, spawnSync } from 'node:child_process';
@@ -21,6 +21,7 @@ import type {
 } from '../../../application/ports/ApplicationPorts.ts';
 
 interface ResolvedTool {
+  supervised?: boolean;
   /** 提供executable信息，供调用方读取或传入。 */
   executable: string;
   /** 提供prefixArgs信息，供调用方读取或传入。 */
@@ -30,6 +31,7 @@ interface ResolvedTool {
 }
 
 interface CapturedProcess {
+  supervision?: string;
   /** 提供exitCode信息，供调用方读取或传入。 */
   exitCode: number | null;
   /** 提供timedOut信息，供调用方读取或传入。 */
@@ -231,7 +233,12 @@ async function capture(
       shell: false,
       windowsHide: true,
       detached: process.platform !== 'win32',
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: ['ignore', 'pipe', 'pipe', ...(tool.supervised ? ['pipe' as const] : [])],
+    });
+    let supervision = '';
+    if (tool.supervised) child.stdio[3]?.on('data', (chunk: Buffer) => {
+      supervision += chunk.toString('utf8');
+      if (supervision.length > 4096) terminateProcessTree(child.pid);
     });
     let stdout: Buffer<ArrayBufferLike> = Buffer.alloc(0);
     let stderr: Buffer<ArrayBufferLike> = Buffer.alloc(0);
@@ -245,11 +252,11 @@ async function capture(
       if (chunk.byteLength > remaining) outputLimitExceeded = true;
       return remaining > 0 ? Buffer.concat([current, chunk.subarray(0, remaining)]) : current;
     };
-    child.stdout.on('data', (chunk: Buffer) => {
+    child.stdout!.on('data', (chunk: Buffer) => {
       stdout = append(stdout, chunk);
       if (outputLimitExceeded) terminateProcessTree(child.pid);
     });
-    child.stderr.on('data', (chunk: Buffer) => {
+    child.stderr!.on('data', (chunk: Buffer) => {
       stderr = append(stderr, chunk);
       if (outputLimitExceeded) terminateProcessTree(child.pid);
     });
@@ -279,6 +286,7 @@ async function capture(
         return;
       }
       resolvePromise({
+        supervision,
         exitCode: exitCode ?? (terminationSignal ? 128 + constants.signals[terminationSignal] : null),
         timedOut,
         outputLimitExceeded,
@@ -386,9 +394,11 @@ export class TrustedProjectEvaluator implements ProjectEvaluator {
     const generatedFileDigests: Record<string, string> = {};
     let bindings: NativeTestBinding[] = [];
     const commands = input.commands.map(command => ({ ...command, args: [...command.args] }));
-    const caseExecution = input.testSuite ? { version: TEST_CASE_PROTOCOL, nonce: randomBytes(24).toString('hex'),
+    const caseExecution = input.testSuite ? { version: TEST_CASE_PROTOCOL,
       manifestSha256: digest(JSON.stringify(input.testSuite.cases)), cases: input.testSuite.cases,
-      records: [] as (CaseRecord & { commandIndex: number; attempt: number })[], failures: [] as string[] } : undefined;
+      records: [] as (CaseRecord & { commandIndex: number; attempt: number; process: CapturedProcess })[], failures: [] as string[] } : undefined;
+    let supervisor = '';
+    let supervisorDigest = '';
     try {
       if (input.testSuite) {
         try {
@@ -396,6 +406,14 @@ export class TrustedProjectEvaluator implements ProjectEvaluator {
           for (const file of input.testSuite.files) if (!input.generatedFiles.some(g => g.path === file.path && g.content === file.content))
             throw new Error('TEST_CASE_SOURCE_BINDING_INVALID');
           bindings = nativeTestBindings(commands, input.testSuite);
+          if (process.platform !== 'linux' || process.arch !== 'x64') throw new Error('SUPERVISOR_PLATFORM_UNSUPPORTED');
+          const source = readFileSync(new URL('./NativeCaseSupervisor.c', import.meta.url));
+          const sourcePath = join(tempRoot, 'NativeCaseSupervisor.c');
+          supervisor = join(tempRoot, 'NativeCaseSupervisor');
+          writeFileSync(sourcePath, source);
+          syncText('gcc', ['-std=c17', '-O2', sourcePath, '-o', supervisor], tempRoot);
+          supervisorDigest = digest(source);
+
         }
         catch (error) {
           const evidence = { label: input.label, commit: input.snapshot.commit, passed: false,
@@ -432,15 +450,17 @@ export class TrustedProjectEvaluator implements ProjectEvaluator {
         const runnerPath = `.flywheel/CaseRunner-${binding.compileIndex}.${compiler.tool === 'gcc' ? 'c' : 'cpp'}`;
         assertNoSymlink(workspace, runnerPath);
         mkdirSync(dirname(pathInside(workspace, runnerPath)), { recursive: true });
-        const runner = caseRunner(input.testSuite!.cases.filter(c => binding.testPaths.includes(c.testPath)), caseExecution!.nonce);
+        const runner = caseRunner(input.testSuite!.cases.filter(c => binding.testPaths.includes(c.testPath)));
         writeFileSync(pathInside(workspace, runnerPath), runner);
         generatedFileDigests[runnerPath] = digest(runner);
         // 文件在受信临时目录内；绝对路径保证项目 cwd 不改变 runner 的位置。
         compiler.args.push(pathInside(workspace, runnerPath));
       }
       const declaredTools = new Set([...input.prepareCommands, ...input.commands].map((command) => command.tool));
+      if (supervisor) declaredTools.add('gcc');
       const toolchain: Record<string, string> = {
         platform: `${process.platform}-${process.arch}`,
+        ...(supervisorDigest ? { supervisor: supervisorDigest } : {}),
         node: process.version,
         git: syncText('git', ['--version'], workspace),
         tar: syncText('tar', ['--version'], workspace).split('\n')[0],
@@ -486,28 +506,53 @@ export class TrustedProjectEvaluator implements ProjectEvaluator {
           tool = { executable: pathInside(workspace, executable), prefixArgs: [] };
           args = args.slice(1);
         } else tool = resolveTool(command.tool, phase === 'prepare');
-        const captured = await capture(
-          tool, args, commandCwd,
-          timeoutMs, maxOutputBytes,
-          redactionRoots, tempRoot, signal,
-        ).catch((error: NodeJS.ErrnoException): CapturedProcess => {
-          if (!['ENOENT', 'EACCES'].includes(error.code ?? '')) throw error;
-          return { exitCode: null, timedOut: false, outputLimitExceeded: false, durationMs: 0,
-            stdout: '', stderr: `PROJECT_EXECUTABLE_UNAVAILABLE: ${error.code}` };
-        });
         const commandIndex = commands.indexOf(command);
         const binding = phase === 'gate' ? bindings.find(b => b.runIndices.includes(commandIndex)) : undefined;
-        const completion = binding ? readCaseRecords(captured.stdout,
-          input.testSuite!.cases.filter(c => binding.testPaths.includes(c.testPath)), caseExecution!.nonce) : undefined;
-        if (completion) {
-          caseExecution!.records.push(...completion.records.map(record => ({ ...record, commandIndex, attempt })));
-          caseExecution!.failures.push(...completion.failures.map(failure => `${commandIndex}:${attempt}: ${failure}`));
+        let captured: CapturedProcess;
+        let counts: {passed: number; total: number; parsed: boolean};
+        if (binding) {
+          const cases = input.testSuite!.cases.filter(c => binding.testPaths.includes(c.testPath));
+          let symbols: string[] = [];
+          let symbolFailure = 'SUPERVISOR_ENTRY_SYMBOL_MISSING';
+          try { symbols = syncText('nm', ['--defined-only', '-C', '-P', tool.executable], commandCwd, true).split('\n'); }
+          catch { symbolFailure = 'SUPERVISOR_SYMBOL_TOOL_UNAVAILABLE'; }
+          const deadline = Date.now() + timeoutMs;
+          captured = { exitCode: 0, timedOut: false, outputLimitExceeded: false, durationMs: 0, stdout: '', stderr: '' };
+          counts = { passed: 0, total: cases.length, parsed: true };
+          for (const [index, item] of cases.entries()) {
+            const symbol = symbols.find(line => line.startsWith(`${item.entryPoint} T `) || line.startsWith(`${item.entryPoint}() T `));
+            let observed: CapturedProcess;
+            if (!symbol) observed = {exitCode: null, timedOut: false, outputLimitExceeded: false, durationMs: 0,
+              stdout: '', stderr: symbolFailure};
+            else observed = await capture({ executable: supervisor, prefixArgs: [], supervised: true },
+              [tool.executable, symbol.split(' ')[2]!, String(index), ...args], commandCwd,
+              Math.max(1, deadline - Date.now()), Math.max(1, maxOutputBytes - Buffer.byteLength(captured.stdout + captured.stderr)),
+              redactionRoots, tempRoot, signal);
+            const completion = readSupervisedReturn(observed.supervision ?? '');
+            const passed = observed.exitCode === 0 && !observed.timedOut && !observed.outputLimitExceeded
+              && completion.returned && completion.value === 0;
+            caseExecution!.records.push({ ...completion, caseId: item.caseId, status: passed ? 'PASS' : 'FAIL', commandIndex, attempt, process: observed });
+            if (passed) counts.passed++;
+            else caseExecution!.failures.push(`${commandIndex}:${attempt}:${item.caseId}: ${completion.reason}`);
+            const unavailable = completion.reason.startsWith('SUPERVISOR_') || completion.reason === 'DENIED_SYSCALL';
+            if (unavailable || observed.exitCode === null) captured.exitCode = null;
+            else if (!passed && captured.exitCode !== null) captured.exitCode = 1;
+            captured.timedOut ||= observed.timedOut;
+            captured.outputLimitExceeded ||= observed.outputLimitExceeded;
+            captured.durationMs += observed.durationMs;
+            captured.stdout += observed.stdout;
+            captured.stderr += observed.stderr;
+          }
+        } else {
+          captured = await capture(tool, args, commandCwd, timeoutMs, maxOutputBytes, redactionRoots, tempRoot, signal)
+            .catch((error: NodeJS.ErrnoException): CapturedProcess => {
+              if (!['ENOENT', 'EACCES'].includes(error.code ?? '')) throw error;
+              return { exitCode: null, timedOut: false, outputLimitExceeded: false, durationMs: 0,
+                stdout: '', stderr: `PROJECT_EXECUTABLE_UNAVAILABLE: ${error.code}` };
+            });
+          counts = command.purpose === 'test' ? parseTestCounts(`${captured.stdout}\n${captured.stderr}`)
+            : {passed: 0, total: 0, parsed: false};
         }
-        const counts = completion ? { passed: completion.passed,
-          total: input.testSuite!.cases.filter(c => binding!.testPaths.includes(c.testPath)).length, parsed: completion.complete }
-          : command.purpose === 'test'
-          ? parseTestCounts(`${captured.stdout}\n${captured.stderr}`)
-          : { passed: 0, total: 0, parsed: false };
         return {
           phase, tool: command.tool, purpose: command.purpose,
           args: redactArgs(command.args, redactionRoots), cwd: command.cwd ?? '.', attempt,
