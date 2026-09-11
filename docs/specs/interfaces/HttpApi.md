@@ -143,7 +143,7 @@ PENDING、Git 关闭、Git 冲突及认证失败使用可定位的错误码。AP
 
 ### 五阶段一键执行
 
-- `POST /api/v1/workbench-pipelines {snapshotId, scopes?, materialIds?}`：冻结生成输入并创建或复用knowledge-pipeline-v14协调记录，返回`{pipeline}`，202或已成功时200。
+- `POST /api/v1/workbench-pipelines {snapshotId, scopes?, materialIds?}`：冻结生成输入并创建或复用knowledge-pipeline-v15协调记录，返回`{pipeline}`，202或已成功时200。
 - `GET /api/v1/workbench-pipelines`：读取协调记录列表；`GET /api/v1/workbench-pipelines/:id`返回`pipeline`、当前阶段及历史轮次去重后的`tasks`、累计`usage`及`publicationVerified:false`。
 - `POST /api/v1/workbench-pipelines/:id/cancel {}`：取消协调和当前子任务；`POST .../resume {inputDigest}`只恢复同契约输入，累计子任务用量不重置。契约/输入冲突为409，不存在为404。
 - 所有入口使用现有匿名部署授权策略，无新增登录。旧契约可读，不能跨契约恢复。逐阶段状态、证据和下载继续复用stage-tasks接口。
@@ -164,7 +164,7 @@ v4 流程详情返回 `iterations` 与 `activeTaskId`，每轮包含冻结卡片
 v5 在已有生成结果存在时，冻结同源码快照内当前后代卡片版本；修订集合进入流程身份。详情 `initialVersionIds` 表示替代原生成版本的冻结集合，首次索引和重建均使用它。重复启动未变输入复用任务；恢复不读取新头。跨源码快照或无有效血缘分别返回409 `PIPELINE_CARD_SNAPSHOT_CHANGED` / `PIPELINE_CARD_LINEAGE_CHANGED`。v4及更早仅可读。
 
 
-当前修订执行使用 knowledge-revision-v5，流程使用 knowledge-pipeline-v14；v4及更早修订、v13及更早流程只读。Review 材料包含固定参考和生成代码，DocGen 只接收已标准化且绑定当前任务/原输出的纠正意见。前端风险状态仍不允许以未知归因或质量拒绝推进。
+当前修订执行使用 knowledge-revision-v5，流程使用 knowledge-pipeline-v15；v4及更早修订、v14及更早流程只读。Review 材料包含固定参考和生成代码，DocGen 只接收已标准化且绑定当前任务/原输出的纠正意见。前端风险状态仍不允许以未知归因或质量拒绝推进。
 
 修订源码复核拒绝以 `UNRESOLVED` 结果保留 `REVISION_SOURCE_REVIEW_REJECTED` 和 `draftRef`；不产生新版本，不刷新该草稿索引。成功版本 metadata 绑定 `sourceReviewResultRef`，仍不表示发布门禁已通过。
 
@@ -193,3 +193,5 @@ v5 在已有生成结果存在时，冻结同源码快照内当前后代卡片�
 ## 工作台本地发布事务
 
 `/api/v1/workbench-publications` 与旧 publications 独立，沿用免登录部署配置。POST 仅接受 reconstructionTaskId、evaluationTaskId、fixedEvaluationTaskId、sourceVerificationTaskId 四个非空任务编号；固定用例从选定任务的冻结输入读取，所有证据仍由完整发布准备门禁验证。GET 支持 projectId/versionId 筛选。GET `/:id` 返回 publication、publicationVerified 和 filesAvailable；只有 COMMITTED 表示已验证，文件可用性单独报告。POST `/:id/resume` 接受空对象，恢复同一发布事务。GET `/:id/artifacts/:sha256` 仅下载该发布文件清单中的已校验 CAS 工件。服务关闭拒绝新发布/恢复，并等待已接受的准备、导出、提交完成后关闭数据库。
+
+一键流程v15在关联完成后，若已冻结固定用例，则用最后一轮重建/可信/固定/来源任务调用独立发布事务。提交成功保存publicationId；导出失败暂停并保留前序阶段，恢复重用同一发布身份。detail返回publication与按冻结版本校验的publicationVerified。未提供固定用例的流程保留未验证状态，不能显示已发布。

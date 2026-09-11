@@ -439,7 +439,7 @@ export function createComposition(input: {
     files: new LocalWorkbenchPublicationFiles(join(runtimeDir, 'publications'), artifacts),
     evidence: new WorkbenchPublicationEvidence({ stages: workbenchStages, repository, artifacts, projects: projectStore,
       tests: nativeTestStore, contracts: workbenchReconstruction.dependencies.roles.dependencies.contracts }) });
-  const workbenchPipelines = new WorkbenchPipelines({ artifacts, fixedEvaluation: workbenchFixedEvaluation, materials: workbenchMaterials.store, environment: async (snapshotId, signal) => {
+  const workbenchPipelines = new WorkbenchPipelines({ publications: workbenchPublications, artifacts, fixedEvaluation: workbenchFixedEvaluation, materials: workbenchMaterials.store, environment: async (snapshotId, signal) => {
     const project = projectStore.get(snapshotId); if (!project) throw new Error('PROJECT_INPUT_NOT_FOUND');
     const fingerprints = [];
     for (const language of [...new Set(project.modules.map((module) => module.language))].sort()) {

@@ -213,3 +213,5 @@ Domain返回的联合证据凭据只表示记录交叉校验通过；Application
 ### 本地发布事务
 
 Application先完成当前发布准备，再冻结卡片Markdown/YAML、准备证据和文件清单到CAS。Domain由这些引用生成独立workbench-publication-v1身份，SQLite原子写PREPARED及审计，Infrastructure向专属临时目录导出并校验全部文件，再原子改名为发布目录，最后SQLite置COMMITTED。仅COMMITTED记录授予本次冻结版本VERIFIED；不重写原知识正文、旧门禁或旧Flywheel runId。崩溃、导出失败时保留PREPARED和错误，恢复只重放相同CAS工件。重复提交与重复恢复不新增发布或提交事件。导出路径只由受限的发布ID及稳定cardId组成，不接受任意宿主路径。
+
+一键执行契约 knowledge-pipeline-v15 增加 publicationId，旧v14及以前只读且不跨契约恢复。固定用例流程在五阶段成功后提交同一独立发布用例，固定子任务suiteRefs必须与流程冻结输入完全一致。Domain校验提交状态、项目、最后迭代完整版本集合和发布身份；PREPARED、缺固定用例、旧流程或其他版本不得投影为已验证。没有固定用例仍可保留五阶段产物，但 publicationVerified=false。发布事务成功后保存流程publicationId；返回丢失时恢复调用相同用例复用内容身份，不重跑成功阶段。

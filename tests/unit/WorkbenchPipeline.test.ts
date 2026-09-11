@@ -6,7 +6,9 @@
 import test from 'node:test';
 import { sourceInput, sourceResult } from '../helpers/WorkbenchSourceFixture.ts';
 import assert from 'node:assert/strict';
-import { pipelineFixedFailure, pipelineStageFailure, pipelineStagnant, pipelineSourceFailure, pipelineSourceStagnant } from '../../src/domain/services/workbench/WorkbenchPipeline.ts';
+import { createPublication } from '../../src/domain/services/workbench/WorkbenchPublicationRecord.ts';
+import { createArtifactRef } from '../../src/domain/Domain.ts';
+import { assertPipelinePublication, createPipeline, pipelineFixedFailure, pipelineStageFailure, pipelineStagnant, pipelineSourceFailure, pipelineSourceStagnant } from '../../src/domain/services/workbench/WorkbenchPipeline.ts';
 import { createStageTask, type WorkbenchStage, type StageResult } from '../../src/domain/services/workbench/StageTask.ts';
 test('pipeline advancement requires successful artifacts and behavior, not just task completion', () => {
   const task = (stage: WorkbenchStage, summary: StageResult['summary']) => ({ ...createStageTask({ projectId: 'p', stage, sourceRevision: 'r', sourceDigest: 's', configurationDigest: 'c', cardVersionIds: [], parameters: {} }, {}, 'now'), status: 'SUCCEEDED' as const, result: { artifactRefs: [], summary } });
@@ -57,4 +59,21 @@ test('fixed pipeline gate checks full module counts, oracle success and reconstr
   assert.equal(pipelineFixedFailure(task, 'code'), 'PIPELINE_FIXED_FAILED');
   task.result.summary.modules = [];
   assert.equal(pipelineFixedFailure(task, 'code'), 'PIPELINE_FIXED_RESULT_INVALID');
+});
+
+test('publication projection rejects uncommitted, other-version and old-contract records', () => {
+  const ref = createArtifactRef(Buffer.from('evidence'), 'application/json');
+  const input = { projectId: 'project', stage: 'GENERATE' as const, sourceRevision: 'r', sourceDigest: 's', configurationDigest: 'c', cardVersionIds: [], parameters: {} };
+  const pipeline = createPipeline(input, 'now', 'environment', [], undefined, [{ moduleId: 'module', suiteRef: ref }]);
+  const task = createStageTask({ ...input, cardVersionIds: ['v1'] }, {}, 'now');
+  pipeline.iterations = [{ number: 1, versionIds: ['v1'], reconstruction: task, evaluation: task, fixedEvaluation: task, sourceVerification: task }];
+  const record = createPublication({ projectId: 'project', versionIds: ['v1'], preparationRef: ref, files: [{ path: 'manifest.json', ref }] }, 'now');
+  assert.throws(() => assertPipelinePublication(pipeline, record), /PIPELINE_PUBLICATION_BINDING_INVALID/);
+  const committed = { ...record, status: 'COMMITTED' as const };
+  assert.doesNotThrow(() => assertPipelinePublication(pipeline, committed));
+  assert.throws(() => assertPipelinePublication({ ...pipeline, contractVersion: 'knowledge-pipeline-v14' }, committed), /PIPELINE_PUBLICATION_BINDING_INVALID/);
+  assert.throws(() => assertPipelinePublication({ ...pipeline, publicationId: 'different' }, committed), /PIPELINE_PUBLICATION_BINDING_INVALID/);
+  assert.throws(() => assertPipelinePublication({ ...pipeline, fixedSuites: [] }, committed), /PIPELINE_PUBLICATION_BINDING_INVALID/);
+  const other = { ...createPublication({ projectId: 'project', versionIds: ['v2'], preparationRef: ref, files: [{ path: 'manifest.json', ref }] }, 'now'), status: 'COMMITTED' as const };
+  assert.throws(() => assertPipelinePublication(pipeline, other), /PIPELINE_PUBLICATION_BINDING_INVALID/);
 });

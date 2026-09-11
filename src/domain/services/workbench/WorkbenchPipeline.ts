@@ -3,16 +3,18 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：定义五阶段协调记录和确定性推进条件。
  */
+import { assertPublicationRecord, type PublicationRecord } from './WorkbenchPublicationRecord.ts';
 import { SOURCE_VERIFICATION_CONTRACT, sourceVerificationOutcome, type SourceCardResult } from '../knowledge/KnowledgeSourceVerification.ts';
 import { SOURCE_REVISION_CONTRACT } from '../knowledge/SourceRevision.ts';
 import { sha256, type ArtifactRef } from '../../Domain.ts';
 import { FIXED_EVALUATION_CONTRACT } from '../evaluation/NativeFixedEvaluation.ts';
 import { canonicalJson, createStageTask, type StageInput, type StageTask, type StageStatus, type WorkbenchStage } from './StageTask.ts';
-export const PIPELINE_CONTRACT = 'knowledge-pipeline-v14';
+export const PIPELINE_CONTRACT = 'knowledge-pipeline-v15';
 export interface IterationProgress { failed: string[]; total: number; passed: number }
 export interface PipelineIteration { number: number; versionIds: string[]; reconstruction?: StageTask; evaluation?: StageTask; fixedEvaluation?: StageTask; revision?: StageTask; progress?: IterationProgress; sourceVerification?: StageTask; sourceRepairs?: string[] }
 export interface PipelineFixedSuite { moduleId: string; suiteRef: ArtifactRef }
 export interface WorkbenchPipeline {
+  publicationId?: string;
   fixedSuites?: PipelineFixedSuite[];
   iterations?: PipelineIteration[]; activeTaskId?: string; initialVersionIds?: string[];
   pipelineId: string; materialIds: string[]; environmentDigest: string; contractVersion: string; inputDigest: string;
@@ -118,4 +120,14 @@ export function pipelineSourceStagnant(iterations: PipelineIteration[]): boolean
     for (const key of round.sourceRepairs) seen.add(key);
   }
   return unchanged >= 3;
+}
+
+export function assertPipelinePublication(pipeline: WorkbenchPipeline, publication: PublicationRecord): void {
+  assertPublicationRecord(publication);
+  const round = pipeline.iterations?.at(-1);
+  if (pipeline.contractVersion !== PIPELINE_CONTRACT || !pipeline.fixedSuites?.length || !round
+    || !round.reconstruction || !round.evaluation || !round.fixedEvaluation || !round.sourceVerification
+    || publication.status !== 'COMMITTED' || publication.projectId !== round.reconstruction.input.projectId
+    || canonicalJson([...publication.versionIds].sort()) !== canonicalJson([...round.versionIds].sort())
+    || (pipeline.publicationId && pipeline.publicationId !== publication.publicationId)) throw new Error('PIPELINE_PUBLICATION_BINDING_INVALID');
 }

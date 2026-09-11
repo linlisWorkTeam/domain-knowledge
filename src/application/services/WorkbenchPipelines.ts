@@ -3,10 +3,11 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：通过独立持久化协调记录串联现有五阶段用例。
  */
+import type { WorkbenchPublications } from './WorkbenchPublications.ts';
 import type { ArtifactStore } from '../ports/ApplicationPorts.ts';
 import type { WorkbenchFixedEvaluation, FixedModuleSuite } from './WorkbenchFixedEvaluation.ts';
 import type { PipelineFixedSuite } from '../../domain/services/workbench/WorkbenchPipeline.ts';
-import { PIPELINE_CONTRACT, createPipeline, pipelineFixedFailure, pipelineStageFailure, pipelineRevisionFailure, pipelineStagnant, pipelineSourceFailure, pipelineSourceRepairs, pipelineSourceStagnant, type WorkbenchPipeline, type PipelineIteration } from '../../domain/services/workbench/WorkbenchPipeline.ts';
+import { PIPELINE_CONTRACT, assertPipelinePublication, createPipeline, pipelineFixedFailure, pipelineStageFailure, pipelineRevisionFailure, pipelineStagnant, pipelineSourceFailure, pipelineSourceRepairs, pipelineSourceStagnant, type WorkbenchPipeline, type PipelineIteration } from '../../domain/services/workbench/WorkbenchPipeline.ts';
 import { WORKBENCH_STAGES, canonicalJson, createStageTask, type StageInput, type StageTask, type WorkbenchStage } from '../../domain/services/workbench/StageTask.ts';
 import type { ExternalMaterialStore } from '../ports/ExternalMaterialPorts.ts';
 import type { WorkbenchPipelineStore } from '../ports/WorkbenchPipelinePorts.ts';
@@ -20,7 +21,7 @@ import type { WorkbenchEvaluation } from './WorkbenchEvaluation.ts';
 import type { KnowledgeIndexService } from './KnowledgeIndex.ts';
 import type { WorkbenchAssociations } from './WorkbenchAssociations.ts';
 export class WorkbenchPipelines {
-  readonly dependencies: { artifacts?: Pick<ArtifactStore, 'put' | 'get' | 'verify'>; fixedEvaluation?: Pick<WorkbenchFixedEvaluation, 'prepare'>; materials: Pick<ExternalMaterialStore, 'get'>; environment(snapshotId: string, signal?: AbortSignal): Promise<string>; store: WorkbenchPipelineStore; stages: WorkbenchStages; generation: Pick<WorkbenchGeneration, 'prepare'>;
+  readonly dependencies: { publications?: Pick<WorkbenchPublications, 'publishFromTasks' | 'get'>; artifacts?: Pick<ArtifactStore, 'put' | 'get' | 'verify'>; fixedEvaluation?: Pick<WorkbenchFixedEvaluation, 'prepare'>; materials: Pick<ExternalMaterialStore, 'get'>; environment(snapshotId: string, signal?: AbortSignal): Promise<string>; store: WorkbenchPipelineStore; stages: WorkbenchStages; generation: Pick<WorkbenchGeneration, 'prepare'>;
     reconstruction: Pick<WorkbenchReconstruction, 'prepare'>; evaluation: Pick<WorkbenchEvaluation, 'prepare'> & Partial<Pick<WorkbenchEvaluation, 'progress'>>; revision?: Pick<WorkbenchKnowledgeRevision, 'prepare'>; sourceVerification?: Pick<WorkbenchSourceVerification, 'prepare'>; sourceRevision?: Pick<WorkbenchSourceRevision, 'prepare'>; index: Pick<KnowledgeIndexService, 'prepare'> & Partial<Pick<KnowledgeIndexService, 'currentVersions'>>; associations: Pick<WorkbenchAssociations, 'prepare'> };
   private readonly pending = new Map<string, Promise<void>>();
   private readonly controllers = new Map<string, AbortController>();
@@ -33,7 +34,11 @@ export class WorkbenchPipelines {
     const references = [...WORKBENCH_STAGES.flatMap(stage => pipeline.children[stage] ? [pipeline.children[stage]!] : []),
       ...(pipeline.iterations ?? []).flatMap(round => [round.reconstruction, round.evaluation, round.fixedEvaluation, round.revision, round.sourceVerification].filter((task): task is StageTask => Boolean(task)))];
     const tasks = [...new Map(references.map(child => [child.taskId, this.dependencies.stages.store.get(child.taskId) ?? child])).values()];
-    return { pipeline, tasks, checkpoints: Object.fromEntries(tasks.map((task) => [task.taskId, this.dependencies.stages.store.checkpoints(task.taskId)])), publicationVerified: false,
+    let publication = null;
+    if (pipeline.publicationId && this.dependencies.publications) {
+      publication = this.dependencies.publications.get(pipeline.publicationId); assertPipelinePublication(pipeline, publication);
+    }
+    return { pipeline, tasks, publication, checkpoints: Object.fromEntries(tasks.map((task) => [task.taskId, this.dependencies.stages.store.checkpoints(task.taskId)])), publicationVerified: publication?.status === 'COMMITTED',
       usage: tasks.reduce((sum, task) => ({ modelCalls: sum.modelCalls + task.usage.modelCalls, tokens: sum.tokens + task.usage.tokens,
         reservedTokens: sum.reservedTokens + task.usage.reservedTokens, elapsedMs: sum.elapsedMs + task.usage.elapsedMs }), { modelCalls: 0, tokens: 0, reservedTokens: 0, elapsedMs: 0 }) };
   }
@@ -209,6 +214,18 @@ export class WorkbenchPipelines {
         const task = await execute(value.children.ASSOCIATE); const reason = pipelineStageFailure(task);
         if (reason) { stop(task, reason); return; }
         value.completed.push('ASSOCIATE'); store.save(value, lease.leaseId);
+      }
+      if (value.fixedSuites?.length) {
+        check(); const publications = this.dependencies.publications;
+        if (!publications) throw new Error('PIPELINE_PUBLICATION_REQUIRED');
+        const round = value.iterations.at(-1)!;
+        if (!round.reconstruction || !round.evaluation || !round.fixedEvaluation || !round.sourceVerification) throw new Error('PIPELINE_PUBLICATION_INPUT_INVALID');
+        const frozenRefs = Object.fromEntries(value.fixedSuites.map(item => [item.moduleId, item.suiteRef]));
+        if (canonicalJson(round.fixedEvaluation.input.parameters.suiteRefs) !== canonicalJson(frozenRefs)) throw new Error('PIPELINE_FIXED_INPUT_CHANGED');
+        const publication = await publications.publishFromTasks({ reconstruction: round.reconstruction.taskId, evaluation: round.evaluation.taskId,
+          fixedEvaluation: round.fixedEvaluation.taskId, sourceVerification: round.sourceVerification.taskId });
+        assertPipelinePublication(value, publication); value.publicationId = publication.publicationId;
+        check(); store.save(value, lease.leaseId);
       }
       value.status = 'SUCCEEDED'; value.reasonCode = null; store.save(value, lease.leaseId, true);
     } catch (error) {

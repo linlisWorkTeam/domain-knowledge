@@ -38,8 +38,8 @@ for (const [path, digest] of Object.entries(target.files)) if (sha256(git('show'
 const reportPath = resolve(args.get('--report')!); mkdirSync(dirname(reportPath), { recursive: true });
 const composition = createComposition({ runtimeDir: resolve(args.get('--runtime')!) });
 const controller = new AbortController(); let active: string | null = null; let activePipeline: string | null = null;
-const report: { schemaVersion: string; mode: string; pipeline?: WorkbenchPipeline; target: string; commit: string; startedAt: string; tasks: StageTask[]; outcome: string; published: false; errorCode?: string } = {
-  schemaVersion: 'native-workbench-acceptance-v3', mode, target: target.name, commit: target.commit, startedAt: new Date().toISOString(), tasks: [], outcome: 'RUNNING', published: false,
+const report: { schemaVersion: string; mode: string; pipeline?: WorkbenchPipeline; target: string; commit: string; startedAt: string; tasks: StageTask[]; outcome: string; published: boolean; publicationId?: string; errorCode?: string } = {
+  schemaVersion: 'native-workbench-acceptance-v4', mode, target: target.name, commit: target.commit, startedAt: new Date().toISOString(), tasks: [], outcome: 'RUNNING', published: false,
 };
 const save = () => { writeFileSync(`${reportPath}.tmp`, `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 }); renameSync(`${reportPath}.tmp`, reportPath); };
 const cancel = () => { if (activePipeline) composition.apps.workbenchPipelines.cancel(activePipeline); if (active) composition.apps.workbenchStages.cancel(active); controller.abort(new Error('NATIVE_ACCEPTANCE_CANCELLED')); };
@@ -84,7 +84,10 @@ try {
       if (!round?.fixedEvaluation || !round.reconstruction) throw new Error('NATIVE_ACCEPTANCE_FIXED_RESULT_MISSING');
       const fixedReason = pipelineFixedFailure(composition.apps.workbenchStages.get(round.fixedEvaluation.taskId), round.reconstruction.taskId);
       if (fixedReason) throw new Error(fixedReason);
-      report.outcome = 'FIXED_BEHAVIOR_AND_SOURCE_PASSED_PUBLICATION_PENDING';
+      if (!final.publicationId || !app.detail(final.pipelineId).publicationVerified) throw new Error('NATIVE_ACCEPTANCE_PUBLICATION_REQUIRED');
+      const publication = await composition.apps.workbenchPublications.detail(final.publicationId);
+      if (!publication.publicationVerified || !publication.filesAvailable) throw new Error('NATIVE_ACCEPTANCE_PUBLICATION_UNAVAILABLE');
+      report.publicationId = final.publicationId; report.published = true; report.outcome = 'VERIFIED_PUBLISHED';
     } finally { clearInterval(timer); activePipeline = null; }
   } else {
   if (args.has('--resume-task')) {
@@ -108,7 +111,11 @@ try {
     const reason = pipelineSourceFailure(source);
     if (reason) throw new Error(reason);
     await wait(composition.apps.workbenchStages.start(composition.apps.workbenchAssociations.prepare(versionIds, materialIds)));
-    report.outcome = 'FIXED_BEHAVIOR_AND_SOURCE_PASSED_PUBLICATION_PENDING';
+    const publication = await composition.apps.workbenchPublications.publishFromTasks({ reconstruction: reconstructed.taskId,
+      evaluation: evaluated.taskId, fixedEvaluation: fixed.taskId, sourceVerification: source.taskId });
+    const detail = await composition.apps.workbenchPublications.detail(publication.publicationId);
+    if (!detail.publicationVerified || !detail.filesAvailable) throw new Error('NATIVE_ACCEPTANCE_PUBLICATION_UNAVAILABLE');
+    report.publicationId = publication.publicationId; report.published = true; report.outcome = 'VERIFIED_PUBLISHED';
   }
   }
 } catch (error) {
