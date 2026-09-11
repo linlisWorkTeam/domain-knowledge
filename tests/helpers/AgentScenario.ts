@@ -13,9 +13,10 @@ import { createDomainKnowledgeInfrastructure } from '../../src/infrastructure/la
 import { NODE_BY_AGENT } from '../../src/domain/workflow/AgentDefinitions.ts';
 import type { WorkflowStageInput } from '../../src/application/ports/ApplicationPorts.ts';
 
-export async function agentScenario(options: { qualityFailure?: boolean; testFailure?: boolean } = {}) {
+export async function agentScenario(options: { qualityFailure?: boolean; testFailure?: boolean; proposal?: boolean } = {}) {
   const c = createTestComposition(), f = cppScenario();
   const calls: {role:string;iteration:number;prompt:string}[] = [];
+  const routes: WorkflowStageInput[] = [];
   const stages = new ProjectWorkflowStages({ flywheel:c.service, evalRunner:c.apps.evalRunner,
     evaluator:new TrustedProjectEvaluator(c.artifacts),nodeByAgent:NODE_BY_AGENT,
     contracts:new JsonSchemaAgentContractValidator('docs/specs/schemas'),
@@ -24,7 +25,7 @@ export async function agentScenario(options: { qualityFailure?: boolean; testFai
       switch(command.agentType){
         case 'orchestrator':return orchestratorOutput(f.scenario.moduleId,stage.iteration);
         case 'test-gen':return cppTestOutput(options.testFailure ? 3 : 4);
-        case 'doc-gen':return {title:'Module knowledge',description:'Precise public behavior',keywords:['module'],
+        case 'doc-gen':if(options.proposal) return {splitProposal:{reason:'Two independent topics require a scope decision',suggestedDocuments:['API contract','Internal flow']}};return {title:'Module knowledge',description:'Precise public behavior',keywords:['module'],
           body:options.qualityFailure ? 'Short unsupported statement. '.repeat(9) : `${GOOD_BODY}\n\n## Behavior\n\nResult is ${stage.iteration ? 4 : 3}.`};
         case 'code':return {files:[{path:'src/module.cpp',content:`int calculate(){return ${stage.iteration ? 4 : 3};}\n`}]};
         case 'check':return {blocking:false,findings:[],scope:['src/module.cpp']};
@@ -32,10 +33,10 @@ export async function agentScenario(options: { qualityFailure?: boolean; testFai
         default:throw new Error('UNEXPECTED_ROLE');
       }
     }}) });
-  const infrastructure = await createDomainKnowledgeInfrastructure({executor:stages,observer:c.workflowObserver,
+  const infrastructure = await createDomainKnowledgeInfrastructure({executor:{async execute(input){const result=await stages.execute(input);if(input.nodeId==='workflow_router') routes.push({ ...input, context: { ...input.context, ...result.context } });return result;}},observer:c.workflowObserver,
     prompts:c.runConfiguration,checkpoint:{kind:'memory'}});
   const workflow=new AutomatedProjectWorkflowService(c.service,infrastructure.engine,c.runConfiguration);
-  return {c,f,stages,workflow,calls,
+  return {c,f,stages,workflow,calls,routes,
     async start(maxIterations:number){
       const handle=await workflow.start(f.scenario,{policyId:'boundary',minimumStability:1,requireAllTests:true,maxIterations,workerCount:0});
       return {handle,result:await workflow.wait(handle.runId)};

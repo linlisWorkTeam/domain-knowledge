@@ -88,7 +88,7 @@ export class KnowledgeFlywheelService {
 
   recordReviewHandoff(runId: string, payload: Record<string, unknown>): void {
     const event = createEvent(runId, 'ReviewHandoffPrepared', payload, this.clock());
-    event.eventId = `review-handoff:${sha256(`${runId}:${String(payload.decisionId)}`)}`;
+    event.eventId = `review-handoff:${sha256(`${runId}:${String(payload.handoffKey ?? payload.decisionId)}`)}`;
     this.repository.recordOperationalEvent(event);
   }
 

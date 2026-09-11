@@ -464,6 +464,7 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
     if (input.context.docGenDecisionRequired || input.context.testValidationRequired) {
       const run = this.flywheel.getRun(input.runId);
       if (run?.state === 'GENERATING') this.flywheel.transition(input.runId, 'LOW_CONFIDENCE');
+      await this.recordGovernance(input);
       return { route: 'STOPPED', detail: input.context.testValidationRequired ? '测试参考校验未通过，等待人工处理' : 'DocGen 等待用户决定文档范围',
         context: { docGenDecisionRequired: input.context.docGenDecisionRequired, testValidationRequired: input.context.testValidationRequired } };
     }
@@ -477,6 +478,7 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
       } else if (!exhausted && run.state === 'GENERATING') {
         this.flywheel.transition(input.runId, 'ITERATING');
       }
+      if (exhausted) await this.recordGovernance(input);
       return {
         detail: `knowledge quality ${quality.score}; ${exhausted ? 'stopped' : 'iterate'}: ${quality.weakPoints.join('; ')}`,
         route: exhausted ? 'STOPPED' : 'ITERATE',
@@ -503,16 +505,27 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
     };
   }
 
-  private async recordGovernance(input: WorkflowStageInput, decision: GateDecision): Promise<void> {
-    const reviewRef = input.context[contextKey('review', input.iteration)] as ArtifactRef | undefined;
-    const review = reviewRef ? await this.readAgentOutput<ReviewOutput>(reviewRef, 'review', input) : undefined;
-    const evidenceRefs = this.uniqueRefs(Object.entries(input.context)
-      .filter(([key]) => /^(review|check|evaluationEvidenceRef|candidateBodyRef):/.test(key))
-      .flatMap(([, value]) => this.artifactRefsIn(value)));
-    const summary = review?.corrections.length
-      ? review.corrections.map((item) => `${item.knowledgePath}：${item.problem}；建议：${item.suggestion}`).join('\n')
-      : `测评停止：${decision.reasonCodes.join('、')}。请检查评测日志后决定修订或重新运行。`;
-    const handoff = { summary, historySummary: review?.historySummary ?? '', evidenceRefs, decisionId: decision.decisionId };
+  private async recordGovernance(input: WorkflowStageInput, decision?: GateDecision): Promise<void> {
+    const reviewRefs = Object.keys(input.context).filter(key => /^review:\d+$/.test(key))
+      .sort((a, b) => Number(b.split(':')[1]) - Number(a.split(':')[1]));
+    const latestKey = reviewRefs[0];
+    const review = latestKey ? await this.readAgentOutput<ReviewOutput>(input.context[latestKey] as ArtifactRef,
+      'review', { ...input, iteration: Number(latestKey.split(':')[1]) }) : undefined;
+    const quality = input.context[contextKey('qualityReport', input.iteration)] as QualityReport | undefined;
+    const proposal = input.context.docGenDecisionRequired as { reason: string; suggestedDocuments: string[] } | undefined;
+    const test = input.context.testValidationRequired as { repairs: number; infrastructureFailure: boolean } | undefined;
+    const reason = test ? 'TEST_VALIDATION_REQUIRED' : proposal ? 'DOCUMENT_SCOPE_REQUIRED' : quality ? 'QUALITY_BUDGET_EXHAUSTED' : 'GATE_STOPPED';
+    const summary = test
+      ? `测试参考校验未通过，已修复 ${test.repairs} 次。请检查测试候选与失败日志${test.infrastructureFailure ? '，修正构建配置或执行环境' : '，确认用例预期和原始实现'}后重新运行。`
+      : proposal ? `文档范围待决定：${proposal.reason}。建议：${proposal.suggestedDocuments.join('；')}。请确认本次单文档范围。`
+      : quality ? `文档质量 ${quality.score}，总轮次预算已用完：${quality.weakPoints.join('；')}。请补充对应内容或调整任务后重新运行。`
+      : review?.corrections.length ? review.corrections.map(item => `${item.knowledgePath}：${item.problem}；建议：${item.suggestion}`).join('\n')
+      : `测评停止：${decision?.reasonCodes.join('、')}。请检查评测日志后决定修订或重新运行。`;
+    const evidenceRefs = this.artifactRefsIn(input.context);
+    if (quality) evidenceRefs.push(await this.flywheel.putArtifact(Buffer.from(JSON.stringify(quality)), 'application/json'));
+    const handoff = { summary, historySummary: review?.historySummary ?? '', evidenceRefs: this.uniqueRefs(evidenceRefs),
+      reason, iteration: input.iteration, decisionId: decision?.decisionId,
+      handoffKey: `${input.iteration}:${reason}:${decision?.decisionId ?? 'early'}` };
     const handoffRef = await this.flywheel.putArtifact(Buffer.from(JSON.stringify(handoff, null, 2)), 'application/json');
     this.flywheel.recordReviewHandoff(input.runId, { ...handoff, handoffRef });
   }
