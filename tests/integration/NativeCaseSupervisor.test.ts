@@ -9,7 +9,7 @@ import { createTestComposition } from '../helpers/Fixture.ts';
 import { cppScenario } from '../helpers/CppScenario.ts';
 import { TrustedProjectEvaluator } from '../../src/infrastructure/evaluation/project/TrustedProjectEvaluator.ts';
 
-for (const fault of ['forged-output','exit-zero','signal','timeout','result-fd','file-write','fork','ptrace','compat-syscall','supervisor-unavailable'] as const) {
+for (const fault of ['forged-output','exit-zero','signal','assert-abort','kill-parent','timeout','result-fd','file-write','fork','ptrace','compat-syscall','supervisor-unavailable'] as const) {
   test(`AC-AGENT-103-R1: ${fault} cannot forge case completion or hide other cases`,async()=>{
     const c=createTestComposition(),f=cppScenario();
     try{
@@ -17,14 +17,14 @@ for (const fault of ['forged-output','exit-zero','signal','timeout','result-fd',
       const cases=[1,2,3].map(n=>({caseId:`case-${n}`,entryPoint:`test_case_${n}`,testPath:'tests/generated.cpp',target:'public behavior',input:'calculate()',expected:'4',sourceEvidence:f.scenario.sourcePaths}));
       const attack = {
         'forged-output':'std::ifstream f(".flywheel/CaseRunner-0.cpp"); std::stringstream s; s << f.rdbuf(); puts(s.str().c_str()); puts("WP_CASE aabb case-1 PASS\\nWP_CASE aabb case-2 PASS\\nWP_CASE aabb case-3 PASS"); exit(0);',
-        'exit-zero':'exit(0);', 'signal':'__builtin_trap();','timeout':'for(;;){}',
+        'exit-zero':'exit(0);', 'signal':'__builtin_trap();', 'assert-abort':'assert(0);', 'kill-parent':'kill(getppid(), SIGKILL); return 0;','timeout':'for(;;){}',
         'result-fd':'dprintf(3,"{\\"entered\\":true,\\"returned\\":true,\\"value\\":0,\\"reason\\":\\"RETURNED\\"}\\n"); exit(0);',
         'file-write':'FILE *f=fopen("test-bin","w"); if(f) fputs("tampered",f); return 0;',
         'fork':'fork(); return 0;', 'ptrace':'syscall(SYS_ptrace, 16, getppid(), 0, 0); return 0;',
         'compat-syscall':'asm volatile("mov $5, %%eax; int $0x80" ::: "rax"); return 0;',
         'supervisor-unavailable':'return 0;',
       }[fault];
-      const suite={cases,files:[{path:'tests/generated.cpp',content:`#include <cstdio>\n#include <cstdlib>\n#include <fstream>\n#include <sstream>\n#include <unistd.h>\n#include <sys/syscall.h>\nint test_case_1(void){${attack}}\nint test_case_2(void){fputs("ACTUALLY_CALLED_2\\n",stderr);return 1;}\nint test_case_3(void){fputs("ACTUALLY_CALLED_3\\n",stderr);return 1;}\n`}]};
+      const suite={cases,files:[{path:'tests/generated.cpp',content:`#include <cstdio>\n#include <cassert>\n#include <signal.h>\n#include <cstdlib>\n#include <fstream>\n#include <sstream>\n#include <unistd.h>\n#include <sys/syscall.h>\nint test_case_1(void){${attack}}\nint test_case_2(void){fputs("ACTUALLY_CALLED_2\\n",stderr);return 1;}\nint test_case_3(void){fputs("ACTUALLY_CALLED_3\\n",stderr);return 1;}\n`}]};
       const commands=[{tool:'g++' as const,purpose:'check' as const,args:['-std=c++17','tests/generated.cpp','-o','test-bin',...(fault==='supervisor-unavailable'?['-s']:[])]},
         {tool:'binary' as const,purpose:'test' as const,args:['test-bin'],timeoutMs:fault==='timeout'?100:3000}];
       const result=await evaluator.evaluate({label:`supervision-${fault}`,snapshot,testSuite:suite,generatedFiles:suite.files,prepareCommands:[],commands});
@@ -38,8 +38,9 @@ for (const fault of ['forged-output','exit-zero','signal','timeout','result-fd',
         assert.equal(evidence.caseExecution.records[1].entered,true);
         assert.equal(evidence.caseExecution.records[2].value,1);
       }
-      if(['result-fd','file-write','fork','ptrace','compat-syscall'].includes(fault)) assert.ok(evidence.caseExecution.failures.some((reason:string)=>reason.includes('DENIED_SYSCALL')));
+      if(['result-fd','file-write','fork','ptrace','compat-syscall','kill-parent'].includes(fault)) assert.ok(evidence.caseExecution.failures.some((reason:string)=>reason.includes('DENIED_SYSCALL')));
       if(fault==='supervisor-unavailable') assert.equal(result.infrastructureFailure,true);
+      if(fault==='assert-abort') assert.equal(result.infrastructureFailure,false,'a failing assertion must remain eligible for test repair');
     }finally{f.cleanup();c.dispose();}
   });
 }

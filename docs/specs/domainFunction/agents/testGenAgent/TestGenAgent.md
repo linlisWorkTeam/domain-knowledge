@@ -76,3 +76,5 @@ AC-AGENT-103 的 C/C++ 测试协议：每个 case 增加合法 C 标识符 `entr
 
 
 监督器在用户态系统调用执行前检查 ABI 和许可范围，仅允许必要的只读文件/内存/时间操作及 stdout/stderr 日志写入；禁止写其他描述符、写文件、派生进程、重新 exec、ptrace 和其他进程内存修改。ptrace 不可用、符号表被剥离、未知 syscall 均明确失败，不能计为通过。超时和输出上限沿用原 binary 命令总预算，剩余入口仍记录调度及未完成结果。新协议标识为 `native-cases-v2-supervised`。
+
+监督器允许仅向被测进程自身发送信号，使 assert/abort 保持普通测试失败、可进入既有有限修复；向监督器或其他进程发送信号仍拒绝。验收覆盖 `assert-abort`、`kill-parent` 和参考断言失败后修复成功。

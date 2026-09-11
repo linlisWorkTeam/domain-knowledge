@@ -47,6 +47,8 @@ static int allowed(const struct ptrace_syscall_info *call) {
   const __u64 *a = call->entry.args;
   if (call->arch != AUDIT_ARCH_X86_64) return 0;
   switch (call->entry.nr) {
+    case SYS_kill: case SYS_tkill: return a[0] == (__u64)tracee;
+    case SYS_tgkill: return a[0] == (__u64)tracee && a[1] == (__u64)tracee;
     case SYS_write: case SYS_writev: return a[0] == 1 || a[0] == 2;
     case SYS_open: return readonly_flags(a[1]);
     case SYS_openat: return readonly_flags(a[2]);

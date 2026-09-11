@@ -58,7 +58,11 @@ function agentOutput(agentType: string, prompt: string): Record<string, unknown>
         assert.match(prompt, /calculate\(\) == 3/);
         assert.match(prompt, /case-1/);
       }
-      return cppTestOutput(count === 1 ? 3 : 4);
+      {
+        const output = cppTestOutput(count === 1 ? 3 : 4);
+        if (count === 1) output.files[0]!.content = '#include <cassert>\nint calculate();\nint test_public_result(void) { assert(calculate() == 3); return 0; }\n';
+        return output;
+      }
     case 'code':
       return { files: [{ path: 'src/module.cpp', content: `int calculate() { return ${count === 1 ? 3 : 4}; }\n` }] };
     case 'check':

@@ -52,7 +52,7 @@ for (const fix of [true, false]) test(`C++ first-test validation repairs once an
   } finally { fixture.cleanup(); c.dispose(); }
 });
 
-for (const fault of ['compile', 'environment', 'missing-binary'] as const) test(`reference ${fault} failure follows its own repair policy`, async () => {
+for (const fault of ['compile', 'assertion', 'environment', 'missing-binary'] as const) test(`reference ${fault} failure follows its own repair policy`, async () => {
   const c = createTestComposition(); const fixture = cppScenario(); let calls = 0;
   if (fault === 'environment') fixture.scenario.prepareCommands = [{ tool: 'node', purpose: 'setup', args: ['-e', 'process.exit(1)'] }];
   if (fault === 'missing-binary') fixture.scenario.referenceCommands = [{ tool: 'binary', purpose: 'test', args: ['missing-test-bin'] }];
@@ -64,6 +64,7 @@ for (const fault of ['compile', 'environment', 'missing-binary'] as const) test(
         if (command.agentType === 'orchestrator') return orchestratorOutput(fixture.scenario.moduleId);
         calls++; const output = cppTestOutput();
         if (fault === 'compile' && calls === 1) output.files[0]!.content = 'invalid C++ source';
+        if (fault === 'assertion' && calls === 1) output.files[0]!.content = '#include <cassert>\nint test_public_result(void){assert(false);return 0;}';
         return output;
       } }),
     });
@@ -74,8 +75,8 @@ for (const fault of ['compile', 'environment', 'missing-binary'] as const) test(
     Object.assign(stage.context, (await stages.execute(stage)).context);
     Object.assign(stage.context, (await stages.execute({ ...stage, nodeId: 'test_gen', agentId: 'test-gen' })).context);
     const result = await stages.execute({ ...stage, nodeId: 'oracle_validation' });
-    assert.equal(calls, fault === 'compile' ? 2 : 1);
-    if (fault === 'compile') assert.ok(result.context?.['validatedTestSuiteRef:0']);
+    assert.equal(calls, ['compile','assertion'].includes(fault) ? 2 : 1);
+    if (['compile','assertion'].includes(fault)) assert.ok(result.context?.['validatedTestSuiteRef:0']);
     else {
       assert.equal(result.route, 'STOPPED');
       Object.assign(stage.context, result.context);
