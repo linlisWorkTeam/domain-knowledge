@@ -1322,3 +1322,5 @@ body.drawer-active { overflow: hidden; }
 [data-workbench-publication-panel] { min-width: 0; overflow-wrap: anywhere; }
 [data-workbench-publication-panel] select { width: 100%; min-width: 0; max-width: 100%; }
 [data-workbench-publication-panel] article { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); }
+[data-project-history] { min-width: 0; overflow-wrap: anywhere; }
+[data-project-history-select], [data-build-scope] { width: 100%; min-width: 0; max-width: 100%; }

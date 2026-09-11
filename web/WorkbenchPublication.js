@@ -77,3 +77,8 @@ export function createWorkbenchPublicationPanel({ root, request, escapeHtml: esc
     render()
   } }
 }
+
+export function publicationDownloadName(disposition) {
+  const name = /(?:^|;)\s*filename="([^"\r\n]+)"(?:;|$)/i.exec(disposition ?? '')?.[1]
+  return name && /^(?:[A-Za-z0-9_-]{1,160}\.md|manifest\.json|evidence\.json)$/.test(name) ? name : 'knowledge-evidence.json'
+}

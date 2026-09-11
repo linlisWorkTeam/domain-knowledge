@@ -5,7 +5,7 @@
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createWorkbenchPublicationPanel } from '../../web/WorkbenchPublication.js'
+import { createWorkbenchPublicationPanel, publicationDownloadName } from '../../web/WorkbenchPublication.js'
 const tick = () => new Promise(resolve => setImmediate(resolve))
 test('publication panel loads all pages and submits only explicitly selected bound task IDs', async () => {
   const handlers = {}, panel = { innerHTML: '' }, requests = []
@@ -41,4 +41,12 @@ test('publication panel ignores a late response after the selected reconstructio
     escapeHtml: String, isEditable: () => true, selection: () => selected })
   app.refresh(); selected = null; app.refresh(); release(); await tick()
   assert.equal(panel.innerHTML, '')
+})
+
+test('publication downloads keep stable card filenames and reject unsafe suggested paths', () => {
+  assert.equal(publicationDownloadName('attachment; filename="card-123.md"'), 'card-123.md')
+  assert.equal(publicationDownloadName('attachment; filename="manifest.json"'), 'manifest.json')
+  assert.equal(publicationDownloadName('attachment; filename="../../secret.md"'), 'knowledge-evidence.json')
+  assert.equal(publicationDownloadName('attachment; filename="script.html"'), 'knowledge-evidence.json')
+  assert.equal(publicationDownloadName(null), 'knowledge-evidence.json')
 })

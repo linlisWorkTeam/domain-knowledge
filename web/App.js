@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：提供app页面的展示、交互或样式资源。
  */
+import { publicationDownloadName } from './WorkbenchPublication.js'
 import { createRepositoryAnalysisPanel } from './RepositoryAnalysis.js'
 import { createKnowledgeIndexPanel } from './KnowledgeIndex.js'
 import { renderKnowledgeMarkdown } from './KnowledgeMarkdown.js'
@@ -929,7 +930,7 @@ async function downloadArtifact(path) {
   const url = URL.createObjectURL(await response.blob())
   const link = document.createElement('a')
   link.href = url
-  link.download = path.includes('/external-materials/') ? 'material-evidence' : path.includes('/stage-tasks/') ? 'stage-evidence.json' : 'evaluation-evidence'
+  link.download = path.startsWith('/api/v1/workbench-publications/') ? publicationDownloadName(response.headers.get('content-disposition')) : path.includes('/external-materials/') ? 'material-evidence' : path.includes('/stage-tasks/') ? 'stage-evidence.json' : 'evaluation-evidence'
   link.click()
   setTimeout(() => URL.revokeObjectURL(url), 0)
 }
