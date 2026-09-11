@@ -11,7 +11,7 @@ SPDX-License-Identifier: MIT
 
 ## PR #46 独立复审修复
 
-四项问题已按补充 Spec 分别修复并提交：`2ab6f14` 外部用例监督、`cb104f6` router 崩溃恢复、`0fb6188` cwd 绑定、`3029d7a` PR 差异格式。原复现已拒绝伪造的 3/3，通过真实 LangGraph 故障注入及 resume 验收。全量 311/311、浏览器 14/14、独立完整 SDK 端到端 PASS/VERIFIED。下方旧结果保留为历史，本次完整证据以 [报告首节](reports/AgentSpecRepairAndE2E.md) 为准。
+四项问题已按补充 Spec 分别修复并提交：`2ab6f14` / `acfd714` 外部用例监督及断言失败修复、`cb104f6` router 崩溃恢复、`0fb6188` cwd 绑定、`3029d7a` PR 差异格式。原复现已拒绝伪造的 3/3，通过真实 LangGraph 故障注入及 resume 验收。最后一次原生断言修复定向 32/32、全量 314/314、浏览器 14/14、独立完整 SDK 端到端 PASS/VERIFIED。下方旧结果保留为历史，本次完整证据以 [报告首节](reports/AgentSpecRepairAndE2E.md) 为准。
 
 交付检查必须运行 `git diff --check c33787b...HEAD` 覆盖整个 PR；干净工作区的无范围检查不能替代。
 
