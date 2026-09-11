@@ -238,3 +238,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 [2026-09-11-0850-project-history.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/d3da9c199cfac09fbcc7a4a75b06d3743a368418/docs/epitaph/2026-09-11-0850-project-history.md) 保存项目与精确版本历史选择已接；随后完整Console发布浏览器验证保存输入、匿名发布/下载、刷新及390px布局通过。真实来源任务已结束UNRESOLVED，待修订与最终真实发布。
 
 [2026-09-11-0855-diagnostics-scope.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/4b48c14789e970955afa1fdbc1d6bcfaa6428aad/docs/epitaph/2026-09-11-0855-diagnostics-scope.md) 缺依赖诊断/匿名证据下载与原范围澄清完成；后续真实gcc、发布浏览器及480自动化通过。新增语言仍C/C++，TS保留markdownLite回归，Make/CMake识别与模块参数不等于执行任意原构建脚本。最终真实修订和部署未完成。
+
+[2026-09-11-0859-browser-preparation.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/283a89397ffdb747d9b33d066ee0d5ac942603ad/docs/epitaph/2026-09-11-0859-browser-preparation.md) 发布浏览器测试准备后已实测通过，下载白名单与分析反馈DOM问题均修复。当前480自动化及32Console全部通过；真实来源仍有风险，已启动明确错误修订，最终部署未完成。

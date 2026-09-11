@@ -202,3 +202,5 @@ Release 包为 177979475 字节，SHA-256 `ea2949fbe9e5962c70475e405459fe57f2dda
 当前补充验收：真实gcc双模块固定案例通过；来源摘要绑定与发布防篡改13项、原生评测/修订集成2项、架构8项通过，类型和Spec通过。完整Console发布浏览器验收1项通过，覆盖保存输入选择、免登录发布与下载、刷新后历史、390px窄屏无水平溢出。首次浏览器执行发现App下载白名单缺少workbench-publications，修复后重跑通过，失败trace与成功截图均保留。这是受控模型证据配合真实HTTP/SQLite/文件的页面验收，不是真实卡片发布成功。证据目录 real-knowledge-revision/publication-browser-actual 与 source-digest-clarification。
 
 全量Node自动化回归现已480/480通过，无跳过（303436ms），日志WorkbenchFullRegressionCurrent.log。Console全套首次执行出现操作中心截图变化和仓库分析错误提示写错DOM节点两项失败，进程在第31项后以143退出，不能计为全套通过。4b48c14修复分析回调精确定位状态与按钮，原仓库分析浏览器断言不变重跑通过。新历史输入区域的截图基线已人工查看并更新，正常比较复测仍在进行。
+
+修复后Console分两批正常执行完成：Console.spec.ts 23/23，其余四文件9/9，合计32/32通过，未改断言/容限。审阅后的历史输入区视觉基线提交283a893。当前真实来源修订任务stage-08294ed8fd24c91739942eb07e10a368adb172e70fac9d545965324a8b61952c已启动，输入为已完成来源核验3ac5...；尚不能称修订或真实发布通过。
