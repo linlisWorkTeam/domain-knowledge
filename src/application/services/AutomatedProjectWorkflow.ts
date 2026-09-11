@@ -5,6 +5,7 @@
  */
 import type { Output as PlanOutput } from '../../domain/agents/orchestratorAgent/OrchestratorAgentContract.ts';
 import type { Output as TestOutput } from '../../domain/agents/testGenAgent/TestGenAgentContract.ts';
+import { canStartIteration, canContinueIteration } from '../../domain/workflow/IterationBudget.ts';
 import { testExecutionPlan } from '../../domain/agents/testGenAgent/TestExecutionPlan.ts';
 import { sourceIdentity, testValidationAction } from '../../domain/agents/testGenAgent/TestSuitePolicy.ts';
 import { validateProjectAgentConfiguration } from '../../domain/agents/ProjectAgentConfiguration.ts';
@@ -144,6 +145,7 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
     input: WorkflowStageInput,
     scenario: AutomatedProjectScenario,
   ): Promise<WorkflowStageResult> {
+    assertInvariant(canStartIteration(input.iteration, input.maxIterations), 'WORKFLOW_ITERATION_LIMIT_EXCEEDED');
     const current = this.flywheel.getRun(input.runId);
     if (!current) throw new Error(`WORKFLOW_RUN_NOT_FOUND: ${input.runId}`);
     if (current.state === 'CREATED') this.flywheel.transition(input.runId, 'PLANNED');
@@ -469,7 +471,7 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
     if (quality?.outcome === 'REJECTED') {
       const run = this.flywheel.getRun(input.runId);
       if (!run) throw new Error(`WORKFLOW_RUN_NOT_FOUND: ${input.runId}`);
-      const exhausted = run.iteration >= input.maxIterations;
+      const exhausted = !canContinueIteration(run.iteration, input.maxIterations);
       if (exhausted && run.state === 'GENERATING') {
         this.flywheel.transition(input.runId, 'LOW_CONFIDENCE');
       } else if (!exhausted && run.state === 'GENERATING') {
@@ -590,7 +592,7 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
       const businessGoalRef = await this.flywheel.putArtifact(Buffer.from(scenario.businessGoal ?? `Generate and evaluate knowledge for ${scenario.moduleId}`), 'text/plain');
       const projectConfigurationRef = await this.flywheel.putArtifact(Buffer.from(JSON.stringify(scenario.agentConfiguration ?? {})), 'application/json');
       const progressRef = await this.flywheel.putArtifact(Buffer.from(JSON.stringify({ iteration: input.iteration,
-        state: this.flywheel.getRun(input.runId)?.state, selectedModuleId: input.iteration > 0 ? scenario.moduleId : null,
+        state: input.iteration === 0 ? 'PLANNED' : 'ITERATING', selectedModuleId: input.iteration > 0 ? scenario.moduleId : null,
         previousDecision: input.context[contextKey('gateDecision', input.iteration - 1)] ?? null, previousQuality: input.context[contextKey('qualityReport', input.iteration - 1)] ?? null,
       })), 'application/json');
       const moduleOverviewRef = await this.flywheel.putArtifact(Buffer.from(JSON.stringify({ modules: (scenario.modules ?? [scenario]).map((module) => ({
