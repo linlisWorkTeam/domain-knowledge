@@ -1,0 +1,11 @@
+# 完整章节接入发布准备
+
+/tmp/domain-knowledge-workbench，feat/five-stage-workbench，基线8baa5f2bd53050c8b708aed12fc4846c9b3256cc。原脏区/旧网站不变，未删知识，目标active，Node24/384MiB重任务串行。
+
+WorkbenchSourcePublication已接prepare(v4)：按实际正文全部H2要求sections完整唯一，验证每章卡片字段、非继承PASS、来源阶段工件归属、CAS/Agent命令结果schema，再调用SourcePublication原始Review规则。prepare新增必须contracts:AgentContractValidator。测试使用真正JsonSchemaAgentContractValidator，夹具正文改为含H2并生成命令/结果/criteria等CAS；缺章节和风险原始Review都在写入前拒绝。13定向单元/集成、8架构、类型/Spec通过，证据publication-source-preparation。
+
+尚未完整发布，也未接Composition/API/UI。下一步WorkbenchSourcePublication需要project和trustedSets来核验referenceRef内来源schema/revision/digest/files与该模块固定源码一致；referenceObservationsRef内suite/oracle绑定可信集，并按sourceSectionObservations重新计算投影，不能只信材料引用。既有prepare已经验证相关CAS图，可复用。然后补可信interface/policy、suite schema与项目identity/分析manifest内容，完成独立SQLite审计/可恢复Markdown发布事务及页面入口。不要把PREPARED当VERIFIED。
+
+真实来源task stage-3ac5a7c55407b750e1205020b04657f09b5e4d4590903f6e5592bf3ab3967b48的PID2411792/session82991再次确认活跃，最新RUNNING，24章节/2卡片，总共7卡。driver /tmp/RunWholeSourcePolicyV1.ts，日志 /tmp/RealWholeSourcePolicyV1.log，完整source-policy-v1/WholeSource.json。不因等待重启；当前原始章节校验验证的是证据一致性，不表示整来源通过或模型质量已验收。
+
+完整剩余目标仍是来源修订后重建/可信固定来源复测，双目标新版一键链路，最终发布，Make/CMake模块参数、TS完整分析/历史选择，全回归和网站部署。

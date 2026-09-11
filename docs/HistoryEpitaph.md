@@ -212,3 +212,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 [2026-09-11-0804-fixed-publication-binding.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/aa2c1a7827aa3390ca97d79805a66ccf3a9ed223/docs/epitaph/2026-09-11-0804-fixed-publication-binding.md) 固定报告绑定代码/卡片正文/工具链，替换字段反例拒绝。后续可信原始观察与持久化测试集已接准备，最终发布仍未实现。
 
 [2026-09-11-0806-trusted-publication-observations.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/759815ac573e50ead95501d6cf76825079b38e77/docs/epitaph/2026-09-11-0806-trusted-publication-observations.md) 可信原始观察Domain规则及真实C31/CPP37复核通过，后续已接发布准备并核对项目构建。最终发布仍未完成。
+
+[2026-09-11-0808-trusted-publication-preparation.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/8baa5f2bd53050c8b708aed12fc4846c9b3256cc/docs/epitaph/2026-09-11-0808-trusted-publication-preparation.md) 可信集持久化及原始观察接发布准备，后续项目构建与来源原始章节也逐步接入；最终发布事务尚未完成。
