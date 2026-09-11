@@ -50,3 +50,26 @@ for(const missing of ['entry','binary','opaque'] as const) test(`AC-AGENT-102: $
     assert.equal(env.c.service.status().publications,0);
   }finally{env.dispose();}
 });
+
+import { createTestComposition } from '../helpers/Fixture.ts';
+import { cppScenario, cppTestOutput } from '../helpers/CppScenario.ts';
+import { TrustedProjectEvaluator } from '../../src/infrastructure/evaluation/project/TrustedProjectEvaluator.ts';
+import { nativeTestBindings } from '../../src/domain/agents/testGenAgent/TestExecutionPlan.ts';
+for (const binaryCwd of ['build', '.']) test(`AC-AGENT-102-R1: build-relative input/output execute from ${binaryCwd}`, async () => {
+  const c = createTestComposition(), f = cppScenario();
+  try {
+    mkdirSync(join(f.scenario.repositoryRoot, 'build'));
+    writeFileSync(join(f.scenario.repositoryRoot, 'build/.keep'), '');
+    execFileSync('git',['add','.'],{cwd:f.scenario.repositoryRoot});
+    execFileSync('git',['-c','user.name=Test','-c','user.email=test@example.invalid','commit','-qm','build directory'],{cwd:f.scenario.repositoryRoot});
+    const commands = [ {tool:'g++' as const,purpose:'check' as const,cwd:'./build',args:['-std=c++17','../src/module.cpp','../tests/generated.cpp','-o','test-bin']},
+      {tool:'binary' as const,purpose:'test' as const,cwd:binaryCwd,args:[binaryCwd === 'build' ? './test-bin' : 'build/test-bin']} ];
+    const before = JSON.stringify(commands), suite = cppTestOutput();
+    assert.equal(nativeTestBindings(commands,suite).length,1);
+    const evaluator = new TrustedProjectEvaluator(c.artifacts), snapshot = await evaluator.inspect(f.scenario);
+    const result = await evaluator.evaluate({label:'cwd-binding',snapshot,generatedFiles:suite.files,testSuite:suite,prepareCommands:[],commands});
+    assert.equal(result.passed,true); assert.equal(JSON.stringify(commands),before);
+    assert.throws(()=>nativeTestBindings([{...commands[0]!,args:['../../tests/generated.cpp','-o','test-bin']},commands[1]!],suite),/PATH|CONFIGURATION/);
+    await assert.rejects(evaluator.evaluate({label:'cwd-escape',snapshot,generatedFiles:suite.files,testSuite:suite,prepareCommands:[],commands:[commands[0]!,{...commands[1]!,cwd:'../outside'}]}).then(r=>{if(r.configurationFailure) throw new Error(r.configurationFailure);}),/PATH|CONFIGURATION/);
+  } finally { f.cleanup();c.dispose(); }
+});

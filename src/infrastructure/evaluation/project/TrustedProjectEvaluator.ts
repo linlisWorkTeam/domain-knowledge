@@ -6,7 +6,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { caseRunner, readCaseRecords, type CaseRecord } from './CaseRunner.ts';
 import { hasExecutableCases, TEST_CASE_PROTOCOL } from '../../../domain/agents/testGenAgent/TestGenAgentContract.ts';
-import { nativeTestBindings, type NativeTestBinding } from '../../../domain/agents/testGenAgent/TestExecutionPlan.ts';
+import { commandPath, nativeTestBindings, type NativeTestBinding } from '../../../domain/agents/testGenAgent/TestExecutionPlan.ts';
 import { spawn, spawnSync } from 'node:child_process';
 import {
   existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync,
@@ -475,12 +475,13 @@ export class TrustedProjectEvaluator implements ProjectEvaluator {
         if (!Number.isSafeInteger(maxOutputBytes) || maxOutputBytes < 1 || maxOutputBytes > 16_777_216) {
           throw new Error(`PROJECT_OUTPUT_LIMIT_INVALID: ${maxOutputBytes}`);
         }
-        const commandCwd = command.cwd ? pathInside(workspace, command.cwd) : workspace;
-        if (command.cwd) assertNoSymlink(workspace, command.cwd);
+        const relativeCwd = commandPath(undefined, command.cwd ?? '.');
+        const commandCwd = relativeCwd === '.' ? workspace : pathInside(workspace, relativeCwd);
+        if (relativeCwd !== '.') assertNoSymlink(workspace, relativeCwd);
         let tool: ResolvedTool;
         let args = command.args;
         if (command.tool === 'binary') {
-          const executable = safeRelativePath(args[0] ?? '');
+          const executable = safeRelativePath(commandPath(command.cwd, args[0] ?? ''));
           assertNoSymlink(workspace, executable);
           tool = { executable: pathInside(workspace, executable), prefixArgs: [] };
           args = args.slice(1);
