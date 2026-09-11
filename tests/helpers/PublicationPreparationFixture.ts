@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：验证发布准备重读卡片并拒绝缺失或被篡改的递归工件。
  */
+import { sourceEvidenceBindings } from '../../src/domain/services/knowledge/SourceEvidenceBindings.ts';
 import assert from 'node:assert/strict';
 import { sha256, type ArtifactRef, type KnowledgeVersion } from '../../src/domain/Domain.ts';
 import { WorkbenchPublicationEvidence } from '../../src/application/services/WorkbenchPublicationEvidence.ts';
@@ -13,7 +14,7 @@ import { sourceSectionObservations } from '../../src/domain/services/knowledge/K
 import type { NativeBehaviorSuite } from '../../src/domain/services/evaluation/NativeBehaviorSuite.ts';
 import { nativeTestKeys, type NativeTestSet } from '../../src/domain/services/evaluation/NativeTestCache.ts';
 import { canonicalJson, createStageTask } from '../../src/domain/services/workbench/StageTask.ts';
-export async function createPublicationPreparationFixture() {
+export async function createPublicationPreparationFixture(options: { sourceEvidencePolicy?: string } = {}) {
   const seed = publicationFixture(); const contents = new Map<string, Buffer>(); let puts = 0;
   const put = async (data: Uint8Array, mediaType: string): Promise<ArtifactRef> => {
     puts++; const buffer = Buffer.from(data); const digest = sha256(buffer); contents.set(digest, buffer);
@@ -64,6 +65,7 @@ export async function createPublicationPreparationFixture() {
   input.evaluation.result!.artifactRefs = [trustedReportRef];
   Object.assign((input.evaluation.result!.summary.modules as Array<Record<string, unknown>>)[0]!, { testSetId: set.testSetId, reportRef: trustedReportRef });
   input.sourceVerification.input.parameters.evaluationDigest = sha256(canonicalJson(input.evaluation.result));
+  if (options.sourceEvidencePolicy) input.sourceVerification.input.parameters.sourceEvidencePolicy = options.sourceEvidencePolicy;
   const sourceIdentity = createStageTask(input.sourceVerification.input, {}, 'now');
   input.sourceVerification.taskId = sourceIdentity.taskId; input.sourceVerification.inputDigest = sourceIdentity.inputDigest;
   const sourceReferenceRef = await put(Buffer.from(JSON.stringify({ schemaVersion: 'knowledge-source-verification-v4', sourceRevision: 'commit', sourceDigest: project.sourceDigest, files: [{ path: 'module.c', content: sourceContent }] })), 'application/json');
@@ -71,6 +73,7 @@ export async function createPublicationPreparationFixture() {
     ...sourceSectionObservations(suite as NativeBehaviorSuite, observations as Parameters<typeof sourceSectionObservations>[1], 'card', 'Value') };
   const observationsRef = await put(Buffer.from(JSON.stringify(sourceObservations)), 'application/json');
   const criteriaRef = await put(Buffer.from(JSON.stringify({ schemaVersion: 'knowledge-source-verification-v4', phase: 'FINAL_SOURCE_REVIEW', binding: input.cards[0],
+    ...(options.sourceEvidencePolicy ? { sourceEvidenceBindings: sourceEvidenceBindings(options.sourceEvidencePolicy, project, 'module') } : {}),
     section: 'Value', verifyPreamble: true, allowedKnowledgePaths: ['knowledge/knowledge-unit.md#Value'] })), 'application/json');
   const rawRef = await put(Buffer.from(JSON.stringify({ recommendation: 'PASS', blocking: false, correction: null })), 'application/json');
   const command = { schemaVersion: '1.0', commandId: 'source-command', runId: input.sourceVerification.taskId, agentType: 'review', generationKey: sha256('source'),

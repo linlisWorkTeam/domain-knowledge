@@ -48,6 +48,9 @@ for (const rejectSourceReview of [false, true]) test(`native stage rejects bad c
         const criteria = JSON.parse(Buffer.from(await composition.artifacts.get(_command.payload.criteriaRef as any)).toString('utf8'));
         assert.equal(criteria.verifyPreamble, criteria.section === 'Behavior');
         assert.deepEqual(criteria.sourceReviewPolicy, { schemaVersion: 'source-review-policy-v1', timeoutMs: 600000 });
+        assert.equal(criteria.sourceEvidenceBindings.schemaVersion, 'source-evidence-bindings-v1');
+        assert.equal(criteria.sourceEvidenceBindings.repositoryFileManifest.sourceDigest, sourceReport.sourceDigest);
+        assert.ok(criteria.sourceEvidenceBindings.sourceFiles.some((file: { path: string; artifactRef: { sha256: string } }) => file.path === 'math.c' && /^[a-f0-9]{64}$/.test(file.artifactRef.sha256)));
         assert.equal(sourceReport.sectionId, `card-add#${criteria.section}`);
         assert.deepEqual(criteria.applicationVerified, { artifactDigests: true, frozenVersionBindings: true });
         if (criteria.section === 'Behavior') { assert.equal(sourceReport.cases[0].observation.actual.sum, '7'); assert.equal(sourceReport.coverage, 'DIRECT_BEHAVIOR_EVIDENCE'); }

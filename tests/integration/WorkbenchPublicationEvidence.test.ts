@@ -5,6 +5,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { SOURCE_EVIDENCE_POLICY } from '../../src/domain/services/knowledge/SourceEvidenceBindings.ts';
 import { sha256, type ArtifactRef, type KnowledgeVersion } from '../../src/domain/Domain.ts';
 import { WorkbenchPublicationEvidence } from '../../src/application/services/WorkbenchPublicationEvidence.ts';
 import { JsonSchemaAgentContractValidator } from '../../src/infrastructure/agentAdapters/contracts/JsonSchemaAgentContractValidator.ts';
@@ -134,4 +135,19 @@ test('fixed cases must exercise the declared API rather than contain only expect
   const before = f.puts();
   await assert.rejects(f.service.prepare(f.ids, f.input.fixedSuites), /NATIVE_BEHAVIOR_SUITE_INVALID/);
   assert.equal(f.puts(), before);
+});
+
+test('explicit source digest bindings remain required even when replacement criteria have valid CAS hashes', async () => {
+  const f = await setup({ sourceEvidencePolicy: SOURCE_EVIDENCE_POLICY });
+  assert.equal((await f.service.prepare(f.ids, f.input.fixedSuites)).state, 'PREPARED');
+  const section = f.sourceSections[0]!; const oldCriteria = section.criteriaRef, oldResult = section.reviewResultRef;
+  const criteria = JSON.parse(f.contents.get(oldCriteria.sha256)!.toString('utf8'));
+  criteria.sourceEvidenceBindings.sourceFiles[0].artifactRef = f.nestedRef;
+  section.criteriaRef = await f.put(Buffer.from(JSON.stringify(criteria)), 'application/json');
+  f.command.payload.criteriaRef = section.criteriaRef;
+  const commandRef = await f.put(Buffer.from(JSON.stringify(f.command)), 'application/json');
+  const envelope = JSON.parse(f.contents.get(oldResult.sha256)!.toString('utf8')); envelope.commandRef = commandRef;
+  section.reviewResultRef = await f.put(Buffer.from(JSON.stringify(envelope)), 'application/json');
+  f.input.sourceVerification.result!.artifactRefs = f.input.sourceVerification.result!.artifactRefs.map(ref => ref.sha256 === oldCriteria.sha256 ? section.criteriaRef : ref.sha256 === oldResult.sha256 ? section.reviewResultRef : ref);
+  await assert.rejects(f.service.prepare(f.ids, f.input.fixedSuites), /PUBLICATION_SOURCE_DIGEST_BINDING_CHANGED/);
 });

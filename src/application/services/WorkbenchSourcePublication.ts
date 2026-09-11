@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：逐卡逐章重读来源Review原始证据并要求正文完整覆盖。
  */
+import { sourceEvidenceBindings } from '../../domain/services/knowledge/SourceEvidenceBindings.ts';
 import { sha256, type ArtifactRef } from '../../domain/Domain.ts';
 import type { AgentCommand, AgentResult } from '../../domain/agents/AgentContracts.ts';
 import type { Output as ReviewOutput } from '../../domain/agents/reviewAgent/ReviewAgentContract.ts';
@@ -61,6 +62,8 @@ export class WorkbenchSourcePublication {
         contracts.assertResult(envelope);
         const command = await load<AgentCommand>(envelope.commandRef); contracts.assertCommand(command);
         const criteria = await load<Record<string, unknown>>(section.criteriaRef);
+        const expectedBindings = sourceEvidenceBindings(task.input.parameters.sourceEvidencePolicy, project, module.moduleId);
+        if (expectedBindings && canonicalJson(criteria.sourceEvidenceBindings) !== canonicalJson(expectedBindings)) throw new Error('PUBLICATION_SOURCE_DIGEST_BINDING_CHANGED');
         assertSourcePublicationSection({ taskId: task.taskId, card: binding, body, section: section.section, first: headings[0] === section.section,
           raw, rawRef: section.reviewRef, result: envelope, command, criteria, criteriaRef: section.criteriaRef,
           referenceRef: section.referenceRef, observationsRef: section.referenceObservationsRef });
