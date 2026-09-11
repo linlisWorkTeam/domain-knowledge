@@ -24,3 +24,20 @@ export function nativeTrustedGates(suites: NativeBehaviorSuite[]) {
   return { suite: { schemaVersion: 'native-cases-v1', cases: entries.map(([, sample]) => sample) } as NativeBehaviorSuite,
     digest: sha256(canonicalJson({ contract: 'native-trusted-gates-v1', cases: entries.map(([key]) => key) })) };
 }
+
+/** Supplementation must not turn a renamed assertion into permission to change its oracle. */
+export function nativeSupplementGates(history: NativeBehaviorSuite[], candidate: NativeBehaviorSuite) {
+  const expectations = new Map<string, string>();
+  const identity = (sample: NativeBehaviorCase) => canonicalJson({ variables: sample.variables, calls: sample.calls, observations: sample.observations });
+  for (const suite of history) for (const sample of suite.cases) {
+    const key = identity(sample), expected = canonicalJson(sample.expected);
+    if (expectations.has(key) && expectations.get(key) !== expected) throw new Error('NATIVE_TRUSTED_EXPECTATION_CONFLICT');
+    expectations.set(key, expected);
+  }
+  for (const sample of candidate.cases) {
+    const key = identity(sample), expected = canonicalJson(sample.expected);
+    if (expectations.has(key) && expectations.get(key) !== expected) throw new Error('NATIVE_SUPPLEMENT_EXPECTATION_CONFLICT');
+    expectations.set(key, expected);
+  }
+  return nativeTrustedGates([...history, candidate]);
+}
