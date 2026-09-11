@@ -3,75 +3,79 @@ Copyright (c) 2026 linlisWorkTeam
 SPDX-License-Identifier: MIT
 文件功能：ReviewAgent 的职责、输入输出与确认状态。
 -->
-# ReviewAgent：根据失败证据，告诉 DocGen 文档该改哪里
+# ReviewAgent
 
-Review 阅读本轮文档、Check 的差异报告和实际评测报告，找出需要修订的文档段落。它交付修改意见，由 DocGen 执笔。
+## 1. 职责与边界
 
-## 它拿到什么
+Review 阅读本轮知识文档、Check 比较报告和实际评测报告，找出需要修订的文档问题，向 DocGen 提供修改位置、原因和建议。
 
-框架把报告正文交给 Review，而不只是告诉它“有一份报告”。有前几轮记录时，还会给出那些轮次的文档、比较结果、测试结果和修改意见，方便判断哪些尝试有效、哪些引入了回归。
+Review 不读取原始仓库，不自行查询未授权历史，也不直接修改文档或批准发布。最终判定由 Gate 完成。
 
-Review 不读取原始仓库，也不能自行查询未授权历史。需要的证据由框架按本次任务范围提供。
+## 2. 输入与输出
 
-## 一条有用的意见长什么样
+输入包含本轮知识及两类报告的正文，不能只给一个引用名称。有前几轮记录时，框架还提供授权的历史文档、比较结果、评测结果和纠正意见。
 
-例如，文档“返回值”一节写的是 3；Check 指出原实现返回 4，重建实现返回 3；测试也证实重建结果不符。Review 应说明：
-
-> 修改“返回值”一节。当前写成 3，与比较报告和测试结果矛盾；建议改为 4，并说明适用条件。依据是本轮的代码差异及失败测试。
-
-每条意见必须有现存位置、问题、建议和依据。没有需要修订的问题就返回空列表，不能为了凑格式编造问题。
-
-有历史时还要总结哪些尝试有用、是否出现回归及下一步建议。当前只是要求这些信息完整且引用有效，真实模型归因是否准确仍需验收。
-
-## 开发规则与验收
-
-### IO-15 / IO-16：用真实报告提出可定位的修改意见
-
-| 项目 | 约定 |
+| 输出 | 内容 |
 | --- | --- |
-| 前提 | 本轮知识、比较报告和评测报告正文已加载；历史存在时框架提供授权的历轮材料。 |
-| 行为 | Review 按报告给出问题、建议和文档位置，有历史时补充总结。框架与 DocGen 使用同一定位规则，核对意见编号及依据，并把所选报告绑定为真实证据引用。 |
-| 结果 | 合法意见交下一轮 DocGen；缺必需材料在调用前失败，不存在/歧义的位置、重复意见编号或非法依据在输出校验时拒绝。不得引用其他 Run 的证据。 |
-| 验收 | 给“返回值”章节及返回错误报告，应能生成可交给 DocGen 的意见；伪造位置或证据须拒绝，多条意见分别绑定所选真实报告。见 [角色测试](../../../../../src/domain/agents/reviewAgent/ReviewAgent.test.ts) 和 [AgentSpecRegression.test.mjs](../../../../../tests/integration/AgentSpecRegression.test.mjs)。 |
-| 状态 | 输入、定位、证据绑定和历史总结结构已实现；真实模型归因与历史分析质量尚未验收。 |
+| 修改意见 | 文档位置、问题、建议及本轮报告依据 |
+| 阻塞标记 | 是否存在阻塞问题 |
+| 历史总结 | 已尝试的修订、有效性、回归情况及下一步建议；有历史输入时必需 |
 
-### IO-16：没有修改意见也不能代替 Gate
+没有需要修改的问题可以返回空意见列表。每条意见的依据只能选择本轮提供的比较报告、评测报告或二者，真实工件引用由框架绑定。
 
-| 项目 | 约定 |
-| --- | --- |
-| 前提 | Review 已阅读实际报告，可能未发现文档问题。 |
-| 行为 | Review 可以返回空意见；若 blocking 为真却没有意见，框架保留未解决风险。发布与继续决策仍读取实际评测和阻塞条件。 |
-| 结果 | 空意见是合法结果，不等于知识通过；Review 本身既不改文档，也不发布知识。 |
-| 验收 | 空意见须通过角色结构校验；测试失败时即使 Review 不阻塞，也不能获得发布结果。正常受控流程须经过独立评测和 Gate 后才发布。见 [角色测试](../../../../../src/domain/agents/reviewAgent/ReviewAgent.test.ts) 、[Gate 单元测试](../../../../../tests/unit/Domain.test.ts) 和 [AgentRevisionFlow.test.ts](../../../../../tests/acceptance/AgentRevisionFlow.test.ts)。 |
-| 状态 | 已实现，有角色及受控流程回归；不以意见数量衡量 Review 质量。 |
+## 3. 工作流程
 
-### AC-AGENT-106：停止时保存可操作的交接
+### 阅读报告并定位问题
 
-| 项目 | 约定 |
-| --- | --- |
-| 前提 | 测试校验/修复失败、文档提案、质量耗尽或 Gate STOPPED 导致流程停止。 |
-| 行为 | Application 根据已发生的事实保存摘要、下一步建议和可打开的证据，有 Review 历史则保留总结；按交接键去重。尚未到 Review 的分支无需强行调用模型。 |
-| 结果 | 得到可读取的 CAS 交接和事件；恢复不重复创建。早期测试失败不得直接归因为知识错误。 |
-| 验收 | 逐一触发四类停止，核对原因、建议、证据正文及交接引用；重复路由后仍只有同一交接。见 [StoppedHandoff.test.ts](../../../../../tests/integration/StoppedHandoff.test.ts)。 |
-| 状态 | 已实现，有四类停止回归；这是 Application 的保证，不依赖 Review 一定已执行。 |
+框架加载材料后，Review 对照实际评测与比较结果分析文档。例如，文档“返回值”写 3，比较报告指出原实现返回 4、重建实现返回 3，测试也失败。Review 可以提出：
 
-完整受控流程验证了“测试失败 → Review 意见 → DocGen 修订 → 再测评”，预设回答不能证明真实模型总能找准原因。自动清理和完整治理展示仍按 [Knowledge IO-19](../../knowledge/Knowledge.md) 保留为未完成能力。
+> 修改“返回值”一节，将返回值更正为 4，并说明适用条件。当前描述与本轮比较报告及失败测试矛盾。
 
-<details>
-<summary>开发对照：意见字段、证据和提示词</summary>
+模型应根据证据解释问题，不能为了凑格式生成没有依据的意见。Prompt 同时要求在存在历史时总结哪些尝试有效、是否出现回归以及下一步建议。
 
-角色 ID 为 `review`，`readablePaths: []`。必需输入为 knowledgeRef、evaluationReportRef、comparisonReportRef；previousCorrectionRefs 可引用框架按轮次整理的历史正文包。
+### 将意见交给下一轮
 
-输出为 blocking、corrections；有历史材料时必需 historySummary。每条 correction 包含 correctionId、knowledgePath、problem、suggestion、evidence。evidence 选择 evaluation、comparison 或二者；knowledgePath 通过与 DocGen 共用的定位解析校验，支持当前文档路径、唯一章节或唯一原文所在章节。
+框架与 DocGen 使用同一套位置解析，检查意见能否定位到当前文档。合法意见被规范为 COR 数字编号，problem 和 suggestion 合成 criterion，problem 记入 risk，选定报告转换为受信 evidenceRefs。
 
-框架将 correctionId 规范为 COR 数字编号，将 problem 与 suggestion 合并为 criterion，将 problem 写入 risk，并把依据映射为受信 evidenceRefs。下一轮提供上一版文档和这些意见，不能把模型输出的任意工件引用直接交给 DocGen。
+需要继续且预算允许时，下一轮 DocGen 接收上一版正文和这些意见进行修订。Review 没有意见也不代表通过；系统继续按实际评测和阻塞条件判定。
 
-STOPPED 保存 ReviewHandoffPrepared 事件及 CAS 交接，包含 summary、historySummary、evidenceRefs、handoffRef，并按交接键去重。验收入口 `tests/integration/StoppedHandoff.test.ts` 检查四类摘要可操作、证据可读、重复路由不重复交接；早期测试失败不得直接归因为知识错误。
+### 停止时留下交接
 
-Prompt 要求按实际报告定位问题，结合已有历史总结，仅引用授权轮次和证据，最终通过由 Gate 判断。共同执行规则见 [Agents](../Agents.md)，版本及证据见 [报告](../../../../reports/AgentSpecRepairAndE2E.md)。
+流程进入 STOPPED 时，Application 保存问题摘要、下一步建议及可打开的证据，有 Review 历史时保留总结，并按交接键去重。
 
-</details>
+测试校验或修复失败、文档拆分提案、文档质量耗尽轮次等分支可能还没执行 Review。此时 Application 根据已有事实生成交接，不为写摘要强行调用模型，也不把早期测试失败直接归因为知识错误。
 
-## 代码与样例
+## 4. 关键约束与失败处理
+
+必需报告或文档缺失，在模型调用前失败。意见位置支持当前文档路径、唯一章节或唯一原文所在章节；位置不存在、存在歧义或指向另一文档时拒绝。
+
+重复意见编号、非法依据均拒绝；模型不能指定另一个 Run 的证据。有历史输入却缺少 historySummary，也不能作为合法输出。
+
+若 blocking 为真却没有修改意见，框架保留未解决风险。取消与非法输出不得提交成功结果，规则见 [Agents](../Agents.md)。停止交接由框架保证，重试和恢复不能重复创建同一交接。
+
+## 5. 验收场景
+
+- **意见可供 DocGen 使用。** 给定返回错误报告，意见定位到当前文档的唯一章节或原文；框架绑定正确的比较/评测引用，DocGen 可按该位置修订。
+- **拒绝虚构位置和依据。** 指向不存在或歧义位置、重复编号、使用非法证据，结果被拒绝；多条意见分别绑定各自选定的真实报告。
+- **检查历史与空意见。** 有历史时输出总结；没有问题时允许空意见。报告阻塞却没有意见时保留风险；测试失败不会因 Review 不阻塞而获得 PASS。
+- **四类停止都可交接。** 分别触发测试校验/修复失败、文档提案、质量耗尽、Gate 停止，检查原因、建议和证据可读取；重复路由后仍只有同一交接。
+
+输入、定位、证据、历史总结结构及停止交接已有回归。受控端到端验证过“测试失败 → Review 意见 → DocGen 修订 → 再评测”，预设回答不证明真实模型能正确归因。
+
+## 6. 未实现与待定事项
+
+真实模型对文档问题的定位、因果分析和历史总结质量尚未验收。自动清理和完整治理展示仍按 [Knowledge](../../knowledge/Knowledge.md) 保留为未完成能力。
+
+## 7. 实现及测试索引
+
+角色 ID：`review`，readablePaths 为空。输入为 knowledgeRef、evaluationReportRef、comparisonReportRef，历史正文包由 previousCorrectionRefs 引用。输出为 blocking、corrections 和有历史时必需的 historySummary；完整意见字段见 Contract。
+
+STOPPED 保存 ReviewHandoffPrepared 事件及 CAS 交接，包含 summary、historySummary、evidenceRefs、handoffRef。规则对应：报告与意见为 IO-15、IO-16；停止交接为 AC-AGENT-106；资料清理为 IO-19。
+
+- 跨角色意见定位：[AgentSpecRegression.test.mjs](../../../../../tests/integration/AgentSpecRegression.test.mjs)。
+- 四类停止交接及去重：[StoppedHandoff.test.ts](../../../../../tests/integration/StoppedHandoff.test.ts)。
+- Gate 独立判定：[Domain.test.ts](../../../../../tests/unit/Domain.test.ts)。
+- 修订和再评测流程：[AgentRevisionFlow.test.ts](../../../../../tests/acceptance/AgentRevisionFlow.test.ts)。
+- 既往执行版本与产物：[AgentSpecRepairAndE2E.md](../../../../reports/AgentSpecRepairAndE2E.md)。
 
 代码位置：[执行入口](../../../../../src/domain/agents/reviewAgent/ReviewAgent.ts)、[输入输出契约](../../../../../src/domain/agents/reviewAgent/ReviewAgentContract.ts)、[提示词与读取范围](../../../../../src/domain/agents/reviewAgent/ReviewAgentPrompt.ts)、[角色测试](../../../../../src/domain/agents/reviewAgent/ReviewAgent.test.ts)、[独立样例](../../../../../src/domain/agents/reviewAgent/examples/ReviewAgentSample.json)。

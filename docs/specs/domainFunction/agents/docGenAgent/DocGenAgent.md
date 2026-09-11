@@ -3,123 +3,97 @@ Copyright (c) 2026 linlisWorkTeam
 SPDX-License-Identifier: MIT
 文件功能：DocGenAgent 的职责、输入输出与确认状态。
 -->
-# DocGenAgent：把源码分析写成一份文档
+# DocGenAgent
 
-DocGen 负责写候选知识文档。首次生成时，它组织内部 DocWorker 阅读源码，再汇总片段；后续轮次则根据上一版文档和纠正意见修改正文。
+## 1. 职责与边界
 
-写出来的文档要交给 Code 重建、独立评测和 Review。DocGen 没有发布权限。
+DocGen 把源码分析写成一份候选知识文档，并在后续轮次根据评测意见修订。它负责组织内部 DocWorker、汇总片段、处理重复与矛盾，以及说明仍未解决的问题。
 
-## 一次生成需要什么
+每次飞轮默认处理一份文档。文档生成后还要交给 Code 重建实现，经过独立评测、Review 和 Gate 才能发布。DocGen 不直接操作数据库或发布知识。
 
-框架提供本次模块的源码、公开接口和允许读取的范围。如果安排了 Worker，还会提供各 Worker 的分析范围、知识片段、源码依据和没弄清的问题。
+## 2. 输入与输出
 
-DocGen 要把这些内容组织成一份完整文档，处理重复和矛盾，并给出标题、摘要和关键词。无法解决的问题应留在风险说明中，不能在汇总时丢掉。
-
-例如，两个 Worker 分别分析订单创建和取消逻辑。它们交付的是两份分析材料，DocGen 默认将其合成一份订单模块文档，而不是直接发布两篇文档。
-
-## Worker 怎么安排
-
-当前按源码文件列表均分任务，默认 1 个 Worker，可设置 0～5 个；0 表示不启动 Worker，DocGen 直接分析。重复路径去重，不派发空任务。
-
-每个 Worker 在独立会话中处理自己的材料。全部成功后，DocGen 才开始汇总。任何一个失败，框架取消同批其他在途任务并等待结束，不用缺了一部分的结果继续写文档。
-
-同一次 Run 中，任务范围、源码和冻结提示词未变时，可复用已保存的 Worker 结果；文档修订不必重新读一遍相同源码。完整结果引用会保留下来，便于查清文档使用了哪些分析材料。
-
-文件均分只是当前实现。按业务模块和调用关系分组、按上下文预算拆小、处理跨模块依赖，仍按 IO-08 保留为下一版本目标。
-
-## “绑定上一版文档”到底是什么意思
-
-假设第一版有“创建订单”“取消订单”“退款”三个章节。Review 只指出“退款”章节有错，框架会把第一版原文和这条意见一起交给 DocGen。
-
-DocGen 必须在这份原文上改“退款”，其余正文原样保留；不能顺手重写“创建订单”，也不能换成另一份模块文档。这就是绑定上一版：明确本轮改哪一份、依据是什么、允许改哪里。
-
-框架会检查上一版确实存在，修改位置能唯一找到，以及未涉及的正文有没有变化。若意见针对整篇文档，或提供了整体质量反馈，则允许调整本篇结构。框架生成的 YAML 描述头不算正文比较范围。
-
-找不到上一版、位置不存在或有歧义、指向另一文档、改动超出允许章节，都会失败。记录“已接收这些纠正意见”不等于问题已经修好，修复效果仍由下一次评测和 Review 判断。
-
-## 内容太多，想拆成几篇怎么办
-
-默认每次飞轮只处理一份文档。DocGen 认为内容太多时，可以只返回拆分建议，说明困难及建议范围，等待用户决定；这时不同时生成正文，也不继续进入 Code。
-
-用户决定继续合成一份，调用方将明确答复和原提案交给新任务；用户同意拆分，则先选择其中一份范围再启动任务。没有答复不能当作同意拆分。
-
-提案和停止处理已实现。专用 Console 决策界面、自动判断“多大必须拆分”的阈值、自动多文档任务都不属于当前已交付能力。
-
-## 输出是什么，描述信息谁来写
-
-正常结果是一份正文、标题、摘要和关键词。模型只写这些内容，框架负责生成 YAML 头、保存 Markdown，并将标题、摘要、关键词写入同一知识版本的索引。
-
-读取方可以先看授权文档的标题和摘要，再决定加载哪一份正文。索引不能扩大读取权限，也不会让候选文档自动成为已通过评测的知识。
-
-## 开发规则与验收
-
-### IO-07 / IO-09：收齐 Worker 结果后再汇总
-
-| 项目 | 约定 |
+| 材料 | 内容 |
 | --- | --- |
-| 前提 | 本次模块和源码已固定，Worker 数量为 0～5，默认 1。 |
-| 行为 | DocGen 按去重后的文件列表分配非空任务；启用 Worker 时等全部成功后才汇总，保留完整片段及未解决问题。失败则取消同批在途任务并等待结束；冻结输入不变时可复用已提交结果。 |
-| 结果 | 正常生成一份候选并保留 Worker 结果引用；Worker 批次失败不得继续合成半份文档。数量为 0 时直接分析。 |
-| 验收 | 两个 Worker 均成功才调用汇总模型；其中一个失败不得产生候选。重试复用已提交且材料一致的结果，风险信息仍传给汇总。见 [角色测试](../../../../../src/domain/agents/docGenAgent/DocGenAgent.test.ts) 和 [DocGenSubAgents.test.ts](../../../../../tests/integration/DocGenSubAgents.test.ts)。 |
-| 状态 | 最小批次管理已实现，有角色及集成回归；业务分组和预算仍属 IO-08 待完成目标。 |
+| 基础输入 | 本次模块、固定版本的源码、公开接口和读取范围 |
+| Worker 材料 | 各任务的分析范围、完整片段、源码依据及未解决问题 |
+| 修订输入 | 上一版文档、纠正意见或整体质量反馈 |
+| 决策输入 | 用户对拆分提案的明确答复及对应提案 |
 
-### IO-18：在指定上一版上定向修订
+正常输出包含正文、标题、摘要和关键词，可附未解决风险。框架保存 Markdown 后，返回候选引用、来源、变更路径及 Worker 结果引用；修订结果另记录上一版引用和接收的意见编号。
 
-| 项目 | 约定 |
-| --- | --- |
-| 前提 | 本轮收到纠正意见或整体质量反馈，且提供对应的上一版正文。 |
-| 行为 | 框架先验证上一版和定位。仅章节意见且无整体质量反馈时，DocGen 只改命中章节，其余正文逐字保留；整篇意见或整体质量反馈允许调整本篇结构。 |
-| 结果 | 成功保存候选及上一版、意见编号的关联；缺上一版、定位不存在/不唯一、指向别篇或越界改正文均拒绝。接受意见不表示问题已解决。 |
-| 验收 | 上一版含创建、取消、退款三节，只给退款意见：仅改退款应通过，顺改创建必须失败；缺上一版或两个同名目标章节必须拒绝。Review 原文定位应能被 DocGen 接续使用。见 [角色测试](../../../../../src/domain/agents/docGenAgent/DocGenAgent.test.ts) 和 [AgentSpecRegression.test.mjs](../../../../../tests/integration/AgentSpecRegression.test.mjs)。 |
-| 状态 | 已实现，有修订及跨角色定位回归；最终修复效果仍需独立评测。 |
+拆分提案是另一种输出，只包含拆分原因和建议文档范围，不附正文。输入输出的完整字段见文末 Contract。
 
-### IO-18：拆分建议必须停下来等明确决定
+## 3. 工作流程
 
-| 项目 | 约定 |
-| --- | --- |
-| 前提 | 默认生成单文档；模型认为需要拆分，或新任务携带用户对既有提案的明确答复。 |
-| 行为 | 提案只交原因和建议范围，不同时交正文。框架保存提案后停止；继续一份时核对显式 keep-single 答复及提案绑定，拆分时由调用方选定范围建立新任务。 |
-| 结果 | 提出建议时不创建候选、不调用 Code；无答复不得自动拆分。混交提案与正文、错误提案或范围绑定均拒绝。 |
-| 验收 | 只返回提案时检查 Run 停止且没有候选；提案混入正文须拒绝；显式继续单文档后才允许生成正文。见 [角色测试](../../../../../src/domain/agents/docGenAgent/DocGenAgent.test.ts) 和 [DocGenDecision.test.ts](../../../../../tests/integration/DocGenDecision.test.ts)。 |
-| 状态 | 提案、停止和单文档答复链路已实现；专用 Console 决策界面、自动阈值及自动多文档任务未交付。 |
+### 首次生成
 
-### IO-22：正文与描述信息一起保存
+DocGen 先检查材料，再安排 Worker 阅读源码。当前按去重后的文件列表均分，默认 1 个 Worker，可设置 0～5 个，不派发空任务；设为 0 时由 DocGen 直接分析。
 
-| 项目 | 约定 |
-| --- | --- |
-| 前提 | DocGen 正常交付正文、标题、摘要、关键词，可能附带未解决风险。 |
-| 行为 | 框架校验正文至少 200 字符、描述非空、关键词非空、不重复且无首尾空白，拒绝模型自写 YAML 头；统一生成 Markdown 描述头和同版本索引。索引及正文读取都核对授权。 |
-| 结果 | 得到带描述和来源的候选文档；非法格式拒绝。描述可用于选择加载哪篇正文，不能扩大读取范围，也不授予发布状态。 |
-| 验收 | 正常输出的 Markdown 与索引描述应一致；空关键词、模型自写 YAML 须拒绝；读取描述不应加载正文，未授权请求不得读取工件。见 [角色测试](../../../../../src/domain/agents/docGenAgent/DocGenAgent.test.ts) 和 [KnowledgeDocument.test.ts](../../../../../tests/integration/KnowledgeDocument.test.ts)、[DocGenDecision.test.ts](../../../../../tests/integration/DocGenDecision.test.ts)。 |
-| 状态 | 已实现，有序列化、索引和授权回归；描述准确性及文档能否支撑真实业务重建待验收。 |
+各 Worker 在独立会话中执行，全部成功后才开始汇总。例如两个 Worker 分别分析订单创建和取消逻辑，DocGen 将它们组织成一份订单模块文档。Worker 提出的缺口必须随完整片段传入，汇总结果继续保留未解决风险。
 
-## 保留的目标与证据边界
+同一次 Run 内，任务范围、源码和冻结提示词不变时，可以复用已保存的 Worker 结果。框架保留结果引用，便于追溯这份文档使用了哪些分析。
 
-IO-10 保留按业务主题分批汇总、中间摘要、问题回查源码及请求补充分析的目标；方案待论文调研，尚未实现。2026-09-10 已确认将业务分组/预算、分批汇总及补充分析留待下一版本确定，不能用文件均分和一次汇总声称已解决大仓库上下文问题。
+DocGen 只输出正文和描述信息。框架统一生成 YAML 头，并将标题、摘要和关键词写入同一知识版本的索引，关键词保存为版本 tags。授权读取方可先调用 describe 查看描述，再通过 loadDocument 读取正文；这一能力不新增 SearchAgent，也不改变候选的发布资格。
 
-运行资料清理按 [Knowledge IO-19](../../knowledge/Knowledge.md)，历史最佳回退等按 [Evaluation IO-20](../../evaluation/Evaluation.md)。自动清理与历史回退仍未完成，不因本页整理而取消。
+### 根据意见修订
 
-上述流程回归使用预设模型回答，已有执行证据见 [验收报告](../../../../reports/AgentSpecRepairAndE2E.md)。源码分析的完整性、矛盾处理和真实模型文档质量仍需业务验收。
+后续轮次中，框架把上一版原文与纠正意见交给 DocGen，明确本轮改哪份文档、依据是什么。
 
-<details>
-<summary>开发对照：字段、修订规则和提示词</summary>
+假设上一版有“创建订单”“取消订单”“退款”三节，Review 只指出退款章节有错，且没有整体质量反馈。DocGen 只能修改退款章节，其余正文必须逐字保留。框架接收结果时检查这一点，YAML 描述头不参与正文比较。
 
-角色 ID 为 `doc-gen`。必需输入为 moduleId、sourceRefs、publicInterfaceRefs；可选 workerFragmentRefs、baseKnowledgeRef、corrections、qualityFeedback、documentDecision。DocGenContext.docWorkers 承接内部执行；workerCount 默认 1，范围 0～5，非法值在模型调用前失败。
+意见针对整篇文档，或附带整体质量反馈时，允许调整本篇结构。成功结果记录 baseKnowledgeRef 和 appliedCorrectionIds；记录接收意见不表示问题已经解决，修复效果仍由下一轮评测和 Review 判断。
 
-正常输出为 body、title、description、keywords，可带 unresolvedRisks。正文至少 200 字符，标题/摘要不能纯空白，关键词非空、不重复且不得含首尾空白。模型不得输出 YAML 头，框架统一序列化。模块标识必须与输入一致且为稳定 slug。
+### 提出文档拆分
 
-结果为 knowledgeCandidate，包含 bodyRef、provenance、changedPaths、workerResultRefs 和 unresolvedRisks；修订还带 baseKnowledgeRef、appliedCorrectionIds。片段工件保存完整结构，Worker 的未解决问题必须传给 DocGen。
+内容难以合成一篇时，DocGen 可以返回拆分原因和建议范围。框架保存提案，返回 userDecisionRequired；候选节点不创建文档，路由进入 STOPPED，也不继续调用 Code。
 
-有 corrections 或 qualityFeedback 时必需非空 baseKnowledgeRef；生产后续轮次缺失上一版直接失败。Correction 的 knowledgePath 支持当前 `knowledge/<moduleId>.md`、该路径加 `#章节标题`、唯一章节标题或唯一原文片段。Review 与 DocGen 共用 DocGenRevision，原文片段归入所在章节；只涉及章节且无整体质量反馈时，其余正文逐字保留。Correction 沿用 correctionId、criterion、evidenceRefs、risk，拒绝重复编号和非法定位。
+用户明确选择继续一篇后，调用方在新任务中提供 keep-single 答复、proposalRef 和提案正文，框架核对模块与源码绑定后继续。用户同意拆分时，由调用方先选定一份范围再建立任务；没有答复不能推定同意。
 
-拆分输出为独立的 `splitProposal: { reason, suggestedDocuments }`，不能混入 body。结果 userDecisionRequired 携带 proposalRef；candidate_knowledge 识别后不创建候选，经 workflow_router STOPPED。继续单文档时显式提供 `documentDecision: { action: 'keep-single', proposalRef }` 和提案正文；框架核对提案及源码绑定。
+## 4. 关键约束与失败处理
 
-版本 tags 保存关键词。KnowledgeSearchApp 的 `describe(allowedVersionIds)` 只读授权描述，`loadDocument(versionId, allowedVersionIds)` 才读正文；未授权请求在工件读取前拒绝，不新增 SearchAgent。
+### 材料与 Worker 批次
 
-Prompt 要求可追溯的单文档汇总、定向修订、范围外保留、矛盾/缺口说明，以及拆分前等待答复。执行端负责并发上限、取消、冻结提示词及保存结果；DocGen 不操作数据库或发布。共同约定见 [Agents](../Agents.md)。
+模块标识必须与输入一致且使用稳定 slug。必需材料缺失、Worker 数量非法，在模型调用前失败。任一 Worker 失败时，执行端取消同批其他在途任务并等待结束，不拿部分结果继续汇总。
 
-</details>
+### 修订范围
 
-## 代码与样例
+有纠正意见或质量反馈时必须提供非空上一版；后续轮次缺上一版也直接失败。意见保留 correctionId、criterion、evidenceRefs 和 risk，编号不能重复，证据不能为空。
+
+修改位置使用 Review 与 DocGen 共用的定位规则：支持当前文档路径、路径加章节标题、唯一章节标题或唯一原文片段。原文片段归入所在章节；不存在、无法唯一定位或指向另一文档都拒绝。仅允许修改部分章节时，范围外正文变化同样拒绝。
+
+### 输出与读取权限
+
+正文至少 200 字符；标题和摘要不能纯空白；关键词非空、不重复且无首尾空白。模型自写 YAML 头、提案与正文混交、错误提案绑定均拒绝。
+
+索引和正文都按授权版本集合读取，未授权请求在工件读取前失败。Prompt 要求单文档汇总、定向修订、保留范围外正文和未解决问题；并发、取消、材料授权及保存由执行端保证。通用失败规则见 [Agents](../Agents.md)。
+
+## 5. 验收场景
+
+- **汇总完整批次。** 两个 Worker 均成功后才调用汇总模型，候选保留双方结果引用和风险；任一失败，不产生候选。冻结输入相同的重试可复用已提交片段。
+- **只修改退款。** 提供三节正文和退款意见，仅改退款接受为新候选；同时改写创建章节则拒绝。
+- **拒绝无依据修订。** 缺上一版、目标不存在或有两个同名目标章节时失败；Review 给出的唯一原文位置能被 DocGen 接续使用。
+- **等待拆分决定。** 返回提案后 Run 停止且没有候选；混入正文拒绝；明确答复继续单文档后才生成正文。
+- **保存描述并检查授权。** Markdown 描述与版本索引一致；空关键词和模型自写 YAML 拒绝。只读描述不加载正文，未授权请求不读取工件。
+
+上述结构和流程已有受控回归。源码分析是否完整、矛盾是否解决及文档是否足以重建真实业务，仍需真实模型和业务场景验收。
+
+## 6. 未实现与待定事项
+
+业务分组、上下文预算及跨模块依赖处理尚未实现。按业务主题分批汇总、保存中间摘要、发现问题回查源码或请求补充分析仍是待论文调研的方案。2026-09-10 已确认留待下一版本确定，当前文件均分和一次汇总不算这些目标完成。
+
+专用 Console 决策界面、自动拆分阈值和自动多文档任务尚未交付。自动清理及历史最佳回退也仍未完成，分别沿用 [Knowledge](../../knowledge/Knowledge.md) 和 [Evaluation](../../evaluation/Evaluation.md) 的目标。
+
+## 7. 实现及测试索引
+
+角色 ID：`doc-gen`。内部执行由 DocGenContext.docWorkers 承接。正文结果为 knowledgeCandidate，提案结果为 userDecisionRequired；字段和 Prompt 入口见下方代码链接。
+
+规则对应：Worker 管理与片段交接为 IO-07、IO-09；业务分组为 IO-08；分批汇总为 IO-10；修订和拆分为 IO-18；描述与索引为 IO-22；清理和回退为 IO-19、IO-20。
+
+- Worker 批次、失败及复用：[DocGenSubAgents.test.ts](../../../../../tests/integration/DocGenSubAgents.test.ts)。
+- 提案停止及候选质量检查：[DocGenDecision.test.ts](../../../../../tests/integration/DocGenDecision.test.ts)。
+- 跨角色修订定位：[AgentSpecRegression.test.mjs](../../../../../tests/integration/AgentSpecRegression.test.mjs)。
+- 描述、索引及授权：[KnowledgeDocument.test.ts](../../../../../tests/integration/KnowledgeDocument.test.ts)。
+- 既往执行版本与产物：[AgentSpecRepairAndE2E.md](../../../../reports/AgentSpecRepairAndE2E.md)。
 
 代码位置：[执行入口](../../../../../src/domain/agents/docGenAgent/DocGenAgent.ts)、[输入输出契约](../../../../../src/domain/agents/docGenAgent/DocGenAgentContract.ts)、[提示词与读取范围](../../../../../src/domain/agents/docGenAgent/DocGenAgentPrompt.ts)、[角色测试](../../../../../src/domain/agents/docGenAgent/DocGenAgent.test.ts)、[独立样例](../../../../../src/domain/agents/docGenAgent/examples/DocGenAgentSample.json)。

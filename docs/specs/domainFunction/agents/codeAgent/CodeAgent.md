@@ -3,65 +3,73 @@ Copyright (c) 2026 linlisWorkTeam
 SPDX-License-Identifier: MIT
 文件功能：CodeAgent 的职责、输入输出与确认状态。
 -->
-# CodeAgent：只看文档，重新写出实现
+# CodeAgent
 
-CodeAgent 用候选知识文档和必要的编写配置，生成一份新的 C/C++ 实现。这样，后面的测试才能检查文档是否足以描述原来的业务行为。
+## 1. 职责与边界
 
-## 它能看到什么
+CodeAgent 根据候选知识文档和必要编写配置，重新生成 C/C++ 实现。后面的独立测试用这份实现检查文档能否准确描述业务行为。
 
-知识文档要包含需要实现的接口和行为。框架另给语言标准、依赖声明、编写约束，以及允许生成的文件路径。
+Code 看不到原始实现、原仓库的独立接口文件、测试用例和答案，也不会拿到整份项目场景。它返回生成文件，不直接修改业务仓库，不执行发布。
 
-Code 看不到原始实现、原仓库的独立接口文件、测试用例或测试答案，也不会拿到整份项目场景。项目编译命令和完整运行配置交给评测器。
+## 2. 输入与输出
 
-例如，文档说“calculate() 返回 4”，并要求生成 `src/module.cpp`。Code 根据这份说明写函数；如果文档漏写了边界行为，Code 不能去偷看原实现补答案。是否漏写，需要后面的评测和 Review 发现。
-
-## 开发规则与验收
-
-### IO-03 / IO-04：只凭文档与必要配置重建
-
-| 项目 | 约定 |
+| 输入 | 用途 |
 | --- | --- |
-| 前提 | 候选文档已包含接口和行为；框架已裁剪编写配置。 |
-| 行为 | 框架只提供知识正文、语言标准、依赖声明、编写约束和输出范围，工具仓库视图为空。Code 根据这些材料实现，不读取原实现、独立接口、测试及答案。 |
-| 结果 | 生成的实现可用于检验文档是否足以重建行为。缺少必需材料在模型调用前失败，不能扩大读取范围补材料。 |
-| 验收 | 在场景中放入原源码和测试答案，检查模型实际收到的 Prompt、配置和读取范围，均不得带入这些内容；缺知识引用须在模型执行前失败。见 [角色测试](../../../../../src/domain/agents/codeAgent/CodeAgent.test.ts)。 |
-| 状态 | 已实现，有材料裁剪回归；完整部署隔离另行验收。 |
+| 候选知识文档 | 描述需要实现的接口和业务行为 |
+| 编写配置 | 语言、标准、依赖声明和编写约束 |
+| 允许生成路径 | 限定可以交付哪些文件 |
+| 必须重建路径 | 在生产流程中指定一个也不能漏的实现文件 |
 
-### IO-04 / IO-05：完整交付规定的 C/C++ 文件
+知识和配置以内联材料提供，工具仓库视图为空。配置只包含 languageId、standard、dependencies、constraints、allowedGeneratedPaths；编译及运行命令由评测器持有。
 
-| 项目 | 约定 |
-| --- | --- |
-| 前提 | 配置给出允许生成路径；生产工作流另给必须重建的实现路径。 |
-| 行为 | Code 返回路径和非空源码。框架校验语言、相对路径、授权、重复及必需文件；评测器先删除必须重建的原实现，再写入生成文件。 |
-| 结果 | 合法输出成为候选代码；漏必需文件、越界或重复输出均失败，不能用残留原实现补齐，也不能凭生成成功发布。 |
-| 验收 | 合法文件通过；增加越权路径、重复同一路径或漏一个必需文件必须拒绝。流程中漏重建文件不得发布；正常输出交真实编译与评测。见 [角色测试](../../../../../src/domain/agents/codeAgent/CodeAgent.test.ts) 和 [AgentSpecRegression.test.mjs](../../../../../tests/integration/AgentSpecRegression.test.mjs)、[AgentRevisionFlow.test.ts](../../../../../tests/acceptance/AgentRevisionFlow.test.ts)。 |
-| 状态 | 已实现，有角色、失败流程和受控 C/C++ 编译回归；真实模型重建质量待验收。 |
+输出是 `files: [{ path, content }]`。允许生成的集合可以大于必须重建的集合。独立角色契约允许省略 requiredGeneratedPaths；生产流程必须提供，取 sourcePaths 中不属于 publicInterfacePaths 的实现路径。
 
-### IO-06：编写配置与评测命令分开提供
+## 3. 工作流程
 
-| 项目 | 约定 |
-| --- | --- |
-| 前提 | 项目场景包含 Agent 编写配置及参考/最终评测命令。 |
-| 行为 | 框架校验并冻结场景，仅把编写配置交给 Code；完整构建、运行命令由评测器读取。 |
-| 结果 | Code 输入不含整份场景或测试命令；非法语言、配置字段或不一致的输出范围被拒绝。 |
-| 验收 | 提供含构建命令的完整场景，模型只应收到契约允许的配置字段；语言与输出范围不一致时拒绝。见 [角色测试](../../../../../src/domain/agents/codeAgent/CodeAgent.test.ts)。 |
-| 状态 | 场景冻结和配置裁剪已实现；独立项目配置文件及版本管理（KF-SYS-044）尚未实现，继续保留。 |
+### 接收文档与配置
 
-公司 CodeAgent CLI 属于另一项适配工作，当前角色实现不代表已接入该 CLI。
+框架先校验并冻结项目场景，裁剪出 Code 可以看到的编写配置，再加载知识正文。接口必须由文档说明，不能额外提供原仓库接口文件补足信息。
 
-<details>
-<summary>开发对照：字段、权限和提示词</summary>
+### 生成全新实现
 
-角色 ID 为 `code`。输入为 knowledgeRef、projectConfigurationRef、languageId、allowedGeneratedPaths；生产工作流还提供 requiredGeneratedPaths。独立角色契约允许省略最后一项，生产值取 sourcePaths 中不属于 publicInterfacePaths 的实现路径。
+例如，文档要求 calculate() 返回 4，并将实现写入 src/module.cpp。Code 按此描述生成函数；如果文档遗漏边界行为，不能读取原源码补答案，应由后续评测和 Review 发现缺口。
 
-裁剪后的配置只允许 languageId、standard、dependencies、constraints、allowedGeneratedPaths。场景的 agentConfiguration 经校验并冻结；referenceCommands/finalCommands 由执行器使用，详细配置见 [Application](../../../application/Application.md)。
+Prompt 要求完整交付规定文件，禁止添加未授权的测试、文档或配置。框架收到结果后检查整组文件，合法结果才成为候选代码。
 
-模型输出 `files: [{ path, content }]`。角色 `readablePaths: []`，知识和配置以内联材料提供，Adapter 创建空的仓库文件视图。输入、动态 Schema 和 Domain 校验共同检查范围、语言、配置、重复路径及必需重建文件；旧执行版本不兼容时拒绝恢复。
+### 交给独立评测
 
-Prompt 要求按文档生成全新实现、完整返回规定文件，并禁止读取参考源码或门禁答案、添加未授权测试/文档/配置。提示词以外的读取控制见 [Workspace](../../workspace/Workspace.md)；通用执行规则见 [Agents](../Agents.md)。
+评测器在独立副本中先删除必须重建范围内的原实现，再写入生成文件，防止漏生成被旧文件补齐。随后使用已固定测试集，按项目配置编译运行。
 
-</details>
+生成成功只表示拿到了候选代码。知识是否通过仍由评测、Review 和 Gate 决定。
 
-## 代码与样例
+## 4. 关键约束与失败处理
+
+必需材料缺失，在模型调用前失败。只支持 C/C++ 及对应语言标准；非法语言、额外配置字段、配置与授权路径不一致均拒绝。
+
+文件内容必须非空，扩展名符合 C/C++ 约定，路径是允许集合内的规范相对路径。绝对路径、路径越界、重复文件、未授权输出，以及遗漏必需文件都会失败。
+
+输入、动态 Schema 与 Domain 校验共同限制输出；Prompt 之外的实际读取控制见 [Workspace](../../workspace/Workspace.md)。旧执行版本不兼容时拒绝恢复，其他取消与失败规则见 [Agents](../Agents.md)。
+
+## 5. 验收场景
+
+- **材料不泄露答案。** 场景带有原源码、接口路径和测试配置时，检查模型实际收到的材料与读取范围：只有知识和裁剪配置，不能出现参考实现或测试答案。
+- **拒绝不完整交付。** 合法文件可接受；增加越权路径、重复文件或漏一个必须重建的文件，均拒绝，流程不得发布。
+- **检查配置。** 输入不支持的语言或不一致的输出范围时失败；完整场景中的构建命令不能进入模型配置。
+- **真实编译与评测。** 正常输出交给执行器编译；文档写错导致重建行为错误时评测失败，文档修订后再重建、再评测。
+
+材料裁剪和文件校验已有角色回归，完整流程已有受控 C/C++ 编译证据。真实模型的代码质量及完整部署隔离仍需单独验收。
+
+## 6. 未实现与待定事项
+
+场景冻结和配置裁剪已实现；独立项目配置文件及其版本管理尚未实现，仍保留为目标。详细配置边界见 [Application](../../../application/Application.md)。
+
+公司 CodeAgent CLI 是另一项适配工作，当前同名角色的实现不代表已接入该 CLI。
+
+## 7. 实现及测试索引
+
+角色 ID：`code`，readablePaths 为空。规则对应：文档及接口输入为 IO-03；材料和输出范围为 IO-04；C/C++ 目标为 IO-05；配置管理为 IO-06，独立配置版本管理目标为 KF-SYS-044。
+
+- 漏文件等失败流程：[AgentSpecRegression.test.mjs](../../../../../tests/integration/AgentSpecRegression.test.mjs)。
+- 两轮重建与独立评测：[AgentRevisionFlow.test.ts](../../../../../tests/acceptance/AgentRevisionFlow.test.ts)。
 
 代码位置：[执行入口](../../../../../src/domain/agents/codeAgent/CodeAgent.ts)、[输入输出契约](../../../../../src/domain/agents/codeAgent/CodeAgentContract.ts)、[提示词与读取范围](../../../../../src/domain/agents/codeAgent/CodeAgentPrompt.ts)、[角色测试](../../../../../src/domain/agents/codeAgent/CodeAgent.test.ts)、[独立样例](../../../../../src/domain/agents/codeAgent/examples/CodeAgentSample.json)。

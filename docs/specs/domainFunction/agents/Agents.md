@@ -50,25 +50,17 @@ Orchestrator 先选定一个模块。随后，两条工作同时开始：DocGen 
 | Gate / 发布判定 | 根据真实评测和阻塞条件决定通过、继续或停止的确定性规则 |
 | checkpoint / 检查点 | 已保存的执行进度或结果，用于中断后恢复，避免重复提交 |
 
-## 开发时怎样使用这组 Spec
+## 文档阅读顺序
 
-先读角色页前半部分，理解任务和例子；再按“开发规则与验收”逐项实现。每项规则都写明以下五件事：
+角色页统一采用七节：职责与边界、输入与输出、工作流程、关键约束与失败处理、验收场景、未实现与待定事项、实现及测试索引。
 
-| 项目 | 开发和 review 要核对什么 |
-| --- | --- |
-| 前提 | 哪些输入或上游结果必须已经存在，规则在哪个分支生效 |
-| 行为 | Agent 做什么，框架负责校验、执行或保存什么 |
-| 结果 | 成功交付什么；不满足约定时拒绝、修复还是停止，不能继续做什么 |
-| 验收 | 给出什么场景，必须观察到什么结果；已有测试从哪里进入 |
-| 状态 | 哪部分已实现，证据覆盖到哪里，还有什么没有完成 |
+先读前四节理解任务如何执行，再用验收场景核对成功和失败行为。第六节保留未完成设计，第七节集中列出规则编号、Contract、Prompt、实现和测试入口。流程小节按角色实际工作组织，例如 DocGen 分为首次生成、根据意见修订和提出文档拆分。
 
-IO 编号沿用业务决定，AC-AGENT 编号沿用验收要求；同一编号可以涉及多个角色，不表示由这些角色重复执行。角色页写行为约定，折叠的“开发对照”解释字段和实现位置，完整机器字段见链接的 Contract；跨角色顺序、轮次及恢复以 [Workflow](../workflow/Workflow.md) 为共同约定。发现它们互相矛盾时应修正并说明差异，不能自行选择更宽松的版本。
+IO 编号沿用业务决定，AC-AGENT 编号沿用验收要求；同一编号可能涉及多个角色，不表示重复执行。跨角色顺序、轮次及恢复统一见 [Workflow](../workflow/Workflow.md)。文档、Contract 或实现互相矛盾时，应说明并修正差异，不能自行采用更宽松的约束。
 
-所有角色共同遵守：缺必需材料应在调用模型前失败；非法模型结果在返回成功前拒绝；调用前或执行中取消都不得提交成功产物。Adapter 的网络/格式重试不等于业务修复，业务修复只能走明确规定的分支。各角色测试均包含正常、缺材料、非法输出及取消用例。
+“已实现”描述现有代码及回归覆盖；“受控”表示模型回答预设，执行器仍可能真实编译运行。它们不等于真实模型质量或部署隔离已验收。测试索引提供现有验收入口，既往版本与产物见 [报告](../../../reports/AgentSpecRepairAndE2E.md)，不表示每次文档编辑都重新执行这些测试。
 
-“已实现”只指所写的行为已有代码和对应回归；“受控”表示模型回答预设，执行器仍可能真实编译运行。两者都不等于真实模型质量或部署环境验收。各页测试链接是现有验收入口，既往执行版本与产物见 [验收报告](../../../reports/AgentSpecRepairAndE2E.md)，不表示每次编辑文档都重新跑过这些测试。
-
-尚未实现、暂定或延期的目标单独保留。缺少预算、阈值或算法决定时，应先明确设计与验收条件，不能用当前简化实现替换目标，也不能把本轮静态文档校验当成功能完成证据。
+尚未实现、暂定或延期的目标继续保留。缺少预算、阈值或算法决定时，要先明确设计与验收条件，不能用当前简化实现替换目标，也不能把静态文档校验当作功能完成证据。
 
 ## 已完成和仍保留的目标
 
@@ -85,8 +77,7 @@ Worker 的业务分组与预算、DocGen 分批汇总、Check 相似度研究分
 
 SearchAgent 也还未实现：目标是由 Application 的 KnowledgeSearchApp 直接调用，只读已发布、当前 VERIFIED 且正文完整的授权知识，不新建 Run、不经 Orchestrator 或 LangGraph。现有多状态管理查询不能直接充当它的读取接口，KF-SYS-043 保持 Planned。
 
-<details>
-<summary>开发对照：共同执行约定</summary>
+## 共同执行约定
 
 每个角色有入口、Contract、Prompt、测试和样例。`execute(input, context)` 接收该角色的 Payload 与已加载材料；context 提供模型执行接口、effectivePrompt、iteration 和取消信号。
 
@@ -98,8 +89,7 @@ Prompt 由角色基础指令、冻结的 promptAddon、适用治理指令、本�
 
 独立入口示例：`npm run agent:run -- --role code --input src/domain/agents/codeAgent/examples/CodeAgentSample.json --output /tmp/code-agent-run`。默认样例使用预设回答；`--provider dsh` 需要真实接入配置。独立角色结果不自动评测或发布，操作见 [AgentDevelopment](../../../AgentDevelopment.md)。
 
-</details>
 
-## 代码与样例
+## 实现及测试索引
 
 代码位置：[src/domain/agents/AgentRegistry.ts](../../../../src/domain/agents/AgentRegistry.ts)、[src/domain/agents/AgentExecution.ts](../../../../src/domain/agents/AgentExecution.ts)、[src/domain/agents/AgentContracts.ts](../../../../src/domain/agents/AgentContracts.ts)。
