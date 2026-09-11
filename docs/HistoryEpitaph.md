@@ -246,3 +246,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 [2026-09-11-0916-console-regression.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/8e7c2c93114b35ecf432be9f7c11ee95362e3a92/docs/epitaph/2026-09-11-0916-console-regression.md) 480自动化通过，Console初次反馈错位与布局基线问题随后修复并32/32通过。真实两卡修订和新代码可信31/31、固定11/11通过，来源仍在复核，未部署。
 
 [2026-09-11-0918-live-source-correction.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/f82208072ae7a620739f16bcd34951bd76b37fcb/docs/epitaph/2026-09-11-0918-live-source-correction.md) 完整Console通过后真实两卡修订完成，新重建可信31/31固定11/11通过。新来源复核仍运行；独立混合风险章节修订已补，自动流程与最终发布部署未完成。
+
+[2026-09-11-0921-revised-reconstruction.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/504ac15890a03be8e416a74385f5ae564184735e/docs/epitaph/2026-09-11-0921-revised-reconstruction.md) 两卡真实修订后重建可信31/31、固定11/11完成，新来源仍运行。随后独立及一键混合风险修订路径已接，风险保留，最终真实发布部署未完成。

@@ -1,0 +1,13 @@
+# 混合风险一键推进v16
+
+实际/tmp/domain-knowledge-workbench，feat/five-stage-workbench，实现504ac15890a03be8e416a74385f5ae564184735e，Node24/384MiB，目标active，旧站/原树保持。
+
+Domain WorkbenchPipeline新增pipelineSourceRepairable：完整sourceFailure仍UNRESOLVED，但新选择器存在同卡明确纠正时可走sourceRevision；不改source门禁。pipelineSourceRevisionFailure独立于原pipelineRevisionFailure：UNRESOLVED仅新source-correction-selection-v1成功来源修订、indexed=true、至少1张REVISED/ACCEPTED、updatedIds与cards一一匹配、完整versionIds严格替换原输入且无重复才可继续重建。质量拒绝/缺索引/错来源/伪造映射/无更新仍失败。pipelineSourceRepairs使用专门判定，停滞规则不变。Application分支已接，web版本及面板fixture更新knowledge-pipeline-v16；v15及更早只读、不恢复不取消，新增v15明确断言，保留原v1/v14断言。
+
+测试：WorkbenchSourcePipeline5PASS（含混合风险→修订→重建→来源仍未知停止，或完整来源成功才关联；取消/六轮/停滞原assertions不变）；Domain/Panel9PASS，固定流程+普通流程+完整publication准备17PASS；新增v15后Domain/普通pipeline11PASS；架构8PASS，type/Spec/diff通过。统计有重叠。新测试最初读取round.revision冻结句柄的空result出错，改读stages.get最终任务，已修正；无放宽。证据mixed-source-pipeline目录包含各log。之前480/32全回归是旧基线，当前两次混合风险改动还需完整回归。
+
+下一项必要工作：补WorkbenchEvaluation.test.ts的真实Application混合章节修订断言（现有两种sourceReject情形仍保留），模型结束后串行原生执行，再Console仓库全案例与新混合风险UI检查。当前模拟DOM验证入口和风险保留，尚非浏览器新混合路径实测。
+
+真实source task stage-826fed86bba18a7aa3b75ead348d503aac5181395798f5f4a1d341194f734bd4仍运行，PID2522760/session32339，/tmp/SourceAfterCorrectionBindings.log；最新15calls/276294tokens/reserved1330240/约460s。继续同handle，勿重启。Source.json位于real-knowledge-revision/source-after-correction-bindings-v1。模型后续使用当前代码新sourceCorrectionPolicy修订，旧来源/旧版本风险不删。不要对已变化旧3ac5输入强制执行。来源执行本身未改，正在进程保持原加载代码。
+
+原始任务仍含jsmn/TinyXML2双目标完整真实一键/分步、最终来源通过/关联查看/发布、当前全回归截图与网站部署；尚未完成。重资源串行，模型运行时只做轻量代码/SQLite/类型检查，不启动浏览器或原生编译。
