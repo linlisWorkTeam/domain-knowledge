@@ -64,3 +64,9 @@ Application 冻结配置，LangGraph 保存执行 checkpoint，Registry 记录�
 ### DocGen 待决结果接线
 
 DocGen 可返回 userDecisionRequired（拆分原因与建议），candidate_knowledge 将提案引用和内容放入 docGenDecisionRequired，并沿现有 workflow_router → stopped 停止；不创建候选、不进入 code。该结果只用于 IO-18 的文档范围沟通，不改变正常测评、Review、Gate 与发布顺序。用户答复后由调用方准备显式单文档任务。
+
+## 轮次上限的强制验收（2026-09-11）
+
+AC-AGENT-105：maxIterations 表示包含首轮的最大业务轮数；内部 iteration 保持从 0 开始。进入每轮生成前统一检查 `0 <= iteration < maxIterations`，当前轮结束时仅当 `iteration + 1 < maxIterations` 才允许继续。质量拒绝、测评失败及恢复必须使用相同 Domain 规则，不能分支各自判断。模型格式重试、TestGen 有限修复和同轮节点重放不增加业务轮数。持久化节点提交键保证同轮重放幂等，下一轮必须经过 Orchestrator 入口检查。
+
+验收命令：`node --test tests/integration/WorkflowIterationLimit.test.ts`。maxIterations=1 首轮失败后 STOPPED，Orchestrator/DocGen/Code 均不出现第二轮；maxIterations=2 可在第二轮通过；质量拒绝同样停在上限；已耗尽上下文直接重入生成入口时必须在模型调用前拒绝；恢复/重放不多消费或绕过轮数。

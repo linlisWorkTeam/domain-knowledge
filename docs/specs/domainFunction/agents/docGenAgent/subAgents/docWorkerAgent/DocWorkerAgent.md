@@ -55,3 +55,9 @@ IO-09 采用必需字段 `analysisScope: { moduleId, files, symbols }`、`fragme
 片段工件保存完整 JSON，确保汇总收到范围、正文、依据和缺口；未解决问题进入结果 unresolvedRisks，并沿内部执行端传递给 DocGen，不能被固定空数组丢弃。缺依赖可以明确报告问题，不得编造依据；未覆盖任务文件则本次执行失败。上述字段与语义校验落地后由角色测试与组合回归验证。
 
 2026-09-10 用户确认：本次保留现有最小链路，IO-08 的业务模块/调用关系分组、上下文预算和跨模块依赖处理，以及 IO-10 的分批汇总等未定项留待下个版本确定，不作为本次 PR 的完成条件。
+
+## 强制材料边界验收（2026-09-11）
+
+AC-AGENT-104：每个 Worker 的授权集合等于 assignedSourcePaths 与公开接口。Application 必须创建裁剪后的独立源码清单及 CAS 引用；提示词、sourceRefs/publicInterfaceRefs 的正文和模型工具工作区使用同一授权集合。不得把父级完整源码清单传入子任务；隐藏其引用但携带正文同样违规。重试、跨轮复用和并发 Worker 均不得扩大范围。
+
+验收命令：`node --test tests/integration/WorkerMaterialBoundary.test.ts tests/security/AgentWorkspace.test.ts`。准备两个文件各含唯一标记；两个 Worker 并发时各自提示词、工件和实际工作区只出现自己的标记，未授权文件不存在；公开接口仍可读。重试和下一轮复用保留相同裁剪材料，父级修订/历史材料不能进入子任务。文件与提示词都必须检查，不能仅断言 readablePaths。生产 OS 隔离另由已有 DSH sandbox 验收覆盖。
