@@ -16,14 +16,14 @@ import { assertModelOutput } from '../../src/infrastructure/agentAdapters/ModelE
 import { NativeToolchain } from '../../src/infrastructure/evaluation/project/NativeToolchain.ts';
 import { NativeCaseExecutor } from '../../src/infrastructure/evaluation/project/NativeCaseExecutor.ts';
 
-for (const rejectSourceReview of [false, true]) test(`native stage rejects bad candidates, resumes trusted cases after restart and maps generated failures to revised cards (source rejection=${rejectSourceReview})`, async () => {
+for (const { rejectSourceReview, mixedSourceRisks } of [{ rejectSourceReview: false, mixedSourceRisks: false }, { rejectSourceReview: true, mixedSourceRisks: false }, { rejectSourceReview: false, mixedSourceRisks: true }]) test(`native stage rejects bad candidates, resumes trusted cases after restart and maps generated failures to revised cards (source rejection=${rejectSourceReview}, mixed risks=${mixedSourceRisks})`, async () => {
   const root = mkdtempSync(join(tmpdir(), 'evaluation-source-')); const runtimeDir = mkdtempSync(join(tmpdir(), 'evaluation-runtime-'));
   const git = (...args: string[]) => execFileSync('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.test', ...args], { cwd: root, encoding: 'utf8' }).trim();
   git('init', '-q'); writeFileSync(join(root, 'math.h'), 'int add(int a,int b);');
   writeFileSync(join(root, 'math.c'), '#include "math.h"\n/* REFERENCE_PRIVATE */\nint add(int a,int b){return a+b;}');
   git('add', '.'); git('commit', '-qm', 'Fixed reference');
   let composition = createComposition({ runtimeDir }); let testCalls = 0, codeCalls = 0, generatedRuns = 0, reviewCalls = 0, revisionCalls = 0, sourceReviewCalls = 0;
-  let acceptFalseSource = false; let interruptSourceSection = true; const sectionCalls = new Map<string, number>();
+  let exposeMixedRisk = false; let acceptFalseSource = false; let interruptSourceSection = true; const sectionCalls = new Map<string, number>();
   let wrongCandidate = true, wrongCode = false, interrupt = true, reviewKeepsKnowledge = false;
   const install = () => {
     const deps = composition.apps.workbenchReconstruction.dependencies;
@@ -58,6 +58,7 @@ for (const rejectSourceReview of [false, true]) test(`native stage rejects bad c
         const sectionKey = `${_command.runId}:${criteria.section}`;
         sectionCalls.set(sectionKey, (sectionCalls.get(sectionKey) ?? 0) + 1);
         if (criteria.section === 'Limits' && interruptSourceSection) { interruptSourceSection = false; throw new Error('TEST_SOURCE_SECTION_INTERRUPTION'); }
+        if (exposeMixedRisk && criteria.section === 'Limits') return { blocking: true, recommendation: 'ITERATE', correction: null, unresolvedRisks: ['Independent Limits evidence remains unknown.'] };
         return !acceptFalseSource && body.includes('The difference') && criteria.section === 'Behavior' ? { blocking: true, recommendation: 'ITERATE', correction: { correctionId: 'source-error', knowledgePath: 'knowledge/unit-add.md#Behavior', criterion: 'Pinned source adds the arguments.', risk: 'Incorrect operation.' }, unresolvedRisks: [] }
           : { blocking: false, recommendation: 'PASS', correction: null, unresolvedRisks: [] };
       }
@@ -218,6 +219,7 @@ for (const rejectSourceReview of [false, true]) test(`native stage rejects bad c
       await assert.rejects(composition.apps.workbenchReconstruction.start(project.snapshotId, second!.versionIds, { retryEvaluationTaskId: second!.evaluation!.taskId }), /RECONSTRUCTION_RETRY_INVALID/);
     } finally { composition.apps.workbenchGeneration.generate = originalGenerate; composition.apps.workbenchPipelines.dependencies.environment = originalEnvironment; reviewKeepsKnowledge = false; wrongCode = false; }
     // A correct reconstruction must not excuse false knowledge that it happened to ignore.
+    exposeMixedRisk = mixedSourceRisks;
     const falseCard = await composition.apps.flywheel.ingestCandidate({ ...input, body: input.body.replace('The sum', 'The difference') + '\nIndependent whole-card counterexample.' });
     wrongCode = false;
     const luckyCode = await composition.apps.workbenchReconstruction.start(project.snapshotId, [falseCard.version.versionId]);
@@ -229,7 +231,7 @@ for (const rejectSourceReview of [false, true]) test(`native stage rejects bad c
     let falseSource = await composition.apps.workbenchSourceVerification.start(luckyTask.taskId);
     const falseResult = await composition.apps.workbenchStages.wait(falseSource.taskId);
     assert.equal(falseResult.status, 'SUCCEEDED', falseResult.reasonCode ?? '');
-    assert.equal(falseResult.result!.summary.outcome, 'SOURCE_MISMATCH');
+    assert.equal(falseResult.result!.summary.outcome, mixedSourceRisks ? 'UNRESOLVED' : 'SOURCE_MISMATCH');
     assert.equal(falseResult.result!.summary.publicationVerified, false);
     const originalSourceTaskId = falseSource.taskId;
     acceptFalseSource = true;
@@ -237,7 +239,7 @@ for (const rejectSourceReview of [false, true]) test(`native stage rejects bad c
     assert.notEqual(falseSource.taskId, originalSourceTaskId, 'new input freezes the existing contradiction');
     const carried = await composition.apps.workbenchStages.wait(falseSource.taskId);
     assert.equal(carried.status, 'SUCCEEDED', carried.reasonCode ?? '');
-    assert.equal(carried.result!.summary.outcome, 'SOURCE_MISMATCH', 'a later model PASS cannot erase a source contradiction in unchanged knowledge');
+    assert.equal(carried.result!.summary.outcome, mixedSourceRisks ? 'UNRESOLVED' : 'SOURCE_MISMATCH', 'a later model PASS cannot erase a source contradiction in unchanged knowledge');
     const carriedCard = (carried.result!.summary.cards as any[])[0];
     assert.equal(carriedCard.originEvidence.taskId, originalSourceTaskId); assert.equal(carriedCard.carriedForward, true);
     assert.equal(sectionCalls.get(`${falseSource.taskId}:Behavior`), undefined, 'carried finding is not represented as a fresh model call');
@@ -259,7 +261,10 @@ for (const rejectSourceReview of [false, true]) test(`native stage rejects bad c
     composition.apps.workbenchStages.resume(sourceRepair.taskId, sourceRepair.inputDigest);
     const repairedSource = await composition.apps.workbenchStages.wait(sourceRepair.taskId);
     assert.equal(repairedSource.status, 'SUCCEEDED', repairedSource.reasonCode ?? '');
-    assert.equal(repairedSource.result!.summary.outcome, 'REVISED_INDEXED');
+    assert.equal(repairedSource.result!.summary.outcome, mixedSourceRisks ? 'UNRESOLVED' : 'REVISED_INDEXED');
+    assert.equal(sourceRepair.input.parameters.sourceCorrectionPolicy, 'source-correction-selection-v1');
+    assert.equal(repairedSource.result!.summary.indexed, true);
+    if (mixedSourceRisks) assert.match(JSON.stringify(repairedSource.result!.summary.unresolved), /Independent Limits evidence remains unknown/);
     assert.equal(revisionCalls, beforeSourceDocGen + 1, 'index retry must reuse the accepted source revision');
     assert.equal(repairedSource.usage.modelCalls, partialSource.usage.modelCalls);
     assert.equal(repairedSource.usage.tokens, partialSource.usage.tokens);
@@ -274,7 +279,14 @@ for (const rejectSourceReview of [false, true]) test(`native stage rejects bad c
     assert.equal(sourceRetested.status, 'SUCCEEDED');
     assert.equal((sourceRetested.result!.summary.modules as any[])[0].status, 'BEHAVIOR_PASSED');
     const recheck = await composition.apps.workbenchSourceVerification.start(sourceRetest.taskId);
-    assert.equal((await composition.apps.workbenchStages.wait(recheck.taskId)).result!.summary.outcome, 'SOURCE_MATCHED');
+    const rechecked = await composition.apps.workbenchStages.wait(recheck.taskId);
+    assert.equal(rechecked.result!.summary.outcome, mixedSourceRisks ? 'UNRESOLVED' : 'SOURCE_MATCHED');
+    if (mixedSourceRisks) {
+      const sections = (rechecked.result!.summary.cards as any[])[0].sections;
+      assert.equal(sections.find((section: any) => section.section === 'Behavior').outcome, 'SOURCE_MATCHED');
+      assert.equal(sections.find((section: any) => section.section === 'Limits').outcome, 'UNRESOLVED');
+      assert.equal(rechecked.result!.summary.publicationVerified, false);
+    }
     assert.equal(testCalls, 2, 'source-driven revision cannot replace or drop existing trusted expected results');
 
     writeFileSync(join(root, 'math.c'), '#include "math.h"\nint add(int a,int b){return a+b+1;}');
