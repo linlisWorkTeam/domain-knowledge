@@ -23,6 +23,7 @@ test('individually successful evidence cannot cross version, source, configurati
     input => { input.fixedEvaluation.input.parameters.reconstructionTaskId = 'other'; reidentify(input.fixedEvaluation); },
     input => { input.sourceVerification.input.parameters.evaluationDigest = sha256('other'); reidentify(input.sourceVerification); },
     input => { input.cards[0]!.bodyDigest = sha256('changed body'); },
+    input => { input.sourceModules.version = 'other-module'; },
     input => { input.fixedSuites[0]!.suiteRef = ref('changed suite'); },
     input => { input.evaluation.input.parameters.snapshotId = 'other'; },
   ];

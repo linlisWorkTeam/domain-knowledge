@@ -10,6 +10,8 @@ import { WorkbenchPublicationEvidence } from '../../src/application/services/Wor
 import { JsonSchemaAgentContractValidator } from '../../src/infrastructure/agentAdapters/contracts/JsonSchemaAgentContractValidator.ts';
 import { publicationFixture, publicationBody } from '../helpers/WorkbenchPublicationFixture.ts';
 import { buildConstraints, type WorkbenchProjectSnapshot } from '../../src/domain/services/workbench/WorkbenchProject.ts';
+import { sourceSectionObservations } from '../../src/domain/services/knowledge/KnowledgeSourceVerification.ts';
+import type { NativeBehaviorSuite } from '../../src/domain/services/evaluation/NativeBehaviorSuite.ts';
 import { nativeTestKeys, type NativeTestSet } from '../../src/domain/services/evaluation/NativeTestCache.ts';
 import { canonicalJson, createStageTask } from '../../src/domain/services/workbench/StageTask.ts';
 async function setup() {
@@ -23,6 +25,10 @@ async function setup() {
   const manifestRef = await put(Buffer.from(JSON.stringify({ sourceDigest: input.reconstruction.input.sourceDigest })), 'application/json');
   const project = { schemaVersion: 'workbench-project-v1', projectId: 'project', snapshotId: 'snapshot', repositoryId: 'repository', directory: '/reference',
     commit: 'commit', sourceDigest: input.reconstruction.input.sourceDigest, modules: [], build: buildConstraints(), sourceFiles: [], manifestRef, createdAt: 'now' } as WorkbenchProjectSnapshot;
+  const sourceContent = 'int value = 1;';
+  const sourceRef = await put(Buffer.from(sourceContent), 'text/plain');
+  project.modules = [{ moduleId: 'module', language: 'c', sourcePaths: ['module.c'], testPaths: [], selectedByDefault: true, reasons: [] }];
+  project.sourceFiles = [{ path: 'module.c', objectId: 'object', kind: 'source', ref: sourceRef }];
   const bodyRef = await put(Buffer.from(publicationBody), 'text/markdown');
   const nestedRef = await put(Buffer.from('audit'), 'text/plain');
   const suite = { schemaVersion: 'native-cases-v1', cases: ['a', 'b'].map(caseId => ({ caseId, description: 'value', sections: ['card#value'], variables: [], calls: [],
@@ -40,7 +46,7 @@ async function setup() {
   const reportRef = await put(Buffer.from(JSON.stringify(report)), 'application/json');
   input.fixedEvaluation.result!.artifactRefs = [reportRef];
   (input.fixedEvaluation.result!.summary.modules as Array<Record<string, unknown>>)[0]!.reportRef = reportRef;
-  const referenceRef = await put(Buffer.from(JSON.stringify({ language: 'c', build: project.build, files: [], sanitizers: true })), 'application/json');
+  const referenceRef = await put(Buffer.from(JSON.stringify({ language: 'c', build: project.build, files: [{ path: 'module.c', ref: sourceRef }], sanitizers: true })), 'application/json');
   const oracleRef = await put(Buffer.from(JSON.stringify(observations)), 'application/json');
   const binding = { cardIds: ['card'], knowledgeBodyDigests: [bodyRef.sha256], referenceDigest: referenceRef.sha256,
     interfaceDigest: sha256('interface'), policyDigest: sha256('policy'), toolchainDigest: sha256('toolchain') };
@@ -57,10 +63,12 @@ async function setup() {
   input.sourceVerification.input.parameters.evaluationDigest = sha256(canonicalJson(input.evaluation.result));
   const sourceIdentity = createStageTask(input.sourceVerification.input, {}, 'now');
   input.sourceVerification.taskId = sourceIdentity.taskId; input.sourceVerification.inputDigest = sourceIdentity.inputDigest;
-  const sourceReferenceRef = await put(Buffer.from(JSON.stringify({ schemaVersion: 'knowledge-source-verification-v4', sourceRevision: 'commit', sourceDigest: project.sourceDigest, files: [] })), 'application/json');
-  const observationsRef = await put(Buffer.from(JSON.stringify({ suiteRef, oracleRef })), 'application/json');
+  const sourceReferenceRef = await put(Buffer.from(JSON.stringify({ schemaVersion: 'knowledge-source-verification-v4', sourceRevision: 'commit', sourceDigest: project.sourceDigest, files: [{ path: 'module.c', content: sourceContent }] })), 'application/json');
+  const sourceObservations = { schemaVersion: 'native-source-review-evidence-v3', sourceRevision: project.commit, sourceDigest: project.sourceDigest, suiteRef, oracleRef,
+    ...sourceSectionObservations(suite as NativeBehaviorSuite, observations as Parameters<typeof sourceSectionObservations>[1], 'card', 'Value') };
+  const observationsRef = await put(Buffer.from(JSON.stringify(sourceObservations)), 'application/json');
   const criteriaRef = await put(Buffer.from(JSON.stringify({ schemaVersion: 'knowledge-source-verification-v4', phase: 'FINAL_SOURCE_REVIEW', binding: input.cards[0],
-    section: 'Value', verifyPreamble: true, allowedKnowledgePaths: ['knowledge/module.md#Value'] })), 'application/json');
+    section: 'Value', verifyPreamble: true, allowedKnowledgePaths: ['knowledge/knowledge-unit.md#Value'] })), 'application/json');
   const rawRef = await put(Buffer.from(JSON.stringify({ recommendation: 'PASS', blocking: false, correction: null })), 'application/json');
   const command = { schemaVersion: '1.0', commandId: 'source-command', runId: input.sourceVerification.taskId, agentType: 'review', generationKey: sha256('source'),
     payload: { knowledgeRef: bodyRef, checkReportRef: sourceReferenceRef, evaluationReportRef: observationsRef, criteriaRef } };
@@ -72,7 +80,7 @@ async function setup() {
   (input.sourceVerification.result!.summary.cards as Array<Record<string, unknown>>)[0]!.sections = sourceSections;
   input.sourceVerification.result!.artifactRefs = [rawRef, resultRef, sourceReferenceRef, observationsRef, criteriaRef];
   const records = [input.reconstruction, input.evaluation, input.fixedEvaluation, input.sourceVerification];
-  const card = { versionId: 'version', bodyRef, metadata: { cardId: 'card', sourceModule: 'module', projectSnapshotId: 'snapshot' } } as unknown as KnowledgeVersion;
+  const card = { versionId: 'version', moduleId: 'knowledge-unit', bodyRef, metadata: { cardId: 'card', sourceModule: 'module', projectSnapshotId: 'snapshot' } } as unknown as KnowledgeVersion;
   const service = new WorkbenchPublicationEvidence({ contracts: new JsonSchemaAgentContractValidator('docs/specs/schemas'), projects: { get: () => structuredClone(project) }, tests: { get: id => id === set.testSetId ? structuredClone(set) : null }, stages: { get(id) { const task = records.find(task => task.taskId === id); assert.ok(task); return structuredClone(task); } },
     repository: { getKnowledgeVersion: () => structuredClone(card) }, artifacts: {
       put, get: async ref => { const value = contents.get(ref.sha256); assert.ok(value); return value; },
@@ -80,12 +88,12 @@ async function setup() {
     } });
   puts = 0;
   const ids = { reconstruction: input.reconstruction.taskId, evaluation: input.evaluation.taskId, fixedEvaluation: input.fixedEvaluation.taskId, sourceVerification: input.sourceVerification.taskId };
-  return { service, ids, input, contents, nestedRef, card, report, set, trustedReport, project, sourceSections, rawRef, put, puts: () => puts };
+  return { service, ids, input, contents, nestedRef, card, report, set, trustedReport, project, sourceSections, sourceObservations, command, rawRef, put, puts: () => puts };
 }
 test('preparation checks recursive CAS graph, binds body and is content-idempotent', async () => {
   const f = await setup(); const prepared = await f.service.prepare(f.ids, f.input.fixedSuites);
   assert.equal(prepared.state, 'PREPARED'); assert.equal(prepared.publicationVerified, false);
-  assert.equal(prepared.verifiedArtifactRefs.length, 16);
+  assert.equal(prepared.verifiedArtifactRefs.length, 18);
   assert.equal((await f.service.prepare(f.ids, f.input.fixedSuites)).artifactRef.sha256, prepared.artifactRef.sha256);
 });
 test('corrupt nested artifact and changed persistent body reject before writing preparation', async () => {
@@ -164,4 +172,14 @@ test('source summary PASS cannot conceal missing chapters or a risky original Re
   const before = g.puts();
   await assert.rejects(g.service.prepare(g.ids, g.input.fixedSuites), /PUBLICATION_SOURCE_REVIEW_REJECTED/);
   assert.equal(g.puts(), before);
+});
+
+test('source observation projection must match the trusted oracle, even with a valid new artifact', async () => {
+  const f = await setup(); f.sourceObservations.relatedObservations[0]!.actual = { value: '9' };
+  const ref = await f.put(Buffer.from(JSON.stringify(f.sourceObservations)), 'application/json');
+  f.sourceSections[0]!.referenceObservationsRef = ref;
+  f.input.sourceVerification.result!.artifactRefs.push(ref);
+  const before = f.puts();
+  await assert.rejects(f.service.prepare(f.ids, f.input.fixedSuites), /PUBLICATION_SOURCE_OBSERVATIONS_CHANGED/);
+  assert.equal(f.puts(), before);
 });

@@ -38,14 +38,16 @@ export class WorkbenchPublicationEvidence {
       || project.commit !== reconstruction.input.sourceRevision || project.sourceDigest !== reconstruction.input.sourceDigest) throw new Error('PUBLICATION_PROJECT_BINDING_CHANGED');
     const projectBuild = buildConstraints(project.build);
     const bodies: ArtifactRef[] = [];
+    const sourceModules: Record<string, string> = {};
     const cards = reconstruction.input.cardVersionIds.map(id => {
       const card = repository.getKnowledgeVersion(id);
       if (!card || card.versionId !== id || card.metadata.projectSnapshotId !== reconstruction.input.parameters.snapshotId
         || typeof card.metadata.cardId !== 'string' || typeof card.metadata.sourceModule !== 'string') throw new Error('PUBLICATION_CARD_BINDING_CHANGED');
       bodies.push(card.bodyRef);
-      return { cardId: card.metadata.cardId, versionId: id, moduleId: card.metadata.sourceModule, bodyDigest: card.bodyRef.sha256 };
+      sourceModules[id] = card.metadata.sourceModule;
+      return { cardId: card.metadata.cardId, versionId: id, moduleId: card.moduleId, bodyDigest: card.bodyRef.sha256 };
     });
-    const evidence = publicationEvidence({ reconstruction, evaluation, fixedEvaluation, sourceVerification, cards, fixedSuites });
+    const evidence = publicationEvidence({ reconstruction, evaluation, fixedEvaluation, sourceVerification, cards, sourceModules, fixedSuites });
     const trustedSets = (evaluation.result!.summary.modules as Array<Record<string, unknown>>).map(module => {
       const set = this.dependencies.tests.get(String(module.testSetId));
       if (!set || set.testSetId !== module.testSetId) throw new Error('PUBLICATION_TRUSTED_SET_MISSING');
@@ -97,7 +99,7 @@ export class WorkbenchPublicationEvidence {
         || canonicalJson(report.suiteRef) !== canonicalJson(suiteRef) || canonicalJson(report.manifestRef) !== canonicalJson(project.manifestRef)) throw new Error('PUBLICATION_FIXED_REPORT_BINDING_CHANGED');
       const codeModule = (reconstruction.result!.summary.modules as Array<Record<string, unknown>>).find(item => item.moduleId === module.moduleId);
       const fingerprints = fixedEvaluation.input.parameters.fingerprints as Record<string, unknown>;
-      const selectedCards = cards.filter(card => card.moduleId === module.moduleId);
+      const selectedCards = cards.filter(card => sourceModules[card.versionId] === module.moduleId);
       const expectedCards = selectedCards.map(card => ({ cardId: card.cardId, versionId: card.versionId,
         bodyRef: bodies[reconstruction.input.cardVersionIds.indexOf(card.versionId)]! })).sort((a, b) => a.versionId.localeCompare(b.versionId));
       if (!codeModule || !fingerprints || !Array.isArray(report.cards) || !Array.isArray(report.cardVersionIds)
@@ -112,7 +114,7 @@ export class WorkbenchPublicationEvidence {
       const reportRef = module.reportRef as ArtifactRef;
       if (!evaluation.result!.artifactRefs.some(ref => ref.sha256 === reportRef?.sha256)) throw new Error('PUBLICATION_TRUSTED_REPORT_UNBOUND');
       const codeModule = (reconstruction.result!.summary.modules as Array<Record<string, unknown>>).find(item => item.moduleId === module.moduleId)!;
-      const expected = cards.filter(card => card.moduleId === module.moduleId).map(card => ({ cardId: card.cardId, bodyDigest: card.bodyDigest })).sort((a, b) => a.cardId.localeCompare(b.cardId));
+      const expected = cards.filter(card => sourceModules[card.versionId] === module.moduleId).map(card => ({ cardId: card.cardId, bodyDigest: card.bodyDigest })).sort((a, b) => a.cardId.localeCompare(b.cardId));
       const bound = set.binding.cardIds.map((cardId, index) => ({ cardId, bodyDigest: set.binding.knowledgeBodyDigests[index] })).sort((a, b) => a.cardId.localeCompare(b.cardId));
       const fingerprintRef = (fixedEvaluation.input.parameters.fingerprints as Record<string, unknown>)[String(codeModule.language)] as ArtifactRef;
       const fingerprint = await load<{ digest: string }>(fingerprintRef);
@@ -136,8 +138,8 @@ export class WorkbenchPublicationEvidence {
         || !Array.isArray(reference.files) || canonicalJson(fileDigests(reference.files)) !== canonicalJson(fileDigests(sourceFiles))) throw new Error('PUBLICATION_PROJECT_IMPLEMENTATION_CHANGED');
       assertTrustedPublicationObservations(set, await load<NativeBehaviorSuite>(set.suiteRef), await load<FixedNativeObservation[]>(set.oracleRef), report);
     }
-    await new WorkbenchSourcePublication({ artifacts, contracts: this.dependencies.contracts }).verify(sourceVerification, cards.map((card, index) => ({ ...card, bodyRef: bodies[index]! })));
-    const prepared = { schemaVersion: 'workbench-publication-preparation-v4', state: 'PREPARED', evidence, trustedSets, projectSnapshot: project,
+    await new WorkbenchSourcePublication({ artifacts, contracts: this.dependencies.contracts }).verify(sourceVerification, cards.map((card, index) => ({ ...card, bodyRef: bodies[index]! })), project, sourceModules, (evaluation.result!.summary.modules as Array<Record<string, unknown>>).map(module => ({ moduleId: String(module.moduleId), set: trustedSets.find(set => set.testSetId === module.testSetId)! })));
+    const prepared = { schemaVersion: 'workbench-publication-preparation-v6', state: 'PREPARED', evidence, trustedSets, projectSnapshot: project,
       verifiedArtifactRefs: queue.sort((a, b) => a.sha256.localeCompare(b.sha256)), publicationVerified: false };
     const artifactRef = await artifacts.put(Buffer.from(JSON.stringify(prepared)), 'application/json');
     return { ...prepared, artifactRef };

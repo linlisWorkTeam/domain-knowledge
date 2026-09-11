@@ -19,9 +19,9 @@ export function publicationFixture(): PublicationEvidence {
   const suiteRef = publicationRef('fixed');
   const fixedEvaluation = done({ ...base, stage: 'EVALUATE', parameters: { ...params, operation: 'FIXED_NATIVE_EVALUATION', fixedEvaluationContract: 'fixed-native-evaluation-v1', suiteRefs: { module: suiteRef }, fingerprints: { c: publicationRef(JSON.stringify({ digest: sha256('toolchain') })) } } },
     { reconstructionTaskId: reconstruction.taskId, publicationVerified: false, modules: [{ moduleId: 'module', status: 'FIXED_PASSED', interfaceCompatible: true, referencePassed: true, passed: 2, total: 2 }] });
-  const cards = [{ cardId: 'card', versionId: 'version', moduleId: 'module', bodyDigest: sha256(publicationBody) }];
+  const cards = [{ cardId: 'card', versionId: 'version', moduleId: 'knowledge-unit', bodyDigest: sha256(publicationBody) }];
   const sourceVerification = done({ ...base, stage: 'EVALUATE', parameters: { snapshotId: 'snapshot', operation: 'KNOWLEDGE_SOURCE_VERIFICATION', verificationContract: SOURCE_VERIFICATION_CONTRACT,
     evaluationTaskId: evaluation.taskId, evaluationDigest: sha256(canonicalJson(evaluation.result)) } },
     { snapshotId: 'snapshot', evaluationTaskId: evaluation.taskId, publicationVerified: false, outcome: 'SOURCE_MATCHED', cards: cards.map(card => ({ ...card, outcome: 'SOURCE_MATCHED' })) });
-  return { reconstruction, evaluation, fixedEvaluation, sourceVerification, cards, fixedSuites: [{ moduleId: 'module', suiteRef }] };
+  return { reconstruction, evaluation, fixedEvaluation, sourceVerification, cards, sourceModules: { version: 'module' }, fixedSuites: [{ moduleId: 'module', suiteRef }] };
 }

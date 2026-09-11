@@ -201,3 +201,7 @@ Domain返回的联合证据凭据只表示记录交叉校验通过；Application
 来源发布章节复核规则：原始Review必须明确PASS、无阻塞/纠正/未解决风险；标准化结果必须同一来源任务的成功review/attribution且无纠正/风险，绑定原始输出、命令及知识正文。命令的源码、参考观察、criteria引用须逐项一致，criteria必须绑定同一稳定卡片/版本/正文、当前H2及首章前言检查范围。此规则用于后续Application逐章重读与完整覆盖检查，不以它单独替代整卡/发布事务。
 
 发布准备v4已接逐章来源复核：Application重读持久化正文，以实际H2清单要求sections完整且唯一，逐章验证卡片绑定、阶段工件归属、命令和结果信封schema，再调用原始Review规则。继承意见不能作为新的PASS发布证据。测试夹具改为含实际H2与真实形状命令/结果CAS，不跳过来源门禁。仍须继续核验参考源码内容与项目及观察材料与可信集的对应关系，PREPARED不是发布完成。
+
+发布准备v5核验来源材料：来源reference必须属于该卡片模块的固定源码路径和内容摘要，来源版本/摘要及契约一致；从对应可信集读取suite/oracle，按当前cardId/H2重新计算sourceSectionObservations，完整核对材料中的直接案例和相关观察摘要。不能把合法CAS摘要当作与参考事实对应的证明。仍须继续接口/策略/suite schema等绑定及发布事务，PREPARED不是VERIFIED。
+
+真实材料验收发现知识单元moduleId与源码模块ID不同。联合证据v2/准备v6分开保存：cards.moduleId保留知识单元身份（用于正文路径、来源criteria），sourceModules[versionId]冻结metadata.sourceModule（用于项目模块、Code/测试集分组）。不得以源码模块ID覆盖知识单元身份。测试夹具使用不同值，覆盖实际仓库结构；此修正不改旧卡片及执行记录。

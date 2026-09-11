@@ -214,3 +214,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 [2026-09-11-0806-trusted-publication-observations.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/759815ac573e50ead95501d6cf76825079b38e77/docs/epitaph/2026-09-11-0806-trusted-publication-observations.md) 可信原始观察Domain规则及真实C31/CPP37复核通过，后续已接发布准备并核对项目构建。最终发布仍未完成。
 
 [2026-09-11-0808-trusted-publication-preparation.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/8baa5f2bd53050c8b708aed12fc4846c9b3256cc/docs/epitaph/2026-09-11-0808-trusted-publication-preparation.md) 可信集持久化及原始观察接发布准备，后续项目构建与来源原始章节也逐步接入；最终发布事务尚未完成。
+
+[2026-09-11-0810-project-publication-binding.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/041b7dbe8ec43db3ec3439e381cdc44fc6900e0a/docs/epitaph/2026-09-11-0810-project-publication-binding.md) 项目/参考源文件/构建约束接发布准备，真实两目标报告匹配。后续真实来源材料发现知识单元与源码模块身份不可混用并修复，最终发布未完成。
