@@ -5,9 +5,53 @@ SPDX-License-Identifier: MIT
 -->
 # Agent Spec 修复与端到端测试报告
 
-## 2026-09-11：六项强制约束验收
+## 2026-09-11：独立复审的四项修复
 
-代码版本：`9f34a85`。先提交可执行 Spec（`9f29682`），再对每项缺陷记录失败复现、实现、通过验收后单独提交。以下是当前结果；后文 2026-09-10 的 266 项测试及 `2/2` 计数是历史记录，不能替代本轮验收。
+验收代码 `2ab6f14`。复审指出的问题均能复现，之前“测试全绿”没有覆盖原生代码伪造完成事实，以及 Registry 和 LangGraph 之间的崩溃窗口。此前把同进程 nonce 当可信边界、把 Orchestrator 重放当路由恢复覆盖的判断不成立；下面旧版记录仅保留历史用途。本轮先提交补充 Spec（`73e9b54`），各项验收后分别提交。
+
+| Finding | 修复与实际验收 | 提交 |
+| --- | --- | --- |
+| 高：被测进程伪造逐项 PASS | 外部 Linux 监督器按清单逐个启动入口，以 ptrace 观察入口与返回地址、读取实际返回值。被测 stdout/stderr 只作日志；结果经子进程关闭的独立 FD 3 返回。原公开复现从 `true, 3/3` 变为 `false, 0/3`，后两个失败入口实际执行。还覆盖写结果 FD、改程序文件、fork、ptrace、兼容 ABI syscall、直接退出、信号、超时、符号缺失和内核拒绝 ptrace | `2ab6f14` |
+| 高：router 重放报错或改写结论 | 以 `runId + iteration + route-v2` 固定路由结果，再执行幂等迁移与交接；已提交 Gate 可按相同证据取回。真实 LangGraph 在 Registry 之后、图更新之前注入异常并 resume；覆盖质量/Gate 的 ITERATE、STOPPED，另覆盖路由固定后迁移前、Gate 固定后路由保存前，以及输入冲突 | `cb104f6` |
+| 中：cwd 原生绑定不正确 | 各命令分别解析 cwd，规范化根内 `.`/`..`，拒绝越界；编译输入、输出及 binary 路径采用一致解析，原参数保留。两个 build 子目录布局实际编译运行通过 | `0fb6188` |
+| 低：整个 PR 差异存在尾随空格 | 删除测试中的尾随空格，改用 `git diff --check c33787b...HEAD` 检查真实 PR base 到 HEAD，检查通过 | `3029d7a` |
+
+当前执行版本：`domain-agents-v8-supervised-routing` / `contract-v8`，测试证据协议为 `native-cases-v2-supervised`；旧协议缓存不能继承当前验收状态。
+
+### 本次验证结果
+
+- 定向修复与 SDK/路由回归：42/42 通过；最后增加监督进程逐项日志和工具指纹后，对应 22/22 复验通过。
+- 全量 `npm test`：311/311 通过，216.4 秒，无跳过或取消。
+- 浏览器：14/14 通过，39.9 秒。
+- 独立保留产物 SDK 端到端：1/1 通过，24.2 秒。
+- TypeScript、Spec 校验通过；整个 PR 的差异格式检查通过。
+
+### 本次完整流程及证据
+
+Run ID：`9fb44b1c-01a6-41b6-90cb-81de65ef6d13`。结果 `COMPLETED / PASS / VERIFIED`，总轮数上限 2，实际 iteration 0、1，发布一次。13 次模型调用，5 次评测，79 个 CAS 工件均核验摘要，83 条事件。模型响应受控，但 SDK、LangGraph、数据库、编译、监督与函数执行都实际运行。
+
+原始测试先错误期望 3，监督器记录正常返回非零，参考校验失败；TestGen 修复为 4 后固定测试集。首轮重建仍返回 3，Check/评测/Review 促成知识修订；第二轮复用同一清单，重建返回 4，各入口由监督器观察到正常返回 0，Gate PASS 后发布。
+
+保留目录：`.workpanel/acceptance/2026-09-11-review/`。原复现和修复日志、测试日志及报告位于根目录；完整 SDK 产物在 `e2e/`：
+
+- `evaluation-index.json`：五次评测；每个 `caseExecution.records` 包含 entered、returned、返回值、监督原因和实际进程输出。
+- `evaluations/*/NativeCaseSupervisor.c`、`NativeCaseSupervisor`：独立编译的监督器源码及二进制；`workspace/.flywheel/` 保留实际单入口 runner；项目编译二进制、归档和评测输入输出均保留。
+- `model-exchanges.jsonl`、`readable/`：13 次完整请求/响应及两轮知识、测试、代码。
+- `runtime-*/`、`cas-index.json`、`workflow-result.json`：SQLite/CAS、LangGraph 检查点、SDK 资料和全部事件。
+- 根目录 `SHA256SUMS` 核对全部本轮保留文件；归档为 `.workpanel/acceptance/AgentAcceptance-2026-09-11-review.tar.gz`。
+
+原始产物保留在当前工作区，不随 PR 上传。
+
+### 明确的适用边界
+
+监督执行当前限定 Linux x86_64、可用的 ptrace / PTRACE_GET_SYSCALL_INFO、gcc、nm 和保留入口符号的原生构建。未知 syscall、写文件、派生进程、修改其他进程、监督工具不可用均失败，不能降级为 stdout 计数。普通返回失败后继续调度其他用例，超时仍遵守 binary 命令总预算。每个用例独立进程，不支持依赖跨用例全局状态的测试布局。
+
+监督器保护的是逐入口执行和结果通道，不负责判断断言是否充分，也不等同于文件读取隔离、完整部署沙箱或外部模型质量验收。系统接口依据见 [Linux ptrace 手册](https://man7.org/linux/man-pages/man2/ptrace.2.html)。路由验收通过精确边界的异常注入和真实 LangGraph resume 完成，没有声称用操作系统强杀命中了相同窗口。既有共享能力待办及用户延期事项仍不计为完成。
+
+
+## 历史：2026-09-11 第一轮六项验收
+
+代码版本：`9f34a85`。先提交可执行 Spec（`9f29682`），再对每项缺陷记录失败复现、实现、通过验收后单独提交。以下是当时的测试结果，复审发现的缺口以本文首节为准；后文 2026-09-10 的 266 项测试及 `2/2` 计数是历史记录，不能替代本轮验收。
 
 | Spec 验收项 | 实现与通过条件 | 独立提交 |
 | --- | --- | --- |

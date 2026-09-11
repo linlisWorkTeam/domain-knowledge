@@ -1138,6 +1138,12 @@
       "metadataLocation": "file-header"
     },
     {
+      "path": "src/infrastructure/evaluation/project/NativeCaseSupervisor.c",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "在被测地址空间之外监督一个 Linux x86_64 用例入口与返回，独立 FD 3 写结果。",
+      "metadataLocation": "file-header"
+    },
+    {
       "path": "src/infrastructure/evaluation/project/TrustedProjectEvaluator.ts",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "提供Trusted项目Evaluator的基础设施实现与外部系统接入。",
@@ -1462,6 +1468,12 @@
       "metadataLocation": "file-header"
     },
     {
+      "path": "tests/integration/NativeCaseSupervisor.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验收外部原生监督器，不让被测进程伪造其他入口或函数返回。",
+      "metadataLocation": "file-header"
+    },
+    {
       "path": "tests/integration/OpencodeGoConfig.test.ts",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "验证OpencodeGoConfig的行为、约束及失败场景。",
@@ -1543,6 +1555,12 @@
       "path": "tests/integration/WorkflowIterationLimit.test.ts",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "验收 AC-AGENT-105 的总轮次上限、质量分支与恢复入口。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/integration/WorkflowRouterReplay.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验收 Registry 已提交而 LangGraph 尚未保存路由时的故障恢复。",
       "metadataLocation": "file-header"
     },
     {

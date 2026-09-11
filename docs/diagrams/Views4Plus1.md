@@ -95,6 +95,8 @@ sequenceDiagram
   participant G as LangGraph
   participant R as Domain Agents
   participant E as 独立评测器
+  participant N as 外部用例监督器
+  participant X as 被测子进程
   participant D as Domain Gate
   participant S as SQLite/CAS
   U->>A: 提交显式项目场景
@@ -104,7 +106,12 @@ sequenceDiagram
   R-->>A: 业务结果及待保存正文
   A->>S: 绑定工件和结果信封
   A->>E: 按项目参数编译测试与独立 runner
-  E->>E: 逐项调用固定清单入口并绑定执行记录
+  loop 固定清单的每个入口
+    E->>N: 程序、入口符号、运行预算
+    N->>X: 独立启动并监督入口到达与返回
+    X-->>E: stdout/stderr 仅保留为日志
+    N-->>E: 独立通道提交观察到的返回值
+  end
   alt 首次测试失败且非配置或环境故障
     A->>R: TestGen 有限修复（独立尝试记录）
     R-->>A: 修订后的测试文件及用例清单
@@ -119,7 +126,9 @@ sequenceDiagram
   R-->>A: 多条位置、问题、建议及可信依据
   A->>D: 报告与策略
   D-->>A: ITERATE
-  A-->>G: 在总轮数预算内路由下一轮
+  A->>S: 先固定本轮路由决定
+  A->>S: 幂等推进业务轮次
+  A-->>G: 返回固定决定，允许 Graph 恢复重放
   G->>R: DocGen 修订、Code fresh 生成
   A->>E: 复用固定测试集进行新一轮评测
   E-->>A: 完整逐用例证据与门禁事实
