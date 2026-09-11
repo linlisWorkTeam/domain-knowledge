@@ -175,3 +175,26 @@ Release 包为 177979475 字节，SHA-256 `ea2949fbe9e5962c70475e405459fe57f2dda
 
 
 前台后续更新（2026-09-10）：在独立 `feat/taste-console` 工作树完成视觉审阅后的文案精简，并按用户明确选择为当前临时网站启用免登录编辑。`WP_KNOWLEDGE_NO_LOGIN=1`、`directEditing` 将目录、发布设置、提示词和批次操作直接提供给访问者，保留目录范围、密钥脱敏及跨站写入防护。没有重打或替换 v0.2.0 发行包；具体部署与本次验证见最新交接。
+
+## 五阶段知识工作台：当前实现与待验收（2026-09-11）
+
+本节对应新的五环节修改计划，不改写上方 v0.2.0 发行结论。新增闭环语言是 C、C++；TypeScript 的验收范围是保留现有 markdownLite 回归和共同案例执行边界，不将任意 TypeScript 仓库生成误列为本次必交功能。Make/CMake 配置识别、工具检查和可编辑模块参数属于本次范围；静态识别不是运行完整原仓库构建脚本的证明。
+
+| 原计划要求 | 当前证据 | 尚需完成的验收 |
+| --- | --- | --- |
+| 操作中心选择仓库/源码版本、默认支持模块、独立五阶段及一键执行 | RepositoryAnalysis、ProjectHistory、WorkbenchPipelines v15 与阶段HTTP；历史选择/过滤/分页测试通过 | 当前桌面与窄屏完整浏览器检查 |
+| C/C++ 多张卡片、用途/接口/行为/边界/来源、生成即可阅读 | WorkbenchGeneration、KnowledgeUnits；已有真实生成和恢复记录 | 两个目标最终修订版本的完整真实验收 |
+| 稳定cardId、不可变versionId、旧卡历史分组 | KnowledgeCards、ConsoleVersionCounts 回归通过 | 最终页面版本分组复核 |
+| YAML、增量索引、渐进检索、索引失败保留卡片 | KnowledgeIndex 集成验证合法YAML、按需正文读取、失效与同任务恢复 | 最终修订产物索引与页面证据 |
+| Code只见知识/公开接口/构建约束，隔离重建、确定性差异 | WorkbenchReconstruction、NativeToolchain、SourceComparison 及既有执行证据 | 最新修订后的C/C++重建和行为门禁 |
+| 参考验证候选、可信测试复用、缓存失效、固定预期不变 | NativeSuiteEvaluation、WorkbenchEvaluation、FixedEvaluation 及对应测试 | 双目标新一键/分步最终通过；markdownLite当前全回归 |
+| 差异/失败定位章节、修订、刷新索引及来源复核 | KnowledgeRevision、SourceRevision、v15流程恢复测试 | 真实来源任务尚有MISMATCH/UNRESOLVED；修订后重新核验 |
+| 关联材料来自本地文档/指定链接、库内关联与不适用回退 | WorkbenchMaterials、WorkbenchAssociations、ExternalAssociations 回归通过 | 双目标最终卡片关联查看截图 |
+| 工具链检测、可编辑编译器/标准/包含目录/模块参数、缺依赖提示 | 模块配置贯穿生成/重建/评测/发布；受控双C模块执行通过；缺头文件诊断与匿名下载通过 | 显式原生双模块执行和前台参数操作验证 |
+| 同版本取消/恢复、冻结输入、预算累计、旧契约只读 | WorkbenchStages、Pipelines、Publication恢复集成测试 | 当前版本全回归及双目标真实重启/恢复核对 |
+| 固定及可信门禁后才发布，发布不重复 | WorkbenchPublications SQLite/文件事务、受限HTTP下载、v15一键提交已接；返回丢失恢复测试通过 | 真实最终publicationId及导出文件校验 |
+| 不增加账户、主动搜索、框架、向量库或全语言安装包 | 沿用Console/七角色/SQLite/隔离与免登录配置 | 最终部署配置及站点检查 |
+| 单任务/单进程编译、384MiB Node、子进程限额、无隔离不执行 | 现有ModelProcessLane、NativeToolchain与IsolatedCommand；当前重资源任务串行 | 全回归期间资源/取消/清理复核 |
+| 代码、Spec、操作说明、前后截图、报告、真实编号与网站 | 代码/Spec/Operations已持续更新，阶段证据保存在工作台验收目录 | 完整回归报告、最终截图/编号及当前网站更新尚未交付 |
+
+本次原计划对照的轻量回归共26项通过，覆盖卡片身份、索引、编译数据库候选、共用语言执行边界、材料与关联、版本统计、仓库快照和失败诊断。日志为 `/tmp/WorkbenchReadAndDiagnosticsRegression.log`，这不是全测试套件或浏览器验收。最新真实来源任务仍在运行，不能以已有参考用例通过、阶段成功或此表未发现新问题宣称整体完成。
