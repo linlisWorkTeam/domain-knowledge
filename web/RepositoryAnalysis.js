@@ -93,7 +93,7 @@ export function createRepositoryAnalysisPanel({ root, request, escapeHtml: escap
     request('/api/v1/projects', { method: 'POST', body: JSON.stringify(payload) })
       .then((value) => { project = value; generation.setProject(value) })
       .catch((failure) => { error = errors[failure.code] ?? '项目输入保存失败，前序分析仍可查看。' })
-      .finally(() => { saving = false; const panel = root.querySelector('[data-repository-panel]'); if (panel) { panel.querySelector('[data-repository-result]').innerHTML = result(); panel.querySelector('[role="status"]').textContent = error } })
+      .finally(() => { saving = false; const panel = root.querySelector('[data-repository-panel]'); if (panel) { panel.querySelector('[data-repository-result]').innerHTML = result(); panel.querySelector('[data-repository-notice]').textContent = error } })
   })
   root.addEventListener('input', (event) => {
     if (!event.target.closest('[data-repository-form]')) return
@@ -114,7 +114,7 @@ export function createRepositoryAnalysisPanel({ root, request, escapeHtml: escap
       .finally(() => {
         busy = false
         const panel = root.querySelector('[data-repository-panel]')
-        if (panel) { panel.querySelector('[data-repository-result]').innerHTML = result(); panel.querySelector('details').open = true; panel.querySelector('[role="status"]').textContent = error; panel.querySelector('button').disabled = !isEditable(); panel.querySelector('button').textContent = '分析仓库' }
+        if (panel) { panel.querySelector('[data-repository-result]').innerHTML = result(); panel.querySelector('details').open = true; panel.querySelector('[data-repository-notice]').textContent = error; panel.querySelector('[data-repository-form] button').disabled = !isEditable(); panel.querySelector('[data-repository-form] button').textContent = '分析仓库' }
       })
   })
   return {
