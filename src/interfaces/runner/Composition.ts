@@ -306,6 +306,7 @@ export function createComposition(input: {
           allowedWorkspaceRoots: [...codeAgentAllowedRoots, agentWorkspaceRoot],
         };
   providerOperations.executionParameters.runtimeSha256 = sha256(JSON.stringify({
+    configuredTransportVersion: 'session-routing-v1',
     profile: 'sdk-minimal', processIsolation, bubblewrapCommand, timeoutMs, maxOutputBytes,
     allowedWorkspaceRoots: [...allowedRoots, agentWorkspaceRoot],
     toolPolicy: sha256(readFileSync(new URL('../../infrastructure/agentAdapters/deepSeekHarness/RoleTools.mjs', import.meta.url))),

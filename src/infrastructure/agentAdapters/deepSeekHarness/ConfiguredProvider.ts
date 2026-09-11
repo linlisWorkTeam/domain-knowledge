@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：提供Configured提供方的基础设施实现与外部系统接入。
  */
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { once } from 'node:events';
 import { createServer } from 'node:http';
 import { fetch } from 'undici';
@@ -78,7 +78,14 @@ export class ConfiguredDshProvider implements AgentProvider {
         const target = new URL('chat/completions', endpoint.url.href.replace(/\/?$/, '/'));
         const response = await fetch(target, {
           method: 'POST', body: Buffer.concat(chunks), dispatcher, redirect: 'manual', signal: abort.signal,
-          headers: { 'content-type': 'application/json', ...(settings.apiKey ? { authorization: `Bearer ${settings.apiKey}` } : {}) },
+          headers: {
+            'content-type': 'application/json',
+            'user-agent': 'domain-knowledge/0.1 (+https://github.com/linlisWorkTeam/domain-knowledge)',
+            ...(endpoint.url.hostname === 'opencode.ai' ? {
+              'x-opencode-session': `dk-${createHash('sha256').update(request.idempotencyKey).digest('hex')}`,
+            } : {}),
+            ...(settings.apiKey ? { authorization: `Bearer ${settings.apiKey}` } : {}),
+          },
         });
         if (response.status >= 300 && response.status < 400) {
           await response.body?.cancel();

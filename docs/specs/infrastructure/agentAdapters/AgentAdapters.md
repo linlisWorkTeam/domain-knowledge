@@ -22,6 +22,8 @@ DSH 原生 SDK 是默认接入后端，Adapter 负责输出提取、闭合 Schem
 
 ConfiguredProvider 解析已验证设置或环境配置。Console 已保存但未启用/未验证的配置阻止新 Run，不静默回退；已有 Run 使用冻结配置。OpenCode Go 根据非秘密参数生成运行目录补丁，补丁只记录密钥环境变量名。配置方式见 Runtime 指南。
 
+已配置提供方的 HTTP 转发使用自己的 `User-Agent` 标识。对 `opencode.ai`，依据 [Go 客户端约定](https://opencode.ai/docs/go/#where-can-i-use-it) 发送 `x-opencode-session`：从当前角色调用的 idempotencyKey 生成不可逆摘要，同一次调用内的工具往返和格式修复保持稳定，不同角色/轮次使用不同标识；不发送原始项目路径或密钥，也不转发客户端任意头。其他主机不发送此提供方专属头。传输策略版本进入运行配置指纹；已有失败运行不在配置改变后静默恢复。`GET /models` 通过只证明模型目录可访问，不证明正式生成请求成功。
+
 ## 凭据与材料
 
 ProviderSettings 加密保存凭据，对外只返回配置状态、脱敏摘要和校验结果；密钥不进入浏览器持久化、Prompt 日志或 Run 摘要。PublicHttps 位于独立 http 适配器，模型探针与来源读取共用。材料插件按角色白名单读取；Bubblewrap 隔离和会话限制由运行时实现，不扩大 Domain 工具权限。
