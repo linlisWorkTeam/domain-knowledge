@@ -475,7 +475,7 @@ function referenceRunRow(run, selected = false) {
 }
 
 function renderRunWorkspace(snapshot) {
-  const { run, events = [], checkpoints = [], workflowNodes = [], evaluations = [], versions = [], latestDecision, progress } = snapshot
+  const { run, events = [], checkpoints = [], workflowNodes = [], evaluations = [], versions = [], latestDecision, progress, workflowStatus } = snapshot
   const automationNodes = workflowNodes.length ? workflowNodes : checkpoints
   const primaryStates = ['CREATED', 'PLANNED', 'GENERATING', 'EVALUATING', 'REVIEWING', 'PUBLISHING', 'VERIFIED']
   const currentIndex = primaryStates.indexOf(run.state)
@@ -493,6 +493,7 @@ function renderRunWorkspace(snapshot) {
         <div class="run-title-actions">${badge(run.state)}<a class="secondary-button" href="/api/v1/runs/${encodeURIComponent(run.runId)}/report" download>导出报告</a><button class="secondary-button" data-refresh-run="${escapeHtml(run.runId)}">刷新</button></div>
       </div>
       <ol class="run-stepper">${steps}</ol>
+      <div class="state-callout"><b>工作流执行：${escapeHtml(displayLabel(workflowStatus?.executionStatus ?? 'UNKNOWN'))}</b><span>${escapeHtml(workflowStatus?.currentNode ? `阶段 ${NODE_LABELS[workflowStatus.currentNode] ?? workflowStatus.currentNode}` : '执行状态暂不可读')}${workflowStatus?.error ? ` · ${escapeHtml(workflowStatus.error)}` : ''}</span></div>
       ${progress?.mode === 'DETERMINATE' ? `<div class="state-callout"><b>可证明进度：${escapeHtml(progress.completedUnits)} / ${escapeHtml(progress.totalUnits)}</b><span>当前阶段 ${escapeHtml(displayLabel(progress.currentStage))} · 不提供推测性的预计完成时间</span><progress class="progress" value="${escapeHtml(progress.completedUnits)}" max="${escapeHtml(progress.totalUnits)}"></progress></div>` : '<div class="state-callout"><b>进度暂不可确定</b><span>服务端没有完整冻结工作单元，不显示百分比或预计完成时间。</span></div>'}
       ${['ITERATING', 'ROLLING_BACK', 'LOW_CONFIDENCE', 'FAILED', 'CANCELLED'].includes(run.state) ? `<div class="state-callout ${run.state.toLowerCase().replaceAll('_', '-')}"><b>当前状态：${escapeHtml(displayLabel(run.state))}</b><span>第 ${escapeHtml(run.iteration + 1)} 轮 · 详情以事件与门禁证据为准</span></div>` : ''}
     </section>
@@ -501,7 +502,7 @@ function renderRunWorkspace(snapshot) {
         <div class="section-heading"><div><p class="eyebrow">工作流执行记录</p><h2>自动化节点</h2><p>这里展示节点执行进度；运行聚合仍是业务状态的唯一依据。</p></div><span class="counter">${automationNodes.length}</span></div>
         <div class="node-list">${automationNodes.length ? automationNodes.map((node) => `
           <article class="node-card">
-            <div><span class="node-icon">${['COMMITTED', 'COMPLETED'].includes(node.status) ? '✓' : node.status === 'FAILED' ? '!' : '●'}</span><div><b>${escapeHtml(NODE_LABELS[node.nodeId] ?? node.nodeId)}</b><small>${escapeHtml(node.agentId ? `${AGENT_LABELS[node.agentId] ?? node.agentId} · ${node.detail || '等待详情'}` : node.generationKey || node.detail || '确定性节点')}</small></div></div>
+            <div><span class="node-icon">${['COMMITTED', 'COMPLETED'].includes(node.status) ? '✓' : node.status === 'FAILED' ? '!' : '●'}</span><div><b>${escapeHtml(NODE_LABELS[node.nodeId] ?? node.nodeId)}</b><small>${escapeHtml(node.agentId ? `${AGENT_LABELS[node.agentId] ?? node.agentId} · ${node.error || node.detail || '等待详情'}` : node.generationKey || node.detail || '确定性节点')}</small></div></div>
             <div>${badge(node.status)}<small>第 ${escapeHtml((node.iteration ?? run.iteration) + 1)} 轮 · 第 ${escapeHtml(node.attempt ?? ((node.retryCount ?? 0) + 1))} 次尝试</small></div>
           </article>`).join('') : emptyState('暂无节点记录', '这个批次可能由命令行创建，或者尚未执行 Agent 节点。')}</div>
       </section>
@@ -729,7 +730,7 @@ async function loadGraph(runId) {
   const nodeStates = new Map(definitions.map((agent) => [agent.agentId, graphNodeState(agent.agentId, nodes)]))
   const statusCounts = { complete: 0, running: 0, failed: 0, idle: 0 }
   for (const node of nodeStates.values()) statusCounts[graphStatus(node?.status)] += 1
-  stage.innerHTML = `<div class="reference-graph-canvas"><div class="workflow-graph" aria-label="只读 Agent 工作流图"><svg class="graph-connections" viewBox="0 0 900 540" preserveAspectRatio="none" aria-hidden="true"><defs><marker id="graph-arrow-idle" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z"></path></marker><marker id="graph-arrow-running" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z"></path></marker><marker id="graph-arrow-complete" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z"></path></marker></defs>${GRAPH_EDGES.map(([from, to]) => graphEdge(from, to, nodeStates)).join('')}</svg>${definitions.map((agent) => { const node = nodeStates.get(agent.agentId); const status = node?.status ?? 'PENDING'; return `<button class="graph-node node-${escapeHtml(agent.agentId)} ${graphStatus(status)}" data-graph-agent="${escapeHtml(agent.agentId)}"><span class="graph-node-icon" aria-hidden="true">${['COMMITTED', 'COMPLETED'].includes(status) ? '✓' : status === 'FAILED' ? '!' : status === 'RUNNING' ? '●' : '○'}</span><b>${escapeHtml(AGENT_LABELS[agent.agentId] ?? agent.name ?? agent.agentId)}</b><small>${escapeHtml(displayLabel(status))}${node ? ` · 第 ${(node.iteration ?? 0) + 1} 轮 · 第 ${node.attempt ?? (node.retryCount ?? 0) + 1} 次尝试` : ''}</small></button>` }).join('')}</div><div class="graph-status-legend"><span><i class="running"></i>运行中 ${statusCounts.running}</span><span><i class="complete"></i>已完成 ${statusCounts.complete}</span><span><i class="failed"></i>失败 ${statusCounts.failed}</span><span><i></i>未开始 ${statusCounts.idle}</span></div></div><aside class="reference-node-detail"><header><em>批次状态</em><b>${nodes.length}</b></header><h3>${escapeHtml(snapshot.run?.moduleId ?? runId)}</h3><p>业务状态 ${escapeHtml(displayLabel(snapshot.run?.state))}<br>工作流 ${escapeHtml(displayLabel(workflowStatus.status ?? workflowStatus.workflowStatus ?? 'PENDING'))}</p><small>执行情况</small><div><span>运行中</span><b>${statusCounts.running}</b></div><div><span>已完成</span><b>${statusCounts.complete}</b></div><div><span>失败</span><b>${statusCounts.failed}</b></div><div><span>未开始</span><b>${statusCounts.idle}</b></div><button class="wide" data-page-link="evaluations">查看评测证据 →</button></aside>`
+  stage.innerHTML = `<div class="reference-graph-canvas"><div class="workflow-graph" aria-label="只读 Agent 工作流图"><svg class="graph-connections" viewBox="0 0 900 540" preserveAspectRatio="none" aria-hidden="true"><defs><marker id="graph-arrow-idle" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z"></path></marker><marker id="graph-arrow-running" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z"></path></marker><marker id="graph-arrow-complete" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z"></path></marker></defs>${GRAPH_EDGES.map(([from, to]) => graphEdge(from, to, nodeStates)).join('')}</svg>${definitions.map((agent) => { const node = nodeStates.get(agent.agentId); const status = node?.status ?? 'PENDING'; return `<button class="graph-node node-${escapeHtml(agent.agentId)} ${graphStatus(status)}" data-graph-agent="${escapeHtml(agent.agentId)}"><span class="graph-node-icon" aria-hidden="true">${['COMMITTED', 'COMPLETED'].includes(status) ? '✓' : status === 'FAILED' ? '!' : status === 'RUNNING' ? '●' : '○'}</span><b>${escapeHtml(AGENT_LABELS[agent.agentId] ?? agent.name ?? agent.agentId)}</b><small>${escapeHtml(displayLabel(status))}${node ? ` · 第 ${(node.iteration ?? 0) + 1} 轮 · 第 ${node.attempt ?? (node.retryCount ?? 0) + 1} 次尝试` : ''}</small></button>` }).join('')}</div><div class="graph-status-legend"><span><i class="running"></i>运行中 ${statusCounts.running}</span><span><i class="complete"></i>已完成 ${statusCounts.complete}</span><span><i class="failed"></i>失败 ${statusCounts.failed}</span><span><i></i>未开始 ${statusCounts.idle}</span></div></div><aside class="reference-node-detail"><header><em>批次状态</em><b>${nodes.length}</b></header><h3>${escapeHtml(snapshot.run?.moduleId ?? runId)}</h3><p>业务状态 ${escapeHtml(displayLabel(snapshot.run?.state))}<br>工作流 ${escapeHtml(displayLabel(workflowStatus.executionStatus ?? 'UNKNOWN'))}</p><small>执行情况</small><div><span>运行中</span><b>${statusCounts.running}</b></div><div><span>已完成</span><b>${statusCounts.complete}</b></div><div><span>失败</span><b>${statusCounts.failed}</b></div><div><span>未开始</span><b>${statusCounts.idle}</b></div><button class="wide" data-page-link="evaluations">查看评测证据 →</button></aside>`
 }
 
 function ensureGraphStream(runId, after) {
@@ -1169,11 +1170,12 @@ async function openRun(runId) {
   state.page = 'runs'
   content.innerHTML = '<div class="loading-state"><span class="spinner"></span>正在读取批次快照…</div>'
   const encoded = encodeURIComponent(runId)
-  const [snapshot, progress] = await Promise.all([
+  const [snapshot, progress, workflowStatus] = await Promise.all([
     request(`/api/v1/runs/${encoded}`),
     request(`/api/v1/runs/${encoded}/progress`),
+    request(`/api/v1/runs/${encoded}/workflow-status`).catch(() => ({ executionStatus: 'UNKNOWN' })),
   ])
-  state.selectedRun = { ...snapshot, progress }
+  state.selectedRun = { ...snapshot, progress, workflowStatus }
   renderRunWorkspace(state.selectedRun)
 }
 
