@@ -232,3 +232,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 [2026-09-11-0838-publication-http-panel.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/d442a10a0140bddf8af6e58e68592cd89e851ff6/docs/epitaph/2026-09-11-0838-publication-http-panel.md) 发布HTTP/独立面板接通，生命周期/受限匿名下载测试通过。后续v15最终发布与模块构建配置/历史选择已接。原source attempt1非JSON失败，同task恢复attempt2；无真实最终发布。
 
 [2026-09-11-0841-pipeline-publication.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/8567275ce76d10fc51c51f095f4f84ae22fdbacf/docs/epitaph/2026-09-11-0841-pipeline-publication.md) v15最终发布及受控响应丢失恢复通过，后续模块参数/历史选择/缺依赖诊断已接；真实来源和发布验收仍未完成。旧交接将任意TS多卡片和动态Make执行误列必交范围，0855已按用户原计划纠正。
+
+[2026-09-11-0845-module-builds.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/4fd7aab105c2427e557c5cc7de87056decb9472d/docs/epitaph/2026-09-11-0845-module-builds.md) 模块配置贯穿执行/发布并验证双C指纹，后续补受控固定执行及显式native模式但尚未实际运行；历史选择与诊断已接。原TS/动态Make额外范围已0855纠正，按原用户计划验收。
