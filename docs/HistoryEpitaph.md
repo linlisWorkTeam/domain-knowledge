@@ -234,3 +234,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 [2026-09-11-0841-pipeline-publication.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/8567275ce76d10fc51c51f095f4f84ae22fdbacf/docs/epitaph/2026-09-11-0841-pipeline-publication.md) v15最终发布及受控响应丢失恢复通过，后续模块参数/历史选择/缺依赖诊断已接；真实来源和发布验收仍未完成。旧交接将任意TS多卡片和动态Make执行误列必交范围，0855已按用户原计划纠正。
 
 [2026-09-11-0845-module-builds.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/4fd7aab105c2427e557c5cc7de87056decb9472d/docs/epitaph/2026-09-11-0845-module-builds.md) 模块配置贯穿执行/发布并验证双C指纹，后续补受控固定执行及显式native模式但尚未实际运行；历史选择与诊断已接。原TS/动态Make额外范围已0855纠正，按原用户计划验收。
+
+[2026-09-11-0850-project-history.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/d3da9c199cfac09fbcc7a4a75b06d3743a368418/docs/epitaph/2026-09-11-0850-project-history.md) 保存项目与精确版本历史选择已接；随后完整Console发布浏览器验证保存输入、匿名发布/下载、刷新及390px布局通过。真实来源任务已结束UNRESOLVED，待修订与最终真实发布。

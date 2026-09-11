@@ -190,11 +190,13 @@ Release 包为 177979475 字节，SHA-256 `ea2949fbe9e5962c70475e405459fe57f2dda
 | 参考验证候选、可信测试复用、缓存失效、固定预期不变 | NativeSuiteEvaluation、WorkbenchEvaluation、FixedEvaluation 及对应测试 | 双目标新一键/分步最终通过；markdownLite当前全回归 |
 | 差异/失败定位章节、修订、刷新索引及来源复核 | KnowledgeRevision、SourceRevision、v15流程恢复测试 | 真实来源任务尚有MISMATCH/UNRESOLVED；修订后重新核验 |
 | 关联材料来自本地文档/指定链接、库内关联与不适用回退 | WorkbenchMaterials、WorkbenchAssociations、ExternalAssociations 回归通过 | 双目标最终卡片关联查看截图 |
-| 工具链检测、可编辑编译器/标准/包含目录/模块参数、缺依赖提示 | 模块配置贯穿生成/重建/评测/发布；受控双C模块执行通过；缺头文件诊断与匿名下载通过 | 显式原生双模块执行和前台参数操作验证 |
+| 工具链检测、可编辑编译器/标准/包含目录/模块参数、缺依赖提示 | 模块配置贯穿生成/重建/评测/发布；受控及真实gcc双C模块执行通过；缺头文件诊断与匿名下载通过 | 前台参数操作验证 |
 | 同版本取消/恢复、冻结输入、预算累计、旧契约只读 | WorkbenchStages、Pipelines、Publication恢复集成测试 | 当前版本全回归及双目标真实重启/恢复核对 |
 | 固定及可信门禁后才发布，发布不重复 | WorkbenchPublications SQLite/文件事务、受限HTTP下载、v15一键提交已接；返回丢失恢复测试通过 | 真实最终publicationId及导出文件校验 |
 | 不增加账户、主动搜索、框架、向量库或全语言安装包 | 沿用Console/七角色/SQLite/隔离与免登录配置 | 最终部署配置及站点检查 |
 | 单任务/单进程编译、384MiB Node、子进程限额、无隔离不执行 | 现有ModelProcessLane、NativeToolchain与IsolatedCommand；当前重资源任务串行 | 全回归期间资源/取消/清理复核 |
 | 代码、Spec、操作说明、前后截图、报告、真实编号与网站 | 代码/Spec/Operations已持续更新，阶段证据保存在工作台验收目录 | 完整回归报告、最终截图/编号及当前网站更新尚未交付 |
 
-本次原计划对照的轻量回归共26项通过，覆盖卡片身份、索引、编译数据库候选、共用语言执行边界、材料与关联、版本统计、仓库快照和失败诊断。日志为 `/tmp/WorkbenchReadAndDiagnosticsRegression.log`，这不是全测试套件或浏览器验收。最新真实来源任务仍在运行，不能以已有参考用例通过、阶段成功或此表未发现新问题宣称整体完成。
+本次原计划对照的轻量回归共26项通过，覆盖卡片身份、索引、编译数据库候选、共用语言执行边界、材料与关联、版本统计、仓库快照和失败诊断。日志为 `/tmp/WorkbenchReadAndDiagnosticsRegression.log`，这不是全测试套件或浏览器验收。真实来源任务 stage-3ac5a7c55407b750e1205020b04657f09b5e4d4590903f6e5592bf3ab3967b48 已完成，结果 UNRESOLVED（7张卡片中2张SOURCE_MISMATCH、4张UNRESOLVED、1张SOURCE_MATCHED）；49次累计模型调用。不能以已有参考用例通过或阶段执行成功宣称整体完成。
+
+当前补充验收：真实gcc双模块固定案例通过；来源摘要绑定与发布防篡改13项、原生评测/修订集成2项、架构8项通过，类型和Spec通过。完整Console发布浏览器验收1项通过，覆盖保存输入选择、免登录发布与下载、刷新后历史、390px窄屏无水平溢出。首次浏览器执行发现App下载白名单缺少workbench-publications，修复后重跑通过，失败trace与成功截图均保留。这是受控模型证据配合真实HTTP/SQLite/文件的页面验收，不是真实卡片发布成功。证据目录 real-knowledge-revision/publication-browser-actual 与 source-digest-clarification。
