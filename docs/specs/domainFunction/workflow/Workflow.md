@@ -14,7 +14,7 @@ SPDX-License-Identifier: MIT
 
 输入是 Application 解析并固定的项目场景、材料引用、策略和 workerCount（传给 DocGen 的内部任务数量）。AgentDefinitions 显式绑定业务角色与节点；Workflow 给出固定连接及纯路由函数。角色自己的计划输出不驱动动态建图。
 
-[Orchestrator IO-17](../agents/orchestratorAgent/OrchestratorAgent.md) 已确认的目标是根据业务目标、模块概况、项目配置及任务进度，输出本轮模块、承接 Agent 与输入材料的任务计划。当前单模块任务与材料槽位校验已接线，实际执行顺序继续由工作流负责；DocGen 自行拆分内部 Worker，测试复用按源代码变化规则处理。
+[Orchestrator IO-17](../agents/orchestratorAgent/OrchestratorAgent.md) 已确认的目标是根据业务目标、模块概况、项目配置及任务进度，输出本轮模块、承接 Agent 与输入材料的任务计划。当前从最多 32 个授权候选中选择一个模块、绑定 Run 并校验任务材料槽位的流程已接线，实际执行顺序继续由工作流负责；DocGen 自行拆分内部 Worker，测试复用按源代码变化规则处理。
 
 | 阶段 | 规则 | 下游 |
 | --- | --- | --- |
@@ -30,7 +30,7 @@ SPDX-License-Identifier: MIT
 
 ## Check、评测与 Review 的证据传递
 
-[TestGen IO-21](../agents/testGenAgent/TestGenAgent.md) 已确认首次候选测试校验失败的兜底：Application 将失败证据交回 TestGen，有限修复后由执行器重新校验，仍失败则转人工处理；正常校验通过直接固定测试集，不进入修复分支。该流程不改变已校验测试的源码不变则复用规则，maxTestRepairs 默认 1（0～3）；源码身份只取输入路径及内容摘要，已通过测试跨 Run 保持不变。
+[TestGen IO-21](../agents/testGenAgent/TestGenAgent.md) 已确认首次候选测试校验失败的兜底：Application 将失败证据交回 TestGen，有限修复后由执行器重新校验，仍失败则转人工处理；正常校验通过直接固定测试集，不进入修复分支。该流程不改变已校验测试的源码不变则复用规则，maxTestRepairs 默认 1（0～3）；源码身份由模块标识、输入源码/接口路径及内容摘要组成，已通过测试跨 Run 保持不变。
 
 [DocGen IO-18](../agents/docGenAgent/DocGenAgent.md) 明确每次飞轮以一份知识文档为修订对象，后续轮次在这份文档基础上修改，不将多份 Worker 产出直接作为多文档输入。初次生成时由 DocGen 将 Worker 产出合成一份文档；内容过大而建议拆分时先与用户沟通，以用户意见为准。即使用户同意拆分，每次飞轮仍只选择一份文档。单文档约束针对知识输入范围，不移除 Check 的源代码输入、测试材料或项目配置。DocGen 已校验单文档修订范围，并通过 userDecisionRequired 提案与 STOPPED 路由交接用户决策；资料保留与清理按 IO-19，达标结束按 IO-20；历史最佳与关键回归回滚已有目标要求，评分可比性和回退实现细节待落实。
 
@@ -42,7 +42,7 @@ evaluate 保存 Check 和固定测试集引用作为依赖，在独立副本中�
 
 ## 运行生命周期
 
-[Evaluation IO-20](../evaluation/Evaluation.md) 已确认文档达到验收标准后立即结束本次飞轮，不再为提高分数追加轮次。沿用既有自动通过路径，结束并交付达标文档；达到最大轮次仍未达标或预算耗尽时停止并转人工治理，不再作为待确认问题。候选结构检查通过不代表飞轮验收通过。后续验收需覆盖达标后不派发新一轮任务。
+[Evaluation IO-20](../evaluation/Evaluation.md) 已确认文档达到验收标准后立即结束本次飞轮，不再为提高分数追加轮次。沿用既有自动通过路径，结束并交付达标文档；达到最大轮次仍未达标或预算耗尽时停止并转人工治理，不再作为待确认问题。候选结构检查通过不代表飞轮验收通过。受控两轮 SDK 验收已覆盖 PASS 后结束且只发布一次；真实模型质量、历史最优回退和成本/停滞策略仍不计为完成。
 
 [FlywheelDomainService](../../../../src/domain/workflow/FlywheelDomainService.ts) 封装创建 Run、状态迁移和生成能力声明，调用 Domain.ts 中的共享实体规则拒绝非法状态变化。Application 决定何时调用并保存结果；本模块不执行模型调用或数据库写入。业务连接与生命周期同属 workflow，LangGraph 引擎接线保留在 Infrastructure。
 
@@ -73,6 +73,6 @@ AC-AGENT-105：maxIterations 表示包含首轮的最大业务轮数；内部 it
 
 ### AC-AGENT-105-R1：路由跨存储恢复
 
-Registry 与 LangGraph 的提交不是同一事务。router 必须以 runId、输入 iteration、版本化 generation key 保存不可变决定，业务状态迁移不能改变重放结果。先固定决定再执行可重复的迁移/交接；Gate 已提交而路由尚未保存时，可按相同证据取回既有 Gate，不重复记录评测。输入冲突应拒绝。
+Registry 与 LangGraph 的提交不是同一事务。router 以 `${runId}:workflow_router:${iteration}:route-v2` 保存不可变决定，业务状态迁移不能改变重放结果。先固定决定再执行可重复的迁移/交接；Gate 已提交而路由尚未保存时，可按相同证据取回既有 Gate，不重复记录评测。输入冲突应拒绝。
 
-验收 `tests/integration/WorkflowRouterReplay.test.ts`：质量 ITERATE、Gate ITERATE、Gate STOPPED、质量 STOPPED 均在 Registry 副作用提交后、LangGraph 节点输出保存前注入故障，然后用原始输入恢复；决定、业务轮次、Gate 和交接数量保持一致。另覆盖决定已固定、迁移尚未执行的恢复窗口，不只重放 Orchestrator。
+验收 `tests/integration/WorkflowRouterReplay.test.ts`：质量 ITERATE、Gate ITERATE、Gate STOPPED、质量 STOPPED 均在 Registry 副作用提交后、LangGraph 节点输出保存前注入故障，然后用原始输入恢复；决定、业务轮次、Gate 和交接数量保持一致；该验收已通过，属于精确边界异常注入，不宣称操作系统强杀命中同一窗口。另覆盖决定已固定、迁移尚未执行的恢复窗口，不只重放 Orchestrator。

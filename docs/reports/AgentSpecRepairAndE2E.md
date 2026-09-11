@@ -51,6 +51,22 @@ Run ID：`69f2a95c-fd7f-4a33-a878-ed1861313068`。结果 `COMPLETED / PASS / VER
 监督器保护的是逐入口执行和结果通道，不负责判断断言是否充分，也不等同于文件读取隔离、完整部署沙箱或外部模型质量验收。系统接口依据见 [Linux ptrace 手册](https://man7.org/linux/man-pages/man2/ptrace.2.html)。路由验收通过精确边界的异常注入和真实 LangGraph resume 完成，没有声称用操作系统强杀命中了相同窗口。既有共享能力待办及用户延期事项仍不计为完成。
 
 
+## 2026-09-11：现有文档同步复核
+
+本次依据 `c33787b...e45dff4` 的代码差异同步现有文档，生产代码和测试未修改。复核不仅检查文档路径，还对照实际输入输出、错误分支、调用顺序和测试证据：
+
+| 核对范围 | 已同步的描述与代码依据 |
+| --- | --- |
+| 角色输入与修订 | Code 的 requiredGeneratedPaths、Check 非空规则及双侧原文核验、Review 报告/历史输入、DocGen 与 Review 共用章节定位；依据各角色 Contract 和 DocGenRevision |
+| Worker 与 Prompt | WorkerMaterials / DocWorkerExecution 的裁剪清单、CAS、Prompt 和工作区授权一致；固定 Prompt 与 subagent-v3 复用；预算分组和语义质量仍未完成 |
+| 测试与原生评测 | TestExecutionPlan 的各命令 cwd 绑定、TestSuitePolicy 的有限修复与复用、CaseRunner / NativeCaseSupervisor 的独立执行和结果通道；补充系统限制及普通断言失败分类 |
+| 编排与持久化 | AutomatedProjectWorkflow 的模块绑定、总轮数、route-v2 不可变结果和幂等交接；ApplicationServices 的相同证据 Gate 复用；同步 Workflow、LangGraph、SQLite 及 4+1 图 |
+| 使用与状态 | 独立角色与完整受控流程的运行区别、保留产物变量、本地 .workpanel 目录、旧协议恢复边界；更新 Status/追踪并清除失效“待实现”描述 |
+
+本轮 Node 24 文档验证：`npm run validate:specs` 通过，17 schemas / 7 commands / 8 results / 52 p0；`node --test tests/contract/*.test.ts` 28/28 通过；相对 PR base 的差异格式检查通过。未重跑全量业务、浏览器或真实模型测试，原始验收产物未改写。上节 `acfd714` 的全量和受控端到端结果是上次实际执行证据，已复核现存日志与最终 summary，不能把文档更新记作新增业务验收。
+
+保留原有未完成目标：Worker 业务分组/预算/跨模块依赖、分批汇总与补充分析、相似度研究、独立项目配置版本、自动资料清理、历史最佳/成本/停滞策略、SearchAgent/外部知识关联及公司 CLI/真实模型验收。当前参考校验仍是用户暂时保留的规则，不改写为最终产品定案。
+
 ## 历史：2026-09-11 第一轮六项验收
 
 代码版本：`9f34a85`。先提交可执行 Spec（`9f29682`），再对每项缺陷记录失败复现、实现、通过验收后单独提交。以下是当时的测试结果，复审发现的缺口以本文首节为准；后文 2026-09-10 的 266 项测试及 `2/2` 计数是历史记录，不能替代本轮验收。

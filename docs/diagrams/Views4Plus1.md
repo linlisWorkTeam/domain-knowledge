@@ -42,7 +42,7 @@ flowchart TB
 
 ```mermaid
 flowchart TD
-  O[orchestrator] --> D
+  O[orchestrator: 轮次检查与模块绑定] --> D
   O --> T[test_gen]
   subgraph DG[DocGen Agent 内部]
     D[拆分源码任务] --> W[DocWorker subAgents]
@@ -51,9 +51,9 @@ flowchart TD
   end
   G --> Q[candidate_knowledge]
   Q -->|可继续| C[code]
-  Q -->|ITERATE 或 STOPPED| R[workflow_router]
+  Q -->|ITERATE 或 STOPPED| R[workflow_router: 固定决定后幂等迁移]
   C --> K[check]
-  T --> V[oracle_validation]
+  T --> V[oracle_validation: 参考校验 / 有限修复 / 固定测试复用]
   K --> B[等待两条链]
   V --> B
   B --> E[evaluation]
@@ -61,10 +61,10 @@ flowchart TD
   E -->|FAILED| F[failed]
   E -->|STOPPED| R
   RV --> R
-  R -->|ITERATE| O
+  R -->|ITERATE 且预算未耗尽| O
   R -->|PASS| P[publication]
   R -->|FAILED| F
-  R -->|其他| S[stopped]
+  R -->|STOPPED 保存精简交接| S[stopped]
 ```
 
 ## 物理视图：本地运行与外部资源
@@ -79,12 +79,19 @@ flowchart LR
   Server --> Harness[DSH SDK / 隔离工作空间]
   Harness --> Model[已配置模型 HTTPS API]
   Server --> Project[固定提交的参考与生成副本]
-  Project --> Processes[node / pnpm / cargo / gcc / g++ / 测试程序]
+  Project --> Processes[项目准备与编译命令]
+  Server --> Supervisor[受信 NativeCaseSupervisor]
+  Supervisor -->|ptrace 逐入口监督| Native[独立 C/C++ 被测进程]
+  Project --> Native
+  Supervisor -->|独立结果通道| Server
+  Native -->|stdout/stderr 日志| Server
   Server -. 适配器已提供 .-> Redis[Redis 租约与上下文]
   Browser --> Static[同源 web 静态资源]
 ```
 
 CLI 和 HTTP 是两个可独立启动的入口，上图 Server 框表示共享应用装配，不要求 CLI 经 HTTP 转发。运行数据库、CAS 和项目副本位于运行目录，不提交到 Git；Redis 不成为知识事实源。
+
+Agent 材料边界由授权工件、受限工具和 DSH 工作区控制；原生用例由另一个受信父进程监督。当前监督器限定 Linux x86_64、gcc/nm、入口符号及可用 ptrace，不提供完整文件读取隔离或通用部署沙箱。Registry 先保存 route-v2 结果及幂等副作用，Graph 随后保存节点 checkpoint，两者不在同一事务中。
 
 ## 场景视图（+1）：一次失败后的修订与发布
 
@@ -161,14 +168,15 @@ flowchart LR
   Plan --> Bind[Application 绑定模块及任务材料]
   Bind --> Tests[TestGen 测试源码与清单]
   Tests --> Reference[原实现 + 项目命令 + 绑定测试编译运行]
-  Reference -->|失败证据与完整候选| Tests
+  Reference -->|首次候选普通失败且仍有修复预算| Tests
+  Reference -->|配置或环境故障 / 修复耗尽 / 固定集合失败| Handoff
   Reference -->|成功固定测试集| Eval[删除目标原实现后评测重建代码]
   Eval --> Review[Review 当前证据与历史全文]
   Review --> Revision[统一定位的 DocGen 修订]
   Revision --> Eval
   Review --> Gate[确定性 Gate]
   Gate -->|PASS| Publish[发布知识]
-  Gate -->|STOPPED| Handoff[问题、建议、历史对比及证据摘要]
+  Gate -->|STOPPED| Handoff[问题、建议、可用历史对比及证据摘要]
 ```
 
-该图补充业务材料交接，不改变固定 LangGraph 拓扑。修订迭代继续使用选定模块及已固定测试集。验收运行可显式保留评测工作区、编译产物和完整证据。
+该图补充业务材料交接，不改变固定 LangGraph 拓扑。修订迭代继续使用选定模块及已固定测试集；原生参考与重建评测均采用外部逐入口监督。最终受控 SDK 验收运行两轮、五次评测后 PASS，只发布一次；模型质量仍待真实调用验证。运行可显式保留评测工作区、编译产物和完整证据，见 [报告](../reports/AgentSpecRepairAndE2E.md)。

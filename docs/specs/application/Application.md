@@ -29,6 +29,16 @@ ProjectWorkflowStages 负责解析场景上下文、读取历史工件、构造�
 
 DocWorkerExecutionService 实现 DocGen 的内部 Worker 执行端口，生产与独立样例共用。它校验任务范围、加载冻结的 Worker 提示词、通过 RoleExecutionService 提交独立结果，并读取已提交片段返回给 DocGen。ConcurrentTasks 在 Infrastructure 中提供默认三个并发槽；任一任务失败取消同批调用并等待在途任务结束。它不决定源码如何分组或文档如何汇总。
 
+WorkerMaterials 按分配源码与公开接口裁剪独立源码清单，再保存子任务 CAS 引用；同一路径材料冲突以 WORKER_SOURCE_CONFLICT 拒绝。Prompt 正文、子任务 sourceRefs/publicInterfaceRefs 和可读工作区使用同一授权集合，父级历史/纠正材料不进入 Worker；重试与复用以包含载荷、冻结 Prompt 的 subagent-v3 键绑定该范围。
+
+## 路由、停止与跨存储恢复
+
+Orchestrator 从场景授权模块中选择一个，Application 将模块、固定提交快照和任务材料绑定到 Run，后续轮次不能换模块。maxIterations 包含首轮，入口与质量/Gate 继续条件共用 Domain IterationBudget；模型格式重试、TestGen 修复及同轮重放不消费新业务轮次。
+
+workflow_router 先用 runId、输入 iteration、route-v2 的 generation key 保存不可变结果及输入身份，再幂等推进 ITERATING/LOW_CONFIDENCE 和停止交接，最后返回 LangGraph 更新。恢复不依据已经推进的 Run.iteration 重算结论；已提交评测/Gate 按相同输入和证据取回，冲突拒绝。Registry 与 Graph checkpoint 无跨库事务，故障窗口由真实图恢复测试覆盖，详见 [Workflow](../domainFunction/workflow/Workflow.md)。
+
+测试校验/修复失败、DocGen 文档范围提案、质量耗尽、Gate STOPPED 四类人工停止均保存精简 CAS 交接，包含问题、下一步建议和有效证据；已有 Review 历史时带 historySummary。ReviewHandoffPrepared 事件及待办按交接键去重。早期停止可由 Application 根据事实组织摘要，无须强行调用 Review；自动资料清理与历史最佳回退仍未实现。
+
 ## 当前内容质量策略
 
 DeterministicQualityPolicy 位于 Application：来源证据 30%、结构 25%、可验证性 20%、正文量 15%、可读性 10%，默认阈值 70。KnowledgeWritingGuide 报告模板化表达和超长段落；弱项形成反馈送回 DocGen。质量拒绝跳过 Code，质量通过不等于行为 Gate PASS。

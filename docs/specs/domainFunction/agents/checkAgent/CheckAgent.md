@@ -26,13 +26,13 @@ IO-14、15 的契约和交接已实现。输入为 `sourceSnapshotRef`、`genera
 - `findings`：每项包含 ruleId、sourcePath、path、original、generated、message、severity（BLOCKER / INFO）。original 和 generated 是对应的原文片段。
 - `blocking`：必须与 findings 中是否存在 BLOCKER 一致。
 
-Domain 校验范围覆盖全部生成文件、每项 ruleId 来自配置、sourcePath 属于授权源码/接口范围，path 属于生成文件、generated 片段确实存在于对应代码中。原始片段的语义及与源码的吻合仍需模型检查；没有声称实现 AST 等价证明。结果信封将每项独立映射到 findingId、severity、criterionId、evidenceLocation 和说明，保留原始结构化输出引用。
+Domain 校验范围覆盖全部生成文件、每项 ruleId 来自配置、sourcePath 属于授权源码/接口范围，path 属于生成文件；original 必须出现在冻结源码清单对应文件的正文中，generated 必须出现在对应生成文件中。片段存在性由代码核验，差异是否具有所述业务含义仍需模型判断，不等于 AST 等价证明。结果信封将每项独立映射到 findingId、severity、criterionId、evidenceLocation 和说明，保留原始结构化输出引用。
 
 Application 将真实 Check 原始报告作为 Review 的 `comparisonReportRef`，与测评报告一起加载。评测器运行配置指定的命令；Gate 继续读取 check.blocking。
 
 ## 延后事项与验证
 
-相似度算法、评分、权重和阈值仍属下一版本研究范围。当前不内置这些判据；没有配置规则时只允许空 findings，不能据此宣称比较覆盖完整。
+相似度算法、评分、权重和阈值仍属下一版本研究范围。当前不内置这些判据；规则为空、内容为空或标识重复时，在模型调用前以 CHECK_RULES_REQUIRED 拒绝，不能把缺配置当作无差异。只有提供合法规则并完成比较后，才允许返回空 findings。
 
 角色回归覆盖规则伪造、生成片段伪造、越界位置和 blocking 不一致。完整 C++ 流程验证 Check 报告进入 Review，报告引用进入最终 Gate 输入。
 

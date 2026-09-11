@@ -68,20 +68,20 @@ SPDX-License-Identifier: MIT
 
 ## 需求追踪矩阵
 
-实现和测试路径相对仓库根目录。AC-FLOW-003 的自动回滚、AC-FLOW-004 的完整冲突调度、AC-LANG-002 的 C++ 沙箱、AC-EVAL-001 的候选 oracle 晋升仍按 Partial / Planned 审查，不能根据场景措辞推定已实现。2026-09-10 KF-SYS-045 已有 C/C++ 契约、材料隔离和完整受控链路回归；KF-SYS-044 已实现冻结场景内的配置裁剪，独立项目配置文件管理仍为 Partial。真实业务模型质量仍交 S3 验收。
+实现和测试路径相对仓库根目录。AC-FLOW-003 的自动回滚、AC-FLOW-004 的完整冲突调度、AC-LANG-002 的 C++ 沙箱、AC-EVAL-001 的通用 oracle 质量扩展仍按 Partial / Planned 范围审查；当前 C/C++ 候选参考校验、固定集合与外部逐入口监督已实现，其余扩展不能凭场景描述推定完成。2026-09-10 KF-SYS-045 已有 C/C++ 契约、材料隔离和完整受控链路回归；KF-SYS-044 已实现冻结场景内的配置裁剪，独立项目配置文件管理仍为 Partial。真实业务模型质量仍交 S3 验收。
 
 | 需求 ID | 验收 | 状态 | 实现 | 测试 |
 | --- | --- | --- | --- | --- |
 | KF-SYS-001 | AC-FLOW-001 | Partial | `src/application/services/ApplicationServices.ts` | `tests/acceptance/PublicationFlow.test.ts` |
-| KF-SYS-002 | AC-AGENT-001 | Planned | — | — |
+| KF-SYS-002 | AC-AGENT-001 | Implemented | `src/domain/agents/docGenAgent/DocGenAgent.ts`、`src/domain/agents/reviewAgent/ReviewAgent.ts` | `tests/integration/DocGenDecision.test.ts`、`tests/acceptance/AgentRevisionFlow.test.ts` |
 | KF-SYS-003 | AC-SEC-001 | Partial | `src/domain/workspace` + `src/infrastructure/agentAdapters/deepSeekHarness/IsolationLauncher.mjs` | `tests/security/AgentWorkspace.test.ts` + `tests/integration/DeepseekHarnessAgent.test.ts` |
-| KF-SYS-004 | AC-EVAL-001 | Planned | — | — |
+| KF-SYS-004 | AC-EVAL-001 | Partial | `src/application/services/AutomatedProjectWorkflow.ts`、`src/infrastructure/evaluation/project` | `tests/integration/TestGenExecution.test.ts`、`tests/integration/NativeCaseSupervisor.test.ts`、`tests/acceptance/AgentRevisionFlow.test.ts` |
 | KF-SYS-005 | AC-EVAL-002 | Implemented | `src/infrastructure/evaluation/project` + `src/domain/Domain.ts` | `tests/acceptance/RealSourceFlow.test.ts` |
 | KF-SYS-006 | AC-OBS-001 | Implemented | `src/infrastructure/sqlite/SqliteCas.ts` | `tests/integration/SqliteCas.test.ts` |
-| KF-SYS-007 | AC-FLOW-002 | Implemented | `src/application/services/ProjectFlow.ts` | `tests/acceptance/RealSourceFlow.test.ts` |
+| KF-SYS-007 | AC-FLOW-002 | Implemented | `src/application/services/AutomatedProjectWorkflow.ts`、`src/domain/agents/docGenAgent/DocGenRevision.ts`、`src/domain/agents/reviewAgent/ReviewAgent.ts` | `tests/integration/AgentSpecRegression.test.mjs`、`tests/acceptance/AgentRevisionFlow.test.ts` |
 | KF-SYS-008 | AC-FLOW-003 | Partial | `src/domain/Domain.ts` | `tests/unit/Domain.test.ts` |
 | KF-SYS-009 | AC-PUB-001 | Implemented | `src/application/services/ApplicationServices.ts` + `src/infrastructure/sqlite/SqliteCas.ts` | `tests/acceptance/PublicationFlow.test.ts` |
-| KF-SYS-010 | AC-REC-001 | Partial | `src/application/services/ApplicationServices.ts` + `src/infrastructure/sqlite/SqliteCas.ts` | `tests/integration/SqliteCas.test.ts` |
+| KF-SYS-010 | AC-REC-001 | Partial | `src/application/services/ApplicationServices.ts`、`src/application/services/AutomatedProjectWorkflow.ts`、`src/infrastructure/sqlite/SqliteCas.ts` | `tests/integration/SqliteCas.test.ts`、`tests/integration/WorkflowRouterReplay.test.ts` |
 | KF-SYS-011 | AC-SCHEMA-001 | Implemented | `docs/specs/schemas` + `src/application/ports` + `src/infrastructure/agentAdapters/contracts` + `src/application/services/AutomatedProjectWorkflow.ts` | `scripts/ValidateSpecs.ts` + `tests/integration/AgentContracts.test.ts` + `tests/acceptance/AutomatedLanggraphFlow.test.ts` |
 | KF-SYS-012 | AC-LANG-001 | Implemented | `src/application/ports/ApplicationPorts.ts` | `tests/contract/Architecture.test.ts` |
 | KF-SYS-013 | AC-SEC-002 | Partial | `src/interfaces/runner/Server.ts` | `tests/integration/Server.test.ts` |

@@ -15,12 +15,12 @@ SPDX-License-Identifier: MIT
 | --- | --- | --- | --- |
 | IO-03 | CodeAgent 的主要业务输入及公开接口来源 | 已实现，待业务验收 | 主要业务输入是知识卡片，公开接口资料包含在卡片中，不单独传入接口材料，也不通过额外读取原仓库接口文件补充。publicInterfaceRefs 与接口文件读取授权已移除；本轮已同步实现。 |
 | IO-04 | CodeAgent 的其他输入与执行权限 | 已实现，待业务验收 | 接收项目配置中影响代码编写的语言、依赖约束和允许生成路径；框架冻结本轮可读文件白名单与输出位置，以受限工具和进程隔离落实。CodeAgent 返回文件列表，由框架校验并落盘，不直接写业务仓库。 |
-| IO-05 | CodeAgent 的目标语言 | 已实现，待业务验收 | 用户业务代码为 C/C++，生成代码的目标语言限定为 C/C++。具体标准、依赖与工具链由项目/场景配置指定；现有 TypeScript 开发样例不能作为目标业务语言已适配的证据。 |
-| IO-06 | 依赖与构建说明的存放边界 | 已实现，待业务验收 | 不放入知识卡片。框架侧按业务项目管理项目配置，场景引用对应配置版本；角色只获得必要部分，完整构建配置交编译、评测执行器。切换项目选择另一份配置，运行中使用已冻结版本。 |
+| IO-05 | CodeAgent 的目标语言 | 已实现，待业务验收 | 用户业务代码为 C/C++，生成代码的目标语言限定为 C/C++。具体标准、依赖与工具链由项目/场景配置指定；当前独立角色样例与完整受控验收使用 C/C++；通用执行器仍保留其他工具入口，不代表 CodeAgent 支持其他业务语言。 |
+| IO-06 | 依赖与构建说明的存放边界 | 已实现，待业务验收 | 不放入知识卡片。目标是框架按业务项目管理配置版本；当前已实现 agentConfiguration 随场景冻结及按角色裁剪，完整构建配置交评测执行器。独立项目配置文件及版本管理仍为 KF-SYS-044 的未完成部分。 |
 
 ## 当前输入输出
 
-IO-03～06 已实现。CodeAgent 的模型输入仅为 `knowledgeRef`、`projectConfigurationRef`、`languageId` 和 `allowedGeneratedPaths`。知识正文包含接口说明；裁剪配置只含 languageId、standard、dependencies、constraints、allowedGeneratedPaths。完整 scenario、源码快照、独立接口和测试材料不会进入 Code 的 Prompt。
+IO-03～06 的角色契约已实现。CodeAgent 的模型输入为 `knowledgeRef`、`projectConfigurationRef`、`languageId`、`allowedGeneratedPaths` 和生产工作流提供的 `requiredGeneratedPaths`（独立角色契约可省略）。最后一项标明本轮必须完整重建的文件，是允许输出路径的子集；缺少其中任一文件即拒绝。知识正文包含接口说明；裁剪配置只含 languageId、standard、dependencies、constraints、allowedGeneratedPaths。完整 scenario、源码快照、独立接口和测试材料不会进入 Code 的 Prompt。
 
 角色声明 `readablePaths: []`，生产 Adapter 为其创建空的仓库文件视图，知识与配置通过内联工件提供；DSH 继续使用已有受限工具及进程隔离。框架冻结场景和配置摘要，恢复不兼容的旧角色执行版本会明确失败。
 

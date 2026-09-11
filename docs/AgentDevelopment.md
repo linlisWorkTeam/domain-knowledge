@@ -7,7 +7,7 @@ SPDX-License-Identifier: MIT
 
 角色设计从 [Agents 索引](specs/domainFunction/agents/Agents.md) 进入各自独立文档，跨角色流程见 [Workflow](specs/domainFunction/workflow/Workflow.md)。本文件只说明如何定位、运行和修改角色，DocGen 的固定源码教程合并在后半部分。
 
-CodeAgent 的目标输入输出已于 2026-09-10 确认：知识卡片包含接口，项目配置提供 C/C++ 运行约束，框架冻结读取权限并校验源码输出，详见 [CodeAgent 目标设计](specs/domainFunction/agents/codeAgent/CodeAgent.md) 和 [S2-05 任务](Status.md)。以下命令与样例仍对应现有实现，尚未支持新的项目配置入口；原 TypeScript 样例不能用作 C/C++ 业务验收结论。
+CodeAgent 当前只接收包含接口的知识卡片和裁剪后的 C/C++ 编写配置，角色契约、生产场景 agentConfiguration 及 C/C++ 独立样例均已接通。框架冻结材料权限并检查完整重建范围，详见 [CodeAgent](specs/domainFunction/agents/codeAgent/CodeAgent.md) 和 [Application 场景字段](specs/application/Application.md)。独立项目配置文件/版本管理仍未完成；受控样例通过不等于真实模型业务验收。
 
 ## 定位代码
 
@@ -37,7 +37,26 @@ npm run agent:run -- --role code --input src/domain/agents/codeAgent/examples/Co
 
 修改后按需要验证角色，例如 `node --test src/domain/agents/codeAgent/CodeAgent.test.ts`。公共契约变化同步 `docs/specs/schemas/`、消费者与集成测试。正常交付检查见 [Development](Development.md)；用户要求不跑测试时只记录实际静态检查，不能宣称角色测试通过。
 
+Prompt 在各角色 XxxAgentPrompt.ts 中维护，包含职责、基础指令、工具和可读路径。运行时拼入冻结的 promptAddon、适用治理指令、本轮命令和授权工件正文；输出 Schema 单独约束结果。修改材料或执行语义时同时核对 Contract、Application 组装、样例/受控响应及执行版本，不能只改提示词。
+
 真实模型开发在样例命令追加 `--provider dsh`，环境配置见 [Runtime](Runtime.md)。此时不使用样例 modelOutput，源码按 expectedCommit 物化，scenario.repositoryRoot 相对当前目录解析。每次调用创建独立 runtime；独立入口使用 Runtime 中的环境配置方式。
+
+## 完整流程与证据保留
+
+`tests/integration/` 验证本平台各模块协作；TestGen 生成的 C/C++ files/cases 是目标项目的测试材料，两者不同。完整受控 SDK 回归在 `tests/acceptance/AgentRevisionFlow.test.ts`，覆盖 TestGen 失败修复、固定测试集、两轮知识修订、真实编译/外部监督及 Gate 发布：
+
+```bash
+WP_ACCEPTANCE_OUTPUT=/absolute/path/to/new-acceptance-output \
+  node --test tests/acceptance/AgentRevisionFlow.test.ts
+```
+
+使用 Node 24 和下述原生评测环境，选择一个新的输出目录。该变量让用例保留源码仓库、运行数据库/CAS 及模型请求响应等资料；不设置时使用临时目录并在测试后清理。报告中 readable、评测索引及归档是验收后的整理产物，不能假定每次执行都会自动生成相同整理目录。
+
+本轮最终代码 `acfd714` 的受控 SDK 运行有 13 次模型调用、5 次评测，结果 COMPLETED/PASS/VERIFIED；全部材料及验证范围见 [报告首节](reports/AgentSpecRepairAndE2E.md)。模型响应由本地测试服务控制，不能用它声明真实模型的文档或测试质量已验收。
+
+原生生成测试必须包含唯一 caseId/entryPoint，提供 `int entryPoint(void)`，不定义 main。参考与 finalCommands 都须显式编译测试文件并运行对应 binary；支持每条命令独立 cwd，框架保留项目参数并追加 runner。监督器需求及配置失败处理见 [Runtime](Runtime.md)，完整契约见 [TestGen](specs/domainFunction/agents/testGenAgent/TestGenAgent.md)。
+
+`.workpanel/` 是本仓库被 Git 忽略的本地数据目录名，包含验收产物、默认图检查点及 bootstrap 记录；不是 ohMyWorkPanel 依赖。`WP_ACCEPTANCE_OUTPUT` 可指定其他目录，生产运行位置由 `WP_FLYWHEEL_HOME` 等运行配置决定。
 
 ## DocGen 固定源码样例
 
