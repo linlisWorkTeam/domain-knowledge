@@ -50,27 +50,61 @@ IO-12 是用户在 2026-09-10 暂时同意保留的规则，已经实现，但�
 
 这能证明入口被执行并记录结果，不能证明用例写得足够严格。例如测试函数直接返回成功却不检查业务，仍属于测试质量问题，需要真实业务验收。
 
-## 已确认的规则与当前边界
+## 开发规则与验收
 
-| 编号 | 规则 | 当前状态 |
-| --- | --- | --- |
-| IO-02 | 从源码获得测试依据，不读知识文档 | 已实现；替代早期从知识生成测试的方向 |
-| IO-11 | 输出可执行源码和逐项清单，由执行器运行 | 已实现 |
-| IO-12 | 先在原始源码上验证候选测试 | 已实现，规则暂时保留 |
-| IO-13 | 源码不变就复用，不因文档或配置变化重写 | 已实现 |
-| IO-21 | 首次候选失败时有限修复，仍失败转人工 | 已实现 |
+### IO-02 / IO-11 / AC-AGENT-101：从源码交付可执行测试
 
-当前支持可明确绑定的 gcc/g++ 编译与 binary 执行；复杂构建脚本需要适配。外部监督限定 Linux x86_64、可用 ptrace、gcc/nm 和保留的入口符号；不等于完整部署沙箱。源码正确性、测试覆盖率和真实模型质量仍未验收，详见 [执行器设计](../../../infrastructure/evaluation/Evaluation.md)。
+| 项目 | 约定 |
+| --- | --- |
+| 前提 | 已加载授权源码、接口、语言和测试策略，以及允许写入的测试路径。 |
+| 行为 | TestGen 只据源码生成测试文件和用例清单，不读取候选知识或重建代码。每个测试源文件关联用例，每个用例有唯一入口和源码依据；辅助头文件可无用例，但不能作入口。 |
+| 结果 | 文件集合与逐项清单分别保存；覆盖原实现、越权路径、虚构依据、缺入口或源文件无关联用例均拒绝，不能仅交测试方案。 |
+| 验收 | 一份测试源文件加辅助头文件应能编译执行；让头文件充当入口、增加未关联用例的源文件须拒绝。加入无关候选知识时不得进入模型材料。见 [角色测试](../../../../../src/domain/agents/testGenAgent/TestGenAgent.test.ts) 和 [TestEntryContract.test.ts](../../../../../tests/integration/TestEntryContract.test.ts)。 |
+| 状态 | 已实现，有角色及真实编译回归；用例的业务覆盖率和断言质量尚未验收。 |
 
-## 怎样验收
+### IO-12 / IO-21：参考校验失败时有限修复
 
-| 验收编号 | 必须观察到的行为 | 对应测试 |
-| --- | --- | --- |
-| AC-AGENT-101 | 源文件加辅助头文件能执行；头文件不能冒充用例入口，未关联用例的测试源文件被拒绝 | TestEntryContract.test.ts |
-| AC-AGENT-102 / AC-AGENT-102-R1 | 保留宏、头文件目录、链接和运行参数；分别按命令工作目录处理路径，无法绑定就停止 | TestBuildBinding.test.ts |
-| AC-AGENT-103 / AC-AGENT-103-R1 | 清单完整执行才可能通过；读取 runner 后伪造三个 PASS 并退出不能蒙混过关，后两个入口仍会被启动 | TestCaseExecution.test.ts、NativeCaseSupervisor.test.ts |
+| 项目 | 约定 |
+| --- | --- |
+| 前提 | 首次候选测试已生成；修复预算为 0～3，默认 1，参考实现保持不变。 |
+| 行为 | 执行器先在原始源码副本编译运行。普通编译/运行/断言失败时，Application 将完整上一候选及失败证据交 TestGen 修复；环境、工具、超时或绑定失败直接停止。 |
+| 结果 | 通过才固定测试集；修复耗尽仍失败则 STOPPED 并保留交接。修复不推进文档轮次，候选测试失败不直接要求 Review 改知识。 |
+| 验收 | 首次断言或编译失败后应携带完整测试源码和用例修复一次；再失败停止。预算为 0 不修复，环境失败不调用修复模型。见 [TestGenExecution.test.ts](../../../../../tests/integration/TestGenExecution.test.ts)、[AgentSpecRegression.test.mjs](../../../../../tests/integration/AgentSpecRegression.test.mjs)。 |
+| 状态 | 已实现，有有界修复及停止回归。IO-12 仍是暂时保留的产品规则，假设参考实现正确，不证明业务本身正确。 |
 
-这些文件位于 `tests/integration/`。监督测试还覆盖正常返回、断言、信号、超时、伪造结果通道、修改文件/进程、缺符号和内核拒绝 ptrace。TestGenExecution.test.ts 覆盖有限修复及跨 Run 复用；完整流程见 [验收报告](../../../../reports/AgentSpecRepairAndE2E.md)。旧 nonce/stdout 方案已被替换，其旧测试通过记录不作为当前可信完成证明。
+### IO-13：同一源码使用已固定测试
+
+| 项目 | 约定 |
+| --- | --- |
+| 前提 | 按模块、源码/接口路径及内容摘要，找到已校验测试；新 Run 或新轮次可能改变文档、提示词或配置。 |
+| 行为 | 框架复用固定集合，在当前环境重新编译运行；只有源码身份改变才允许建立新集合。并发时使用实际保存的首个通过集合，不能沿用输掉保存竞争的候选。 |
+| 结果 | 源码不变不重新生成；固定测试失败停止，不能自动改答案。旧协议结果不能冒充当前通过，也不能靠重生成绕过迁移。 |
+| 验收 | 只改文档或提示词、新建 Run，模型不得重写固定测试；改源码须得到不同源码身份。旧协议缓存须停止且不调用生成。见 [角色测试](../../../../../src/domain/agents/testGenAgent/TestGenAgent.test.ts)、[复用策略测试](../../../../../src/domain/agents/testGenAgent/TestSuitePolicy.test.ts) 和 [TestGenExecution.test.ts](../../../../../tests/integration/TestGenExecution.test.ts)、[TestCaseExecution.test.ts](../../../../../tests/integration/TestCaseExecution.test.ts)。 |
+| 状态 | 已实现，有策略和跨 Run 复用回归；原始源码正确性不在复用校验范围内。 |
+
+### AC-AGENT-102 / AC-AGENT-102-R1：按每条命令的工作目录绑定测试
+
+| 项目 | 约定 |
+| --- | --- |
+| 前提 | 项目配置提供可解析的 gcc/g++ 编译及 binary 运行命令，显式声明测试源文件与输出。 |
+| 行为 | 执行器分别按各命令 cwd 规范化源码、输出和运行路径，确认编译产物对应运行目标；保留宏、头文件目录、链接、运行参数和附加检查。 |
+| 结果 | 明确绑定后编译执行；无法绑定或路径逃逸时报告配置错误并转人工，不丢参数、不请求模型改测试来迎合命令。 |
+| 验收 | cwd=build 编译 ../tests/generated.cpp -o test-bin，运行从 build 或根目录指向同一产物，都应绑定成功；缺源文件/输出绑定及不透明命令停止。见 [TestBuildBinding.test.ts](../../../../../tests/integration/TestBuildBinding.test.ts)。 |
+| 状态 | 已实现，有参数及 cwd 回归；复杂构建脚本仍需适配，不声明支持任意命令。 |
+
+### AC-AGENT-103 / AC-AGENT-103-R1：逐项完成事实由外部监督器记录
+
+| 项目 | 约定 |
+| --- | --- |
+| 前提 | 测试清单和原生入口已绑定，运行环境支持当前监督协议。 |
+| 行为 | 监督器为每项独立启动进程，观察真实入口、正常返回及返回值。普通失败后继续调度后项；所有用例共享命令总超时和输出预算。stdout/stderr 只作日志。 |
+| 结果 | 只有清单完整执行且全部通过才可能 PASS。提前退出、伪造打印、缺项/重复/未知结果或监督不可用均不能通过；预算耗尽的剩余项记录未完成，不伪装执行成功。 |
+| 验收 | 第一个入口读取 runner、伪造三项 PASS 后退出，后两项实际失败：总体必须失败，后两项仍被启动。另覆盖正常返回、断言、超时、结果通道攻击及内核拒绝 ptrace。见 [TestCaseExecution.test.ts](../../../../../tests/integration/TestCaseExecution.test.ts)、[NativeCaseSupervisor.test.ts](../../../../../tests/integration/NativeCaseSupervisor.test.ts)。 |
+| 状态 | 已实现，有真实原生执行和攻击回归；只能证明入口执行事实，不能证明测试包含有效断言。 |
+
+## 当前支持范围与保留问题
+
+外部监督限定 Linux x86_64、可用 ptrace、gcc/nm 和保留的入口符号，不等于完整部署沙箱。旧 nonce/stdout 方案已替换，旧测试通过记录不作为当前可信完成证明。源码正确性、测试覆盖率及真实模型质量仍未验收。详见 [执行器设计](../../../infrastructure/evaluation/Evaluation.md) 和 [验收报告](../../../../reports/AgentSpecRepairAndE2E.md)。
 
 <details>
 <summary>开发对照：字段、执行协议和提示词</summary>
