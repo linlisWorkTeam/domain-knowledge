@@ -6,7 +6,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { execute } from './TestGenAgent.ts';
-import type { Input } from './TestGenAgentContract.ts';
+import { schemaFor, validateOutput, type Input } from './TestGenAgentContract.ts';
+import { assertModelOutput } from '../../../../src/infrastructure/agentAdapters/ModelExecution.ts';
 import { roleExample } from '../../../../tests/helpers/RoleExample.ts';
 
 test('test-gen: normal output uses one model call and validates before returning artifacts', async () => {
@@ -53,9 +54,23 @@ test('test-gen rejects undeclared test files and invented evidence and stores di
   assert.deepEqual(result.payload.caseManifestRef, { pendingArtifact: 'cases' });
   sample.output.cases[0].sourceEvidence = ['private.cpp'];
   sample.context.model.execute = async () => sample.output;
-  await assert.rejects(execute(sample.input, sample.context), /CASE_MANIFEST_INVALID/);
+  await assert.rejects(execute(sample.input, sample.context), /AGENT_OUTPUT_INVALID/);
+  assert.throws(() => validateOutput(sample.output, sample.input), /CASE_MANIFEST_INVALID/);
   sample.output.files[0].path = '../source.cpp';
-  await assert.rejects(execute(sample.input, sample.context), /OUTPUT_PATH_INVALID/);
+  await assert.rejects(execute(sample.input, sample.context), /AGENT_OUTPUT_INVALID/);
+  assert.throws(() => validateOutput(sample.output, sample.input), /OUTPUT_PATH_INVALID/);
+});
+
+test('model schema exposes exact evidence and output boundaries before business validation', () => {
+  const sample = roleExample<Input>('test-gen');
+  const schema = schemaFor(sample.input);
+  assert.doesNotThrow(() => assertModelOutput(sample.output, schema));
+  const qualified = structuredClone(sample.output);
+  qualified.cases[0].sourceEvidence = [`${sample.input.sourcePaths[0]}:calculate`];
+  assert.throws(() => assertModelOutput(qualified, schema), /AGENT_OUTPUT_INVALID/);
+  const extra = structuredClone(sample.output);
+  extra.files.push({path: `${extra.files[0].path}.manifest.json`, content: '{}'});
+  assert.throws(() => assertModelOutput(extra, schema), /AGENT_OUTPUT_INVALID/);
 });
 
 test('validated source tests bypass the model even when the prompt changes', async () => {
