@@ -5,6 +5,10 @@ SPDX-License-Identifier: MIT
 -->
 # 历史交接与设计演进
 
+## 2026-09-11 归档：CodeAgent 输入输出确认
+
+[2026-09-10-1038 原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/50aad21312a60bb8a866ebd1a4d9bcf0d5180ee9/docs/epitaph/2026-09-10-1038-codeagent-input-output.md)：当时仅确认 CodeAgent IO-03～06 的知识、C/C++、项目配置与读取隔离设计，修改设计和追踪，Spec 校验通过，未运行真实模型；项目配置及隔离实现、TestGen 测试依据仍待推进。其当时的 Planned 和“C/C++ 评测尚未实现”是历史快照，当前实现及真实模型结果以最新验收报告为准；测试依据在固定版本兼容与标准差异上的未决边界仍须明确。为保留最新三篇交接归档此文，不删除原始 Git 证据。
+
 本文件汇总已归档交接、重复里程碑报告和旧设计决策，记录“改了什么”及当时证据边界，不作为当前任务授权。当前设计见 specs，当前能力见 Status。完整旧文档通过固定 Git 提交读取；不保留一整套过期设计副本。
 
 ## 历次交接归纳

@@ -68,18 +68,27 @@ TestGen 真实生成独立测试候选，在原实现通过并固定后，每轮
 ```mermaid
 flowchart TD
   A[固定源码提交与验收配置] --> B[原实现与上游固定用例基线]
-  B --> C[真实 Orchestrator / DocGen 内部 DocWorker]
-  C --> D[候选知识与真实 TestGen]
-  D --> E[原实现校验并冻结生成测试]
-  E --> F[CodeAgent 仅依据知识重建完整 Utils]
-  F --> G[Check + 编译 + 逐项监督测试 + 上游固定检查]
-  G --> H[Review 与确定性 Gate]
-  H -->|需修订且预算内| C
+  B --> O[真实 Orchestrator]
+  O --> C[DocGen 内部 DocWorker / 候选知识]
+  O --> D[真实 TestGen]
+  D --> E[原实现校验 / 通过才冻结测试]
+  E -->|允许修复| D
+  C --> F[CodeAgent 仅依据知识重建完整 Utils]
+  F --> Q[Check]
+  Q --> G[汇合：检查参考校验结果]
+  E --> G
+  G -->|参考校验通过| T[编译 / 逐项监督 / 上游固定检查]
+  G -->|需人工处理| J[保存失败或停止阶段与证据]
+  T --> H[Review 与确定性 Gate]
+  H -->|需修订且预算内| O
   H -->|通过| I[发布知识与保存证据]
-  H -->|停止或失败| J[保存失败阶段与证据]
+  H -->|停止或失败| J
+  Q -->|契约错误| J
   I --> K[匹配版本控制台展示与浏览器复核]
   J --> K
 ```
+
+执行后依据实际拓扑校正上图：Code/Check 与参考测试分支在 evaluation 汇合，参考失败不代表 Code 从未启动。第四批最终结果为 FAILED / CHECK_EVIDENCE_INVALID，生成测试参考校验两次均 48/49，重建独立编译失败，没有发布；完整记录见上述验收报告。
 
 #### 通过标准与前台展示
 

@@ -5,6 +5,67 @@ SPDX-License-Identifier: MIT
 -->
 # Agent Spec 修复与端到端测试报告
 
+## 2026-09-11：cJSON Utils 真实模型验收，未通过
+
+先提交[验收计划](../specs/infrastructure/evaluation/Evaluation.md#2026-09-11-cjson-utils-真实模型端到端验收)（`1d4c3e4`），再实际执行。目标为 cJSON `v1.7.19` / `c859b25da02955fef659d658b8f324b5cde87be3` 的完整 `cJSON_Utils.c`（1481 行、14 个公开 API）；基础库和头文件固定，原始源码工作区最终无改动。配套材料包括上游 README、公开头文件和 JSON Pointer/Patch/Merge Patch 标准。不是此前的一行受控测试模块。
+
+最终有效配置批次：`a0a2694c-ada1-491d-a10a-2b75b303f48b`，执行代码 `80ac495`，北京时间 18:04:08—18:07:21，`FAILED / CHECK_EVIDENCE_INVALID`，停在 iteration 0 的 Check。最大三轮未耗尽，但契约错误终止流程；Review、重建代码的工作流内评测及 Gate 发布均未发生。报告后续的独立编译复核不能倒填为这些节点已经执行。
+
+### 真实调用与四个批次
+
+使用已保存提供方配置中的 `deepseek-v4-flash`，经 OpenCode Go HTTPS 和 DSH SDK 实际推理。最终批次有七个模型会话：Orchestrator、DocWorker、TestGen、DocGen、TestGen 修复、Code、Check。七个 SDK 会话都收到模型输出，但 Check 输出被业务契约拒绝；SDK SUCCEEDED 不等于角色业务验收通过。SDK 最终 usage 合计 282858 tokens，每会话只计最后一次聚合值，属于提供方报告用量，不是独立账单核算。
+
+| 批次 / Run ID | 实际结果与归因 |
+| --- | --- |
+| 1 / `028d17d6-8543-4c3a-910b-dbfabc21831c` | 模型目录探测成功，正式推理请求缺少 OpenCode 会话头，返回 MissingSessionID；Orchestrator 失败，无有效模型输出 |
+| 2 / `70522e65-8242-4dd5-817d-784df94538b9` | 真实 TestGen 返回 40 项，但 sourceEvidence 使用文件加函数的格式，被 TESTGEN_CASE_MANIFEST_INVALID 拒绝；并发 DocGen 另受错误 moduleId 阻塞 |
+| 3 / `193ef7ca-e065-43e4-80bf-5d2258c9f137` | 生成 38 项测试，参考执行 37/38；有限修复返回未授权的附加 manifest 文件，被 TESTGEN_OUTPUT_PATH_INVALID 拒绝；DocGen 的 moduleId 仍错误 |
+| 4 / `a0a2694c-ada1-491d-a10a-2b75b303f48b` | 修正场景 ID 和输出 Schema 后，生成知识、49 项测试及完整代码；参考测试修复前后均 48/49，Check 引用校验失败，最终未通过 |
+
+第二、三批的 `cjson-utils-v1.7.19` 是执行者场景配置错误，违反已有 ID 规则，不归因于模型理解能力。第四批使用 `cjson-utils-v1-7-19` 并增加启动前检查。每次新批次原因先补入计划，所有失败记录保留；第四批后不再另起模型批次。
+
+### 行为证据与产物
+
+| 检查 | 实际结果 |
+| --- | --- |
+| 原实现上游固定回归 | json_patch_tests、old_utils_tests、misc_utils_tests 均退出 0，Unity 分组分别 3、5、1，0 失败。JSON 数据共 121 条、4 条原始禁用；未把分组数或数据条目数冒充逐条监督通过数 |
+| 原实现独立补充复核 | 18/18，真实 gcc C99 构建和外部逐入口监督，覆盖全部 14 个 API；测试在模型工作区外保留 |
+| 模型生成测试的参考校验 | 第四批初稿与一次修复均 48/49，失败项 applypatch.escaped-path-segment；测试集没有获得通过后的冻结资格 |
+| 候选知识 | 24830 字符，14 个公开 API 名称均出现；版本 `kv_81dc24535d8a834fee9a6ccf`，CANDIDATE，质量分 91。名称覆盖及质量分不能证明语义充分，重建未通过 |
+| 模型重建 | 原样导出 1523 行 `Reconstructed.c`。独立编译失败：使用 true/false，但未定义或包含 stdbool.h；18 项独立用例没有进入执行，不能描述成 18 个行为断言均失败 |
+| 重建上游回归 | 三个测试程序均因上述编译问题未能执行；未手工补头文件后冒充模型原输出通过 |
+| Check 原始输出 | 共 22 条 finding，其中第 3、13、21 条至少一侧引用不是输入源码的精确子串；被 CHECK_EVIDENCE_INVALID 拒绝。其余引用能匹配不意味着语义结论正确，不能称为 22 个已确认缺陷 |
+| 工件完整性 | workflow runtime 的 65 个 CAS 文件摘要全部匹配；另有独立复核 CAS 与导出文件摘要清单 |
+
+单独复现参考失败：对象 `{"a/b":1}`，应用 `replace /a~1b = 2`，固定版本 ApplyPatchesCaseSensitive 实际返回 13，对象不变。固定源码 decode_pointer_inplace 的转义处理与模型期望不一致；查找 Pointer 与应用 Patch 不共用完全相同的解码路径。这里必须区分“复现固定版本行为”和“符合标准的预期”，不能直接修改原实现或降低测试预期来通过。重建版同一复现因编译失败未执行。
+
+实际拓扑中 Code/Check 与 TestGen/参考校验是两条汇合于 evaluation 的分支。因此参考校验返回人工处理后，Code 仍可能已经执行；本批次 oracle_validation 的 COMPLETED 表示节点执行结束，返回的是 STOPPED/人工处理，并非测试 PASS。随后 Check 契约失败先终止整体流程。该行为依据 AutomatedProjectWorkflow.validateOracle 和 Workflow 的汇合边界核对，不将未冻结测试描述为已接受。
+
+Code 使用知识和编写配置，实际角色工作区只留工作区标记；本次配置 bubblewrap，并沿用 read_material 授权边界。没有额外做恶意越权读取实验，不能扩展声称完成所有部署隔离验收。
+
+### 前台、修复与复现入口
+
+新[只读验收前台](https://ties-charitable-min-elementary.trycloudflare.com/)连接本次独立 SQLite/CAS，服务为 `127.0.0.1:4311`。浏览器实际打开四个批次列表、最终失败节点及知识正文，无页面脚本错误；知识显示“尚未通过，不可发布”。原 MVP 地址和历史数据库保持原样，不能把旧 v5 程序直接接到这次 v8 数据上。
+
+新增控制台展示修复 `50aad21`：分别显示业务状态与工作流执行状态，节点展示真实 error；原来仅显示 GENERATING 容易误认为失败运行仍在执行。当前页面使用该提交资产，模型运行仍以先前记录的 `80ac495` 为准。公开实例为只读，原始评测工件下载仍需要鉴权；完整原始测试、代码与编译证据从下述本地目录查阅。因此 CJSON-REAL-06 的页面展示已验证，全部工件的公开下载未满足。
+
+运行中必要修复：`9d83188` 补提供方 User-Agent 及按幂等键生成的 OpenCode 会话头，加入传输指纹；`80ac495` 将 TestGen 允许输出路径和证据路径写入动态 Schema，原有业务校验保持严格。回归分别为提供方适配 4/4、运行配置 7/7、TestGen 与受控 SDK 9/9；typecheck、Spec 和差异格式检查通过。这些定向受控回归与上述真实模型验收分别计数，本次未新增永久 CI，也未重跑全量测试。
+
+保留目录：主工作区 `.workpanel/acceptance/2026-09-11-cjson-real/`（忽略入 Git）。
+
+- `Run.mjs`、各批 Execution/Scenario/WorkflowResult：实际入口、脱敏配置、运行版本、状态与事件；重跑会消耗真实模型用量，不应作为普通回归自动执行。
+- `ModelAudit.json`、`runtime/demo/agent-runs.jsonl`、DSH session 日志：真实角色、模型、时间、usage 和原始会话；runtime 中加密提供方配置及临时凭据不应公开或打包上传。
+- `KnowledgeCandidate.md`、`Reconstructed.c`、`GeneratedTestsInitial.c`、`GeneratedTestsRepaired.c`、`readable/`：未手改的模型产物。
+- `Baseline.json`、`IndependentCases.c`、`Independent-*.json`、`Upstream-generated.json`、`PointerReproduction.json`、`evaluations/`：原始基线、独立测试、实际编译与监督失败证据。
+- `DocumentCoverage.json`、`CheckEvidenceDiagnosis.json`、`CasIntegrity.json`、`EvidenceManifest.json`：覆盖范围、引用复核和摘要。
+- `Browser.json`、`ConsoleRunDetail.png`、`ConsoleKnowledge.png`：最终状态及候选正文的浏览器证据。
+
+验收判定：CJSON-REAL-01 的真实调用已验证；02 的源码固定、替换和授权配置有证据，隔离攻击验收不在本次范围；03 的语义充分性未通过；04 失败；05 的 PASS 发布路径未到达，实际没有发布；06 展示通过、公开原始工件下载受限。整体 **FAIL**，不能宣布复杂模块理解与知识飞轮闭环验收完成。
+
+后续应先明确固定版本兼容与标准差异的测试依据，再处理 Check 的可验证引用及有限修复，并让真实编译诊断进入后续修订。以上是剩余工作，不是本次已实现的能力。所有更改位于本地 `test/cjson-utils-real-e2e` / `/tmp/domain-knowledge-cjson-real`，未合并主工作区。
+
+临时前台由 tmux `cjson-real-console` 与 `cjson-real-tunnel` 维持；主机或进程结束会使地址失效。停止命令分别为 `tmux kill-session -t cjson-real-tunnel` 和 `tmux kill-session -t cjson-real-console`，停止不删除证据。
+
 ## 2026-09-11：独立复审的四项修复
 
 验收代码 `acfd714`。复审指出的问题均能复现，之前“测试全绿”没有覆盖原生代码伪造完成事实，以及 Registry 和 LangGraph 之间的崩溃窗口。此前把同进程 nonce 当可信边界、把 Orchestrator 重放当路由恢复覆盖的判断不成立；下面旧版记录仅保留历史用途。本轮先提交补充 Spec（`73e9b54`），各项验收后分别提交。
