@@ -4,7 +4,7 @@
  * 文件功能：展示整卡来源复核、冻结版本和独立结论，提供恢复及证据下载。
  */
 import { createKnowledgeRevisionPanel } from './KnowledgeRevision.js'
-export function createSourceVerificationPanel({ root, request, escapeHtml: escape, isEditable, selection }) {
+export function createSourceVerificationPanel({ root, request, escapeHtml: escape, isEditable, selection, onSupplement }) {
   let task = null, checkpoints = [], events = [], loadedFor = null, timer = null, busy = false, notice = ''
   const revision = createKnowledgeRevisionPanel({ root, request, escapeHtml: escape, isEditable, source: true, selection: () => task?.status === 'SUCCEEDED' ? task.taskId : null, evidence: () => task?.result?.summary })
   const host = () => root.querySelector('[data-source-verification-panel]')
@@ -25,6 +25,7 @@ export function createSourceVerificationPanel({ root, request, escapeHtml: escap
       ${inputs ? `<details><summary>最近处理卡片的固定输入</summary><button class="text-button" type="button" data-version-id="${escape(inputs.summary.versionId)}">查看输入卡片</button>${inputs.artifactRefs.map((ref, index) => `<button class="secondary-button" type="button" data-download-artifact="/api/v1/stage-tasks/${escape(task.taskId)}/artifacts/${escape(ref.sha256)}">下载${['卡片正文', '固定源码', '参考观察', '复核准则', '可信测试集', '参考执行报告'][index] ?? '输入材料'}</button>`).join('')}</details>` : ''}
       ${events.filter(event => event.detail?.phase === 'role-stage-attempt' && ['FAILED', 'REJECTED'].includes(event.detail.status)).map(event => `<p>角色尝试 ${escape(event.detail.taskAttempt)} / ${escape(event.detail.attempt)} · ${escape(event.detail.issueHint ?? '执行未完成')} <button class="secondary-button" type="button" data-download-artifact="/api/v1/stage-tasks/${escape(task.taskId)}/artifacts/${escape(event.detail.artifactRef.sha256)}">下载复核尝试</button></p>`).join('')}
       ${cards.map(card => `<article><button class="text-button" type="button" data-version-id="${escape(card.versionId)}">查看冻结卡片</button><p>${escape(card.moduleId)} · ${escape(outcomes[card.outcome] ?? '未知')}</p><p>${escape(card.heading ?? '')} · ${escape(card.criterion ?? '')} ${(card.unresolved ?? []).map(escape).join('；')}</p>${card.reviewRef ? `<button class="secondary-button" type="button" data-download-artifact="/api/v1/stage-tasks/${escape(task.taskId)}/artifacts/${escape(card.reviewRef.sha256)}">下载来源意见</button>` : ''}${(card.sections ?? []).map(section => `<details><summary>${escape(section.section)} · ${escape(outcomes[section.outcome] ?? '未知')}</summary>${section.carriedForward ? `<p>沿用同一正文已有的来源矛盾，尚待修订。原任务 <code>${escape(section.originEvidence?.taskId ?? '')}</code></p>` : ''}<p>${escape(section.criterion ?? '')} ${(section.unresolved ?? []).map(escape).join('；')}</p>${section.reviewRef ? `<button class="secondary-button" type="button" data-download-artifact="/api/v1/stage-tasks/${escape(task.taskId)}/artifacts/${escape(section.reviewRef.sha256)}">下载章节复核</button>` : ''}</details>`).join('')}</article>`).join('')}
+      ${current() && task.status === 'SUCCEEDED' && cards.some(card => card.sections?.some(section => section.outcome === 'UNRESOLVED')) && onSupplement ? `<button class="secondary-button" type="button" data-source-verification-action="supplement" ${busy || !isEditable() ? 'disabled' : ''}>补充验证用例</button><p>针对未解决章节新增候选用例，先在参考实现上验证，再评测重建代码。</p>` : ''}
       ${active() ? `<button class="secondary-button" type="button" data-source-verification-action="cancel" ${busy || !isEditable() ? 'disabled' : ''}>取消来源复核</button>` : ''}
       ${current() && ['FAILED', 'PAUSED', 'CANCELLED'].includes(task.status) ? `<button class="secondary-button" type="button" data-source-verification-action="resume" ${busy || !isEditable() ? 'disabled' : ''}>恢复来源复核</button>` : ''}` : ''}<section data-source-revision-panel></section>`
     revision.refresh()
@@ -41,10 +42,16 @@ export function createSourceVerificationPanel({ root, request, escapeHtml: escap
   }
   root.addEventListener('click', async event => {
     const action = event.target.closest('[data-source-verification-action]')?.dataset.sourceVerificationAction
-    if (!['start', 'cancel', 'resume'].includes(action) || busy || !isEditable()) return
+    if (!['start', 'cancel', 'resume', 'supplement'].includes(action) || busy || !isEditable()) return
     const parent = selection(); if (!parent || (action !== 'start' && !task)) return
     busy = true; notice = ''; render()
     try {
+      if (action === 'supplement') {
+        const evaluation = await request(`/api/v1/stage-tasks/${encodeURIComponent(parent)}`)
+        const result = await request('/api/v1/native-evaluations', { method: 'POST', body: JSON.stringify({ reconstructionTaskId: evaluation.task.input.parameters.reconstructionTaskId, sourceVerificationTaskId: task.taskId }) })
+        if (selection() === parent) await onSupplement(result.task)
+        return
+      }
       const result = await request(action === 'start' ? '/api/v1/source-verifications' : `/api/v1/stage-tasks/${encodeURIComponent(task.taskId)}/${action}`, { method: 'POST', body: JSON.stringify(action === 'start' ? { evaluationTaskId: parent } : action === 'resume' ? { inputDigest: task.inputDigest } : {}) })
       if (selection() !== parent) return
       task = result.task; await observe()

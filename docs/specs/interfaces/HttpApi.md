@@ -50,7 +50,7 @@ Available 是已接线路由；Planned 路由不作为当前能力。Available /
 | `POST /api/v1/generations` | Available | snapshotId及可选scopes（以moduleId为键，entryPath/astFilter/symbols）；冻结模型配置，启动或复用C/C++ GENERATE任务，返回task。已有卡片可立即读取；任务状态、取消和同输入恢复共用stage-tasks。 |
 | `POST /api/v1/reconstructions` | Available | snapshotId、versionIds；冻结模型与实际工具链身份，启动或复用FLYWHEEL中的代码重建及接口比较。返回阶段任务，行为评测与知识修订仍未接线，结果不具有发布资格。 |
 | `GET /api/v1/stage-tasks/:taskId/artifacts/:sha256` | Available | 仅下载该任务结果或成功检查点直接引用的工件；无关系的CAS摘要返回404。沿用免登录或令牌访问规则，不提供任意CAS读取。 |
-| `POST /api/v1/native-evaluations` | Available | reconstructionTaskId；绑定成功重建的结果摘要、配置、工具链与卡片版本，启动或复用EVALUATE。候选参考失败以TEST_CANDIDATE_REJECTED结束，可同输入恢复生成新候选；行为失败保存报告，不授予发布资格。 |
+| `POST /api/v1/native-evaluations` | Available | reconstructionTaskId，可选sourceVerificationTaskId；补证时冻结knowledge-test-supplement-v1及来源未知章节需求，必须绑定同一重建/版本/源/配置；绑定成功重建的结果摘要、配置、工具链与卡片版本，启动或复用EVALUATE。候选参考失败以TEST_CANDIDATE_REJECTED结束，可同输入恢复生成新候选；行为失败保存报告，不授予发布资格。 |
 | `GET /api/v1/native-evaluations/:taskId/revision-evidence` | Available | 只读派生native-revision-evidence-v1，核验成功评测的参考oracle、固定正文及当前H2绑定。返回Review候选、失败数及未解决诊断，不授权改卡片；未完成评测或证据不匹配409。 |
 | `POST /api/v1/knowledge-revisions` | Available | evaluationTaskId；冻结可信证据、卡片和配置，以FLYWHEEL/KNOWLEDGE_REVISION独立执行Review、DocGen和受影响索引刷新。返回标准stage task，可同输入恢复/取消。结果区分REVISED_INDEXED、QUALITY_REJECTED、UNRESOLVED，不发布。 |
 | `POST /api/v1/index-builds` | Available | 可选 versionIds，必须是当前版本；冻结输入后创建或复用 INDEX 任务。200 表示 reusedTask，202 表示已接受；restored 为恢复文件数。 |

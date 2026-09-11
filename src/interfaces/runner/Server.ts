@@ -466,9 +466,10 @@ export function createKnowledgeServer(input: {
           send(response, 200, await composition.apps.workbenchAssociations.candidates(decodeURIComponent(associated[1]!))); return;
         }
         if (request.method === 'POST' && url.pathname === '/api/v1/native-evaluations') {
-          const payload = await body(request); requireOnlyKeys(payload, ['reconstructionTaskId']);
+          const payload = await body(request); requireOnlyKeys(payload, ['reconstructionTaskId', 'sourceVerificationTaskId']);
           if (typeof payload.reconstructionTaskId !== 'string') throw new Error('PAYLOAD_INVALID');
-          const task = await composition.apps.workbenchEvaluation.start(payload.reconstructionTaskId);
+          if (payload.sourceVerificationTaskId !== undefined && typeof payload.sourceVerificationTaskId !== 'string') throw new Error('PAYLOAD_INVALID');
+          const task = await composition.apps.workbenchEvaluation.start(payload.reconstructionTaskId, payload.sourceVerificationTaskId as string | undefined);
           send(response, task.status === 'SUCCEEDED' ? 200 : 202, { task }); return;
         }
         if (request.method === 'POST' && url.pathname === '/api/v1/reconstructions') {

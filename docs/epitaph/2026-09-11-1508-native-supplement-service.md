@@ -1,0 +1,13 @@
+# 补充评测服务与真实修订恢复
+
+实际/tmp/domain-knowledge-workbench，feat/five-stage-workbench，8b8a7f3834aeb328559434feaa148e7b9f7197d9。目标active。旧站未改，完整双目标验收/最终发布/部署仍未完成。
+
+NativeSuiteEvaluation.prepare新增可选supplement={schemaVersion:native-supplement-v1,demandDigest}。需求进入policy摘要；仅相同绑定且覆盖完整历史门禁的成功集复用；否则递归普通prepare先守住历史门禁，再propose和独立candidate参考检查点，冲突预期拒绝，仅候选全通过才merge后验证。新候选失败保存REJECTED集，原TRUSTED不变；返回明确rejection分类。WorkbenchEvaluation使用该分类，不再用reused>0误判。普通模式原逻辑保留。
+
+新NativeSupplement.test.ts使用真实SQLite/CAS与受控参考观察，实际1/1通过，覆盖拒绝/晋升/同需求缓存/旧门禁冲突停止propose。原WorkbenchEvaluation三场景宿主实际3/3通过，29635ms，/tmp/NativeSupplementRegression.log；沙箱先因spawnSync git EPERM失败后已升级重跑。架构8/8、类型、Spec及diff通过。尚未真实编译补充模式或TestGen补充模型验收。
+
+下一功能：从成功source任务提取并冻结当前cardId#H2证据需求，验证同Code/源/版本/配置，传TestGen policy及evaluation.prepare.supplement。HTTP/Console补充按钮及一键协调未接入，Spec已明确部分实现。需要新执行契约/版本兼容、补充后行为修订与来源重验、按未知H2集合控制无进展。不要把底层服务完成当作全闭环完成。
+
+真实修订恢复：旧c32fbb4e24f9f30e81d03a2aa45623f08ef5a834e5a2b29252c157e07fe0be7c原PID确实退出。首次resume失败STAGE_NOT_RESUMABLE，因driver未回收遗留租约；已在/tmp/RunSourceCorrectionSelectionV1.ts加入store.recoverOrphans()，没有手改数据库。随后暂停DSH_CONFIGURATION_UNAVAILABLE，查明verification过期（checkedAt 2026-09-10T03:02:00.751Z），不是额度无限或密钥缺失。/tmp/ReverifyWorkbenchProvider.ts通过现有verify重新验证同配置，VERIFIED/GENERATION_READY，revision5；/tmp/ReverifyWorkbenchProvider.log，未暴露密钥。
+
+现在真实同task已RUNNING，PID2692082/session26127，/tmp/SourceCorrectionSelectionV1ResumeVerified.log。已实际poll会话确认live，初始usage保留elapsed111105/calls7/tokens345973/reserved1293347。继续同handle，重资源串行。输出仍原real-knowledge-revision/source-correction-selection-v1/SourceCorrection.json。早先失败sessions2785/62473、验证37403均终态，不再等待。当前工具需升级进行真实网络及release目录写入；不要凭沙箱ps判宿主退出。后续完成修订后按最新版本重建/可信/固定/来源，剩余证据gap通过补证能力处理。

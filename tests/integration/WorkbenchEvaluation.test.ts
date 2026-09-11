@@ -23,7 +23,7 @@ for (const { rejectSourceReview, mixedSourceRisks } of [{ rejectSourceReview: fa
   writeFileSync(join(root, 'math.c'), '#include "math.h"\n/* REFERENCE_PRIVATE */\nint add(int a,int b){return a+b;}');
   git('add', '.'); git('commit', '-qm', 'Fixed reference');
   let composition = createComposition({ runtimeDir }); let testCalls = 0, codeCalls = 0, generatedRuns = 0, reviewCalls = 0, revisionCalls = 0, sourceReviewCalls = 0;
-  let exposeMixedRisk = false; let acceptFalseSource = false; let interruptSourceSection = true; const sectionCalls = new Map<string, number>();
+  let supplementRequested = false; let exposeMixedRisk = false; let acceptFalseSource = false; let interruptSourceSection = true; const sectionCalls = new Map<string, number>();
   let wrongCandidate = true, wrongCode = false, interrupt = true, reviewKeepsKnowledge = false;
   const install = () => {
     const deps = composition.apps.workbenchReconstruction.dependencies;
@@ -70,6 +70,11 @@ for (const { rejectSourceReview, mixedSourceRisks } of [{ rejectSourceReview: fa
       assert.equal(request.role, 'test-gen'); testCalls++; usage(`test-${testCalls}`, 5);
       assert.match(request.prompt, /card-add#Behavior/);
       if (testCalls === 2) { assert.match(request.prompt, /NATIVE_BEHAVIOR_MISMATCH/); assert.match(request.prompt, /rejectedCandidate/); }
+      if (supplementRequested) {
+        assert.match(request.prompt, /missing|unknown/); assert.match(request.prompt, /card-add#Limits/);
+        return { oracleRequired: true, nativeSuite: { schemaVersion: 'native-cases-v1', cases: [{ caseId: 'zero', description: 'Zero boundary', sections: ['card-add#Limits'], variables: [],
+          calls: [{ function: 'add', arguments: [{ integer: '0' }, { integer: '0' }], result: 'sum' }], observations: [{ name: 'sum', kind: 'integer', read: { variable: 'sum' } }], expected: { sum: '0' } }] } };
+      }
       return { oracleRequired: true, nativeSuite: { schemaVersion: 'native-cases-v1', cases: [{ caseId: 'sum', description: 'Sum from fixed inputs',
         sections: ['card-add#Behavior'], variables: [], calls: [{ function: 'add', arguments: [{ integer: '3' }, { integer: '4' }], result: 'sum' }],
         observations: [{ name: 'sum', kind: 'integer', read: { variable: 'sum' } }], expected: { sum: wrongCandidate ? '9' : '7' } }] } };
@@ -321,5 +326,18 @@ for (const { rejectSourceReview, mixedSourceRisks } of [{ rejectSourceReview: fa
     composition.apps.workbenchStages.resume(baselineTask.taskId, baselineTask.inputDigest);
     assert.equal((await composition.apps.workbenchStages.wait(baselineTask.taskId)).reasonCode, 'NATIVE_REFERENCE_BASELINE_FAILED');
     assert.equal(retriedBuilds, 1, 'failed baseline evidence cannot suppress a real retry'); assert.equal(testCalls, 2);
+    if (mixedSourceRisks) {
+      supplementRequested = true;
+      const supplemental = await composition.apps.workbenchEvaluation.start(sourceRebuilt.taskId, rechecked.taskId);
+      assert.equal(supplemental.input.parameters.supplementContract, 'knowledge-test-supplement-v1');
+      const done = await composition.apps.workbenchStages.wait(supplemental.taskId);
+      assert.equal(done.status, 'SUCCEEDED', done.reasonCode ?? '');
+      const report = (done.result!.summary.modules as any[])[0];
+      assert.equal(report.proposed, 1); assert.equal(report.reused, 1); assert.equal(report.passed, 2);
+      assert.equal(testCalls, 3);
+      assert.equal((await composition.apps.workbenchEvaluation.start(sourceRebuilt.taskId, rechecked.taskId)).taskId, supplemental.taskId);
+      assert.equal(testCalls, 3);
+      await assert.rejects(composition.apps.workbenchEvaluation.prepare(changedCode.taskId, rechecked.taskId), /NATIVE_SUPPLEMENT_BINDING_INVALID/);
+    }
   } finally { await composition.close(); rmSync(root, { recursive: true, force: true }); rmSync(runtimeDir, { recursive: true, force: true }); }
 });

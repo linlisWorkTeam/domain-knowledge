@@ -26,3 +26,27 @@ test('mixed source findings expose only explicit correction and retain risk afte
   assert.doesNotMatch(panel.innerHTML, /已验证并发布/)
   saved.result.summary.indexed = false; restored.refresh(); assert.doesNotMatch(panel.innerHTML, /重建修订版本/)
 })
+
+test('source panel starts supplemental evaluation from the frozen source and hands off its task', async () => {
+  const { createSourceVerificationPanel } = await import('../../web/KnowledgeSourceVerification.js')
+  const panel = { innerHTML: '' }, listeners = [], posts = []
+  const source = { taskId: 'source', contractVersion: 'knowledge-workbench-v1', status: 'SUCCEEDED', usage: { modelCalls: 1 },
+    input: { cardVersionIds: ['v1'], parameters: { operation: 'KNOWLEDGE_SOURCE_VERIFICATION', verificationContract: 'knowledge-source-verification-v4', evaluationTaskId: 'evaluation' } },
+    result: { summary: { outcome: 'UNRESOLVED', cards: [{ versionId: 'v1', moduleId: 'm', outcome: 'UNRESOLVED', sections: [{ section: 'Errors', outcome: 'UNRESOLVED', unresolved: ['Missing error behavior'] }] }] } } }
+  let handedOff = null
+  const app = createSourceVerificationPanel({ root: { querySelector: selector => selector === '[data-source-verification-panel]' ? panel : null, addEventListener: (_name, listener) => listeners.push(listener) },
+    escapeHtml: String, isEditable: () => true, selection: () => 'evaluation', onSupplement: async task => { handedOff = task },
+    request: async (path, options) => {
+      if (options) { posts.push({ path, body: JSON.parse(options.body) }); return { task: { taskId: 'supplement' } } }
+      if (path === '/api/v1/stage-tasks') return { items: [source] }
+      if (path.endsWith('/evaluation')) return { task: { input: { parameters: { reconstructionTaskId: 'code' } } } }
+      return { task: source, checkpoints: [], events: [] }
+    } })
+  app.refresh(); await new Promise(resolve => setImmediate(resolve))
+  assert.match(panel.innerHTML, /补充验证用例/); assert.match(panel.innerHTML, /Missing error behavior/)
+  const event = { target: { closest: selector => selector === '[data-source-verification-action]' ? { dataset: { sourceVerificationAction: 'supplement' } } : null } }
+  for (const listener of listeners) await listener(event)
+  assert.deepEqual(posts, [{ path: '/api/v1/native-evaluations', body: { reconstructionTaskId: 'code', sourceVerificationTaskId: 'source' } }])
+  assert.equal(handedOff.taskId, 'supplement')
+  source.status = 'FAILED'; app.refresh(); assert.doesNotMatch(panel.innerHTML, /补充验证用例/)
+})

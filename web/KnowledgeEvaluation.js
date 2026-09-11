@@ -10,7 +10,7 @@ export function createKnowledgeEvaluationPanel({ root, request, escapeHtml: esca
   const reportCache = new Map()
   const revisionCache = new Map()
   const revision = createKnowledgeRevisionPanel({ root, request, escapeHtml: escape, isEditable, selection: () => task?.status === 'SUCCEEDED' ? task.taskId : null, evidence: () => revisionCache.get(task?.taskId) })
-  const sourceVerification = createSourceVerificationPanel({ root, request, escapeHtml: escape, isEditable, selection: () => task?.status === 'SUCCEEDED' ? task.taskId : null })
+  const sourceVerification = createSourceVerificationPanel({ root, request, escapeHtml: escape, isEditable, selection: () => task?.status === 'SUCCEEDED' ? task.taskId : null, onSupplement: async next => { task = next; checkpoints = []; events = []; notice = '已启动补充验证'; render(); await observe() } })
   const host = () => root.querySelector('[data-native-evaluation-panel]')
   const active = () => task && ['PENDING', 'RUNNING'].includes(task.status)
   const labels = { PENDING: '排队中', RUNNING: '评测中', SUCCEEDED: '评测执行完成', FAILED: '执行失败', PAUSED: '已暂停', CANCELLED: '已取消' }
