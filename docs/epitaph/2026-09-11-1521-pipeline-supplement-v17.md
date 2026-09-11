@@ -1,0 +1,13 @@
+# 一键补证v17与新版真实门禁
+
+实际/tmp/domain-knowledge-workbench，feat/five-stage-workbench，功能dc3dbf8。目标active，旧站未改。当前权限全访问，不传sandbox_permissions。Node24/384MiB、重模型/编译/浏览器串行。磁盘5.2GiB可用、内存约1GiB可用，未删旧知识。
+
+v17已实现一键自动补证：Domain pipelineUnknownSections只取完整绑定有效未知章节；优先明确纠正，否则evaluation.prepare(codeTaskId,sourceTaskId)。下一iteration复用Code/fixed，冻结新evaluation和supplementSourceTaskId，重新来源。unknownSections严格缩小才算进展，连续3次不缩小暂停PIPELINE_NO_SOURCE_EVIDENCE_PROGRESS；随机新风险不重置。取消/恢复同child保留用量；旧v16不能恢复/取消/发布投影，UI标只读。修订结果6REVISED+1无version/quality但有原因UNRESOLVED可继续，必须有新ACCEPTED/索引成功/精确替换映射，质量拒绝/空更新仍停止。最终source与publication门禁未放宽。
+
+验证：WorkbenchSourcePipeline7/7，/tmp/PipelineSupplementFinal.log（8343ms一轮，最后补snapshot校验后已重跑通过）；含新增补证推进、未知暂停/恢复不增用量、取消重启保留同代码/原来源/child模型用量。WorkbenchPipelines4/4 /tmp/PipelineV17Regression.log；WorkbenchPipeline单测8/8；panel2/2；WorkbenchFixedPipeline1/1 /tmp/PipelineV17Fixed.log；架构8/8、类型/Spec/diff通过。途中undefined fixedEvaluation写JSON失败已修复为仅存在时序列化，非放宽断言。新版本整套Console/全回归还未执行，原480/32不是当前证明。
+
+真实新版jsmn：eval04df8642ea5ede61137ffd5313e0e5bcc48d22ab94e920ab78c5b0ab19406ca7 SUCCEEDED，31/31，reused31/revalidatedtrue/proposed0/0modelcalls，45751ms，setnative-tests-d4bc1150a0a707e3c83c29d9b4e6203322905e07fa8a44fbf94dcae67831d321，report86edc5c829d1a40cc1ac7c5bc9083c4dcafa7e3f4e2e027afb8190b3d91d3bb2。固定0122e5dcd58d35c6ef15adef484546154fc0da1748d612da96ab6e3bf6bd17e4 SUCCEEDED，参考通过且11/11，19401ms，report74c06fab01d0a7c79becad593e4c1a2753ac2c7dd81bef56436318fefc964ff3。输入仍a2f02最新Code/7卡；旧suite期望不变。对应evaluation-after-selection-v1与fixed-after-selection-v1目录，/tmp/RunEvaluationAfterSelection.ts和/tmp/RunFixedAfterSelection.ts。
+
+目前真实来源51992c6a6dbd845525ffbcfb9fcb77fe747bf5be215053d95651f94da5061686 RUNNING，PID2710064/session73025，/tmp/RunSourceAfterSelection.ts，log /tmp/SourceAfterSelection.log，输出source-after-selection-v1/Source.json。最后已实际poll live，5calls70338tokens/reserved446620/elapsed69954ms。继续同handle，不因日志暂未刷新重启。eval53528/fixed71247已日志终态，不再重启；c32f和a2f均早已完成。当前source用完整最新7版本，缺证据下一步可调用已实现补证入口后重新source；明确矛盾仍按授权修订。最终发布未发生。
+
+下一步：新来源结果出来后，按真实风险继续修订/补证；v17真实一键及逐步对照和完整双目标验收仍需做。TinyXML2 XMLUtil尚是旧37/37及40/40报告，尚未当前闭环。全类型/Spec/架构/unit/integration/Console/markdownLite、真实HTTP浏览器补证点击与桌面窄屏截图、报告及部署网站仍未交付。不能用受控协调通过宣称全计划完成。原始用户范围不扩展账户/主动搜索/全语言工具链，也不清除来源未知。

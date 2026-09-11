@@ -1,9 +1,0 @@
-# 补充测试领域规则已实现
-
-实际工作树/tmp/domain-knowledge-workbench，feat/five-stage-workbench，功能提交227a4414cbf87862bed2261245dd16ee0cf3ca3d。完整目标仍active，未部署，旧站未改。
-
-nativeSupplementGates新增独立合并规则：历史输入预期冲突与新候选冲突分别报错；变量/调用/观察一致时换caseId、说明、章节不能改变expected；新增输入和引用可并入，不改原对象。原nativeTrustedGates行为保留。直接node tests/unit/NativeTrustedGates.test.ts实际4/4通过，tsc与ValidateSpecs、diff检查通过。尚未接入NativeSuiteEvaluation/Application/HTTP/Console/pipeline，Spec标部分实现。下一步按0944补证设计接通旧门禁先验证、新候选单独验证/失败分类/显式需求冻结与缓存，再做真实补证。
-
-重要运行状态：旧sourceCorrection c32fbb4e24f9f30e81d03a2aa45623f08ef5a834e5a2b29252c157e07fe0be7c的session87129已不存在；已升级到宿主执行ps -p 2550876，确认PID不存在，不只是沙箱不可见。只读SQLite仍RUNNING，usage elapsed111006/calls7/tokens345973/reserved1293347；落盘SourceCorrection.json也非终态，无result。应检查阶段恢复规则后以同taskId恢复，保留检查点与累计预算，不新建或宣称成功。/tmp/RunSourceCorrectionSelectionV1.ts支持taskId参数，但输出路径在/root/projects/domain-knowledge-releases（当前写入受限）；运行真实模型需按当前权限升级，不绕过沙箱。此轮未重启模型。
-
-当前环境沙箱ps仅见自身，不能据此判宿主任务终止。node --test只显示文件级1项，直接node测试文件得到实际4项。Git元数据只读，提交需升级，227a441已成功。Node24路径仍有效。完整原生/Console回归、双目标真实验收、最终发布与当前网站更新均未完成；不得把此领域单测当作闭环验收。

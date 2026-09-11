@@ -1015,6 +1015,12 @@ test('操作中心从固定 Git 版本分析仓库，显示模块和环境且窄
       if (request.role === 'test-gen') {
         const ref = command.payload.testPolicyRef as Parameters<typeof instance.composition.artifacts.get>[0];
         const policy = JSON.parse(Buffer.from(await instance.composition.artifacts.get(ref)).toString('utf8'));
+        if (policy.supplement) {
+          expect(policy.supplement.demands[0].sectionId).toContain('#Behavior');
+          return { oracleRequired: true, nativeSuite: { schemaVersion: 'native-cases-v1', cases: [{ caseId: 'parseTwice', description: '连续调用补充用例',
+            sections: [policy.supplement.demands[0].sectionId], variables: [], calls: [{ function: 'parse', arguments: [], result: 'first' }, { function: 'parse', arguments: [], result: 'result' }],
+            observations: [{ name: 'result', kind: 'integer', read: { variable: 'result' } }], expected: { result: '1' } }] } };
+        }
         return { oracleRequired: true, nativeSuite: { schemaVersion: 'native-cases-v1', cases: [{ caseId: 'parseResult', description: '固定解析结果',
           sections: [policy.knowledge[0].sections[0]], variables: [], calls: [{ function: 'parse', arguments: [], result: 'result' }],
           observations: [{ name: 'result', kind: 'integer', read: { variable: 'result' } }], expected: { result: '1' } }] } };
@@ -1169,6 +1175,30 @@ test('操作中心从固定 Git 版本分析仓库，显示模块和环境且窄
     await page.locator('[data-source-revision-panel]').getByRole('button', { name: '重建修订版本', exact: true }).click();
     await expect.poll(() => instance.composition.apps.workbenchStages.store.list().find(item => item.input.stage === 'FLYWHEEL' && !item.input.parameters.operation)?.input.cardVersionIds).toEqual(sourceRepair.result!.summary.versionIds);
     await expect(page.locator('[data-reconstruction-panel]')).toContainText('重建及接口检查完成');
+    sourceCorrection = false;
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.getByRole('button', { name: '执行评测', exact: true }).click();
+    await expect(page.locator('[data-native-evaluation-panel]')).toContainText('评测执行完成');
+    await page.getByRole('button', { name: '复核全部卡片来源', exact: true }).click();
+    const supplementButton = page.getByRole('button', { name: '补充验证用例', exact: true });
+    await expect(supplementButton).toBeVisible(); await supplementButton.scrollIntoViewIfNeeded();
+    await expect(supplementButton).toBeInViewport();
+    const supplementResponse = page.waitForResponse(response => response.url().endsWith('/api/v1/native-evaluations') && response.request().method() === 'POST');
+    await supplementButton.click();
+    const supplemental = (await (await supplementResponse).json()).task;
+    expect(supplemental.input.parameters.supplementContract).toBe('knowledge-test-supplement-v1');
+    await expect.poll(() => instance.composition.apps.workbenchStages.get(supplemental.taskId).status).toBe('SUCCEEDED');
+    const supplemented = instance.composition.apps.workbenchStages.get(supplemental.taskId);
+    const supplementalModule = (supplemented.result!.summary.modules as any[])[0];
+    expect(supplementalModule.proposed).toBe(1); expect(supplementalModule.reused).toBe(1); expect(supplementalModule.total).toBe(2);
+    await expect(page.locator('[data-native-evaluation-panel]')).toContainText('通过 0/2');
+    await expect(page.locator('[data-native-evaluation-panel]')).toContainText('连续调用补充用例');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await page.screenshot({ path: test.info().outputPath('supplement-evaluation-mobile.png'), fullPage: true });
+    await page.setViewportSize({ width: 1363, height: 936 });
+    await page.screenshot({ path: test.info().outputPath('supplement-evaluation-desktop.png'), fullPage: true });
+
+
 
 
   } finally { nativeEvaluation.snapshot = originalEvaluation.snapshot; nativeEvaluation.runner = originalEvaluation.runner; instance.composition.apps.workbenchEvaluation.dependencies.native = originalEvaluation.native; reconstruction.roles.dependencies.model = originalReconstruction.model; reconstruction.snapshot = originalReconstruction.snapshot; reconstruction.native = originalReconstruction.native; instance.composition.apps.workbenchGeneration.dependencies.model = originalModel; instance.composition.apps.workbenchGeneration.dependencies.native = originalNative; rmSync(directory, { recursive: true, force: true }); }

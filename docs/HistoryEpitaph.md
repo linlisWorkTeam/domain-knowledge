@@ -260,3 +260,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 - 2026-09-11-0936：真实CAS审计证明两卡仅授权H2改变且索引精确更新；31个可信用例输入/预期跨版本不变。非发布验收，后续状态见0944。[原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/8b8a7f3834aeb328559434feaa148e7b9f7197d9/docs/epitaph/2026-09-11-0936-live-artifact-audits.md)。
 
 - 2026-09-11-0944：原生混合应用3/3、Console筛选2/2通过；source826fed完成但UNRESOLVED，发现有可信库后永不新增测试缺口并先写Spec。后续实现见1508/1515。[原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/d58b044bca9f8affd09babd3139d347b81ceec26/docs/epitaph/2026-09-11-0944-source-supplement-gap.md)。
+
+- 2026-09-11-1432：227a441补充测试领域合并规则，4单测/类型/Spec通过；当时尚未接服务，并确认旧修订宿主PID退出但数据库RUNNING。后续租约恢复与配置重验见1508。[原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/dc3dbf8d68b7e2a108706f001ea526a1c5caad53/docs/epitaph/2026-09-11-1432-supplement-domain.md)。
