@@ -5,11 +5,11 @@
  */
 import { assertPublicationRecord, type PublicationRecord } from './WorkbenchPublicationRecord.ts';
 import { SOURCE_VERIFICATION_CONTRACT, sourceVerificationOutcome, type SourceCardResult } from '../knowledge/KnowledgeSourceVerification.ts';
-import { SOURCE_REVISION_CONTRACT } from '../knowledge/SourceRevision.ts';
+import { SOURCE_REVISION_CONTRACT, SOURCE_CORRECTION_POLICY, sourceCorrectionCandidates } from '../knowledge/SourceRevision.ts';
 import { sha256, type ArtifactRef } from '../../Domain.ts';
 import { FIXED_EVALUATION_CONTRACT } from '../evaluation/NativeFixedEvaluation.ts';
 import { canonicalJson, createStageTask, type StageInput, type StageTask, type StageStatus, type WorkbenchStage } from './StageTask.ts';
-export const PIPELINE_CONTRACT = 'knowledge-pipeline-v15';
+export const PIPELINE_CONTRACT = 'knowledge-pipeline-v16';
 export interface IterationProgress { failed: string[]; total: number; passed: number }
 export interface PipelineIteration { number: number; versionIds: string[]; reconstruction?: StageTask; evaluation?: StageTask; fixedEvaluation?: StageTask; revision?: StageTask; progress?: IterationProgress; sourceVerification?: StageTask; sourceRepairs?: string[] }
 export interface PipelineFixedSuite { moduleId: string; suiteRef: ArtifactRef }
@@ -102,10 +102,36 @@ export function pipelineSourceFailure(task: StageTask): string | null {
     return outcome === 'SOURCE_MATCHED' ? null : outcome === 'SOURCE_MISMATCH' ? 'PIPELINE_SOURCE_MISMATCH' : 'PIPELINE_SOURCE_UNRESOLVED';
   } catch { return 'PIPELINE_SOURCE_RESULT_INVALID'; }
 }
+/** 可修订不等于来源门禁通过；未知但无明确纠正时停止。 */
+export function pipelineSourceRepairable(task: StageTask): boolean {
+  const reason = pipelineSourceFailure(task);
+  if (reason === 'PIPELINE_SOURCE_MISMATCH') return true;
+  if (reason !== 'PIPELINE_SOURCE_UNRESOLVED') return false;
+  try { return sourceCorrectionCandidates(task.result!.summary.cards as unknown as Parameters<typeof sourceCorrectionCandidates>[0], SOURCE_CORRECTION_POLICY).length > 0; }
+  catch { return false; }
+}
+/** 仅允许成功保存并索引的局部修订继续重建；风险仍阻止关联和发布。 */
+export function pipelineSourceRevisionFailure(task: StageTask): string | null {
+  const reason = pipelineRevisionFailure(task);
+  if (reason !== 'PIPELINE_REVISION_UNRESOLVED') return reason;
+  const summary = task.result?.summary;
+  if (task.status !== 'SUCCEEDED' || task.input.parameters.operation !== 'KNOWLEDGE_SOURCE_REVISION'
+    || task.input.parameters.revisionContract !== SOURCE_REVISION_CONTRACT || task.input.parameters.sourceCorrectionPolicy !== SOURCE_CORRECTION_POLICY
+    || summary?.outcome !== 'UNRESOLVED' || summary.indexed !== true || summary.sourceVerificationTaskId !== task.input.parameters.sourceVerificationTaskId
+    || !Array.isArray(summary.cards) || !summary.cards.length || !Array.isArray(summary.updatedVersionIds) || !Array.isArray(summary.versionIds)) return reason;
+  const cards = summary.cards as Array<{ baseVersionId: string; versionId: string; quality: string; outcome: string }>;
+  if (cards.some(card => !card || card.quality !== 'ACCEPTED' || card.outcome !== 'REVISED' || typeof card.versionId !== 'string' || !card.versionId
+    || card.versionId === card.baseVersionId || !task.input.cardVersionIds.includes(card.baseVersionId))
+    || new Set(cards.map(card => card.baseVersionId)).size !== cards.length
+    || new Set(summary.versionIds).size !== task.input.cardVersionIds.length
+    || canonicalJson([...summary.updatedVersionIds].sort()) !== canonicalJson(cards.map(card => card.versionId).sort())
+    || canonicalJson(summary.versionIds) !== canonicalJson(task.input.cardVersionIds.map(id => cards.find(card => card.baseVersionId === id)?.versionId ?? id))) return reason;
+  return null;
+}
 /** 仅记录真正保存且通过源码复核的章节；新正文摘要不能重置进展。 */
 export function pipelineSourceRepairs(task: StageTask): string[] {
   const cards = task.result?.summary.cards;
-  if (task.input.parameters.operation !== 'KNOWLEDGE_SOURCE_REVISION' || task.input.parameters.revisionContract !== SOURCE_REVISION_CONTRACT || pipelineRevisionFailure(task) || !Array.isArray(cards)) throw new Error('PIPELINE_SOURCE_REPAIR_INVALID');
+  if (task.input.parameters.operation !== 'KNOWLEDGE_SOURCE_REVISION' || task.input.parameters.revisionContract !== SOURCE_REVISION_CONTRACT || pipelineSourceRevisionFailure(task) || !Array.isArray(cards)) throw new Error('PIPELINE_SOURCE_REPAIR_INVALID');
   return [...new Set(cards.flatMap(value => {
     const card = value as { cardId?: string; heading?: string; quality?: string; outcome?: string; versionId?: string };
     if (!card || typeof card !== 'object') throw new Error('PIPELINE_SOURCE_REPAIR_INVALID');

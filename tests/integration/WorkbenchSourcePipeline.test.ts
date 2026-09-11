@@ -12,10 +12,10 @@ import { WorkbenchPipelines } from '../../src/application/services/WorkbenchPipe
 import { WorkbenchStages } from '../../src/application/services/WorkbenchStages.ts';
 import { SqliteStageTasks } from '../../src/infrastructure/sqlite/SqliteStageTasks.ts';
 import { SqliteWorkbenchPipelines } from '../../src/infrastructure/sqlite/SqliteWorkbenchPipelines.ts';
-import { SOURCE_REVISION_CONTRACT } from '../../src/domain/services/knowledge/SourceRevision.ts';
+import { SOURCE_REVISION_CONTRACT, SOURCE_CORRECTION_POLICY } from '../../src/domain/services/knowledge/SourceRevision.ts';
 import type { StageInput, StageResult, WorkbenchStage } from '../../src/domain/services/workbench/StageTask.ts';
 import { sourceInput, sourceResult } from '../helpers/WorkbenchSourceFixture.ts';
-function fixture(target: number, stagnant = false, unknown = false) {
+function fixture(target: number, stagnant = false, unknown = false, mixed = false) {
   const directory = mkdtempSync(join(tmpdir(), 'source-pipeline-')), db = join(directory, 'state.sqlite');
   let blocked = false, started = false;
   const input = (stage: WorkbenchStage, versions = ['v1']): StageInput => ({ stage, projectId: 'p', sourceRevision: 'r', sourceDigest: 's', configurationDigest: 'c', cardVersionIds: versions, parameters: { snapshotId: 'snapshot' } });
@@ -29,13 +29,18 @@ function fixture(target: number, stagnant = false, unknown = false) {
         if (context.task.input.parameters.operation === 'KNOWLEDGE_SOURCE_REVISION') {
           started = true;
           if (blocked) await new Promise((_, reject) => context.signal.addEventListener('abort', () => reject(context.signal.reason), { once: true }));
-          return { artifactRefs: [], summary: { outcome: 'REVISED_INDEXED', versionIds: [`v${n + 1}`], cards: [{ cardId: 'card-0', baseVersionId: `v${n}`, versionId: `v${n + 1}`, heading: stagnant ? 'Same heading' : `Heading ${n}`, quality: 'ACCEPTED', outcome: 'REVISED' }] } };
+          return { artifactRefs: [], summary: { outcome: mixed ? 'UNRESOLVED' : 'REVISED_INDEXED', ...(mixed ? { indexed: true, updatedVersionIds: [`v${n + 1}`], sourceVerificationTaskId: context.task.input.parameters.sourceVerificationTaskId!, unresolved: [{ unresolved: ['Evidence remains unknown'] }] } : {}), versionIds: [`v${n + 1}`], cards: [{ cardId: 'card-0', baseVersionId: `v${n}`, versionId: `v${n + 1}`, heading: stagnant ? 'Same heading' : `Heading ${n}`, quality: 'ACCEPTED', outcome: 'REVISED' }] } };
         }
         return { artifactRefs: [], summary: { modules: [{ interfaceComparison: { compatible: true } }] } };
       },
       EVALUATE: async context => {
         context.account('call', { modelCalls: 1 });
-        if (context.task.input.parameters.operation === 'KNOWLEDGE_SOURCE_VERIFICATION') return sourceResult(context.task.input, unknown ? 'UNRESOLVED' : Number(context.task.input.cardVersionIds[0]!.slice(1)) >= target ? 'SOURCE_MATCHED' : 'SOURCE_MISMATCH');
+        if (context.task.input.parameters.operation === 'KNOWLEDGE_SOURCE_VERIFICATION') {
+          const beforeTarget = Number(context.task.input.cardVersionIds[0]!.slice(1)) < target;
+          const result = sourceResult(context.task.input, mixed && beforeTarget || unknown ? 'UNRESOLVED' : beforeTarget ? 'SOURCE_MISMATCH' : 'SOURCE_MATCHED');
+          if (mixed && beforeTarget) result.summary.cards = (result.summary.cards as Array<Record<string, any>>).map(card => ({ ...card, unresolved: ['Evidence remains unknown'], sections: [{ ...card, outcome: 'SOURCE_MISMATCH', unresolved: [] }, { ...card, outcome: 'UNRESOLVED', unresolved: ['Evidence remains unknown'] }] }));
+          return result;
+        }
         return { artifactRefs: [], summary: { completedModules: 1, requestedModules: 1, modules: [{ status: 'BEHAVIOR_PASSED', interfaceCompatible: true }] } };
       },
       ASSOCIATE: async context => { context.account('call', { modelCalls: 1 }); return { artifactRefs: [], summary: { relations: 0 } }; },
@@ -45,7 +50,7 @@ function fixture(target: number, stagnant = false, unknown = false) {
       reconstruction: { prepare: async (_snapshot, versions, options) => { assert.equal(options?.retryEvaluationTaskId, undefined, 'source correction cannot fabricate a behavioral retry'); return input('FLYWHEEL', versions); } },
       evaluation: { prepare: async id => input('EVALUATE', stages.get(id).input.cardVersionIds), progress: async () => ({ passed: 1, total: 1, failed: [] }) },
       sourceVerification: { prepare: async id => sourceInput(stages.get(id)) },
-      sourceRevision: { prepare: async id => ({ ...input('FLYWHEEL', stages.get(id).input.cardVersionIds), parameters: { operation: 'KNOWLEDGE_SOURCE_REVISION', revisionContract: SOURCE_REVISION_CONTRACT, sourceVerificationTaskId: id } }) },
+      sourceRevision: { prepare: async id => ({ ...input('FLYWHEEL', stages.get(id).input.cardVersionIds), parameters: { operation: 'KNOWLEDGE_SOURCE_REVISION', revisionContract: SOURCE_REVISION_CONTRACT, ...(mixed ? { sourceCorrectionPolicy: SOURCE_CORRECTION_POLICY } : {}), sourceVerificationTaskId: id } }) },
       associations: { prepare: versions => input('ASSOCIATE', versions) },
     });
     return { app, stages, close: async () => { await app.shutdown(); await stages.shutdown(); store.close(); stageStore.close(); } };
@@ -95,6 +100,23 @@ test('unknown source evidence and a missing source executor both prevent associa
       const first = await r.app.start('snapshot'), done = await r.app.wait(first.pipelineId);
       assert.equal(done.reasonCode, missing ? 'PIPELINE_SOURCE_VERIFICATION_REQUIRED' : 'PIPELINE_SOURCE_UNRESOLVED');
       assert.equal(done.children.ASSOCIATE, undefined);
+    } finally { await r.close(); rmSync(f.directory, { recursive: true, force: true }); }
+  }
+});
+
+test('mixed source risks permit bound repair and rebuilt evaluation but cannot authorize association', async () => {
+  for (const remainsUnknown of [false, true]) {
+    const f = fixture(2, false, remainsUnknown, true), r = f.open();
+    try {
+      const first = await r.app.start('snapshot'), done = await r.app.wait(first.pipelineId);
+      assert.equal(done.iterations!.length, 2);
+      const repaired = r.stages.get(done.iterations![0]!.revision!.taskId);
+      assert.equal(repaired.result!.summary.outcome, 'UNRESOLVED');
+      assert.deepEqual(repaired.result!.summary.unresolved, [{ unresolved: ['Evidence remains unknown'] }]);
+      assert.deepEqual(done.iterations![1]!.reconstruction!.input.cardVersionIds, ['v2']);
+      if (remainsUnknown) { assert.equal(done.reasonCode, 'PIPELINE_SOURCE_UNRESOLVED'); assert.equal(done.children.ASSOCIATE, undefined); }
+      else { assert.equal(done.status, 'SUCCEEDED', done.reasonCode ?? ''); assert.deepEqual(done.children.ASSOCIATE!.input.cardVersionIds, ['v2']); }
+      assert.equal(r.app.detail(first.pipelineId).publicationVerified, false);
     } finally { await r.close(); rmSync(f.directory, { recursive: true, force: true }); }
   }
 });

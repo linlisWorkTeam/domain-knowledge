@@ -7,7 +7,7 @@ import type { WorkbenchPublications } from './WorkbenchPublications.ts';
 import type { ArtifactStore } from '../ports/ApplicationPorts.ts';
 import type { WorkbenchFixedEvaluation, FixedModuleSuite } from './WorkbenchFixedEvaluation.ts';
 import type { PipelineFixedSuite } from '../../domain/services/workbench/WorkbenchPipeline.ts';
-import { PIPELINE_CONTRACT, assertPipelinePublication, createPipeline, pipelineFixedFailure, pipelineStageFailure, pipelineRevisionFailure, pipelineStagnant, pipelineSourceFailure, pipelineSourceRepairs, pipelineSourceStagnant, type WorkbenchPipeline, type PipelineIteration } from '../../domain/services/workbench/WorkbenchPipeline.ts';
+import { PIPELINE_CONTRACT, assertPipelinePublication, createPipeline, pipelineFixedFailure, pipelineStageFailure, pipelineRevisionFailure, pipelineStagnant, pipelineSourceFailure, pipelineSourceRepairable, pipelineSourceRevisionFailure, pipelineSourceRepairs, pipelineSourceStagnant, type WorkbenchPipeline, type PipelineIteration } from '../../domain/services/workbench/WorkbenchPipeline.ts';
 import { WORKBENCH_STAGES, canonicalJson, createStageTask, type StageInput, type StageTask, type WorkbenchStage } from '../../domain/services/workbench/StageTask.ts';
 import type { ExternalMaterialStore } from '../ports/ExternalMaterialPorts.ts';
 import type { WorkbenchPipelineStore } from '../ports/WorkbenchPipelinePorts.ts';
@@ -190,7 +190,7 @@ export class WorkbenchPipelines {
             }
             const verified = await execute(round.sourceVerification); const sourceReason = pipelineSourceFailure(verified);
             if (!sourceReason) { value.completed.push('EVALUATE'); store.save(value, lease.leaseId); break; }
-            if (sourceReason !== 'PIPELINE_SOURCE_MISMATCH') { stop(verified, sourceReason); return; }
+            if (!pipelineSourceRepairable(verified)) { stop(verified, sourceReason); return; }
             if (pipelineSourceStagnant(value.iterations)) { stop(verified, 'PIPELINE_NO_SOURCE_PROGRESS'); return; }
             if (!this.dependencies.sourceRevision) throw new Error('PIPELINE_SOURCE_REVISION_REQUIRED');
             sourceRepair = true; prepareRevision = () => this.dependencies.sourceRevision!.prepare(verified.taskId);
@@ -201,7 +201,7 @@ export class WorkbenchPipelines {
             prepareRevision = () => this.dependencies.revision!.prepare(evaluated.taskId);
           }
           if (!round.revision) { round.revision = await freeze(await prepareRevision()); store.save(value, lease.leaseId); }
-          const revised = await execute(round.revision); const revisionReason = pipelineRevisionFailure(revised);
+          const revised = await execute(round.revision); const revisionReason = sourceRepair ? pipelineSourceRevisionFailure(revised) : pipelineRevisionFailure(revised);
           if (revisionReason) { stop(revised, revisionReason); return; }
           if (sourceRepair && !round.sourceRepairs) { round.sourceRepairs = pipelineSourceRepairs(revised); store.save(value, lease.leaseId); }
           const versions = revised.result!.summary.versionIds;

@@ -8,7 +8,7 @@ import assert from 'node:assert/strict'
 import { createWorkbenchPipelinePanel } from '../../web/WorkbenchPipeline.js'
 for (const verified of [false, true]) test(`pipeline panel distinguishes execution completion from publication (${verified})`, async () => {
   const panel = { innerHTML: '' }
-  const pipeline = { pipelineId: 'pipeline', contractVersion: 'knowledge-pipeline-v15', status: 'SUCCEEDED', currentStage: 'ASSOCIATE', children: {}, iterations: [], materialIds: [], fixedSuites: [{ moduleId: 'module' }] }
+  const pipeline = { pipelineId: 'pipeline', contractVersion: 'knowledge-pipeline-v16', status: 'SUCCEEDED', currentStage: 'ASSOCIATE', children: {}, iterations: [], materialIds: [], fixedSuites: [{ moduleId: 'module' }] }
   const publication = { publicationId: 'publication', files: [{ path: 'cards/card.md', ref: { sha256: 'a'.repeat(64) } }] }
   const app = createWorkbenchPipelinePanel({ root: { querySelector: () => panel, addEventListener() {} }, escapeHtml: String, isEditable: () => true, selection: () => null,
     request: async url => url === '/api/v1/workbench-pipelines' ? { items: [pipeline] } : { pipeline, tasks: [], publication: verified ? publication : null, publicationVerified: verified } })

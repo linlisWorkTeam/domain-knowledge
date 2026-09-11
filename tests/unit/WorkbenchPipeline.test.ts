@@ -7,8 +7,9 @@ import test from 'node:test';
 import { sourceInput, sourceResult } from '../helpers/WorkbenchSourceFixture.ts';
 import assert from 'node:assert/strict';
 import { createPublication } from '../../src/domain/services/workbench/WorkbenchPublicationRecord.ts';
+import { SOURCE_CORRECTION_POLICY, SOURCE_REVISION_CONTRACT } from '../../src/domain/services/knowledge/SourceRevision.ts';
 import { createArtifactRef } from '../../src/domain/Domain.ts';
-import { assertPipelinePublication, createPipeline, pipelineFixedFailure, pipelineStageFailure, pipelineStagnant, pipelineSourceFailure, pipelineSourceStagnant } from '../../src/domain/services/workbench/WorkbenchPipeline.ts';
+import { assertPipelinePublication, createPipeline, pipelineFixedFailure, pipelineStageFailure, pipelineStagnant, pipelineSourceFailure, pipelineSourceRevisionFailure, pipelineRevisionFailure, pipelineSourceStagnant } from '../../src/domain/services/workbench/WorkbenchPipeline.ts';
 import { createStageTask, type WorkbenchStage, type StageResult } from '../../src/domain/services/workbench/StageTask.ts';
 test('pipeline advancement requires successful artifacts and behavior, not just task completion', () => {
   const task = (stage: WorkbenchStage, summary: StageResult['summary']) => ({ ...createStageTask({ projectId: 'p', stage, sourceRevision: 'r', sourceDigest: 's', configurationDigest: 'c', cardVersionIds: [], parameters: {} }, {}, 'now'), status: 'SUCCEEDED' as const, result: { artifactRefs: [], summary } });
@@ -72,8 +73,24 @@ test('publication projection rejects uncommitted, other-version and old-contract
   const committed = { ...record, status: 'COMMITTED' as const };
   assert.doesNotThrow(() => assertPipelinePublication(pipeline, committed));
   assert.throws(() => assertPipelinePublication({ ...pipeline, contractVersion: 'knowledge-pipeline-v14' }, committed), /PIPELINE_PUBLICATION_BINDING_INVALID/);
+  assert.throws(() => assertPipelinePublication({ ...pipeline, contractVersion: 'knowledge-pipeline-v15' }, committed), /PIPELINE_PUBLICATION_BINDING_INVALID/);
   assert.throws(() => assertPipelinePublication({ ...pipeline, publicationId: 'different' }, committed), /PIPELINE_PUBLICATION_BINDING_INVALID/);
   assert.throws(() => assertPipelinePublication({ ...pipeline, fixedSuites: [] }, committed), /PIPELINE_PUBLICATION_BINDING_INVALID/);
   const other = { ...createPublication({ projectId: 'project', versionIds: ['v2'], preparationRef: ref, files: [{ path: 'manifest.json', ref }] }, 'now'), status: 'COMMITTED' as const };
   assert.throws(() => assertPipelinePublication(pipeline, other), /PIPELINE_PUBLICATION_BINDING_INVALID/);
+});
+
+test('partial source repair requires saved accepted versions and an exact indexed replacement map', () => {
+  const task = { ...createStageTask({ projectId: 'p', stage: 'FLYWHEEL', sourceRevision: 'r', sourceDigest: 's', configurationDigest: 'c', cardVersionIds: ['old', 'unchanged'], parameters: {
+    operation: 'KNOWLEDGE_SOURCE_REVISION', revisionContract: SOURCE_REVISION_CONTRACT, sourceCorrectionPolicy: SOURCE_CORRECTION_POLICY, sourceVerificationTaskId: 'source' } }, {}, 'now'), status: 'SUCCEEDED' as const,
+    result: { artifactRefs: [], summary: { outcome: 'UNRESOLVED', indexed: true, sourceVerificationTaskId: 'source', updatedVersionIds: ['new'], versionIds: ['new', 'unchanged'], unresolved: ['Still unknown'],
+      cards: [{ cardId: 'card', baseVersionId: 'old', versionId: 'new', heading: 'Behavior', quality: 'ACCEPTED', outcome: 'REVISED' }] } } };
+  assert.equal(pipelineRevisionFailure(task), 'PIPELINE_REVISION_UNRESOLVED');
+  assert.equal(pipelineSourceRevisionFailure(task), null);
+  for (const patch of [{ indexed: false }, { updatedVersionIds: [] }, { versionIds: ['new', 'missing'] }, { sourceVerificationTaskId: 'other' }, { cards: [{ ...task.result.summary.cards[0]!, quality: 'REJECTED' }] }, { cards: [] }]) {
+    assert.equal(pipelineSourceRevisionFailure({ ...task, result: { ...task.result, summary: { ...task.result.summary, ...patch } } }), 'PIPELINE_REVISION_UNRESOLVED');
+  }
+  const legacy = structuredClone(task); delete (legacy.input.parameters as Record<string, unknown>).sourceCorrectionPolicy;
+  assert.equal(pipelineSourceRevisionFailure(legacy), 'PIPELINE_REVISION_UNRESOLVED');
+  assert.deepEqual(task.result.summary.unresolved, ['Still unknown']);
 });
