@@ -220,3 +220,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 [2026-09-11-0812-source-publication-sections.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/9cc96b63da45b3c1deaf0598f4b6d4b13ee1b58f/docs/epitaph/2026-09-11-0812-source-publication-sections.md) 原始来源章节Domain核验与15真实章节验证；后续已接完整H2和材料投影，修复知识/源码模块身份混用。最终发布事务未完成。
 
 [2026-09-11-0815-source-publication-preparation.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/1e1faa166c7d27649bb38b59e418884c36b2cae8/docs/epitaph/2026-09-11-0815-source-publication-preparation.md) 完整H2和原始来源Review接准备，后续材料/模块身份及接口策略校验完成。准备仍非最终发布，下一步提交事务。
+
+[2026-09-11-0818-source-materials-binding.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/e8f626c98c77da49c88c7ee1fb7a28dd9e0d60be/docs/epitaph/2026-09-11-0818-source-materials-binding.md) 来源原始源码/观察投影匹配，修复知识单元和源码moduleId混用；之后全部准备门禁接齐，真实来源仍未整体结束。
