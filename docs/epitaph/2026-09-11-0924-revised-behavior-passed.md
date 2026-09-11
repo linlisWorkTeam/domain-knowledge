@@ -1,0 +1,13 @@
+# 修订后真实行为通过与来源复核
+
+实际/tmp/domain-knowledge-workbench，feat/five-stage-workbench，Node24/384MiB。480自动化、32Console通过；旧站原树未改，目标active。
+
+重建stage-15b051f11b581d63e72c0dd8fdfc38ddfc860a2e193cec60942a3cce0d0060de已SUCCEEDED，1call/40534tokens/30771ms，session6778结束0。使用source correction08294...产出的7版本，含两张修订卡。
+
+真实可信评测stage-eb581db88f5496116ae49257198d84de8d1d81328e89a8d62e7ac9cc7274ee8e已SUCCEEDED，31/31，reused31/revalidated=true/proposed0，0modelcall，session24735结束0；testset native-tests-714f1d824048c99a1fd8ccfac488e4346a17d0276a48519b69371a30db8a9436，report ef4a0b05acbc54615c0b4621fa4b0621d642f9b10ef98b15ed17a834066232bb。完整driver/log/JSON在real-knowledge-revision/evaluation-after-source-correction。
+
+固定stage-2ec1045319dfb638b5b7bfe6ae57919b6ca700ab465fe2a17fdb9d1ddc3c2093已SUCCEEDED，参考通过、生成11/11，session61688结束0。从旧成功固定task605948...冻结suiteRefs读取并验证CAS后用于新重建，未修改expected。report0ed3889194ae6c07fa57ef286fb67db0370b16c7b286f75fe861244bf757a97c。driver/log/JSON在fixed-after-source-correction。
+
+新来源核验stage-826fed86bba18a7aa3b75ead348d503aac5181395798f5f4a1d341194f734bd4已RUNNING，PID2522760/session32339，/tmp/RunSourceAfterCorrectionBindings.ts、/tmp/SourceAfterCorrectionBindings.log；产物real-knowledge-revision/source-after-correction-bindings-v1/Source.json。输入新可信evaleb581...，含source-evidence-bindings-v1，故这次不仅正文两卡变化，摘要类别澄清也首次实测。不要因观测超时重启，继续同handle。旧源码矛盾仍携带，不赌博PASS。当前仍非发布。
+
+后续检查来源结果的sections与summary，明确矛盾走修订，未知风险保留。整卡UNRESOLVED内存在明确MISMATCH章节的修订选择限制见0921，仍需Domain审查；不能改判PASS或删除风险。C++TinyXML2、双目标最终一键/分步、完整关联截图及最终网站更新仍未交付。重资源串行，不在来源模型执行时跑浏览器/编译。
