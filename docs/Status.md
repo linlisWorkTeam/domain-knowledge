@@ -5,7 +5,7 @@ SPDX-License-Identifier: MIT
 -->
 # 开发任务与当前进度
 
-更新日期：2026-09-10（北京时间）。本轮开发基线：`c33787b`（已合入 DocGen/DocWorker 和站点失效断言清理）。四阶段顺序和本会话分工由用户确认；任务验收状态依据现有代码及记录填写，具体回归证据见文末。
+更新日期：2026-09-11（北京时间）。本轮开发基线：`c33787b`（已合入 DocGen/DocWorker 和站点失效断言清理）。四阶段顺序和本会话分工由用户确认；任务验收状态依据现有代码及记录填写，具体回归证据见文末。
 
 本文件统一维护当前任务、步骤、依赖、状态和证据索引。实现细节维护在所属模块设计，验收条件引用 [Verification](specs/totalRules/Verification.md)，历史记录见 [HistoryEpitaph](HistoryEpitaph.md)。旧 DEV-019 的 R0～R4 是历史计划，与下面的新四阶段不按编号对应，也不直接继承完成勾选。
 
@@ -21,6 +21,8 @@ SPDX-License-Identifier: MIT
 | AC-AGENT-104 | Worker 全通道材料授权 | 已验收：并发/重试/复用、CAS/提示词及工作区共 9 项通过，typecheck 通过 |
 | AC-AGENT-105 | 统一业务轮次上限 | 已验收：总轮次/质量分支/入口恢复及领域服务 7 项通过，typecheck 通过 |
 | AC-AGENT-106 | 所有人工停止分支的有效交接 | 已验收：四种停止交接及轮次回归 8 项通过，typecheck 通过 |
+
+六项均已按 Spec 验收并分别提交；代码 `9f34a85` 全量回归 292/292，独立保留产物 SDK 端到端 PASS/VERIFIED。详细记录见 [报告](reports/AgentSpecRepairAndE2E.md)。
 
 本轮处理六项复现缺陷；原有共享能力待办与用户明确延后事项继续在所属 Spec 保持未完成状态，不以本轮验收替代。
 

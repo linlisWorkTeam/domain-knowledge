@@ -5,6 +5,59 @@ SPDX-License-Identifier: MIT
 -->
 # Agent Spec 修复与端到端测试报告
 
+## 2026-09-11：六项强制约束验收
+
+代码版本：`9f34a85`。先提交可执行 Spec（`9f29682`），再对每项缺陷记录失败复现、实现、通过验收后单独提交。以下是当前结果；后文 2026-09-10 的 266 项测试及 `2/2` 计数是历史记录，不能替代本轮验收。
+
+| Spec 验收项 | 实现与通过条件 | 独立提交 |
+| --- | --- | --- |
+| AC-AGENT-101 | .cpp 与辅助 .h 正常编译；头文件不能冒充入口；未关联翻译单元被拒绝 | `1f48c63` |
+| AC-AGENT-102 | 使用项目原生编译/执行绑定，保留 -D、-I、链接及运行参数；缺失绑定、不可解析脚本转人工，不盲目修测试 | `907596c` |
+| AC-AGENT-103 | 清单声明唯一 entryPoint，框架生成 runner 逐项调用；漏项、重复/未知记录、提前退出、汇总冒充失败；C/C++、多文件及旧缓存迁移均验收 | `9f34a85` |
+| AC-AGENT-104 | Worker 的 CAS、提示词与实际工作区都只包含分配源码和共享接口；并发、失败重试及复用不泄露兄弟任务源码 | `43c8363` |
+| AC-AGENT-105 | maxIterations 包含首轮；上限 1 不启动第二轮，上限 2 可第二轮通过；质量分支和入口共用 Domain 规则，同轮重放幂等 | `b0c1d64` |
+| AC-AGENT-106 | 测试失败、文档范围提案、质量耗尽、Gate 停止均保存可操作摘要和 CAS 证据，有 Review 历史则保留；重放不重复交接 | `22cb8cf` |
+
+角色执行版本为 `domain-agents-v7-case-execution`，节点为 `contract-v7`。已固定的旧协议测试转人工迁移，源码不变时不会悄悄重新生成测试。Worker 子任务版本升级为 `subagent-v3`，避免复用旧的未裁剪材料。
+
+### 当前验证
+
+- 全量 `npm test`：292/292 通过，152.1 秒，无跳过或取消。
+- 独立保留产物的 SDK 端到端：1/1 通过，20.8 秒。
+- 浏览器 `npm run test:ui`：14/14 通过，31.3 秒。
+- TypeScript、Spec 校验和差异格式检查通过；Spec 为 17 schemas / 7 commands / 8 results / 52 p0。
+- 每项失败复现和通过日志：`.workpanel/acceptance/2026-09-11/101-red.log`、`101-green.log`，其余按编号 102～106 对应命名。全量日志为 `full-suite.log`。
+
+### 完整运行与产物
+
+Run：`fdb9476a-ce71-4bb6-81a7-01b7b98d2ab9`。最终 `COMPLETED / PASS / VERIFIED`，业务轮次为 0、1，上限为 2，只发布一次。13 次受控模型调用覆盖七个角色，保留 81 条事件、5 次实际编译执行评测、75 个 CAS 工件；CAS 内容摘要全部核验一致。
+
+| 实际测评 | 逐用例结果 | 后续动作 |
+| --- | --- | --- |
+| 首轮参考测试，错误期望为 3 | case-1 FAIL，0/1 | TestGen 获得原候选及失败证据，有限修复 |
+| 修复参考测试，期望为 4 | case-1 PASS，1/1 | 固定清单和测试源码 |
+| 首轮生成实现返回 3 | case-1 FAIL，0/1 | Review 给出修订意见，Gate ITERATE |
+| 第二轮参考重验 | case-1 PASS，1/1 | 同源测试复用，不再调用 TestGen |
+| 第二轮生成实现返回 4 | case-1 PASS，1/1 | Review 历史复核，Gate PASS，发布 |
+
+失败均为用例主动注入并成功处理的错误。当前 `1/1` 明确表示固定清单中的一个用例；不再把项目命令和附加命令的重复执行累计成业务用例数。另有三用例验收验证完整调用、普通失败后继续执行、缺记录及提前退出的拒绝路径。
+
+完整目录：`.workpanel/acceptance/2026-09-11/e2e/`，保留原始 Git 仓库、完整模型请求/响应、逐轮文档、测试及重建源码、框架生成的 runner、编译二进制、stdout/stderr、SQLite、CAS、LangGraph 检查点和 SDK 材料。
+
+- `readable/`：按模型调用顺序整理的提示词、输出、知识 Markdown 和源码。
+- `evaluation-index.json`：五次测评及各自的清单、随机执行标识、逐项结果。
+- `evaluations/*/workspace/.flywheel/CaseRunner-0.cpp`：实际使用的框架 runner。
+- `cas-index.json`、`workflow-result.json`、`summary.json`：内容核验、事件与最终结果。
+- 上级目录 `SHA256SUMS` 校验全部本轮保留文件；相邻归档为 `AgentAcceptance-2026-09-11.tar.gz`。
+
+原始产物仅保留在本工作区，不随 PR 上传；报告和验收代码随提交保存。
+
+### 本轮边界
+
+本轮关闭以上六项可复现缺陷，不代表全部历史 Specs 都已完成。受控 HTTP 响应通过真实 DSH SDK、LangGraph、SQLite/CAS 和 G++ 执行；它证明编排、权限材料交接和逐项执行协议，不证明外部模型的测试业务质量或部署级进程隔离。复杂构建脚本仍需适配，当前无法证明绑定时明确转人工。先前延期的 Worker 业务分组/预算/依赖、分阶段文档合成、相似度算法，以及共享配置版本、资料清理、历史最优回退、成本/停滞策略和公司 CLI 验收仍保持未完成状态。
+
+## 2026-09-10：历史验收记录
+
 测试日期：2026-09-10，北京时间。代码版本：`4c5c580`；分支：`feat/next-agent`；PR：[#46](https://github.com/linlisWorkTeam/domain-knowledge/pull/46)。后续报告提交仅更新文档与文件清单。
 
 上一轮审查的九项问题已完成修复，并有九个针对性回归用例。完整端到端运行得到 `COMPLETED / PASS`，Run 最终为 `VERIFIED`，只发布一次。此次使用可控模型响应、真实 DSH SDK 与 HTTP 流、真实 LangGraph、SQLite/CAS、G++ 编译和二进制执行；不构成外部真实模型的业务质量验收。

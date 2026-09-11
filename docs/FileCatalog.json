@@ -886,6 +886,12 @@
       "metadataLocation": "file-header"
     },
     {
+      "path": "src/domain/agents/docGenAgent/subAgents/docWorkerAgent/WorkerMaterials.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "从父级材料提取 Worker 获准读取的文件，拒绝隐式传递其他正文。",
+      "metadataLocation": "file-header"
+    },
+    {
       "path": "src/domain/agents/docGenAgent/subAgents/docWorkerAgent/examples/DocWorkerAgentSample.json",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "保存DocWorker角色样例的结构化配置、样例或元数据。",
@@ -1030,6 +1036,12 @@
       "metadataLocation": "file-header"
     },
     {
+      "path": "src/domain/workflow/IterationBudget.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "统一零基轮次与包含首轮的总轮次预算。",
+      "metadataLocation": "file-header"
+    },
+    {
       "path": "src/domain/workflow/Workflow.ts",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "定义跨角色业务流程、文档任务拆分及质量判定后的流转规则。",
@@ -1117,6 +1129,12 @@
       "path": "src/infrastructure/agentAdapters/scenario/Scenario.ts",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "提供Scenario的基础设施实现与外部系统接入。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "src/infrastructure/evaluation/project/CaseRunner.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "生成独立用例驱动程序并核对逐用例完成记录。",
       "metadataLocation": "file-header"
     },
     {
@@ -1324,6 +1342,12 @@
       "metadataLocation": "catalog"
     },
     {
+      "path": "tests/helpers/AgentScenario.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "用受控角色响应驱动真实 LangGraph 和 C++ 测评以验收边界。",
+      "metadataLocation": "file-header"
+    },
+    {
       "path": "tests/helpers/Fixture.ts",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "维护夹具相关的项目配置与工程说明。",
@@ -1483,6 +1507,42 @@
       "path": "tests/integration/SqliteCas.test.ts",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "验证SqliteCas的行为、约束及失败场景。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/integration/StoppedHandoff.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验收 AC-AGENT-106 所有人工停止路径的持久交接与幂等。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/integration/TestBuildBinding.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验收 AC-AGENT-102 项目编译参数保留及不可绑定配置的人工停止。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/integration/TestCaseExecution.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验收 AC-AGENT-103 固定清单逐用例执行，拒绝汇总冒充或提前退出。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/integration/TestEntryContract.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验收 AC-AGENT-101 的测试入口与辅助文件契约。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/integration/WorkerMaterialBoundary.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验收 AC-AGENT-104 的 Worker 提示词、CAS 和真实工作区权限。",
+      "metadataLocation": "file-header"
+    },
+    {
+      "path": "tests/integration/WorkflowIterationLimit.test.ts",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "验收 AC-AGENT-105 的总轮次上限、质量分支与恢复入口。",
       "metadataLocation": "file-header"
     },
     {
