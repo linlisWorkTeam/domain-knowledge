@@ -236,3 +236,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 [2026-09-11-0845-module-builds.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/4fd7aab105c2427e557c5cc7de87056decb9472d/docs/epitaph/2026-09-11-0845-module-builds.md) 模块配置贯穿执行/发布并验证双C指纹，后续补受控固定执行及显式native模式但尚未实际运行；历史选择与诊断已接。原TS/动态Make额外范围已0855纠正，按原用户计划验收。
 
 [2026-09-11-0850-project-history.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/d3da9c199cfac09fbcc7a4a75b06d3743a368418/docs/epitaph/2026-09-11-0850-project-history.md) 保存项目与精确版本历史选择已接；随后完整Console发布浏览器验证保存输入、匿名发布/下载、刷新及390px布局通过。真实来源任务已结束UNRESOLVED，待修订与最终真实发布。
+
+[2026-09-11-0855-diagnostics-scope.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/4b48c14789e970955afa1fdbc1d6bcfaa6428aad/docs/epitaph/2026-09-11-0855-diagnostics-scope.md) 缺依赖诊断/匿名证据下载与原范围澄清完成；后续真实gcc、发布浏览器及480自动化通过。新增语言仍C/C++，TS保留markdownLite回归，Make/CMake识别与模块参数不等于执行任意原构建脚本。最终真实修订和部署未完成。

@@ -200,3 +200,5 @@ Release 包为 177979475 字节，SHA-256 `ea2949fbe9e5962c70475e405459fe57f2dda
 本次原计划对照的轻量回归共26项通过，覆盖卡片身份、索引、编译数据库候选、共用语言执行边界、材料与关联、版本统计、仓库快照和失败诊断。日志为 `/tmp/WorkbenchReadAndDiagnosticsRegression.log`，这不是全测试套件或浏览器验收。真实来源任务 stage-3ac5a7c55407b750e1205020b04657f09b5e4d4590903f6e5592bf3ab3967b48 已完成，结果 UNRESOLVED（7张卡片中2张SOURCE_MISMATCH、4张UNRESOLVED、1张SOURCE_MATCHED）；49次累计模型调用。不能以已有参考用例通过或阶段执行成功宣称整体完成。
 
 当前补充验收：真实gcc双模块固定案例通过；来源摘要绑定与发布防篡改13项、原生评测/修订集成2项、架构8项通过，类型和Spec通过。完整Console发布浏览器验收1项通过，覆盖保存输入选择、免登录发布与下载、刷新后历史、390px窄屏无水平溢出。首次浏览器执行发现App下载白名单缺少workbench-publications，修复后重跑通过，失败trace与成功截图均保留。这是受控模型证据配合真实HTTP/SQLite/文件的页面验收，不是真实卡片发布成功。证据目录 real-knowledge-revision/publication-browser-actual 与 source-digest-clarification。
+
+全量Node自动化回归现已480/480通过，无跳过（303436ms），日志WorkbenchFullRegressionCurrent.log。Console全套首次执行出现操作中心截图变化和仓库分析错误提示写错DOM节点两项失败，进程在第31项后以143退出，不能计为全套通过。4b48c14修复分析回调精确定位状态与按钮，原仓库分析浏览器断言不变重跑通过。新历史输入区域的截图基线已人工查看并更新，正常比较复测仍在进行。
