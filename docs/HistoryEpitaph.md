@@ -258,3 +258,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 - 2026-09-11-0934：新增第三项原生混合风险应用场景，当时仅类型检查；后来实际3/3通过见0944记录。旧source826fed当时运行，随后已完成。原记录：[固定提交](https://github.com/linlisWorkTeam/domain-knowledge/blob/227a4414cbf87862bed2261245dd16ee0cf3ca3d/docs/epitaph/2026-09-11-0934-mixed-application-test.md)。
 
 - 2026-09-11-0936：真实CAS审计证明两卡仅授权H2改变且索引精确更新；31个可信用例输入/预期跨版本不变。非发布验收，后续状态见0944。[原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/8b8a7f3834aeb328559434feaa148e7b9f7197d9/docs/epitaph/2026-09-11-0936-live-artifact-audits.md)。
+
+- 2026-09-11-0944：原生混合应用3/3、Console筛选2/2通过；source826fed完成但UNRESOLVED，发现有可信库后永不新增测试缺口并先写Spec。后续实现见1508/1515。[原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/d58b044bca9f8affd09babd3139d347b81ceec26/docs/epitaph/2026-09-11-0944-source-supplement-gap.md)。

@@ -15,9 +15,9 @@ import { SqliteWorkbenchPipelines } from '../../src/infrastructure/sqlite/Sqlite
 import { SOURCE_REVISION_CONTRACT, SOURCE_CORRECTION_POLICY } from '../../src/domain/services/knowledge/SourceRevision.ts';
 import type { StageInput, StageResult, WorkbenchStage } from '../../src/domain/services/workbench/StageTask.ts';
 import { sourceInput, sourceResult } from '../helpers/WorkbenchSourceFixture.ts';
-function fixture(target: number, stagnant = false, unknown = false, mixed = false) {
+function fixture(target: number, stagnant = false, unknown = false, mixed = false, supplement = false) {
   const directory = mkdtempSync(join(tmpdir(), 'source-pipeline-')), db = join(directory, 'state.sqlite');
-  let blocked = false, started = false;
+  let blocked = false, started = false, sourceCalls = 0;
   const input = (stage: WorkbenchStage, versions = ['v1']): StageInput => ({ stage, projectId: 'p', sourceRevision: 'r', sourceDigest: 's', configurationDigest: 'c', cardVersionIds: versions, parameters: { snapshotId: 'snapshot' } });
   const open = () => {
     const store = new SqliteWorkbenchPipelines(db), stageStore = new SqliteStageTasks(db);
@@ -35,10 +35,15 @@ function fixture(target: number, stagnant = false, unknown = false, mixed = fals
       },
       EVALUATE: async context => {
         context.account('call', { modelCalls: 1 });
+        if (context.task.input.parameters.supplementContract) {
+          started = true;
+          if (blocked) await new Promise((_, reject) => context.signal.addEventListener('abort', () => reject(context.signal.reason), { once: true }));
+        }
         if (context.task.input.parameters.operation === 'KNOWLEDGE_SOURCE_VERIFICATION') {
-          const beforeTarget = Number(context.task.input.cardVersionIds[0]!.slice(1)) < target;
-          const result = sourceResult(context.task.input, mixed && beforeTarget || unknown ? 'UNRESOLVED' : beforeTarget ? 'SOURCE_MISMATCH' : 'SOURCE_MATCHED');
+          const beforeTarget = supplement ? ++sourceCalls < target : Number(context.task.input.cardVersionIds[0]!.slice(1)) < target;
+          const result = sourceResult(context.task.input, (mixed || supplement) && beforeTarget || unknown ? 'UNRESOLVED' : beforeTarget ? 'SOURCE_MISMATCH' : 'SOURCE_MATCHED');
           if (mixed && beforeTarget) result.summary.cards = (result.summary.cards as Array<Record<string, any>>).map(card => ({ ...card, unresolved: ['Evidence remains unknown'], sections: [{ ...card, outcome: 'SOURCE_MISMATCH', unresolved: [] }, { ...card, outcome: 'UNRESOLVED', unresolved: ['Evidence remains unknown'] }] }));
+          if (supplement && beforeTarget) result.summary.cards = (result.summary.cards as Array<Record<string, any>>).map(card => ({ ...card, sections: [{ ...card, section: 'Errors', outcome: 'UNRESOLVED', unresolved: ['Missing behavior evidence'] }] }));
           return result;
         }
         return { artifactRefs: [], summary: { completedModules: 1, requestedModules: 1, modules: [{ status: 'BEHAVIOR_PASSED', interfaceCompatible: true }] } };
@@ -48,7 +53,7 @@ function fixture(target: number, stagnant = false, unknown = false, mixed = fals
     const app = new WorkbenchPipelines({ store, stages, environment: async () => 'fixed', materials: { get: () => null },
       generation: { prepare: async () => input('GENERATE') }, index: { prepare: versions => input('INDEX', versions) },
       reconstruction: { prepare: async (_snapshot, versions, options) => { assert.equal(options?.retryEvaluationTaskId, undefined, 'source correction cannot fabricate a behavioral retry'); return input('FLYWHEEL', versions); } },
-      evaluation: { prepare: async id => input('EVALUATE', stages.get(id).input.cardVersionIds), progress: async () => ({ passed: 1, total: 1, failed: [] }) },
+      evaluation: { prepare: async (id, sourceId) => ({ ...input('EVALUATE', stages.get(id).input.cardVersionIds), ...(sourceId ? { parameters: { snapshotId: 'snapshot', reconstructionTaskId: id, sourceVerificationTaskId: sourceId, supplementContract: 'knowledge-test-supplement-v1' } } : {}) }), progress: async () => ({ passed: 1, total: 1, failed: [] }) },
       sourceVerification: { prepare: async id => sourceInput(stages.get(id)) },
       sourceRevision: { prepare: async id => ({ ...input('FLYWHEEL', stages.get(id).input.cardVersionIds), parameters: { operation: 'KNOWLEDGE_SOURCE_REVISION', revisionContract: SOURCE_REVISION_CONTRACT, ...(mixed ? { sourceCorrectionPolicy: SOURCE_CORRECTION_POLICY } : {}), sourceVerificationTaskId: id } }) },
       associations: { prepare: versions => input('ASSOCIATE', versions) },
@@ -119,4 +124,39 @@ test('mixed source risks permit bound repair and rebuilt evaluation but cannot a
       assert.equal(r.app.detail(first.pipelineId).publicationVerified, false);
     } finally { await r.close(); rmSync(f.directory, { recursive: true, force: true }); }
   }
+});
+
+test('source evidence gaps use supplemental evaluation with the same code and preserve gates', async () => {
+  for (const target of [2, 99]) {
+    const f = fixture(target, false, false, false, true), r = f.open();
+    try {
+      const first = await r.app.start('snapshot'), done = await r.app.wait(first.pipelineId);
+      assert.equal(done.iterations!.length, target === 2 ? 2 : 4);
+      assert.equal(new Set(done.iterations!.map(round => round.reconstruction!.taskId)).size, 1);
+      assert.ok(done.iterations!.slice(1).every(round => round.supplementSourceTaskId && round.evaluation!.input.parameters.supplementContract === 'knowledge-test-supplement-v1'));
+      if (target === 2) assert.equal(done.status, 'SUCCEEDED', done.reasonCode ?? '');
+      else {
+        assert.equal(done.reasonCode, 'PIPELINE_NO_SOURCE_EVIDENCE_PROGRESS'); assert.equal(done.children.ASSOCIATE, undefined);
+        const usage = r.app.detail(first.pipelineId).usage;
+        r.app.resume(first.pipelineId, first.inputDigest);
+        assert.equal((await r.app.wait(first.pipelineId)).reasonCode, 'PIPELINE_NO_SOURCE_EVIDENCE_PROGRESS');
+        assert.deepEqual(r.app.detail(first.pipelineId).usage, usage);
+      }
+      assert.equal(r.app.detail(first.pipelineId).publicationVerified, false);
+    } finally { await r.close(); rmSync(f.directory, { recursive: true, force: true }); }
+  }
+});
+
+test('supplement cancellation and restart preserve the same code, source and child budget', async () => {
+  const f = fixture(2, false, false, false, true); let r = f.open(); f.block(true);
+  try {
+    const first = await r.app.start('snapshot'); while (!f.started()) await new Promise(resolve => setTimeout(resolve, 10));
+    const before = r.app.get(first.pipelineId), child = before.iterations![1]!.evaluation!.taskId;
+    r.app.cancel(first.pipelineId); assert.equal((await r.app.wait(first.pipelineId)).status, 'CANCELLED');
+    await r.close(); r = f.open(); f.block(false); r.app.resume(first.pipelineId, first.inputDigest);
+    const done = await r.app.wait(first.pipelineId); assert.equal(done.status, 'SUCCEEDED', done.reasonCode ?? '');
+    assert.equal(done.iterations![1]!.evaluation!.taskId, child); assert.equal(r.stages.get(child).usage.modelCalls, 2);
+    assert.equal(r.stages.get(before.iterations![0]!.sourceVerification!.taskId).usage.modelCalls, 1);
+    assert.equal(r.stages.get(before.iterations![0]!.reconstruction!.taskId).usage.modelCalls, 1);
+  } finally { await r.close(); rmSync(f.directory, { recursive: true, force: true }); }
 });

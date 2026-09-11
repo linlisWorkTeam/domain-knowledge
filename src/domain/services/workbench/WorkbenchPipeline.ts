@@ -9,9 +9,9 @@ import { SOURCE_REVISION_CONTRACT, SOURCE_CORRECTION_POLICY, sourceCorrectionCan
 import { sha256, type ArtifactRef } from '../../Domain.ts';
 import { FIXED_EVALUATION_CONTRACT } from '../evaluation/NativeFixedEvaluation.ts';
 import { canonicalJson, createStageTask, type StageInput, type StageTask, type StageStatus, type WorkbenchStage } from './StageTask.ts';
-export const PIPELINE_CONTRACT = 'knowledge-pipeline-v16';
+export const PIPELINE_CONTRACT = 'knowledge-pipeline-v17';
 export interface IterationProgress { failed: string[]; total: number; passed: number }
-export interface PipelineIteration { number: number; versionIds: string[]; reconstruction?: StageTask; evaluation?: StageTask; fixedEvaluation?: StageTask; revision?: StageTask; progress?: IterationProgress; sourceVerification?: StageTask; sourceRepairs?: string[] }
+export interface PipelineIteration { number: number; versionIds: string[]; reconstruction?: StageTask; evaluation?: StageTask; fixedEvaluation?: StageTask; revision?: StageTask; progress?: IterationProgress; sourceVerification?: StageTask; sourceRepairs?: string[]; unknownSections?: string[]; supplementSourceTaskId?: string }
 export interface PipelineFixedSuite { moduleId: string; suiteRef: ArtifactRef }
 export interface WorkbenchPipeline {
   publicationId?: string;
@@ -110,6 +110,36 @@ export function pipelineSourceRepairable(task: StageTask): boolean {
   try { return sourceCorrectionCandidates(task.result!.summary.cards as unknown as Parameters<typeof sourceCorrectionCandidates>[0], SOURCE_CORRECTION_POLICY).length > 0; }
   catch { return false; }
 }
+/** Only frozen unknown sections can trigger supplementation; malformed findings still stop. */
+export function pipelineUnknownSections(task: StageTask): string[] {
+  if (pipelineSourceFailure(task) !== 'PIPELINE_SOURCE_UNRESOLVED') return [];
+  const cards = task.result!.summary.cards as unknown as Array<SourceCardResult & { sections?: Array<SourceCardResult & { section?: string; unresolved?: string[] }> }>;
+  const unknown: string[] = [];
+  for (const card of cards) {
+    if (!Array.isArray(card.sections) || !card.sections.length) return [];
+    const headings = new Set<string>();
+    for (const section of card.sections) {
+      if (!section || typeof section.section !== 'string' || !section.section || headings.has(section.section)
+        || section.cardId !== card.cardId || section.versionId !== card.versionId || section.moduleId !== card.moduleId || section.bodyDigest !== card.bodyDigest) return [];
+      headings.add(section.section);
+      if (section.outcome === 'UNRESOLVED') {
+        if (!section.unresolved?.length) return [];
+        unknown.push(`${card.cardId}#${section.section}`);
+      }
+    }
+  }
+  return [...new Set(unknown)].sort();
+}
+export function pipelineSupplementStagnant(iterations: PipelineIteration[]): boolean {
+  const history = iterations.flatMap(round => round.unknownSections ? [round.unknownSections] : []);
+  let best = new Set(history[0] ?? []), unchanged = 0;
+  for (const sections of history.slice(1)) {
+    const current = new Set(sections);
+    if (current.size < best.size && [...current].every(section => best.has(section))) { best = current; unchanged = 0; }
+    else unchanged++;
+  }
+  return unchanged >= 3;
+}
 /** 仅允许成功保存并索引的局部修订继续重建；风险仍阻止关联和发布。 */
 export function pipelineSourceRevisionFailure(task: StageTask): string | null {
   const reason = pipelineRevisionFailure(task);
@@ -119,10 +149,11 @@ export function pipelineSourceRevisionFailure(task: StageTask): string | null {
     || task.input.parameters.revisionContract !== SOURCE_REVISION_CONTRACT || task.input.parameters.sourceCorrectionPolicy !== SOURCE_CORRECTION_POLICY
     || summary?.outcome !== 'UNRESOLVED' || summary.indexed !== true || summary.sourceVerificationTaskId !== task.input.parameters.sourceVerificationTaskId
     || !Array.isArray(summary.cards) || !summary.cards.length || !Array.isArray(summary.updatedVersionIds) || !Array.isArray(summary.versionIds)) return reason;
-  const cards = summary.cards as Array<{ baseVersionId: string; versionId: string; quality: string; outcome: string }>;
-  if (cards.some(card => !card || card.quality !== 'ACCEPTED' || card.outcome !== 'REVISED' || typeof card.versionId !== 'string' || !card.versionId
-    || card.versionId === card.baseVersionId || !task.input.cardVersionIds.includes(card.baseVersionId))
-    || new Set(cards.map(card => card.baseVersionId)).size !== cards.length
+  const results = summary.cards as Array<{ baseVersionId: string; versionId?: string; quality?: string; outcome: string; unresolved?: string[] }>;
+  if (results.some(card => !card || !task.input.cardVersionIds.includes(card.baseVersionId)) || new Set(results.map(card => card.baseVersionId)).size !== results.length) return reason;
+  const cards = results.filter(card => card.outcome === 'REVISED');
+  if (!cards.length || results.some(card => card.outcome !== 'REVISED' && (card.outcome !== 'UNRESOLVED' || card.versionId != null || card.quality != null || !card.unresolved?.length))
+    || cards.some(card => card.quality !== 'ACCEPTED' || typeof card.versionId !== 'string' || !card.versionId || card.versionId === card.baseVersionId)
     || new Set(summary.versionIds).size !== task.input.cardVersionIds.length
     || canonicalJson([...summary.updatedVersionIds].sort()) !== canonicalJson(cards.map(card => card.versionId).sort())
     || canonicalJson(summary.versionIds) !== canonicalJson(task.input.cardVersionIds.map(id => cards.find(card => card.baseVersionId === id)?.versionId ?? id))) return reason;

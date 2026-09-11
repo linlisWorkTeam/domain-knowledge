@@ -7,7 +7,7 @@ import type { WorkbenchPublications } from './WorkbenchPublications.ts';
 import type { ArtifactStore } from '../ports/ApplicationPorts.ts';
 import type { WorkbenchFixedEvaluation, FixedModuleSuite } from './WorkbenchFixedEvaluation.ts';
 import type { PipelineFixedSuite } from '../../domain/services/workbench/WorkbenchPipeline.ts';
-import { PIPELINE_CONTRACT, assertPipelinePublication, createPipeline, pipelineFixedFailure, pipelineStageFailure, pipelineRevisionFailure, pipelineStagnant, pipelineSourceFailure, pipelineSourceRepairable, pipelineSourceRevisionFailure, pipelineSourceRepairs, pipelineSourceStagnant, type WorkbenchPipeline, type PipelineIteration } from '../../domain/services/workbench/WorkbenchPipeline.ts';
+import { PIPELINE_CONTRACT, assertPipelinePublication, createPipeline, pipelineFixedFailure, pipelineStageFailure, pipelineRevisionFailure, pipelineStagnant, pipelineSourceFailure, pipelineSourceRepairable, pipelineSourceRevisionFailure, pipelineSourceRepairs, pipelineSourceStagnant, pipelineUnknownSections, pipelineSupplementStagnant, type WorkbenchPipeline, type PipelineIteration } from '../../domain/services/workbench/WorkbenchPipeline.ts';
 import { WORKBENCH_STAGES, canonicalJson, createStageTask, type StageInput, type StageTask, type WorkbenchStage } from '../../domain/services/workbench/StageTask.ts';
 import type { ExternalMaterialStore } from '../ports/ExternalMaterialPorts.ts';
 import type { WorkbenchPipelineStore } from '../ports/WorkbenchPipelinePorts.ts';
@@ -190,7 +190,21 @@ export class WorkbenchPipelines {
             }
             const verified = await execute(round.sourceVerification); const sourceReason = pipelineSourceFailure(verified);
             if (!sourceReason) { value.completed.push('EVALUATE'); store.save(value, lease.leaseId); break; }
-            if (!pipelineSourceRepairable(verified)) { stop(verified, sourceReason); return; }
+            if (!pipelineSourceRepairable(verified)) {
+              const unknown = pipelineUnknownSections(verified);
+              if (!unknown.length) { stop(verified, sourceReason); return; }
+              round.unknownSections = unknown; store.save(value, lease.leaseId);
+              if (pipelineSupplementStagnant(value.iterations)) { stop(verified, 'PIPELINE_NO_SOURCE_EVIDENCE_PROGRESS'); return; }
+              const supplemental = await this.dependencies.evaluation.prepare(code.taskId, verified.taskId);
+              if (supplemental.parameters.supplementContract !== 'knowledge-test-supplement-v1' || supplemental.parameters.sourceVerificationTaskId !== verified.taskId
+                || supplemental.parameters.reconstructionTaskId !== code.taskId || canonicalJson(supplemental.cardVersionIds) !== canonicalJson(round.versionIds)
+                || supplemental.sourceDigest !== code.input.sourceDigest || supplemental.sourceRevision !== code.input.sourceRevision
+                || supplemental.configurationDigest !== code.input.configurationDigest || supplemental.projectId !== code.input.projectId
+                || supplemental.parameters.snapshotId !== code.input.parameters.snapshotId) throw new Error('PIPELINE_SUPPLEMENT_INPUT_CHANGED');
+              const next = { number: round.number + 1, versionIds: [...round.versionIds], reconstruction: round.reconstruction,
+                ...(round.fixedEvaluation ? { fixedEvaluation: round.fixedEvaluation } : {}), evaluation: await freeze(supplemental), supplementSourceTaskId: verified.taskId };
+              value.iterations.push(next); value.children.EVALUATE = next.evaluation; store.save(value, lease.leaseId); continue;
+            }
             if (pipelineSourceStagnant(value.iterations)) { stop(verified, 'PIPELINE_NO_SOURCE_PROGRESS'); return; }
             if (!this.dependencies.sourceRevision) throw new Error('PIPELINE_SOURCE_REVISION_REQUIRED');
             sourceRepair = true; prepareRevision = () => this.dependencies.sourceRevision!.prepare(verified.taskId);

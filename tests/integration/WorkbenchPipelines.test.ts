@@ -123,6 +123,11 @@ test('successful one-click execution reaches all five stages and reuses task ide
     assert.throws(() => app.resume(prior.pipelineId, prior.inputDigest), /PIPELINE_CONTRACT_INCOMPATIBLE/);
     assert.throws(() => app.cancel(prior.pipelineId), /PIPELINE_CONTRACT_INCOMPATIBLE/);
     assert.deepEqual(app.get(prior.pipelineId), prior);
+    const v16 = { ...createPipeline(input('GENERATE'), new Date().toISOString(), 'prior-v16'), contractVersion: 'knowledge-pipeline-v16', status: 'PAUSED' as const };
+    store.insert(v16);
+    assert.throws(() => app.resume(v16.pipelineId, v16.inputDigest), /PIPELINE_CONTRACT_INCOMPATIBLE/);
+    assert.throws(() => app.cancel(v16.pipelineId), /PIPELINE_CONTRACT_INCOMPATIBLE/);
+    assert.deepEqual(app.get(v16.pipelineId), v16);
 
   } finally { await app.shutdown(); await stages.shutdown(); store.close(); stageStore.close(); rmSync(directory, { recursive: true, force: true }); }
 });
