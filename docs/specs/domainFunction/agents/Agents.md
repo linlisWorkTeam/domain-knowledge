@@ -3,76 +3,93 @@ Copyright (c) 2026 linlisWorkTeam
 SPDX-License-Identifier: MIT
 文件功能：七角色设计索引与共同执行协议。
 -->
-# 七角色设计索引与共同协议
+# 七个 Agent 怎么协作
+
+这套系统要验证一件事：把源码里的业务行为写成文档后，另一个只看文档的 Agent，能不能重新写出行为正确的代码。
+
+因此，文档写出来只是候选。系统还要生成代码、实际运行测试、分析失败原因；评测通过后才能发布为可使用的知识。
+
+## 每个角色负责什么
+
+| Agent | 接到的任务 | 交出的结果 |
+| --- | --- | --- |
+| [Orchestrator](orchestratorAgent/OrchestratorAgent.md) | 根据目标和进度选择本次处理的模块，安排任务材料 | 本轮任务计划 |
+| [DocWorker](docGenAgent/subAgents/docWorkerAgent/DocWorkerAgent.md) | 阅读 DocGen 分给自己的源码 | 有源码依据的分析片段，以及没弄清的问题 |
+| [DocGen](docGenAgent/DocGenAgent.md) | 汇总源码分析，或按意见修改上一版文档 | 一份候选文档；必要时提出拆分建议 |
+| [TestGen](testGenAgent/TestGenAgent.md) | 根据源码和公开接口编写测试 | 测试源码和逐项用例清单 |
+| [Code](codeAgent/CodeAgent.md) | 只根据候选文档和必要编写配置重建实现 | 新的 C/C++ 源文件 |
+| [Check](checkAgent/CheckAgent.md) | 按配置规则比较原始代码和重建代码 | 带双方原文依据的差异报告 |
+| [Review](reviewAgent/ReviewAgent.md) | 结合差异报告和实际测试结果分析文档问题 | 指明修改位置、原因和建议的意见 |
+
+DocWorker 是 DocGen 的内部助手，由 DocGen 分派。外层工作流只安排其余六个角色；七个角色都保留独立的提示词、执行记录和开发入口。
+
+## 一次任务怎么走完
+
+Orchestrator 先选定一个模块。随后，两条工作同时开始：DocGen 组织 Worker 阅读源码并写文档；TestGen 根据源码写测试，交执行器在原始实现上校验。
+
+文档通过候选质量检查后，Code 只看这份文档重写实现。Check 对比新旧代码。等 Check 和参考测试校验都完成，再用固定下来的测试评测新实现，把差异与测试报告交给 Review。
+
+最后由代码实现的发布判定规则（Gate）决定：通过就发布；需要修订且还有轮次，就带着意见进入下一轮；需要人工处理就停止并留下问题和证据。Agent 自己说“通过”不能代替这个判定。候选质量不足时会先反馈给 DocGen，跳过本轮代码生成。
+
+固定流程及异常分支见 [Workflow](../workflow/Workflow.md)，图在 [4+1 视图](../../../diagrams/Views4Plus1.md)。Orchestrator 可以选任务，不能改写这套流程。
+
+## 用一个小例子理解
+
+假设源码中的函数返回 4，文档却写成返回 3。Code 只看文档，可能真的写出返回 3 的代码。TestGen 根据源码准备的测试要求返回 4，于是重建评测失败。Review 将失败与文档中的错误段落联系起来，DocGen 修订该段，再交 Code 重建和测试。
+
+这只是角色分工示例。真实模型未必能一次写对或正确归因；现有完整自动化测试采用预设回答，验证系统会怎样处理这些结果。
+
+## 几个容易混淆的词
+
+| 文档中的词 | 这里的意思 |
+| --- | --- |
+| Run / 一次飞轮 | 从选择模块开始，到发布、停止或失败结束的一次任务，可以包含多轮修订 |
+| 候选文档 | 已生成并保存，但还没通过行为评测的文档 |
+| 固定源码 / 冻结材料 | 本次运行选定的源码版本和材料；中途不会悄悄换成另一版 |
+| 工件 / Artifact | 保存下来的文档、代码、报告等产物；引用用于找到原文并校验内容摘要 |
+| Gate / 发布判定 | 根据真实评测和阻塞条件决定通过、继续或停止的确定性规则 |
+| checkpoint / 检查点 | 已保存的执行进度或结果，用于中断后恢复，避免重复提交 |
+
+## 文档阅读顺序
+
+角色页统一采用七节：职责与边界、输入与输出、工作流程、关键约束与失败处理、验收场景、未实现与待定事项、实现及测试索引。
+
+先读前四节理解任务如何执行，再用验收场景核对成功和失败行为。第六节保留未完成设计，第七节集中列出规则编号、Contract、Prompt、实现和测试入口。流程小节按角色实际工作组织，例如 DocGen 分为首次生成、根据意见修订和提出文档拆分。
+
+IO 编号沿用业务决定，AC-AGENT 编号沿用验收要求；同一编号可能涉及多个角色，不表示重复执行。跨角色顺序、轮次及恢复统一见 [Workflow](../workflow/Workflow.md)。文档、Contract 或实现互相矛盾时，应说明并修正差异，不能自行采用更宽松的约束。
+
+“已实现”描述现有代码及回归覆盖；“受控”表示模型回答预设，执行器仍可能真实编译运行。它们不等于真实模型质量或部署隔离已验收。测试索引提供现有验收入口，既往版本与产物见 [报告](../../../reports/AgentSpecRepairAndE2E.md)，不表示每次文档编辑都重新执行这些测试。
+
+尚未实现、暂定或延期的目标继续保留。缺少预算、阈值或算法决定时，要先明确设计与验收条件，不能用当前简化实现替换目标，也不能把静态文档校验当作功能完成证据。
+
+## 已完成和仍保留的目标
+
+七个角色都有实现、输入输出校验、样例和自动化测试。受控端到端已跑过测试修复、两轮文档修订和一次发布；这证明流程接通，不能代替真实模型质量或大型项目验收。具体版本和证据见 [验收报告](../../../reports/AgentSpecRepairAndE2E.md)。
+
+以下决定继续保留，不因当前实现较简单就取消：
+
+- IO-01：保留七种角色身份。“知识生成、检索、飞轮、评测、关联”是五类业务阶段，不新增五个同名 Agent；尚未接入阶段的角色分工不由当前流程推定。
+- IO-19：[资料保留与清理](../knowledge/Knowledge.md)。运行期间保留过程材料；达标且最终文档及验收记录保存成功后立即清理可清理的中间材料。停止交接已实现，自动清理还没实现。
+- IO-20：[结束与回退](../evaluation/Evaluation.md)。通过后立即结束，轮次耗尽转人工；历史最佳回退、成本及停滞策略仍未完成。
+- IO-23：[外部知识关联](../association/Association.md) 本阶段不做，不能自行交给 DocGen。
+
+Worker 的业务分组与预算、DocGen 分批汇总、Check 相似度研究分别保留在角色文档中。2026-09-10 已确认的延期事项仍按原决定处理。未确认的方案不能作为修改代码、输出格式或材料权限的依据。
+
+SearchAgent 也还未实现：目标是由 Application 的 KnowledgeSearchApp 直接调用，只读已发布、当前 VERIFIED 且正文完整的授权知识，不新建 Run、不经 Orchestrator 或 LangGraph。现有多状态管理查询不能直接充当它的读取接口，KF-SYS-043 保持 Planned。
+
+## 共同执行约定
+
+每个角色有入口、Contract、Prompt、测试和样例。`execute(input, context)` 接收该角色的 Payload 与已加载材料；context 提供模型执行接口、effectivePrompt、iteration 和取消信号。
+
+执行顺序为：检查取消及必需材料 → 构建 Prompt/Schema → 调用模型 → 再查取消 → 校验结构和业务规则 → 返回 output/payload/artifacts。缺材料在调用前失败，额外字段、缺字段、角色错配或非法输出被拒绝；取消和失败不能提交半份成功结果。Adapter 负责网络/格式重试；Application 单独发起 TestGen 业务修复。DocGen 汇总前先完成内部 Worker 批次。
+
+Prompt 由角色基础指令、冻结的 promptAddon、适用治理指令、本轮 AgentCommand 和授权工件正文组成；DocGen 另带内部汇总载荷。材料限制同时落实到提示词、工件和工具工作区，不能只写“禁止读取”。应用层保存正文并将 pending 引用换成实际工件引用，Domain 不直接操作 CAS、数据库或发布。
+
+当前执行版本为 `domain-agents-v8-supervised-routing`，命令键为 `contract-v8`；不兼容的旧结果不能作为当前成功结果恢复。
+
+独立入口示例：`npm run agent:run -- --role code --input src/domain/agents/codeAgent/examples/CodeAgentSample.json --output /tmp/code-agent-run`。默认样例使用预设回答；`--provider dsh` 需要真实接入配置。独立角色结果不自动评测或发布，操作见 [AgentDevelopment](../../../AgentDevelopment.md)。
+
+
+## 实现及测试索引
 
 代码位置：[src/domain/agents/AgentRegistry.ts](../../../../src/domain/agents/AgentRegistry.ts)、[src/domain/agents/AgentExecution.ts](../../../../src/domain/agents/AgentExecution.ts)、[src/domain/agents/AgentContracts.ts](../../../../src/domain/agents/AgentContracts.ts)。
-
-## 角色设计索引
-
-每个角色的职责、输入输出、权限、确认记录和验收重点由对应文档维护；本文件只维护角色索引与共同协议。角色目录与 src/domain/agents 保持对应。
-
-| 角色 ID | 独立设计 | 职责 |
-| --- | --- | --- |
-| `orchestrator` | [OrchestratorAgent](orchestratorAgent/OrchestratorAgent.md) | 业务计划 |
-| `doc-worker` | [DocWorkerAgent](docGenAgent/subAgents/docWorkerAgent/DocWorkerAgent.md) | 知识片段提取 |
-| `doc-gen` | [DocGenAgent](docGenAgent/DocGenAgent.md) | 知识正文生成与修订 |
-| `test-gen` | [TestGenAgent](testGenAgent/TestGenAgent.md) | 测试生成 |
-| `code` | [CodeAgent](codeAgent/CodeAgent.md) | 代码生成 |
-| `check` | [CheckAgent](checkAgent/CheckAgent.md) | 只读检查 |
-| `review` | [ReviewAgent](reviewAgent/ReviewAgent.md) | 评测复核与纠正 |
-
-## 角色划分确认
-
-| 编号 | 议题 | 状态 | 记录 |
-| --- | --- | --- | --- |
-| IO-01 | Agent 划分与业务阶段 | 已确认 | 保留原有 Orchestrator、DocWorker、DocGen、TestGen、Code、Check、Review 七种执行身份；当前 main 已将 DocWorker 收入 DocGen 内部，六个外层 Agent 由 LangGraph 调度。知识生成、知识检索、知识飞轮、知识评测、知识关联是多 Agent 协作的五个业务阶段，不分别改为五个独立 Agent。各阶段到角色的具体分工仍待逐项明确。 |
-
-输入输出确认记录随角色维护：[TestGen IO-02](testGenAgent/TestGenAgent.md)、[CodeAgent IO-03～06](codeAgent/CodeAgent.md)。未确认项不能作为修改代码、Schema 或材料权限的依据。
-
-TestGen 的业务输入为源代码，不读取知识卡片。[IO-11～13、IO-21](testGenAgent/TestGenAgent.md) 已实现 C/C++ 测试源码、逐入口清单、参考校验、源码内容身份绑定及跨 Run 复用。首次候选失败的有限修复默认 1 次，可配 0～3 次；配置或环境故障、修复耗尽、固定测试复用失败均转人工。参考源码先行校验仍是用户暂时保留的产品规则，不将其写成最终定案。
-
-[DocWorker IO-07～09](docGenAgent/subAgents/docWorkerAgent/DocWorkerAgent.md) 已确认内部子 Agent 归属、上下文控制目的、任务拆分原则及片段输出内容；DocGen 负责汇总、去重、处理矛盾并组织知识卡片。Worker 机器片段字段与范围校验已实现；具体预算、跨模块依赖和分批汇总机制继续确认。
-
-[DocGen IO-10](docGenAgent/DocGenAgent.md) 的分批汇总与按需补充方案暂定保留，先保持最小知识生成链路可运行，待用户论文调研后再确认；不作为最终设计或已实现能力。
-
-[CheckAgent IO-14～15](checkAgent/CheckAgent.md) 已实现原始源码、生成代码与非空比较规则的输入契约，双方原文片段核验及比较报告交接。Review 同时读取真实比较与评测报告；规则的业务适用性和相似度算法仍待研究，不由当前结构检查替代。
-
-[ReviewAgent IO-16](reviewAgent/ReviewAgent.md) 已实现位置、问题、依据、建议及历史总结的机器契约（存在历史材料时必需），纠正意见绑定本轮证据后交 DocGen 修改；没有意见时返回空列表。STOPPED 的精简交接及幂等保存已实现，语义归因质量仍待真实模型验收。
-
-[Orchestrator IO-17](orchestratorAgent/OrchestratorAgent.md) 已确认输入业务目标、模块概况、项目配置及任务进度，输出本轮模块、承接 Agent 和输入材料的任务计划；执行顺序、内部 Worker 拆分及测试复用由各自既定规则负责。
-
-[DocGen IO-18](docGenAgent/DocGenAgent.md) 已修正为：DocWorker 产出默认由 DocGen 合成一份知识文档；内容过大而建议拆分时先与用户沟通，以用户意见为准。每次飞轮只输入并修订一份文档，不自动批量修改多份文档；DocGen 已通过 userDecisionRequired 提案与 STOPPED 路由交接用户决策，并校验单文档修订范围。版本保留与清理按 IO-19，结束行为按 IO-20；历史最佳与关键回归回滚已有目标要求，具体实现待落实。
-
-[Knowledge IO-19](../knowledge/Knowledge.md) 补充确认过程资料保留与治理范围：运行期间保留，达标后保留最终文档与简短验收记录，需要人工治理时提供精简问题清单并暂存相关证据。达标且最终文档及验收记录保存成功后立即清理中间资料，不设额外保留期，规则尚未实现；达标自动结束并交付、轮次或预算耗尽转人工治理沿用 [Evaluation IO-20](../evaluation/Evaluation.md)，不新增人工确认。
-
-[DocGen IO-22](docGenAgent/DocGenAgent.md) 已确认知识索引分工：DocGen 生成标题、摘要和关键词，框架写入 YAML 头并建立支持渐进式加载的索引，不新增 Agent。DocGen 已输出 keywords 并生成带 YAML 描述的文档，生产版本索引与显式授权的 describe/loadDocument 已接通，细节见角色设计。
-
-[Association IO-23](../association/Association.md) 已明确外部知识关联当前阶段不实现，来源约定仅保留供后续参考，角色分工不再作为当前待确认项。此前建议由 DocGen 判断关联未获确认，不扩展其当前职责；IO-22 的文档描述与渐进加载索引仍在当前范围内。
-
-## DocGen 与 DocWorker 的归属
-
-当前为六个外层 Agent 加 DocGen 内部的 DocWorker，共保留七种执行身份。具体拆分、汇总和复用规则见 [DocGenAgent](docGenAgent/DocGenAgent.md)，Worker 契约见 [DocWorkerAgent](docGenAgent/subAgents/docWorkerAgent/DocWorkerAgent.md)。
-
-## 共同协议
-
-每个 XxxAgent 目录有入口、Contract、Prompt、测试和显式样例；DocWorker 目录嵌套在 DocGen 内。`execute(input, context)` 的 input 使用角色专属 Payload 与已加载材料；context 注入模型 Port、effectivePrompt、轮次与取消信号。入口依次检查取消和材料、构建 Prompt / Schema、调用一次模型、再次检查取消、校验输出、返回 output / payload / artifacts。格式及网络重试由 Adapter 负责，DocGen 在汇总模型调用前先完成内部 Worker 批次；其他角色仍为一次业务调用，TestGen 的业务修复由 Application 单独发起。
-
-每个 Prompt 文件定义职责、基础指令、工具和可读路径。Application 冻结基础指令、promptAddon 及适用治理附加指令；角色再拼入本轮 AgentCommand 与其引用的授权工件正文，DocGen 额外传入内部汇总载荷。Schema 与 Domain 校验约束结构、路径和证据引用，材料裁剪同时落实到 Prompt、CAS 和工具工作区；不能只靠提示词声明权限。当前角色执行版本为 `domain-agents-v8-supervised-routing`，节点命令键使用 `contract-v8`；旧版本不作为当前成功结果恢复。
-
-七角色的契约、生产接线和受控两轮流程已有验收，证据统一见 [修复报告](../../../reports/AgentSpecRepairAndE2E.md)。该结论不包括真实模型质量、Worker 业务分组/预算/依赖、分批汇总、相似度研究、历史最优回退或自动资料清理。
-
-`RoleResult` 中 pending 引用由 Application 保存正文后绑定，Domain 不操作 CAS 路径或信封事务。材料的可见范围由角色 Prompt 定义与载荷引用共同限制，不能把完整工作流上下文交给所有角色。
-
-## 输出与失败
-
-闭合 Schema 拒绝缺失字段、额外字段或角色错配；Code 额外检查路径语义。缺材料在模型前失败；取消在模型前后检查。失败由 Application / Adapter 记录，不能伪造正常业务结果。角色只有授权工具，发布、Registry 和图调度不属于角色能力。
-
-## 开发入口
-
-使用 `npm run agent:run -- --role code --input src/domain/agents/codeAgent/examples/CodeAgentSample.json --output /tmp/code-agent-run`，其他角色替换角色 ID 和样例。Fixture 与 DSH 都经过同一入口和提交链路；默认样例使用可控模型，`--provider dsh` 需要明确接入配置。结果为独立开发 Run，不自动评测或发布。步骤详见 [角色开发](../../../AgentDevelopment.md)。
-
-## 独立检索方向（未实现）
-
-SearchAgent 不属于七角色枚举。目标是 KnowledgeSearchApp 直接调用，只读已发布、当前 VERIFIED 且正文摘要有效的知识，不创建 FlywheelRun、不经 Orchestrator 或 LangGraph。当前 KnowledgeSearchApp 仍是普通查询服务，治理目录允许多状态，不能直接充作该角色的合格材料读取工具。KF-SYS-043 保持 Planned。
-
-文档关系：[设计目录](../../README.md)负责代码与设计定位；[开发指南](../../../Development.md)说明修改和交付步骤。
