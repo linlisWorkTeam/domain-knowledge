@@ -195,3 +195,5 @@ v5 在已有生成结果存在时，冻结同源码快照内当前后代卡片�
 `/api/v1/workbench-publications` 与旧 publications 独立，沿用免登录部署配置。POST 仅接受 reconstructionTaskId、evaluationTaskId、fixedEvaluationTaskId、sourceVerificationTaskId 四个非空任务编号；固定用例从选定任务的冻结输入读取，所有证据仍由完整发布准备门禁验证。GET 支持 projectId/versionId 筛选。GET `/:id` 返回 publication、publicationVerified 和 filesAvailable；只有 COMMITTED 表示已验证，文件可用性单独报告。POST `/:id/resume` 接受空对象，恢复同一发布事务。GET `/:id/artifacts/:sha256` 仅下载该发布文件清单中的已校验 CAS 工件。服务关闭拒绝新发布/恢复，并等待已接受的准备、导出、提交完成后关闭数据库。
 
 一键流程v15在关联完成后，若已冻结固定用例，则用最后一轮重建/可信/固定/来源任务调用独立发布事务。提交成功保存publicationId；导出失败暂停并保留前序阶段，恢复重用同一发布身份。detail返回publication与按冻结版本校验的publicationVerified。未提供固定用例的流程保留未验证状态，不能显示已发布。
+
+POST /api/v1/projects 可选 moduleBuilds，以所选源码moduleId为键、声明式构建参数为值。服务器先合并项目默认值、验证后冻结完整模块参数；未知模块或越界路径拒绝。空覆盖不改变旧项目身份。模块参数进入源码快照身份及按模块工具链缓存键，执行与发布不能回退到其他模块的指纹。

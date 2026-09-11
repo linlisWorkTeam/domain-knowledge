@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：交接固定源码、接口和现有DocGen角色，逐卡提交并保留恢复材料。
  */
+import { moduleBuild } from '../../domain/services/workbench/WorkbenchProject.ts';
 import { sha256, type ArtifactRef } from '../../domain/Domain.ts';
 import { executeAgent } from '../../domain/services/workflow/AgentExecutionService.ts';
 import type { AgentCommand } from '../../domain/agents/AgentContracts.ts';
@@ -74,7 +75,7 @@ export class WorkbenchGeneration {
       context.progress({ phase: 'interfaces', module: module.moduleId });
       const prepared = await context.step(`interface:${sha256(module.moduleId)}`, async () => {
         try {
-          const value = await native.publicInterface({ language: module.language as 'c' | 'cpp', files: allSources, build: project.build, entryPath,
+          const value = await native.publicInterface({ language: module.language as 'c' | 'cpp', files: allSources, build: moduleBuild(project, module.moduleId), entryPath,
             ...(scope.symbols ? { symbols: scope.symbols } : {}), ...(scope.astFilter ? { astFilter: scope.astFilter } : {}) }, context.signal);
           const ref = await artifacts.put(Buffer.from(JSON.stringify(value)), 'application/json');
           return { artifactRefs: [ref], summary: { module: module.moduleId, declarations: value.declarations.length } };
@@ -96,7 +97,7 @@ export class WorkbenchGeneration {
         context.progress({ phase: 'card', cardId: unit.cardId, symbol: unit.symbol, completed: cards.length });
         const completed = await context.step(`card:${unit.cardId}`, async (key) => {
           const unitFact = { schemaVersion: 'knowledge-unit-v1', unit, repositoryId: project.repositoryId, commit: project.commit,
-            sourceFiles, build: project.build, interfaceRef };
+            sourceFiles, build: moduleBuild(project, module.moduleId), interfaceRef };
           const unitRef = await artifacts.put(Buffer.from(JSON.stringify(unitFact)), 'application/json');
           const payload = { moduleId: unit.storageModuleId, sourceRefs: sourceFiles.map((file) => file.ref), publicInterfaceRefs: [interfaceRef], workerFragmentRefs: [unitRef] };
           const command: AgentCommand = { schemaVersion: '1.0', runId: context.task.taskId, agentType: 'doc-gen', commandId: `cmd-${sha256(key)}`, generationKey: key, payload };

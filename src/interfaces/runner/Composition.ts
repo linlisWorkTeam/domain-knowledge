@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：提供Composition的外部入口、参数转换与响应处理。
  */
+import { moduleBuild } from '../../domain/services/workbench/WorkbenchProject.ts';
 import { WorkbenchPublicationEvidence } from '../../application/services/WorkbenchPublicationEvidence.ts';
 import { WorkbenchPublications } from '../../application/services/WorkbenchPublications.ts';
 import { SqliteWorkbenchPublications } from '../../infrastructure/sqlite/SqliteWorkbenchPublications.ts';
@@ -442,9 +443,16 @@ export function createComposition(input: {
   const workbenchPipelines = new WorkbenchPipelines({ publications: workbenchPublications, artifacts, fixedEvaluation: workbenchFixedEvaluation, materials: workbenchMaterials.store, environment: async (snapshotId, signal) => {
     const project = projectStore.get(snapshotId); if (!project) throw new Error('PROJECT_INPUT_NOT_FOUND');
     const fingerprints = [];
-    for (const language of [...new Set(project.modules.map((module) => module.language))].sort()) {
-      if (language !== 'c' && language !== 'cpp') throw new Error('GENERATION_LANGUAGE_UNSUPPORTED');
-      fingerprints.push({ language, digest: (await workbenchReconstruction.dependencies.snapshot(language, project.build, signal)).digest });
+    if (project.moduleBuilds) {
+      for (const module of [...project.modules].sort((a, b) => a.moduleId.localeCompare(b.moduleId))) {
+        if (module.language !== 'c' && module.language !== 'cpp') throw new Error('GENERATION_LANGUAGE_UNSUPPORTED');
+        fingerprints.push({ moduleId: module.moduleId, language: module.language, digest: (await workbenchReconstruction.dependencies.snapshot(module.language, moduleBuild(project, module.moduleId), signal)).digest });
+      }
+    } else {
+      for (const language of [...new Set(project.modules.map((module) => module.language))].sort()) {
+        if (language !== 'c' && language !== 'cpp') throw new Error('GENERATION_LANGUAGE_UNSUPPORTED');
+        fingerprints.push({ language, digest: (await workbenchReconstruction.dependencies.snapshot(language, project.build, signal)).digest });
+      }
     }
     return sha256(JSON.stringify(fingerprints));
   }, store: pipelineStore, stages: workbenchStages, generation: workbenchGeneration, reconstruction: workbenchReconstruction, evaluation: workbenchEvaluation, revision: workbenchKnowledgeRevision, sourceVerification: workbenchSourceVerification, sourceRevision: workbenchSourceRevision, index: knowledgeIndex, associations: workbenchAssociations });

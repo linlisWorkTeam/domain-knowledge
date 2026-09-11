@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：冻结模块与构建输入，先存源码工件再原子提交项目快照。
  */
-import { buildConstraints, createProjectSnapshot, selectProjectModules, type ProjectSource } from '../../domain/services/workbench/WorkbenchProject.ts';
+import { projectModuleBuilds, buildConstraints, createProjectSnapshot, selectProjectModules, type ProjectSource } from '../../domain/services/workbench/WorkbenchProject.ts';
 import type { ArtifactStore } from '../ports/ApplicationPorts.ts';
 import type { RepositorySourceReader } from '../ports/RepositoryAnalysisPorts.ts';
 import type { WorkbenchProjectStore } from '../ports/WorkbenchProjectPorts.ts';
@@ -17,10 +17,11 @@ export class WorkbenchProjects {
     reader: RepositorySourceReader, artifacts: ArtifactStore) {
     this.store = store; this.analysis = analysis; this.reader = reader; this.artifacts = artifacts;
   }
-  async create(request: { directory: string; revision?: string; moduleIds?: string[]; build?: unknown }, signal?: AbortSignal) {
+  async create(request: { directory: string; revision?: string; moduleIds?: string[]; build?: unknown; moduleBuilds?: unknown }, signal?: AbortSignal) {
     const build = buildConstraints(request.build);
     const report = await this.analysis.analyze(request.directory, request.revision, signal);
     const modules = selectProjectModules(report, request.moduleIds);
+    const moduleBuilds = projectModuleBuilds(request.moduleBuilds, modules, build);
     const paths = [...new Set([...modules.flatMap((module) => module.sourcePaths), ...report.files.filter((file) => file.kind === 'build').map((file) => file.path)])].sort();
     const files = await this.reader.readFiles(report.directory, report.commit, paths, signal);
     const sourceFiles: ProjectSource[] = [];
@@ -34,6 +35,6 @@ export class WorkbenchProjects {
     if (files.length !== paths.length) throw new Error('PROJECT_SOURCE_INCOMPLETE');
     signal?.throwIfAborted();
     return this.store.save(createProjectSnapshot({ repositoryId: report.repositoryId, directory: report.directory,
-      commit: report.commit, sourceDigest: report.sourceDigest, manifestRef: report.manifestRef, modules, build, sourceFiles }, new Date().toISOString()));
+      commit: report.commit, sourceDigest: report.sourceDigest, manifestRef: report.manifestRef, modules, build, ...(moduleBuilds ? { moduleBuilds } : {}), sourceFiles }, new Date().toISOString()));
   }
 }

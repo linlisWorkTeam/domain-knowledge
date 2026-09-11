@@ -11,7 +11,7 @@ import { assertTrustedPublicationObservations, type TrustedPublicationReport } f
 import type { StageModelConfiguration } from '../ports/WorkbenchGenerationPorts.ts';
 import type { NativeLanguageToolchain } from '../ports/LanguageToolchainPorts.ts';
 import type { WorkbenchProjectStore } from '../ports/WorkbenchProjectPorts.ts';
-import { buildConstraints } from '../../domain/services/workbench/WorkbenchProject.ts';
+import { buildConstraints, moduleBuild, moduleFingerprintKey } from '../../domain/services/workbench/WorkbenchProject.ts';
 import type { NativeTestStore } from '../ports/NativeEvaluationPorts.ts';
 import type { FixedNativeObservation } from '../../domain/services/evaluation/NativeFixedEvaluation.ts';
 import { assertProjectPublication, type ProjectPublicationManifest } from '../../domain/services/workbench/ProjectPublication.ts';
@@ -39,7 +39,6 @@ export class WorkbenchPublicationEvidence {
     const project = this.dependencies.projects.get(String(reconstruction.input.parameters.snapshotId));
     if (!project || project.projectId !== reconstruction.input.projectId || project.snapshotId !== reconstruction.input.parameters.snapshotId
       || project.commit !== reconstruction.input.sourceRevision || project.sourceDigest !== reconstruction.input.sourceDigest) throw new Error('PUBLICATION_PROJECT_BINDING_CHANGED');
-    const projectBuild = buildConstraints(project.build);
     const bodies: ArtifactRef[] = [];
     const sourceModules: Record<string, string> = {};
     const cards = reconstruction.input.cardVersionIds.map(id => {
@@ -125,7 +124,7 @@ export class WorkbenchPublicationEvidence {
         bodyRef: bodies[reconstruction.input.cardVersionIds.indexOf(card.versionId)]! })).sort((a, b) => a.versionId.localeCompare(b.versionId));
       if (!codeModule || !fingerprints || !Array.isArray(report.cards) || !Array.isArray(report.cardVersionIds)
         || canonicalJson(report.codeRef) !== canonicalJson(codeModule.codeRef)
-        || canonicalJson(report.fingerprintRef) !== canonicalJson(fingerprints[String(codeModule.language)])
+        || canonicalJson(report.fingerprintRef) !== canonicalJson(fingerprints[moduleFingerprintKey(project, String(module.moduleId), String(codeModule.language))])
         || canonicalJson([...report.cardVersionIds].sort()) !== canonicalJson(selectedCards.map(card => card.versionId).sort())
         || canonicalJson([...report.cards].sort((a, b) => a.versionId.localeCompare(b.versionId))) !== canonicalJson(expectedCards)) throw new Error('PUBLICATION_FIXED_IMPLEMENTATION_CHANGED');
       const suite = await load<NativeBehaviorSuite>(suiteRef);
@@ -139,7 +138,7 @@ export class WorkbenchPublicationEvidence {
       const codeModule = (reconstruction.result!.summary.modules as Array<Record<string, unknown>>).find(item => item.moduleId === module.moduleId)!;
       const expected = cards.filter(card => sourceModules[card.versionId] === module.moduleId).map(card => ({ cardId: card.cardId, bodyDigest: card.bodyDigest })).sort((a, b) => a.cardId.localeCompare(b.cardId));
       const bound = set.binding.cardIds.map((cardId, index) => ({ cardId, bodyDigest: set.binding.knowledgeBodyDigests[index] })).sort((a, b) => a.cardId.localeCompare(b.cardId));
-      const fingerprintRef = (fixedEvaluation.input.parameters.fingerprints as Record<string, unknown>)[String(codeModule.language)] as ArtifactRef;
+      const fingerprintRef = (fixedEvaluation.input.parameters.fingerprints as Record<string, unknown>)[moduleFingerprintKey(project, String(module.moduleId), String(codeModule.language))] as ArtifactRef;
       const fingerprint = await load<{ digest: string }>(fingerprintRef);
       if (set.projectSnapshotId !== reconstruction.input.parameters.snapshotId || set.sourceRevision !== reconstruction.input.sourceRevision
         || canonicalJson(bound) !== canonicalJson(expected) || set.binding.toolchainDigest !== fingerprint.digest
@@ -156,8 +155,8 @@ export class WorkbenchPublicationEvidence {
       const sourceFiles = project.sourceFiles.filter(file => file.kind === 'source');
       const fileDigests = (files: Array<{ path: string; ref: ArtifactRef }>) => files.map(file => ({ path: file.path, sha256: file.ref.sha256 })).sort((a, b) => a.path.localeCompare(b.path));
       if (reference.language !== codeModule.language || reference.sanitizers !== true || generated.sanitizers !== true
-        || canonicalJson(buildConstraints(reference.build)) !== canonicalJson(projectBuild)
-        || canonicalJson(buildConstraints(generated.build)) !== canonicalJson(projectBuild)
+        || canonicalJson(buildConstraints(reference.build)) !== canonicalJson(moduleBuild(project, String(module.moduleId)))
+        || canonicalJson(buildConstraints(generated.build)) !== canonicalJson(moduleBuild(project, String(module.moduleId)))
         || !Array.isArray(reference.files) || canonicalJson(fileDigests(reference.files)) !== canonicalJson(fileDigests(sourceFiles))) throw new Error('PUBLICATION_PROJECT_IMPLEMENTATION_CHANGED');
       const contract = nativeContracts.get(String(module.moduleId))!;
       if (set.binding.interfaceDigest !== sha256(canonicalJson(contract)) || set.binding.policyDigest !== policyDigest) throw new Error('PUBLICATION_TEST_POLICY_CHANGED');

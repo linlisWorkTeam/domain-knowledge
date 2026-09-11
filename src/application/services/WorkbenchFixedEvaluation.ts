@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：冻结固定测试并分别评测参考与重建实现，逐案保留恢复证据。
  */
+import { moduleBuild, moduleFingerprintKey } from '../../domain/services/workbench/WorkbenchProject.ts';
 import { sha256, type ArtifactRef } from '../../domain/Domain.ts';
 import { canonicalJson, type JsonValue, type StageInput } from '../../domain/services/workbench/StageTask.ts';
 import { assertNativeBehaviorSuite, nativeFunctions, type NativeBehaviorSuite, type NativeContract } from '../../domain/services/evaluation/NativeBehaviorSuite.ts';
@@ -49,7 +50,7 @@ export class WorkbenchFixedEvaluation {
       contract.targetFunctions = [...nativeFunctions(contract).keys()];
       const suite = suites.find(item => item.moduleId === module.moduleId)!.suite; assertNativeBehaviorSuite(suite, contract);
       Object.defineProperty(suiteRefs, module.moduleId, { value: await artifacts.put(Buffer.from(canonicalJson(suite)), 'application/json'), enumerable: true });
-      if (!fingerprints[module.language]) fingerprints[module.language] = await artifacts.put(Buffer.from(JSON.stringify(await evaluation.dependencies.snapshot(module.language, project.build))), 'application/json');
+      if (!fingerprints[moduleFingerprintKey(project, module.moduleId, module.language)]) fingerprints[moduleFingerprintKey(project, module.moduleId, module.language)] = await artifacts.put(Buffer.from(JSON.stringify(await evaluation.dependencies.snapshot(module.language, moduleBuild(project, module.moduleId)))), 'application/json');
     }
     return { ...parent.input, stage: 'EVALUATE', parameters: { ...parent.input.parameters,
       operation: 'FIXED_NATIVE_EVALUATION', fixedEvaluationContract: FIXED_EVALUATION_CONTRACT, reconstructionTaskId,
@@ -79,9 +80,9 @@ export class WorkbenchFixedEvaluation {
         if (!card || typeof card.metadata.cardId !== 'string' || !card.metadata.cardId || card.metadata.projectSnapshotId !== project.snapshotId || card.metadata.sourceModule !== module.moduleId || card.metadata.language !== module.language || !await artifacts.verify(card.bodyRef)) throw new Error('FIXED_KNOWLEDGE_BINDING_INVALID');
         cards.push({ cardId: card.metadata.cardId, versionId: id, bodyRef: card.bodyRef });
       }
-      const fingerprintRef = (p.fingerprints as unknown as Record<string, ArtifactRef>)[module.language]!;
+      const fingerprintRef = (p.fingerprints as unknown as Record<string, ArtifactRef>)[moduleFingerprintKey(project, module.moduleId, module.language)]!;
       const fingerprint = await this.load<{ digest: string }>(fingerprintRef);
-      if ((await evaluation.dependencies.snapshot(module.language, project.build, context.signal)).digest !== fingerprint.digest) throw new Error('NATIVE_TEST_TOOLCHAIN_CHANGED');
+      if ((await evaluation.dependencies.snapshot(module.language, moduleBuild(project, module.moduleId), context.signal)).digest !== fingerprint.digest) throw new Error('NATIVE_TEST_TOOLCHAIN_CHANGED');
       const completed = await context.step(`fixed-module:${module.moduleId}`, async () => {
         const api = await this.load<Awaited<ReturnType<NativeLanguageToolchain['publicInterface']>>>(module.interfaceRef);
         const contract: NativeContract = { schemaVersion: 'native-contract-v1', language: module.language, includePath: api.sourcePath,
@@ -94,7 +95,7 @@ export class WorkbenchFixedEvaluation {
           files.push({ path: source.path, content: Buffer.from(await artifacts.get(source.ref)).toString('utf8') });
         }
         const referenceInterface = await context.step(`fixed-reference-interface:${module.moduleId}`, async () => {
-          const projected = await native.publicInterface({ language: module.language, build: project.build, files, entryPath: api.sourcePath,
+          const projected = await native.publicInterface({ language: module.language, build: moduleBuild(project, module.moduleId), files, entryPath: api.sourcePath,
             symbols: api.declarations.map(item => item.name), ...(api.astFilter ? { astFilter: api.astFilter } : {}) }, context.signal);
           const ref = await artifacts.put(Buffer.from(JSON.stringify(projected)), 'application/json');
           return { artifactRefs: [ref], summary: { compatible: compareNativeInterfaces(api.declarations, projected.declarations).compatible } };
@@ -114,16 +115,16 @@ export class WorkbenchFixedEvaluation {
           }
           return observations;
         };
-        const reference = await run('reference', { language: module.language, build: project.build, files }, contract);
+        const reference = await run('reference', { language: module.language, build: moduleBuild(project, module.moduleId), files }, contract);
         const referencePassed = fixedNativePassed(suite, reference); let generated: NativeCaseObservation[] = []; let compatible = false;
         if (referencePassed) {
           const code = await this.load<{ files: ToolchainFile[] }>(module.codeRef);
-          const input = { language: module.language, build: project.build, files: code.files };
+          const input = { language: module.language, build: moduleBuild(project, module.moduleId), files: code.files };
           const projected = await native.publicInterface({ ...input, entryPath: api.sourcePath, symbols: api.declarations.map(item => item.name), ...(api.astFilter ? { astFilter: api.astFilter } : {}) }, context.signal);
           compatible = compareNativeInterfaces(api.declarations, projected.declarations).compatible;
           if (compatible) generated = await run('generated', input, { ...contract, entryPaths: code.files.filter(file => file.path !== contract.includePath && /\.(c|cc|cpp|cxx)$/.test(file.path)).map(file => file.path) });
         }
-        if ((await evaluation.dependencies.snapshot(module.language, project.build, context.signal)).digest !== fingerprint.digest) throw new Error('NATIVE_TEST_TOOLCHAIN_CHANGED');
+        if ((await evaluation.dependencies.snapshot(module.language, moduleBuild(project, module.moduleId), context.signal)).digest !== fingerprint.digest) throw new Error('NATIVE_TEST_TOOLCHAIN_CHANGED');
         const status = !referencePassed ? 'REFERENCE_REJECTED' : !compatible ? 'INTERFACE_MISMATCH' : fixedNativePassed(suite, generated) ? 'FIXED_PASSED' : 'FIXED_FAILED';
         const report = { schemaVersion: FIXED_EVALUATION_CONTRACT, moduleId: module.moduleId, reconstructionTaskId: parent.taskId,
           snapshotId: project.snapshotId, sourceDigest: project.sourceDigest, manifestRef: project.manifestRef, cards, cardVersionIds: module.cardVersionIds,

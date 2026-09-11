@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：从固定卡片与公开接口启动隔离重建，保存代码和接口比较证据。
  */
+import { moduleBuild, moduleFingerprintKey } from '../../domain/services/workbench/WorkbenchProject.ts';
 import type { AgentCommand, AgentResult } from '../../domain/agents/AgentContracts.ts';
 import { sha256, type ArtifactRef, type KnowledgeVersion } from '../../domain/Domain.ts';
 import { canonicalJson, type JsonValue } from '../../domain/services/workbench/StageTask.ts';
@@ -78,9 +79,12 @@ export class WorkbenchReconstruction {
       retry = { contract: 'native-reconstruction-retry-v1', evaluationTaskId: previous.taskId, inputDigest: previous.inputDigest, resultDigest: sha256(canonicalJson(previous.result!)) };
     }
     const fingerprints: Record<string, ArtifactRef> = {};
-    for (const language of new Set(versions.map((version) => String(version.metadata.language)))) {
+    for (const module of project.modules.filter(module => versions.some(version => version.metadata.sourceModule === module.moduleId))) {
+      const language = module.language;
       if (language !== 'c' && language !== 'cpp') throw new Error('RECONSTRUCTION_LANGUAGE_UNSUPPORTED');
-      fingerprints[language] = await artifacts.put(Buffer.from(JSON.stringify(await snapshot(language, project.build, options.signal))), 'application/json');
+      const key = moduleFingerprintKey(project, module.moduleId, language);
+      if (fingerprints[key]) continue;
+      fingerprints[key] = await artifacts.put(Buffer.from(JSON.stringify(await snapshot(language, moduleBuild(project, module.moduleId), options.signal))), 'application/json');
     }
     return { projectId: project.projectId, stage: 'FLYWHEEL', sourceRevision: project.commit, sourceDigest: project.sourceDigest,
       cardVersionIds: [...versionIds].sort(), configurationDigest: configurationRef.sha256,
@@ -111,8 +115,8 @@ export class WorkbenchReconstruction {
     const results: JsonValue[] = []; const artifactRefs: ArtifactRef[] = [];
     for (const module of project.modules.filter((module) => versions.some((version) => version.metadata.sourceModule === module.moduleId))) {
       const language = module.language as 'c' | 'cpp';
-      const fingerprint = JSON.parse(await this.load(fingerprints[language]!)) as { digest: string };
-      if ((await snapshot(language, project.build, context.signal)).digest !== fingerprint.digest) throw new Error('NATIVE_TEST_TOOLCHAIN_CHANGED');
+      const fingerprint = JSON.parse(await this.load(fingerprints[moduleFingerprintKey(project, module.moduleId, language)]!)) as { digest: string };
+      if ((await snapshot(language, moduleBuild(project, module.moduleId), context.signal)).digest !== fingerprint.digest) throw new Error('NATIVE_TEST_TOOLCHAIN_CHANGED');
       const cards = versions.filter((version) => version.metadata.sourceModule === module.moduleId);
       const interfaceRefs = [...new Map(cards.map((card) => { const ref = card.metadata.interfaceRef as ArtifactRef; return [ref.artifactId, ref] as const; })).values()];
       if (interfaceRefs.length !== 1) throw new Error('RECONSTRUCTION_INTERFACE_CONFLICT');
@@ -144,7 +148,7 @@ export class WorkbenchReconstruction {
       const knowledge = [];
       for (const card of cards) knowledge.push({ cardId: card.metadata.cardId, versionId: card.versionId, body: await this.load(card.bodyRef) });
       const knowledgeRef = await artifacts.put(Buffer.from(JSON.stringify(knowledge)), 'application/json');
-      const buildContract = { schemaVersion: 'native-build-v1', language, build: project.build, includePath: api.sourcePath,
+      const buildContract = { schemaVersion: 'native-build-v1', language, build: moduleBuild(project, module.moduleId), includePath: api.sourcePath,
         allowedGeneratedPaths: module.sourcePaths, scope: api.astFilter, behaviorVerified: false, previousGeneratedAttempt };
       const buildContractRef = await artifacts.put(Buffer.from(JSON.stringify(buildContract)), 'application/json');
       const payload = { knowledgeRef, publicInterfaceRefs: interfaceRefs, languageId: language, buildContractRef, allowedGeneratedPaths: module.sourcePaths };
@@ -182,7 +186,7 @@ export class WorkbenchReconstruction {
       if (!Array.isArray(files) || files.reduce((sum, file) => sum + Buffer.byteLength(file.content), 0) > 2_097_152) throw new Error('RECONSTRUCTION_OUTPUT_TOO_LARGE');
       const checked = await context.step(`generated-interface:${module.moduleId}${revision ? `:repair:${revision}` : ''}`, async () => {
         try {
-          const projected = await native.publicInterface({ language, files, build: project.build, entryPath: api.sourcePath,
+          const projected = await native.publicInterface({ language, files, build: moduleBuild(project, module.moduleId), entryPath: api.sourcePath,
             ...(api.astFilter ? { astFilter: api.astFilter } : {}), symbols: [...new Set(api.declarations.map((item) => item.name))] }, context.signal);
           const comparison = compareNativeInterfaces(api.declarations, projected.declarations);
           const ref = await artifacts.put(Buffer.from(JSON.stringify({ ...comparison, generatedInterface: projected })), 'application/json');
@@ -201,7 +205,7 @@ export class WorkbenchReconstruction {
           throw error;
         }
       });
-      if ((await snapshot(language, project.build, context.signal)).digest !== fingerprint.digest) throw new Error('NATIVE_TEST_TOOLCHAIN_CHANGED');
+      if ((await snapshot(language, moduleBuild(project, module.moduleId), context.signal)).digest !== fingerprint.digest) throw new Error('NATIVE_TEST_TOOLCHAIN_CHANGED');
       const compared = await context.step(`source-comparison:${module.moduleId}${revision ? `:repair:${revision}` : ''}`, async () => {
         const reference: ToolchainFile[] = [];
         const referenceRefs: ArtifactRef[] = [];

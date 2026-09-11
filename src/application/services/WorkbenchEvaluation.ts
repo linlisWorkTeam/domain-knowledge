@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：将固定重建结果交给原生参考验证与可信评测，不授予发布资格。
  */
+import { moduleBuild, moduleFingerprintKey } from '../../domain/services/workbench/WorkbenchProject.ts';
 import { sha256, type ArtifactRef } from '../../domain/Domain.ts';
 import { canonicalJson, type JsonValue } from '../../domain/services/workbench/StageTask.ts';
 import { nativeFunctions, assertNativeContract, type NativeContract, type NativeBehaviorSuite } from '../../domain/services/evaluation/NativeBehaviorSuite.ts';
@@ -105,8 +106,8 @@ export class WorkbenchEvaluation {
       contract.targetFunctions = [...nativeFunctions(contract).keys()];
       assertNativeContract(contract);
       const fingerprintRefs = context.task.input.parameters.fingerprints as unknown as Record<string, ArtifactRef>;
-      const fingerprint = await this.load<{ digest: string }>(fingerprintRefs[module.language]!);
-      if ((await evaluation.dependencies.snapshot(module.language, project.build, context.signal)).digest !== fingerprint.digest) throw new Error('NATIVE_TEST_TOOLCHAIN_CHANGED');
+      const fingerprint = await this.load<{ digest: string }>(fingerprintRefs[moduleFingerprintKey(project, module.moduleId, module.language)]!);
+      if ((await evaluation.dependencies.snapshot(module.language, moduleBuild(project, module.moduleId), context.signal)).digest !== fingerprint.digest) throw new Error('NATIVE_TEST_TOOLCHAIN_CHANGED');
       const completed = stages.store.checkpoints(context.task.taskId).find((item) => item.key === `module-report:${module.moduleId}`);
       if (completed) { reports.push(completed.result.summary); artifactRefs.push(...completed.result.artifactRefs);
         if (completed.result.summary.status === 'BEHAVIOR_FAILED') break;
@@ -117,7 +118,7 @@ export class WorkbenchEvaluation {
         if (!await artifacts.verify(source.ref)) throw new Error('STAGE_ARTIFACT_CORRUPT');
         referenceFiles.push({ path: source.path, content: Buffer.from(await artifacts.get(source.ref)).toString('utf8') });
       }
-      const reference = { language: module.language, build: project.build, files: referenceFiles };
+      const reference = { language: module.language, build: moduleBuild(project, module.moduleId), files: referenceFiles };
       const baseline = await context.step(`reference-baseline:${module.moduleId}`, async () => {
         const path = module.language === 'c' ? '__workbench_baseline.c' : '__workbench_baseline.cpp';
         if (referenceFiles.some((item) => item.path === path)) throw new Error('EVALUATION_RESERVED_PATH');
@@ -194,7 +195,7 @@ export class WorkbenchEvaluation {
       }
       const generated = await this.load<{ files: ToolchainFile[] }>(module.codeRef);
       context.progress({ phase: 'generated-evaluation', module: module.moduleId, testSetId: prepared.set.testSetId });
-      const result = await evaluation.evaluate(prepared.set.testSetId, { language: module.language, build: project.build, files: generated.files }, contract, context);
+      const result = await evaluation.evaluate(prepared.set.testSetId, { language: module.language, build: moduleBuild(project, module.moduleId), files: generated.files }, contract, context);
       artifactRefs.push(result.reportRef, result.report.generatedRef);
       const moduleReport = { moduleId: module.moduleId, testSetId: prepared.set.testSetId, status: result.report.allPassed ? 'BEHAVIOR_PASSED' : 'BEHAVIOR_FAILED',
         interfaceCompatible: module.interfaceComparison.compatible, proposed: prepared.proposed, reused: prepared.reused, revalidated: prepared.revalidated,

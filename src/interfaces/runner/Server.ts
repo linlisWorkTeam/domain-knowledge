@@ -492,12 +492,12 @@ export function createKnowledgeServer(input: {
           send(response, 200, snapshot); return;
         }
         if (request.method === 'POST' && url.pathname === '/api/v1/projects') {
-          const payload = await body(request); requireOnlyKeys(payload, ['directory', 'revision', 'moduleIds', 'build']);
+          const payload = await body(request); requireOnlyKeys(payload, ['directory', 'revision', 'moduleIds', 'build', 'moduleBuilds']);
           if (typeof payload.directory !== 'string' || (payload.revision !== undefined && typeof payload.revision !== 'string')
             || (payload.moduleIds !== undefined && (!Array.isArray(payload.moduleIds) || payload.moduleIds.some((value) => typeof value !== 'string')))) throw new Error('PAYLOAD_INVALID');
           const controller = new AbortController(); const abort = () => { if (!response.writableEnded) controller.abort(); };
           response.once('close', abort);
-          try { send(response, 200, await composition.apps.workbenchProjects.create({ directory: payload.directory, revision: payload.revision as string | undefined, moduleIds: payload.moduleIds as string[] | undefined, build: payload.build }, controller.signal)); }
+          try { send(response, 200, await composition.apps.workbenchProjects.create({ directory: payload.directory, revision: payload.revision as string | undefined, moduleIds: payload.moduleIds as string[] | undefined, build: payload.build, moduleBuilds: payload.moduleBuilds }, controller.signal)); }
           finally { response.off('close', abort); }
           return;
         }

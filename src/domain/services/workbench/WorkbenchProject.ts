@@ -16,7 +16,7 @@ export interface ProjectSource { path: string; objectId: string; kind: 'source' 
 export interface WorkbenchProjectSnapshot {
   schemaVersion: 'workbench-project-v1'; projectId: string; snapshotId: string;
   repositoryId: string; directory: string; commit: string; sourceDigest: string;
-  modules: RepositoryModule[]; build: BuildConstraints; sourceFiles: ProjectSource[];
+  modules: RepositoryModule[]; build: BuildConstraints; moduleBuilds?: Record<string, BuildConstraints>; sourceFiles: ProjectSource[];
   manifestRef: ArtifactRef; createdAt: string;
 }
 export function buildConstraints(input: unknown = {}): BuildConstraints {
@@ -44,7 +44,27 @@ export function selectProjectModules(report: RepositoryAnalysis, moduleIds?: str
   return modules as RepositoryModule[];
 }
 export function createProjectSnapshot(input: Omit<WorkbenchProjectSnapshot, 'schemaVersion' | 'projectId' | 'snapshotId' | 'createdAt'>, now: string): WorkbenchProjectSnapshot {
+  if (input.moduleBuilds && canonicalJson(projectModuleBuilds(input.moduleBuilds, input.modules, buildConstraints(input.build))) !== canonicalJson(input.moduleBuilds)) throw new Error('PROJECT_MODULE_BUILD_INVALID');
   const identity = { schemaVersion: 'workbench-project-v1' as const, ...input };
   return { ...identity, projectId: `project-${sha256(input.repositoryId).slice(0, 32)}`,
     snapshotId: `project-input-${sha256(canonicalJson(identity))}`, createdAt: now };
+}
+
+export function projectModuleBuilds(input: unknown, modules: RepositoryModule[], defaults: BuildConstraints): Record<string, BuildConstraints> | undefined {
+  if (input === undefined) return undefined;
+  if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('PROJECT_MODULE_BUILD_INVALID');
+  const entries = Object.entries(input);
+  if (entries.length > modules.length) throw new Error('PROJECT_MODULE_BUILD_INVALID');
+  const result: Record<string, BuildConstraints> = {};
+  for (const [id, value] of entries.sort(([a], [b]) => a.localeCompare(b))) {
+    if (!modules.some(module => module.moduleId === id) || !value || typeof value !== 'object' || Array.isArray(value)) throw new Error('PROJECT_MODULE_BUILD_INVALID');
+    Object.defineProperty(result, id, { value: buildConstraints({ ...defaults, ...value }), enumerable: true });
+  }
+  return entries.length ? result : undefined;
+}
+export function moduleBuild(project: Pick<WorkbenchProjectSnapshot, 'build' | 'moduleBuilds'>, moduleId: string): BuildConstraints {
+  return buildConstraints(project.moduleBuilds && Object.hasOwn(project.moduleBuilds, moduleId) ? project.moduleBuilds[moduleId] : project.build);
+}
+export function moduleFingerprintKey(project: Pick<WorkbenchProjectSnapshot, 'moduleBuilds'>, moduleId: string, language: string): string {
+  return project.moduleBuilds && Object.keys(project.moduleBuilds).length ? `module-${sha256(moduleId)}` : language;
 }
