@@ -49,7 +49,7 @@ export function validateOutput(output: Output, input: Input): void {
   const paths = output.files.map((file) => file.path);
   if (new Set(paths).size !== paths.length || paths.some((path) => !input.payload.allowedTestPaths.includes(path))) throw new Error('TESTGEN_OUTPUT_PATH_INVALID');
   const ids = output.cases.map((item) => item.caseId);
-  if (new Set(ids).size !== ids.length || output.cases.some((item) => !paths.includes(item.testPath)
+  if (new Set(ids).size !== ids.length || output.cases.some((item) => !/\.(c|cc|cpp|cxx)$/.test(item.testPath) || !paths.includes(item.testPath)
     || item.sourceEvidence.some((path) => ![...input.sourcePaths, ...input.publicInterfacePaths].includes(path)))
-    || paths.some((path) => !output.cases.some((item) => item.testPath === path))) throw new Error('TESTGEN_CASE_MANIFEST_INVALID');
+    || paths.some((path) => /\.(c|cc|cpp|cxx)$/.test(path) && !output.cases.some((item) => item.testPath === path))) throw new Error('TESTGEN_CASE_MANIFEST_INVALID');
 }
