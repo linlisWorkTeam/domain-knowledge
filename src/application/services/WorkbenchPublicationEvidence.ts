@@ -6,7 +6,10 @@
 import { assertFixedPublicationObservations } from '../../domain/services/evaluation/NativeFixedEvaluation.ts';
 import type { NativeBehaviorSuite } from '../../domain/services/evaluation/NativeBehaviorSuite.ts';
 import { canonicalJson } from '../../domain/services/workbench/StageTask.ts';
-import type { ArtifactRef } from '../../domain/Domain.ts';
+import { sha256, type ArtifactRef } from '../../domain/Domain.ts';
+import { assertTrustedPublicationObservations, type TrustedPublicationReport } from '../../domain/services/evaluation/NativeTrustedPublication.ts';
+import type { NativeTestStore } from '../ports/NativeEvaluationPorts.ts';
+import type { FixedNativeObservation } from '../../domain/services/evaluation/NativeFixedEvaluation.ts';
 import type { ArtifactStore, FlywheelRepository } from '../ports/ApplicationPorts.ts';
 import type { StageTask } from '../../domain/services/workbench/StageTask.ts';
 import type { PipelineFixedSuite } from '../../domain/services/workbench/WorkbenchPipeline.ts';
@@ -15,11 +18,13 @@ export interface PublicationTaskIds { reconstruction: string; evaluation: string
 export class WorkbenchPublicationEvidence {
   readonly dependencies: {
     stages: { get(id: string): StageTask };
+    tests: Pick<NativeTestStore, 'get'>;
     repository: Pick<FlywheelRepository, 'getKnowledgeVersion'>;
     artifacts: Pick<ArtifactStore, 'get' | 'put' | 'verify'>;
   };
   constructor(dependencies: WorkbenchPublicationEvidence['dependencies']) { this.dependencies = dependencies; }
   async prepare(ids: PublicationTaskIds, fixedSuites: PipelineFixedSuite[]) {
+    fixedSuites = structuredClone(fixedSuites);
     const { stages, repository, artifacts } = this.dependencies;
     const reconstruction = stages.get(ids.reconstruction); const evaluation = stages.get(ids.evaluation);
     const fixedEvaluation = stages.get(ids.fixedEvaluation); const sourceVerification = stages.get(ids.sourceVerification);
@@ -32,6 +37,11 @@ export class WorkbenchPublicationEvidence {
       return { cardId: card.metadata.cardId, versionId: id, moduleId: card.metadata.sourceModule, bodyDigest: card.bodyRef.sha256 };
     });
     const evidence = publicationEvidence({ reconstruction, evaluation, fixedEvaluation, sourceVerification, cards, fixedSuites });
+    const trustedSets = (evaluation.result!.summary.modules as Array<Record<string, unknown>>).map(module => {
+      const set = this.dependencies.tests.get(String(module.testSetId));
+      if (!set || set.testSetId !== module.testSetId) throw new Error('PUBLICATION_TRUSTED_SET_MISSING');
+      return structuredClone(set);
+    });
     const queue: ArtifactRef[] = []; const seen = new Set<string>(); let bytes = 0;
     const collect = (value: unknown, depth = 0): void => {
       if (depth > 64) throw new Error('PUBLICATION_ARTIFACT_GRAPH_LIMIT');
@@ -53,7 +63,7 @@ export class WorkbenchPublicationEvidence {
       for (const child of Object.values(item)) collect(child, depth + 1);
     };
     collect([reconstruction.input, reconstruction.result, evaluation.input, evaluation.result,
-      fixedEvaluation.input, fixedEvaluation.result, sourceVerification.input, sourceVerification.result, bodies, fixedSuites]);
+      fixedEvaluation.input, fixedEvaluation.result, sourceVerification.input, sourceVerification.result, bodies, fixedSuites, trustedSets]);
     for (let index = 0; index < queue.length; index++) {
       const ref = queue[index]!;
       bytes += ref.size;
@@ -88,7 +98,30 @@ export class WorkbenchPublicationEvidence {
         || canonicalJson([...report.cards].sort((a, b) => a.versionId.localeCompare(b.versionId))) !== canonicalJson(expectedCards)) throw new Error('PUBLICATION_FIXED_IMPLEMENTATION_CHANGED');
       assertFixedPublicationObservations(await load<NativeBehaviorSuite>(suiteRef), report, Number(module.total));
     }
-    const prepared = { schemaVersion: 'workbench-publication-preparation-v1', state: 'PREPARED', evidence,
+    for (const module of evaluation.result!.summary.modules as Array<Record<string, unknown>>) {
+      const set = trustedSets.find(item => item.testSetId === module.testSetId)!;
+      const reportRef = module.reportRef as ArtifactRef;
+      if (!evaluation.result!.artifactRefs.some(ref => ref.sha256 === reportRef?.sha256)) throw new Error('PUBLICATION_TRUSTED_REPORT_UNBOUND');
+      const codeModule = (reconstruction.result!.summary.modules as Array<Record<string, unknown>>).find(item => item.moduleId === module.moduleId)!;
+      const expected = cards.filter(card => card.moduleId === module.moduleId).map(card => ({ cardId: card.cardId, bodyDigest: card.bodyDigest })).sort((a, b) => a.cardId.localeCompare(b.cardId));
+      const bound = set.binding.cardIds.map((cardId, index) => ({ cardId, bodyDigest: set.binding.knowledgeBodyDigests[index] })).sort((a, b) => a.cardId.localeCompare(b.cardId));
+      const fingerprintRef = (fixedEvaluation.input.parameters.fingerprints as Record<string, unknown>)[String(codeModule.language)] as ArtifactRef;
+      const fingerprint = await load<{ digest: string }>(fingerprintRef);
+      if (set.projectSnapshotId !== reconstruction.input.parameters.snapshotId || set.sourceRevision !== reconstruction.input.sourceRevision
+        || canonicalJson(bound) !== canonicalJson(expected) || set.binding.toolchainDigest !== fingerprint.digest
+        || canonicalJson(set.fingerprintRef) !== canonicalJson(fingerprintRef)) throw new Error('PUBLICATION_TRUSTED_BINDING_CHANGED');
+      const report = await load<TrustedPublicationReport & { generatedRef: ArtifactRef; generatedDigest: string }>(reportRef);
+      if (report.total !== module.total || report.passed !== module.passed) throw new Error('PUBLICATION_TRUSTED_REPORT_BINDING_CHANGED');
+      const reference = await load<unknown>(set.referenceRef);
+      const generated = await load<{ language: string; files: Array<{ path: string; ref: ArtifactRef }> }>(report.generatedRef);
+      const code = await load<{ files: Array<{ path: string; content: string }> }>(codeModule.codeRef as ArtifactRef);
+      if (sha256(JSON.stringify(reference)) !== set.binding.referenceDigest || sha256(JSON.stringify(generated)) !== report.generatedDigest
+        || generated.language !== codeModule.language || !Array.isArray(generated.files) || !Array.isArray(code.files)
+        || canonicalJson(generated.files.map(file => ({ path: file.path, sha256: file.ref.sha256 })).sort((a, b) => a.path.localeCompare(b.path)))
+          !== canonicalJson(code.files.map(file => ({ path: file.path, sha256: sha256(Buffer.from(file.content)) })).sort((a, b) => a.path.localeCompare(b.path)))) throw new Error('PUBLICATION_TRUSTED_IMPLEMENTATION_CHANGED');
+      assertTrustedPublicationObservations(set, await load<NativeBehaviorSuite>(set.suiteRef), await load<FixedNativeObservation[]>(set.oracleRef), report);
+    }
+    const prepared = { schemaVersion: 'workbench-publication-preparation-v2', state: 'PREPARED', evidence, trustedSets,
       verifiedArtifactRefs: queue.sort((a, b) => a.sha256.localeCompare(b.sha256)), publicationVerified: false };
     const artifactRef = await artifacts.put(Buffer.from(JSON.stringify(prepared)), 'application/json');
     return { ...prepared, artifactRef };

@@ -16,7 +16,7 @@ export function publicationFixture(): PublicationEvidence {
   const evaluation = done({ ...base, stage: 'EVALUATE', parameters: params }, { reconstructionTaskId: reconstruction.taskId, requestedModules: 1, completedModules: 1,
     modules: [{ moduleId: 'module', status: 'BEHAVIOR_PASSED', interfaceCompatible: true, passed: 2, total: 2 }] });
   const suiteRef = publicationRef('fixed');
-  const fixedEvaluation = done({ ...base, stage: 'EVALUATE', parameters: { ...params, operation: 'FIXED_NATIVE_EVALUATION', fixedEvaluationContract: 'fixed-native-evaluation-v1', suiteRefs: { module: suiteRef }, fingerprints: { c: publicationRef('{"toolchain":"test"}') } } },
+  const fixedEvaluation = done({ ...base, stage: 'EVALUATE', parameters: { ...params, operation: 'FIXED_NATIVE_EVALUATION', fixedEvaluationContract: 'fixed-native-evaluation-v1', suiteRefs: { module: suiteRef }, fingerprints: { c: publicationRef(JSON.stringify({ digest: sha256('toolchain') })) } } },
     { reconstructionTaskId: reconstruction.taskId, publicationVerified: false, modules: [{ moduleId: 'module', status: 'FIXED_PASSED', interfaceCompatible: true, referencePassed: true, passed: 2, total: 2 }] });
   const cards = [{ cardId: 'card', versionId: 'version', moduleId: 'module', bodyDigest: sha256('body') }];
   const sourceVerification = done({ ...base, stage: 'EVALUATE', parameters: { snapshotId: 'snapshot', operation: 'KNOWLEDGE_SOURCE_VERIFICATION', verificationContract: SOURCE_VERIFICATION_CONTRACT,
