@@ -27,7 +27,7 @@ CodeAgent 当前只接收包含接口的知识卡片和裁剪后的 C/C++ 编写
 
 ## 运行自己的角色
 
-使用 Node 24+；新工作树先 bootstrap 至 READY。以下示例无需启动上游角色：
+使用 Node 24+；执行以下依赖运行时的示例前按 AGENTS 核对 bootstrap READY，纯文档编辑不需要。以下示例无需启动上游角色：
 
 ```bash
 npm run agent:run -- --role code --input src/domain/agents/codeAgent/examples/CodeAgentSample.json --output /tmp/code-development

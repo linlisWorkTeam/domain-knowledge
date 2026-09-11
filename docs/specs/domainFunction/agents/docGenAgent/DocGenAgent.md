@@ -76,7 +76,7 @@ Worker 的提交键绑定 Run、内部任务身份、源码输入和冻结提示
 
 对应 S2-03：按 IO-18 验证 Worker 产出默认合成一份文档、建议拆分时先征求用户意见、每次飞轮只修订输入的单份文档；继续细化内容结构、标识与路径、来源、旧版与纠正输入、质量反馈及定向修订规则。[Review IO-16](../reviewAgent/ReviewAgent.md) 已确认由 Review 提供修订位置、问题说明、依据和建议，DocGen 执行知识文档修改；DocGen 已按既有 Correction 的 knowledgePath/criterion/risk/evidenceRefs 消费定位、建议、问题与依据；Review 自身的 IO-16 输出升级仍由其角色负责。正文长度检查只证明结构下限，不证明业务质量。
 
-固定源码样例为 [DocGenFixedSourceSample.json](../../../../../src/domain/agents/docGenAgent/examples/DocGenFixedSourceSample.json)，包含原始源码、公开接口和追加指令；[样例检查器](../../../../../src/domain/agents/docGenAgent/examples/DocGenReference.ts) 与 [样例测试](../../../../../src/domain/agents/docGenAgent/DocGenExample.test.ts) 由本角色目录维护。统一 agent:run 负责执行和提交，固定参考测试不作为生产角色阶段；操作方法见 [AgentDevelopment](../../../../AgentDevelopment.md)。
+固定源码样例为 [DocGenFixedSourceSample.json](../../../../../src/domain/agents/docGenAgent/examples/DocGenFixedSourceSample.json)，包含原始源码、公开接口和追加指令；[样例检查器](../../../../../src/domain/agents/docGenAgent/examples/DocGenReference.ts) 与 [样例测试](../../../../../tests/acceptance/DocGenExample.test.ts) 分别归属于角色样例和显式 acceptance 范围。统一 agent:run 负责执行和提交，固定参考测试不作为生产角色阶段；操作方法见 [AgentDevelopment](../../../../AgentDevelopment.md)。
 
 开发步骤与证据统一记录在 [Status](../../../../Status.md)，独立运行方法见 [AgentDevelopment](../../../../AgentDevelopment.md)。
 
