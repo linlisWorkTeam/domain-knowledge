@@ -7,12 +7,14 @@ import { sha256 } from '../../src/domain/Domain.ts';
 import type { PublicationEvidence } from '../../src/domain/services/workbench/WorkbenchPublication.ts';
 import { createStageTask, canonicalJson, type StageTask, type StageInput, type StageResult } from '../../src/domain/services/workbench/StageTask.ts';
 import { SOURCE_VERIFICATION_CONTRACT } from '../../src/domain/services/knowledge/KnowledgeSourceVerification.ts';
+export const publicationConfiguration = { agents: [{ agentId: 'test-gen', effectivePromptSha256: sha256('prompt') }], roleExecutionVersion: 'fixture', contracts: {}, provider: {} };
+export const publicationApi = { sourcePath: 'module.c', declarations: [{ kind: 'FunctionDecl', name: 'value', type: 'int (void)', parameters: [] }] };
 export const publicationBody = '# Card\n\n## Value\nbody';
 export const publicationRef = (text: string) => ({ artifactId: `sha256:${sha256(text)}`, sha256: sha256(text), size: text.length, mediaType: 'application/json' });
 export function publicationFixture(): PublicationEvidence {
-  const base: StageInput = { projectId: 'project', stage: 'FLYWHEEL', sourceRevision: 'commit', sourceDigest: sha256('source'), configurationDigest: sha256('configuration'), cardVersionIds: ['version'], parameters: { snapshotId: 'snapshot' } };
+  const base: StageInput = { projectId: 'project', stage: 'FLYWHEEL', sourceRevision: 'commit', sourceDigest: sha256('source'), configurationDigest: sha256(canonicalJson(publicationConfiguration)), cardVersionIds: ['version'], parameters: { snapshotId: 'snapshot', configurationRef: publicationRef(canonicalJson(publicationConfiguration)) } };
   const done = (input: StageInput, summary: StageResult['summary']): StageTask => ({ ...createStageTask(input, {}, 'now'), status: 'SUCCEEDED', result: { artifactRefs: [], summary } });
-  const reconstruction = done(base, { modules: [{ moduleId: 'module', language: 'c', codeRef: publicationRef('{"files":[]}'), cardVersionIds: ['version'], interfaceComparison: { compatible: true } }] });
+  const reconstruction = done(base, { modules: [{ moduleId: 'module', language: 'c', interfaceRef: publicationRef(JSON.stringify(publicationApi)), codeRef: publicationRef('{"files":[]}'), cardVersionIds: ['version'], interfaceComparison: { compatible: true } }] });
   const params = { snapshotId: 'snapshot', reconstructionTaskId: reconstruction.taskId, reconstructionDigest: sha256(canonicalJson(reconstruction.result)) };
   const evaluation = done({ ...base, stage: 'EVALUATE', parameters: params }, { reconstructionTaskId: reconstruction.taskId, requestedModules: 1, completedModules: 1,
     modules: [{ moduleId: 'module', status: 'BEHAVIOR_PASSED', interfaceCompatible: true, passed: 2, total: 2 }] });

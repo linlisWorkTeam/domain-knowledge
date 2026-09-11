@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { sha256, type ArtifactRef, type KnowledgeVersion } from '../../src/domain/Domain.ts';
 import { WorkbenchPublicationEvidence } from '../../src/application/services/WorkbenchPublicationEvidence.ts';
 import { JsonSchemaAgentContractValidator } from '../../src/infrastructure/agentAdapters/contracts/JsonSchemaAgentContractValidator.ts';
-import { publicationFixture, publicationBody } from '../helpers/WorkbenchPublicationFixture.ts';
+import { publicationFixture, publicationBody, publicationConfiguration, publicationApi } from '../helpers/WorkbenchPublicationFixture.ts';
 import { buildConstraints, type WorkbenchProjectSnapshot } from '../../src/domain/services/workbench/WorkbenchProject.ts';
 import { sourceSectionObservations } from '../../src/domain/services/knowledge/KnowledgeSourceVerification.ts';
 import type { NativeBehaviorSuite } from '../../src/domain/services/evaluation/NativeBehaviorSuite.ts';
@@ -21,6 +21,8 @@ async function setup() {
     return { artifactId: `sha256:${digest}`, sha256: digest, size: buffer.length, mediaType };
   };
   await put(Buffer.from('{"files":[]}'), 'application/json');
+  await put(Buffer.from(canonicalJson(publicationConfiguration)), 'application/json');
+  await put(Buffer.from(JSON.stringify(publicationApi)), 'application/json');
   const fingerprintRef = await put(Buffer.from(JSON.stringify({ digest: sha256('toolchain') })), 'application/json');
   const manifestRef = await put(Buffer.from(JSON.stringify({ sourceDigest: input.reconstruction.input.sourceDigest })), 'application/json');
   const project = { schemaVersion: 'workbench-project-v1', projectId: 'project', snapshotId: 'snapshot', repositoryId: 'repository', directory: '/reference',
@@ -31,7 +33,7 @@ async function setup() {
   project.sourceFiles = [{ path: 'module.c', objectId: 'object', kind: 'source', ref: sourceRef }];
   const bodyRef = await put(Buffer.from(publicationBody), 'text/markdown');
   const nestedRef = await put(Buffer.from('audit'), 'text/plain');
-  const suite = { schemaVersion: 'native-cases-v1', cases: ['a', 'b'].map(caseId => ({ caseId, description: 'value', sections: ['card#value'], variables: [], calls: [],
+  const suite = { schemaVersion: 'native-cases-v1', cases: ['a', 'b'].map(caseId => ({ caseId, description: 'value', sections: ['card#value'], variables: [], calls: [{ function: 'value', arguments: [], result: 'value' }],
     observations: [{ name: 'value', kind: 'integer', read: { variable: 'value' } }], expected: { value: '1' } })) };
   const suiteRef = await put(Buffer.from(JSON.stringify(suite)), 'application/json');
   input.fixedSuites[0]!.suiteRef = suiteRef; input.fixedEvaluation.input.parameters.suiteRefs = { module: { ...suiteRef } };
@@ -49,7 +51,8 @@ async function setup() {
   const referenceRef = await put(Buffer.from(JSON.stringify({ language: 'c', build: project.build, files: [{ path: 'module.c', ref: sourceRef }], sanitizers: true })), 'application/json');
   const oracleRef = await put(Buffer.from(JSON.stringify(observations)), 'application/json');
   const binding = { cardIds: ['card'], knowledgeBodyDigests: [bodyRef.sha256], referenceDigest: referenceRef.sha256,
-    interfaceDigest: sha256('interface'), policyDigest: sha256('policy'), toolchainDigest: sha256('toolchain') };
+    interfaceDigest: sha256(canonicalJson({ schemaVersion: 'native-contract-v1', language: 'c', includePath: 'module.c', entryPaths: [], declarations: publicationApi.declarations, targetFunctions: ['value'] })),
+    policyDigest: sha256(canonicalJson({ schemaVersion: 'native-test-policy-v1', prompt: publicationConfiguration.agents[0]!.effectivePromptSha256, roleExecutionVersion: publicationConfiguration.roleExecutionVersion, contracts: publicationConfiguration.contracts, provider: publicationConfiguration.provider })), toolchainDigest: sha256('toolchain') };
   const keys = nativeTestKeys(binding);
   const set: NativeTestSet = { ...keys, binding, testSetId: `native-tests-${sha256(`${keys.cacheKey}:${suiteRef.sha256}:${oracleRef.sha256}`)}`,
     parentTestSetId: null, originVersionIds: ['version'], projectSnapshotId: 'snapshot', sourceRevision: 'commit', status: 'TRUSTED',
@@ -93,7 +96,7 @@ async function setup() {
 test('preparation checks recursive CAS graph, binds body and is content-idempotent', async () => {
   const f = await setup(); const prepared = await f.service.prepare(f.ids, f.input.fixedSuites);
   assert.equal(prepared.state, 'PREPARED'); assert.equal(prepared.publicationVerified, false);
-  assert.equal(prepared.verifiedArtifactRefs.length, 18);
+  assert.equal(prepared.verifiedArtifactRefs.length, 20);
   assert.equal((await f.service.prepare(f.ids, f.input.fixedSuites)).artifactRef.sha256, prepared.artifactRef.sha256);
 });
 test('corrupt nested artifact and changed persistent body reject before writing preparation', async () => {
@@ -181,5 +184,31 @@ test('source observation projection must match the trusted oracle, even with a v
   f.input.sourceVerification.result!.artifactRefs.push(ref);
   const before = f.puts();
   await assert.rejects(f.service.prepare(f.ids, f.input.fixedSuites), /PUBLICATION_SOURCE_OBSERVATIONS_CHANGED/);
+  assert.equal(f.puts(), before);
+});
+
+test('trusted interface and policy digests must match frozen interface and model configuration', async () => {
+  for (const field of ['interfaceDigest', 'policyDigest'] as const) {
+    const f = await setup(); f.set.binding[field] = sha256('changed');
+    await assert.rejects(f.service.prepare(f.ids, f.input.fixedSuites), /PUBLICATION_TEST_POLICY_CHANGED/);
+    assert.equal(f.puts(), 0);
+  }
+});
+
+test('fixed cases must exercise the declared API rather than contain only expected values', async () => {
+  const f = await setup();
+  const suite = JSON.parse(f.contents.get(f.input.fixedSuites[0]!.suiteRef.sha256)!.toString('utf8'));
+  for (const sample of suite.cases) sample.calls = [];
+  const suiteRef = await f.put(Buffer.from(JSON.stringify(suite)), 'application/json');
+  f.input.fixedSuites[0]!.suiteRef = suiteRef;
+  f.input.fixedEvaluation.input.parameters.suiteRefs = { module: { ...suiteRef } };
+  const identity = createStageTask(f.input.fixedEvaluation.input, {}, 'now');
+  f.input.fixedEvaluation.taskId = identity.taskId; f.input.fixedEvaluation.inputDigest = identity.inputDigest; f.ids.fixedEvaluation = identity.taskId;
+  f.report.suiteRef = suiteRef;
+  const reportRef = await f.put(Buffer.from(JSON.stringify(f.report)), 'application/json');
+  f.input.fixedEvaluation.result!.artifactRefs = [reportRef];
+  (f.input.fixedEvaluation.result!.summary.modules as Array<Record<string, unknown>>)[0]!.reportRef = reportRef;
+  const before = f.puts();
+  await assert.rejects(f.service.prepare(f.ids, f.input.fixedSuites), /NATIVE_BEHAVIOR_SUITE_INVALID/);
   assert.equal(f.puts(), before);
 });
