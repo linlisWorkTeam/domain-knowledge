@@ -202,3 +202,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 [2026-09-11-0746-fixed-pipeline.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/f07e4aa74a6d352f9a6ad7a42ec6190acc344924/docs/epitaph/2026-09-11-0746-fixed-pipeline.md) pipeline-v13接通每轮固定suite，旧快照复用验证通过；来源180秒持续推理超时，后续600秒策略已越过旧失败章节，仍未完成发布。
 
 [2026-09-11-0754-source-review-policy.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/c29fab2e56910ed885b94c5474acf68d8b1d4b30/docs/epitaph/2026-09-11-0754-source-review-policy.md) 冻结来源600秒策略，旧输入保持180秒与原审计。真实新任务已启动并越过旧失败章节，仍运行，未发布。
+
+[2026-09-11-0758-publication-evidence.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/c5da7fa0769207304cf69bacf55a0cbb53b3d32b/docs/epitaph/2026-09-11-0758-publication-evidence.md) Domain联合证据规则已实现；随后Application递归验证工件及固定原始观察，尚未提交最终发布事务。来源新策略任务仍在运行。

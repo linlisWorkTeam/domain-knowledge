@@ -15,6 +15,8 @@ async function setup() {
     puts++; const buffer = Buffer.from(data); const digest = sha256(buffer); contents.set(digest, buffer);
     return { artifactId: `sha256:${digest}`, sha256: digest, size: buffer.length, mediaType };
   };
+  await put(Buffer.from('{"files":[]}'), 'application/json');
+  const fingerprintRef = await put(Buffer.from('{"toolchain":"test"}'), 'application/json');
   const bodyRef = await put(Buffer.from('body'), 'text/markdown');
   const nestedRef = await put(Buffer.from('audit'), 'text/plain');
   const suite = { schemaVersion: 'native-cases-v1', cases: ['a', 'b'].map(caseId => ({ caseId, description: 'value', sections: ['card#value'], variables: [], calls: [],
@@ -26,7 +28,9 @@ async function setup() {
   const observations = suite.cases.map(test => ({ caseId: test.caseId, status: 'PASSED', actual: { value: '1' },
     report: { build: { exitCode: 0, timedOut: false, outputLimitExceeded: false }, execution: { exitCode: 0, timedOut: false, outputLimitExceeded: false } } }));
   const report = { schemaVersion: 'fixed-native-evaluation-v1', status: 'FIXED_PASSED', moduleId: 'module', reconstructionTaskId: input.reconstruction.taskId,
-    snapshotId: 'snapshot', sourceDigest: input.reconstruction.input.sourceDigest, suiteRef, reference: observations, generated: structuredClone(observations), nestedRef };
+    snapshotId: 'snapshot', sourceDigest: input.reconstruction.input.sourceDigest, suiteRef, fingerprintRef,
+    codeRef: (input.reconstruction.result!.summary.modules as Array<Record<string, unknown>>)[0]!.codeRef,
+    cardVersionIds: ['version'], cards: [{ cardId: 'card', versionId: 'version', bodyRef }], reference: observations, generated: structuredClone(observations), nestedRef };
   const reportRef = await put(Buffer.from(JSON.stringify(report)), 'application/json');
   input.fixedEvaluation.result!.artifactRefs = [reportRef];
   (input.fixedEvaluation.result!.summary.modules as Array<Record<string, unknown>>)[0]!.reportRef = reportRef;
@@ -44,7 +48,7 @@ async function setup() {
 test('preparation checks recursive CAS graph, binds body and is content-idempotent', async () => {
   const f = await setup(); const prepared = await f.service.prepare(f.ids, f.input.fixedSuites);
   assert.equal(prepared.state, 'PREPARED'); assert.equal(prepared.publicationVerified, false);
-  assert.equal(prepared.verifiedArtifactRefs.length, 4);
+  assert.equal(prepared.verifiedArtifactRefs.length, 6);
   assert.equal((await f.service.prepare(f.ids, f.input.fixedSuites)).artifactRef.sha256, prepared.artifactRef.sha256);
 });
 test('corrupt nested artifact and changed persistent body reject before writing preparation', async () => {
@@ -62,4 +66,17 @@ test('a correctly hashed report cannot hide wrong generated observations behind 
   const before = f.puts();
   await assert.rejects(f.service.prepare(f.ids, f.input.fixedSuites), /PUBLICATION_FIXED_OBSERVATIONS_REJECTED/);
   assert.equal(f.puts(), before);
+});
+
+test('report code, card and toolchain bindings cannot be replaced while preserving task identity', async () => {
+  for (const field of ['codeRef', 'fingerprintRef', 'cards', 'cardVersionIds'] as const) {
+    const f = await setup();
+    if (field === 'cards') f.report.cards[0]!.cardId = 'other';
+    else if (field === 'cardVersionIds') f.report.cardVersionIds = ['other'];
+    else f.report[field] = f.nestedRef;
+    const ref = await f.put(Buffer.from(JSON.stringify(f.report)), 'application/json');
+    f.input.fixedEvaluation.result!.artifactRefs = [ref];
+    (f.input.fixedEvaluation.result!.summary.modules as Array<Record<string, unknown>>)[0]!.reportRef = ref;
+    await assert.rejects(f.service.prepare(f.ids, f.input.fixedSuites), /PUBLICATION_FIXED_IMPLEMENTATION_CHANGED/);
+  }
 });

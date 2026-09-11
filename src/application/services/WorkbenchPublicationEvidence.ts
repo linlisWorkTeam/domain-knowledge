@@ -70,11 +70,22 @@ export class WorkbenchPublicationEvidence {
       if (!fixedEvaluation.result!.artifactRefs.some(ref => ref.sha256 === reportRef?.sha256)) throw new Error('PUBLICATION_FIXED_REPORT_UNBOUND');
       const report = await load<Parameters<typeof assertFixedPublicationObservations>[1] & {
         moduleId: string; reconstructionTaskId: string; snapshotId: string; sourceDigest: string; suiteRef: ArtifactRef;
+        codeRef: ArtifactRef; fingerprintRef: ArtifactRef; cardVersionIds: string[]; cards: Array<{ cardId: string; versionId: string; bodyRef: ArtifactRef }>;
       }>(reportRef);
       const suiteRef = fixedSuites.find(item => item.moduleId === module.moduleId)!.suiteRef;
       if (report.moduleId !== module.moduleId || report.reconstructionTaskId !== reconstruction.taskId
         || report.snapshotId !== reconstruction.input.parameters.snapshotId || report.sourceDigest !== reconstruction.input.sourceDigest
         || canonicalJson(report.suiteRef) !== canonicalJson(suiteRef)) throw new Error('PUBLICATION_FIXED_REPORT_BINDING_CHANGED');
+      const codeModule = (reconstruction.result!.summary.modules as Array<Record<string, unknown>>).find(item => item.moduleId === module.moduleId);
+      const fingerprints = fixedEvaluation.input.parameters.fingerprints as Record<string, unknown>;
+      const selectedCards = cards.filter(card => card.moduleId === module.moduleId);
+      const expectedCards = selectedCards.map(card => ({ cardId: card.cardId, versionId: card.versionId,
+        bodyRef: bodies[reconstruction.input.cardVersionIds.indexOf(card.versionId)]! })).sort((a, b) => a.versionId.localeCompare(b.versionId));
+      if (!codeModule || !fingerprints || !Array.isArray(report.cards) || !Array.isArray(report.cardVersionIds)
+        || canonicalJson(report.codeRef) !== canonicalJson(codeModule.codeRef)
+        || canonicalJson(report.fingerprintRef) !== canonicalJson(fingerprints[String(codeModule.language)])
+        || canonicalJson([...report.cardVersionIds].sort()) !== canonicalJson(selectedCards.map(card => card.versionId).sort())
+        || canonicalJson([...report.cards].sort((a, b) => a.versionId.localeCompare(b.versionId))) !== canonicalJson(expectedCards)) throw new Error('PUBLICATION_FIXED_IMPLEMENTATION_CHANGED');
       assertFixedPublicationObservations(await load<NativeBehaviorSuite>(suiteRef), report, Number(module.total));
     }
     const prepared = { schemaVersion: 'workbench-publication-preparation-v1', state: 'PREPARED', evidence,
