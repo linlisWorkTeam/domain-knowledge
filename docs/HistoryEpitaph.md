@@ -204,3 +204,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 [2026-09-11-0754-source-review-policy.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/c29fab2e56910ed885b94c5474acf68d8b1d4b30/docs/epitaph/2026-09-11-0754-source-review-policy.md) 冻结来源600秒策略，旧输入保持180秒与原审计。真实新任务已启动并越过旧失败章节，仍运行，未发布。
 
 [2026-09-11-0758-publication-evidence.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/c5da7fa0769207304cf69bacf55a0cbb53b3d32b/docs/epitaph/2026-09-11-0758-publication-evidence.md) Domain联合证据规则已实现；随后Application递归验证工件及固定原始观察，尚未提交最终发布事务。来源新策略任务仍在运行。
+
+[2026-09-11-0800-publication-preparation.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/142d83331034b881d284484e14f6dc2f76e1f4e2/docs/epitaph/2026-09-11-0800-publication-preparation.md) 发布准备递归验证CAS，后续增加固定观察与代码/正文/工具链绑定；可信及来源语义和最终发布事务仍未接完。

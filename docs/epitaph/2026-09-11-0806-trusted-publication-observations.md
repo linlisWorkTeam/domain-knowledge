@@ -1,0 +1,13 @@
+# 可信报告发布复核
+
+/tmp/domain-knowledge-workbench，feat/five-stage-workbench，基线142d83331034b881d284484e14f6dc2f76e1f4e2。原脏区/旧网站不变，未删知识，目标active；Node24/384MiB重任务串行。
+
+新增Domain NativeTrustedPublication.assertTrustedPublicationObservations：TRUSTED状态，nativeTestKeys和testSetId派生一致；冻结suite完整无重复，oracle和生成case原始实际值及编译/执行状态均通过；报告内input和expected逐案与suite相同。1单元测试含8类拒绝变体，8架构、类型/Spec通过。
+
+实际只读 /tmp/VerifyTrustedPublicationReports.ts 用Composition读取旧真实可信集与CAS，不调用模型/编译：C31例、CPP37例均通过，内存改执行退出码副本均拒绝。证据publication-trusted-observations/ActualReports.json。原数据库与CAS证据未修改，脚本已退出0。
+
+此Domain规则尚未接入WorkbenchPublicationEvidence.prepare。下一步增加NativeTestStore get端口，加载并验证set/suite/oracle与report，核验card/body/source/toolchain绑定后调用规则；递归CAS扫描须把测试集引用纳入。生成manifest需与Code逐文件摘要对应。随后核验来源全部H2及原始Review授权与项目manifest，再做独立SQLite审计/可恢复Markdown发布事务并接Composition/API/UI。PREPARED仍非VERIFIED。
+
+真实source-policy-v1任务stage-3ac5a7c55407b750e1205020b04657f09b5e4d4590903f6e5592bf3ab3967b48，PID2411792/session82991本轮已确认活跃，最新RUNNING，13章节/1卡片。driver /tmp/RunWholeSourcePolicyV1.ts，日志 /tmp/RealWholeSourcePolicyV1.log，完整证据source-policy-v1/WholeSource.json。旧9次调用时的慢章节已完成并进入第10次，不因等待重启。审计用量见SourceProgress.json。
+
+完整未完成范围仍为来源修订后重建/可信固定来源复测、双目标新版一键真实链路、最终发布、Make/CMake模块参数、TS完整分析/历史版本选择、全回归与网站部署。
