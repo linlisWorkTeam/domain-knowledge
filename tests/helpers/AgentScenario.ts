@@ -13,7 +13,7 @@ import { createDomainKnowledgeInfrastructure } from '../../src/infrastructure/la
 import { NODE_BY_AGENT } from '../../src/domain/workflow/AgentDefinitions.ts';
 import type { WorkflowStageInput } from '../../src/application/ports/ApplicationPorts.ts';
 
-export async function agentScenario(options: { qualityFailure?: boolean; testFailure?: boolean; proposal?: boolean } = {}) {
+export async function agentScenario(options: { qualityFailure?: boolean; testFailure?: boolean; proposal?: boolean; afterRouter?: (input: WorkflowStageInput) => void } = {}) {
   const c = createTestComposition(), f = cppScenario();
   const calls: {role:string;iteration:number;prompt:string}[] = [];
   const routes: WorkflowStageInput[] = [];
@@ -33,10 +33,10 @@ export async function agentScenario(options: { qualityFailure?: boolean; testFai
         default:throw new Error('UNEXPECTED_ROLE');
       }
     }}) });
-  const infrastructure = await createDomainKnowledgeInfrastructure({executor:{async execute(input){const result=await stages.execute(input);if(input.nodeId==='workflow_router') routes.push({ ...input, context: { ...input.context, ...result.context } });return result;}},observer:c.workflowObserver,
+  const infrastructure = await createDomainKnowledgeInfrastructure({executor:{async execute(input){const result=await stages.execute(input);if(input.nodeId==='workflow_router') routes.push({ ...input, context: { ...input.context, ...result.context } });if(input.nodeId==='workflow_router') options.afterRouter?.(input);return result;}},observer:c.workflowObserver,
     prompts:c.runConfiguration,checkpoint:{kind:'memory'}});
   const workflow=new AutomatedProjectWorkflowService(c.service,infrastructure.engine,c.runConfiguration);
-  return {c,f,stages,workflow,calls,routes,
+  return {c,f,stages,workflow,calls,routes,engine:infrastructure.engine,
     async start(maxIterations:number){
       const handle=await workflow.start(f.scenario,{policyId:'boundary',minimumStability:1,requireAllTests:true,maxIterations,workerCount:0});
       return {handle,result:await workflow.wait(handle.runId)};

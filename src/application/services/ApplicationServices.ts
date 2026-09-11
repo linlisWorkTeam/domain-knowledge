@@ -187,9 +187,8 @@ export class KnowledgeFlywheelService {
       assertArtifactRef(ref);
       assertInvariant(await this.artifacts.verify(ref), `evaluation evidence failed integrity verification: ${ref.artifactId}`);
     }
-    if (run.state === 'REVIEWING') {
-      const existing = this.repository.getEvaluationAndDecision(run.runId, version.versionId);
-      assertInvariant(existing !== null, 'reviewing run is missing its evaluation decision');
+    const existing = this.repository.getEvaluationAndDecision(run.runId, version.versionId);
+    if (existing) {
       const sameRefs = (left: ArtifactRef[], right: ArtifactRef[]) =>
         left.map((ref) => ref.artifactId).join('\0') === right.map((ref) => ref.artifactId).join('\0');
       assertInvariant(

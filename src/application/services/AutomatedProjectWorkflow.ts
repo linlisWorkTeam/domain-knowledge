@@ -475,24 +475,41 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
   }
 
   private async route(input: WorkflowStageInput): Promise<WorkflowStageResult> {
+    // 固定判定先于迁移，避免 Registry 已推进而 Graph 仍重放旧输入时重新作决定。
+    const requestRef = await this.flywheel.putArtifact(Buffer.from(JSON.stringify({
+      iteration: input.iteration, maxIterations: input.maxIterations, gatePolicy: input.context.gatePolicy,
+      quality: input.context[contextKey('qualityReport', input.iteration)],
+      candidateVersion: input.context[contextKey('candidateVersionId', input.iteration)],
+      docGenDecisionRequired: input.context.docGenDecisionRequired, testValidationRequired: input.context.testValidationRequired,
+    })), 'application/json');
+    const refs = Object.entries(input.context).filter(([key]) => !key.startsWith('gateDecision:'))
+      .flatMap(([,value]) => this.artifactRefsIn(value));
+    const checkpoint = await this.flywheel.executeNode({runId: input.runId, nodeId: 'workflow_router',
+      generationKey: `${input.runId}:workflow_router:${input.iteration}:route-v2`,
+      inputRefs: this.uniqueRefs([requestRef, ...refs]) }, async () => {
+        const result = await this.decideRoute(input);
+        return [await this.flywheel.putArtifact(Buffer.from(JSON.stringify(result)), 'application/json')];
+      });
+    const result = await this.readJson<WorkflowStageResult>(checkpoint.outputRefs[0]!);
+    const run = this.flywheel.getRun(input.runId);
+    if (!run) throw new Error(`WORKFLOW_RUN_NOT_FOUND: ${input.runId}`);
+    if (run.iteration === input.iteration && ['GENERATING', 'REVIEWING'].includes(run.state)) {
+      if (result.route === 'ITERATE') this.flywheel.transition(input.runId, 'ITERATING');
+      else if (result.route === 'STOPPED') this.flywheel.transition(input.runId, 'LOW_CONFIDENCE');
+    }
+    if (result.route === 'STOPPED') await this.recordGovernance(input,
+      result.context?.[contextKey('gateDecision', input.iteration)] as GateDecision | undefined);
+    return result;
+  }
+
+  private async decideRoute(input: WorkflowStageInput): Promise<WorkflowStageResult> {
     if (input.context.docGenDecisionRequired || input.context.testValidationRequired) {
-      const run = this.flywheel.getRun(input.runId);
-      if (run?.state === 'GENERATING') this.flywheel.transition(input.runId, 'LOW_CONFIDENCE');
-      await this.recordGovernance(input);
       return { route: 'STOPPED', detail: input.context.testValidationRequired ? '测试参考校验未通过，等待人工处理' : 'DocGen 等待用户决定文档范围',
         context: { docGenDecisionRequired: input.context.docGenDecisionRequired, testValidationRequired: input.context.testValidationRequired } };
     }
     const quality = input.context[contextKey('qualityReport', input.iteration)] as QualityReport | undefined;
     if (quality?.outcome === 'REJECTED') {
-      const run = this.flywheel.getRun(input.runId);
-      if (!run) throw new Error(`WORKFLOW_RUN_NOT_FOUND: ${input.runId}`);
-      const exhausted = !canContinueIteration(run.iteration, input.maxIterations);
-      if (exhausted && run.state === 'GENERATING') {
-        this.flywheel.transition(input.runId, 'LOW_CONFIDENCE');
-      } else if (!exhausted && run.state === 'GENERATING') {
-        this.flywheel.transition(input.runId, 'ITERATING');
-      }
-      if (exhausted) await this.recordGovernance(input);
+      const exhausted = !canContinueIteration(input.iteration, input.maxIterations);
       return {
         detail: `knowledge quality ${quality.score}; ${exhausted ? 'stopped' : 'iterate'}: ${quality.weakPoints.join('; ')}`,
         route: exhausted ? 'STOPPED' : 'ITERATE',
@@ -505,13 +522,6 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
     const evaluation = await this.readJson<ProjectEvaluation>(evaluationRef);
     const decision = existing ?? await this.recordGateDecision(input, evaluation);
     const route = routeFor(decision.outcome);
-    if (route === 'STOPPED') await this.recordGovernance(input, decision);
-    const run = this.flywheel.getRun(input.runId);
-    if (route === 'ITERATE' && run?.state === 'REVIEWING') {
-      this.flywheel.transition(input.runId, 'ITERATING');
-    } else if (route === 'STOPPED' && run?.state === 'REVIEWING') {
-      this.flywheel.transition(input.runId, 'LOW_CONFIDENCE');
-    }
     return {
       detail: `workflow route ${route}`,
       route,
