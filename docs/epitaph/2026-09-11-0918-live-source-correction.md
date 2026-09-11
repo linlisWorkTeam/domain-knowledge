@@ -1,9 +1,0 @@
-# 完整Console通过，真实来源修订启动
-
-实际/tmp/domain-knowledge-workbench，feat/five-stage-workbench，Node24/384MiB；原树/旧站保持，新版未部署，目标active。
-
-上一轮修复4b48c14已保留原浏览器断言验证。当前Console.spec.ts正常比较23/23通过，/tmp/ConsoleRegressionFixed.log，session69772结束0。剩余DirectEditing/ProductConsole/RunExecutionConsole/WorkbenchPublication四文件9/9通过，/tmp/ConsoleRemainingCurrent.log，session86213结束0。合计32/32通过；此前首次32项运行143退出及两个失败仍单独保存，不覆盖。截图新历史区域人工审阅，原差异容限未变，基线已提交283a89397ffdb747d9b33d066ee0d5ac942603ad。480自动化全通过状态不变。证据real-knowledge-revision/console-full-first保存初次失败及修复logs；名称是历史目录，不代表最终结果失败。
-
-已启动真实来源修订/tmp/RunSourceCorrectionAfterPolicy.ts，NodePID2512480、execsession14840，日志/tmp/SourceCorrectionAfterPolicy.log。任务stage-08294ed8fd24c91739942eb07e10a368adb172e70fac9d545965324a8b61952c，输出real-knowledge-revision/source-correction-after-policy-v1/SourceCorrection.json。输入source stage-3ac5a7c55407b750e1205020b04657f09b5e4d4590903f6e5592bf3ab3967b48。start已成功RUNNING，不能重复启动或因观测超时重开；下一轮poll14840及PID，保存最终完整证据。只处理Domain授权明确MISMATCH，未解决风险保持。该driver可传taskId同版本resume。未启动其他模型任务，重资源继续串行。
-
-当前仍需双目标真实来源修订后新Code/可信固定/source/关联/发布，一键与分步完整真实编号、最终报告截图和当前网站部署。真实修订结束后检查result.versionIds/indexed/outcome；未知风险不可PASS，不能拿当前受控32浏览器当真实知识发布。执行边界与旧任务累计预算保持。
