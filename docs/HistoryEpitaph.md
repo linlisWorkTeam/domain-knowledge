@@ -228,3 +228,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 [2026-09-11-0824-publication-project-identity.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/462eb061ba3bc103f2da2ee48626c28c2691146c/docs/epitaph/2026-09-11-0824-publication-project-identity.md) 项目身份/manifest门禁和真实报告校验通过，后续已实现独立事务、HTTP/Console及一键发布。真实全卡来源与发布验收仍未完成。
 
 [2026-09-11-0829-publication-transaction.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/e00c4509842485bd5f0190094cc11f2e6e42e24a/docs/epitaph/2026-09-11-0829-publication-transaction.md) 可恢复SQLite/文件发布事务落地，后续HTTP/Console和v15一键发布已接。该旧记录源码任务状态矛盾已经0838记录更正；原attempt1终止，attempt2仍运行。真实验收未完成。
+
+[2026-09-11-0838-publication-http-panel.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/d442a10a0140bddf8af6e58e68592cd89e851ff6/docs/epitaph/2026-09-11-0838-publication-http-panel.md) 发布HTTP/独立面板接通，生命周期/受限匿名下载测试通过。后续v15最终发布与模块构建配置/历史选择已接。原source attempt1非JSON失败，同task恢复attempt2；无真实最终发布。
