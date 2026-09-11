@@ -198,3 +198,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 [2026-09-11-0727-provider-stream-diagnostics.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/9ae594d71337840c625dcee63324e57afdca3253/docs/epitaph/2026-09-11-0727-provider-stream-diagnostics.md) 增加无正文流式诊断，受控取消保留计数；来源v3后续误放行已知矛盾而取消。v4保留历史意见，真实180秒持续推理无最终正文后超时，下一版冻结600秒来源期限。尚未发布。
 
 [2026-09-11-0735-source-finding-history.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/fb3f28b8d2949af64da2303abef9b2bd477992d5/docs/epitaph/2026-09-11-0735-source-finding-history.md) 来源v4冻结同正文历史明确矛盾，修订重新验证原始意见；新600秒策略真实运行仍保留这些矛盾。未完成最终发布。
+
+[2026-09-11-0746-fixed-pipeline.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/f07e4aa74a6d352f9a6ad7a42ec6190acc344924/docs/epitaph/2026-09-11-0746-fixed-pipeline.md) pipeline-v13接通每轮固定suite，旧快照复用验证通过；来源180秒持续推理超时，后续600秒策略已越过旧失败章节，仍未完成发布。
