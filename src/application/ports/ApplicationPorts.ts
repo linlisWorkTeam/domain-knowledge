@@ -1,3 +1,4 @@
+import type { Output as TestSuite } from '../../domain/agents/testGenAgent/TestGenAgentContract.ts';
 /**
  * Copyright (c) 2026 linlisWorkTeam
  * SPDX-License-Identifier: MIT
@@ -637,6 +638,7 @@ export interface ProjectEvaluation {
   stability: number;
   /** 提供infrastructureFailure信息，供调用方读取或传入。 */
   infrastructureFailure: boolean;
+  configurationFailure?: string;
   /** 提供工具链指纹信息，供调用方读取或传入。 */
   toolchainFingerprint: string;
   /** 提供generated文件Digests信息，供调用方读取或传入。 */
@@ -662,6 +664,7 @@ export interface ProjectEvaluator {
     snapshot: ProjectSnapshot;
     generatedFiles: GeneratedProjectFile[];
     replaceSourcePaths?: string[];
+    testSuite?: TestSuite;
     prepareCommands: ProjectCommand[];
     commands: ProjectCommand[];
   }, signal?: AbortSignal): Promise<ProjectEvaluation>;

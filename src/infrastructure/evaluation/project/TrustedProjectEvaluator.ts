@@ -4,6 +4,7 @@
  * 文件功能：提供Trusted项目Evaluator的基础设施实现与外部系统接入。
  */
 import { createHash } from 'node:crypto';
+import { nativeTestBindings } from '../../../domain/agents/testGenAgent/TestExecutionPlan.ts';
 import { spawn, spawnSync } from 'node:child_process';
 import {
   existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync,
@@ -373,14 +374,7 @@ export class TrustedProjectEvaluator implements ProjectEvaluator {
   }
 
   /** 评估请求。 */
-  async evaluate(input: {
-    label: string;
-    snapshot: ProjectSnapshot;
-    generatedFiles: GeneratedProjectFile[];
-    replaceSourcePaths?: string[];
-    prepareCommands: ProjectCommand[];
-    commands: ProjectCommand[];
-  }, signal?: AbortSignal): Promise<ProjectEvaluation> {
+  async evaluate(input: Parameters<ProjectEvaluator['evaluate']>[0], signal?: AbortSignal): Promise<ProjectEvaluation> {
     if (input.commands.length === 0) throw new Error('PROJECT_GATE_EMPTY');
     if (this.retainedWorkspaceRoot) mkdirSync(this.retainedWorkspaceRoot, { recursive: true });
     const tempRoot = mkdtempSync(join(this.retainedWorkspaceRoot ?? tmpdir(), 'wp-project-eval-'));
@@ -389,6 +383,19 @@ export class TrustedProjectEvaluator implements ProjectEvaluator {
     const archivePath = join(tempRoot, 'snapshot.tar');
     const generatedFileDigests: Record<string, string> = {};
     try {
+      if (input.testSuite) {
+        try { nativeTestBindings(input.commands, input.testSuite); }
+        catch (error) {
+          const evidence = { label: input.label, commit: input.snapshot.commit, passed: false,
+            testsPassed: 0, testsTotal: input.testSuite.cases.length, stability: 0, infrastructureFailure: true,
+            configurationFailure: String(error), toolchainFingerprint: 'configuration-not-executed',
+            generatedFileDigests: Object.fromEntries(input.generatedFiles.map(file => [file.path, digest(file.content)])), results: [],
+            sourceManifestRef: input.snapshot.manifestRef };
+          if (this.retainedWorkspaceRoot) writeFileSync(join(tempRoot, 'evidence.json'), JSON.stringify(evidence, null, 2));
+          const evidenceRef = await this.artifacts.put(Buffer.from(JSON.stringify(evidence, null, 2)), 'application/json');
+          return { ...evidence, evidenceRef };
+        }
+      }
       mkdirSync(workspace, { recursive: true });
       syncText('git', ['-C', input.snapshot.repositoryRoot, 'archive', '--format=tar', `--output=${archivePath}`, input.snapshot.commit], tempRoot);
       syncText('tar', ['-xf', archivePath, '-C', workspace], tempRoot);

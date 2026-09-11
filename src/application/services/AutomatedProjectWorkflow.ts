@@ -6,7 +6,6 @@
 import type { Output as PlanOutput } from '../../domain/agents/orchestratorAgent/OrchestratorAgentContract.ts';
 import type { Output as TestOutput } from '../../domain/agents/testGenAgent/TestGenAgentContract.ts';
 import { canStartIteration, canContinueIteration } from '../../domain/workflow/IterationBudget.ts';
-import { testExecutionPlan } from '../../domain/agents/testGenAgent/TestExecutionPlan.ts';
 import { sourceIdentity, testValidationAction } from '../../domain/agents/testGenAgent/TestSuitePolicy.ts';
 import { validateProjectAgentConfiguration } from '../../domain/agents/ProjectAgentConfiguration.ts';
 import { renderKnowledgeDocument } from '../../domain/knowledge/KnowledgeDocument.ts';
@@ -369,7 +368,7 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
       const checked = await this.flywheel.executeNode({ runId: input.runId, nodeId: 'oracle_validation',
         generationKey: `${input.runId}:oracle_validation:${input.iteration}:${repairs}:${sha256(JSON.stringify(output))}:${fixedSuiteRef?.sha256 ?? 'candidate'}:tests-v1`, inputRefs: [fixedSuiteRef ?? candidateRef, snapshot.manifestRef] }, async () => {
         const evaluation = await this.evaluator.evaluate({ label: `test-reference-${input.iteration}-${repairs}`, snapshot,
-          generatedFiles: output.files, prepareCommands: scenario.prepareCommands, commands: [...scenario.referenceCommands, ...testExecutionPlan(scenario.agentConfiguration!, scenario.sourcePaths, output)] }, input.signal);
+          generatedFiles: output.files, prepareCommands: scenario.prepareCommands, commands: scenario.referenceCommands, testSuite: output }, input.signal);
         return [evaluation.evidenceRef];
       });
       const evidenceRef = checked.outputRefs[0]!;
@@ -433,7 +432,7 @@ export class ProjectWorkflowStages implements WorkflowStageExecutor {
         snapshot,
         generatedFiles: [...code.files, ...suite.output.files],
         prepareCommands: scenario.prepareCommands,
-        commands: [...scenario.finalCommands, ...testExecutionPlan(scenario.agentConfiguration!, scenario.sourcePaths, suite.output)],
+        commands: scenario.finalCommands, testSuite: suite.output,
         replaceSourcePaths: scenario.sourcePaths.filter((path) => !scenario.publicInterfacePaths.includes(path)),
       }, input.signal);
       return [evaluation.evidenceRef];
