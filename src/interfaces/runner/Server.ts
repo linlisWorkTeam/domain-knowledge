@@ -48,6 +48,8 @@ const assets = new Map([
   ['/KnowledgeMarkdown.js', 'KnowledgeMarkdown.js'],
   ['/KnowledgeIndex.js', 'KnowledgeIndex.js'],
   ['/RepositoryAnalysis.js', 'RepositoryAnalysis.js'],
+  ['/ProjectHistory.js', 'ProjectHistory.js'],
+  ['/StageHistory.js', 'StageHistory.js'],
   ['/KnowledgeGeneration.js', 'KnowledgeGeneration.js'],
   ['/SourceComparison.js', 'SourceComparison.js'],
   ['/KnowledgeRevision.js', 'KnowledgeRevision.js'],
@@ -518,7 +520,7 @@ export function createKnowledgeServer(input: {
           send(response, 200, await composition.apps.workbenchEvaluation.revisionEvidence(decodeURIComponent(revisionEvidence[1]!))); return;
         }
         if (request.method === 'GET' && url.pathname === '/api/v1/stage-tasks') {
-          send(response, 200, page(stages.store.list(url.searchParams.get('projectId') ?? undefined), url)); return;
+          send(response, 200, page(stages.store.list(url.searchParams.get('projectId') ?? undefined).filter(task => (!url.searchParams.has('snapshotId') || task.input.parameters.snapshotId === url.searchParams.get('snapshotId')) && (!url.searchParams.has('stage') || task.input.stage === url.searchParams.get('stage'))), url)); return;
         }
         const stageArtifact = /^\/api\/v1\/stage-tasks\/([^/]+)\/artifacts\/([a-f0-9]{64})$/.exec(url.pathname);
         if (request.method === 'GET' && stageArtifact) {

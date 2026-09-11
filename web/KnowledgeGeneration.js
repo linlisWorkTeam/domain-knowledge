@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：展示独立知识生成任务、逐卡产物及同版本恢复入口。
  */
+import { readStageHistory } from './StageHistory.js'
 import { createWorkbenchPipelinePanel } from './WorkbenchPipeline.js'
 import { createKnowledgeReconstructionPanel } from './KnowledgeReconstruction.js'
 export function createKnowledgeGenerationPanel({ root, request, escapeHtml: escape, isEditable }) {
@@ -59,7 +60,7 @@ export function createKnowledgeGenerationPanel({ root, request, escapeHtml: esca
     panel.querySelector('[data-generation-task]').innerHTML = taskHtml()
     panel.querySelector('[data-generation-notice]').textContent = notice
     const start = panel.querySelector('[data-generation-action="start"]'); if (start) start.disabled = !project || busy || active() || !isEditable()
-    reconstruction.render()
+    reconstruction.refresh()
     pipeline.render()
     for (const field of panel.querySelectorAll('[data-generation-scope]')) field.disabled = busy || active()
   }
@@ -99,16 +100,16 @@ export function createKnowledgeGenerationPanel({ root, request, escapeHtml: esca
     finally { if (current === epoch) { busy = false; render() } }
   })
   return { html,
-    setProject(value) { project = value; const panel = host(); if (panel) panel.outerHTML = html(); queueMicrotask(observe); reconstruction.refresh(); pipeline.refresh() },
+    setProject(value) { if (project?.snapshotId !== value?.snapshotId) { epoch++; task = null; checkpoints = []; events = []; scopes.clear(); notice = ''; busy = false; initialized = false; clearTimeout(timer); timer = null } project = value; const panel = host(); if (panel) panel.outerHTML = html(); queueMicrotask(observe); reconstruction.refresh(); pipeline.refresh() },
     refresh() {
       pipeline.refresh()
       reconstruction.refresh()
       if (!isEditable()) return
       if (!initialized && host()) {
         initialized = true; const current = epoch
-        request('/api/v1/stage-tasks').then((result) => {
+        readStageHistory(request, 'GENERATE', project?.snapshotId).then((result) => {
           if (epoch !== current) return
-          task = result.items.find((item) => item.input.stage === 'GENERATE') ?? null
+          task = result.items.find((item) => item.input.stage === 'GENERATE' && (!project || item.input.parameters.snapshotId === project.snapshotId)) ?? null
           render(); return observe()
         }).catch(() => { initialized = false; notice = '历史生成任务暂时无法读取。'; render() })
       } else if (task && active() && !timer) queueMicrotask(observe)

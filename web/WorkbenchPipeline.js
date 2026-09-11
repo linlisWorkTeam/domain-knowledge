@@ -7,6 +7,7 @@ import { sourceComparisonHtml } from './SourceComparison.js'
 export function createWorkbenchPipelinePanel({ root, request, escapeHtml: escape, isEditable, selection }) {
   let publication = null, publicationVerified = false
   let pipeline = null, tasks = [], checkpoints = {}, usage = null, busy = false, notice = '', timer = null, epoch = 0, initialized = false
+  let selectedSnapshot = null
   let materials = [], materialsLoaded = false, materialNotice = ''
   const selectedMaterials = new Set()
   const fixedSuites = new Map(); let fixedSnapshot = null
@@ -121,6 +122,8 @@ export function createWorkbenchPipelinePanel({ root, request, escapeHtml: escape
     finally { if (current === epoch) { busy = false; render() } }
   })
   return { render, active, refresh() {
+    const snapshotId = selection()?.snapshotId ?? null
+    if (snapshotId !== selectedSnapshot) { selectedSnapshot = snapshotId; epoch++; pipeline = null; tasks = []; publication = null; publicationVerified = false; checkpoints = {}; usage = null; busy = false; initialized = false; clearTimeout(timer); timer = null }
     render(); if (!host()) return
     if (selection() && !materialsLoaded) loadMaterials()
     if (!initialized) { initialized = true; const current = epoch

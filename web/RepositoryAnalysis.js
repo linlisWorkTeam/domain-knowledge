@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：提供无需场景 JSON 的固定源码分析入口。
  */
+import { createProjectHistory } from './ProjectHistory.js'
 import { createKnowledgeGenerationPanel } from './KnowledgeGeneration.js'
 export function createRepositoryAnalysisPanel({ root, request, escapeHtml: escape, isEditable }) {
   const generation = createKnowledgeGenerationPanel({ root, request, escapeHtml: escape, isEditable })
@@ -17,6 +18,16 @@ export function createRepositoryAnalysisPanel({ root, request, escapeHtml: escap
   const build = { cCompiler: 'gcc', cppCompiler: 'g++', cStandard: 'c11', cppStandard: 'c++17', includeDirectories: '', definitions: '' }
   const moduleBuilds = new Map(); let editingModule = ''
   const activeBuild = () => editingModule ? moduleBuilds.get(editingModule) ?? build : build
+  const history = createProjectHistory({ root, request, escapeHtml: escape, canSelect: () => !busy && !saving,
+    onSelect(value) {
+      project = value; directory = value.directory; revision = value.commit; report = null; selected = new Set(value.modules.map(module => module.moduleId)); editingModule = ''; moduleBuilds.clear()
+      for (const [key, value] of Object.entries(project.build)) build[key] = Array.isArray(value) ? value.join('\n') : value
+      const directoryField = root.querySelector('[name="repositoryDirectory"]'), revisionField = root.querySelector('[name="repositoryRevision"]')
+      if (directoryField) directoryField.value = directory
+      if (revisionField) revisionField.value = revision
+      const resultPanel = root.querySelector('[data-repository-result]'); if (resultPanel) resultPanel.innerHTML = '<p>已载入保存的源码与构建输入。需要修改模块或参数时，可重新分析该版本。</p>'
+      generation.setProject(project); generation.refresh()
+    } })
   const language = { c: 'C', cpp: 'C++', typescript: 'TypeScript', unsupported: '尚未支持' }
   const reasons = { LANGUAGE_NOT_SUPPORTED: '此语言尚未支持', TYPESCRIPT_MODULE_REGRESSION_ONLY: '保留现有模块回归；此多卡片生成入口尚未支持 TypeScript', SOURCE_FILE_TOO_LARGE: '文件超出默认生成大小', MIXED_LANGUAGE_MODULE: '需要明确不同语言的构建范围' }
   function result() {
@@ -108,8 +119,8 @@ export function createRepositoryAnalysisPanel({ root, request, escapeHtml: escap
   })
   return {
     focus: () => { const element = document.activeElement; return element?.closest('[data-repository-form], [data-project-form], [data-generation-panel]') ? { name: element.name, start: element.selectionStart, end: element.selectionEnd } : null },
-    restore: (focus) => { generation.refresh(); if (!focus) return; const field = root.querySelector(`[name="${CSS.escape(focus.name)}"]`); field?.focus({ preventScroll: true }); if (typeof focus.start === 'number') field?.setSelectionRange(focus.start, focus.end) },
-    html: () => `<section class="repository-panel" data-repository-panel><h2>代码仓</h2><form data-repository-form>
+    restore: (focus) => { history.refresh(); generation.refresh(); if (!focus) return; const field = root.querySelector(`[name="${CSS.escape(focus.name)}"]`); field?.focus({ preventScroll: true }); if (typeof focus.start === 'number') field?.setSelectionRange(focus.start, focus.end) },
+    html: () => `<section class="repository-panel" data-repository-panel><h2>代码仓</h2><section data-project-history>${history.html()}</section><form data-repository-form>
       <label>服务器仓库目录<input name="repositoryDirectory" value="${escape(directory)}" placeholder="粘贴 Git 仓库根目录" required></label>
       <label>源码版本<input name="repositoryRevision" value="${escape(revision)}" placeholder="分支、标签或提交" maxlength="256" required></label>
       <button class="primary-button" type="submit" ${busy || saving || !isEditable() ? 'disabled' : ''}>${busy ? '分析中…' : '分析仓库'}</button></form>

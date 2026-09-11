@@ -197,3 +197,5 @@ v5 在已有生成结果存在时，冻结同源码快照内当前后代卡片�
 一键流程v15在关联完成后，若已冻结固定用例，则用最后一轮重建/可信/固定/来源任务调用独立发布事务。提交成功保存publicationId；导出失败暂停并保留前序阶段，恢复重用同一发布身份。detail返回publication与按冻结版本校验的publicationVerified。未提供固定用例的流程保留未验证状态，不能显示已发布。
 
 POST /api/v1/projects 可选 moduleBuilds，以所选源码moduleId为键、声明式构建参数为值。服务器先合并项目默认值、验证后冻结完整模块参数；未知模块或越界路径拒绝。空覆盖不改变旧项目身份。模块参数进入源码快照身份及按模块工具链缓存键，执行与发布不能回退到其他模块的指纹。
+
+GET /api/v1/stage-tasks 支持 snapshotId、stage 查询参数，与 projectId 同时过滤后再分页，避免历史源码任务混入当前选择。已保存项目通过 GET /projects 列表和 GET /projects/:snapshotId 读取，前台切换只读取不可变快照，不重新分析或修改历史。

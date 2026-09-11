@@ -3,12 +3,14 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：展示独立重建、检查点代码下载与恢复，区分接口检查和行为验证。
  */
+import { readStageHistory } from './StageHistory.js'
 import { createWorkbenchPublicationPanel } from './WorkbenchPublication.js'
 import { createFixedEvaluationPanel } from './FixedEvaluation.js'
 import { sourceComparisonHtml } from './SourceComparison.js'
 import { createKnowledgeEvaluationPanel } from './KnowledgeEvaluation.js'
 export function createKnowledgeReconstructionPanel({ root, request, escapeHtml: escape, isEditable, selection }) {
   let task = null, checkpoints = [], busy = false, notice = '', timer = null, initialized = false, epoch = 0
+  let selectedKey = null
   const evaluation = createKnowledgeEvaluationPanel({ root, request, escapeHtml: escape, isEditable, selection: () => task?.status === 'SUCCEEDED' ? task.taskId : null })
   const fixedEvaluation = createFixedEvaluationPanel({ root, request, escapeHtml: escape, isEditable, selection: () => task?.status === 'SUCCEEDED' ? task.taskId : null })
   const publication = createWorkbenchPublicationPanel({ root, request, escapeHtml: escape, isEditable, selection: () => task?.status === 'SUCCEEDED' ? task.taskId : null })
@@ -76,12 +78,14 @@ export function createKnowledgeReconstructionPanel({ root, request, escapeHtml: 
     finally { if (current === epoch) { busy = false; render() } }
   })
   return { render, refresh() {
-    render(); if (!host() || !isEditable()) return
+    const selected = selection(), key = selected ? JSON.stringify([selected.snapshotId, [...selected.versionIds].sort()]) : null
+    if (key !== selectedKey) { selectedKey = key; epoch++; task = null; checkpoints = []; notice = ''; busy = false; initialized = false; clearTimeout(timer); timer = null }
+    render(); if (!host() || !isEditable() || !selected) return
     if (!initialized) {
       initialized = true; const current = epoch
-      request('/api/v1/stage-tasks').then((result) => {
+      readStageHistory(request, 'FLYWHEEL', selected?.snapshotId).then((result) => {
         if (current !== epoch) return
-        task = result.items.find((item) => item.input.stage === 'FLYWHEEL' && !item.input.parameters.operation) ?? null
+        task = result.items.find((item) => item.input.stage === 'FLYWHEEL' && !item.input.parameters.operation && (!selected || (item.input.parameters.snapshotId === selected.snapshotId && JSON.stringify([...item.input.cardVersionIds].sort()) === JSON.stringify([...selected.versionIds].sort())))) ?? null
         return observe()
       }).catch(() => { initialized = false })
     } else if (active() && !timer) queueMicrotask(observe)
