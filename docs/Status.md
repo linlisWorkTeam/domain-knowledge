@@ -212,3 +212,5 @@ Release 包为 177979475 字节，SHA-256 `ea2949fbe9e5962c70475e405459fe57f2dda
 新增混合风险独立修订选择（f822080）：source-correction-selection-v1冻结策略允许在整卡UNRESOLVED时消费同卡无未知风险的明确SOURCE_MISMATCH章节；原Review绑定校验与整卡风险保留。新策略独立任务与旧无policy任务分离；旧恢复不变。Domain/架构11项、模拟DOM面板1项、类型与Spec通过，真实旧报告只读审计从2张可选变为6张、4张风险不变。本次尚未完成原生修订集成及完整浏览器复测；一键混合风险自动推进仍未接，不能把此前480/32当本提交全回归。
 
 一键混合风险推进已接入504ac15（knowledge-pipeline-v16）：来源门禁仍失败但有绑定明确纠正可先修订；UNRESOLVED修订必须已ACCEPTED保存、索引成功、完整替换映射才继续重建。无明确纠正/缺索引/质量拒绝仍停止，关联发布仍要求完整来源通过。受控来源流程5项、Domain/面板9项、固定/发布准备等17项、含v15只读检查11项、架构8项及type/Spec通过（统计有重叠，不作为唯一总数）。原生Application混合风险和完整浏览器复测尚待完成，当前真实来源仍运行。
+
+真实工件补充审计：source correction08294...的两张卡各仅改动获准H2（配套接口与调用契约、公共接口与数据结构），其余H2及前言字节一致，恰好2个index检查点且均updated。可信eval19c898...与eb581...的31个输入/预期逐案一致，新知识绑定生成新testSet且revalidated=true，0新候选，31案实际结果等于预期。证据ScopeAudit.json、TrustedReuseAudit.json及可复验脚本保存在相应真实运行目录；均非最终发布证明。

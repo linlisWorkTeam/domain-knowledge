@@ -250,3 +250,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 [2026-09-11-0921-revised-reconstruction.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/504ac15890a03be8e416a74385f5ae564184735e/docs/epitaph/2026-09-11-0921-revised-reconstruction.md) 两卡真实修订后重建可信31/31、固定11/11完成，新来源仍运行。随后独立及一键混合风险修订路径已接，风险保留，最终真实发布部署未完成。
 
 [2026-09-11-0924-revised-behavior-passed.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/ef4b3d58ab68e7e16bd30a058e3f4674e416bf18/docs/epitaph/2026-09-11-0924-revised-behavior-passed.md) 真实jsmn新重建可信31/31固定11/11通过，新来源复核持续执行。后续独立及一键混合风险修订规则已接，原生新场景测试已准备但待执行；双目标最终发布部署未完成。
+
+[2026-09-11-0928-mixed-source-corrections.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/595ad4bb64f204d43b6e2a4fb59f37376bd0333b/docs/epitaph/2026-09-11-0928-mixed-source-corrections.md) 独立混合风险章节选择完成，后续v16一键推进已接并定向通过；新原生混合风险测试准备完成但排队。真实来源仍运行，最终验收部署未完成。
