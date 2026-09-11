@@ -70,3 +70,9 @@ DocGen 可返回 userDecisionRequired（拆分原因与建议），candidate_kno
 AC-AGENT-105：maxIterations 表示包含首轮的最大业务轮数；内部 iteration 保持从 0 开始。进入每轮生成前统一检查 `0 <= iteration < maxIterations`，当前轮结束时仅当 `iteration + 1 < maxIterations` 才允许继续。质量拒绝、测评失败及恢复必须使用相同 Domain 规则，不能分支各自判断。模型格式重试、TestGen 有限修复和同轮节点重放不增加业务轮数。持久化节点提交键保证同轮重放幂等，下一轮必须经过 Orchestrator 入口检查。
 
 验收命令：`node --test tests/integration/WorkflowIterationLimit.test.ts`。maxIterations=1 首轮失败后 STOPPED，Orchestrator/DocGen/Code 均不出现第二轮；maxIterations=2 可在第二轮通过；质量拒绝同样停在上限；已耗尽上下文直接重入生成入口时必须在模型调用前拒绝；恢复/重放不多消费或绕过轮数。
+
+### AC-AGENT-105-R1：路由跨存储恢复
+
+Registry 与 LangGraph 的提交不是同一事务。router 必须以 runId、输入 iteration、版本化 generation key 保存不可变决定，业务状态迁移不能改变重放结果。先固定决定再执行可重复的迁移/交接；Gate 已提交而路由尚未保存时，可按相同证据取回既有 Gate，不重复记录评测。输入冲突应拒绝。
+
+验收 `tests/integration/WorkflowRouterReplay.test.ts`：质量 ITERATE、Gate ITERATE、Gate STOPPED、质量 STOPPED 均在 Registry 副作用提交后、LangGraph 节点输出保存前注入故障，然后用原始输入恢复；决定、业务轮次、Gate 和交接数量保持一致。另覆盖决定已固定、迁移尚未执行的恢复窗口，不只重放 Orchestrator。
