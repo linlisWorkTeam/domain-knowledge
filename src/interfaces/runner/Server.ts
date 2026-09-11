@@ -374,7 +374,7 @@ export function createKnowledgeServer(input: {
       }
       // 目录、配置和写入仅允许直接本机访问，或携带远程访问令牌。
       const localClient = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(request.socket.remoteAddress ?? '');
-      const workbenchRoute = /^\/api\/v1\/(external-materials|workbench-pipelines|stage-tasks|index-builds|knowledge-index|repository-analyses|projects|generations|reconstructions|native-evaluations|fixed-evaluations|knowledge-revisions|source-verifications|source-revisions|associations)(\/|$)/.test(url.pathname);
+      const workbenchRoute = /^\/api\/v1\/(external-materials|workbench-publications|workbench-pipelines|stage-tasks|index-builds|knowledge-index|repository-analyses|projects|generations|reconstructions|native-evaluations|fixed-evaluations|knowledge-revisions|source-verifications|source-revisions|associations)(\/|$)/.test(url.pathname);
       const productRoute = url.pathname.startsWith('/api/v1/publications')
         || url.pathname === '/api/v1/server-directories' || url.pathname === '/api/v1/runs/markdown-lite';
       if (url.pathname.startsWith('/api/') && (!localClient || productRoute || workbenchRoute) && !authorized(request, writeToken, anonymousAccess)) {
@@ -383,6 +383,36 @@ export function createKnowledgeServer(input: {
         return;
       }
       if (workbenchRoute) {
+        const publications = composition.apps.workbenchPublications;
+        if (url.pathname === '/api/v1/workbench-publications' && request.method === 'GET') {
+          send(response, 200, { items: publications.list(url.searchParams.get('projectId') ?? undefined, url.searchParams.get('versionId') ?? undefined)
+            .map(publication => ({ ...publication, publicationVerified: publication.status === 'COMMITTED' })) }); return;
+        }
+        if (url.pathname === '/api/v1/workbench-publications' && request.method === 'POST') {
+          const payload = await body(request);
+          const keys = ['reconstructionTaskId', 'evaluationTaskId', 'fixedEvaluationTaskId', 'sourceVerificationTaskId'];
+          requireOnlyKeys(payload, keys);
+          if (keys.some(key => typeof payload[key] !== 'string' || !(payload[key] as string).trim())) throw new Error('PAYLOAD_INVALID');
+          const publication = await publications.publishFromTasks({ reconstruction: payload.reconstructionTaskId as string,
+            evaluation: payload.evaluationTaskId as string, fixedEvaluation: payload.fixedEvaluationTaskId as string,
+            sourceVerification: payload.sourceVerificationTaskId as string });
+          send(response, 200, await publications.detail(publication.publicationId)); return;
+        }
+        const publicationArtifact = /^\/api\/v1\/workbench-publications\/([^/]+)\/artifacts\/([a-f0-9]{64})$/.exec(url.pathname);
+        if (publicationArtifact && request.method === 'GET') {
+          const artifact = await publications.artifact(decodeURIComponent(publicationArtifact[1]!), publicationArtifact[2]!);
+          response.setHeader('content-disposition', `attachment; filename="${artifact.path.split('/').at(-1)}"`);
+          send(response, 200, Buffer.from(artifact.bytes), artifact.ref.mediaType); return;
+        }
+        const publicationRoute = /^\/api\/v1\/workbench-publications\/([^/]+)(?:\/(resume))?$/.exec(url.pathname);
+        if (publicationRoute && request.method === 'GET' && !publicationRoute[2]) {
+          send(response, 200, await publications.detail(decodeURIComponent(publicationRoute[1]!))); return;
+        }
+        if (publicationRoute && request.method === 'POST' && publicationRoute[2]) {
+          requireOnlyKeys(await body(request), []);
+          const id = decodeURIComponent(publicationRoute[1]!); await publications.resume(id);
+          send(response, 200, await publications.detail(id)); return;
+        }
         const materials = composition.apps.workbenchMaterials;
         if (url.pathname === '/api/v1/external-materials' && request.method === 'GET') {
           send(response, 200, { items: materials.store.list() }); return;

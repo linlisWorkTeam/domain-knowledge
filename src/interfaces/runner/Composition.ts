@@ -3,6 +3,10 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：提供Composition的外部入口、参数转换与响应处理。
  */
+import { WorkbenchPublicationEvidence } from '../../application/services/WorkbenchPublicationEvidence.ts';
+import { WorkbenchPublications } from '../../application/services/WorkbenchPublications.ts';
+import { SqliteWorkbenchPublications } from '../../infrastructure/sqlite/SqliteWorkbenchPublications.ts';
+import { LocalWorkbenchPublicationFiles } from '../../infrastructure/publication/LocalWorkbenchPublicationFiles.ts';
 import { SOURCE_COMPARISON_CONTRACT } from '../../domain/services/evaluation/NativeSourceComparison.ts';
 import { WorkbenchMaterials } from '../../application/services/WorkbenchMaterials.ts';
 import { SqliteExternalMaterials } from '../../infrastructure/sqlite/SqliteExternalMaterials.ts';
@@ -430,6 +434,11 @@ export function createComposition(input: {
   workbenchSourceVerification = new WorkbenchSourceVerification(workbenchEvaluation);
   workbenchFixedEvaluation = new WorkbenchFixedEvaluation(workbenchEvaluation);
   workbenchKnowledgeRevision = new WorkbenchKnowledgeRevision(workbenchEvaluation, flywheelApp, knowledgeIndex);
+  const publicationStore = new SqliteWorkbenchPublications(join(runtimeDir, 'workbench.sqlite'));
+  const workbenchPublications = new WorkbenchPublications({ store: publicationStore, render: indexStore,
+    files: new LocalWorkbenchPublicationFiles(join(runtimeDir, 'publications'), artifacts),
+    evidence: new WorkbenchPublicationEvidence({ stages: workbenchStages, repository, artifacts, projects: projectStore,
+      tests: nativeTestStore, contracts: workbenchReconstruction.dependencies.roles.dependencies.contracts }) });
   const workbenchPipelines = new WorkbenchPipelines({ artifacts, fixedEvaluation: workbenchFixedEvaluation, materials: workbenchMaterials.store, environment: async (snapshotId, signal) => {
     const project = projectStore.get(snapshotId); if (!project) throw new Error('PROJECT_INPUT_NOT_FOUND');
     const fingerprints = [];
@@ -590,6 +599,7 @@ export function createComposition(input: {
       publicationOperations,
       workbenchStages,
       workbenchPipelines,
+      workbenchPublications,
       knowledgeIndex,
       workbenchAssociations,
       repositoryAnalysis,
@@ -634,11 +644,11 @@ export function createComposition(input: {
     runConfiguration,
     agentProviderMode,
     automatedWorkflow: workflow,
-    shutdown: async () => { await workbenchPipelines.shutdown(); await workbenchStages.shutdown(); if (workflowPromise) await (await workflowPromise).shutdown(); },
+    shutdown: async () => { await workbenchPipelines.shutdown(); await workbenchStages.shutdown(); await workbenchPublications.shutdown(); if (workflowPromise) await (await workflowPromise).shutdown(); },
     close: () => {
-      const release = () => { pipelineStore.close(); nativeTestStore.close(); projectStore.close(); indexStore.close(); stageStore.close(); publisher.close(); repository.close(); };
-      if (workbenchPipelines.idle && workbenchStages.idle) { void workbenchPipelines.shutdown(); void workbenchStages.shutdown(); release(); }
-      else return workbenchPipelines.shutdown().then(() => workbenchStages.shutdown()).then(release);
+      const release = () => { publicationStore.close(); pipelineStore.close(); nativeTestStore.close(); projectStore.close(); indexStore.close(); stageStore.close(); publisher.close(); repository.close(); };
+      if (workbenchPipelines.idle && workbenchStages.idle && workbenchPublications.idle) { void workbenchPipelines.shutdown(); void workbenchStages.shutdown(); void workbenchPublications.shutdown(); release(); }
+      else return workbenchPipelines.shutdown().then(() => workbenchStages.shutdown()).then(() => workbenchPublications.shutdown()).then(release);
     },
   };
 }

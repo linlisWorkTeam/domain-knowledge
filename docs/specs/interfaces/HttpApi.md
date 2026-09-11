@@ -189,3 +189,7 @@ v5 在已有生成结果存在时，冻结同源码快照内当前后代卡片�
 一键流程POST可含fixedSuites:[{moduleId,suite}]。suite先冻结CAS，固定子任务在每轮可信评测通过后执行；查询的iterations包含fixedEvaluation并计入tasks/usage。流程v13身份包含固定suite摘要，改用例创建新流程，不能覆盖旧预期。v12只读。固定失败暂停评测且不进入来源/关联。
 
 新来源任务input.parameters包含sourceReviewPolicy（source-review-policy-v1，timeoutMs=600000），来源修订继承并校验一致性。旧无策略任务仍为180000ms，恢复不补写策略；新策略通过输入摘要产生新的任务身份。流程v14采用新策略，v13只读。
+
+## 工作台本地发布事务
+
+`/api/v1/workbench-publications` 与旧 publications 独立，沿用免登录部署配置。POST 仅接受 reconstructionTaskId、evaluationTaskId、fixedEvaluationTaskId、sourceVerificationTaskId 四个非空任务编号；固定用例从选定任务的冻结输入读取，所有证据仍由完整发布准备门禁验证。GET 支持 projectId/versionId 筛选。GET `/:id` 返回 publication、publicationVerified 和 filesAvailable；只有 COMMITTED 表示已验证，文件可用性单独报告。POST `/:id/resume` 接受空对象，恢复同一发布事务。GET `/:id/artifacts/:sha256` 仅下载该发布文件清单中的已校验 CAS 工件。服务关闭拒绝新发布/恢复，并等待已接受的准备、导出、提交完成后关闭数据库。

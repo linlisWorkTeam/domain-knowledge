@@ -52,3 +52,27 @@ test('interruption after directory export resumes from SQLite without rewriting 
     assert.equal(eventCount(database), 3);
   } finally { render.close(); store.close(); rmSync(root, { recursive: true, force: true }); }
 });
+test('shutdown waits for accepted preparation and rejects new publication requests', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'publication-shutdown-')); const f = await createPublicationPreparationFixture();
+  const database = join(root, 'workbench.sqlite'); const store = new SqliteWorkbenchPublications(database);
+  const render = new SqliteKnowledgeIndex(database, join(root, 'index'));
+  const files = new LocalWorkbenchPublicationFiles(join(root, 'published'), f.service.dependencies.artifacts);
+  let release!: () => void; const hold = new Promise<void>(resolve => { release = resolve; });
+  const prepare = f.service.prepare.bind(f.service);
+  f.service.prepare = async (...args) => { await hold; return prepare(...args); };
+  const app = new WorkbenchPublications({ evidence: f.service, store, files, render });
+  try {
+    const pending = app.publishFromTasks(f.ids); assert.equal(app.idle, false);
+    let closed = false; const shutdown = app.shutdown().then(() => { closed = true; });
+    await assert.rejects(app.publishFromTasks(f.ids), /PUBLICATION_SHUTDOWN/);
+    await assert.rejects(app.resume('missing'), /PUBLICATION_SHUTDOWN/);
+    assert.equal(closed, false); release();
+    const record = await pending; await shutdown;
+    assert.equal(record.status, 'COMMITTED'); assert.equal(app.idle, true);
+    assert.equal((await app.detail(record.publicationId)).publicationVerified, true);
+    assert.equal(app.list(undefined, 'missing').length, 0);
+    const artifact = await app.artifact(record.publicationId, record.files[0]!.ref.sha256);
+    assert.ok(artifact.bytes.length > 0);
+    await assert.rejects(app.artifact(record.publicationId, '0'.repeat(64)), /PUBLICATION_ARTIFACT_NOT_FOUND/);
+  } finally { release(); await app.shutdown(); render.close(); store.close(); rmSync(root, { recursive: true, force: true }); }
+});
