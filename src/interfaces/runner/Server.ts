@@ -50,6 +50,7 @@ const assets = new Map([
   ['/RepositoryAnalysis.js', 'RepositoryAnalysis.js'],
   ['/ProjectHistory.js', 'ProjectHistory.js'],
   ['/StageHistory.js', 'StageHistory.js'],
+  ['/BuildDiagnostics.js', 'BuildDiagnostics.js'],
   ['/KnowledgeGeneration.js', 'KnowledgeGeneration.js'],
   ['/SourceComparison.js', 'SourceComparison.js'],
   ['/KnowledgeRevision.js', 'KnowledgeRevision.js'],

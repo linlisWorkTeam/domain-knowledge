@@ -32,6 +32,7 @@ export class WorkbenchReconstruction {
     for (const event of stages.store.events(taskId)) {
       const detail = event.detail as Record<string, unknown>;
       if (detail?.phase === 'role-stage-attempt' && detail.artifactRef) refs.push(detail.artifactRef as ArtifactRef);
+      if (['interface-failed', 'generated-interface-failed'].includes(String(detail?.phase)) && detail.diagnosticRef) refs.push(detail.diagnosticRef as ArtifactRef);
     }
     const ref = refs.find((item) => item.sha256 === digest);
     if (!ref) return null;

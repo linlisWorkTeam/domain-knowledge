@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：展示独立知识生成任务、逐卡产物及同版本恢复入口。
  */
+import { interfaceDiagnosticsHtml } from './BuildDiagnostics.js'
 import { readStageHistory } from './StageHistory.js'
 import { createWorkbenchPipelinePanel } from './WorkbenchPipeline.js'
 import { createKnowledgeReconstructionPanel } from './KnowledgeReconstruction.js'
@@ -42,6 +43,7 @@ export function createKnowledgeGenerationPanel({ root, request, escapeHtml: esca
       ${active() && progress ? `<p>当前：${escape(progress.symbol ?? progress.module)}</p>` : ''}
       <ul>${cards.map((card) => `<li><button class="text-button" data-version-id="${escape(card.versionId)}" type="button">${escape(card.title)}</button> · ${escape(card.quality)}</li>`).join('')}</ul>
       ${task.reasonCode ? `<p>${escape(reasons[task.reasonCode] ?? task.reasonCode)}</p>` : ''}
+      ${interfaceDiagnosticsHtml(events, task.taskId, escape)}
       ${active() ? `<button class="secondary-button" data-generation-action="cancel" ${busy || task.cancelRequested || !isEditable() ? 'disabled' : ''} type="button">取消生成</button>` : ''}
       ${resume ? `<button class="secondary-button" data-generation-action="resume" ${busy || !isEditable() ? 'disabled' : ''} type="button">恢复生成</button>` : ''}
       ${cards.length ? '<p>下一步：在知识页面「知识索引与试检索」中建立索引。</p>' : ''}

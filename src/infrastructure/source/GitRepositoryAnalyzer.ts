@@ -114,7 +114,7 @@ export class GitRepositoryAnalyzer implements RepositoryAnalyzer, RepositorySour
     const sources = files.filter((file) => file.kind === 'source');
     const modules = groupRepositoryModules(files);
     const tools: RepositoryAnalysis['tools'] = [];
-    for (const name of ['gcc', 'g++', 'clang', 'make', 'cmake', 'bwrap', 'prlimit']) {
+    for (const name of ['gcc', 'g++', 'clang', 'clang++', 'make', 'cmake', 'bwrap', 'prlimit']) {
       signal?.throwIfAborted();
       try { tools.push({ name, available: true, version: (await readCommand(name, ['--version'], root, signal, 16_384)).split('\n')[0]!.slice(0, 256) }); }
       catch (error) { if (signal?.aborted) throw error; tools.push({ name, available: false, version: null }); }

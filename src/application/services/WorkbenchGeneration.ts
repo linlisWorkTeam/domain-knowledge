@@ -82,7 +82,8 @@ export class WorkbenchGeneration {
         } catch (error) {
           if (error instanceof Error && error.cause) {
             const ref = await artifacts.put(Buffer.from(JSON.stringify(error.cause)), 'application/json');
-            context.progress({ phase: 'interface-failed', module: module.moduleId, diagnosticRef: json(ref) });
+            const cause = error.cause as { issues?: unknown };
+            context.progress({ phase: 'interface-failed', module: module.moduleId, diagnosticRef: json(ref), ...(Array.isArray(cause.issues) ? { issues: json(cause.issues) } : {}) });
           }
           throw error;
         }

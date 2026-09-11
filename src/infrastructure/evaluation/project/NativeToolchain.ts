@@ -10,6 +10,7 @@ import type { NativeLanguageToolchain, NativeToolchainInput, ToolchainFile } fro
 import { buildConstraints } from '../../../domain/services/workbench/WorkbenchProject.ts';
 import { modelProcessLane } from '../../agentAdapters/ModelProcessLane.ts';
 import { captureIsolated } from '../../runtime/IsolatedCommand.ts';
+import { nativeBuildIssues } from './NativeBuildDiagnostics.ts';
 import { clangDeclarations } from './ClangDeclarations.ts';
 
 const memoryBytes = 536_870_912;
@@ -78,7 +79,7 @@ export class NativeToolchain implements NativeLanguageToolchain {
           ...(input.astFilter ? ['-Xclang', `-ast-dump-filter=${input.astFilter}`] : []), `/workspace/source/${input.entryPath}`],
         timeoutMs: 30_000, memoryBytes, processLimit: 32, outputBytes: 8_388_608 }, signal);
       if (result.exitCode !== 0 || result.timedOut || result.outputLimitExceeded) throw new Error('NATIVE_INTERFACE_COMPILE_FAILED', {
-        cause: { exitCode: result.exitCode, timedOut: result.timedOut, outputLimitExceeded: result.outputLimitExceeded, stderr: result.stderr },
+        cause: { exitCode: result.exitCode, timedOut: result.timedOut, outputLimitExceeded: result.outputLimitExceeded, stderr: result.stderr, issues: nativeBuildIssues(result.stderr) },
       });
       let ast: unknown; try { ast = JSON.parse(result.stdout); } catch { throw new Error('NATIVE_AST_AMBIGUOUS'); }
       return { schemaVersion: 'native-interface-v1' as const, language: input.language, sourcePath: input.entryPath,
