@@ -34,7 +34,7 @@ function git(root: string, args: string[]): string {
 const counts: Record<string, number> = {};
 function agentOutput(agentType: string, prompt: string): Record<string, unknown> {
   const count = counts[agentType] = (counts[agentType] ?? 0) + 1;
-  
+
   switch (agentType) {
     case 'orchestrator':
       return orchestratorOutput('dsh-module', count - 1);
