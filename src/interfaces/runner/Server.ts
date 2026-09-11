@@ -56,6 +56,7 @@ const assets = new Map([
   ['/KnowledgeReconstruction.js', 'KnowledgeReconstruction.js'],
   ['/KnowledgeEvaluation.js', 'KnowledgeEvaluation.js'],
   ['/FixedEvaluation.js', 'FixedEvaluation.js'],
+  ['/WorkbenchPublication.js', 'WorkbenchPublication.js'],
   ['/KnowledgeAssociations.js', 'KnowledgeAssociations.js'],
   ['/Styles.css', 'Styles.css'],
 ]);

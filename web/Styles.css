@@ -1318,3 +1318,7 @@ body.drawer-active { overflow: hidden; }
 [data-fixed-evaluation-panel] table { width: 100%; table-layout: fixed; border-collapse: collapse; }
 [data-fixed-evaluation-panel] th, [data-fixed-evaluation-panel] td { text-align: left; vertical-align: top; padding: 6px; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
 [data-fixed-evaluation-panel] pre { white-space: pre-wrap; overflow: auto; max-width: 100%; }
+
+[data-workbench-publication-panel] { min-width: 0; overflow-wrap: anywhere; }
+[data-workbench-publication-panel] select { width: 100%; min-width: 0; max-width: 100%; }
+[data-workbench-publication-panel] article { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); }
