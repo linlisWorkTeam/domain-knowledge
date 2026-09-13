@@ -1,0 +1,39 @@
+/**
+ * Copyright (c) 2026 linlisWorkTeam
+ * SPDX-License-Identifier: MIT
+ * 文件功能：验证来源页面显示真实配置边界，失败和旧记录不伪造范围。
+ */
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { createSourceVerificationPanel } from '../../web/KnowledgeSourceVerification.js'
+for (const mode of ['current', 'unavailable', 'legacy']) test(`source build scope display: ${mode}`, async () => {
+  const panel = { innerHTML: '' }, requests = []
+  const task = { taskId: 'source', status: 'SUCCEEDED', contractVersion: 'knowledge-workbench-v1', usage: { modelCalls: 7 },
+    input: { cardVersionIds: ['v1'], parameters: { operation: 'KNOWLEDGE_SOURCE_VERIFICATION', verificationContract: 'knowledge-source-verification-v4',
+      evaluationTaskId: 'eval', ...(mode === 'legacy' ? {} : { executionScopesRef: { sha256: 'scope' } }) } },
+    result: { summary: { outcome: 'UNRESOLVED', cards: [] } } }
+  const scope = { schemaVersion: 'source-execution-scope-v1', configurationCoverage: 'SINGLE_FROZEN_BUILD', language: 'c', architecture: 'x64',
+    build: { cCompiler: 'gcc', cStandard: 'c11', definitions: [], includeDirectories: [] }, referenceRef: { sha256: 'reference' }, fingerprintRef: { sha256: 'tools' } }
+  const app = createSourceVerificationPanel({ root: { querySelector: selector => selector === '[data-source-verification-panel]' ? panel : null, addEventListener() {} },
+    selection: () => 'eval', isEditable: () => true, escapeHtml: String, request: async url => {
+      requests.push(url)
+      if (url.endsWith('/artifacts/scope')) { if (mode === 'unavailable') throw new Error('unavailable'); return [{ moduleId: 'jsmn', scope }] }
+      return url === '/api/v1/stage-tasks' ? { items: [task] } : { task, checkpoints: [], events: [] }
+    } })
+  app.refresh(); await new Promise(resolve => setImmediate(resolve))
+  assert.match(panel.innerHTML, /仍有未解决问题/)
+  if (mode === 'current') {
+    assert.match(panel.innerHTML, /jsmn · gcc · c11 · x64/)
+    assert.match(panel.innerHTML, /宏定义：未额外指定/)
+    assert.match(panel.innerHTML, /不等于所有宏组合已验证/)
+    assert.match(panel.innerHTML, /artifacts\/reference/)
+    assert.match(panel.innerHTML, /artifacts\/tools/)
+  } else if (mode === 'unavailable') {
+    assert.match(panel.innerHTML, /构建范围暂不可读/)
+    assert.match(panel.innerHTML, /下载冻结构建范围/)
+    assert.doesNotMatch(panel.innerHTML, /gcc/)
+  } else {
+    assert.doesNotMatch(panel.innerHTML, /本次实际构建范围|gcc/)
+    assert.equal(requests.some(url => url.includes('/artifacts/')), false)
+  }
+})

@@ -274,3 +274,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 - 2026-09-14-0052：ce81da2新增补证目标Domain和原生服务可选检查，零命中候选不执行且原可信不变；6定向/类型/Spec通过，之后53e7已接阶段与页面。基线494回归确认，完整真实验收仍未完成。[原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/036a864ea3aa0ad8ba9b284ec9f7944831356417/docs/epitaph/2026-09-14-0052-supplement-target-check.md)。
 
 - 2026-09-14-0100：53e7接入补证目标冻结、拒绝恢复反馈及页面。最终3应用/16架构流程页面/浏览器1通过，早期偶发暂停和浏览器总时限失败保留日志。后续真实修订/构建见0103。原scope尚未交接。[原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/d41c8c1dba36c822272e0ffcb67b6690b049ccb8/docs/epitaph/2026-09-14-0100-supplement-target-handoff.md)。
+
+- 2026-09-14-0103：真实修订21cf两卡各一段变更并索引，重建d86fa成功；随后可信685ee 31/31及固定4112 11/11通过。供应商原配置重验revision6，未更换模型/密钥，旧可信保留。完整运行编号与driver见[原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/a027c64decb7a40ac79c5732054274933f10ab23/docs/epitaph/2026-09-14-0103-live-native-revision.md)。
