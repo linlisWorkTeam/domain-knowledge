@@ -288,3 +288,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 - 2026-09-14-0134：审计C++旧6c904/537782与fb5/0c881绑定不同，provider参数摘要也与当前不同，要求同9卡新配置重建。后续17d6已完成，可信9ea26通过，详见0215。[原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/0ae56fe9a620efbebf8cb34c058a8d797fe7c657/docs/epitaph/2026-09-14-0134-cpp-acceptance-bindings.md)。
 
 - 2026-09-14-0157：ec72网站通过独立发布目录部署，免登录原数据保留与完整备份；首页/health/API/两JS HTTP200并比对文件，26定向检查通过。最新浏览器和完整原生验收尚缺。[原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/40e8077a6cd47301556e14bb90b6a18b20ca7393/docs/epitaph/2026-09-14-0157-website-deployment.md)。
+
+- 2026-09-14-0210：C来源54a完成53段、5差异/5未知；原生测试发现新scope任务错误早复用，0ae56fe限定旧策略分支后原断言6/6通过。启动C++新Code17d6，后续可信/固定均通过。[原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/e89be2e6ff80554131cea9164759bb62d5366f84/docs/epitaph/2026-09-14-0210-source-history-recovery.md)。
