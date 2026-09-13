@@ -81,6 +81,10 @@ export class WorkbenchSourceVerification {
     if (!project || project.snapshotId !== parent.input.parameters.snapshotId || project.commit !== context.task.input.sourceRevision || project.sourceDigest !== context.task.input.sourceDigest) throw new Error('STAGE_INPUT_CHANGED');
     const executionScopes = parameters.sourceExecutionPolicy ? await this.executionScopes(project, evidence.modules) : [];
     if (parameters.sourceExecutionPolicy && canonicalJson(executionScopes) !== canonicalJson(await this.load(parameters.executionScopesRef as unknown as ArtifactRef))) throw new Error('SOURCE_EXECUTION_BINDING_INVALID');
+    if (parameters.sourceExecutionPolicy) await context.step('source-execution-scope', async () => ({
+      artifactRefs: [parameters.executionScopesRef as unknown as ArtifactRef, ...executionScopes.flatMap(item => [item.scope.referenceRef, item.scope.fingerprintRef])],
+      summary: { sourceExecutionPolicy: SOURCE_EXECUTION_SCOPE, modules: executionScopes.map(item => item.moduleId), publicationVerified: false },
+    }));
     const priorFindingsRef = parameters.priorFindingsRef as unknown as ArtifactRef;
     const proofs = await this.load<SourceFindingProof[]>(priorFindingsRef);
     if (!Array.isArray(proofs) || proofs.length > 1000) throw new Error('SOURCE_HISTORY_BINDING_INVALID');

@@ -13,10 +13,12 @@ export function createSourceVerificationPanel({ root, request, escapeHtml: escap
   const active = () => current() && ['PENDING', 'RUNNING'].includes(task.status)
   const reasons = { AGENT_STAGE_TIMEOUT: '来源复核超时，已完成章节和输入材料保留。', DSH_AGENT_OUTPUT_NOT_JSON: '模型输出格式错误，前序结果保留，可恢复原任务。', STAGE_PROCESS_EXITED: '上次进程退出，可恢复原任务。', PROVIDER_QUOTA_EXHAUSTED: '供应商额度不足，累计用量和已完成结果保留。' }
   const outcomes = { SOURCE_MATCHED: '来源复核匹配', SOURCE_MISMATCH: '正文与源码存在矛盾', UNRESOLVED: '仍有未解决问题' }
+  const scopeAvailable = ref => [...(task?.result?.artifactRefs ?? []), ...checkpoints.flatMap(item => item.result?.artifactRefs ?? [])].some(item => item.sha256 === ref?.sha256)
   const download = (ref, label) => `<button class="secondary-button" type="button" data-download-artifact="/api/v1/stage-tasks/${escape(task.taskId)}/artifacts/${escape(ref.sha256)}">${label}</button>`
   function scopeHtml() {
     const ref = task?.input.parameters.executionScopesRef
     if (!ref) return ''
+    if (!scopeAvailable(ref)) return '<details><summary>本次实际构建范围</summary><p>构建证据尚未完成运行校验，校验完成后提供范围和下载；任务失败时可恢复原任务重试。</p></details>'
     const matching = scopeKey === `${task.taskId}:${ref.sha256}`
     return `<details><summary>本次实际构建范围</summary><p>仅说明本轮参考测试使用的固定配置，不代表其他宏组合或平台已验证。</p>
       ${matching && scopeError ? '<p>构建范围暂不可读，可下载原始工件重试；复核结果保留。</p>' : !matching || scopes === null ? '<p>正在读取冻结构建记录…</p>' : scopes.map(({ moduleId, scope }) => `<article><p>${escape(moduleId)} · ${escape(scope.language === 'c' ? scope.build.cCompiler : scope.build.cppCompiler)} · ${escape(scope.language === 'c' ? scope.build.cStandard : scope.build.cppStandard)} · ${escape(scope.architecture)}</p>
@@ -52,7 +54,7 @@ export function createSourceVerificationPanel({ root, request, escapeHtml: escap
       task = result.task; checkpoints = result.checkpoints ?? []; events = result.events ?? []; render()
       const ref = task.input.parameters.executionScopesRef
       const key = ref ? `${id}:${ref.sha256}` : ''
-      if (key && key !== scopeKey) {
+      if (key && key !== scopeKey && scopeAvailable(ref)) {
         scopeKey = key; scopes = null; scopeError = false
         try {
           const value = await request(`/api/v1/stage-tasks/${encodeURIComponent(id)}/artifacts/${ref.sha256}`)

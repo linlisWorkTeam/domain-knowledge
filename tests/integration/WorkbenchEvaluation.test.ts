@@ -46,6 +46,7 @@ for (const { rejectSourceReview, mixedSourceRisks } of [{ rejectSourceReview: fa
         const body = Buffer.from(await composition.artifacts.get(_command.payload.knowledgeRef as any)).toString('utf8');
         usage(`whole-source-${_command.commandId}`, 3);
         const criteria = JSON.parse(Buffer.from(await composition.artifacts.get(_command.payload.criteriaRef as any)).toString('utf8'));
+        assert.ok(composition.apps.workbenchStages.store.checkpoints(_command.runId).some(row => row.key === 'source-execution-scope'), 'execution scope is downloadable before Review starts');
         assert.equal(criteria.executionScope.schemaVersion, 'source-execution-scope-v1');
         assert.equal(criteria.executionScope.configurationCoverage, 'SINGLE_FROZEN_BUILD');
         assert.equal(criteria.executionScope.build.cStandard, 'c11');
