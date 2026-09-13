@@ -262,3 +262,7 @@ This document summarizes older handoffs, milestones and architectural decisions 
 - 2026-09-11-0944：原生混合应用3/3、Console筛选2/2通过；source826fed完成但UNRESOLVED，发现有可信库后永不新增测试缺口并先写Spec。后续实现见1508/1515。[原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/d58b044bca9f8affd09babd3139d347b81ceec26/docs/epitaph/2026-09-11-0944-source-supplement-gap.md)。
 
 - 2026-09-11-1432：227a441补充测试领域合并规则，4单测/类型/Spec通过；当时尚未接服务，并确认旧修订宿主PID退出但数据库RUNNING。后续租约恢复与配置重验见1508。[原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/dc3dbf8d68b7e2a108706f001ea526a1c5caad53/docs/epitaph/2026-09-11-1432-supplement-domain.md)。
+
+- 2026-09-11-1508：8b8a7f3补充评测服务与真实SQLite/CAS测试；原评测3/3、架构8/8。真实修订孤儿租约回收后发现供应商验证过期，原配置重验后恢复成功。后续来源/一键及部署见1515/1521/本次。[原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/3b83ac6c7921d4c522e9ab7bfcd1f881050ea792/docs/epitaph/2026-09-11-1508-native-supplement-service.md)。
+
+- 2026-09-11-1515：来源未知需求经Domain/App/HTTP/Console交接补充评测，受控三场景通过；随后v17一键与部署见1521/1535。目标引用覆盖缺口在真实补证中发现，9月14日继续处理。[原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/3b83ac6c7921d4c522e9ab7bfcd1f881050ea792/docs/epitaph/2026-09-11-1515-source-supplement-entry.md)。

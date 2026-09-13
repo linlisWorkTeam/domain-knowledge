@@ -10,11 +10,13 @@ import { markdownSections } from '../../domain/services/knowledge/KnowledgeSecti
 import { assertNativeBehaviorSuite, type NativeBehaviorSuite, type NativeContract } from '../../domain/services/evaluation/NativeBehaviorSuite.ts';
 import { nativeTrustedGates, nativeSupplementGates } from '../../domain/services/evaluation/NativeTrustedGates.ts';
 import { nativeTestKeys, nativeOracleTrusted, type NativeTestSet } from '../../domain/services/evaluation/NativeTestCache.ts';
+import { nativeSupplementTargetCoverage, type NativeSupplementTargets } from '../../domain/services/evaluation/NativeSupplementTargets.ts';
 import type { ArtifactStore } from '../ports/ApplicationPorts.ts';
 import type { NativeCaseRunner, NativeSnapshotter, NativeTestStore, NativeCaseObservation } from '../ports/NativeEvaluationPorts.ts';
 import type { NativeToolchainInput } from '../ports/LanguageToolchainPorts.ts';
 import type { StageExecutionContext } from './WorkbenchStages.ts';
-type Prepared = { set: NativeTestSet; reused: number; proposed: number; revalidated: boolean; rejection: 'TRUSTED_GATE_CONFLICT' | 'CANDIDATE_REJECTED' | null };
+type Prepared = { set: NativeTestSet; reused: number; proposed: number; revalidated: boolean; rejection: 'TRUSTED_GATE_CONFLICT' | 'CANDIDATE_REJECTED' | null;
+  targetCoverage?: ReturnType<typeof nativeSupplementTargetCoverage> };
 type Context = Partial<Pick<StageExecutionContext, 'signal' | 'step' | 'progress'>>;
 export class NativeSuiteEvaluation {
   readonly dependencies: { artifacts: ArtifactStore; runner: NativeCaseRunner; snapshot: NativeSnapshotter; store: NativeTestStore };
@@ -59,7 +61,7 @@ export class NativeSuiteEvaluation {
     projectSnapshotId: string; sourceRevision: string; cardIds: string[]; versionIds: string[]; bodyRefs: ArtifactRef[];
     reference: NativeToolchainInput; contract: NativeContract; policyDigest: string;
     propose: () => Promise<NativeBehaviorSuite>; expectedToolchainDigest?: string;
-    supplement?: { schemaVersion: 'native-supplement-v1'; demandDigest: string };
+    supplement?: { schemaVersion: 'native-supplement-v1'; demandDigest: string; targets?: NativeSupplementTargets };
   }, context: Context = {}): Promise<Prepared> {
     const { artifacts, snapshot, store } = this.dependencies;
     if (!input.versionIds.length || input.versionIds.length !== input.bodyRefs.length || input.cardIds.length !== input.bodyRefs.length || new Set(input.versionIds).size !== input.versionIds.length) throw new Error('NATIVE_TEST_BINDING_INVALID');
@@ -67,6 +69,7 @@ export class NativeSuiteEvaluation {
     const fingerprint = await snapshot(input.reference.language, input.reference.build, context.signal);
     if (input.expectedToolchainDigest && input.expectedToolchainDigest !== fingerprint.digest) throw new Error('NATIVE_TEST_TOOLCHAIN_CHANGED');
     if (input.supplement && (input.supplement.schemaVersion !== 'native-supplement-v1' || !/^[a-f0-9]{64}$/.test(input.supplement.demandDigest))) throw new Error('NATIVE_SUPPLEMENT_INVALID');
+    if (input.supplement?.targets) nativeSupplementTargetCoverage(input.supplement.targets, { schemaVersion: 'native-cases-v1', cases: [] });
     const reference = await this.manifest(input.reference);
     const binding = { cardIds: [...input.cardIds], knowledgeBodyDigests: input.bodyRefs.map((ref) => ref.sha256), referenceDigest: sha256(JSON.stringify(reference)),
       interfaceDigest: sha256(canonicalJson(input.contract)), policyDigest: input.supplement ? sha256(canonicalJson({ policyDigest: input.policyDigest, supplement: input.supplement })) : input.policyDigest, toolchainDigest: fingerprint.digest };
@@ -97,11 +100,19 @@ export class NativeSuiteEvaluation {
     if (proposedSuite) assertNativeBehaviorSuite(proposedSuite, input.contract);
     let candidateObservations: NativeCaseObservation[] | undefined;
     let candidateRejected = false;
+    const targetCoverage = input.supplement?.targets && proposedSuite ? nativeSupplementTargetCoverage(input.supplement.targets, proposedSuite) : undefined;
     if (input.supplement && proposedSuite) {
       nativeSupplementGates(historicalSuites, proposedSuite);
       const ref = await this.put(proposedSuite);
-      candidateObservations = await this.cases('reference', `supplement:${sha256(canonicalJson(binding))}:${ref.sha256}`, input.reference, input.contract, proposedSuite, context);
-      candidateRejected = !nativeOracleTrusted(proposedSuite, candidateObservations);
+      if (targetCoverage) {
+        const persist = async () => ({ artifactRefs: [await this.put(targetCoverage), ref],
+          summary: { candidateEligible: targetCoverage.candidateEligible, semanticCoverageProven: false } });
+        if (context.step) await context.step(`native:supplement-targets:${sha256(canonicalJson(binding))}:${ref.sha256}`, persist);
+        else await persist();
+      }
+      candidateObservations = targetCoverage && !targetCoverage.candidateEligible ? []
+        : await this.cases('reference', `supplement:${sha256(canonicalJson(binding))}:${ref.sha256}`, input.reference, input.contract, proposedSuite, context);
+      candidateRejected = targetCoverage?.candidateEligible === false || !nativeOracleTrusted(proposedSuite, candidateObservations);
     }
     const gates = input.supplement && proposedSuite && !candidateRejected
       ? nativeSupplementGates(historicalSuites, proposedSuite) : nativeTrustedGates(proposedSuite ? [proposedSuite] : historicalSuites);
@@ -137,6 +148,7 @@ export class NativeSuiteEvaluation {
       parentTestSetId: parent?.testSetId ?? null, originVersionIds: [...input.versionIds], projectSnapshotId: input.projectSnapshotId, sourceRevision: input.sourceRevision,
       binding: bound, inheritedTestSetIds: inherited.map((item) => item.testSetId), sectionBindings, status: nativeOracleTrusted(suite, observations) ? 'TRUSTED' : 'REJECTED', suiteRef, oracleRef, referenceRef, fingerprintRef, createdAt: new Date().toISOString() });
     return { set, reused, proposed: proposedSuite?.cases.length ?? 0, revalidated: Boolean(inherited.length),
+      ...(targetCoverage ? { targetCoverage } : {}),
       rejection: set.status === 'TRUSTED' ? null : candidateRejected || !inherited.length ? 'CANDIDATE_REJECTED' : 'TRUSTED_GATE_CONFLICT' };
   }
   async evaluate(testSetId: string, generated: NativeToolchainInput, contract: NativeContract, context: Context = {}) {
