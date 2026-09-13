@@ -268,3 +268,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 - 2026-09-11-1515：来源未知需求经Domain/App/HTTP/Console交接补充评测，受控三场景通过；随后v17一键与部署见1521/1535。目标引用覆盖缺口在真实补证中发现，9月14日继续处理。[原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/3b83ac6c7921d4c522e9ab7bfcd1f881050ea792/docs/epitaph/2026-09-11-1515-source-supplement-entry.md)。
 
 - 2026-09-11-1521：v17一键补证与部分修订推进，104单测通过；jsmn新版31可信/11固定通过但来源当时运行。后续source51992终态UNRESOLVED及部署见1535；9月14日全回归494通过已确认。[原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/ce81da2ca0837bb216a25812af86ae58101277f3/docs/epitaph/2026-09-11-1521-pipeline-supplement-v17.md)。
+
+- 2026-09-11-1535：网站部署dc3dbf8，保留原runtime与回退、免登录；公开站点桌面/窄屏通过。source51992最终SUCCEEDED/UNRESOLVED，后续补证f1未晋升。部署完整路径、恢复命令与证据见[原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/53e7c51618527fa49ed7aa1758262d6409cfe815/docs/epitaph/2026-09-11-1535-workbench-deployed.md)。
