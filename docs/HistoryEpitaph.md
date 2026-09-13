@@ -270,3 +270,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 - 2026-09-11-1521：v17一键补证与部分修订推进，104单测通过；jsmn新版31可信/11固定通过但来源当时运行。后续source51992终态UNRESOLVED及部署见1535；9月14日全回归494通过已确认。[原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/ce81da2ca0837bb216a25812af86ae58101277f3/docs/epitaph/2026-09-11-1521-pipeline-supplement-v17.md)。
 
 - 2026-09-11-1535：网站部署dc3dbf8，保留原runtime与回退、免登录；公开站点桌面/窄屏通过。source51992最终SUCCEEDED/UNRESOLVED，后续补证f1未晋升。部署完整路径、恢复命令与证据见[原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/53e7c51618527fa49ed7aa1758262d6409cfe815/docs/epitaph/2026-09-11-1535-workbench-deployed.md)。
+
+- 2026-09-14-0052：ce81da2新增补证目标Domain和原生服务可选检查，零命中候选不执行且原可信不变；6定向/类型/Spec通过，之后53e7已接阶段与页面。基线494回归确认，完整真实验收仍未完成。[原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/036a864ea3aa0ad8ba9b284ec9f7944831356417/docs/epitaph/2026-09-14-0052-supplement-target-check.md)。
