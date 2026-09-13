@@ -1,7 +1,0 @@
-# C++ 当前配置重建与可信评测通过
-
-本轮确认新Code stage-17d6c7f60c1267ae1605903c7fcf430dbc66149387e9038dd20986cedf541e8c SUCCEEDED，1调用42951 tokens，37495ms，同9卡，接口compatible。旧session45741/PID3638261结束。新可信 stage-9ea26f4d44ef2010c9853cd148e48e8f1fedc26c45bdee13d9588a321fb895a3 SUCCEEDED，37/37，reused37/proposed0/revalidatedtrue，117646ms、0模型调用。set native-tests-613ba1dca90c0975842972ac3a4b0e2dbe25424e19cef3e1f5b6f3536055b467，report f4b6a9d4324090579f41c0ef4e6c788ec02e383afc2f336921087b050a40d060。cpp-evaluation-current-provider/ImmutableGateAudit.json CAS比较与旧537782整套suite完全一致。session20797/PID3640057已结束。
-
-随后已启动同新Code固定评测 stage-4db04d343b050a929aaf224665e30280d5e3e1f40014fd45da3632aca4a2002e，session39041/PID3644367仍live。driver /tmp/RunCppFixedCurrentProvider.ts，从旧0c881读取并校验原suiteRefs，输出 /tmp/CppFixedCurrentProvider.log 与 cpp-fixed-current-provider/Fixed.json。下一轮先poll此handle，勿重启；通过后以当前可信9ea26创建C++新scope来源（可从/tmp/RunSourceAfterTargets.ts派生driver改评测ID与证据目录），再处理实际来源结果。
-
-更新WorkbenchAcceptance报告为C源53段终态、scope历史修复6测试、ec72网站部署以及当前C++绑定；报告仍不宣称完整通过。此前C source54a的5差异/5未知仍需实际修订，不能清除；后续同版本恢复预算保留。全套Node/Console/markdownLite、浏览器、一键分步/关联与发布验收仍待补。当前代码0ae56fe，网站ec72尚未含历史修复。无新产品改动，diff检查通过。
