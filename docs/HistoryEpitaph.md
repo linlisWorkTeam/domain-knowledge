@@ -294,3 +294,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 - 2026-09-14-0215：C++当前17d6重建成功、9ea26可信37/37且整套旧suite一致，随后同Code固定4db04启动并已40/40通过，见0216。[原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/572c78bfb54d02946c815cb154148de224c9885b/docs/epitaph/2026-09-14-0215-cpp-trusted-current.md)。
 
 - 2026-09-14-0216：C++同17d6生成代码可信37/37、固定4db04 40/40通过，来源508961启动，scope/fingerprint/reference CAS及检查点绑定已核验，单构建不是全宏验证。[原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/3ded0a172ff46849b54278e30ef5416551954067/docs/epitaph/2026-09-14-0216-cpp-source-started.md)。
+
+- 2026-09-14-0243：C++来源508961首次非JSON失败14调用后同任务恢复，保留13完成段落和累计用量；随后持续推进，最新handle见0332。[原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/49f8a6f28dadfbf5aff2533af407239e5c066fcb/docs/epitaph/2026-09-14-0243-cpp-source-resume.md)。

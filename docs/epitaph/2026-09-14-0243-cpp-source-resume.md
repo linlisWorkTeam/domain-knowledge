@@ -1,7 +1,0 @@
-# C++ 来源非JSON失败后的同任务恢复
-
-前轮为已确认进程存活的等待。本轮旧PID3648340消失，日志明确stage-5089612faaa3ef67a2d36d24f4cc188e9f7408133e825775be1f872840d1fee6 FAILED/DSH_AGENT_OUTPUT_NOT_JSON，elapsed1631813ms、14calls1021139tokens、reserved3345725。不因观察超时重启；此处已明确终态。旧session22922结束，日志/tmp/CppSourceCurrentProvider.log保留。
-
-使用既有driver同ID参数恢复：/tmp/RunCppSourceCurrentProvider.ts stage-5089612faaa3ef67a2d36d24f4cc188e9f7408133e825775be1f872840d1fee6。新session91373/PID3656587，日志/tmp/CppSourceCurrentProviderResume.log；Source.json仍同证据目录cpp-source-current-provider。ResumeUsageAudit.json验证原taskId、tokens/modelCalls未下降。恢复最初RUNNING仍14calls1021139tokens；13个已完成source-section检查点保留，6匹配/6差异/1未知；整卡未完成，不能发布或抹除差异。
-
-下一轮先poll91373/PID3656587，不再等旧PID。保持单模型/构建串行，遇终态再按实际原因处理。当前C++同新Code37可信+40固定通过及scope证据见0215/0216；C source54a五差异/五未知仍需实际修订。网站ec72（历史修复未部署），完整Node/Console/markdownLite/浏览器/真实一键分步/关联与发布尚待补齐。此次无产品改动，diff通过，目标继续。
