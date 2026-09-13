@@ -284,3 +284,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 - 2026-09-14-0122：Console 展示冻结构建配置与原始材料下载，旧任务不伪造范围；随后 b5d 修复运行中证据绑定。页面单测通过，当时尚未部署。[原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/ec72c43893d8b929e29484e4368e54c9ebded511/docs/epitaph/2026-09-14-0122-source-scope-panel.md)。
 
 - 2026-09-14-0126：来源执行范围在 Review 前保存检查点，免登录下载依然验证工件归属，等待状态避免提前404；5检查通过，后续已部署ec72。[原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/058bd421e5e7d3af96243eaa5613d98cbe6c0cc9/docs/epitaph/2026-09-14-0126-scope-download-checkpoint.md)。
+
+- 2026-09-14-0134：审计C++旧6c904/537782与fb5/0c881绑定不同，provider参数摘要也与当前不同，要求同9卡新配置重建。后续17d6已完成，可信9ea26通过，详见0215。[原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/0ae56fe9a620efbebf8cb34c058a8d797fe7c657/docs/epitaph/2026-09-14-0134-cpp-acceptance-bindings.md)。
