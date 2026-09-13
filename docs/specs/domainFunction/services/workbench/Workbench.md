@@ -238,8 +238,10 @@ Console提供“补充验证用例”动作，展示复用/新增/拒绝数量�
 
 一键补证契约升级为knowledge-pipeline-v17：来源无明确可修订意见但含完整绑定的未知章节时，冻结同Code的补充评测，下一轮复用Code及固定评测，重新执行可信/来源检查。记录unknownSections，只有其集合严格缩小算进展，连续三次不缩小暂停。旧v16及以前只读，不跨版本恢复。存在部分已保存修订及明确无新版本的UNRESOLVED卡时，校验完整替换映射后允许重建；质量拒绝、错误映射或无新版本仍停止。最终来源门禁不变。
 
-### 补证目标命中约束（领域与原生服务已实现，阶段交接待接入）
+### 补证目标命中约束（已接入新补证任务，真实验收继续）
 
 真实补证f1c54生成29个候选，2个参考失败且整批未晋升，旧31可信例保留；审计同时确认候选未引用6个请求补证章节中的任何一个。不能以“新增用例”替代实际补证。新增冻结的补证目标策略要求至少一个候选引用本次需求中的精确cardId#H2；未命中时在编译前记录候选与目标缺口，拒绝晋升并向下一次TestGen提供反馈。保留各未命中章节供来源复核，不伪造全覆盖。命中标签仅说明定位，不证明语义正确，更不允许把无法用行为用例证明的摘要/来源元信息伪装成行为门禁通过。普通评测及旧冻结输入不在恢复时注入新规则；策略必须有显式版本并进入阶段输入和缓存身份。测试应覆盖真实无命中候选拒绝、同输入恢复反馈、原可信期望不变，以及仅部分命中时仍保留未解决章节。
 
-当前NativeSupplementTargets使用native-supplement-targets-v1规范化并校验精确章节集合，区分matched/unmatched与semanticCoverageProven=false。NativeSuiteEvaluation仅在显式传入targets时启用，策略进入缓存摘要；零命中保存候选/覆盖检查点与空参考观察并拒绝，不执行候选。未传入targets的旧执行保持原契约。阶段prepare冻结、拒绝反馈及Console显示仍待接入，不能宣称线上已启用。
+当前NativeSupplementTargets使用native-supplement-targets-v1规范化并校验精确章节集合，区分matched/unmatched与semanticCoverageProven=false。NativeSuiteEvaluation仅在显式传入targets时启用，策略进入缓存摘要；零命中保存候选/覆盖检查点与空参考观察并拒绝，不执行候选。未传入targets的旧执行保持原契约。阶段prepare冻结、拒绝反馈及Console显示现已接入，尚未部署此变更。
+
+WorkbenchEvaluation新补证输入冻结supplementTargets及其显式contract，执行时与冻结来源需求完整比对，再按模块交接。候选拒绝报告包含targetCoverage；同任务恢复将缺口和旧候选反馈给TestGen，使用原累计预算。成功结果和缓存读取也提供段落定位报告；页面显示未命中段落，零命中明确说明未执行候选。若同来源/代码已有旧策略任务，prepare保留其原身份和策略，不以新任务替代重试。旧任务升级新策略的显式预算迁移尚未提供。

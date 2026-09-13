@@ -266,3 +266,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 - 2026-09-11-1508：8b8a7f3补充评测服务与真实SQLite/CAS测试；原评测3/3、架构8/8。真实修订孤儿租约回收后发现供应商验证过期，原配置重验后恢复成功。后续来源/一键及部署见1515/1521/本次。[原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/3b83ac6c7921d4c522e9ab7bfcd1f881050ea792/docs/epitaph/2026-09-11-1508-native-supplement-service.md)。
 
 - 2026-09-11-1515：来源未知需求经Domain/App/HTTP/Console交接补充评测，受控三场景通过；随后v17一键与部署见1521/1535。目标引用覆盖缺口在真实补证中发现，9月14日继续处理。[原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/3b83ac6c7921d4c522e9ab7bfcd1f881050ea792/docs/epitaph/2026-09-11-1515-source-supplement-entry.md)。
+
+- 2026-09-11-1521：v17一键补证与部分修订推进，104单测通过；jsmn新版31可信/11固定通过但来源当时运行。后续source51992终态UNRESOLVED及部署见1535；9月14日全回归494通过已确认。[原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/ce81da2ca0837bb216a25812af86ae58101277f3/docs/epitaph/2026-09-11-1521-pipeline-supplement-v17.md)。

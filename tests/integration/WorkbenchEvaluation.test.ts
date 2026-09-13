@@ -23,7 +23,7 @@ for (const { rejectSourceReview, mixedSourceRisks } of [{ rejectSourceReview: fa
   writeFileSync(join(root, 'math.c'), '#include "math.h"\n/* REFERENCE_PRIVATE */\nint add(int a,int b){return a+b;}');
   git('add', '.'); git('commit', '-qm', 'Fixed reference');
   let composition = createComposition({ runtimeDir }); let testCalls = 0, codeCalls = 0, generatedRuns = 0, reviewCalls = 0, revisionCalls = 0, sourceReviewCalls = 0;
-  let supplementRequested = false; let exposeMixedRisk = false; let acceptFalseSource = false; let interruptSourceSection = true; const sectionCalls = new Map<string, number>();
+  let supplementMissesTarget = true; let supplementRequested = false; let exposeMixedRisk = false; let acceptFalseSource = false; let interruptSourceSection = true; const sectionCalls = new Map<string, number>();
   let wrongCandidate = true, wrongCode = false, interrupt = true, reviewKeepsKnowledge = false;
   const install = () => {
     const deps = composition.apps.workbenchReconstruction.dependencies;
@@ -72,7 +72,9 @@ for (const { rejectSourceReview, mixedSourceRisks } of [{ rejectSourceReview: fa
       if (testCalls === 2) { assert.match(request.prompt, /NATIVE_BEHAVIOR_MISMATCH/); assert.match(request.prompt, /rejectedCandidate/); }
       if (supplementRequested) {
         assert.match(request.prompt, /missing|unknown/); assert.match(request.prompt, /card-add#Limits/);
-        return { oracleRequired: true, nativeSuite: { schemaVersion: 'native-cases-v1', cases: [{ caseId: 'zero', description: 'Zero boundary', sections: ['card-add#Limits'], variables: [],
+        assert.match(request.prompt, /native-supplement-targets-v1/);
+        if (!supplementMissesTarget) { assert.match(request.prompt, /targetCoverage/); assert.match(request.prompt, /unmatchedSectionIds/); }
+        return { oracleRequired: true, nativeSuite: { schemaVersion: 'native-cases-v1', cases: [{ caseId: 'zero', description: 'Zero boundary', sections: [supplementMissesTarget ? 'card-add#Behavior' : 'card-add#Limits'], variables: [],
           calls: [{ function: 'add', arguments: [{ integer: '0' }, { integer: '0' }], result: 'sum' }], observations: [{ name: 'sum', kind: 'integer', read: { variable: 'sum' } }], expected: { sum: '0' } }] } };
       }
       return { oracleRequired: true, nativeSuite: { schemaVersion: 'native-cases-v1', cases: [{ caseId: 'sum', description: 'Sum from fixed inputs',
@@ -130,7 +132,8 @@ for (const { rejectSourceReview, mixedSourceRisks } of [{ rejectSourceReview: fa
     wrongCode = true;
     const revised = await composition.apps.flywheel.ingestCandidate({ ...input, body: input.body.replace('The sum', 'The difference') + '\nOverflow is excluded explicitly.' });
     const rebuilt = await composition.apps.workbenchReconstruction.start(project.snapshotId, [revised.version.versionId]);
-    assert.equal((await composition.apps.workbenchStages.wait(rebuilt.taskId)).status, 'SUCCEEDED');
+    const rebuiltDone = await composition.apps.workbenchStages.wait(rebuilt.taskId);
+    assert.equal(rebuiltDone.status, 'SUCCEEDED', rebuiltDone.reasonCode ?? '');
     const next = await composition.apps.workbenchEvaluation.start(rebuilt.taskId);
     const failedBehavior = await composition.apps.workbenchStages.wait(next.taskId);
     assert.equal(failedBehavior.status, 'SUCCEEDED', failedBehavior.reasonCode ?? '');
@@ -231,6 +234,7 @@ for (const { rejectSourceReview, mixedSourceRisks } of [{ rejectSourceReview: fa
     assert.equal((await composition.apps.workbenchStages.wait(luckyCode.taskId)).status, 'SUCCEEDED');
     const luckyTask = await composition.apps.workbenchEvaluation.start(luckyCode.taskId);
     const lucky = await composition.apps.workbenchStages.wait(luckyTask.taskId);
+    assert.equal(lucky.status, 'SUCCEEDED', lucky.reasonCode ?? '');
     assert.equal((lucky.result!.summary.modules as any[])[0].status, 'BEHAVIOR_PASSED');
     assert.equal((await composition.apps.workbenchEvaluation.revisionEvidence(luckyTask.taskId)).modules[0]!.nextAction, 'NO_BEHAVIOR_REVISION_REQUIRED');
     let falseSource = await composition.apps.workbenchSourceVerification.start(luckyTask.taskId);
@@ -330,13 +334,27 @@ for (const { rejectSourceReview, mixedSourceRisks } of [{ rejectSourceReview: fa
       supplementRequested = true;
       const supplemental = await composition.apps.workbenchEvaluation.start(sourceRebuilt.taskId, rechecked.taskId);
       assert.equal(supplemental.input.parameters.supplementContract, 'knowledge-test-supplement-v1');
+      assert.equal((supplemental.input.parameters.supplementTargets as any).contract, 'native-supplement-targets-v1');
+      const rejected = await composition.apps.workbenchStages.wait(supplemental.taskId);
+      assert.equal(rejected.status, 'FAILED'); assert.equal(rejected.reasonCode, 'TEST_CANDIDATE_REJECTED');
+      const checkpoint = composition.apps.workbenchStages.store.checkpoints(supplemental.taskId).find(item => item.key.startsWith('candidate-rejection:'))!;
+      const rejection = JSON.parse(Buffer.from(await composition.artifacts.get(checkpoint.result.artifactRefs[0]!)).toString());
+      assert.equal(rejection.targetCoverage.candidateEligible, false);
+      assert.deepEqual(rejection.targetCoverage.unmatchedSectionIds, ['card-add#Limits']);
+      assert.equal(rejection.cases[0].observation, undefined);
+      assert.equal((await composition.apps.workbenchEvaluation.start(sourceRebuilt.taskId, rechecked.taskId)).taskId, supplemental.taskId);
+      await composition.close(); composition = createComposition({ runtimeDir }); install();
+      supplementMissesTarget = false;
+      composition.apps.workbenchStages.resume(supplemental.taskId, supplemental.inputDigest);
       const done = await composition.apps.workbenchStages.wait(supplemental.taskId);
+      assert.equal(done.usage.modelCalls, rejected.usage.modelCalls + 1);
+      assert.equal(done.usage.tokens, rejected.usage.tokens + 5);
       assert.equal(done.status, 'SUCCEEDED', done.reasonCode ?? '');
       const report = (done.result!.summary.modules as any[])[0];
       assert.equal(report.proposed, 1); assert.equal(report.reused, 1); assert.equal(report.passed, 2);
-      assert.equal(testCalls, 3);
+      assert.equal(testCalls, 4);
       assert.equal((await composition.apps.workbenchEvaluation.start(sourceRebuilt.taskId, rechecked.taskId)).taskId, supplemental.taskId);
-      assert.equal(testCalls, 3);
+      assert.equal(testCalls, 4);
       await assert.rejects(composition.apps.workbenchEvaluation.prepare(changedCode.taskId, rechecked.taskId), /NATIVE_SUPPLEMENT_BINDING_INVALID/);
     }
   } finally { await composition.close(); rmSync(root, { recursive: true, force: true }); rmSync(runtimeDir, { recursive: true, force: true }); }

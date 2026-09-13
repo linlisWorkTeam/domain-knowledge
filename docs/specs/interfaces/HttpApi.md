@@ -203,3 +203,5 @@ GET /api/v1/stage-tasks 支持 snapshotId、stage 查询参数，与 projectId �
 独立来源修订新输入冻结sourceCorrectionPolicy=source-correction-selection-v1，可选择整卡UNRESOLVED内已绑定且自身无未知风险的明确矛盾章节，原整卡风险仍保留。无policy旧输入继续原选择，未知policy拒绝；相同新policy输入复用同任务。Console为此提供来源修订与已保存/已索引版本重建入口，不把局部修订或重建标成发布通过。
 
 一键v16在混合风险中允许明确来源纠正及已保存/已索引的局部修订继续重建，风险本身不解除；缺索引、质量拒绝、无明确纠正均停止。完整来源未通过不得关联或发布，旧v15只读。
+
+原生补证评测新任务在服务端冻结supplementTargets（native-supplement-targets-v1），前端不编辑该策略。评测报告可包含targetCoverage的matchedSectionIds、unmatchedSectionIds、candidateEligible与semanticCoverageProven=false。未命中仍返回TEST_CANDIDATE_REJECTED，保留原任务恢复入口和累计用量；已存在的旧补证任务不自动升级或替换。
