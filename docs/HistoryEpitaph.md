@@ -292,3 +292,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 - 2026-09-14-0210：C来源54a完成53段、5差异/5未知；原生测试发现新scope任务错误早复用，0ae56fe限定旧策略分支后原断言6/6通过。启动C++新Code17d6，后续可信/固定均通过。[原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/e89be2e6ff80554131cea9164759bb62d5366f84/docs/epitaph/2026-09-14-0210-source-history-recovery.md)。
 
 - 2026-09-14-0215：C++当前17d6重建成功、9ea26可信37/37且整套旧suite一致，随后同Code固定4db04启动并已40/40通过，见0216。[原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/572c78bfb54d02946c815cb154148de224c9885b/docs/epitaph/2026-09-14-0215-cpp-trusted-current.md)。
+
+- 2026-09-14-0216：C++同17d6生成代码可信37/37、固定4db04 40/40通过，来源508961启动，scope/fingerprint/reference CAS及检查点绑定已核验，单构建不是全宏验证。[原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/3ded0a172ff46849b54278e30ef5416551954067/docs/epitaph/2026-09-14-0216-cpp-source-started.md)。
