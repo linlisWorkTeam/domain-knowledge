@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：验证发布准备重读卡片并拒绝缺失或被篡改的递归工件。
  */
+import { SOURCE_EXECUTION_SCOPE, sourceExecutionScope } from '../../src/domain/services/knowledge/SourceExecutionScope.ts';
 import { sourceEvidenceBindings } from '../../src/domain/services/knowledge/SourceEvidenceBindings.ts';
 import assert from 'node:assert/strict';
 import { sha256, type ArtifactRef, type KnowledgeVersion } from '../../src/domain/Domain.ts';
@@ -14,7 +15,7 @@ import { sourceSectionObservations } from '../../src/domain/services/knowledge/K
 import type { NativeBehaviorSuite } from '../../src/domain/services/evaluation/NativeBehaviorSuite.ts';
 import { nativeTestKeys, type NativeTestSet } from '../../src/domain/services/evaluation/NativeTestCache.ts';
 import { canonicalJson, createStageTask } from '../../src/domain/services/workbench/StageTask.ts';
-export async function createPublicationPreparationFixture(options: { sourceEvidencePolicy?: string } = {}) {
+export async function createPublicationPreparationFixture(options: { sourceEvidencePolicy?: string; executionScope?: boolean } = {}) {
   const seed = publicationFixture(); const contents = new Map<string, Buffer>(); let puts = 0;
   const put = async (data: Uint8Array, mediaType: string): Promise<ArtifactRef> => {
     puts++; const buffer = Buffer.from(data); const digest = sha256(buffer); contents.set(digest, buffer);
@@ -23,7 +24,8 @@ export async function createPublicationPreparationFixture(options: { sourceEvide
   await put(Buffer.from('{"files":[]}'), 'application/json');
   await put(Buffer.from(canonicalJson(publicationConfiguration)), 'application/json');
   await put(Buffer.from(JSON.stringify(publicationApi)), 'application/json');
-  const fingerprintRef = await put(Buffer.from(JSON.stringify({ digest: sha256('toolchain') })), 'application/json');
+  let fingerprintRef = await put(Buffer.from(JSON.stringify({ digest: sha256('toolchain') })), 'application/json');
+  if (options.executionScope) fingerprintRef = await put(Buffer.from(JSON.stringify({ digest: sha256('toolchain'), schemaVersion: 'native-toolchain-v1', language: 'c', build: buildConstraints(), architecture: 'x64' })), 'application/json');
   const sourceContent = 'int value(void) { return 1; }';
   const sourceRef = await put(Buffer.from(sourceContent), 'text/plain');
   const module = { moduleId: 'module', language: 'c' as const, sourcePaths: ['module.c'], testPaths: [], selectedByDefault: true, reasons: [] };
@@ -32,6 +34,7 @@ export async function createPublicationPreparationFixture(options: { sourceEvide
   const project = createProjectSnapshot({ repositoryId: 'repository', directory: '/reference', commit: 'commit', sourceDigest: seed.reconstruction.input.sourceDigest,
     modules: [module], build: buildConstraints(), sourceFiles: [{ path: 'module.c', objectId: 'object', kind: 'source', ref: sourceRef }], manifestRef }, 'now');
   const input = publicationFixture({ projectId: project.projectId, snapshotId: project.snapshotId });
+  if (options.executionScope) input.fixedEvaluation.input.parameters.fingerprints = { c: JSON.parse(JSON.stringify(fingerprintRef)) };
   const bodyRef = await put(Buffer.from(publicationBody), 'text/markdown');
   const nestedRef = await put(Buffer.from('audit'), 'text/plain');
   const suite = { schemaVersion: 'native-cases-v1', cases: ['a', 'b'].map(caseId => ({ caseId, description: 'value', sections: ['card#value'], variables: [], calls: [{ function: 'value', arguments: [], result: 'value' }],
@@ -66,6 +69,9 @@ export async function createPublicationPreparationFixture(options: { sourceEvide
   Object.assign((input.evaluation.result!.summary.modules as Array<Record<string, unknown>>)[0]!, { testSetId: set.testSetId, reportRef: trustedReportRef });
   input.sourceVerification.input.parameters.evaluationDigest = sha256(canonicalJson(input.evaluation.result));
   if (options.sourceEvidencePolicy) input.sourceVerification.input.parameters.sourceEvidencePolicy = options.sourceEvidencePolicy;
+  const executionScope = options.executionScope ? sourceExecutionScope(set, JSON.parse(contents.get(referenceRef.sha256)!.toString()), JSON.parse(contents.get(fingerprintRef.sha256)!.toString()), project.build) : undefined;
+  const executionScopesRef = executionScope ? await put(Buffer.from(canonicalJson([{ moduleId: 'module', scope: executionScope }])), 'application/json') : undefined;
+  if (executionScopesRef) { input.sourceVerification.input.parameters.sourceExecutionPolicy = SOURCE_EXECUTION_SCOPE; input.sourceVerification.input.parameters.executionScopesRef = JSON.parse(JSON.stringify(executionScopesRef)); }
   const sourceIdentity = createStageTask(input.sourceVerification.input, {}, 'now');
   input.sourceVerification.taskId = sourceIdentity.taskId; input.sourceVerification.inputDigest = sourceIdentity.inputDigest;
   const sourceReferenceRef = await put(Buffer.from(JSON.stringify({ schemaVersion: 'knowledge-source-verification-v4', sourceRevision: 'commit', sourceDigest: project.sourceDigest, files: [{ path: 'module.c', content: sourceContent }] })), 'application/json');
@@ -74,6 +80,7 @@ export async function createPublicationPreparationFixture(options: { sourceEvide
   const observationsRef = await put(Buffer.from(JSON.stringify(sourceObservations)), 'application/json');
   const criteriaRef = await put(Buffer.from(JSON.stringify({ schemaVersion: 'knowledge-source-verification-v4', phase: 'FINAL_SOURCE_REVIEW', binding: input.cards[0],
     ...(options.sourceEvidencePolicy ? { sourceEvidenceBindings: sourceEvidenceBindings(options.sourceEvidencePolicy, project, 'module') } : {}),
+    ...(executionScope ? { executionScope } : {}),
     section: 'Value', verifyPreamble: true, allowedKnowledgePaths: ['knowledge/knowledge-unit.md#Value'] })), 'application/json');
   const rawRef = await put(Buffer.from(JSON.stringify({ recommendation: 'PASS', blocking: false, correction: null })), 'application/json');
   const command = { schemaVersion: '1.0', commandId: 'source-command', runId: input.sourceVerification.taskId, agentType: 'review', generationKey: sha256('source'),
@@ -84,7 +91,7 @@ export async function createPublicationPreparationFixture(options: { sourceEvide
   const sourceSections = [{ ...input.cards[0], section: 'Value', outcome: 'SOURCE_MATCHED', reviewRef: rawRef, reviewResultRef: resultRef,
     referenceRef: sourceReferenceRef, referenceObservationsRef: observationsRef, criteriaRef }];
   (input.sourceVerification.result!.summary.cards as Array<Record<string, unknown>>)[0]!.sections = sourceSections;
-  input.sourceVerification.result!.artifactRefs = [rawRef, resultRef, sourceReferenceRef, observationsRef, criteriaRef];
+  input.sourceVerification.result!.artifactRefs = [rawRef, resultRef, sourceReferenceRef, observationsRef, criteriaRef, ...(executionScopesRef ? [executionScopesRef, referenceRef, fingerprintRef] : [])];
   const records = [input.reconstruction, input.evaluation, input.fixedEvaluation, input.sourceVerification];
   const card = { versionId: 'version', moduleId: 'knowledge-unit', bodyRef, title: 'Value', description: 'Returns a value', tags: ['c'], provenance: [{ path: 'module.c', commit: 'commit' }], metadata: { cardId: 'card', sourceModule: 'module', projectSnapshotId: project.snapshotId } } as unknown as KnowledgeVersion;
   const service = new WorkbenchPublicationEvidence({ contracts: new JsonSchemaAgentContractValidator('docs/specs/schemas'), projects: { get: () => structuredClone(project) }, tests: { get: id => id === set.testSetId ? structuredClone(set) : null }, stages: { get(id) { const task = records.find(task => task.taskId === id); assert.ok(task); return structuredClone(task); } },

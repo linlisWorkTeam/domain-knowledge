@@ -4,6 +4,8 @@
  * 文件功能：对全部冻结卡片执行独立来源复核，保留纠正意见而不伪造行为失败。
  */
 import { SOURCE_EVIDENCE_POLICY, sourceEvidenceBindings } from '../../domain/services/knowledge/SourceEvidenceBindings.ts';
+import { SOURCE_EXECUTION_SCOPE, sourceExecutionScope } from '../../domain/services/knowledge/SourceExecutionScope.ts';
+import { moduleBuild, type WorkbenchProjectSnapshot } from '../../domain/services/workbench/WorkbenchProject.ts';
 import { WorkbenchSourceFindingHistory, type SourceFindingProof } from './WorkbenchSourceFindingHistory.ts';
 import { SOURCE_REVIEW_POLICY, readSourceReviewPolicy } from '../../domain/services/knowledge/SourceReviewPolicy.ts';
 import { sha256, type ArtifactRef } from '../../domain/Domain.ts';
@@ -26,23 +28,42 @@ export class WorkbenchSourceVerification {
     return JSON.parse(Buffer.from(await artifacts.get(ref)).toString('utf8')) as T;
   }
   async start(evaluationTaskId: string) { return this.evaluation.dependencies.stages.start(await this.prepare(evaluationTaskId)); }
+  private async executionScopes(project: WorkbenchProjectSnapshot, modules: Array<{ moduleId: string; testSetId: string }>) {
+    const scopes = [];
+    for (const module of modules) {
+      const set = this.evaluation.dependencies.evaluation.dependencies.store.get(module.testSetId);
+      if (!set || set.projectSnapshotId !== project.snapshotId || set.sourceRevision !== project.commit) throw new Error('SOURCE_EXECUTION_BINDING_INVALID');
+      const reference = await this.load<Parameters<typeof sourceExecutionScope>[1]>(set.referenceRef);
+      const toolchain = await this.load<Parameters<typeof sourceExecutionScope>[2]>(set.fingerprintRef);
+      scopes.push({ moduleId: module.moduleId, scope: sourceExecutionScope(set, reference, toolchain, moduleBuild(project, module.moduleId)) });
+    }
+    return scopes.sort((a, b) => a.moduleId.localeCompare(b.moduleId));
+  }
   async prepare(evaluationTaskId: string): Promise<StageInput> {
     const { stages, artifacts, configuration } = this.evaluation.dependencies;
     const parent = stages.get(evaluationTaskId);
     if (parent.input.stage !== 'EVALUATE' || parent.input.parameters.operation !== undefined || parent.status !== 'SUCCEEDED' || !parent.result) throw new Error('SOURCE_VERIFICATION_EVALUATION_REQUIRED');
+    const existing = stages.store.list(parent.input.projectId).find(task => task.input.parameters.operation === 'KNOWLEDGE_SOURCE_VERIFICATION'
+      && task.input.parameters.verificationContract === SOURCE_VERIFICATION_CONTRACT && task.input.parameters.evaluationTaskId === evaluationTaskId);
+    if (existing) return existing.input;
     const evidence = await this.evaluation.revisionEvidence(evaluationTaskId);
     const configurationRef = parent.input.parameters.configurationRef as unknown as ArtifactRef;
     await configuration.assertStageCompatible(await this.load<StageModelConfiguration>(configurationRef));
     const priorFindingsRef = await artifacts.put(Buffer.from(JSON.stringify(await new WorkbenchSourceFindingHistory(this.evaluation).collect(parent))), 'application/json');
     const evidenceRef = await artifacts.put(Buffer.from(canonicalJson(evidence)), 'application/json');
+    const project = this.evaluation.dependencies.projects.get(String(parent.input.parameters.snapshotId));
+    if (!project) throw new Error('STAGE_INPUT_CHANGED');
+    const executionScopesRef = await artifacts.put(Buffer.from(canonicalJson(await this.executionScopes(project, evidence.modules))), 'application/json');
     return { ...parent.input, parameters: { operation: 'KNOWLEDGE_SOURCE_VERIFICATION', verificationContract: SOURCE_VERIFICATION_CONTRACT,
       sourceReviewPolicy: json(SOURCE_REVIEW_POLICY), sourceEvidencePolicy: SOURCE_EVIDENCE_POLICY,
+      sourceExecutionPolicy: SOURCE_EXECUTION_SCOPE, executionScopesRef: json(executionScopesRef),
       evaluationTaskId, evaluationDigest: sha256(canonicalJson(parent.result)), snapshotId: parent.input.parameters.snapshotId!,
       priorFindingsRef: json(priorFindingsRef), evidenceRef: json(evidenceRef), configurationRef: json(configurationRef) } };
   }
   async verify(context: StageExecutionContext) {
     const { stages, projects, repository, artifacts, roles, configuration } = this.evaluation.dependencies;
     const parameters = context.task.input.parameters;
+    if (parameters.sourceExecutionPolicy !== undefined && parameters.sourceExecutionPolicy !== SOURCE_EXECUTION_SCOPE) throw new Error('SOURCE_EXECUTION_POLICY_INVALID');
     const sourceReviewPolicy = readSourceReviewPolicy(parameters.sourceReviewPolicy);
     if (parameters.sourceEvidencePolicy !== undefined && parameters.sourceEvidencePolicy !== SOURCE_EVIDENCE_POLICY) throw new Error('SOURCE_EVIDENCE_POLICY_INVALID');
     if (parameters.operation !== 'KNOWLEDGE_SOURCE_VERIFICATION' || parameters.verificationContract !== SOURCE_VERIFICATION_CONTRACT) throw new Error('STAGE_CONTRACT_INCOMPATIBLE');
@@ -58,6 +79,8 @@ export class WorkbenchSourceVerification {
     const frozen = await this.load<StageModelConfiguration>(configRef); await configuration.assertStageCompatible(frozen);
     const project = projects.get(String(parameters.snapshotId));
     if (!project || project.snapshotId !== parent.input.parameters.snapshotId || project.commit !== context.task.input.sourceRevision || project.sourceDigest !== context.task.input.sourceDigest) throw new Error('STAGE_INPUT_CHANGED');
+    const executionScopes = parameters.sourceExecutionPolicy ? await this.executionScopes(project, evidence.modules) : [];
+    if (parameters.sourceExecutionPolicy && canonicalJson(executionScopes) !== canonicalJson(await this.load(parameters.executionScopesRef as unknown as ArtifactRef))) throw new Error('SOURCE_EXECUTION_BINDING_INVALID');
     const priorFindingsRef = parameters.priorFindingsRef as unknown as ArtifactRef;
     const proofs = await this.load<SourceFindingProof[]>(priorFindingsRef);
     if (!Array.isArray(proofs) || proofs.length > 1000) throw new Error('SOURCE_HISTORY_BINDING_INVALID');
@@ -70,12 +93,18 @@ export class WorkbenchSourceVerification {
     }
     const expected: SourceCardBinding[] = [], results: Array<SourceCardResult & Record<string, unknown>> = [];
     const refs: ArtifactRef[] = [parameters.evidenceRef as unknown as ArtifactRef, priorFindingsRef];
+    if (parameters.sourceExecutionPolicy) refs.push(parameters.executionScopesRef as unknown as ArtifactRef);
     for (const versionId of context.task.input.cardVersionIds) {
       const card = repository.getKnowledgeVersion(versionId);
       if (!card || typeof card.metadata.cardId !== 'string' || card.metadata.projectSnapshotId !== project.snapshotId || !await artifacts.verify(card.bodyRef)) throw new Error('SOURCE_VERIFICATION_CARD_UNBOUND');
       const module = project.modules.find(item => item.moduleId === card.metadata.sourceModule);
       const moduleEvidence = evidence.modules.find(item => item.moduleId === module?.moduleId);
       if (!module || !moduleEvidence) throw new Error('SOURCE_VERIFICATION_CARD_UNBOUND');
+      const executionScope = executionScopes.find(item => item.moduleId === module.moduleId)?.scope;
+      const executionMaterials = executionScope ? [
+        { ref: executionScope.referenceRef, content: await this.load(executionScope.referenceRef) },
+        { ref: executionScope.fingerprintRef, content: await this.load(executionScope.fingerprintRef) },
+      ] : [];
       const binding: SourceCardBinding = { cardId: card.metadata.cardId, versionId, moduleId: card.moduleId, bodyDigest: card.bodyRef.sha256 };
       expected.push(binding);
       const output = await context.step(`source-card:${versionId}`, async () => {
@@ -109,16 +138,18 @@ export class WorkbenchSourceVerification {
             const reportRef = await artifacts.put(Buffer.from(JSON.stringify(report)), 'application/json');
             const digestBindings = sourceEvidenceBindings(parameters.sourceEvidencePolicy, project, module.moduleId);
             const criteria = { schemaVersion: SOURCE_VERIFICATION_CONTRACT, phase: 'FINAL_SOURCE_REVIEW', binding,
+              ...(executionScope ? { executionScope, executionScopeInstruction: '本次参考测试使用executionScope中的固定构建与平台；definitions列出声明式编译定义，不是编译器全部预定义宏。SINGLE_FROZEN_BUILD不证明其他宏组合或平台已测试。结合源码判断该配置下的事实，不凭空补充覆盖，也不清除实际未知风险。' } : {}),
               ...(digestBindings ? { sourceEvidenceBindings: digestBindings } : {}),
               ...(sourceReviewPolicy ? { sourceReviewPolicy } : {}),
               applicationVerified: { artifactDigests: true, frozenVersionBindings: true }, section: heading, verifyPreamble: sectionIndex === 0, allowedKnowledgePaths: [`knowledge/${card.moduleId}.md#${heading}`],
               instruction: '本次只独立核对 section 指定的 H2 与固定源码的一致性。完整正文提供上下文，其他 H2 由独立调用复核，不属于本次纠正范围或未知风险。必须核对该节全部事实、边界和例子。verifyPreamble为true时也须核对标题及首个H2之前的文本；若该区域有无法在授权H2修正的矛盾，保留未解决风险，不能放行或修改其他区域。应用已验证提供工件的摘要和冻结来源绑定；无需重新计算摘要或联网审计。仍须检查正文对来源和版本的文字断言是否与提供的绑定相符。cases包含精确绑定当前卡片章节的完整参考用例；relatedObservations保留模块其他已验证观察的摘要，章节标签不能作为源码事实适用范围的硬边界。相关摘要不是完整输入定义，不据此推断未覆盖输入，判断关联性仍以固定源码为准；NO_DIRECT_BEHAVIOR_EVIDENCE 表示没有直接行为用例，不能虚构覆盖，也不自动否定可由固定源码证明的事实。参考观察明确标记PINNED_REFERENCE，只证明对应参考用例；不能推断所有可能输入都已验证。逐项核对边界、状态、接口及示例。与固定源码直接矛盾的事实必须指出，即使重建代码通过了行为测试。上游失败归因PASS不代表正文正确。发现明确错误时指向已有H2；缺少证据则保留风险。仅在当前 H2 无矛盾、无未知风险时PASS；这不是发布授权。' };
             const criteriaRef = await artifacts.put(Buffer.from(JSON.stringify(criteria)), 'application/json');
             const inputRefs = [card.bodyRef, referenceRef, reportRef, criteriaRef, moduleEvidence.suiteRef, moduleEvidence.oracleRef];
+            inputRefs.push(...executionMaterials.map(item => item.ref));
             await context.step(`source-materials:${versionId}:${sectionKey}`, async () => ({ artifactRefs: inputRefs, summary: { versionId, heading } }));
             const review = await roles.execute(context, frozen, 'review', `final-source:${versionId}:${sectionKey}`, { moduleId: card.moduleId, sourcePaths: [], publicInterfacePaths: [], provenance: [card.bodyRef, referenceRef],
               payload: { knowledgeRef: card.bodyRef, evaluationReportRef: reportRef, checkReportRef: referenceRef, criteriaRef },
-              materials: [{ ref: card.bodyRef, content: body }, { ref: referenceRef, content: reference }, { ref: reportRef, content: report }, { ref: criteriaRef, content: criteria }] });
+              materials: [{ ref: card.bodyRef, content: body }, { ref: referenceRef, content: reference }, { ref: reportRef, content: report }, { ref: criteriaRef, content: criteria }, ...executionMaterials] });
             const opinion = review.output as unknown as ReviewOutput;
             const decision = sourceSectionDecision(card.moduleId, body, heading, opinion);
             return { artifactRefs: [...inputRefs, review.resultRef, review.rawRef], summary: { ...binding, section: heading, ...decision, criterion: opinion.correction?.criterion ?? null, referenceRef: json(referenceRef), referenceObservationsRef: json(reportRef), criteriaRef: json(criteriaRef), reviewResultRef: json(review.resultRef), reviewRef: json(review.rawRef) } };

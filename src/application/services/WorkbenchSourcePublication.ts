@@ -4,6 +4,8 @@
  * 文件功能：逐卡逐章重读来源Review原始证据并要求正文完整覆盖。
  */
 import { sourceEvidenceBindings } from '../../domain/services/knowledge/SourceEvidenceBindings.ts';
+import { SOURCE_EXECUTION_SCOPE, sourceExecutionScope } from '../../domain/services/knowledge/SourceExecutionScope.ts';
+import { moduleBuild } from '../../domain/services/workbench/WorkbenchProject.ts';
 import { sha256, type ArtifactRef } from '../../domain/Domain.ts';
 import type { AgentCommand, AgentResult } from '../../domain/agents/AgentContracts.ts';
 import type { Output as ReviewOutput } from '../../domain/agents/reviewAgent/ReviewAgentContract.ts';
@@ -28,6 +30,19 @@ export class WorkbenchSourcePublication {
       if (!ref || !await artifacts.verify(ref)) throw new Error('PUBLICATION_SOURCE_ARTIFACT_CORRUPT');
       return JSON.parse(Buffer.from(await artifacts.get(ref)).toString('utf8')) as T;
     };
+    if (task.input.parameters.sourceExecutionPolicy !== undefined) {
+      if (task.input.parameters.sourceExecutionPolicy !== SOURCE_EXECUTION_SCOPE) throw new Error('SOURCE_EXECUTION_POLICY_INVALID');
+      const scopeRef = task.input.parameters.executionScopesRef as unknown as ArtifactRef;
+      if (!scopeRef || !task.result?.artifactRefs.some(ref => ref.sha256 === scopeRef.sha256)) throw new Error('PUBLICATION_SOURCE_ARTIFACT_UNBOUND');
+      const expected = [];
+      for (const { moduleId, set } of sets) {
+        if (set.projectSnapshotId !== project.snapshotId || set.sourceRevision !== project.commit) throw new Error('SOURCE_EXECUTION_BINDING_INVALID');
+        const reference = await load<Parameters<typeof sourceExecutionScope>[1]>(set.referenceRef);
+        const toolchain = await load<Parameters<typeof sourceExecutionScope>[2]>(set.fingerprintRef);
+        expected.push({ moduleId, scope: sourceExecutionScope(set, reference, toolchain, moduleBuild(project, moduleId)) });
+      }
+      if (canonicalJson(await load(scopeRef)) !== canonicalJson(expected.sort((a, b) => a.moduleId.localeCompare(b.moduleId)))) throw new Error('PUBLICATION_SOURCE_EXECUTION_CHANGED');
+    }
     const results = task.result?.summary.cards as unknown as Array<SourceCardBinding & { sections: Section[] }>;
     if (!Array.isArray(results) || results.length !== cards.length || new Set(results.map(card => card.versionId)).size !== results.length || new Set(cards.map(card => card.versionId)).size !== cards.length) throw new Error('PUBLICATION_SOURCE_COVERAGE_INVALID');
     for (const card of cards) {
@@ -62,6 +77,11 @@ export class WorkbenchSourcePublication {
         contracts.assertResult(envelope);
         const command = await load<AgentCommand>(envelope.commandRef); contracts.assertCommand(command);
         const criteria = await load<Record<string, unknown>>(section.criteriaRef);
+        if (task.input.parameters.sourceExecutionPolicy) {
+          const expectedScope = sourceExecutionScope(set, await load(set.referenceRef), await load(set.fingerprintRef), moduleBuild(project, module.moduleId));
+          if (canonicalJson(criteria.executionScope) !== canonicalJson(expectedScope)
+            || [set.referenceRef, set.fingerprintRef].some(ref => !task.result!.artifactRefs.some(item => item.sha256 === ref.sha256))) throw new Error('PUBLICATION_SOURCE_EXECUTION_CHANGED');
+        }
         const expectedBindings = sourceEvidenceBindings(task.input.parameters.sourceEvidencePolicy, project, module.moduleId);
         if (expectedBindings && canonicalJson(criteria.sourceEvidenceBindings) !== canonicalJson(expectedBindings)) throw new Error('PUBLICATION_SOURCE_DIGEST_BINDING_CHANGED');
         assertSourcePublicationSection({ taskId: task.taskId, card: binding, body, section: section.section, first: headings[0] === section.section,

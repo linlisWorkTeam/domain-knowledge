@@ -1,0 +1,13 @@
+# 来源构建证据已接App与发布复查，原生测试排队
+
+工作树/tmp/domain-knowledge-workbench，基线d41c8c1，本轮先读0110和Git。上轮领域提交与真实固定通过为progress。本轮实现WorkbenchSourceVerification的新sourceExecutionPolicy=source-execution-scope-v1及executionScopesRef；prepare在经过原revisionEvidence可信oracle校验后重读参考清单/工具链CAS，验证moduleBuild并冻结按moduleId排序的scope。已有同eval同source-v4任务返回原input，不自动新建/重置预算。evaluate重读比较冻结scope，按H2提供criteria.executionScope及原reference/fingerprint材料并保存工件。无policy旧执行不改变。历史明确SOURCE_MISMATCH仍保留原originEvidence，不能当作新scope复核通过。
+
+WorkbenchSourcePublication在准备发布时重新读取set与原CAS，验证scopeRef属于任务工件且等于当前set/moduleBuild；逐章criteria必须精确对应scope，引用也须绑定。有效CAS新criteria若偷改宏配置仍拒绝。未改来源门禁、未知风险或可信预期。新接口说明和Workbench Spec已同步，尚未部署。
+
+验证：/tmp/SourceScopeContractTests.log共26/26（8架构+13发布证据+3来源prepare+2Domain），typecheck、validate:specs、diff check通过。新增发布fixture opt-in完整工具链，保留原minimal CAS以兼容既有种子引用并更新固定输入fingerprint再算身份；初次两次失败分别由fixture遗漏旧CAS和固定fingerprint未同步导致，未修改产品门禁，修正后13/13。prepare新fixture补齐真实eval应有configurationRef后3/3。原WorkbenchEvaluation.test.ts增加模型接收真实scope的断言，重原生测试尚未运行。
+
+当前真实来源仍RUNNING：stage-54a2931f73371a18fc102c4cc723adbe65c75a66f4842f80351af3bc46061de5；session69756，PID3596179；/tmp/RunSourceAfterTargets.ts、/tmp/SourceAfterTargets.log、source-after-target-policy/Source.json。最后实际ps Sl/live12分50秒；7calls122731tokens/reserved602428/elapsed759995ms，第6调用已结束，第7处理中，单次600秒不是全任务限时。不要因tokens暂不增长重启。
+
+已启动串行测试队列：session20697，PID3605442，/tmp/RunScopeApplicationAfterSource.py。它监测源PID3596179及/proc start=1641798545，只有该进程终态/identity变更才启动node --test --test-concurrency=1 tests/integration/WorkbenchEvaluation.test.ts，写/tmp/SourceScopeApplicationTests.log并打印测试PID/exit。当前队列已ps验证live，尚在等待，不能称原生测试通过；不要同时另跑原生/全回归/浏览器。下一轮首先检查源与队列两个handle，源若结束先读结果；不要重复开启源任务或测试。
+
+后续：完成原生应用测试和必要修复；真实当前source仍旧冻结scope策略，不自动升级同输入。根据其明确矛盾/未知继续真实修订或补证产生新eval，新source自然冻结新scope；若要迁移旧输入需显式预算方案，不能新建同输入绕用量。已有jsmn新版31/31可信+11/11固定仍非完整发布；TinyXML2当前XMLUtil闭环、一键与逐步、全部Node/Console/MarkdownLite回归及最终网站更新/证据报告仍未完，goal继续。

@@ -46,6 +46,10 @@ for (const { rejectSourceReview, mixedSourceRisks } of [{ rejectSourceReview: fa
         const body = Buffer.from(await composition.artifacts.get(_command.payload.knowledgeRef as any)).toString('utf8');
         usage(`whole-source-${_command.commandId}`, 3);
         const criteria = JSON.parse(Buffer.from(await composition.artifacts.get(_command.payload.criteriaRef as any)).toString('utf8'));
+        assert.equal(criteria.executionScope.schemaVersion, 'source-execution-scope-v1');
+        assert.equal(criteria.executionScope.configurationCoverage, 'SINGLE_FROZEN_BUILD');
+        assert.equal(criteria.executionScope.build.cStandard, 'c11');
+        assert.equal(criteria.executionScope.allMacroCombinationsVerified, false);
         assert.equal(criteria.verifyPreamble, criteria.section === 'Behavior');
         assert.deepEqual(criteria.sourceReviewPolicy, { schemaVersion: 'source-review-policy-v1', timeoutMs: 600000 });
         assert.equal(criteria.sourceEvidenceBindings.schemaVersion, 'source-evidence-bindings-v1');

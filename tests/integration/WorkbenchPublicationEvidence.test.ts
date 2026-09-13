@@ -151,3 +151,17 @@ test('explicit source digest bindings remain required even when replacement crit
   f.input.sourceVerification.result!.artifactRefs = f.input.sourceVerification.result!.artifactRefs.map(ref => ref.sha256 === oldCriteria.sha256 ? section.criteriaRef : ref.sha256 === oldResult.sha256 ? section.reviewResultRef : ref);
   await assert.rejects(f.service.prepare(f.ids, f.input.fixedSuites), /PUBLICATION_SOURCE_DIGEST_BINDING_CHANGED/);
 });
+
+
+test('publication rechecks frozen execution scope against the actual trusted reference and Review', async () => {
+  const f = await setup({ executionScope: true });
+  const prepared = await f.service.prepare(f.ids, f.input.fixedSuites);
+  assert.equal(prepared.state, 'PREPARED');
+  const section = f.sourceSections[0]!;
+  const criteria = JSON.parse(f.contents.get(section.criteriaRef.sha256)!.toString());
+  assert.equal(criteria.executionScope.configurationCoverage, 'SINGLE_FROZEN_BUILD');
+  criteria.executionScope.build.definitions = ['UNTESTED_MACRO'];
+  section.criteriaRef = await f.put(Buffer.from(JSON.stringify(criteria)), 'application/json');
+  f.input.sourceVerification.result!.artifactRefs.push(section.criteriaRef);
+  await assert.rejects(f.service.prepare(f.ids, f.input.fixedSuites), /PUBLICATION_SOURCE_EXECUTION_CHANGED/);
+});
