@@ -278,3 +278,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 - 2026-09-14-0103：真实修订21cf两卡各一段变更并索引，重建d86fa成功；随后可信685ee 31/31及固定4112 11/11通过。供应商原配置重验revision6，未更换模型/密钥，旧可信保留。完整运行编号与driver见[原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/a027c64decb7a40ac79c5732054274933f10ab23/docs/epitaph/2026-09-14-0103-live-native-revision.md)。
 
 - 2026-09-14-0110：固定4112 11/11与可信685ee 31/31确认，旧输入预期CAS比较不变。新增SourceExecutionScope领域校验10检查通过并用真实CAS确认gcc/c11/x64单配置。后续App/发布和UI已在a027/112ba接通，当前真实source仍旧冻结策略。[原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/112ba4c804e34303483f4884842bb0ecc637ac2e/docs/epitaph/2026-09-14-0110-source-execution-scope.md)。
+
+- 2026-09-14-0118：a027接入sourceExecutionPolicy/冻结scope、Review材料及发布逐章重验。26检查通过，原生回归排队；后续112ba页面与b5d运行中下载修复，均保留旧任务与风险。[原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/b5d05aa5e77073b9b1f8f1869c03a5c8b0bf4aee/docs/epitaph/2026-09-14-0118-source-scope-application.md)。
