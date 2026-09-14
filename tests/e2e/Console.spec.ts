@@ -951,21 +951,49 @@ test('知识索引可独立构建、试检索并预览 YAML，命中后才读取
 });
 
 
-test('操作中心从固定 Git 版本分析仓库，显示模块和环境且窄屏可操作', async ({ page }) => {
-  const directory = mkdtempSync(join(tmpdir(), 'console-analysis-'));
-  const originalModel = instance.composition.apps.workbenchGeneration.dependencies.model;
-  const originalNative = instance.composition.apps.workbenchGeneration.dependencies.native;
-  const reconstruction = instance.composition.apps.workbenchReconstruction.dependencies;
-  const originalReconstruction = { model: reconstruction.roles.dependencies.model, snapshot: reconstruction.snapshot, native: reconstruction.native };
-  const nativeEvaluation = instance.composition.apps.nativeEvaluation.dependencies;
-  const originalEvaluation = { snapshot: nativeEvaluation.snapshot, runner: nativeEvaluation.runner, native: instance.composition.apps.workbenchEvaluation.dependencies.native };
-  const git = (args: string[]) => execFileSync('git', ['-c', 'user.name=Browser Test', '-c', 'user.email=browser@example.test', ...args], {
-    cwd: directory, encoding: 'utf8', env: { PATH: process.env.PATH, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null' },
-  }).trim();
-  try {
+test.describe.serial('工作台固定仓库完整流程', () => {
+  let page: Page;
+  let context: import('@playwright/test').BrowserContext;
+  let fixture: ReturnType<typeof setupWorkflow>;
+  let commit = '';
+  let docGenAttempts = 0, sourceCorrection = false;
+  function setupWorkflow() {
+    const directory = mkdtempSync(join(tmpdir(), 'console-analysis-'));
+    const originalModel = instance.composition.apps.workbenchGeneration.dependencies.model;
+    const originalNative = instance.composition.apps.workbenchGeneration.dependencies.native;
+    const reconstruction = instance.composition.apps.workbenchReconstruction.dependencies;
+    const originalReconstruction = { model: reconstruction.roles.dependencies.model, snapshot: reconstruction.snapshot, native: reconstruction.native };
+    const nativeEvaluation = instance.composition.apps.nativeEvaluation.dependencies;
+    const originalEvaluation = { snapshot: nativeEvaluation.snapshot, runner: nativeEvaluation.runner, native: instance.composition.apps.workbenchEvaluation.dependencies.native };
+    const git = (args: string[]) => execFileSync('git', ['-c', 'user.name=Browser Test', '-c', 'user.email=browser@example.test', ...args], {
+      cwd: directory, encoding: 'utf8', env: { PATH: process.env.PATH, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null' },
+    }).trim();
+    return { directory, originalModel, originalNative, reconstruction, originalReconstruction, nativeEvaluation, originalEvaluation, git };
+  }
+  // 同一工作流按阶段验收，保留全部操作与断言；失败后不执行依赖阶段。
+  test.beforeAll(async ({ browser }, testInfo) => {
+    commit = ''; docGenAttempts = 0; sourceCorrection = false;
+    fixture = setupWorkflow();
+    const { locale, colorScheme, viewport } = testInfo.project.use;
+    context = await browser.newContext({ locale, colorScheme, viewport });
+    page = await context.newPage();
+  });
+  test.afterAll(async () => {
+    try {
+      if (fixture) {
+        const { directory, originalModel, originalNative, reconstruction, originalReconstruction, nativeEvaluation, originalEvaluation, git } = fixture;
+        nativeEvaluation.snapshot = originalEvaluation.snapshot; nativeEvaluation.runner = originalEvaluation.runner; instance.composition.apps.workbenchEvaluation.dependencies.native = originalEvaluation.native; reconstruction.roles.dependencies.model = originalReconstruction.model; reconstruction.snapshot = originalReconstruction.snapshot; reconstruction.native = originalReconstruction.native; instance.composition.apps.workbenchGeneration.dependencies.model = originalModel; instance.composition.apps.workbenchGeneration.dependencies.native = originalNative;
+      }
+    } finally {
+      try { if (context) await context.close(); }
+      finally { if (fixture) rmSync(fixture.directory, { recursive: true, force: true }); }
+    }
+  });
+  test('分析固定仓库并生成卡片', async () => {
+    const { directory, originalModel, originalNative, reconstruction, originalReconstruction, nativeEvaluation, originalEvaluation, git } = fixture;
     git(['init', '-q']); writeFileSync(join(directory, 'parser.c'), 'int parse(void) { return 1; }');
     writeFileSync(join(directory, 'compile_commands.json'), JSON.stringify([{ directory, file: 'parser.c', arguments: ['gcc', '-std=c99', '-DFEATURE=1', '-c', 'parser.c'] }, { directory, file: 'parser.c', arguments: ['gcc', '-pthread', '-c', 'parser.c'] }]));
-    git(['add', '.']); git(['commit', '-qm', 'Fixed source']); const commit = git(['rev-parse', 'HEAD']);
+    git(['add', '.']); git(['commit', '-qm', 'Fixed source']); commit = git(['rev-parse', 'HEAD']);
     await page.goto(baseUrl); await enterGovernance(page);
     await page.getByLabel('服务器仓库目录', { exact: true }).fill(directory);
     await page.getByLabel('源码版本', { exact: true }).fill(commit);
@@ -1004,7 +1032,6 @@ test('操作中心从固定 Git 版本分析仓库，显示模块和环境且窄
     await expect(page.locator('[data-generation-task]').getByRole('button', { name: 'Parser generated card', exact: true })).toBeVisible();
     reconstruction.snapshot = async (language, build) => ({ schemaVersion: 'native-toolchain-v1', language, build, architecture: 'test', files: [], digest: 'a'.repeat(64) });
     reconstruction.native = instance.composition.apps.workbenchGeneration.dependencies.native;
-    let docGenAttempts = 0, sourceCorrection = false;
     reconstruction.roles.dependencies.model = (command) => ({ assertOutput: assertModelOutput, execute: async (request) => {
       expect(request.readablePaths).toEqual([]);
       if (['code', 'test-gen'].includes(request.role)) expect(request.prompt).not.toContain('return 1;');
@@ -1045,6 +1072,9 @@ test('操作中心从固定 Git 版本分析仓库，显示模块和环境且窄
       return { caseId: sample.caseId, status: generated ? 'FAILED' : 'PASSED', reasonCode: generated ? 'NATIVE_BEHAVIOR_MISMATCH' : null,
         actual: { result: generated ? '0' : '1' }, mismatches: generated ? ['result'] : [], report: { build: commandReport, execution: { ...commandReport, stderr: generated ? '<script>diagnosticText()</script>' : '' } } };
     } };
+  });
+  test('重建与固定门禁的失败详情和下载', async () => {
+    const { directory, originalModel, originalNative, reconstruction, originalReconstruction, nativeEvaluation, originalEvaluation, git } = fixture;
     await page.getByRole('button', { name: '执行代码重建', exact: true }).click();
     await expect(page.locator('[data-reconstruction-panel]')).toContainText('重建及接口检查完成');
     await expect(page.locator('[data-reconstruction-panel]')).toContainText('公开接口匹配');
@@ -1081,6 +1111,9 @@ test('操作中心从固定 Git 版本分析仓库，显示模块和环境且窄
     await page.screenshot({ path: test.info().outputPath('fixed-evaluation-mobile.png'), fullPage: true });
     await page.setViewportSize(fixedViewport);
     await fixedPanel.locator(':scope > details > summary').click();
+  });
+  test('可信评测、来源意见与窄屏下载', async () => {
+    const { directory, originalModel, originalNative, reconstruction, originalReconstruction, nativeEvaluation, originalEvaluation, git } = fixture;
     await page.getByRole('button', { name: '执行评测', exact: true }).click();
     await expect(page.locator('[data-native-evaluation-panel]')).toContainText('可信用例存在失败');
     await expect(page.locator('[data-native-evaluation-panel]')).toContainText('通过 0/1');
@@ -1108,6 +1141,9 @@ test('操作中心从固定 Git 版本分析仓库，显示模块和环境且窄
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await expect(page.getByRole('button', { name: '分析仓库', exact: true })).toBeVisible();
     await page.screenshot({ path: test.info().outputPath('repository-analysis-mobile.png'), fullPage: true });
+  });
+  test('一键门禁拒绝与重载恢复前序产物', async () => {
+    const { directory, originalModel, originalNative, reconstruction, originalReconstruction, nativeEvaluation, originalEvaluation, git } = fixture;
     await page.locator('[data-workbench-pipeline-panel]').getByText('一键流程的固定用例', { exact: true }).click();
     await page.locator('[data-pipeline-fixed="parser"]').setInputFiles({ name: 'PipelineFixed.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ schemaVersion: 'native-cases-v1', cases: [{
       caseId: 'fixedParse', description: '固定解析结果', sections: ['fixed-interface#parse'], variables: [], calls: [{ function: 'parse', arguments: [], result: 'result' }],
@@ -1137,6 +1173,10 @@ test('操作中心从固定 Git 版本分析仓库，显示模块和环境且窄
     await page.getByRole('button', { name: '分析仓库', exact: true }).click();
     await expect(page.locator('[data-repository-notice]')).toContainText('无法读取这个源码版本');
     await expect(page.locator('[data-repository-result]')).not.toContainText(commit);
+  });
+  test('知识修订保留失败审计并重建绑定版本', async () => {
+    const { directory, originalModel, originalNative, reconstruction, originalReconstruction, nativeEvaluation, originalEvaluation, git } = fixture;
+    const pipelineRecords = instance.composition.apps.workbenchPipelines.dependencies.store.list();
     await page.locator('[data-workbench-pipeline-panel] details').filter({ has: page.locator('[data-pipeline-round="1"]') }).locator('summary').click();
     await page.getByRole('button', { name: '查看第 1 轮评测', exact: true }).click();
     await page.getByRole('button', { name: '查看修订依据', exact: true }).click();
@@ -1166,6 +1206,9 @@ test('操作中心从固定 Git 版本分析仓库，显示模块和环境且窄
     await expect(page.locator('[data-reconstruction-panel]')).toContainText('重建及接口检查完成');
     const rebuiltTask = instance.composition.apps.workbenchStages.store.list().find(item => item.input.stage === 'FLYWHEEL' && !item.input.parameters.operation)!;
     expect(rebuiltTask.input.cardVersionIds).toEqual(revisedTask.result!.summary.versionIds);
+  });
+  test('来源修订和重建更新后的卡片版本', async () => {
+    const { directory, originalModel, originalNative, reconstruction, originalReconstruction, nativeEvaluation, originalEvaluation, git } = fixture;
     sourceCorrection = true;
     await page.getByRole('button', { name: '执行评测', exact: true }).click();
     await expect(page.locator('[data-native-evaluation-panel]')).toContainText('评测执行完成');
@@ -1184,6 +1227,9 @@ test('操作中心从固定 Git 版本分析仓库，显示模块和环境且窄
     await page.locator('[data-source-revision-panel]').getByRole('button', { name: '重建修订版本', exact: true }).click();
     await expect.poll(() => instance.composition.apps.workbenchStages.store.list().find(item => item.input.stage === 'FLYWHEEL' && !item.input.parameters.operation)?.input.cardVersionIds).toEqual(sourceRepair.result!.summary.versionIds);
     await expect(page.locator('[data-reconstruction-panel]')).toContainText('重建及接口检查完成');
+  });
+  test('补充候选用例经参考验证后保留可信门禁', async () => {
+    const { directory, originalModel, originalNative, reconstruction, originalReconstruction, nativeEvaluation, originalEvaluation, git } = fixture;
     sourceCorrection = false;
     await page.setViewportSize({ width: 390, height: 844 });
     await page.getByRole('button', { name: '执行评测', exact: true }).click();
@@ -1206,11 +1252,7 @@ test('操作中心从固定 Git 版本分析仓库，显示模块和环境且窄
     await page.screenshot({ path: test.info().outputPath('supplement-evaluation-mobile.png'), fullPage: true });
     await page.setViewportSize({ width: 1363, height: 936 });
     await page.screenshot({ path: test.info().outputPath('supplement-evaluation-desktop.png'), fullPage: true });
-
-
-
-
-  } finally { nativeEvaluation.snapshot = originalEvaluation.snapshot; nativeEvaluation.runner = originalEvaluation.runner; instance.composition.apps.workbenchEvaluation.dependencies.native = originalEvaluation.native; reconstruction.roles.dependencies.model = originalReconstruction.model; reconstruction.snapshot = originalReconstruction.snapshot; reconstruction.native = originalReconstruction.native; instance.composition.apps.workbenchGeneration.dependencies.model = originalModel; instance.composition.apps.workbenchGeneration.dependencies.native = originalNative; rmSync(directory, { recursive: true, force: true }); }
+  });
 });
 
 test('关联阶段可独立执行并在卡片详情查看真实引用候选', async ({ page }) => {
