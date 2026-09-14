@@ -143,13 +143,15 @@ test('full SDK workflow repairs tests, revises knowledge and publishes only afte
     operationalMetrics: { recordProviderInvocation: (record) => { invocations.push(record); }, runs: () => ({}), governance: () => ({}) },
     providerSettingsStore: store,
     providerEndpointPolicy: endpointPolicy,
-    providerProbe: { verify: async ({ model }) => ({ status: 'VERIFIED', reasonCode: 'READY', model }) },
+    providerProbe: { verify: async ({ model }) => ({ status: 'VERIFIED', reasonCode: 'GENERATION_READY', checks: { modelList: 'PASSED' as const, generation: 'PASSED' as const }, model }) },
   });
   try {
     await composition.apps.providerOperations.put({
       provider: 'deepseek-harness', apiUrl, apiKey: 'acceptance-key', model: 'test-model', expectedRevision: 0,
     });
-    await composition.apps.providerOperations.verify({ expectedRevision: 1 });
+    const verification = await composition.apps.providerOperations.verify({ expectedRevision: 1 });
+    assert.equal(verification.enabled, true);
+    assert.equal(verification.reasonCode, 'GENERATION_READY');
     assert.ok(store.value);
     const workflow = await composition.automatedWorkflow();
     const commands = [{ tool: 'g++' as const, purpose: 'check' as const, args: ['-std=c++17', 'src/module.cpp', 'tests/generated.cpp', '-o', 'test-bin'] },

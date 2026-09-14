@@ -126,3 +126,9 @@ Server集成测试清理现在先await composition.shutdown，再关闭HTTP并�
 [CI 34825909370](https://github.com/linlisWorkTeam/domain-knowledge/actions/runs/34825909370)通过完整代码检查，Console 38/39通过；唯一失败是批次工作流状态直接显示私有上游错误。现状态API复用安全原因码投影，前台使用run.executionFailure.code；原始持久化错误不改写。HTTP补充验证状态响应不含私有文本且原记录保留，2/2通过；原浏览器恢复/失败/预算两项2/2通过；类型与Spec检查通过。日志 `/tmp/WorkbenchWorkflowPrivacyHttp.log`、`/tmp/WorkbenchWorkflowPrivacyBrowser.log`。
 
 C++ v11重建e6d45已成功：接口兼容，生成代码3558ef78ac2159520edb30dbcf257d801d0e30030ff1d38ff2b8ed17ae4913a8，累计2调用82,552tokens，9份检查点工件摘要/大小已审计（cpp-v11-reconstruction/ArtifactAudit.json）。新可信评测03dc1c087c74a95bd631009a12b2e6ce16d842d24aab141f93df95959bc807a5已通过参考基础构建并保存部分用例检查点，仍因内存不足暂停；不能记录37/37。指纹复用缓冲区试改内存收益不足，已撤回，无任务指纹变更。临时驱动对年轻代8MiB的测量有改善，但仍不足以证明全部资源暂停已解决；编译内存门槛不变。
+
+## 当前v11行为评测及CI验收（2026-09-14）
+
+[CI 34827215087](https://github.com/linlisWorkTeam/domain-knowledge/actions/runs/34827215087)的verify已通过，包括Console；acceptance为24/25。唯一失败AgentRevisionFlow仍用旧READY探针模拟返回，无法通过现有GENERATION_READY及modelList/generation双检查。已同步受控探针并增加启用状态断言，不改生产验证要求或原流程断言；本地该完整SDK修订流程1/1通过（`/tmp/WorkbenchAgentRevisionProbeRetest.log`）。这是受控模型验收，不能代表真实供应商质量。
+
+C++当前v11可信评测`stage-03dc1c087c74a95bd631009a12b2e6ce16d842d24aab141f93df95959bc807a5`已成功，37/37、复用37、新增0，报告BEHAVIOR_PASSED，publicationVerified仍为false。81份引用工件摘要和大小逐一通过检查，证据`cpp-v11-evaluation/ArtifactAudit.json`。固定评测`stage-79e38c35042c352024afa7b29593269a728deede2ab676b7e384380c3a37d1b5`绑定同一重建和原固定测试集，首次保存14条参考用例检查点后因资源不足暂停，现从原检查点串行继续。来源复核、关联、发布及新网站仍未完成。
