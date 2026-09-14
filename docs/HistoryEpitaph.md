@@ -432,3 +432,7 @@ This document summarizes older handoffs, milestones and architectural decisions 
 ## 2026-09-14 归档：DSH home删除
 
 [2257 原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/2c55117b693fcab4bf94081cdd2a2504819e796d/docs/epitaph/2026-09-14-2257-dsh-home-deletion.md)：审计归属的DSH home文件和符号链接进入冻结见证清理，链接目标保留。后续HTTP/UI、多根恢复和CI已通过并部署；生产旧检查点缺少owner阻挡删除，C/C++最终发布仍待完成。
+
+## 2026-09-14 归档：删除HTTP与Console
+
+[2315 原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/aef905965b9f8f60e4e7a342b983a49321b5d83d/docs/epitaph/2026-09-14-2315-deletion-http-console.md)：真实删除预览、二次确认与恢复入口及窄屏验证完成；后续多DSH根、CI和部署完成，线上旧owner缺失仍阻挡删除，未删用户历史。

@@ -1,0 +1,13 @@
+# 旧身份错误说明已修正，C++当前契约评测进行中
+
+目标active。主工作树/tmp/domain-knowledge-workbench。aef9059已推送PR50 Draft，仍未合并；现场仍2c55117，未部署诊断修复。aef CI34859869166最后检查verify运行中。前一轮部署及回滚信息见2335记录，线上用户数据未动。
+
+CheckpointOwner增加RUNNING/EXITED/UNKNOWN区分，checkpointOwnerExited布尔边界保持完全相同。SqliteDeletionRunStates暴露带指纹检查的unknown owner事实，Composition抛DELETION_CHECKPOINT_OWNER_UNKNOWN，HTTP409/nonretryable中文说明不能确认旧任务停止，而非503建议重试。缺失/损坏owner不自动修复，不解除删除屏障；这不是旧历史删除能力已经恢复。23项状态/HTTP/维护/跨进程测试、typecheck、Spec通过，/tmp/DeletionOwnerDiagnostics.log、DeletionOwnerTypes.log、DeletionOwnerSpecs.log。原断言未放宽。仍需安全的旧身份兼容方案，不能填造身份或改写历史绕过保护。
+
+C++真实任务已继续，启动前查真实workbench.sqlite无RUNNING任务、原PID缺失。当前契约使用原9张修订卡、TinyXML2固定snapshot/revision，无新范围。重建stage-cf78101126884ae4e6af2fa2c8808b5fa94e9958a0b6d6743cb7b536585839b6首轮生成缺TINYXML2_LIB宏导致NATIVE_INTERFACE_COMPILE_FAILED（非资源/超时），确认FAILED且PID243613退出后同任务恢复，PID245467已成功退出，累计2调用88890tokens。接口兼容1；14份引用CAS摘要/大小验证通过。不等于行为已验证。
+
+证据/root/projects/domain-knowledge-releases/2026-09-10-workbench-progress/real-knowledge-revision/cpp-current-contract-reconstruction/Reconstruction.json及Audit.json。日志/tmp/CppCurrentContractReconstruction.log、CppCurrentContractReconstructionResume1.log。脚本/tmp/RunCppCurrentContractReconstruction.ts支持传原taskId恢复，不能无参重复重建。
+
+控制器/tmp/ContinueCppCurrentContractGatesResume1.py已等待重建真实PID退出并校验SUCCEEDED，随后串行启动Evaluation再Fixed；任一步失败退出，不循环、不调用来源、不发布。控制器exec session59679，日志/tmp/CppCurrentContractGatesResume1Controller.log。最后观察Evaluation PID246675仍运行，stage-eb7e2c4256a141d3231700f83367e4c89d90368740c446d622f239cf325adb43，modelCalls0，日志/tmp/CppCurrentContractEvaluation.log；对应证据文件夹cpp-current-contract-evaluation。Fixed将用原固定测试suiteRefs校验后绑定新cf781重建，日志CppCurrentContractFixed.log、证据cpp-current-contract-fixed。必须先查PID/日志/控制器再动作，观察超时不是任务停止，不要重复启动。第一次控制器脚本等待首轮失败后退出，日志CppCurrentContractGatesController.log，此实例不再活动。
+
+下一步取真实可信/固定结果、核对原可信输入预期未变，之后在同当前契约评测上执行来源复核/必要修订和关联发布。旧86fde来源复核SUCCEEDED/UNRESOLVED、旧e6ec补证PAUSED/NATIVE_TRUSTED_GATE_LIMIT，不能跨引擎恢复旧任务。容量64限制未改，不删旧可信门禁。C最新修订后评测/来源、C++最终质量、线上完整链路、历史多发布根和保留评测目录仍未完成。
