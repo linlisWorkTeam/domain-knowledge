@@ -50,6 +50,8 @@ testSuite 使用 `native-cases-v2-supervised` 协议，含 files 与 cases，cas
 
 新匹配版本只读前台使用 127.0.0.1:4313、新 SQLite/CAS 和独立临时隧道，实际浏览器核对当前 Run、节点、候选正文、通过/未通过标记。按原完整验收标准观察 Check、参考校验、真实重建编译/行为评测、Review 修订与 Gate；失败保存原始输出、逐项诊断、事件和 CAS 摘要，不手工修改模型代码，不循环新建 Run。结果补充到原报告。
 
+本次 v12 执行已结束：Run `41b1eec9-7ead-400c-9254-f028fa48c33f`，HEAD `00214c6845a2b792452113e28373a2a453ef84a7`，737.113 秒 FAILED。Worker/DocGen 成功，43 项测试计划及前 6 批（24 个用例槽位）保存，第 7 批 SDK 初始化未发请求即超时；Code 实际请求 thinking=disabled，却收到 133511 字符推理、0 字符正文，600 秒节点超时。没有完整测试参考校验、重建编译、Check/Review/Gate 或发布；候选知识保持 CANDIDATE，未执行恢复或另开 Run。详细用量、真实请求证据及前台剩余状态不一致见原报告最新节。
+
 #### 2026-09-14 修复后新一次完整验收
 
 本批由用户重新授权，不受上次“第四个最后批次”的结束约定限制。GitHub 已核对 PR #49 合并于 `22fe34fdf1ee9e37c08d0bd17a03b2c7e4103cf0`，分支最终修复 `0b6a0d51fec2bbe76e581c4602659ddb82fa6b26`。从当前 origin/main 创建 `test/cjson-utils-v10-real-e2e` / `/tmp/domain-knowledge-cjson-v10`；执行源码为该合并提交，启动前只更新本计划和报告，最终记录实际 HEAD。契约为 `domain-agents-v10-check-evidence-guards` / `contract-v10`。

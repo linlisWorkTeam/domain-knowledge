@@ -5,6 +5,50 @@ SPDX-License-Identifier: MIT
 -->
 # Agent Spec 修复与端到端测试报告
 
+## 2026-09-14：v12 cJSON 真实完整验收再次执行，未通过
+
+用户明确要求“重新跑完cJSON验收”后，启动新的真实 Run `41b1eec9-7ead-400c-9254-f028fa48c33f`。北京时间 15:17:12—15:29:29，737.113 秒（12 分 17 秒），iteration 0 最终 FAILED。Worker 范围修复通过本次真实调用，TestGen 分批产物得以保存；完整飞轮仍未跑通，没有 Gate 决策或发布。
+
+### 版本、输入与预算
+
+执行 HEAD `00214c6845a2b792452113e28373a2a453ef84a7`，只在修复提交 `099ce794e92202dc006af5df2b631bba9233c720` 上增加验收计划；包含最新 origin/main `22fe34fdf1ee9e37c08d0bd17a03b2c7e4103cf0`。独立工作树 `/tmp/domain-knowledge-cjson-v12`，分支 `test/cjson-utils-v12-real-e2e`，协议 `domain-agents-v12-testgen-batches` / `contract-v12`。修复尚未合并，主工作区及历史 worktree/runtime 未覆盖。Node 24.13.0 独立 bootstrap READY，Spec 检查通过。
+
+固定 cJSON v1.7.19 / `c859b25da02955fef659d658b8f324b5cde87be3`，完整 cJSON_Utils.c 1481 行、14 API。229 个受控源码 SHA-256 与历史材料一致；独立用例未改、旧候选测试状态未继承。测试依据仍是固定版本实际行为，RFC 差异单独说明。实际 Code 命令仅含 knowledgeRef、languageId、projectConfigurationRef、allowedGeneratedPaths、requiredGeneratedPaths，未交付原实现或固定验收答案。
+
+真实 deepseek-v4-flash，经已配置 OpenCode HTTPS 上游、生产角色入口、DSH SDK/Bubblewrap。一次 Run，最多三轮、workflow.start 起 30 分钟、角色/节点总预算十分钟、DocWorker=1、构建串行、TestGen 最多一次修复、Check 至多三次报告尝试且无底层叠加重试，其他角色至多两次 Schema 尝试。maxTokens=32768、contextWindow=128000、thinking=disabled；分批每批最多四项。全局 30 分钟及 605 秒清理 backstop 均未触发；本次由 Code 原生 600 秒节点超时终止。
+
+### 实际节点和评测结果
+
+| 阶段 | 本次事实 |
+| --- | --- |
+| 原实现基线 | 独立监督测试 18/18；json_patch_tests、old_utils_tests、misc_utils_tests 三个程序编译/执行成功。转义 Patch 复现仍为返回 13、原文档不变；未修改标准/版本差异预期。 |
+| Orchestrator | 真实调用成功，3.937 秒。 |
+| DocWorker | 17.744 秒成功，框架生成分析范围，包含目标 cJSON_Utils.c；不再因参考头文件混入分析范围失败。 |
+| DocGen / 候选知识 | 35.353 秒成功；候选 `kv_96737cb66de045c71ce42cff`，正文含头部 17333 字符、24937 字节，质量分 91，状态 CANDIDATE。14 API 名称均出现，但名称覆盖和质量分不证明语义充分。 |
+| TestGen 计划 | 15.541 秒成功，43 项用例。 |
+| TestGen 批次 | 第 1—6 批完成 Schema/关联校验并分别保存，共 24 个计划用例槽位；尚未参考执行，不能称 24 项测试通过。第 7 批 DSH 本地初始化失败，第 8—11 批未调用，无完整 testCandidates 或冻结资格。 |
+| 测试参考校验/修复 | 未到达，未发生 TestGen 修复。没有继承历史 48/49。 |
+| Code | 达到 600 秒节点上限；SDK 审计 599728ms / AGENT_CANCELLED，未收到代码正文，无有效重建源码。 |
+| 重建编译、行为评测、Check、Review、Gate | 均未到达，没有知识自动修订、Gate 决策或发布。 |
+
+分批进度在 Run 进程退出后仍可从同一 SQLite/CAS 读回，本次实际证明完成批次没有因后续失败全部作废。曾计划在同一 Run 内恢复第 7 批，但并行 Code 随后耗尽自己的十分钟预算，恢复它会突破原有角色预算，因此没有执行 resume，也没有启动第二个 Run。本批不声称验证了真实模型跨进程续跑路径。
+
+### 两个失败分别归因
+
+TestGen 第 7 批报 `initialize timed out after 30000ms waiting for dsh profile "sdk-minimal"`，完整 SDK 调用及清理耗时 47293ms。审计 requests=[]，没有向真实上游发出本批模型请求，也没有模型回答，属于环境/SDK 初始化故障。同期浏览器验证与模型进程并存，可用内存观测到约 222MiB；相关性有记录，但未独立证明 OOM 或内存压力是唯一根因。失败 CAS 为 `sha256:82993f56a6c5404f33e1cefb223b661efa418ee062688feb5e621dcc7a42892a`。
+
+Code 长任务复现了配置与响应不一致。SDK request/header 的 reasoningEffort=off；实际 HTTP 请求审计 thinking=disabled、未记录启用的 reasoning_effort、max_tokens=32768。上游流返回 reasoningCharacters=133511，contentCharacters=0，首个推理片段 1270ms，disabledButReasoningObserved=true。请求摘要 `c2bacc24d0cbd1c0e6b3b2315135681b8cfc16874fec3a89f940ed20edf35aba`，会话 `wp-38aed5084aa64d8281dd5ab45f3e858e`。因此本次证明不是 disabled 在本地传递时丢失；已配置上游如何解释参数、是否存在协议/路由转换仍需查明，不能直接归咎于 DeepSeek 官方服务，也不能用小型探针成功推定所有长任务正常。
+
+### 用量、前台和证据
+
+共 12 次 SDK 调用、11 次实际 HTTP 模型请求：10 次完整响应、第 7 批初始化未请求、1 次 Code 请求超时。10 次完整响应 usage 合计 input=343568、output=23121、total=366689 tokens；Code 无最终 usage，真实总消耗和费用未知，不能把 366689 当完整账单值。本次 TestGen 每批重复提供源码上下文，已完成批次各约 4 万输入 tokens，分批存储解决进度丢失，但输入成本仍明显。
+
+只读前台 [本次 v12 Run](https://silicon-sisters-geek-circuit.trycloudflare.com) → 127.0.0.1:4313，匹配 v12 工作树和 `/root/projects/domain-knowledge/.workpanel/acceptance/2026-09-14-cjson-v12-real/runtime` 的独立 SQLite/CAS。公网 health、首页、Run API 均 HTTP 200；运行中和终态均实际打开浏览器，无脚本错误，只有本 Run，知识正文可读并显示“尚未通过，不可发布”。TestGen/Code 节点均收敛为 FAILED，无残留 RUNNING 投影；但业务聚合 state 仍为 GENERATING，页面主徽标/阶段栏保留“生成中”，与工作流失败横幅并存。这项展示一致性仍未完全通过，未手改数据库。
+
+服务会话 `cjson-v12-console`、`cjson-v12-tunnel` 保持运行；临时地址随隧道/主机结束失效。需要停止时分别执行 `tmux kill-session -t cjson-v12-tunnel`、`tmux kill-session -t cjson-v12-console`。历史 4311/4312 服务保留。
+
+完整证据根目录 `/root/projects/domain-knowledge/.workpanel/acceptance/2026-09-14-cjson-v12-real/`：Run.mjs、Attempt1 的配置/Run/事件/终态，ModelAudit.json（含实际请求配置、响应统计及最终 usage）、SDK 原始会话、CodeInterruptedMessages.json、InitializationFailure.json、ProgressBeforeResume.json、分批 CAS、readable 知识/角色产物、原实现 Baseline/Independent-reference/PointerReproduction、CodeCommandBoundary.json、SourceIntegrity、CasIntegrity、TerminalNodes、FinalSummary，以及 ConsoleRunning/Final 截图与 BrowserFinal.json。46 个工作流 CAS 摘要均匹配。runtime 含加密配置，不上传或提交；报告只引用非秘密摘要。未改生产源码、模型重建、固定用例或门禁规则，没有新增永久 CI。
+
 ## 2026-09-14：TestGen 分批保存与 reasoning 链路诊断
 
 本次按用户确认的两个问题分别处理，在独立工作树 `/tmp/domain-knowledge-worker-scope`、分支 `fix/testgen-batches-and-reasoning` 继续开发，基于 Worker 修复 `161057e`。没有把节点预算延长到二十分钟，也没有重跑完整 cJSON Run。执行协议升级为 `domain-agents-v12-testgen-batches` / `contract-v12`，旧原子 TestGen checkpoint 不兼容；已通过参考验收的同源固定测试仍按原规则复用。

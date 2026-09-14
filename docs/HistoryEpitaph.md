@@ -91,3 +91,8 @@ This document summarizes older handoffs, milestones and architectural decisions 
 ## 2026-09-14 验收交接归档
 
 [2026-09-10-1046-docgen-internal-workers.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/22fe34fdf1ee9e37c08d0bd17a03b2c7e4103cf0/docs/epitaph/2026-09-10-1046-docgen-internal-workers.md)：将 DocWorker 收入 DocGen 内部调用，保留七角色身份、白名单材料与 workerResultRefs；当时 Node 24 READY、定向 35 项和组合 fixture 通过，全量 227/229，两项 Site 问题在基线复现。该任务未调用真实模型或发布；固定文件拆分、语义汇总质量及当时尚未接入的 TestGen/Review 能力不得由该历史记录推定完成。其“尚未提交”是当时状态，后续以实际 Git 和报告为准。
+
+
+## 2026-09-14 v12 真实验收交接归档
+
+[2026-09-10-1424-pr41-docs-merge.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/22fe34fdf1ee9e37c08d0bd17a03b2c7e4103cf0/docs/epitaph/2026-09-10-1424-pr41-docs-merge.md)：记录 PR #41 文档分支合并 main 并解决六份冲突，保留 Domain 目录和 DocGen 内部 Worker；当时通过 typecheck、Spec、架构与文档链接检查，未重跑完整模型验收，未替用户合并 PR。当时 Code 输入边界与 TestGen 依据仍待实现/确认；后续状态须以当前 Spec、代码及真实验收为准，不能继承旧受控结果作为模型质量证明。
