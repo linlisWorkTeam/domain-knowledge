@@ -5,7 +5,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { LocalCasArtifactStore } from '../../src/infrastructure/sqlite/SqliteCas.ts';
@@ -37,6 +37,8 @@ test('corrupt remaining files stop preflight before any other file is removed', 
   const f = await fixture();
   try {
     const witness = f.files.capture(f.plan, f.nodes), [first, second] = witness.files;
+    // CAS正常只读；夹具明确允许所有者写入，才能在普通CI用户下制造内容损坏。
+    chmodSync(f.paths.get(second!.id)!, 0o600);
     writeFileSync(f.paths.get(second!.id)!, 'corrupt');
     assert.throws(() => f.files.clean(f.plan, witness), /DELETION_ARTIFACT_CORRUPT/);
     assert.equal(existsSync(f.paths.get(first!.id)!), true);
