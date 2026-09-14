@@ -1,6 +1,20 @@
 # 五阶段工作台验收记录
 
-截至2026-09-14，完整验收尚未完成。真实目标证据的历史代码基线为 `e66ec50`；下列结果只证明各自明确列出的版本、任务和范围，不代表全部知识已验证发布。
+截至2026-09-15，完整验收尚未完成。真实目标证据的历史代码基线为 `e66ec50`；下列结果只证明各自明确列出的版本、任务和范围，不代表全部知识已验证发布。
+
+## 当前部署与来源核验结论（2026-09-15）
+
+线上代码为 `956fe2649acc67ac2ad7557a27ff719acd8525fc`，地址 https://contract-strict-warren-theories.trycloudflare.com/ 。本节替代下文历史记录中的当前运行状态；下文仍保留各次验证经过。CI [34867068206](https://github.com/linlisWorkTeam/domain-knowledge/actions/runs/34867068206) 通过727项代码测试、44项Console测试和25项隔离验收。
+
+发行目录为 `/root/projects/domain-knowledge-releases/2026-09-15-workbench-956fe26`。停止旧服务后备份运行目录，沿用免登录配置、4310端口及原隧道；公网HTML和两个脚本逐字节匹配发行文件。桌面、390px窄屏及公网设置页检查通过；模型服务配置与知识发布设置默认折叠，悬停提示及展开读取正常，未保存配置。`PublicVerification.json`、`DataPreservation.json`、`Prepared.json`和`browser/after-*.png`记录验证。原8个运行和10个知识版本按原字段逐行摘要比较不变。临时真实验收库未导入线上。
+
+删除预览仍返回409 `DELETION_CHECKPOINT_OWNER_UNKNOWN`：旧RUNNING检查点缺少执行身份，不能证明停止。此次只验证预览的中文拒绝原因，没有发送第二次确认或删除数据。历史执行兼容及部分历史产物目录清理仍未完成。
+
+C++来源任务 `stage-434571dde4545602e48f0c9fdc15e7ad1d473f93b1759819825c36f2f024abf7` 已结束，执行SUCCEEDED、质量UNRESOLVED。9卡63章节中35匹配、27未解决、1来源差异；累计73次模型调用、4813813 tokens，380个直接引用校验通过。证据位于既有真实验收根目录的 `cpp-source-v5/FinalAudit.json`，不应再恢复该成功任务。
+
+固定TinyXML2参考隔离运行证明ToInt对0x、0X、0xg及前导空白加0x均返回true并写0，反驳此前Review的失败预期；`HexPrefixReference.json`保留源码与构建绑定。`ToIntDeclarationAudit.json`进一步核对唯一SOURCE_MISMATCH：固定头文件确实含TAB，卡片与源码的声明词法单元一致，尚未证明实质接口差异；这不证明所有失败路径行为。两项证据均未改变可信测试预期、原Review或发布状态。
+
+下一步需让固定参考反证进入正式测试验证与来源复核流程，并允许有证据地纠正模型意见，同时保留原审计与未知风险。不能把引用真实当成推理正确，也不能为了消除差异重写等价代码。现有37项可信及40项固定C++用例通过不覆盖上述裸前缀；C修订卡的后续重建、评测、来源及最终发布仍待完成。
 
 ## 来源v5保留待核实线索（2026-09-14）
 

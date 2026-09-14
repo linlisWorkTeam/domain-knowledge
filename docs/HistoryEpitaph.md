@@ -454,3 +454,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 - [2026-09-14-2350 来源缓存历史审计](https://github.com/linlisWorkTeam/domain-knowledge/blob/a6c7291/docs/epitaph/2026-09-14-2350-source-cache-history-guard.md)：跨taskAttempt核对原Review事实，缓存和发布恢复均拒绝矛盾PASS；来源v5保留失败线索，保护性拒绝仍不等于实际修订与发布完成。
 
 - [2026-09-14-2355 来源v5线索冻结](https://github.com/linlisWorkTeam/domain-knowledge/blob/234919a/docs/epitaph/2026-09-14-2355-source-v5-pending-concerns.md)：同源码/卡片版本冻结2条失败线索，逐条回应并绑定引用；来源继续发现未知风险与格式问题，后续隔离诊断反驳裸0x失败推断，未完成修订发布。
+
+- [2026-09-14-2359 换行引用恢复](https://github.com/linlisWorkTeam/domain-knowledge/blob/956fe2649acc67ac2ad7557a27ff719acd8525fc/docs/epitaph/2026-09-14-2359-source-v5-newline-resume.md)：保留逐字校验并反馈CRLF差异，同任务恢复保留累计用量。后续任务已执行结束但来源质量未解决，不能依据本记录重启。
