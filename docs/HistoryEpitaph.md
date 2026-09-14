@@ -416,3 +416,7 @@ This document summarizes older handoffs, milestones and architectural decisions 
 ## 2026-09-14 归档：运行目录进程锁
 
 [2215 原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/51abbf5158f14d99f20b52e7d418d44905fd9a03/docs/epitaph/2026-09-14-2215-runtime-file-lock.md)：公共Composition采用Linux生命周期共享锁、维护升级独占，19项测试和类型/Spec校验通过。锁覆盖当前入口，不覆盖旧进程或外部SQLite工具；生产删除接口、全部执行文件覆盖及C/C++最终验收仍未完成。
+
+## 2026-09-14 归档：删除存储组合
+
+[2224 原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/e619924fcea34d82067ba655d74c560491c8c9af/docs/epitaph/2026-09-14-2224-runtime-deletion-assembly.md)：业务库、图、CAS、发布文件统一组装，33项测试与类型/Spec通过；目录授权与源码双向重叠检查。后续已加入工作区、会话及DSH home参与者，生产接线、前台和C/C++最终验收仍待完成。

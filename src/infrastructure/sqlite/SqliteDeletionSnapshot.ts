@@ -26,7 +26,7 @@ export async function sqliteDeletionSnapshot(input: {
   databases: Record<string, DatabaseSync>; graph?: SqliteGraphDeletion;
   runStates?: Record<string, SqliteDeletionRunStates>; reader: DeletionArtifactReader;
   published?: { manifest(records: DeletionRecordInventory): PublishedDeletionFile[]; files: PublishedDeletionFiles;
-    additional?(records: DeletionRecordInventory): { files: PublishedDeletionFile[]; protectedNodes: DeletionNode[] } };
+    additional?(records: DeletionRecordInventory): { files: PublishedDeletionFile[]; nodes: DeletionNode[] } };
 }) {
   const scan = () => {
     let records = sqliteDeletionInventory(input.databases, input.runStates);
@@ -42,10 +42,10 @@ export async function sqliteDeletionSnapshot(input: {
     const additional = input.published?.additional?.(records);
     const publishedManifest = [...(input.published?.manifest(records) ?? []), ...(additional?.files ?? [])];
     const publishedNodes = input.published?.files.observe(publishedManifest) ?? [];
-    return { records, publishedManifest, publishedNodes, protectedNodes: additional?.protectedNodes ?? [] };
+    return { records, publishedManifest, publishedNodes, additionalNodes: additional?.nodes ?? [] };
   };
   const snapshot = scan(), { records, publishedManifest, publishedNodes } = snapshot, revision = sha256(JSON.stringify(snapshot));
-  const artifacts = await expandDeletionArtifacts({ nodes: [...records.nodes, ...publishedNodes, ...snapshot.protectedNodes], seeds: records.artifactSeeds,
+  const artifacts = await expandDeletionArtifacts({ nodes: [...records.nodes, ...publishedNodes, ...snapshot.additionalNodes], seeds: records.artifactSeeds,
     identities: identities(records), reader: input.reader });
   if (sha256(JSON.stringify(scan())) !== revision) throw new Error('DELETION_RECORD_CHANGED');
   return { ...records, nodes: artifacts.nodes, missingArtifacts: artifacts.missingArtifacts, publishedManifest,

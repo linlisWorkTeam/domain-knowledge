@@ -6,7 +6,8 @@
 import type { DatabaseSync } from 'node:sqlite';
 import type { BatchDeletionStore } from '../../application/ports/BatchDeletionPorts.ts';
 import { SqliteBatchDeletions } from './SqliteBatchDeletions.ts';
-import { SqliteDeletionRecovery } from './SqliteDeletionRecovery.ts';
+import { DshHomeDeletionFiles } from './DshHomeDeletionFiles.ts';
+import { SqliteDeletionRecovery, type DeletionFileParticipant } from './SqliteDeletionRecovery.ts';
 import { SqliteDeletionRows } from './SqliteDeletionRows.ts';
 import { SqliteGraphDeletion } from './SqliteGraphDeletion.ts';
 import { sqliteDeletionSnapshot } from './SqliteDeletionSnapshot.ts';
@@ -25,12 +26,13 @@ export function sqliteRuntimeDeletions(input: {
   allowedRoots: string[]; sourceRoots: () => string[];
   workspaces?: { rootNames: string[]; audits: () => unknown[] };
   sessions?: { rootName: string; audits: () => unknown[] };
+  dshHomes?: { root: string; audits: () => unknown[] };
   runStates: () => Promise<Record<string, SqliteDeletionRunStates>>;
   exclusive: BatchDeletionStore['exclusive'];
 }): SqliteBatchDeletions {
   input = { ...input, databases: { ...input.databases }, graph: { ...input.graph },
     publicationRoots: { ...input.publicationRoots }, allowedRoots: [...input.allowedRoots], legacyRoots: [...input.legacyRoots] };
-  const assertScope = () => assertDeletionDirectoryScope({ roots: [input.casRoot, ...Object.values(input.publicationRoots)],
+  const assertScope = () => assertDeletionDirectoryScope({ roots: [input.casRoot, ...Object.values(input.publicationRoots), ...(input.dshHomes ? [input.dshHomes.root] : [])],
     allowedRoots: input.allowedRoots, sourceRoots: input.sourceRoots() });
   assertScope();
   const workspaceRoots = Object.fromEntries((input.workspaces?.rootNames ?? []).map(name => {
@@ -39,6 +41,11 @@ export function sqliteRuntimeDeletions(input: {
   }));
   if (input.sessions && !input.publicationRoots[input.sessions.rootName]) throw new Error('DELETION_SESSION_ROOT_UNAUTHORIZED');
   const cas = new CasDeletionFiles(input.casRoot), files = new PublishedDeletionFiles(input.publicationRoots);
+  const dsh = input.dshHomes ? new DshHomeDeletionFiles(input.dshHomes.root) : null;
+  let homes: ReturnType<DshHomeDeletionFiles['observe']>['homes'] = [];
+  const dshParticipants: DeletionFileParticipant[] = dsh ? [{ name: 'dsh-homes', contract: dsh.contract, scope: dsh.scope,
+    capture: plan => { assertScope(); current(); return dsh.capture(plan, homes); },
+    clean: (plan, witness) => { assertScope(); dsh.clean(plan, witness); } }] : [];
   const graph = new SqliteGraphDeletion(input.graph.name, input.graph.database);
   let snapshot: Awaited<ReturnType<typeof sqliteDeletionSnapshot>> | null = null;
   let states: Record<string, SqliteDeletionRunStates> = {};
@@ -58,7 +65,7 @@ export function sqliteRuntimeDeletions(input: {
       clean: (plan, witness) => { assertScope(); cas.clean(plan, witness); } },
     { name: 'published-files', contract: files.contract, scope: files.scope,
       capture: plan => { assertScope(); const record = current(); return files.capture(plan, record.publishedManifest, record.nodes); },
-      clean: (plan, witness) => { assertScope(); files.clean(plan, witness); } }]);
+      clean: (plan, witness) => { assertScope(); files.clean(plan, witness); } }, ...dshParticipants]);
   return new SqliteBatchDeletions({ recovery, exclusive: input.exclusive, inventory: async () => {
     assertScope(); snapshot = null; states = await input.runStates();
     snapshot = await sqliteDeletionSnapshot({ databases: input.databases, graph, runStates: states, reader: cas,
@@ -66,7 +73,8 @@ export function sqliteRuntimeDeletions(input: {
         const workspace = input.workspaces ? workspaceDeletionManifest({ roots: workspaceRoots, inventory, audits: input.workspaces.audits() }) : { files: [], protectedNodes: [] };
         const session = input.sessions ? sessionDeletionManifest({ rootName: input.sessions.rootName,
           root: input.publicationRoots[input.sessions.rootName]!, inventory, audits: input.sessions.audits() }) : { files: [], protectedNodes: [] };
-        return { files: [...workspace.files, ...session.files], protectedNodes: [...workspace.protectedNodes, ...session.protectedNodes] };
+        const dshInventory = dsh ? dsh.observe(input.dshHomes!.audits(), inventory) : { homes: [], nodes: [] }; homes = dshInventory.homes;
+        return { files: [...workspace.files, ...session.files], nodes: [...workspace.protectedNodes, ...session.protectedNodes, ...dshInventory.nodes] };
       }, manifest: inventory => publishedDeletionManifest({ databases: input.databases, inventory,
         roots: input.publicationRoots, indexRoot: input.indexRoot, workbenchRoot: input.workbenchRoot, legacyRoots: input.legacyRoots }) } });
     assertScope(); return snapshot.nodes;
