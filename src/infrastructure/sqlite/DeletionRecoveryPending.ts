@@ -16,11 +16,9 @@ export function deletionRecoveryPending(filename: string): boolean {
 }
 
 /** 维护开始前还须检查持久租约，不能只依据本进程的 Promise 数量判断空闲。 */
-export function deletionExecutionsIdle(registryPath: string, workbenchPath: string): boolean {
+export function deletionWorkbenchExecutionsIdle(workbenchPath: string): boolean {
   const databases: DatabaseSync[] = [];
   try {
-    const registry = new DatabaseSync(registryPath, { readOnly: true }); databases.push(registry);
-    if (registry.prepare("SELECT 1 FROM runs WHERE state IS NULL OR state NOT IN ('VERIFIED','LOW_CONFIDENCE','FAILED','CANCELLED') LIMIT 1").get()) return false;
     const workbench = new DatabaseSync(workbenchPath, { readOnly: true }); databases.push(workbench);
     for (const query of [
       "SELECT 1 FROM wb_stage_tasks WHERE lease_id IS NOT NULL OR status IS NULL OR status NOT IN ('SUCCEEDED','FAILED','PAUSED','CANCELLED') LIMIT 1",

@@ -5,7 +5,8 @@
  */
 import { WorkbenchBatches } from '../../application/services/WorkbenchBatches.ts';
 import { RuntimeMaintenance } from '../../application/services/RuntimeMaintenance.ts';
-import { deletionRecoveryPending, deletionExecutionsIdle } from '../../infrastructure/sqlite/DeletionRecoveryPending.ts';
+import { deletionRecoveryPending, deletionWorkbenchExecutionsIdle } from '../../infrastructure/sqlite/DeletionRecoveryPending.ts';
+import { SqliteDeletionRunStates } from '../../infrastructure/sqlite/SqliteDeletionRunStates.ts';
 import { SqliteWorkbenchBatches } from '../../infrastructure/sqlite/SqliteWorkbenchBatches.ts';
 import { moduleBuild } from '../../domain/workbench/WorkbenchProject.ts';
 import { WorkbenchPublicationEvidence } from '../../application/services/WorkbenchPublicationEvidence.ts';
@@ -472,7 +473,9 @@ export function createComposition(input: {
     canSchedule: () => maintenance?.available ?? false });
   maintenance = new RuntimeMaintenance({ needsRecovery: () => deletionRecoveryPending(join(runtimeDir, 'deletion-recovery.sqlite')),
     idle: () => workbenchBatches.idle && workbenchPipelines.idle && workbenchStages.idle && workbenchPublications.idle
-      && deletionExecutionsIdle(join(runtimeDir, 'registry.sqlite'), join(runtimeDir, 'workbench.sqlite')) });
+      && deletionWorkbenchExecutionsIdle(join(runtimeDir, 'workbench.sqlite')),
+    verifyIdle: async () => (await SqliteDeletionRunStates.inspect(repository.database,
+      async runId => (await workflow()).workflow.status(runId))).idle });
   const projectStages = () => {
       const auditDirectory = join(runtimeDir, 'demo');
       const auditPath = join(auditDirectory, 'agent-runs.jsonl');

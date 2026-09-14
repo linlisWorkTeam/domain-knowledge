@@ -1,0 +1,11 @@
+# 删除检查已接真实执行状态
+
+目标active。工作树/tmp/domain-knowledge-workbench；线上仍d869e1a，无部署、数据删除及真实模型调用。上一轮6c09e43已推送PR50，仍Draft。
+
+SqliteDeletionRunStates只读冻结runs/checkpoints/checkpoint_owners，串行读取原始workflow.status，不经过会同步业务状态的service.status。GENERATING但实际FAILED可空闲，VERIFIED但执行RUNNING仍阻止；只有确切WORKFLOW_NOT_FOUND才按终态业务回退。RUNNING检查点执行者未确认退出、身份不可读、未知状态及活动孤立检查点均阻止。异步前后摘要变化拒绝，库存和行捕获可复用本次锁内快照且复核摘要。
+
+Composition在RuntimeMaintenance锁内使用该检查，工作台租约仍由同步检查独立拦截。SqliteDeletionInventory与Rows.capture增加可选执行快照；未提供仍保持旧保守逻辑。快照不是跨进程锁，不能缓存到下一次请求，正式删除用例尚须每次重新核验。
+
+DeletionRunStatesRegression2.log 30项通过，覆盖真实嵌入式引擎运行到失败清理、生产组合读取原始状态、HTTP屏障、旧运行删除、库存、行见证及架构。类型最终日志DeletionRunStatesTypes4.log。早期Types/Types3分别发现参数属性不支持及测试Server参数不存在，已修复；不以失败日志为通过证据。
+
+剩余：LangGraph检查点和pending writes纳入归属/清理；完整跨进程写入排他；统一跨库删除应用/API二次确认及前台；文件删除及恢复后启动队列。C/C++最终来源质量、修订后全部门禁、发布与线上真实验收未完成，PR38/50仍不合并。没有把本次执行判断测试当成完整删除上线。

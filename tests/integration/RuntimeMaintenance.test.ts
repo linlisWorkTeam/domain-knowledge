@@ -119,3 +119,30 @@ test('missing recovery tables and unknown phases do not silently reopen the serv
     assert.equal(deletionRecoveryPending(path), false);
   } finally { database.close(); rmSync(root, { recursive: true, force: true }); }
 });
+
+test('composition uses raw workflow status under maintenance without rewriting the legacy business phase', async t => {
+  const runtimeDir = mkdtempSync(join(tmpdir(), 'maintenance-run-status-'));
+  const instance = createKnowledgeServer({ runtimeDir, anonymousAccess: true });
+  const run = instance.composition.apps.flywheel.createRun('legacy-module', 'local-v1');
+  instance.composition.apps.flywheel.transition(run.runId, 'PLANNED');
+  instance.composition.apps.flywheel.transition(run.runId, 'GENERATING');
+  const workflow = await instance.composition.apps.orchestrator.workflow();
+  let executionStatus: 'FAILED' | 'RUNNING' | 'STOPPED' = 'FAILED';
+  const status = t.mock.method(workflow.workflow, 'status', async (runId: string) => {
+    assert.equal(instance.composition.apps.maintenance.status, 'MAINTENANCE');
+    return { runId, executionStatus, currentNode: 'doc_gen', iteration: 0, maxIterations: 1, route: null, error: null };
+  });
+  const operation = instance.composition.apps.maintenance.enter();
+  try {
+    await operation.exclusive(async () => {});
+    assert.equal(status.mock.callCount(), 1);
+    executionStatus = 'RUNNING';
+    await assert.rejects(operation.exclusive(async () => assert.fail('running')), /RUNTIME_OPERATIONS_ACTIVE/);
+    executionStatus = 'STOPPED';
+    await operation.exclusive(async () => {});
+    assert.equal(instance.composition.apps.flywheel.getRun(run.runId)!.state, 'GENERATING');
+  } finally {
+    operation.release(); await instance.composition.shutdown(); await instance.composition.close();
+    rmSync(runtimeDir, { recursive: true, force: true });
+  }
+});

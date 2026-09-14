@@ -7,6 +7,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import { sha256 } from '../../domain/Domain.ts';
 import type { DeletionKind, DeletionNode } from '../../domain/workbench/BatchDeletion.ts';
 import { deletionArtifactSeed, type DeletionArtifactSeed } from '../../application/services/DeletionArtifacts.ts';
+import type { SqliteDeletionRunStates } from './SqliteDeletionRunStates.ts';
 
 type Row = Record<string, unknown>;
 interface Entry { database: string; table: string; key: Row; row: Row; value: Row; node: DeletionNode }
@@ -65,9 +66,10 @@ function strings(value: unknown): string[] {
  * 调用者负责以同一快照读取各库；本函数不建立跨库写事务，也不执行删除。
  * 输出只涵盖数据库记录。CAS 递归引用、发布文件和墓碑仍须加入最终删除清单。
  */
-export function sqliteDeletionInventory(databases: Record<string, DatabaseSync>): DeletionRecordInventory {
+export function sqliteDeletionInventory(databases: Record<string, DatabaseSync>, runStates: Record<string, SqliteDeletionRunStates> = {}): DeletionRecordInventory {
   const entries: Entry[] = [], unclassifiedTables: string[] = [];
   for (const [database, db] of Object.entries(databases).sort(([a], [b]) => a.localeCompare(b))) {
+    runStates[database]?.assertCurrent(db);
     const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all();
     const deletedRuns = new Set(tables.some(table => table.name === 'deletion_execution_tombstones')
       ? db.prepare("SELECT execution_id FROM deletion_execution_tombstones WHERE table_name='runs'").all().map(row => String(row.execution_id)) : []);
@@ -84,7 +86,8 @@ export function sqliteDeletionInventory(databases: Record<string, DatabaseSync>)
         const rowKind = table === 'runs' && deletedRuns.has(String(row.run_id)) ? 'configuration' : kind;
         const node: DeletionNode = { id, kind: rowKind, revision: sha256(JSON.stringify(row)), ownedBy: [], references: [] };
         const record = object(value.value ?? value.record ?? value.snapshot);
-        if (rowKind === 'run') node.active = !['VERIFIED', 'LOW_CONFIDENCE', 'FAILED', 'CANCELLED'].includes(String(row.state));
+        if (rowKind === 'run') node.active = runStates[database]?.active(row)
+          ?? !['VERIFIED', 'LOW_CONFIDENCE', 'FAILED', 'CANCELLED'].includes(String(row.state));
         if (['batch', 'pipeline', 'stage'].includes(kind)) node.active = !!row.lease_id
           || !['READY', 'SUCCEEDED', 'FAILED', 'CANCELLED', 'PAUSED'].includes(String(record.status))
           || kind === 'batch' && object(record.schedule).enabled === true;

@@ -7,6 +7,7 @@ import type { DatabaseSync, SQLInputValue } from 'node:sqlite';
 import { sha256 } from '../../domain/Domain.ts';
 import type { BatchDeletionPlan } from '../../domain/workbench/BatchDeletion.ts';
 import { sqliteDeletionInventory } from './SqliteDeletionInventory.ts';
+import type { SqliteDeletionRunStates } from './SqliteDeletionRunStates.ts';
 
 interface FrozenRow { id: string; table: string; key: Record<string, string | number>; revision: string; usage: unknown }
 interface RowWitness { contract: 'deletion-rows-v2'; database: string; rows: FrozenRow[] }
@@ -57,8 +58,8 @@ export class SqliteDeletionRows {
     return this.db.prepare(`SELECT * FROM ${quote(table)} WHERE ${primary.map(column => `${quote(column)}=?`).join(' AND ')}`)
       .get(...primary.map(column => key[column] as SQLInputValue));
   }
-  capture(plan: BatchDeletionPlan): RowWitness {
-    const inventory = sqliteDeletionInventory({ [this.name]: this.db });
+  capture(plan: BatchDeletionPlan, runStates?: SqliteDeletionRunStates): RowWitness {
+    const inventory = sqliteDeletionInventory({ [this.name]: this.db }, runStates ? { [this.name]: runStates } : {});
     if (inventory.unclassifiedTables.length) throw new Error('DELETION_UNCLASSIFIED_TABLES');
     const records = new Map(inventory.records.map(record => [record.id, record]));
     const nodes = new Map(inventory.nodes.map(node => [node.id, node]));
