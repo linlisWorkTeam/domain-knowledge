@@ -42,7 +42,7 @@ TinyXML2不以整个XML库重建为验收范围。两份C++生成工件经CAS读
 
 | 检查 | 已取得的证据 | 尚不能据此证明 |
 | --- | --- | --- |
-| 当前完整Node回归 | 125个测试文件已串行启动，`/tmp/WorkbenchCurrentFullRegression.log`，文件与代码基线清单同名Manifest.json | 执行中，尚无通过结论 |
+| 当前src/tests回归 | 125个测试文件501/501通过，无失败、取消或跳过，326473ms；`/tmp/WorkbenchCurrentFullRegression.log`及同名Manifest.json | 不覆盖Playwright浏览器、scripts目录测试和最新main集成 |
 | 旧完整Node回归 | `3b83ac6`基线494/494，`/tmp/WorkbenchV17FullRegression.log` | 此后新增补证目标、构建范围及下载检查点的完整回归 |
 | 构建范围交接与发布 | 26项领域、准备、发布、架构检查通过，`/tmp/SourceScopeContractTests.log` | 完整当前Node/Console回归 |
 | 来源历史与原生应用 | 原队列1/3暴露scope任务提前复用缺陷；0ae56fe修复后6/6，`/tmp/SourceScopeHistoryFixTests.log` | 全套当前回归 |
@@ -54,9 +54,11 @@ TinyXML2不以整个XML库重建为验收范围。两份C++生成工件经CAS读
 
 ## 最终交付仍需补齐
 
+用户再次明确要求前台改造：须结合真实页面审查操作中心五阶段入口、输入/产物、错误及下一步、卡片/评测/关联详情和窄屏布局，不能仅以后台或受控测试代替前台交付。
+
 两个目标都须在明确绑定的当前版本上完成多卡片、增量索引、重建与必要修订、固定及可信评测、来源复核、关联查看与发布，并给出一键和分步的真实证据。当前报告未证明这一完整链路。
 
-还需完成当前代码的全套Node、Console、markdownLite及浏览器检查，补齐取消、重启、恢复、质量拒绝、额度与材料不可用等验收证据的清单，并在通过后更新网站。网站已于2026-09-14部署`ec72c43`，首页/health/关键API和变化JS真实HTTP验证通过，保留原数据与备份；0ae56fe历史修复尚未部署，最新浏览器检查待补。
+src/tests当前501项已通过；仍需补齐scripts目录、Console及浏览器检查和明确的markdownLite验收证据，补齐取消、重启、恢复、质量拒绝、额度与材料不可用等验收证据的清单，并在通过后更新网站。网站已于2026-09-14部署`ec72c43`，首页/health/关键API和变化JS真实HTTP验证通过，保留原数据与备份；0ae56fe历史修复尚未部署，最新浏览器检查待补。
 
 ## 原始证据位置
 
@@ -71,3 +73,5 @@ TinyXML2不以整个XML库重建为验收范围。两份C++生成工件经CAS读
 - `supplement-after-selection-v1/CandidateRejectionAudit.json`：旧补证候选拒绝及未命中审计。
 
 具体页面操作见[操作说明](../Operations.md)。
+
+本次尝试在原长浏览器场景追加构建范围和三类下载断言：新增断言执行后，在后续source-revision截图处超过30秒总时限。未记录通过，未放宽时限；未提交的新增断言已撤回并保存至 `/tmp/WorkbenchSourceScopeBrowserPending.patch`，后续拆分为独立场景。失败日志 `/tmp/WorkbenchSourceScopeBrowser.log` 保留。
