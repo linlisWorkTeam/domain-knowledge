@@ -436,6 +436,8 @@ test('HTTP adapter rejects missing credentials and accepts authenticated candida
       assert.equal(legacy.status, 404, legacyPath);
     }
   } finally {
+    // 本场景启动了异步再生成；按服务端停机顺序排空工作后再删除运行目录。
+    await instance.composition.shutdown();
     instance.server.close();
     await once(instance.server, 'close');
     rmSync(runtimeDir, { recursive: true, force: true });

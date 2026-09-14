@@ -383,6 +383,8 @@ export function createComposition(input: {
     runtimeVersion: '0.1.2-alpha.4',
   }));
   const schemaRoot = join(componentRoot, 'docs', 'specs', 'schemas');
+  // 校验同步执行且不保存业务状态；同一装配只编译一份冻结契约。
+  const agentContracts = new JsonSchemaAgentContractValidator(schemaRoot);
   const artifactRefSchemaSha256 = sha256(readFileSync(join(schemaRoot, 'ArtifactRef.schema.json')));
   const correctionSchemaSha256 = sha256(readFileSync(join(schemaRoot, 'Correction.schema.json')));
   const fallbackRunProvider = {
@@ -413,7 +415,7 @@ export function createComposition(input: {
     clock: input.clock,
   });
   workbenchGeneration = new WorkbenchGeneration({ projects: projectStore, artifacts, configuration: runConfiguration,
-    native: new NativeToolchain(), contracts: new JsonSchemaAgentContractValidator(schemaRoot), flywheel: flywheelApp, stages: workbenchStages,
+    native: new NativeToolchain(), contracts: agentContracts, flywheel: flywheelApp, stages: workbenchStages,
     model: (command, configuration, onUsage) => {
       if (processIsolation !== 'bubblewrap') throw new Error('MODULE_ISOLATION_REQUIRED');
       const configured = providerOperations.requireRuntimeConfiguration(configuration.provider);
@@ -431,7 +433,7 @@ export function createComposition(input: {
   });
   workbenchReconstruction = new WorkbenchReconstruction({ projects: projectStore, repository, artifacts, native: new NativeToolchain(),
     snapshot: nativeFingerprint, configuration: runConfiguration, stages: workbenchStages,
-    roles: new WorkbenchRoleExecution({ artifacts, events: (taskId, after) => workbenchStages.store.events(taskId, after), contracts: new JsonSchemaAgentContractValidator(schemaRoot), model: workbenchGeneration.dependencies.model }) });
+    roles: new WorkbenchRoleExecution({ artifacts, events: (taskId, after) => workbenchStages.store.events(taskId, after), contracts: agentContracts, model: workbenchGeneration.dependencies.model }) });
   workbenchEvaluation = new WorkbenchEvaluation({ projects: projectStore, repository, artifacts, native: new NativeToolchain(),
     configuration: runConfiguration, stages: workbenchStages, roles: workbenchReconstruction.dependencies.roles, evaluation: nativeEvaluation });
   workbenchSourceRevision = new WorkbenchSourceRevision(workbenchEvaluation, flywheelApp, knowledgeIndex);
@@ -536,7 +538,7 @@ export function createComposition(input: {
         flywheel: flywheelApp,
         evalRunner: evalRunnerApp,
         evaluator: new TrustedProjectEvaluator(artifacts, input.evaluationArtifactsDirectory),
-        contracts: new JsonSchemaAgentContractValidator(schemaRoot),
+        contracts: agentContracts,
         localPublication: publicationOperations,
         ...(agent ? { agent } : {}),
         agentResolver: (runId) => {
@@ -567,7 +569,7 @@ export function createComposition(input: {
   const agentExample = new AgentExampleService({
     tasks: new ConcurrentTasks(),
     flywheel: flywheelApp, runConfiguration, evaluator: new TrustedProjectEvaluator(artifacts, input.evaluationArtifactsDirectory),
-    contracts: new JsonSchemaAgentContractValidator(schemaRoot), observer: workflowObserver,
+    contracts: agentContracts, observer: workflowObserver,
     nodeByAgent: NODE_BY_AGENT,
     configurePrompt: (role, addon) => { agents.updatePromptAddon(role, addon); },
     model: (request) => {

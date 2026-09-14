@@ -24,7 +24,7 @@
 
 C++ v11重建首次启动在冻结工具链时触发ENOENT：指纹引擎清单仍引用重构前的 `domain/services/evaluation` 和 `domain/services/knowledge`。现已改为当前领域文件路径，真实工具链摘要生成通过，新重建任务 `stage-e6d45b8c9d720b62500ca5841e9b22df594ad0a938afebea451afb35dee4f6db` 已生成代码后因WORKBENCH_RESOURCE_INSUFFICIENT暂停；恢复复用了Code检查点并发现缺失TINYXML2_LIB宏的真实编译错误；同任务生成修复后累计2调用82,552 tokens，再因内存不足暂停，原诊断和修复检查点保留，尚不记录为成功。首次失败发生于建任务/模型调用之前，日志 `/tmp/CppV11Reconstruction.log`；修正后 `/tmp/CppV11ReconstructionAfterPaths.log`，证据目录 `cpp-v11-reconstruction/`。旧来源、可信与固定报告保留，不跨执行契约恢复旧任务。
 
-现有CI已手动触发于 `90b6872`：[运行34824671868](https://github.com/linlisWorkTeam/domain-knowledge/actions/runs/34824671868)，静态/Bubblewrap/类型检查通过，但完整回归601项580通过、21失败，原生用例缺少可写委派cgroup而触发PROJECT_RESOURCE_ISOLATION_UNAVAILABLE，浏览器和acceptance未运行。日志 `/tmp/WorkbenchCi34824671868Failed.log`。26b0019补齐临时runner的委派环境，不降低生产隔离要求；[复验34825340484](https://github.com/linlisWorkTeam/domain-knowledge/actions/runs/34825340484)已启动，尚待结果。GitHub比较接口确认分支相对main领先、落后0，merge base为22fe34fd；PR仍报告CONFLICTING，未重复合并或强推。
+现有CI已手动触发于 `90b6872`：[运行34824671868](https://github.com/linlisWorkTeam/domain-knowledge/actions/runs/34824671868)，静态/Bubblewrap/类型检查通过，但完整回归601项580通过、21失败，原生用例缺少可写委派cgroup而触发PROJECT_RESOURCE_ISOLATION_UNAVAILABLE，浏览器和acceptance未运行。日志 `/tmp/WorkbenchCi34824671868Failed.log`。26b0019补齐临时runner的委派环境，不降低生产隔离要求；[复验34825340484](https://github.com/linlisWorkTeam/domain-knowledge/actions/runs/34825340484)已结束，完整代码回归601项600通过、1失败；21项原生隔离失败已消失。唯一失败是Server测试异步再生成尚未排空就删除目录造成ENOTEMPTY，浏览器及acceptance仍未运行。GitHub比较接口确认分支相对main领先、落后0，merge base为22fe34fd；PR仍报告CONFLICTING，未重复合并或强推。
 
 ## 固定目标与当前真实结果
 
@@ -114,3 +114,9 @@ src/tests当前501项已通过；仍需补齐scripts目录、Console及浏览器
 | 窄屏 | [截图](workbenchScreenshots/BeforeNarrow.png) | [截图](workbenchScreenshots/AfterNarrow.png) |
 
 最终PR处理遵循用户最新条件：全部实现、真实验收与部署完成后，审查#50与#38是否为完整包含关系；若包含，关闭#38并合入#50；若不包含，解决冲突并保留双方改动、合入两个PR。目前未执行关闭或合入。
+
+## 初始化开销和HTTP测试清理（2026-09-14）
+
+Composition将同一schema根下的同步无业务状态契约校验器共享给阶段、工作流和评测装配，避免重复编译。相同192MiB堆条件下测量，初始化RSS从247,283,712降至218,546,176字节；这只是一次对照，不证明所有资源不足已解决。日志 `/tmp/WorkbenchMemoryProfile.log` 与 `/tmp/WorkbenchSharedContractsMemory.log`。契约与阶段/修复组合13/14通过，剩余legacy修复场景因本机WORKBENCH_RESOURCE_INSUFFICIENT暂停；未放宽门槛。类型检查通过。
+
+Server集成测试清理现在先await composition.shutdown，再关闭HTTP并删除目录，与服务端信号停机路径一致；复验7/7通过，`/tmp/WorkbenchServerCleanupRetest.log`。没有加入删除重试来掩盖未完成的后台任务。
