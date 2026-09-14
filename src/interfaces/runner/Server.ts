@@ -1476,6 +1476,9 @@ export function createKnowledgeServer(input: {
       }
       send(response, 404, errorBody('NOT_FOUND', 'Resource not found.', currentRequestId));
     } catch (error) {
+      if (error instanceof Error && error.message === 'DELETION_CHECKPOINT_OWNER_UNKNOWN') {
+        send(response, 409, errorBody(error.message, '历史执行记录不完整，无法确认旧任务已停止，删除已暂停。需先核实旧任务的执行进程；重试不会自动解除此限制。', currentRequestId, false)); return;
+      }
       if (error instanceof Error && ['DELETION_RECOVERY_REQUIRED', 'RUNTIME_MAINTENANCE', 'RUNTIME_OPERATIONS_ACTIVE'].includes(error.message)) {
         send(response, 503, errorBody(error.message, error.message === 'DELETION_RECOVERY_REQUIRED'
           ? '历史删除尚未恢复完成，请先完成恢复。' : '工作台正在维护或有操作执行中，请稍后重试。', currentRequestId, true)); return;

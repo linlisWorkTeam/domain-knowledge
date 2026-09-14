@@ -23,16 +23,19 @@ export function checkpointOwner(): Owner | null {
   catch { return null; }
 }
 
-/** 仅在确认旧启动已结束或 PID 已复用时允许提前接管。 */
-export function checkpointOwnerExited(value: unknown): boolean {
-  if (process.platform !== 'linux' || !value || typeof value !== 'object') return false;
+/** 区分可验证的存活、退出及未知身份，不以读取失败推断已停止。 */
+export function checkpointOwnerState(value: unknown): 'EXITED' | 'RUNNING' | 'UNKNOWN' {
+  if (process.platform !== 'linux' || !value || typeof value !== 'object') return 'UNKNOWN';
   const owner = value as Owner;
   if (owner.version !== 1 || !Number.isSafeInteger(owner.pid) || owner.pid < 1
     || typeof owner.bootId !== 'string' || !/^[0-9a-f-]{36}$/.test(owner.bootId)
-    || typeof owner.startTime !== 'string' || !/^\d+$/.test(owner.startTime)) return false;
+    || typeof owner.startTime !== 'string' || !/^\d+$/.test(owner.startTime)) return 'UNKNOWN';
   let bootId: string;
-  try { bootId = readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim(); } catch { return false; }
-  if (bootId !== owner.bootId) return true;
-  try { return startTime(owner.pid) !== owner.startTime; }
-  catch (error) { return (error as NodeJS.ErrnoException).code === 'ENOENT' || (error as NodeJS.ErrnoException).code === 'ESRCH'; }
+  try { bootId = readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim(); } catch { return 'UNKNOWN'; }
+  if (bootId !== owner.bootId) return 'EXITED';
+  try { return startTime(owner.pid) !== owner.startTime ? 'EXITED' : 'RUNNING'; }
+  catch (error) { return (error as NodeJS.ErrnoException).code === 'ENOENT' || (error as NodeJS.ErrnoException).code === 'ESRCH' ? 'EXITED' : 'UNKNOWN'; }
 }
+
+/** 不完整身份或进程读取失败仍不能证明执行者已退出。 */
+export function checkpointOwnerExited(value: unknown): boolean { return checkpointOwnerState(value) === 'EXITED'; }

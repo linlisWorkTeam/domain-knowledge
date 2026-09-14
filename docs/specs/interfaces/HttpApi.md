@@ -229,3 +229,5 @@ POST /api/v1/projects 新增可选 moduleDefinitions，形如 `[{moduleId:"parse
 POST /api/v1/workbench-batches 可选 execution：`{schemaVersion:"module-execution-v1",scope:{entryPath?,astFilter?,symbols?},materialIds:[],fixedSuite?:{schemaVersion:"native-cases-v1",cases:[]}}`。整个执行配置最多256KiB，固定集1到64例，材料最多32个且必须已存在；范围入口必须属于当前模块。非法配置返回BATCH_EXECUTION_INVALID/422，材料不存在为404。配置参与幂等性且所有轮次复用，不能通过恢复改写。列表返回executionSummary（scope、materialIds、fixedCaseCount），不重复传输固定用例正文；GET单批次详情保留完整冻结配置，用于按需下载。
 
 目录项目通过 repository-analyses 的 revision=WORKTREE 冻结本地目录，返回 directory:SHA256 版本、directorySnapshot 概要及 inventory 文件清单；projects 使用该返回版本保存输入，不能把WORKTREE留作动态执行引用。原分支/标签/提交参数保留Git语义。DIRECTORY_* 输入、超限或损坏错误返回422，SOURCE_ACCESS_DENIED仍为403；不暴露任意目录内容。
+
+旧检查点缺失、损坏或无法验证进程身份时，删除维护检查返回409与DELETION_CHECKPOINT_OWNER_UNKNOWN，retryable为false，中文提示需要核实旧执行者。它不同于可重试的RUNTIME_OPERATIONS_ACTIVE；不得自动填补owner、覆盖检查点或以终态批次跳过保护。

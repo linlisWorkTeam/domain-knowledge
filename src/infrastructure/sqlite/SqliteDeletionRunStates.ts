@@ -6,7 +6,7 @@
 import type { DatabaseSync } from 'node:sqlite';
 import type { WorkflowExecutionView } from '../../application/ports/ApplicationPorts.ts';
 import { sha256 } from '../../domain/Domain.ts';
-import { checkpointOwnerExited } from './CheckpointOwner.ts';
+import { checkpointOwnerState } from './CheckpointOwner.ts';
 import { visibleExecutionSql } from './DeletionTombstones.ts';
 
 type Row = Record<string, unknown>;
@@ -24,21 +24,26 @@ function records(database: DatabaseSync) {
 export class SqliteDeletionRunStates {
   private readonly database: DatabaseSync;
   private readonly fingerprint: string;
+  private readonly unknownOwners: boolean;
   private readonly states: ReadonlyMap<string, { revision: string; active: boolean }>;
-  private constructor(database: DatabaseSync, fingerprint: string, states: ReadonlyMap<string, { revision: string; active: boolean }>) {
-    this.database = database; this.fingerprint = fingerprint; this.states = states;
+  private constructor(database: DatabaseSync, fingerprint: string, states: ReadonlyMap<string, { revision: string; active: boolean }>, unknownOwners: boolean) {
+    this.database = database; this.fingerprint = fingerprint; this.states = states; this.unknownOwners = unknownOwners;
   }
 
   static async inspect(database: DatabaseSync, status: (runId: string) => Promise<WorkflowExecutionView>): Promise<SqliteDeletionRunStates> {
     const before = records(database), fingerprint = sha256(JSON.stringify(before));
     const owners = new Map(before.owners.map(owner => [String(owner.generation_key), owner.owner_json]));
     const blocked = new Set<string>();
+    let unknownOwners = false;
     for (const checkpoint of before.checkpoints) {
       if (['COMMITTED', 'FAILED'].includes(String(checkpoint.status))) continue;
       let exited = false;
       if (checkpoint.status === 'RUNNING') {
-        try { exited = checkpointOwnerExited(JSON.parse(String(owners.get(String(checkpoint.generation_key))))); }
+        let ownerState: 'EXITED' | 'RUNNING' | 'UNKNOWN' = 'UNKNOWN';
+        try { ownerState = checkpointOwnerState(JSON.parse(String(owners.get(String(checkpoint.generation_key))))); }
         catch { /* 缺少或损坏的进程身份不能证明已退出。 */ }
+        exited = ownerState === 'EXITED';
+        unknownOwners ||= ownerState === 'UNKNOWN';
       }
       if (!exited) blocked.add(String(checkpoint.run_id));
     }
@@ -56,7 +61,7 @@ export class SqliteDeletionRunStates {
       }
       states.set(runId, { revision: sha256(JSON.stringify(row)), active: active || blocked.has(runId) });
     }
-    const snapshot = new SqliteDeletionRunStates(database, fingerprint, states);
+    const snapshot = new SqliteDeletionRunStates(database, fingerprint, states, unknownOwners);
     snapshot.assertCurrent(database);
     return snapshot;
   }
@@ -64,6 +69,7 @@ export class SqliteDeletionRunStates {
   assertCurrent(database: DatabaseSync): void {
     if (database !== this.database || sha256(JSON.stringify(records(database))) !== this.fingerprint) throw new Error('DELETION_EXECUTION_CHANGED');
   }
+  get hasUnknownCheckpointOwners(): boolean { this.assertCurrent(this.database); return this.unknownOwners; }
   get idle(): boolean { this.assertCurrent(this.database); return [...this.states.values()].every(state => !state.active); }
   active(row: Row): boolean {
     const state = this.states.get(String(row.run_id));

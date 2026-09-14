@@ -97,3 +97,26 @@ test('both DSH roots join one HTTP plan and recover after the second root fails'
     assert.equal(existsSync(files[1]!), false); assert.equal(readFileSync(dependency, 'utf8'), 'keep tool');
   } finally { DshHomeDeletionFiles.prototype.clean = originalClean; await f.close(); }
 });
+
+test('ownerless legacy checkpoint gives a non-retryable explanation and keeps records intact', async () => {
+  const f = await setup();
+  try {
+    const run = f.composition.apps.flywheel.createRun('legacy-unknown-owner', 'v1');
+    for (const state of ['PLANNED', 'GENERATING', 'EVALUATING', 'FAILED'] as const) f.composition.apps.flywheel.transition(run.runId, state);
+    const db = f.composition.repository.database;
+    db.prepare(`INSERT INTO checkpoints(generation_key,run_id,node_id,status,input_refs_json,output_refs_json,retry_count,updated_at)
+      VALUES(?,?,'test_gen','RUNNING','[]','[]',0,?)`).run('legacy-key', run.runId, '2026-09-10T00:00:00Z');
+    const before = db.prepare('SELECT * FROM checkpoints').all();
+    for (let retry = 0; retry < 2; retry++) {
+      const response = await f.post('preview'), body = await response.json();
+      assert.equal(response.status, 409);
+      assert.equal(body.error.code, 'DELETION_CHECKPOINT_OWNER_UNKNOWN');
+      assert.equal(body.error.retryable, false);
+      assert.match(body.error.message, /历史执行记录不完整/);
+      assert.doesNotMatch(JSON.stringify(body), /legacy-key|legacy-unknown-owner/);
+      assert.deepEqual(db.prepare('SELECT * FROM checkpoints').all(), before);
+      assert.ok(f.batches.get(f.batch.batchId));
+      assert.equal(f.composition.apps.maintenance.status, 'AVAILABLE');
+    }
+  } finally { await f.close(); }
+});

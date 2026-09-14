@@ -66,8 +66,10 @@ test('running checkpoint owner must be proven exited, regardless of a terminal w
     db.exec("INSERT INTO checkpoints VALUES('checkpoint','old-run','RUNNING')");
     const inspect = () => SqliteDeletionRunStates.inspect(db, async () => view('FAILED'));
     assert.equal((await inspect()).idle, false);
+    assert.equal((await inspect()).hasUnknownCheckpointOwners, true);
     db.prepare('INSERT INTO checkpoint_owners VALUES(?,?)').run('checkpoint', JSON.stringify(checkpointOwner()));
     assert.equal((await inspect()).idle, false);
+    if (process.platform === 'linux') assert.equal((await inspect()).hasUnknownCheckpointOwners, false);
     if (process.platform === 'linux') {
       const owner = checkpointOwner(); assert.ok(owner);
       db.prepare('UPDATE checkpoint_owners SET owner_json=?').run(JSON.stringify({ ...owner, startTime: owner.startTime === '0' ? '1' : '0' }));
@@ -87,6 +89,7 @@ test('a run or checkpoint changed during or after async inspection invalidates t
     db.exec("INSERT INTO checkpoints VALUES('new','old-run','RUNNING')");
     assert.throws(() => sqliteDeletionInventory({ registry: db }, { registry: states }), /DELETION_EXECUTION_CHANGED/);
     assert.throws(() => states.idle, /DELETION_EXECUTION_CHANGED/);
+    assert.throws(() => states.hasUnknownCheckpointOwners, /DELETION_EXECUTION_CHANGED/);
   } finally { db.close(); }
 });
 test('an active checkpoint without a visible run cannot be ignored by the global idle check', async () => {
@@ -114,4 +117,19 @@ test('real embedded execution is blocked while its node runs and becomes eligibl
     assert.equal((await inspect()).idle, true);
     assert.equal(db.prepare('SELECT state FROM runs').get()!.state, 'GENERATING');
   } finally { finish(); await infrastructure.engine.shutdown(); db.close(); }
+});
+
+test('malformed and incomplete checkpoint identities remain unknown without modifying stored history', async () => {
+  const db = database('FAILED');
+  try {
+    db.exec("INSERT INTO checkpoints VALUES('checkpoint','old-run','RUNNING'); INSERT INTO checkpoint_owners VALUES('checkpoint','broken-json')");
+    for (const owner of ['broken-json', 'null', '{}', '{"version":1,"pid":1}']) {
+      db.prepare('UPDATE checkpoint_owners SET owner_json=?').run(owner);
+      const snapshot = await SqliteDeletionRunStates.inspect(db, async () => view('FAILED'));
+      assert.equal(snapshot.idle, false);
+      assert.equal(snapshot.hasUnknownCheckpointOwners, true);
+      assert.equal(db.prepare('SELECT owner_json FROM checkpoint_owners').get()!.owner_json, owner);
+      assert.equal(db.prepare('SELECT status FROM checkpoints').get()!.status, 'RUNNING');
+    }
+  } finally { db.close(); }
 });

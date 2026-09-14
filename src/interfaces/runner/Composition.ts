@@ -485,8 +485,11 @@ function composeRuntime(input: CompositionInput, repositoryRoot: string, config:
     needsRecovery: () => !runtimeLock.available || deletionRecoveryPending(join(runtimeDir, 'deletion-recovery.sqlite')),
     idle: () => workbenchBatches.idle && workbenchPipelines.idle && workbenchStages.idle && workbenchPublications.idle
       && deletionWorkbenchExecutionsIdle(join(runtimeDir, 'workbench.sqlite')),
-    verifyIdle: async () => (await SqliteDeletionRunStates.inspect(repository.database,
-      async runId => (await workflow()).workflow.status(runId))).idle });
+    verifyIdle: async () => {
+      const states = await SqliteDeletionRunStates.inspect(repository.database, async runId => (await workflow()).workflow.status(runId));
+      if (states.hasUnknownCheckpointOwners) throw new Error('DELETION_CHECKPOINT_OWNER_UNKNOWN');
+      return states.idle;
+    } });
   const projectStages = () => {
       const auditDirectory = join(runtimeDir, 'demo');
       const auditPath = join(auditDirectory, 'agent-runs.jsonl');
