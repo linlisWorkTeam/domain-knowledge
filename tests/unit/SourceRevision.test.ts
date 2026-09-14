@@ -6,7 +6,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { sha256, type ArtifactRef } from '../../src/domain/Domain.ts';
-import { authorizeSourceCorrection, sourceCorrectionCandidates, SOURCE_CORRECTION_POLICY } from '../../src/domain/knowledge/SourceRevision.ts';
+import { sourceHistoryCommandView, authorizeSourceCorrection, sourceCorrectionCandidates, SOURCE_CORRECTION_POLICY } from '../../src/domain/knowledge/SourceRevision.ts';
 const body = '# Parser\n## Behavior\nReturn the difference.\n';
 const ref = (digest: string): ArtifactRef => ({ artifactId: digest, sha256: digest, mediaType: 'application/json', size: 1 });
 const correction = { correctionId: 'provider-label', knowledgePath: 'knowledge/parser.md#Behavior', criterion: 'Return the sum shown by fixed source.', risk: 'Wrong operation.' };
@@ -47,4 +47,19 @@ test('mixed whole-card risks retain their block while only bound explicit sectio
     assert.throws(() => sourceCorrectionCandidates<Finding>([{ ...card, sections: [{ ...section, [key]: 'other' }] }], SOURCE_CORRECTION_POLICY), /SOURCE_CORRECTION_SECTION_BINDING_INVALID/);
   }
   assert.throws(() => sourceCorrectionCandidates<Finding>([card], 'unknown'), /SOURCE_CORRECTION_POLICY_INVALID/);
+});
+
+test('legacy source command validation view preserves evidence and cannot upgrade new or other commands', () => {
+  const command = { ...input.command, payload: { knowledgeRef: ref('a'.repeat(64)), evaluationReportRef: ref('b'.repeat(64)), checkReportRef: ref('c'.repeat(64)), criteriaRef: ref('d'.repeat(64)) } };
+  const before = structuredClone(command);
+  const view = sourceHistoryCommandView(command, 'knowledge-source-verification-v4', undefined);
+  assert.equal(view.payload.executionContract, 'workbench-review-v1');
+  assert.deepEqual(command, before);
+  assert.equal(view.payload.knowledgeRef, command.payload.knowledgeRef);
+  assert.equal(sourceHistoryCommandView(command, 'knowledge-source-verification-v4', 'source-assessment-v1'), command);
+  assert.equal(sourceHistoryCommandView(command, 'other', undefined), command);
+  const extra = { ...command, payload: { ...command.payload, arbitrary: true } };
+  assert.equal(sourceHistoryCommandView(extra, 'knowledge-source-verification-v4', undefined), extra);
+  const wrong = { ...command, payload: { ...command.payload, executionContract: 'unknown' } };
+  assert.equal(sourceHistoryCommandView(wrong, 'knowledge-source-verification-v4', undefined), wrong);
 });

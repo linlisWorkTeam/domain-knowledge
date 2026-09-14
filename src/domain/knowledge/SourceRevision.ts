@@ -44,3 +44,12 @@ export function sourceCorrectionCandidates<T extends SourceCardResult & { unreso
     return selected ? [selected] : [];
   });
 }
+
+/** 只读校验旧来源命令的结构视图；不改写原始命令、摘要或授权依据。 */
+export function sourceHistoryCommandView(command: AgentCommand, verificationContract: unknown, assessmentPolicy: unknown): AgentCommand {
+  if (assessmentPolicy !== undefined || !['knowledge-source-verification-v2', 'knowledge-source-verification-v3', 'knowledge-source-verification-v4'].includes(String(verificationContract))
+    || command.agentType !== 'review' || command.schemaVersion !== '1.0' || command.payload.executionContract !== undefined) return command;
+  const keys = Object.keys(command.payload).sort();
+  if (keys.join(',') !== 'checkReportRef,criteriaRef,evaluationReportRef,knowledgeRef') return command;
+  return { ...command, payload: { ...command.payload, executionContract: 'workbench-review-v1' } };
+}

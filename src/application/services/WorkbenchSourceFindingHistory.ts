@@ -7,7 +7,7 @@ import { sha256, type ArtifactRef } from '../../domain/Domain.ts';
 import { canonicalJson, type StageInput, type StageTask } from '../../domain/workbench/StageTask.ts';
 import type { AgentCommand, AgentResult } from '../../domain/agents/AgentContracts.ts';
 import type { Output as ReviewOutput } from '../../domain/agents/reviewAgent/WorkbenchReviewContract.ts';
-import { authorizeSourceCorrection } from '../../domain/knowledge/SourceRevision.ts';
+import { authorizeSourceCorrection, sourceHistoryCommandView } from '../../domain/knowledge/SourceRevision.ts';
 import type { SourceCardResult } from '../../domain/knowledge/KnowledgeSourceVerification.ts';
 import type { WorkbenchEvaluation } from './WorkbenchEvaluation.ts';
 export interface SourceFindingProof { taskId: string; checkpointKey: string; checkpointDigest: string }
@@ -43,7 +43,7 @@ export class WorkbenchSourceFindingHistory {
     for (const ref of [...checkpoint.result.artifactRefs, card.bodyRef]) if (!await artifacts.verify(ref)) throw new Error('SOURCE_HISTORY_ARTIFACT_INVALID');
     const raw = await this.load<ReviewOutput>(finding.reviewRef), result = await this.load<AgentResult>(finding.reviewResultRef);
     roles.dependencies.contracts.assertResult(result);
-    const command = await this.load<AgentCommand>(result.commandRef); roles.dependencies.contracts.assertCommand(command);
+    const command = await this.load<AgentCommand>(result.commandRef); roles.dependencies.contracts.assertCommand(sourceHistoryCommandView(command, source.input.parameters.verificationContract, source.input.parameters.sourceAssessmentPolicy));
     for (const [key, ref] of [['checkReportRef', finding.referenceRef], ['evaluationReportRef', finding.referenceObservationsRef], ['criteriaRef', finding.criteriaRef]] as const) {
       if (!ref || (command.payload[key] as ArtifactRef | undefined)?.sha256 !== ref.sha256 || !checkpoint.result.artifactRefs.some(item => item.sha256 === ref.sha256)) throw new Error('SOURCE_HISTORY_BINDING_INVALID');
     }

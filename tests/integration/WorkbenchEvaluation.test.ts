@@ -271,6 +271,7 @@ for (const { rejectSourceReview, mixedSourceRisks, overCapacity = false } of [{ 
     composition.apps.knowledgeIndex.index.write = () => { throw new Error('TEST_SOURCE_INDEX_INTERRUPTION'); };
     const beforeSourceDocGen = revisionCalls;
     const sourceRepair = await composition.apps.workbenchSourceRevision.start(falseSource.taskId);
+    assert.equal(sourceRepair.input.parameters.sourceAssessmentPolicy, 'source-assessment-v1');
     assert.deepEqual(sourceRepair.input.parameters.sourceReviewPolicy, { schemaVersion: 'source-review-policy-v1', timeoutMs: 600000 });
     const partialSource = await composition.apps.workbenchStages.wait(sourceRepair.taskId);
     assert.equal(partialSource.status, 'FAILED'); assert.equal(partialSource.reasonCode, 'INDEX_BUILD_PARTIAL');

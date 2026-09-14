@@ -10,7 +10,7 @@ import type { AgentCommand, AgentResult } from '../../domain/agents/AgentContrac
 import type { Output as ReviewOutput } from '../../domain/agents/reviewAgent/WorkbenchReviewContract.ts';
 import { canonicalJson, type JsonValue, type StageInput } from '../../domain/workbench/StageTask.ts';
 import { SOURCE_VERIFICATION_CONTRACT, sourceVerificationOutcome, type SourceCardResult } from '../../domain/knowledge/KnowledgeSourceVerification.ts';
-import { SOURCE_REVISION_CONTRACT, SOURCE_CORRECTION_POLICY, sourceCorrectionCandidates, authorizeSourceCorrection } from '../../domain/knowledge/SourceRevision.ts';
+import { SOURCE_REVISION_CONTRACT, SOURCE_CORRECTION_POLICY, sourceCorrectionCandidates, authorizeSourceCorrection, sourceHistoryCommandView } from '../../domain/knowledge/SourceRevision.ts';
 import { knowledgeRevisionOutcome } from '../../domain/knowledge/KnowledgeRevision.ts';
 import type { NativeBehaviorSuite } from '../../domain/evaluation/NativeBehaviorSuite.ts';
 import type { StageModelConfiguration } from '../ports/WorkbenchGenerationPorts.ts';
@@ -101,7 +101,7 @@ export class WorkbenchSourceRevision {
         const body = Buffer.from(await artifacts.get(card.bodyRef)).toString('utf8');
         const raw = await this.load<ReviewOutput>(finding.reviewRef), result = await this.load<AgentResult>(finding.reviewResultRef);
         roles.dependencies.contracts.assertResult(result);
-        const command = await this.load<AgentCommand>(result.commandRef); roles.dependencies.contracts.assertCommand(command);
+        const command = await this.load<AgentCommand>(result.commandRef);
         let originTaskId = source.taskId;
         if (finding.originEvidence) {
           const frozenProofs = await this.load<SourceFindingProof[]>(source.input.parameters.priorFindingsRef as unknown as ArtifactRef);
@@ -110,6 +110,8 @@ export class WorkbenchSourceRevision {
           if (prior.finding.reviewRef.sha256 !== finding.reviewRef.sha256 || prior.finding.reviewResultRef.sha256 !== finding.reviewResultRef.sha256) throw new Error('SOURCE_HISTORY_BINDING_INVALID');
           originTaskId = finding.originEvidence.taskId;
         }
+        const originSource = this.evaluation.dependencies.stages.get(originTaskId);
+        roles.dependencies.contracts.assertCommand(sourceHistoryCommandView(command, originSource.input.parameters.verificationContract, originSource.input.parameters.sourceAssessmentPolicy));
         const instruction = authorizeSourceCorrection({ sourceTaskId: originTaskId, card: finding, body, raw, rawRef: finding.reviewRef, result, command });
         const module = evaluationEvidence.modules.find(module => module.moduleId === card.metadata.sourceModule);
         if (!module) throw new Error('SOURCE_REVISION_BINDING_INVALID');
