@@ -448,3 +448,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 ## 2026-09-14 归档：旧身份诊断与C++门禁
 
 [2340 原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/ef65123/docs/epitaph/2026-09-14-2340-owner-diagnostics-cpp-gates.md)：旧owner诊断修复与23项回归完成；C++cf781重建和后续37+40门禁已在后续记录确认通过。旧source348de05已取消，后续已启动独立v5复核，不能按旧记录重启重复任务。
+
+- [2026-09-14-2345 来源格式反馈](https://github.com/linlisWorkTeam/domain-knowledge/blob/e81ce62/docs/epitaph/2026-09-14-2345-review-format-findings.md)：记录有限格式反馈与原事实保留，拒绝格式重试改判PASS；后续由跨尝试历史审计、来源v5线索冻结及换行符具体反馈接续，真实修订发布仍未完成。
