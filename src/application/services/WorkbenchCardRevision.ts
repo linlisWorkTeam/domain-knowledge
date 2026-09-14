@@ -6,7 +6,7 @@
 import { sha256, type ArtifactRef, type KnowledgeVersion } from '../../domain/Domain.ts';
 import { type JsonValue, type StageResult } from '../../domain/workbench/StageTask.ts';
 import { finalizeKnowledgeRevision, knowledgeRevisionDecision, sourceReviewObservations } from '../../domain/knowledge/KnowledgeRevision.ts';
-import { readSourceReviewPolicy } from '../../domain/knowledge/SourceReviewPolicy.ts';
+import { readSourceAssessmentPolicy, readSourceReviewPolicy } from '../../domain/knowledge/SourceReviewPolicy.ts';
 import type { Output as ReviewOutput } from '../../domain/agents/reviewAgent/WorkbenchReviewContract.ts';
 import type { NativeBehaviorSuite } from '../../domain/evaluation/NativeBehaviorSuite.ts';
 import type { WorkbenchProjectSnapshot } from '../../domain/workbench/WorkbenchProject.ts';
@@ -32,6 +32,7 @@ export class WorkbenchCardRevision {
     suiteRef: ArtifactRef; oracleRef: ArtifactRef; referenceCaseIds: string[]; extraRefs: ArtifactRef[];
   }): Promise<StageResult> {
     const { artifacts, repository, roles } = this.evaluation.dependencies;
+    const sourceAssessmentPolicy = readSourceAssessmentPolicy(context.task.input.parameters.sourceAssessmentPolicy);
     const sourceReviewPolicy = readSourceReviewPolicy(context.task.input.parameters.sourceReviewPolicy);
     const { card, body, project, frozen, moduleId, heading, evaluationTaskId, contract, sourceVerificationTaskId,
       review, correction, referenceRef, reportRef, evidenceRef, suiteRef, oracleRef, referenceCaseIds, extraRefs } = input;
@@ -64,6 +65,7 @@ export class WorkbenchCardRevision {
     const sourceEvaluationRef = await artifacts.put(Buffer.from(JSON.stringify(sourceEvaluation)), 'application/json');
     const sourceCriteria = { schemaVersion: contract, phase: 'REVISION_SOURCE_REVIEW',
       ...(sourceReviewPolicy ? { sourceReviewPolicy } : {}),
+      ...(sourceAssessmentPolicy ? { sourceAssessmentPolicy } : {}),
       allowedKnowledgePaths: [`knowledge/${card.moduleId}.md#${heading}`],
       instruction: '独立复核最终正文的授权章节是否准确描述固定参考源码。上游模型的修订并非事实。逐项核对索引、边界、返回值及示例；有矛盾必须指出，不得因为文字流畅或旧评测通过而放行。评测材料只包含已验证的固定参考实现观察，observedImplementation=PINNED_REFERENCE；不能把旧生成代码的失败当成参考实现结果。本次只判断授权正文与固定源码一致性，后续生成代码重建及行为复测由独立阶段处理。只有正文与参考一致且无未解决风险才返回 PASS、blocking=false、correction=null。' };
     const sourceCriteriaRef = await artifacts.put(Buffer.from(JSON.stringify(sourceCriteria)), 'application/json');

@@ -5,7 +5,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SOURCE_REVIEW_POLICY, readSourceReviewPolicy, sourceReviewTimeoutMs } from '../../src/domain/knowledge/SourceReviewPolicy.ts';
+import { SOURCE_ASSESSMENT_POLICY, readSourceAssessmentPolicy, sourceAssessmentInstruction, SOURCE_REVIEW_POLICY, readSourceReviewPolicy, sourceReviewTimeoutMs } from '../../src/domain/knowledge/SourceReviewPolicy.ts';
 import { execute } from '../../src/domain/agents/reviewAgent/ReviewAgent.ts';
 import type { Input } from '../../src/domain/agents/reviewAgent/WorkbenchReviewContract.ts';
 import type { StageAttempt } from '../../src/domain/agents/AgentExecution.ts';
@@ -38,4 +38,22 @@ test('Review records the frozen deadline, preserves the legacy deadline and stil
       sample.controller.abort(); await assert.rejects(execute(sample.input, sample.context), /CANCELLED/);
     }
   }
+});
+
+test('source assessment policy is explicit, versioned and restricted to source phases', () => {
+  assert.equal(readSourceAssessmentPolicy(undefined), null);
+  assert.equal(sourceAssessmentInstruction({ phase: 'FINAL_SOURCE_REVIEW' }), '');
+  for (const value of [null, {}, 'source-assessment-v2', 1]) assert.throws(() => readSourceAssessmentPolicy(value), /SOURCE_ASSESSMENT_POLICY_INVALID/);
+  for (const phase of ['FINAL_SOURCE_REVIEW', 'REVISION_SOURCE_REVIEW']) assert.ok(sourceAssessmentInstruction({ phase, sourceAssessmentPolicy: SOURCE_ASSESSMENT_POLICY }));
+  assert.throws(() => sourceAssessmentInstruction({ phase: 'BEHAVIOR_REVIEW', sourceAssessmentPolicy: SOURCE_ASSESSMENT_POLICY }), /SOURCE_ASSESSMENT_POLICY_INVALID/);
+});
+test('invalid source assessment fails before a model request and does not consume attempts', async () => {
+  const sample = roleExample<Input>('review', 'src/domain/agents/reviewAgent/examples/WorkbenchReviewSample.json');
+  const material = sample.input.materials.find(item => item.ref.artifactId === sample.input.payload.criteriaRef.artifactId)!;
+  material.content = { ...(material.content as object), phase: 'BEHAVIOR_REVIEW', sourceAssessmentPolicy: SOURCE_ASSESSMENT_POLICY };
+  const bytes = JSON.stringify(material.content); const digest = sha256(bytes);
+  material.ref = { ...material.ref, artifactId: `sha256:${digest}`, sha256: digest, size: Buffer.byteLength(bytes) };
+  sample.input.payload.criteriaRef = material.ref; sample.input.provenance = sample.input.materials.map(item => item.ref);
+  await assert.rejects(execute(sample.input, sample.context), /SOURCE_ASSESSMENT_POLICY_INVALID/);
+  assert.equal(sample.requests.length, 0);
 });

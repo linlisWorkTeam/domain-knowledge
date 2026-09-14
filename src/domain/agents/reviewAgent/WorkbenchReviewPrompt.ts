@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：维护证据复核角色的基础指令、职责和可读材料范围。
  */
+import { sourceAssessmentInstruction } from '../../knowledge/SourceReviewPolicy.ts';
 import { correctionTargets } from './WorkbenchReviewContract.ts';
 import { materialsFor } from '../AgentExecution.ts';
 import type { Input } from './WorkbenchReviewContract.ts';
@@ -20,7 +21,9 @@ export const definition = {
 /** 组合基础提示词和本角色可见的受信材料。 */
 export function buildPrompt(input: Input, context: ExecutionContext): string {
   const targets = correctionTargets(input);
-  return `${context.effectivePrompt}\n当前执行 workbench-review-v1：按给定章节与来源证据输出 blocking、recommendation、单个 correction（或 null）及 unresolvedRisks，不输出默认项目模式的 corrections 列表。\n本次唯一允许的修订目标（程序从现有正文提取）：${JSON.stringify(targets)}。必须逐字选用其中一项的 heading 和 knowledgePath；H3/H4 子标题不是授权目标，问题位于子标题时应选择其所属的现有 H2。不能创建新标题或把标题转成 URL slug。\nverificationNeeds 是程序登记的待验收事项或范围限制，不代表行为已失败；以本轮结构化评测判断正文是否仍有陈旧的失败描述。不能靠 PASS 清除 unresolvedRisks，风险处置由独立的证据规则决定。纠正意见必须定位唯一现有 H2：knowledge/${input.moduleId}.md#原样H2标题。criterion 写清该段应补充或纠正的行为和可复验要求；不得建议删除测试、改预期或复制参考实现。可选 targetHeading 必须与锚点相同，replacementMarkdown 只能包含该 H2 段。证据不足时 correction=null，并填写 unresolvedRisks；通过时 unresolvedRisks=[]。\n\n受信 AgentCommand：\n${JSON.stringify(context.command)}\n\n命令引用工件（已校验内容摘要）：\n${JSON.stringify(materialsFor(input.payload, input.materials))}`;
+  const criteria = input.materials.find(material => material.ref.artifactId === input.payload.criteriaRef.artifactId)?.content;
+  const sourceInstruction = sourceAssessmentInstruction(criteria);
+  return `${context.effectivePrompt}${sourceInstruction}\n当前执行 workbench-review-v1：按给定章节与来源证据输出 blocking、recommendation、单个 correction（或 null）及 unresolvedRisks，不输出默认项目模式的 corrections 列表。\n本次唯一允许的修订目标（程序从现有正文提取）：${JSON.stringify(targets)}。必须逐字选用其中一项的 heading 和 knowledgePath；H3/H4 子标题不是授权目标，问题位于子标题时应选择其所属的现有 H2。不能创建新标题或把标题转成 URL slug。\nverificationNeeds 是程序登记的待验收事项或范围限制，不代表行为已失败；以本轮结构化评测判断正文是否仍有陈旧的失败描述。不能靠 PASS 清除 unresolvedRisks，风险处置由独立的证据规则决定。纠正意见必须定位唯一现有 H2：knowledge/${input.moduleId}.md#原样H2标题。criterion 写清该段应补充或纠正的行为和可复验要求；不得建议删除测试、改预期或复制参考实现。可选 targetHeading 必须与锚点相同，replacementMarkdown 只能包含该 H2 段。证据不足时 correction=null，并填写 unresolvedRisks；通过时 unresolvedRisks=[]。\n\n受信 AgentCommand：\n${JSON.stringify(context.command)}\n\n命令引用工件（已校验内容摘要）：\n${JSON.stringify(materialsFor(input.payload, input.materials))}`;
 }
 
 /** 确定本角色允许读取的文件路径。 */

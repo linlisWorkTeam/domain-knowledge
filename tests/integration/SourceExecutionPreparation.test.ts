@@ -30,6 +30,7 @@ test('new source task freezes verified build scope and its immutable artifact re
   const { f, service } = await setup();
   const input = await service.prepare(f.ids.evaluation);
   assert.equal(input.parameters.sourceExecutionPolicy, 'source-execution-scope-v1');
+  assert.equal(input.parameters.sourceAssessmentPolicy, 'source-assessment-v1');
   const ref = input.parameters.executionScopesRef as unknown as ArtifactRef;
   assert.equal(await f.service.dependencies.artifacts.verify(ref), true);
   const scopes = JSON.parse(Buffer.from(await f.service.dependencies.artifacts.get(ref)).toString());
@@ -43,6 +44,7 @@ test('existing source task retains legacy input and consumed usage instead of an
   const { f, old, service } = await setup(true);
   assert.deepEqual(await service.prepare(f.ids.evaluation), old.input);
   assert.equal(old.usage.modelCalls, 7);
+  assert.equal(old.input.parameters.sourceAssessmentPolicy, undefined);
   assert.equal(old.input.parameters.sourceExecutionPolicy, undefined);
 });
 test('corrupt toolchain evidence stops preparation before a new source task is created', async () => {
