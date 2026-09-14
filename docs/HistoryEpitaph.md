@@ -396,3 +396,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 [2126 旧运行审计与异步维护](https://github.com/linlisWorkTeam/domain-knowledge/blob/ec67776/docs/epitaph/2026-09-14-2126-legacy-deletion-audit-and-maintenance.md)：旧runs支持审计墓碑和配置/用量保留，维护屏障增加锁内异步状态检查；37项旧删除回归与4项维护单测通过。实际执行核验和图库清理后续已补适配器，生产删除及完整真实C/C++验收仍未完成。
 
 [2130 实际执行删除核验](https://github.com/linlisWorkTeam/domain-knowledge/blob/292ff0f/docs/epitaph/2026-09-14-2130-live-deletion-execution-check.md)：维护锁内读取原始工作流状态并结合检查点执行者，避免混淆业务阶段与执行存活，30项相关回归通过。该核验仍不能替代跨进程写入排他，最终删除UI/发布文件清理及真实C/C++验收未完成。
+
+[2136 图检查点清理](https://github.com/linlisWorkTeam/domain-knowledge/blob/e2c0936/docs/epitaph/2026-09-14-2136-graph-checkpoint-deletion.md)：新增Graph库存与整线程清理适配器，26项相关回归通过。备份中的1141图记录和274工件种子后来已合入完整数据库/CAS审计，唯一工件仍336个，全部通过；生产其他派生文件和删除界面仍未完成。

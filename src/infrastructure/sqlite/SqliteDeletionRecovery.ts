@@ -21,14 +21,14 @@ export interface DeletionFileParticipant {
   clean(plan: BatchDeletionPlan, witness: unknown): void;
 }
 interface RecoveryIntent {
-  contract: 'deletion-recovery-v3'; plan: BatchDeletionPlan;
+  contract: 'deletion-recovery-v4'; plan: BatchDeletionPlan; preparedAt: string;
   participants: Array<{ name: string; contract: string }>;
   witnesses: Record<string, unknown>;
   files: Array<{ name: string; contract: string; scope: string }>;
   fileWitnesses: Record<string, unknown>;
 }
 export type DeletionRecoveryPhase = 'PREPARED' | 'RECORDS_COMMITTED' | 'COMPLETE';
-export interface DeletionRecoveryRecord { intent: RecoveryIntent; fingerprint: string; phase: DeletionRecoveryPhase }
+export interface DeletionRecoveryRecord { intent: RecoveryIntent; fingerprint: string; phase: DeletionRecoveryPhase; committedAt: string | null; completedAt: string | null }
 
 /**
  * 这不是跨库原子事务。调用者须在 prepare 前冻结写入，启动服务前先恢复 pending。
@@ -57,6 +57,8 @@ export class SqliteDeletionRecovery {
     journal.exec(`PRAGMA synchronous=FULL;
       CREATE TABLE IF NOT EXISTS deletion_recovery_intents(plan_id TEXT PRIMARY KEY,fingerprint TEXT NOT NULL,intent TEXT NOT NULL,phase TEXT NOT NULL);
       CREATE UNIQUE INDEX IF NOT EXISTS deletion_single_pending ON deletion_recovery_intents((1)) WHERE phase <> 'COMPLETE'`);
+    const columns = new Set(journal.prepare('PRAGMA table_info(deletion_recovery_intents)').all().map(row => row.name));
+    for (const column of ['committed_at', 'completed_at']) if (!columns.has(column)) journal.exec(`ALTER TABLE deletion_recovery_intents ADD COLUMN ${column} TEXT`);
     for (const participant of this.participants) participant.database.exec(`PRAGMA synchronous=FULL;
       CREATE TABLE IF NOT EXISTS deletion_participant_receipts(plan_id TEXT PRIMARY KEY,fingerprint TEXT NOT NULL,contract TEXT NOT NULL)`);
   }
@@ -64,14 +66,16 @@ export class SqliteDeletionRecovery {
     const row = this.journal.prepare('SELECT * FROM deletion_recovery_intents WHERE plan_id=?').get(planId);
     if (!row) return null;
     const intent = JSON.parse(String(row.intent)) as RecoveryIntent;
-    if (sha256(String(row.intent)) !== row.fingerprint || intent.contract !== 'deletion-recovery-v3'
+    if (sha256(String(row.intent)) !== row.fingerprint || intent.contract !== 'deletion-recovery-v4'
+      || typeof intent.preparedAt !== 'string' || !Number.isFinite(Date.parse(intent.preparedAt))
       || intent.plan.planId !== planId || !intent.witnesses || typeof intent.witnesses !== 'object'
       || intent.plan.schemaVersion !== 'batch-deletion-v2'
       || intent.participants.some(participant => !Object.hasOwn(intent.witnesses, participant.name))
       || !Array.isArray(intent.files) || !intent.fileWitnesses || typeof intent.fileWitnesses !== 'object'
       || intent.files.some(file => !Object.hasOwn(intent.fileWitnesses, file.name))
       || !['PREPARED', 'RECORDS_COMMITTED', 'COMPLETE'].includes(String(row.phase))) throw new Error('DELETION_RECOVERY_CORRUPT');
-    return { intent, fingerprint: String(row.fingerprint), phase: row.phase as DeletionRecoveryPhase };
+    return { intent, fingerprint: String(row.fingerprint), phase: row.phase as DeletionRecoveryPhase,
+      committedAt: row.committed_at == null ? null : String(row.committed_at), completedAt: row.completed_at == null ? null : String(row.completed_at) };
   }
   pending(): DeletionRecoveryRecord[] {
     return this.journal.prepare("SELECT plan_id FROM deletion_recovery_intents WHERE phase <> 'COMPLETE' ORDER BY plan_id").all()
@@ -108,9 +112,9 @@ export class SqliteDeletionRecovery {
           if (witness === undefined || witness && typeof witness === 'object' && 'then' in witness) throw new Error('DELETION_WITNESS_INVALID');
           return [file.name, witness];
         }));
-        const intent: RecoveryIntent = { contract: 'deletion-recovery-v3', plan: frozen, participants, witnesses, files, fileWitnesses };
+        const intent: RecoveryIntent = { contract: 'deletion-recovery-v4', plan: frozen, preparedAt: new Date().toISOString(), participants, witnesses, files, fileWitnesses };
         const text = JSON.stringify(intent), fingerprint = sha256(text);
-        this.journal.prepare("INSERT INTO deletion_recovery_intents VALUES(?,?,?,'PREPARED')").run(plan.planId, fingerprint, text);
+        this.journal.prepare("INSERT INTO deletion_recovery_intents(plan_id,fingerprint,intent,phase) VALUES(?,?,?,'PREPARED')").run(plan.planId, fingerprint, text);
       }
       this.journal.exec('COMMIT'); return this.get(plan.planId)!;
     } catch (error) { this.journal.exec('ROLLBACK'); throw error; }
@@ -140,7 +144,7 @@ export class SqliteDeletionRecovery {
         db.exec('COMMIT');
       } catch (error) { db.exec('ROLLBACK'); throw error; }
     }
-    this.journal.prepare("UPDATE deletion_recovery_intents SET phase='RECORDS_COMMITTED' WHERE plan_id=? AND phase='PREPARED'").run(planId);
+    this.journal.prepare("UPDATE deletion_recovery_intents SET phase='RECORDS_COMMITTED',committed_at=? WHERE plan_id=? AND phase='PREPARED'").run(new Date().toISOString(), planId);
     return this.get(planId)!;
   }
   /** 使用持久见证执行全部文件清理；失败/重启时保留 RECORDS_COMMITTED。 */
@@ -154,7 +158,7 @@ export class SqliteDeletionRecovery {
         JSON.parse(JSON.stringify(record.intent.fileWitnesses[file.name])));
       if (result && typeof result === 'object' && 'then' in result) throw new Error('DELETION_ASYNC_CLEANUP_UNSUPPORTED');
     }
-    this.journal.prepare("UPDATE deletion_recovery_intents SET phase='COMPLETE' WHERE plan_id=?").run(planId);
+    this.journal.prepare("UPDATE deletion_recovery_intents SET phase='COMPLETE',completed_at=? WHERE plan_id=?").run(new Date().toISOString(), planId);
     return this.get(planId)!;
   }
 }
