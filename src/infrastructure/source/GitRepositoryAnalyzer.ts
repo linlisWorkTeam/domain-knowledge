@@ -13,7 +13,7 @@ import { sha256 } from '../../domain/Domain.ts';
 import type { RepositoryAnalyzer, RepositorySourceReader, RepositoryAnalysis, RepositoryFile, SourceLanguage } from '../../application/ports/RepositoryAnalysisPorts.ts';
 
 /** 只启动明确的只读命令，限制时间和输出；取消始终结束整个进程组。 */
-async function readCommand(command: string, args: string[], directory: string, signal?: AbortSignal, maximum = 2_097_152): Promise<string> {
+export async function readCommand(command: string, args: string[], directory: string, signal?: AbortSignal, maximum = 2_097_152): Promise<string> {
   signal?.throwIfAborted();
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, { cwd: directory, shell: false, detached: true,
@@ -40,7 +40,7 @@ async function readCommand(command: string, args: string[], directory: string, s
     });
   });
 }
-function sourceLanguage(path: string, cpp: boolean): SourceLanguage {
+export function sourceLanguage(path: string, cpp: boolean): SourceLanguage {
   const extension = extname(path).toLowerCase();
   if (['.cpp', '.cc', '.cxx', '.hpp', '.hh', '.hxx'].includes(extension)) return 'cpp';
   if (extension === '.c') return 'c';
@@ -48,9 +48,9 @@ function sourceLanguage(path: string, cpp: boolean): SourceLanguage {
   if (['.ts', '.tsx'].includes(extension)) return 'typescript';
   return 'unsupported';
 }
-const sourceExtension = /\.(?:c|h|cpp|cc|cxx|hpp|hh|hxx|ts|tsx|js|mjs|rs|go|py|java|cs|swift|kt|dart|rb|lua|php|sh|m|mm|s|asm)$/i;
-const testPath = /(?:^|\/)(?:tests?|__tests__|specs?)(?:\/|$)|(?:^|[/_.-])(?:test|spec)(?:[_.-]|$)|(?:[_.-])test\.[^.]+$/i;
-function buildSystem(path: string): string | null {
+export const sourceExtension = /\.(?:c|h|cpp|cc|cxx|hpp|hh|hxx|ts|tsx|js|mjs|rs|go|py|java|cs|swift|kt|dart|rb|lua|php|sh|m|mm|s|asm)$/i;
+export const testPath = /(?:^|\/)(?:tests?|__tests__|specs?)(?:\/|$)|(?:^|[/_.-])(?:test|spec)(?:[_.-]|$)|(?:[_.-])test\.[^.]+$/i;
+export function buildSystem(path: string): string | null {
   const name = basename(path);
   if (name === 'compile_commands.json') return 'compilation-database';
   if (name === 'CMakeLists.txt' || name.endsWith('.cmake')) return 'cmake';

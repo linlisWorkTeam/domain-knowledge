@@ -39,7 +39,7 @@ import { WorkbenchReconstruction } from '../../application/services/WorkbenchRec
 import { WorkbenchRoleExecution } from '../../application/services/WorkbenchRoleExecution.ts';
 import { materialModelExecution } from '../../infrastructure/agentAdapters/MaterialModelExecution.ts';
 import { SqliteWorkbenchProjects } from '../../infrastructure/sqlite/SqliteWorkbenchProjects.ts';
-import { GitRepositoryAnalyzer } from '../../infrastructure/source/GitRepositoryAnalyzer.ts';
+import { ProjectDirectoryReader } from '../../infrastructure/source/ProjectDirectoryReader.ts';
 import { WorkbenchStages } from '../../application/services/WorkbenchStages.ts';
 import { KnowledgeIndexService } from '../../application/services/KnowledgeIndex.ts';
 import { SqliteStageTasks } from '../../infrastructure/sqlite/SqliteStageTasks.ts';
@@ -179,7 +179,7 @@ export function createComposition(input: {
   const artifacts = new LocalCasArtifactStore(join(runtimeDir, 'cas'));
   const repository = new SQLiteFlywheelRepository(join(runtimeDir, 'registry.sqlite'));
   const directoryRoots = (process.env.WP_KNOWLEDGE_DIRECTORY_ROOTS ?? `${dirname(runtimeDir)}${delimiter}${dirname(repositoryRoot)}`).split(delimiter).filter(Boolean);
-  const repositoryReader = new GitRepositoryAnalyzer(directoryRoots, runtimeDir);
+  const repositoryReader = new ProjectDirectoryReader(directoryRoots, runtimeDir, artifacts);
   const repositoryAnalysis = new RepositoryAnalysisService(repositoryReader, artifacts);
   const projectStore = new SqliteWorkbenchProjects(join(runtimeDir, 'workbench.sqlite'));
   const batchStore = new SqliteWorkbenchBatches(join(runtimeDir, 'workbench.sqlite'));

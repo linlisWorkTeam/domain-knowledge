@@ -7,7 +7,7 @@ export function createProjectHistory({ root, request, escapeHtml: escape, onSele
   let items = [], selected = '', loading = false, initialized = false, notice = '', epoch = 0
   const host = () => root.querySelector('[data-project-history]')
   function html() {
-    return `<label>已保存的仓库与源码版本<select data-project-history-select ${loading || !canSelect() ? 'disabled' : ''}><option value="">选择已保存输入</option>${items.map(item => `<option value="${escape(item.snapshotId)}" ${item.snapshotId === selected ? 'selected' : ''}>${escape(item.directory)} · ${escape(item.commit)} · ${escape(item.modules.length)} 个模块</option>`).join('')}</select></label><button type="button" class="secondary-button" data-project-history-refresh ${loading ? 'disabled' : ''}>刷新已保存输入</button><p role="status">${escape(notice)}</p>`
+    return `<label>已保存的项目<select data-project-history-select ${loading || !canSelect() ? 'disabled' : ''}><option value="">选择已保存输入</option>${items.map(item => `<option value="${escape(item.snapshotId)}" ${item.snapshotId === selected ? 'selected' : ''}>${escape(item.directory)} · ${escape(item.commit.startsWith('directory:') ? '目录快照 ' + item.commit.slice(10, 18) : item.commit.slice(0, 12))} · ${escape(item.modules.length)} 个模块</option>`).join('')}</select></label><button type="button" class="secondary-button" data-project-history-refresh ${loading ? 'disabled' : ''}>刷新已保存输入</button><p role="status">${escape(notice)}</p>`
   }
   function render() { const panel = host(); if (panel) panel.innerHTML = html() }
   async function load() {

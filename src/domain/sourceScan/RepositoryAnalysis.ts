@@ -25,6 +25,8 @@ export interface RepositoryAnalysis {
   resources: { availableMemoryBytes: number; availableDiskBytes: number };
   warnings: string[];
   buildCandidates?: RepositoryBuildCandidate[];
+  directorySnapshot?: { schemaVersion: 'directory-snapshot-v1'; fileCount: number; totalBytes: number; excluded: string[] };
+  inventory?: Array<{ path: string; objectId: string; size: number; kind: 'file' | 'symlink' }>;
 }
 
 /** 同名源码和声明组成候选单元；该启发式不宣称已经完成 AST 或公开接口提取。 */

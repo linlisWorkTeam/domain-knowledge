@@ -530,8 +530,14 @@ test('Evaluation Rule 将 scope 作为对象提交并生成新修订', async ({ 
   await expect(rule).toContainText('全局');
   await expect(rule.locator('textarea')).toHaveCount(0);
   await rule.locator('[name=minimumStability]').fill('0.8');
-  await rule.locator('.field-help > summary').filter({ hasText: '?' }).first().click();
-  await expect(rule.locator('.field-help[open]')).toContainText('全局');
+  const help = rule.getByRole('button', { name: '适用范围的用途' });
+  const tooltip = rule.getByRole('tooltip').first();
+  await expect(tooltip).toBeHidden();
+  await help.hover();
+  await expect(tooltip).toBeVisible();
+  await expect(tooltip).toContainText('全局');
+  await rule.locator('[name=minimumStability]').hover();
+  await expect(tooltip).toBeHidden();
 
   page.on('dialog', (dialog) => {
     if (dialog.type() === 'prompt') return dialog.accept('E2E 验证 scope 对象');
@@ -941,13 +947,13 @@ test('知识索引可独立构建、试检索并预览 YAML，命中后才读取
   await page.goto(baseUrl);
   await enterGovernance(page);
   await navigateTo(page, '知识');
-  await page.getByText('知识索引与试检索', { exact: true }).click();
-  await page.getByRole('button', { name: '更新索引', exact: true }).click();
+  await page.getByText('卡片搜索设置', { exact: true }).click();
+  await page.getByRole('button', { name: '更新搜索目录', exact: true }).click();
   await expect(page.locator('[data-index-task]')).toContainText('已完成');
   await expect(page.locator('[data-index-task]')).toContainText('失败 0');
   bodies.length = 0;
-  await page.getByLabel('试检索', { exact: true }).fill('浏览器验收');
-  await page.getByRole('button', { name: '检索索引', exact: true }).click();
+  await page.getByLabel('试搜一个问题', { exact: true }).fill('浏览器验收');
+  await page.getByRole('button', { name: '搜索卡片', exact: true }).click();
   const hit = page.locator('.index-hits li').filter({ has: page.locator(`[data-version-id="${latestVersionId}"]`) });
   await expect(hit).toBeVisible();
   await expect(hit).toContainText('命中');
@@ -957,7 +963,7 @@ test('知识索引可独立构建、试检索并预览 YAML，命中后才读取
   expect(bodies).toHaveLength(0);
   await page.screenshot({ path: test.info().outputPath('index-desktop.png'), fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
-  await expect(page.getByRole('button', { name: '更新索引', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '更新搜索目录', exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.screenshot({ path: test.info().outputPath('index-mobile.png'), fullPage: true });
   await hit.locator(`[data-version-id="${latestVersionId}"]`).click();
@@ -1286,8 +1292,8 @@ test('关联阶段可独立执行并在卡片详情查看真实引用候选', as
   const material = await instance.composition.apps.workbenchMaterials.capture(String(registered.resourceId), '仅适用于示例解析接口');
 
   await page.goto(baseUrl); await enterGovernance(page); await navigateTo(page, '知识');
-  await page.getByText('知识索引与试检索', { exact: true }).click();
-  await page.getByRole('button', { name: '更新索引', exact: true }).click();
+  await page.getByText('卡片搜索设置', { exact: true }).click();
+  await page.getByRole('button', { name: '更新搜索目录', exact: true }).click();
   await expect(page.locator('[data-index-task]')).toContainText('已完成');
   await page.getByText('选择外部材料快照', { exact: true }).click();
   await page.locator(`[data-association-material="${material.materialId}"]`).check();

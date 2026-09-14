@@ -113,10 +113,10 @@ export function createKnowledgeIndexPanel({ root, request, escapeHtml: escape, i
     request(`/api/v1/knowledge-index?q=${encodeURIComponent(query)}`).then((result) => { if (requestedQuery === query) { searchResult = result; render() } }).catch(fail)
   })
   return {
-    html: () => `<details class="index-panel" data-index-panel><summary>知识索引与试检索</summary><div class="index-panel-body">
-      <div class="section-heading"><h2>知识索引</h2><button class="secondary-button" data-index-action="build" ${!isEditable() ? 'disabled' : ''} type="button">更新索引</button></div>
-      <div data-index-task aria-live="polite">${taskHtml()}</div><p data-index-notice role="status">${escape(notice)}</p>
-      <form class="index-search" data-index-search><label>试检索<input name="query" type="text" value="${escape(query)}" placeholder="输入问题、用途或接口名称" maxlength="1024" required></label><button class="secondary-button" type="submit">检索索引</button></form>
+    html: () => `<details class="index-panel" data-index-panel><summary>卡片搜索设置</summary><div class="index-panel-body">
+      <div class="section-heading"><h2>卡片搜索目录</h2><button class="secondary-button" data-index-action="build" ${!isEditable() ? 'disabled' : ''} type="button">更新搜索目录</button></div>
+      <p>将卡片名称、用途和关键词整理成搜索目录。卡片更新后可在这里刷新，再输入问题检查能找到哪些卡片及命中原因。</p><div data-index-task aria-live="polite">${taskHtml()}</div><p data-index-notice role="status">${escape(notice)}</p>
+      <form class="index-search" data-index-search><label>试搜一个问题<input name="query" type="text" value="${escape(query)}" placeholder="输入问题、用途或接口名称" maxlength="1024" required></label><button class="secondary-button" type="submit">搜索卡片</button></form>
       <div data-index-results>${resultsHtml()}</div><div data-index-preview></div><section data-association-panel></section></div></details>`,
   }
 }

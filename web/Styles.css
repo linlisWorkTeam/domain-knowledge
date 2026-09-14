@@ -1366,9 +1366,15 @@ body.drawer-active { overflow: hidden; }
 .rule-field > div { display: flex; gap: 8px; align-items: start; }
 .rule-field label { margin: 0; }
 .rule-field small { display: block; color: var(--muted); }
-.field-help { margin-left: auto; max-width: 260px; }
-.field-help summary { cursor: pointer; border: 1px solid currentColor; border-radius: 50%; width: 22px; text-align: center; list-style: none; }
-.field-help p { font-size: 13px; line-height: 1.6; }
+.rule-field > .rule-label { position: relative; width: fit-content; max-width: 100%; padding-right: 20px; }
+.field-help { display: inline-block; }
+.field-help:hover [role=tooltip], .field-help:focus-within [role=tooltip] { display: block; }
+.field-help button { position: absolute; top: 0; right: 0; display: grid; place-items: center; cursor: pointer; border: 1px solid var(--muted); border-radius: 50%; width: 14px; height: 14px; min-width: 0; min-height: 0; padding: 0; background: transparent; font: 10px/1 sans-serif; color: var(--muted); list-style: none; }
+.field-help button::before { content: ''; position: absolute; inset: -4px; }
+.field-help button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.field-help [role=tooltip] { display: none; position: absolute; top: 22px; left: 0; z-index: 40; width: min(280px, calc(100vw - 72px)); margin: 0; padding: 12px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); box-shadow: 0 8px 24px #0003; font-size: 12px; font-weight: 400; line-height: 1.6; }
+.publication-heading { position: relative; padding-right: 24px; }
+.publication-heading .field-help [role=tooltip] { left: auto; right: 0; }
 .evaluation-history { grid-column: 1 / -1; }
 .evaluation-history > summary { cursor: pointer; padding: 12px 0; }
 .evaluation-history .evidence-card { margin-top: 12px; }

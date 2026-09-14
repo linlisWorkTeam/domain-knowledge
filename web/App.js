@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：提供app页面的展示、交互或样式资源。
  */
+import { nodeExplanation, executionNote } from './WorkbenchLabels.js'
 import { createModuleBatches } from './ModuleBatches.js'
 import { publicationDownloadName } from './WorkbenchPublication.js'
 import { createRepositoryAnalysisPanel } from './RepositoryAnalysis.js'
@@ -57,7 +58,7 @@ applyTheme(initialTheme)
 
 const PAGE_META = {
   overview: '操作中心',
-  projects: '项目',
+  projects: '项目设置',
   runs: '飞轮批次',
   knowledge: '知识',
   graph: '工作流图',
@@ -67,6 +68,7 @@ const PAGE_META = {
 }
 
 const UI_LABELS = {
+  ALL_DETERMINISTIC_GATES_PASSED: '所有确定性检查均已通过',
   KNOWLEDGE_RISK_UNRESOLVED: '知识风险尚未解决',
   CHECK_BLOCKING: '代码检查存在阻塞',
   REVIEW_BLOCKING: '复核要求继续修订',
@@ -585,8 +587,8 @@ function renderRunWorkspace(snapshot) {
         <div class="node-list">${automationNodes.length ? automationNodes.map(node => {
           const key = `${node.iteration ?? run.iteration}:${node.nodeId}:${node.attempt ?? 1}`
           return `<details class="node-record ${node.status === 'RUNNING' && isRunActive(run) ? 'node-running' : ''}" data-node-record="${escapeHtml(key)}" ${openedNodes.has(key) ? 'open' : ''}>
-            <summary class="node-card"><span><b>${escapeHtml(NODE_LABELS[node.nodeId] ?? '执行节点')}</b>${badge(node.status ?? 'UNKNOWN', node.status === 'RUNNING' && !isRunActive(run) ? '历史节点状态：运行中' : displayLabel(node.status ?? 'UNKNOWN'))}</span><span><small>开始 ${escapeHtml(formatDate(node.startedAt))}</small><small>结束 ${escapeHtml(formatDate(node.completedAt))}</small></span></summary>
-            <div class="node-execution-log"><h3>运行日志</h3><dl><div><dt>记录时间</dt><dd>${escapeHtml(formatDate(node.updatedAt))}</dd></div><div><dt>执行记录</dt><dd>${escapeHtml(node.detail || '尚无详细执行记录')}</dd></div>${node.error ? `<div><dt>错误</dt><dd>${escapeHtml(node.error)}</dd></div>` : ''}</dl></div>
+            <summary class="node-card"><span><b>${escapeHtml(nodeExplanation(node.nodeId).name)}</b>${badge(node.status ?? 'UNKNOWN', node.status === 'RUNNING' && !isRunActive(run) ? '历史节点状态：运行中' : displayLabel(node.status ?? 'UNKNOWN'))}</span><span><small>开始 ${escapeHtml(formatDate(node.startedAt))}</small><small>结束 ${escapeHtml(formatDate(node.completedAt))}</small></span></summary>
+            <div class="node-execution-log"><p>${escapeHtml(nodeExplanation(node.nodeId).purpose)}</p><dl><div><dt>输入</dt><dd>${escapeHtml(nodeExplanation(node.nodeId).input)}</dd></div><div><dt>产出</dt><dd>${escapeHtml(nodeExplanation(node.nodeId).output)}</dd></div></dl><h3>运行日志</h3><dl><div><dt>记录时间</dt><dd>${escapeHtml(formatDate(node.updatedAt))}</dd></div><div><dt>执行记录</dt><dd>${escapeHtml(executionNote(node.detail))}</dd></div>${node.error ? `<div><dt>错误</dt><dd>${escapeHtml(executionNote(node.error))}</dd></div>` : ''}</dl><details><summary>原始技术记录</summary><pre>${escapeHtml(node.detail || '')}${node.error ? '\n' + escapeHtml(node.error) : ''}</pre></details></div>
           </details>`
         }).join('') : emptyState('暂无节点记录', '当前轮次尚未记录执行节点。')}</div>
       </section>
@@ -868,7 +870,7 @@ function openGraphNode(agentId, returnFocus) {
 }
 
 function evaluationRuleForm(rule, canEdit) {
-  const help = (key, label, description, control) => `<div class="rule-field"><div><label for="rule-${escapeHtml(rule.ruleId)}-${key}">${label}<small>${key}</small></label><details class="field-help"><summary aria-label="${label}的用途">?</summary><p>${description}</p></details></div>${control}</div>`
+  const help = (key, label, description, control) => `<div class="rule-field"><div class="rule-label"><label for="rule-${escapeHtml(rule.ruleId)}-${key}">${label}<small>${key}</small></label><span class="field-help"><button type="button" aria-label="${label}的用途" aria-describedby="rule-help-${escapeHtml(rule.ruleId)}-${key}">?</button><span role="tooltip" id="rule-help-${escapeHtml(rule.ruleId)}-${key}">${description}</span></span></div>${control}</div>`
   const input = (key, attributes = '') => `<input id="rule-${escapeHtml(rule.ruleId)}-${key}" name="${key}" value="${escapeHtml(rule.config?.[key] ?? '')}" ${attributes} ${canEdit ? '' : 'disabled'}>`
   return `<form class="rule-card" data-rule-id="${escapeHtml(rule.ruleId)}" data-revision="${escapeHtml(rule.revision)}">
     <div class="card-heading"><b>${escapeHtml(rule.name ?? rule.ruleId)}</b><small>修订 ${escapeHtml(rule.revision)}</small></div>
@@ -1138,7 +1140,7 @@ function renderAgents() {
   content.innerHTML = `
     ${operationErrorKeys.length ? partialNotice(`${operationErrorLabels}暂不可用；其他已读取数据仍可查看。`) : ''}
     <section class="reference-metrics"><article><small>Agent 数量</small><b class="mint">${state.agents.length}</b><p>各角色分工固定</p></article><article><small>服务提供方</small><b>${escapeHtml(providerLabel)}</b><p>${escapeHtml(provider?.model ?? '未选择模型')}</p></article><article><small>配置状态</small><b>${escapeHtml(settings?.verification?.status ? displayLabel(settings.verification.status) : '未读取')}</b><p>${settings?.enabled ? '新批次将使用此配置' : '尚未启用'}</p></article><article><small>统计批次</small><b>${formatNumber(runSamples)}</b><p>${escapeHtml(displayLabel(runs?.cohort?.kind ?? 'EMPTY'))}</p></article></section>
-    <section class="panel publication-panel"><div class="section-heading"><h2>知识发布设置</h2><button class="secondary-button" data-load-publications type="button" ${canEdit ? '' : 'disabled'}>查看发布设置</button></div><p>知识通过门禁后，会自动保存为本地 Markdown 文件。需要同步到 Git 时，先启用同步，再手动发起。</p><div id="publication-settings"></div></section>
+    <section class="panel publication-panel"><div class="section-heading publication-heading"><h2>知识发布设置</h2><button class="secondary-button" data-load-publications type="button" ${canEdit ? '' : 'disabled'}>查看发布设置</button><span class="field-help"><button type="button" aria-label="知识发布设置说明" aria-describedby="publication-help">?</button><span role="tooltip" id="publication-help">知识通过门禁后，会自动保存为本地 Markdown 文件。需要同步到 Git 时，先启用同步，再手动发起。</span></span></div><div id="publication-settings"></div></section>
     <details class="panel provider-card"><summary>模型服务配置</summary>
         <dl class="settings-list"><div><dt>当前执行方式</dt><dd>${escapeHtml(executionProviderLabel)}</dd></div><div><dt>认证状态</dt><dd>${escapeHtml(displayLabel(provider?.authentication ?? 'UNKNOWN'))}</dd></div><div><dt>接口地址</dt><dd>${escapeHtml(settings?.apiUrlMasked ?? '未配置')}</dd></div><div><dt>模型</dt><dd>${escapeHtml(settings?.model ?? provider?.model ?? '未配置')}</dd></div><div><dt>最近验证</dt><dd>${escapeHtml(formatDate(settings?.verification?.checkedAt))}</dd></div></dl>
         <form id="provider-settings-form" data-revision="${escapeHtml(settings?.revision ?? 0)}"><label>API 地址<input name="apiUrl" type="url" required placeholder="${escapeHtml(settings?.apiUrlMasked ? `重新输入完整地址；当前 ${settings.apiUrlMasked}` : 'https://模型服务地址/v1')}" ${canEdit ? '' : 'disabled'}></label><label>API Key<input name="apiKey" type="password" autocomplete="new-password" placeholder="${settings?.apiKeyConfigured ? '留空表示保留现有密钥' : '输入服务密钥'}" ${canEdit ? '' : 'disabled'}></label><label>模型<input name="model" value="${escapeHtml(settings?.model ?? '')}" placeholder="模型标识" ${canEdit ? '' : 'disabled'}></label><label class="inline-check"><input name="clearApiKey" type="checkbox" ${canEdit ? '' : 'disabled'}> 清除已保存的 API Key</label><button class="secondary-button" type="submit" ${canEdit ? '' : 'disabled'}>保存配置</button></form>
