@@ -398,3 +398,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 [2130 实际执行删除核验](https://github.com/linlisWorkTeam/domain-knowledge/blob/292ff0f/docs/epitaph/2026-09-14-2130-live-deletion-execution-check.md)：维护锁内读取原始工作流状态并结合检查点执行者，避免混淆业务阶段与执行存活，30项相关回归通过。该核验仍不能替代跨进程写入排他，最终删除UI/发布文件清理及真实C/C++验收未完成。
 
 [2136 图检查点清理](https://github.com/linlisWorkTeam/domain-knowledge/blob/e2c0936/docs/epitaph/2026-09-14-2136-graph-checkpoint-deletion.md)：新增Graph库存与整线程清理适配器，26项相关回归通过。备份中的1141图记录和274工件种子后来已合入完整数据库/CAS审计，唯一工件仍336个，全部通过；生产其他派生文件和删除界面仍未完成。
+
+[2142 合并库存及CAS清理](https://github.com/linlisWorkTeam/domain-knowledge/blob/22d254a/docs/epitaph/2026-09-14-2142-combined-inventory-and-cas-cleanup.md)：数据库/图/CAS库存合并并补双向引用，2107记录/336CAS审核通过；CAS清理支持冻结见证及恢复。文件见证之后已纳入持久协调器、应用入口也已统一；当时发布文件未覆盖，后续2202新增适配，生产目录范围和UI仍待完成。

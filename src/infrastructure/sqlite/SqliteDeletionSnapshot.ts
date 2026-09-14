@@ -10,6 +10,8 @@ import type { DeletionArtifactReader } from '../../application/ports/DeletionArt
 import { sqliteDeletionInventory, type DeletionRecordInventory } from './SqliteDeletionInventory.ts';
 import type { SqliteGraphDeletion } from './SqliteGraphDeletion.ts';
 import type { SqliteDeletionRunStates } from './SqliteDeletionRunStates.ts';
+import type { PublishedDeletionFile } from './PublishedDeletionManifest.ts';
+import type { PublishedDeletionFiles } from './PublishedDeletionFiles.ts';
 
 function identities(inventory: DeletionRecordInventory) {
   return inventory.records.flatMap(record => {
@@ -18,10 +20,11 @@ function identities(inventory: DeletionRecordInventory) {
     return values.filter((value): value is string => typeof value === 'string').map(value => ({ value, nodeId: record.id }));
   });
 }
-/** 调用者持有维护屏障；仍须涵盖发布文件，并在写入前重建和确认同一清单。 */
+/** 调用者持有维护屏障，在写入前重建并确认同一清单；发布存储须显式配置。 */
 export async function sqliteDeletionSnapshot(input: {
   databases: Record<string, DatabaseSync>; graph?: SqliteGraphDeletion;
   runStates?: Record<string, SqliteDeletionRunStates>; reader: DeletionArtifactReader;
+  published?: { manifest(records: DeletionRecordInventory): PublishedDeletionFile[]; files: PublishedDeletionFiles };
 }) {
   const scan = () => {
     let records = sqliteDeletionInventory(input.databases, input.runStates);
@@ -33,11 +36,15 @@ export async function sqliteDeletionSnapshot(input: {
         identities(combined).filter(identity => !baseIds.has(identity.nodeId))));
     }
     if (records.unclassifiedTables.length) throw new Error('DELETION_UNCLASSIFIED_TABLES');
-    return records;
+    if (!input.published && records.records.some(record => ['wb_card_index', 'wb_publications', 'local_publications_v1'].includes(record.table))) throw new Error('DELETION_PUBLICATION_SCOPE_REQUIRED');
+    const publishedManifest = input.published?.manifest(records) ?? [];
+    const publishedNodes = input.published?.files.observe(publishedManifest) ?? [];
+    return { records, publishedManifest, publishedNodes };
   };
-  const records = scan(), revision = sha256(JSON.stringify(records));
-  const artifacts = await expandDeletionArtifacts({ nodes: records.nodes, seeds: records.artifactSeeds,
+  const snapshot = scan(), { records, publishedManifest, publishedNodes } = snapshot, revision = sha256(JSON.stringify(snapshot));
+  const artifacts = await expandDeletionArtifacts({ nodes: [...records.nodes, ...publishedNodes], seeds: records.artifactSeeds,
     identities: identities(records), reader: input.reader });
   if (sha256(JSON.stringify(scan())) !== revision) throw new Error('DELETION_RECORD_CHANGED');
-  return { ...records, nodes: artifacts.nodes, missingArtifacts: artifacts.missingArtifacts };
+  return { ...records, nodes: artifacts.nodes, missingArtifacts: artifacts.missingArtifacts, publishedManifest,
+    missingPublishedFiles: publishedNodes.filter(node => node.revision.startsWith('missing:')).map(node => ({ id: node.id, ownerIds: node.ownedBy })) };
 }

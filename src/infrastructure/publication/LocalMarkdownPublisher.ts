@@ -14,6 +14,7 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import type {
   LocalPublicationInput, LocalPublicationPort, LocalPublicationReceipt, PublicationSettings,
 } from '../../application/ports/PublicationPorts.ts';
+import { localPublicationContent } from './LocalPublicationContent.ts';
 
 const digest = (value: string) => createHash('sha256').update(value).digest('hex');
 const marker = '.knowledge-publications';
@@ -139,9 +140,7 @@ export class LocalMarkdownPublisher implements LocalPublicationPort {
   private complete(input: LocalPublicationInput, receipt: LocalPublicationReceipt): LocalPublicationReceipt {
     const target = dirname(receipt.path);
     const root = this.publicationDirectory(dirname(target));
-    const metadata = { schemaVersion: '1.0', ...input, body: undefined, bodySha256: receipt.bodySha256, createdAt: receipt.createdAt };
-    const markdown = `${input.body.trimEnd()}\n\n---\n\n来源提交：${input.sourceCommit}\n\n来源摘要：${input.sourceDigest}\n\n运行：${input.runId} · 版本：${input.versionId} · 门禁：${input.gateDecisionId}\n`;
-    const metadataText = `${JSON.stringify(metadata, null, 2)}\n`;
+    const { markdown, metadataText } = localPublicationContent(input, receipt);
     if (existsSync(target)) {
       if (lstatSync(target).isSymbolicLink() || lstatSync(receipt.path).isSymbolicLink()
         || lstatSync(join(target, 'Provenance.json')).isSymbolicLink()

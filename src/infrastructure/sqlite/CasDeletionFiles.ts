@@ -3,30 +3,15 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：从确认清单冻结CAS文件，核验内容后清理，并支持部分清理后的恢复。
  */
-import { closeSync, constants, fstatSync, fsyncSync, lstatSync, openSync, unlinkSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { sha256 } from '../../domain/Domain.ts';
+import { fsyncSync } from 'node:fs';
 import type { BatchDeletionPlan, DeletionNode } from '../../domain/workbench/BatchDeletion.ts';
-import { CasDeletionReader } from './CasDeletionReader.ts';
+import { DeletionFileRoot } from './DeletionFileRoot.ts';
 
 interface FileEntry { id: string; present: boolean; size: number }
 interface FileWitness { contract: 'cas-deletion-files-v1'; planId: string; files: FileEntry[] }
 /** 仅在记录提交后、持有维护屏障及完整写入排他时清理；不接收文件路径。 */
-export class CasDeletionFiles extends CasDeletionReader {
+export class CasDeletionFiles extends DeletionFileRoot {
   readonly contract = 'cas-deletion-files-v1';
-  readonly scope: string;
-  private readonly directory: string;
-  constructor(root: string) {
-    super(resolve(root)); this.directory = resolve(root); this.scope = this.currentScope();
-  }
-  private currentScope(): string {
-    const handle = openSync(this.directory, constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW);
-    try {
-      const stat = fstatSync(handle, { bigint: true });
-      return sha256(JSON.stringify({ path: this.directory, device: String(stat.dev), inode: String(stat.ino) }));
-    } finally { closeSync(handle); }
-  }
-  private assertScope(): void { if (this.currentScope() !== this.scope) throw new Error('DELETION_FILE_SCOPE_CHANGED'); }
   capture(plan: BatchDeletionPlan, nodes: DeletionNode[]): FileWitness {
     this.assertScope();
     if (plan.schemaVersion !== 'batch-deletion-v2') throw new Error('DELETION_CONTRACT_INCOMPATIBLE');
@@ -67,14 +52,7 @@ export class CasDeletionFiles extends CasDeletionReader {
   private inspect(entry: FileEntry, remove: boolean): true | null {
     return this.visit(entry.id.slice(4), 32 * 1024 * 1024, file => {
       if (!entry.present || file.bytes.byteLength !== entry.size) throw new Error('DELETION_ARTIFACT_CHANGED');
-      if (remove) {
-        const path = `/proc/self/fd/${file.parent}/${file.name}`;
-        const current = lstatSync(path, { bigint: true }), pinned = fstatSync(file.handle, { bigint: true });
-        if (!current.isFile() || current.dev !== pinned.dev || current.ino !== pinned.ino
-          || current.size !== pinned.size || current.mtimeNs !== pinned.mtimeNs || current.ctimeNs !== pinned.ctimeNs
-          || pinned.size !== file.verified.size || pinned.mtimeNs !== file.verified.mtimeNs || pinned.ctimeNs !== file.verified.ctimeNs) throw new Error('DELETION_ARTIFACT_CHANGED');
-        unlinkSync(path); fsyncSync(file.parent);
-      }
+      if (remove) this.removeFile(file);
       return true as const;
     }, remove ? parent => fsyncSync(parent) : undefined);
   }

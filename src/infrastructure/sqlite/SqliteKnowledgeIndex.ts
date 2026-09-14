@@ -12,6 +12,11 @@ import { sha256 } from '../../domain/Domain.ts';
 import type { CardIndexEntry, CardIndexHeader } from '../../domain/knowledge/KnowledgeIndex.ts';
 import type { KnowledgeIndexStore } from '../../application/ports/KnowledgeIndexPorts.ts';
 
+export function knowledgeIndexFilename(cardId: string): string {
+  const encoded = encodeURIComponent(cardId);
+  return `${encoded.length <= 180 ? encoded : `card-${sha256(cardId)}`}.md`;
+}
+
 /** SQLite 只存索引与审计引用；磁盘 Markdown 可从内容寻址工件恢复。 */
 export class SqliteKnowledgeIndex implements KnowledgeIndexStore {
   private readonly db: DatabaseSync;
@@ -24,8 +29,7 @@ export class SqliteKnowledgeIndex implements KnowledgeIndexStore {
   }
   private path(cardId: string): string {
     // 外部导入的旧 cardId 可能不是文件名；仍仅按稳定身份编码，不使用标题或版本号。
-    const encoded = encodeURIComponent(cardId);
-    return join(this.directory, `${encoded.length <= 180 ? encoded : `card-${sha256(cardId)}`}.md`);
+    return join(this.directory, knowledgeIndexFilename(cardId));
   }
   get(cardId: string): CardIndexEntry | null {
     const row = this.db.prepare('SELECT snapshot FROM wb_card_index WHERE card_id=?').get(cardId);
