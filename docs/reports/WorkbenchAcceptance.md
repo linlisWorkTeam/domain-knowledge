@@ -189,3 +189,12 @@ C++固定任务79e38从14条参考检查点恢复后一次完成80条参考/生�
 公网只读浏览器检查确认独立项目页不含源码版本输入及执行面板，窄屏主要按钮可见、旧知识正文可读，模型及提示词默认折叠，发布说明悬停出现且移开隐藏，无页面脚本错误。证据 `/tmp/WorkbenchDabBrowser2.log` 与发行 `browser/Result.json`；[此前项目页](workbenchScreenshots/ProjectSettingsBeforeDab.png)、[当前项目页](workbenchScreenshots/ProjectSettingsDab.png)、[当前悬停说明](workbenchScreenshots/PublicationHelpDab.png)。此验证未向线上导入验收任务或发起模型调用，线上模型配置显示尚未验证。
 
 首轮公网检查发现窄屏放大到桌面后导航 aria-hidden 未同步。常规桌面和窄屏分别加载通过；视口切换修复已在源代码补上，针对性浏览器1/1通过（`/tmp/ResponsiveNavFix.log`），尚未纳入已部署的 dab50a5。历史批次删除及真实 C/C++ 来源/发布验收仍未完成。
+
+
+## 导航改名与发布设置折叠已上线（2026-09-14 20:34）
+
+网站现运行 `d869e1a680a3777fd55650fa8e95c24035166b07`，导航与页面标题改为“知识飞轮管理”“知识治理”，知识发布设置与模型配置一致默认折叠，展开自动读取配置并保留悬停说明。[CI34843360221](https://github.com/linlisWorkTeam/domain-knowledge/actions/runs/34843360221) 代码627/627、Console41/41、验收25/25通过。此前本地全量40通过、1处旧导航定位失败，修正后该用例单独通过；远端已在修正提交上完整通过。
+
+部署后公网上验证了新名称、默认折叠、展开表单、再次收起、悬停提示和窄屏切回桌面的可访问导航，无页面异常。旧8个运行、1张卡片保留，免登录编辑模式不变。发行目录 `2026-09-14-workbench-d869e1a`，Console PID131134，日志 `/tmp/WorkbenchD869Deploy.log`、`WorkbenchD869Browser.log`、`WorkbenchD869CiPassed.log`，完整备份在发行 `pre-deploy-backup`。仅清理本轮准备但未启用的875a210发布副本，未清理任何运行数据。实际截图：[折叠状态与新导航](workbenchScreenshots/PublicationFoldD869.png)、[展开配置](workbenchScreenshots/PublicationExpandedD869.png)；此前状态见上一节。
+
+删除领域/应用用例与SQLite回执存储已有6单元+2集成测试，覆盖共享依赖、旧确认拒绝、事务回滚、磁盘重启恢复和同进程并发清理去重。尚无完整引用投影、跨库崩溃恢复或生产文件清理/HTTP/UI，不代表删除功能完成。本轮未启动真实模型，C/C++最终来源与发布验收仍未完成。
