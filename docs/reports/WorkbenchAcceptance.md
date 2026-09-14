@@ -198,3 +198,11 @@ C++固定任务79e38从14条参考检查点恢复后一次完成80条参考/生�
 部署后公网上验证了新名称、默认折叠、展开表单、再次收起、悬停提示和窄屏切回桌面的可访问导航，无页面异常。旧8个运行、1张卡片保留，免登录编辑模式不变。发行目录 `2026-09-14-workbench-d869e1a`，Console PID131134，日志 `/tmp/WorkbenchD869Deploy.log`、`WorkbenchD869Browser.log`、`WorkbenchD869CiPassed.log`，完整备份在发行 `pre-deploy-backup`。仅清理本轮准备但未启用的875a210发布副本，未清理任何运行数据。实际截图：[折叠状态与新导航](workbenchScreenshots/PublicationFoldD869.png)、[展开配置](workbenchScreenshots/PublicationExpandedD869.png)；此前状态见上一节。
 
 删除领域/应用用例与SQLite回执存储已有6单元+2集成测试，覆盖共享依赖、旧确认拒绝、事务回滚、磁盘重启恢复和同进程并发清理去重。尚无完整引用投影、跨库崩溃恢复或生产文件清理/HTTP/UI，不代表删除功能完成。本轮未启动真实模型，C/C++最终来源与发布验收仍未完成。
+
+### 删除引用清单验证（2026-09-14 20:45，尚未开放删除）
+
+只读扫描 d869e1a 部署前备份的 registry、workbench、publications 三库，共966条记录；10个历史知识版本全部找到生成归属，未发现未分类表。输出仅为计数和引用摘要，未复制配置值，也未修改备份或线上数据。记录级审计为 `/tmp/DeletionInventoryBackupAudit.json`。
+
+递归工件扫描在一条历史 action_items 的缺失引用处明确停止：`sha256:4292ee379fb4bfaf06b2925361cde072c0a4eba6acd82505a0dcdc5c94f2a0e0` 在备份CAS中不存在。不能把记录级扫描成功说成完整工件清理可用；缺失历史工件处理、墓碑、跨库恢复、物理清理与二次确认HTTP/UI仍待完成。
+
+删除相关14项测试与架构5项共19/19通过，覆盖共享阶段及嵌套文件、来源保护、旧版本归属、未知表/损坏JSON、引用损坏、回执回滚和重启恢复；类型及Spec通过。日志 `/tmp/DeletionGraphRegression.log`、`/tmp/DeletionGraphTypes.log`、`/tmp/DeletionGraphSpecs.log`。本轮新增代码尚未用于线上删除，网站仍为d869e1a。

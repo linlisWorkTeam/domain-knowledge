@@ -378,3 +378,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 [1954 中文原因及入口缺失](https://github.com/linlisWorkTeam/domain-knowledge/blob/bf7aa3f/docs/epitaph/2026-09-14-1954-frontend-reasons-and-remaining-work.md)：补充中文处理原因和发布截图；当时阶段入口未挂载、C修订UNRESOLVED。阶段入口后来恢复并以dab50a5部署，删除机制与真实最终验收尚未完成。
 
 [2000 阶段操作恢复](https://github.com/linlisWorkTeam/domain-knowledge/blob/d869e1a680a3777fd55650fa8e95c24035166b07/docs/epitaph/2026-09-14-2000-stage-operations-restored.md)：恢复阶段子页并修复授权后的项目恢复；本地39+2定向通过，后续dab及d869远端Console41/41通过并部署。C修订3张成功、1张未知，335工件已审计，完整真实发布仍待完成。
+
+[2012 前台首次部署](https://github.com/linlisWorkTeam/domain-knowledge/blob/f90d0b7/docs/epitaph/2026-09-14-2012-frontend-deployed-dab.md)：dab50a5完成代码619、Console41、验收25并部署，保留原数据。该记录的视口修复未上线状态已由后续d869部署取代；真实来源门禁与历史删除仍未完成。
