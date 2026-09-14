@@ -4,9 +4,9 @@
  * 文件功能：协调冻结版本的增量索引、Markdown 恢复和按需正文检索。
  */
 import { sha256 } from '../../domain/Domain.ts';
-import { groupKnowledgeCards, currentCardVersions } from '../../domain/services/knowledge/KnowledgeCards.ts';
-import { CARD_INDEX_VERSION, cardIndexHeader, cardIndexSourceDigest, matchCardIndex } from '../../domain/services/knowledge/KnowledgeIndex.ts';
-import type { StageInput, StageResult } from '../../domain/services/workbench/StageTask.ts';
+import { groupKnowledgeCards, currentCardVersions } from '../../domain/knowledge/KnowledgeCards.ts';
+import { CARD_INDEX_VERSION, cardIndexHeader, cardIndexSourceDigest, matchCardIndex } from '../../domain/knowledge/KnowledgeIndex.ts';
+import type { StageInput, StageResult } from '../../domain/workbench/StageTask.ts';
 import type { ArtifactStore, FlywheelRepository } from '../ports/ApplicationPorts.ts';
 import type { KnowledgeIndexStore } from '../ports/KnowledgeIndexPorts.ts';
 import type { StageExecutionContext } from './WorkbenchStages.ts';

@@ -6,9 +6,9 @@
 import type { WorkbenchPublications } from './WorkbenchPublications.ts';
 import type { ArtifactStore } from '../ports/ApplicationPorts.ts';
 import type { WorkbenchFixedEvaluation, FixedModuleSuite } from './WorkbenchFixedEvaluation.ts';
-import type { PipelineFixedSuite } from '../../domain/services/workbench/WorkbenchPipeline.ts';
-import { PIPELINE_CONTRACT, assertPipelinePublication, createPipeline, pipelineFixedFailure, pipelineStageFailure, pipelineRevisionFailure, pipelineStagnant, pipelineSourceFailure, pipelineSourceRepairable, pipelineSourceRevisionFailure, pipelineSourceRepairs, pipelineSourceStagnant, pipelineUnknownSections, pipelineSupplementStagnant, type WorkbenchPipeline, type PipelineIteration } from '../../domain/services/workbench/WorkbenchPipeline.ts';
-import { WORKBENCH_STAGES, canonicalJson, createStageTask, type StageInput, type StageTask, type WorkbenchStage } from '../../domain/services/workbench/StageTask.ts';
+import type { PipelineFixedSuite } from '../../domain/workbench/WorkbenchPipeline.ts';
+import { PIPELINE_CONTRACT, assertPipelinePublication, createPipeline, pipelineFixedFailure, pipelineStageFailure, pipelineRevisionFailure, pipelineStagnant, pipelineSourceFailure, pipelineSourceRepairable, pipelineSourceRevisionFailure, pipelineSourceRepairs, pipelineSourceStagnant, pipelineUnknownSections, pipelineSupplementStagnant, type WorkbenchPipeline, type PipelineIteration } from '../../domain/workbench/WorkbenchPipeline.ts';
+import { WORKBENCH_STAGES, canonicalJson, createStageTask, type StageInput, type StageTask, type WorkbenchStage } from '../../domain/workbench/StageTask.ts';
 import type { ExternalMaterialStore } from '../ports/ExternalMaterialPorts.ts';
 import type { WorkbenchPipelineStore } from '../ports/WorkbenchPipelinePorts.ts';
 import type { WorkbenchStages } from './WorkbenchStages.ts';

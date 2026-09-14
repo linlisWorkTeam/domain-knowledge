@@ -5,8 +5,8 @@
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { knowledgeUnits } from '../../src/domain/services/knowledge/KnowledgeUnits.ts';
-import type { NativeDeclaration } from '../../src/domain/services/sourceScan/PublicInterface.ts';
+import { knowledgeUnits } from '../../src/domain/knowledge/KnowledgeUnits.ts';
+import type { NativeDeclaration } from '../../src/domain/sourceScan/PublicInterface.ts';
 
 test('overloads share one card, type layouts stay separate and qualified names prevent namespace collisions', () => {
   const declarations: NativeDeclaration[] = [

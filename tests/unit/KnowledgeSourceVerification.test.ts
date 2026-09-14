@@ -5,7 +5,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { sourceSectionObservations, sourceCardDecision, sourceVerificationOutcome, sourceSectionDecision, sourceSectionsOutcome, type SourceCardBinding } from '../../src/domain/services/knowledge/KnowledgeSourceVerification.ts';
+import { sourceSectionObservations, sourceCardDecision, sourceVerificationOutcome, sourceSectionDecision, sourceSectionsOutcome, type SourceCardBinding } from '../../src/domain/knowledge/KnowledgeSourceVerification.ts';
 const body = '# Parser\n## Behavior\nEnd is one past the closing quote.\n## Limits\nPinned source only.\n';
 const correction = { correctionId: 'COR-1', knowledgePath: 'knowledge/parser.md#Behavior', criterion: 'End is the closing quote index in the fixed source.', risk: 'Incorrect token boundary.' };
 test('source contradictions remain actionable without a generated behavior failure; unknown risks cannot become PASS', () => {

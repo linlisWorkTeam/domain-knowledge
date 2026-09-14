@@ -6,9 +6,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { sha256 } from '../../src/domain/Domain.ts';
-import { nativeTestKeys, type NativeTestSet } from '../../src/domain/services/evaluation/NativeTestCache.ts';
-import { assertTrustedPublicationObservations, type TrustedPublicationReport } from '../../src/domain/services/evaluation/NativeTrustedPublication.ts';
-import type { NativeBehaviorSuite } from '../../src/domain/services/evaluation/NativeBehaviorSuite.ts';
+import { nativeTestKeys, type NativeTestSet } from '../../src/domain/evaluation/NativeTestCache.ts';
+import { assertTrustedPublicationObservations, type TrustedPublicationReport } from '../../src/domain/evaluation/NativeTrustedPublication.ts';
+import type { NativeBehaviorSuite } from '../../src/domain/evaluation/NativeBehaviorSuite.ts';
 function fixture() {
   const digest = sha256('fixture');
   const binding = { cardIds: ['card'], knowledgeBodyDigests: [digest], referenceDigest: digest, interfaceDigest: digest, policyDigest: digest, toolchainDigest: digest };

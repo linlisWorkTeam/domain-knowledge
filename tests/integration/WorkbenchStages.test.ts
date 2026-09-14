@@ -11,7 +11,7 @@ import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { WorkbenchStages } from '../../src/application/services/WorkbenchStages.ts';
 import { SqliteStageTasks } from '../../src/infrastructure/sqlite/SqliteStageTasks.ts';
-import { createStageTask, type StageInput, type StageResult } from '../../src/domain/services/workbench/StageTask.ts';
+import { createStageTask, type StageInput, type StageResult } from '../../src/domain/workbench/StageTask.ts';
 
 const input: StageInput = { projectId: 'repository-a', stage: 'GENERATE', sourceRevision: 'commit-1',
   sourceDigest: 'source-sha', cardVersionIds: [], configurationDigest: 'configuration-sha', parameters: {} };
@@ -100,7 +100,7 @@ test('budget exhaustion pauses before another call and retries cannot reset the 
 
 test('actual owner exit recovers to paused, preserving checkpoint and usage across database reopen', () => {
   const env = fixture();
-  const stageModule = resolve('src/domain/services/workbench/StageTask.ts');
+  const stageModule = resolve('src/domain/workbench/StageTask.ts');
   const storeModule = resolve('src/infrastructure/sqlite/SqliteStageTasks.ts');
   const script = `import { createStageTask } from ${JSON.stringify(stageModule)};
     import { SqliteStageTasks } from ${JSON.stringify(storeModule)};

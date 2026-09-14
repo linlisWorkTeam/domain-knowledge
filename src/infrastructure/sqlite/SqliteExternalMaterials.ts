@@ -4,7 +4,7 @@
  * 文件功能：追加保存不可变外部材料快照，复用仓库事务数据库。
  */
 import type { DatabaseSync } from 'node:sqlite';
-import type { ExternalMaterial } from '../../domain/services/association/ExternalMaterial.ts';
+import type { ExternalMaterial } from '../../domain/association/ExternalMaterial.ts';
 import type { ExternalMaterialStore } from '../../application/ports/ExternalMaterialPorts.ts';
 export class SqliteExternalMaterials implements ExternalMaterialStore {
   private readonly db: DatabaseSync;

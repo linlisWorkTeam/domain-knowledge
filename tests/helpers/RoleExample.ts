@@ -12,12 +12,12 @@ import { assertModelOutput } from '../../src/infrastructure/agentAdapters/ModelE
 
 export function roleExamplePath(role: AgentId): string {
   const name = role.split('-').map((part) => part[0]!.toUpperCase() + part.slice(1)).join('') + 'Agent';
-  const directory = name[0]!.toLowerCase() + name.slice(1);
+  const directory = role === 'doc-worker' ? 'docGenAgent/subAgents/docWorkerAgent' : name[0]!.toLowerCase() + name.slice(1);
   return `src/domain/agents/${directory}/examples/${name}Sample.json`;
 }
 
-export function roleExample<I>(role: AgentId) {
-  const sample = JSON.parse(readFileSync(roleExamplePath(role), 'utf8'));
+export function roleExample<I>(role: AgentId, examplePath = roleExamplePath(role)) {
+  const sample = JSON.parse(readFileSync(examplePath, 'utf8'));
   const materials: Material[] = [];
   const named = new Map<string, ArtifactRef>();
   for (const [name, value] of Object.entries(sample.materials)) {

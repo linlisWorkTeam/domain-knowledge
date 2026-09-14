@@ -6,7 +6,7 @@
 import {
   STAGE_CONTRACT, createStageTask, assertStageBudget,
   type JsonValue, type StageInput, type StageLimits, type StageResult, type StageTask, type StageUsage, type WorkbenchStage,
-} from '../../domain/services/workbench/StageTask.ts';
+} from '../../domain/workbench/StageTask.ts';
 import type { StageTaskStore } from '../ports/StageTaskPorts.ts';
 
 /** 外部副作用必须使用给定的幂等键；检查点不宣称能使模型请求恰好执行一次。 */

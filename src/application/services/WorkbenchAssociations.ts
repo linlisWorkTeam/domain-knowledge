@@ -4,16 +4,16 @@
  * 文件功能：协调冻结卡片的关联任务、恢复工件与失效过滤。
  */
 import { sha256, type ArtifactRef } from '../../domain/Domain.ts';
-import { AssociationDomainService } from '../../domain/services/association/AssociationDomainService.ts';
-import { type AssociationCard, type CardAssociation } from '../../domain/services/association/CardAssociations.ts';
-import { cardIndexSourceDigest } from '../../domain/services/knowledge/KnowledgeIndex.ts';
-import { groupKnowledgeCards } from '../../domain/services/knowledge/KnowledgeCards.ts';
-import { canonicalJson, type StageInput } from '../../domain/services/workbench/StageTask.ts';
+import { AssociationDomainService } from '../../domain/association/AssociationDomainService.ts';
+import { type AssociationCard, type CardAssociation } from '../../domain/association/CardAssociations.ts';
+import { cardIndexSourceDigest } from '../../domain/knowledge/KnowledgeIndex.ts';
+import { groupKnowledgeCards } from '../../domain/knowledge/KnowledgeCards.ts';
+import { canonicalJson, type StageInput } from '../../domain/workbench/StageTask.ts';
 import type { ArtifactStore, FlywheelRepository } from '../ports/ApplicationPorts.ts';
 import type { KnowledgeIndexService } from './KnowledgeIndex.ts';
 import type { WorkbenchStages, StageExecutionContext } from './WorkbenchStages.ts';
 import type { WorkbenchMaterials } from './WorkbenchMaterials.ts';
-import type { ExternalAssociation } from '../../domain/services/association/ExternalAssociations.ts';
+import type { ExternalAssociation } from '../../domain/association/ExternalAssociations.ts';
 const contract = 'card-associations-v1';
 const externalContract = 'card-associations-v2';
 export class WorkbenchAssociations {

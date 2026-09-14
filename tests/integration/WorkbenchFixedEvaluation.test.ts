@@ -12,11 +12,11 @@ import { execFileSync } from 'node:child_process';
 import { once } from 'node:events';
 import { createKnowledgeServer } from '../../src/interfaces/runner/Server.ts';
 import { createComposition } from '../../src/interfaces/runner/Composition.ts';
-import { createStageTask, type JsonValue } from '../../src/domain/services/workbench/StageTask.ts';
+import { createStageTask, type JsonValue } from '../../src/domain/workbench/StageTask.ts';
 import { sha256 } from '../../src/domain/Domain.ts';
 import { NativeToolchain } from '../../src/infrastructure/evaluation/project/NativeToolchain.ts';
 import { NativeCaseExecutor } from '../../src/infrastructure/evaluation/project/NativeCaseExecutor.ts';
-import type { NativeBehaviorSuite } from '../../src/domain/services/evaluation/NativeBehaviorSuite.ts';
+import type { NativeBehaviorSuite } from '../../src/domain/evaluation/NativeBehaviorSuite.ts';
 const json = (value: unknown): JsonValue => JSON.parse(JSON.stringify(value));
 for (const apiSource of ['math.h', 'math.c']) test(`fixed reference rejection and restart preserve cases with interface source ${apiSource}`, async () => {
   const root = mkdtempSync(join(tmpdir(), 'fixed-stage-source-')); const runtimeDir = mkdtempSync(join(tmpdir(), 'fixed-stage-runtime-'));

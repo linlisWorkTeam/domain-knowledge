@@ -8,8 +8,8 @@ import test from 'node:test';
 import { NativeToolchain } from '../../src/infrastructure/evaluation/project/NativeToolchain.ts';
 import { NativeCaseExecutor } from '../../src/infrastructure/evaluation/project/NativeCaseExecutor.ts';
 import { nativeCaseHarness } from '../../src/infrastructure/evaluation/project/NativeCaseHarness.ts';
-import { assertNativeBehaviorSuite, type NativeContract, type NativeBehaviorCase } from '../../src/domain/services/evaluation/NativeBehaviorSuite.ts';
-import { buildConstraints } from '../../src/domain/services/workbench/WorkbenchProject.ts';
+import { assertNativeBehaviorSuite, type NativeContract, type NativeBehaviorCase } from '../../src/domain/evaluation/NativeBehaviorSuite.ts';
+import { buildConstraints } from '../../src/domain/workbench/WorkbenchProject.ts';
 const native = new NativeToolchain(); const executor = new NativeCaseExecutor(native); const build = buildConstraints();
 const contract: NativeContract = { schemaVersion: 'native-contract-v1', language: 'c', includePath: 'api.h', entryPaths: ['api.c'], targetFunctions: ['add'],
   declarations: [{ kind: 'FunctionDecl', name: 'add', type: 'int (int, int)', parameters: [{ name: 'a', type: 'int' }, { name: 'b', type: 'int' }] }] };
@@ -55,8 +55,8 @@ test('declarative cases reject source injection, unrelated observations and out-
 
 test('existing TestGen role accepts native knowledge policy and emits an untrusted data manifest', async () => {
   const { roleExample } = await import('../helpers/RoleExample.ts');
-  const { executeAgent } = await import('../../src/domain/services/workflow/AgentExecutionService.ts');
-  const example = roleExample<import('../../src/domain/agents/testGenAgent/TestGenAgentContract.ts').Input>('test-gen');
+  const { executeAgent } = await import('../../src/domain/workflow/AgentExecutionService.ts');
+  const example = roleExample<import('../../src/domain/agents/testGenAgent/BehaviorCasesContract.ts').Input>('test-gen', 'src/domain/agents/testGenAgent/examples/BehaviorCasesSample.json');
   example.input.payload.languageId = 'c';
   example.input.sourcePaths = []; example.input.publicInterfacePaths = [];
   const policy = example.input.materials.find((item) => item.ref.artifactId === example.input.payload.testPolicyRef.artifactId)!;
@@ -127,7 +127,7 @@ test('persisted oracle cache rejects bad candidates, reuses unchanged input and 
     assert.equal(composition.apps.nativeEvaluation.dependencies.store.get(first.set.testSetId)?.status, 'TRUSTED');
     assert.deepEqual(composition.apps.nativeEvaluation.dependencies.store.get(first.set.testSetId)?.binding, first.set.binding);
     // Import a separately validated historical gate from before lineage-aware caching.
-    const { nativeTestKeys } = await import('../../src/domain/services/evaluation/NativeTestCache.ts');
+    const { nativeTestKeys } = await import('../../src/domain/evaluation/NativeTestCache.ts');
     const legacySuite = { ...suite, cases: [{ ...suite.cases[0]!, expected: { sum: '8' } }] };
     const legacyReference = input('int add(int a,int b){return a+b+1;}');
     const legacyObservation = await executor.execute(legacyReference, contract, legacySuite.cases[0]!);

@@ -5,8 +5,8 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { nativeTrustedGates, nativeSupplementGates } from '../../src/domain/services/evaluation/NativeTrustedGates.ts';
-import type { NativeBehaviorSuite } from '../../src/domain/services/evaluation/NativeBehaviorSuite.ts';
+import { nativeTrustedGates, nativeSupplementGates } from '../../src/domain/evaluation/NativeTrustedGates.ts';
+import type { NativeBehaviorSuite } from '../../src/domain/evaluation/NativeBehaviorSuite.ts';
 const suite = (expected: string): NativeBehaviorSuite => ({ schemaVersion: 'native-cases-v1', cases: [{ caseId: 'sum', description: 'addition', sections: ['card#Behavior'], variables: [],
   calls: [{ function: 'add', arguments: [{ integer: '1' }, { integer: '2' }], result: 'out' }], observations: [{ name: 'out', kind: 'integer', read: { variable: 'out' } }], expected: { out: expected } }] });
 test('trusted union keeps conflicting assertions and deterministic aliases without editing history', () => {

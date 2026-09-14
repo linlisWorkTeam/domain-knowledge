@@ -1,220 +1,107 @@
 <!--
 Copyright (c) 2026 linlisWorkTeam
 SPDX-License-Identifier: MIT
-文件功能：记录七角色 MVP 的实现范围、实际验收证据与发行阻塞。
+文件功能：维护持久路线图、能力边界与关键验收索引。
 -->
-# 七角色 MVP 实施与验收记录
+# 开发任务与当前进度
 
-`v0.2.0` 已正式发布：[GitHub Release](https://github.com/linlisWorkTeam/domain-knowledge/releases/tag/v0.2.0)。范围限定 OpenCloudOS 9.4 x86_64 与 ohMyWorkPanel 的 `src/chat/markdownLite.ts`。发行提交 `94d431a86b7656ded4109c3a00ae93b182df2e6c` 的真实七角色飞轮经三轮修订通过，最终 270/270 次行为测试并自动本地发布；CI 340/340、Console 22/22、离线安装及实际升级/浏览器验收通过。用户追加不限总轮次、按供应商额度停止的授权后，历史累计 8 次启动、2 次完整成功；历史失败与取消保留，不改判。下文旧阶段记录是历史证据，最终结果见文末与 Release 验收报告。
+本文件只在 roadmap、能力边界或验收状态发生持久变化时更新。普通任务的命令、临时分工和验证流水记录在 PR、commit 或必要交接中，不要求每次同步 Status。实施方法与 CI 范围见 [Development](Development.md)，设计见 [规范目录](specs/README.md)。
 
-操作见[Linux 安装指南](LinuxInstall.md)，工作流约定见[Workflow](specs/domainFunction/services/workflow/Workflow.md)、[LangGraph](specs/infrastructure/langgraph/LangGraph.md)，七角色设计见[Agents](specs/domainFunction/agents/Agents.md)。历史交接见[HistoryEpitaph](HistoryEpitaph.md)。
+## 五阶段工作台（2026-09-14，验收未完成）
 
-## 实现与取舍
+PR #50 仍为草稿。稳定卡片/版本、阶段任务、索引、C/C++ 重建评测、指定材料与关联用例以及 Console 入口已实现；与 main 的集成尚未完成全量回归和新版部署。当前分支的 TypeScript 模块完整回归 7/7、受控 C++ 两轮流程及类型检查通过，只证明对应受控路径。
 
-| 范围 | 本版实现 | 保留限制 |
+真实 jsmn 与 TinyXML2 XMLUtil 已有生成、修订、重建及行为测试证据；TinyXML2 修订后可信测试 37/37、固定测试 40/40，不等于完整验收通过。当前卡片仍需来源质量复核、关联查看、联合发布及浏览器验收。新执行契约为 domain-agents-v11-workbench-evidence，旧任务不可跨版本恢复。C/C++ 两条真实链路和 markdownLite 回归均为交付要求，不以受控测试替代。
+
+网站仍运行旧部署 ec72c43；本次 main 集成和最新前台改造尚未部署。完成全部验收与部署后，才比较 PR #38 与 #50 的包含关系并按用户确认的条件处理合入。免登录、无主动联网搜索、复用服务器现有工具链及串行资源限制保持。
+
+v0.2.0 是独立的历史发行成果，不重写该版本。其 markdownLite 七角色真实验收及旧工作台流水保留在[合并前状态记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/39092ce/docs/Status.md)，不能用于证明当前 C/C++ 工作台已经完成。
+
+## 四阶段总览
+
+当前处于 S2 实现审阅阶段。DocGen/DocWorker 已合入；TestGen、Code、Check、Review、Orchestrator 已按顺序完成已确认契约和生产接线，业务验收边界见下表。S3 外部真实模型和 S4 公司 CLI 业务验收仍单独开展。
+
+| 阶段 | 目标 | 状态 | 依赖与完成条件 |
+| --- | --- | --- | --- |
+| S1 | 按 DDD 架构重新整理代码目录 | 待验收 | 主要迁移已合入 PR #36、#37；核对分层、引用、入口和当前版本回归后完成 |
+| S2 | 单个 Agent 的细化开发 | 开发中 | 沿用 S1 已稳定的角色边界，可与 S1 收尾并行；七角色分别完成设计、实现、样例和相关验证 |
+| S3 | 在云端（本服务器）运行端到端测试 | 待开发 | 各角色完成 S2 后可逐个进行服务器真实调用检查；全部角色就绪后跑包含内部 Worker 的完整工作流，留下端到端证据 |
+| S4 | 适配公司环境的 CodeAgent CLI，运行实际业务场景 | 待开发 | 以 S3 验收版本为基线，取得真实 CLI 协议、访问条件与业务场景后开展适配及业务验收 |
+
+状态使用：**待开发**（测试任务表示待准备/执行）、**开发中**、**待验收**（实现或材料已就绪，仍缺验收）、**已验收**、**阻塞**（写明具体原因和解除条件）。已有代码或测试文件不等于已验收。实际执行结果另记 `PASS / FAIL / BLOCKED / NOT_RUN`；只有对应版本的必需检查全部通过且证据可查，任务才能改为已验收。
+
+## S1：DDD 目录重整
+
+设计依据：[DDD](specs/totalRules/DomainDrivenDesign.md)、[架构](specs/totalRules/Architecture.md)、[4+1 视图](diagrams/Views4Plus1.md)。
+
+| 步骤 | 工作与交付 | 状态 | 验收与证据 |
+| --- | --- | --- | --- |
+| S1-01 | 核对 Domain、Application、Infrastructure、Interfaces 的职责、依赖及七角色归属 | 待验收 | AC-ARCH-001、002、004；PR #36 已合入，当前版本分层检查结果待补 |
+| S1-02 | 核对迁移后的导入、组合根、运行入口、命名及文档/Schema 路径 | 待验收 | AC-SPEC-001、AC-SCHEMA-001；历史静态检查见交接，当前入口与路径结果待补 |
+| S1-03 | 执行受影响测试及主线回归，记录最终代码版本 | 待开发 | 按 [开发指南](Development.md) 执行；当前提交的回归记录待补，历史 219 + 14 项结果不作本项通过证据 |
+
+## S2：单个 Agent 细化开发
+
+每个角色已有目录、Contract、Prompt、测试和样例，本阶段在其基础上核对业务缺口并细化。下表记录当前交付范围及仍保留的扩展目标；角色契约和受控验收与 S3 真实模型验收分开，不因受控测试通过而取消延期目标。
+
+| 任务 | 角色 | 细化与验收重点 | 状态 | 当前证据 |
+| --- | --- | --- | --- | --- |
+| S2-01 | [Orchestrator](specs/domainFunction/agents/orchestratorAgent/OrchestratorAgent.md) | 计划输入、任务输出和失败处理；保持固定业务连接，不能由模型决定 Gate PASS | 待审阅（已实现） | IO-17 已实现当前模块五类任务、轮次及材料范围校验；见 Orchestrator 角色测试和完整流程回归 |
+| S2-02 | [DocWorker](specs/domainFunction/agents/docGenAgent/subAgents/docWorkerAgent/DocWorkerAgent.md) | 源码分块、片段覆盖、来源引用及材料不足处理 | 待审阅（当前范围已验收） | 内部 Worker、覆盖/证据路径、未解决问题交接、裁剪 CAS/Prompt/工作区及并发重试复用已有角色与 WorkerMaterialBoundary 回归；业务分组、预算和跨模块依赖继续延期 |
+| S2-03 | [DocGen](specs/domainFunction/agents/docGenAgent/DocGenAgent.md) | 单文档汇总、拆分提案、旧版与 Correction 定向修订、描述索引 | 待验收（最小链路开发完成） | 已完成 Worker 汇总交接、单文档与章节范围校验、拆分提案及显式答复、YAML/关键词/版本索引；定向与独立入口证据见历史版本索引。IO-08 预算分组、IO-10 分批汇总仍按原 Spec 待细化，S3 真实模型验收后续进行 |
+| S2-04 | [TestGen](specs/domainFunction/agents/testGenAgent/TestGenAgent.md) | 确认输入与测试预期依据，再细化测试候选、oracle 声明和门禁接线 | 待审阅（已实现） | IO-11～13、21 已实现 C/C++ 测试文件、参考校验、源码内容绑定复用及有限修复；见 TestGenExecution 和完整流程回归 |
+| S2-05 | [CodeAgent](specs/domainFunction/agents/codeAgent/CodeAgent.md) | 知识卡片包含接口，项目配置提供 C/C++ 必要约束；任务白名单与隔离限制读取，框架校验源码列表并落盘 | 待审阅（已实现） | IO-03～06 已实现知识与配置裁剪、空仓库读取视图、C/C++ 输出校验；KF-SYS-044 仍保留独立配置管理的 Partial 范围 |
+| S2-06 | [Check](specs/domainFunction/agents/checkAgent/CheckAgent.md) | 检查输入、判据、findings 可追溯性及只读边界 | 待审阅（已实现） | IO-14、15 已实现源码/生成代码/规则输入及结构化差异报告；相似度算法继续延期 |
+| S2-07 | [Review](specs/domainFunction/agents/reviewAgent/ReviewAgent.md) | 评测证据、Check findings 接入与归因、Correction 及无须修订时的输出 | 待审阅（已实现） | IO-15、16 已实现两类报告输入、多条修订意见和可信证据绑定；STOPPED 精简 CAS 交接及幂等事件已验收，完整治理展示与资料清理仍待开发 |
+
+未完成目标保持在各模块 Spec：DocWorker 业务分组/上下文预算/跨模块依赖、DocGen 分批汇总、Check 相似度研究、独立项目配置管理、治理展示、资料自动清理及历史最佳回退。外部知识关联按 [Association IO-23](specs/domainFunction/association/Association.md) 延期，不作为当前 S2 的前置条件。
+
+资料生命周期按 [Knowledge IO-19](specs/domainFunction/knowledge/Knowledge.md)：运行期间保留过程资料，达标且最终文档与验收记录保存后清理中间资料，替换现用文档时保留上一版；需人工治理时暂存必要证据至治理结束。自动清理尚未实现。停止条件按 [Evaluation IO-20](specs/domainFunction/evaluation/Evaluation.md)：达标立即结束，预算/轮次耗尽转治理；自动历史最优回退仍未实现。
+
+## S3：本服务器端到端测试
+
+| 步骤 | 工作与依赖 | 状态 | 验收与证据 |
+| --- | --- | --- | --- |
+| S3-01 | 固定代码与场景源码版本，准备本服务器 DSH 配置、可信参考测试、输入和输出目录 | 待开发 | 参考测试先通过；记录环境、非秘密配置摘要及场景版本，按 [Runtime](Runtime.md) 配置 |
+| S3-02 | 每个角色完成 S2 后，在本服务器检查真实调用、输出与上下游材料交接 | 待开发 | 七角色分别留下 Run、结果与工件证据，核对 AC-SCHEMA-001；可逐个推进，历史 DocGen live 不能替代新版本检查 |
+| S3-03 | 全部角色就绪后，在本服务器跑完整业务工作流 | 待开发 | AC-E2E-002、003：七角色真实执行、工件交接、独立评测、Gate 和唯一发布回执；保存完整 Run 证据 |
+| S3-04 | 验证失败归因与修订、取消/恢复、重复提交和发布，并完成适用回归 | 待开发 | AC-E2E-001、AC-REC-001、002 及实际适用场景；自然失败与受控注入分别记录，未覆盖项保留未验收 |
+
+本阶段不预填环境阻塞。实际缺少配置或失败时，在对应行记录原因和结果；完整闭环依赖的 oracle、归因等缺口必须在 S2 或联调中明确处理，不以已有 Fixture 用例替代真实验收。
+
+## S4：公司环境适配与实际业务场景
+
+| 步骤 | 工作与依赖 | 状态 | 验收与证据 |
+| --- | --- | --- | --- |
+| S4-01 | 核对真实 CodeAgent CLI 的版本、认证、协议、会话、工具权限及公司运行约束 | 待开发 | 获得实际协议与访问验证记录；现有自建协议夹具只作为参考 |
+| S4-02 | 在现有 Adapter 上完成协议和配置适配，保留业务契约 | 待开发 | 按 [AgentAdapters](specs/infrastructure/agentAdapters/AgentAdapters.md) 补充公司环境验收条件，验证真实调用、错误、取消和材料权限；不把 DSH 的证明直接套用到 CLI |
+| S4-03 | 选择并固定公司真实业务场景，执行生成、评测、修订及发布流程 | 待开发 | 明确业务预期和可信测试，按 AC-E2E-001、002 的适用行为核对；DSH 专属 AC-E2E-003 不能直接算作 CLI 验收 |
+| S4-04 | 整理复现方式和业务验收结果 | 待开发 | 代码/CLI/场景版本、命令、Run、产物和业务判定可追溯；未满足项保持待验收或阻塞 |
+
+
+## 当前能力边界
+
+| 范围 | 当前事实 | 未完成或未验证部分 |
 | --- | --- | --- |
-| Orchestrator | 授权路径、完整角色任务与依赖校验 | 固定拓扑；不调度全仓库依赖图 |
-| DocWorker | 接口、行为、边界事实绑定源码文件、行号和原文 | 证据不足记录风险并阻止发布 |
-| DocGen | 概要后正文；依据 Correction 修订指定 H2，未涉及章节字节不变 | 不支持更细段落范围 |
-| TestGen | 声明式可执行行为案例、说明和复现工件；参考实现验证通过后晋升 | 不做覆盖率驱动搜索或混合变异 |
-| Code | 只接收知识、公开签名和允许输出路径；独立会话/目录 | 仅验独立 TypeScript 模块，不验整个 Tauri 项目 |
-| Check / Review | 约束检查、定位问题、评测/Check 证据绑定、H2 Correction 与未解决风险 | 复杂归因排序与停滞回退延期 |
-| 评测与预算 | 固定门禁先冻结；参考/生成空间分离；内核隔离、严格编译、宿主比较、每案例 5 次重复 | 默认最多 3 轮、30 分钟；显式授权验收支持 provider-quota；恢复不重置预算；缺少隔离能力拒绝任务 |
-| 发布与 Git | SQLite 与工件审计、可恢复文件发布、幂等；手动 Git 默认关闭、冲突与认证失败可重试 | 使用独立知识目录；不强制覆盖远端 |
-| Console | 模型配置、服务器目录、固定任务、取消、角色进度、失败证据、知识阅读、Diff 与 Git | 远程访问需要令牌和受保护的传输 |
-| 安装 | 应用与数据分离，携带 Node/Git/DSH/隔离工具/编译器/依赖/许可证，升级卸载保留数据 | 仅指定 Linux；浏览器和基础系统工具由使用环境提供 |
+| Agent 结构 | 六个外层 Agent；DocWorker 位于 DocGen/subAgents，保留独立执行身份、契约、提示词与提交记录；DocGen 组织源码拆分与汇总 | 结构与流程回归不代表真实模型生成质量验收 |
+| 跨角色流程 | Domain 定义业务连接，LangGraph 只调度外层角色；DocGen 内部 Worker 使用独立 Registry 提交与有界并发 | 旧 roleExecutionVersion 拒绝恢复；不开放动态拓扑编辑 |
+| Domain 组织 | 按领域功能平级组织，已移除 services 目录和总导出 | 共享实体仍位于 Domain.ts |
+| 模型接入 | DSH 原生 SDK、受控 Fixture、OpenCode Go 环境配置已实现 | 公司 CLI 真实协议未验收 |
+| 评测与发布 | 候选参考校验、同源固定测试、外部逐入口监督、确定性 Gate、幂等发布和审计已实现 | 通用 oracle 质量扩展、C++ 插件、完整敌对代码沙箱和自动历史最优回退未实现 |
+| 查询与关联 | 现有查询、血缘、Diff、来源和关联领域能力 | SearchAgent 直接检索链仍为 Planned |
+| 资源模块 | SourceScan、Workspace、legacyOkf 已归入 Domain | 保留既有文件系统、Git 和 YAML 依赖 |
+| 文档组织 | 设计集中 docs/specs，按代码模块重写；4+1 视图集中一份 | 旧规范目录、独立 security 章节与重复任务模板已移除 |
 
-[Issue #20](https://github.com/linlisWorkTeam/domain-knowledge/issues/20) 本版落实测试可信性、固定门禁、五次重复和预算；覆盖率优化、SBST、复杂信用分配/back-off 延期。[#33](https://github.com/linlisWorkTeam/domain-knowledge/issues/33) 落实来源、风险、两阶段生成和定点修订，全仓库依赖调度延期。[#34](https://github.com/linlisWorkTeam/domain-knowledge/issues/34) 落实受限上下文和接口/路径约束，通用检索和分层渐进生成延期。[#35](https://github.com/linlisWorkTeam/domain-knowledge/issues/35) 落实证据绑定和 H2 精度，历史薄弱点排序/复杂停滞升级延期。四个 Issue 保持开放，未声称全部完成。
 
-## 固定基线与隔离
+## 关键证据与历史索引
 
-源码提交 `1bf4c5894b3f196d2e2aba1d8db3aac77aef7095`；源码 SHA-256 `8783c8e83822a97dd25a79e35860b6fe5dc8cf5ae663935db33f266edf645e4e`；参考测试 `0f4db3eda161b93aebb462331deed18c7d3a0d81f96c32a72b68231bf4f8217b`；依赖锁 `6d490bc60496109e58b0c0f9222e1c15fc94f9189d9fbafa93c73c3f3881cf4c`。入口核对固定 Git 对象，原仓库只读。28 个固定行为案例在模型生成前冻结。
+PR #46 修复覆盖原生用例监督、路由崩溃恢复、cwd 绑定与停止交接。代码 `acfd714` 的历史结果为全量 314/314、浏览器 14/14、独立受控 SDK PASS/VERIFIED；具体产物与边界见 [修复与端到端报告](reports/AgentSpecRepairAndE2E.md)。这些结果不代表真实外部模型、敌对代码隔离或本次治理重构的执行结果。
 
-当前角色执行版本为 `seven-role-mvp-v5`；旧记录可读，不跨版本恢复。TestGen 看不到生成知识/实现，Code 看不到参考源码/测试/隐藏门禁；源材料、公开签名与模型可见场景分开存储。沙箱不挂载原仓库，禁止路径穿越、动态导入和通过输出篡改执行器计数。发布要求构建、固定案例、已晋升候选案例、稳定性、Check、Review 及来源证据共同通过。
+2026-09-10～11 的逐次确认、提交和回归流水保存在 [治理整理前的 Status](https://github.com/linlisWorkTeam/domain-knowledge/blob/75d22094ad8e946a6118d441bb7a7c8258140639/docs/Status.md)；更早设计演进见 [HistoryEpitaph](HistoryEpitaph.md)。未改变原有 S1～S4 验收状态，不以文档整理关闭延期项。
 
-ECS 约 3.6 GiB 内存、无 swap。模型与模块评测共享一个进程槽，编译器单核，Node 小堆；回归、浏览器与打包按顺序执行。预算涵盖排队和重试，取消/超时杀死子进程组。
+<details lang="en">
+<summary>English summary</summary>
 
-## 修复前验收基线（1867025）
+Track durable roadmap, capability boundaries and revision-specific acceptance references here. Session activity belongs in PRs, commits or necessary handoffs. Controlled tests and historical evidence do not establish live model quality or current acceptance.
 
-受控角色输出用于确定性回归，原生 DSH 协议使用受控模型端点；它们不计入真实模型验收次数。视觉使用固定数据，新增截图已审阅目录、状态、阅读内容和窄屏溢出。
-
-| 验收 | 实际状态 | 证据 |
-| --- | --- | --- |
-| 固定参考模块 | 28 案 × 5 次，140/140 通过 | 参考评测报告，摘要 `6da15dda45a39e98644764116d8327e27db508c75a25a873ef86e6e2dbb26477` |
-| 完整模块飞轮 | 5/5，通过首次发布、定点修订、错误 oracle 拒绝、轮数停止、风险拒绝 | `tests/acceptance/ModuleFlywheel.test.ts`，实际隔离编译与执行 |
-| 原生 DSH | 12/12 受控协议测试通过 | 原生工具、配置、工作流及 DocGen 示例测试 |
-| Console | 19/19 通过，已有视觉断言保留 | `tests/e2e/Console.spec.ts`、`ProductConsole.spec.ts` 及 snapshots |
-| 实际安装浏览器 | 认证、已验证配置、目录选择、Git 默认关闭和 640px 布局通过；失败批次列表状态未通过 | 无 API 模拟、无写请求；密钥输入框为空；两次可恢复失败仍显示业务状态“生成中” |
-| 最终自动化回归 | 281/281（新增取消清理等待回归）；类型检查通过；规范检查通过（17 Schema / 7 Command / 8 Result / 51 P0） | 包含架构、契约、角色、恢复、取消、反越权、Git、发布和安装 CLI 符号链接 |
-| GitHub CI | 281 项测试和 19 项 Console 检查全部通过 | [CI 34310536570](https://github.com/linlisWorkTeam/domain-knowledge/actions/runs/34310536570)，隔离工具与中文字体显式配置 |
-| 离线安装 | 通过；包内参考门禁 140/140，完整飞轮 5/5，原生 DSH 隔离 1/1 | 断网最小系统目录，启动/重启/升级/卸载及数据摘要核对 |
-| 真实模型 | 已使用 3/3 次，0 次完整通过，无本地发布 | 首次缺会话头；第二次候选 oracle 与正文结构失败；第三次源码引用范围不匹配后取消剩余调用 |
-| GitHub Release | 未发布 | 真实完整飞轮至少 1 次通过后才可发布已验收 MVP |
-
-发行物必须来自同一受测提交，包含安装包、SHA-256、工具依赖清单与第三方许可证；安装及模块构建不下载依赖。真实模型和 Git 同步仍需联网。版本标签检查时 `v0.2.0` 未被占用，正式发布前再次核查。Windows、任意项目工具链、多语言及复杂回退均不在本版验收范围。
-
-## 安装候选与证据边界
-
-初始离线安装候选来自提交 `026326aa56ddc0bf8abe8a49988d6c93dd554c9b`。真实运行依次使用 `026326a`、`7287c7f`、`901ab18` 的安装包；更新安装核对配置、凭据存储、SQLite 和验收账本摘要不变。最终候选另含累计 token 快照统计修复，未再次调用真实模型。候选提交、大小与 SHA-256 记录于工具清单、`.sha256` 和证据包 `Acceptance.json`。安装实测修复了 node-pty 延迟动态库遗漏、glibc/musl 区分、显式目录对 HOME 的依赖和 current 符号链接 CLI 入口；原生 DSH 内部探针确认授权文件可见、同级参考文件不可见。没有修改门禁预期或削弱隔离。
-
-干净环境使用当前 OpenCloudOS 9.4 主机上的最小系统目录，外网关闭，只保留系统 shell、基础文件工具及其运行库，预检确认没有 Node、npm、Git、bwrap、prlimit、编译器或 DSH。受控 HTTP 模型端点仅在隔离回环地址上运行。外层验收环境保留宿主 proc 以支持内层创建用户命名空间；角色与评测仍使用产品自身的完整隔离。这是同内核的干净文件系统验收，未声称在另一台全新虚拟机上验收。
-
-首版没有历史安装包，升级测试把已安装版本移至模拟旧版本目录，再安装同一候选，核对配置和 SQLite 摘要保持不变；重启后 HTTP 检查通过。卸载后再次核对这两类数据保留。修复前的失败证据保留在证据包中，不能用作当前候选的通过记录。
-
-安装候选、工具清单、许可证清单与独立证据包保存在交付目录 `domain-knowledge-releases/v0.2.0-candidate/`。`Acceptance.json` 区分受控回归、安装验收和真实模型；不包含 API Key、访问令牌、数据库或模型响应原文。已从用户 9 月 8 日历史消息中找回授权凭据，并通过运行配置验证；此前“缺少凭据”的判断是漏查历史消息。继续执行 [真实验收入口](LinuxInstall.md#真实模型验收入口)，至少一次完整通过才可发布正式 Release。
-
-草稿 [PR #38](https://github.com/linlisWorkTeam/domain-knowledge/pull/38) 已保存实现与文档；未合并，未打版本标签。已安装预览位于 `/root/.local/share/domain-knowledge-mvp`，测试结束后服务已停止以释放 ECS 内存，配置和记录保留。运行配置已加密保存并验证。账本保留 3/3 次启动记录，不得删除或更换运行目录规避次数。模型凭据可用，但未取得真实七角色全链路及本地发布的成功证据。
-
-## 真实运行明细与当前阻塞
-
-用户已于 9 月 8 日提供 OpenCode Go 地址、模型与密钥。此前仅检查运行配置，漏查历史消息，误报“缺少凭据”；本次已找回原配置并通过生产配置接口加密保存、验证，未要求重复提供密钥。
-
-| 次数 | 运行编号 | 实际结果 |
-| --- | --- | --- |
-| 1 | `139790ab-3d41-4ca0-9908-c8183854a4a9` | 提供方拒绝生成请求：缺少 x-opencode-session。已修复原生会话头与产品 User-Agent，并验证工具往返稳定、重试换会话。 |
-| 2 | `95a61b77-f821-4292-821b-bd438cd5e1e8` | 规划、知识提取、候选测试及概要/正文模型调用成功；参考 oracle 在第 25 个实际执行的案例重复遇到错误预期并停止，DocGen 把概要改为编号 H1，结构检查拒绝。未修改候选或固定测试预期。 |
-| 3 | `8d3237f4-de25-423d-8ef4-b0c5228af2d9` | DocWorker 的两条引用标注第 11–19 行，却多引用下一行的换行与闭括号；精确来源校验拒绝。为节约资源，取消仍在生成测试的任务；报告终态为 CANCELLED，失败原因另保存在诊断证据。 |
-
-第三次终止前未到代码重建、Check 或 Review。三次均未产生通过门禁的版本和 Markdown 发布。不得宣称七角色真实闭环已通过，也不创建已验收 MVP Release。继续真实验收需要新的用户授权预算，现有账本与失败工件必须保留。
-
-最后一次还发现提供方在 SSE 中反复发送累计 token 快照，旧中继逐帧相加造成虚高。已改为每个 HTTP 请求取最新快照，工具往返请求相加、重试独立计数；回归覆盖递增和重复快照。旧数据库记录不改写，其用量统计不能作计费依据。该次 DocWorker 的原生最终消息报告输入 2,957、输出 30,731 token；这只是单次调用的记录，不是订阅账单。
-
-独立证据包 real/ 保存三次 MvpAcceptance 报告、运行与安装提交映射、连接诊断及失败定位。引用不匹配使用位置和摘要留证，不保存密钥、完整模型响应或运行数据库。后续应优先改进有预算的阶段语义反馈，再在新授权预算内验证；不得直接修正原失败输出使其变为通过。
-
-取消收尾还修复了图 Promise 提前结束导致节点审计来不及落盘的问题：现在 wait/cancel/shutdown 等待执行器清理及终态投影完成。受控测试持有清理锁，确认 cancel 不会提前返回；第三次旧记录仍保留一个陈旧 RUNNING 节点投影，进程检查确认对应真实 DSH 子进程已退出，该历史投影不能解释为仍在运行。
-
-修复前受测候选为 `186702547abadddf18c2cbeda4af4b2ad859f493`，安装包 SHA-256 `2ce0e4eb4b3c0b5d21f0ce9c5e1d1084a29f7d1c01a0b8747ed095d579cf41ce`。断网安装、参考 140/140、受控飞轮 5/5、原生隔离 1/1、重启/模拟升级/卸载保留均通过。实际已配置浏览器截图另确认一项未解决问题：可恢复的执行失败未在批次列表合并显示，前两次失败仍显示 GENERATING；运行详情及 real/ 诊断保留真实失败。此项计入未通过的产品验收，不能将只读配置及布局检查通过等同于全部视觉验收通过。
-
-
-## 真实失败后的修复候选（尚未重新真实验收）
-
-用户同意失败分析后的修复顺序。本轮没有新的外网模型调用，也不修改已耗尽的 3 次真实验收账本；上述 3 次运行及 1867025 安装候选的历史证据仍保留，不能视为本轮修复后的真实通过证据。
-
-- DocWorker 只选择程序提供的编号源码范围；系统提取原文并继续严格核验，空白选区不能作事实依据。
-- DocGen 返回固定编号的章节体，由程序组装标题；修订只替换授权章节，原始前言、标题和未授权区域保持字节不变。拒绝标题注入、单独 CR、未闭合围栏及越权编号。
-- 可定位的知识阶段错误最多反馈修正一次；阶段次数、原始输出和截止时间落入 CAS/事件。恢复重用已通过阶段，不重置时间或次数。extract 180 秒/8192 token，outline 90 秒/2048，body/revision 240 秒/12288；总预算仍为 3 轮/30 分钟。
-- Linux 检查点增加进程启动身份，确认执行者已死后才可在租约到期前接管；PID 复用、输入摘要与 retry fence 均校验。执行版本升级为 seven-role-mvp-v3，数据库迁移 7 保留旧记录可读，旧版本运行不恢复。
-- 连接验证先检查列表，再使用生产隔离 DSH 发一次 64 token 最小生成；30 秒覆盖排队和网络，禁止重试或追加工具请求。保存/读取不调用模型，旧版仅列表验证状态需要用户手动重验。
-- Console 区分业务阶段和实际执行状态，失败不再计入运行中；取消、恢复、筛选和预算原因据执行事实显示，旧节点投影作为历史证据保留。
-
-合并后自动化 321/321、Console 21/21、类型检查与 Spec 校验通过。完整回归包括真实隔离的受控飞轮：故意制造源码范围及章节错误，经阶段反馈修复后，同一轮通过固定/候选门禁并本地发布；另覆盖真实子进程 SIGKILL 后接管、次数耗尽后拒绝恢复、超时取消及失败原文不泄漏给 Code。这里的模型端点均为受控数据，不代表 deepseek-v4-flash 已完成新的真实闭环。受控浏览器已覆盖失败状态和恢复预算提示，原有截图基线未变。
-
-
-本轮最终应用提交 `854ac9cef2472f244c57687760a36526da18456d`，安装包 SHA-256 `01bc12000ab4bbc01e6886dc942c88505b7ed8a2589c31d5dae1066b5a61753e`，177,934,846 字节。受测提交的 [CI 34332802538](https://github.com/linlisWorkTeam/domain-knowledge/actions/runs/34332802538) 已通过 321 项自动化、21 项 Console、类型及 Spec 检查。后续提交仅整理交接与验收文档，不改变安装包内的应用文件。
-
-| 本轮验收 | 结果与证据 |
-| --- | --- |
-| 最终包离线安装 | 同内核最小系统目录、断外网、无预装开发工具；140/140 参考门禁、6/6 受控飞轮、1/1 原生隔离、21/21 生成探针和阶段恢复通过；HTTP、重启、模拟升级、卸载保留通过 |
-| 真实用户安装升级 | 从 1867025 经修复候选更新至 854ac9c；配置、加密凭据与 3/3 账本摘要相同；旧数据库所有原表数据不变，只新增 checkpoint_owners 和迁移记录；另保留旧版本及私有备份 |
-| 实际安装浏览器 | 两次 FAILED、一次 CANCELLED，活动数 0；详情显示安全错误和预算耗尽，旧 RUNNING 节点标为历史状态；桌面和 640px 的列表状态可见、无横向溢出；无 API 写入和模型调用 |
-| 凭据与发行物 | 原模型及密钥保留；旧列表验证显示未验证并要求手动生成重验；解包文件与证据精确密钥扫描通过，截图不包含认证过程 |
-
-新交付目录为 `/root/projects/domain-knowledge-releases/v0.2.0-stage-repair-candidate/`，包含安装器、工具及许可证清单、SHA256SUMS、说明、受控/安装/浏览器证据和 Acceptance.json。修复前候选目录保持原样。首个实际浏览器检查因执行会话结束后服务已停止而连接失败，第二次因脚本未等待控制台初始化而操作过早；这些失败记录保留，验收脚本改为同一会话运行并等待就绪。截图审阅另发现窄屏隐藏列表状态文字，已修复并增加可见性断言，随后重建安装包和重做安装、实际浏览器验收。
-
-已安装实例 `/root/.local/share/domain-knowledge-mvp` 在验收后停止，释放 ECS 内存；原 ohMyWorkPanel 仍为固定提交且干净。尚缺修复后的真实模型完整闭环：本轮新增调用 0，历史 3/3 启动、0 次通过、0 次发布不变。进一步真实验收必须追加用户授权，不能删除账本、另换目录或重写原失败证据绕过限制。正式 Release 仍不发布。
-
-## 2026-09-10 开发规范与领域服务结构
-
-`agents` 与 `services` 在 Domain 平级；角色选择通过 AgentExecutionService 封装，association/evaluation 等服务持有各自确定性规则。Spec、目录契约和调用方已同步，详见 [领域边界](specs/totalRules/DomainDrivenDesign.md)。开发 subagent 并行规范见 [CodeTaste](specs/totalRules/CodeTaste.md#开发过程中的-subagent-并行协作)，NFR-013 的实际双任务宿主验收尚未执行。
-
-本次类型、Spec、架构与目录契约通过；完整回归 325 项中 324 通过，唯一站点资产摘要失配已修复并通过站点 12/12 定向复测。未重复执行完整回归，也未运行浏览器、外网模型或重新构建安装包；前述真实 MVP 验收结论保持原有边界。具体交接见 [本次墓志铭](https://github.com/linlisWorkTeam/domain-knowledge/blob/94d431a86b7656ded4109c3a00ae93b182df2e6c/docs/epitaph/2026-09-10-1017-domain-services-subagents.md)。
-
-
-## 第四次真实验收（2026-09-10，最终 STOPPED）
-
-用户明确追加一次真实飞轮，之前的三条账本记录保持原样。授权文件绑定旧账本 SHA-256；入口升级为 `mvp-real-attempts-v2`，最多四次，重复授权不增加容量。先使用原加密配置完成一次 64 token 最小真实生成验证，再启动 `731a6a13-0226-4f21-aedb-71251d3d1222`。总预算仍为 3 轮、30 分钟：北京时间 09:51:02 开始，固定截止 10:21:02；10:15:39 因三轮耗尽停止。两次手动恢复属于同一运行，未重置预算或增加启动数。
-
-| 阶段 | 实际结果与处理 |
-| --- | --- |
-| 初始执行 | TestGen 的长推理流触发旧 2 MiB SSE 累计字节限制，候选测试未完成。原始失败保留。 |
-| 第一次恢复 | 修复传输限制后 TestGen 成功，候选案例通过参考实现；生成实现暴露段落空行错误。Review 使用 H3 作为修订目标，被原 H2 范围校验拒绝。 |
-| 第二次恢复，第 1 轮 | 明确提供现有 H2 目标列表，Review 成功产生合法 Correction；4/140，发现 `alpha\n\nbeta` 多输出 `<br/>`，门禁 ITERATE。 |
-| 第 2 轮 | 定点修订、重建后 315/315，通过固定 28 案及候选 35 案各 5 次；知识仍把已修复行为写成当前失败，Review 要求纠正。 |
-| 第 3 轮 | 再次修订后 315/315、稳定性 1、关键失败 0；Check 无阻塞、Review PASS。知识中三条原始风险仍在，门禁以 CHECK_BLOCKING 停止，0 次本地发布。 |
-
-最后的 `CHECK_BLOCKING` 不是 Check 角色发现了问题：当前门禁将知识 `unresolvedRisks` 非空也合并为该原因。DocWorker 把未运行测试、未提供系统集成信息、公开类型外输入列为风险；其中后两项属于本次验收范围以外，前者后来已有评测证据。DocGen 每轮从原 worker 工件照搬三条字符串，现有结构没有风险标识、范围处置或绑定评测证据的复核状态。因此 Review 即使 PASS，也不能消除旧风险。当前门禁保持拒绝，没有直接删除风险、改写失败输出或降低测试要求。
-
-后续修复应在 Domain 中建立显式风险记录及证据绑定的处置流程，区分本次范围内缺证据、已授权范围限制和后续评测可验证事项；真正的未解决风险继续阻止发布。Application 负责传递、持久化和审计，展示单独的知识风险原因。涉及新持久化语义时版本化；现有第四次 STOPPED 记录及三轮预算不可重开。上述风险处置尚未实现，不能把改 Prompt 或 Review 自评当成解决方案。
-
-本次应用修复提交 `4a8fffc` 将累计 SSE 传输预算与缓冲上限分开：默认传输 16 MiB、单帧待解析缓冲仍 2 Mi 字符，探针仍 64 KiB，保持流式背压、token、超时和取消上限。`51c2972` 明确 Review 的合法 H2 修订目标，严格范围校验不变。初次使用 `548a7c2`（应用代码同 `854ac9c`），第一次恢复使用 `4a8fffc`，第二次恢复使用 `51c2972`，不能声称整个运行来自单一提交。
-
-验证：`51c2972` 的 [CI 34428524075](https://github.com/linlisWorkTeam/domain-knowledge/actions/runs/34428524075) 类型、Spec、324/324 回归及 Console 21/21 全通过。新增定向授权、传输限制与 Review 目标测试通过。一次误用 Node 22 启动的本地完整回归已中止，不计入通过证据；ECS 同时有其他任务，未重复争抢资源。原 ohMyWorkPanel 仓库仍干净。
-
-完整脱敏记录保存在 `/root/projects/domain-knowledge-releases/2026-09-10-additional-acceptance/Acceptance.json` 及同目录初始失败、两次恢复、调用统计与 CI 日志。七角色真实执行和反馈修订已有证据，但本地发布未通过。现有 `v0.2.0-stage-repair-candidate` 安装包仍来自 `854ac9c`，不包含本次两项应用修复；没有新安装包验收或正式 Release。PR #38 保持草稿。4/4 启动额度已用完，不自动发起第五次。
-
-
-## 风险复核修复（2026-09-10，受控验证）
-
-用户同意修复后，新增 Domain `services/knowledge/KnowledgeRisks.ts`。风险记录绑定来源工件、稳定编号和原始声明；每轮形成独立的 OPEN / VERIFIED / OUT_OF_SCOPE 审计，绑定当前 run、知识版本和评测证据。原风险不删除，上一轮通过不会自动传递给下一轮。
-
-DocWorker 可使用三个明确的 verificationNeeds：固定/晋升模块案例待验证、系统集成范围限制、公开类型外范围限制。声明文本由程序生成，不接受模型自定义“已解决”的内容。模块案例待验证仅在冻结模块契约内、当前可信评测非空且全部通过、稳定性 1 时成为 VERIFIED；两类范围限制按冻结模块契约记为 OUT_OF_SCOPE，不声称已验证。普通 unresolvedRisks 仍按缺证据阻塞，不通过自然语言分类或模型自评清除；需补齐材料后重新提取。
-
-Application 保存初始风险元数据及每轮审计 CAS 工件，门禁 evidenceRefs 保留复核依据。knowledgeRiskBlocking 与 Check / Review 分开，页面展示独立的“知识风险尚未解决”。执行版本升为 seven-role-mvp-v4，旧 v3 与缺失版本均只读不可恢复，原第四次 STOPPED 记录不改判。
-
-受控验证：本地完整回归 330/330 通过；随后增加非有限计数防护并保留旧缺失版本断言，最终定向 12/12 通过。独立模块隔离验收覆盖首轮失败、修订后通过并自动发布，同时保留两轮风险审计；原“行为测试全过但真实缺证据仍拒绝”断言保留并细分门禁原因。类型及 Spec 通过。Console 22/22 通过，新风险原因截图已审阅；最终提交 CI 状态见此次交接与证据索引。
-
-本次没有调用真实模型，没有改账本；SHA-256 仍为 f52cc9087ceee9638cb90e62bc05403b8bd85dac9febbaf19e04ddb183c76081。原 4/4 次启动保持不变。修复验证是受控模型数据，不证明 deepseek-v4-flash 已在 v4 完整通过；未打新安装包或发布正式 Release。历史854ac9c安装候选继续保留，不能冒充本次修复的安装验收。
-
-
-风险修复最终整合提交为 `9e35adfe5523c156dcbd8d0e1dc1a0fe490d4358`，合入远端 `e1c470e` 的 Domain/services 重构；风险规则现位于 `src/domain/services/knowledge/KnowledgeRisks.ts`。该提交 [CI 34430538172](https://github.com/linlisWorkTeam/domain-knowledge/actions/runs/34430538172) 类型、Spec、331/331 回归与 Console 22/22 全通过。整合前本地 330 项与整合后 CI 的统计分别保留；新增一项来自远端架构测试。证据目录 `/root/projects/domain-knowledge-releases/2026-09-10-risk-repair/` 含最终索引、日志、受控截图与摘要。本次只完成风险修复的受控验收，不新增真实飞轮或安装验收。
-
-
-## 正式发行与最终验收（2026-09-10）
-
-用户明确授权“飞轮轮次不限，token用完为止”。账本升级为 mvp-real-attempts-v3，保留原四次记录及摘要；验收取消总次数、总轮次和总时长限制，保留单阶段截止时间、取消、隔离及串行资源约束。供应商明确额度/付款错误持久化为账户停止标记，普通限流不当成余额耗尽；连接探针与执行共用停止记录。默认产品入口仍为三轮/三十分钟。
-
-第五次在 275/275 行为测试后因 Review PASS 与未解决风险矛盾失败。修复 DocWorker 字段职责及 Review 一次语义反馈，第六次 `cc297303-00c5-41b7-a1ec-2bb74d18ff96` 在提交 a90ebd9 两轮通过 285/285 并发布。视觉复核发现版本数量误显示为零及模块范围不明，修复只读统计后重新验收发行提交；第七次候选预期与参考实现不符而拒绝，未改预期或晋升失败测试。
-
-最终第八次 `da8de66a-cce3-4922-a5f5-0b3e62eadcaf` 在提交 `94d431a86b7656ded4109c3a00ae93b182df2e6c` 三轮完成，七角色真实执行、两个 H2 修订及逐轮证据均保留。每轮 28 个固定与 26 个已晋升候选案例各重复五次，270/270 通过；第三轮 Review 和确定性门禁通过，发布 `kv_452f056dce70cb05d252658c`。成功后停止额外模型调用。
-
-[最终 CI](https://github.com/linlisWorkTeam/domain-knowledge/actions/runs/34433077664) 类型、Spec、架构及 340 自动化、22 Console 测试通过；OpenCloudOS 本机 Console 22/22 与截图比较通过。最终包在断网同内核最小系统中完成参考 140/140、模块飞轮 7/7、原生工具 1/1、探针与阶段恢复 22/22，以及安装、重启、升级、卸载和数据保留。实际用户升级保持数据库、配置、凭据、账本字节摘要一致；真实浏览器校验批次数量、已评测版本、历史失败、成功批次及知识阅读，无水平溢出。
-
-Release 包为 177979475 字节，SHA-256 `ea2949fbe9e5962c70475e405459fe57f2dda7767140c0e724bd227e370dbbd1`；9 个上传资产的 GitHub 摘要与本地一致，标签指向同一受测提交。交付目录 `/root/projects/domain-knowledge-releases/v0.2.0/` 含安装包、许可证清单、SHA256SUMS、安装说明和 AcceptanceReport.md；证据包区分受控、真实、历史与安装证据。用户安装 `/root/.local/share/domain-knowledge-mvp` 已更新，服务在验收后停止节省资源，原数据与回退版本保留。
-
-普通缺证据风险不自动解除；通过仅证明固定及已晋升案例。Windows、任意项目工具链、复杂回退等限制不变。干净安装是相同内核的独立文件系统验证，不宣称独立虚拟机验收。旧发行候选、旧墓志铭和本文件早期阶段不代表当前发行状态。
-
-
-前台后续更新（2026-09-10）：在独立 `feat/taste-console` 工作树完成视觉审阅后的文案精简，并按用户明确选择为当前临时网站启用免登录编辑。`WP_KNOWLEDGE_NO_LOGIN=1`、`directEditing` 将目录、发布设置、提示词和批次操作直接提供给访问者，保留目录范围、密钥脱敏及跨站写入防护。没有重打或替换 v0.2.0 发行包；具体部署与本次验证见最新交接。
-
-## 五阶段知识工作台：当前实现与待验收（2026-09-11）
-
-本节对应新的五环节修改计划，不改写上方 v0.2.0 发行结论。新增闭环语言是 C、C++；TypeScript 的验收范围是保留现有 markdownLite 回归和共同案例执行边界，不将任意 TypeScript 仓库生成误列为本次必交功能。Make/CMake 配置识别、工具检查和可编辑模块参数属于本次范围；静态识别不是运行完整原仓库构建脚本的证明。
-
-| 原计划要求 | 当前证据 | 尚需完成的验收 |
-| --- | --- | --- |
-| 操作中心选择仓库/源码版本、默认支持模块、独立五阶段及一键执行 | RepositoryAnalysis、ProjectHistory、WorkbenchPipelines v15 与阶段HTTP；历史选择/过滤/分页测试通过 | 当前桌面与窄屏完整浏览器检查 |
-| C/C++ 多张卡片、用途/接口/行为/边界/来源、生成即可阅读 | WorkbenchGeneration、KnowledgeUnits；已有真实生成和恢复记录 | 两个目标最终修订版本的完整真实验收 |
-| 稳定cardId、不可变versionId、旧卡历史分组 | KnowledgeCards、ConsoleVersionCounts 回归通过 | 最终页面版本分组复核 |
-| YAML、增量索引、渐进检索、索引失败保留卡片 | KnowledgeIndex 集成验证合法YAML、按需正文读取、失效与同任务恢复 | 最终修订产物索引与页面证据 |
-| Code只见知识/公开接口/构建约束，隔离重建、确定性差异 | WorkbenchReconstruction、NativeToolchain、SourceComparison 及既有执行证据 | 最新修订后的C/C++重建和行为门禁 |
-| 参考验证候选、可信测试复用、缓存失效、固定预期不变 | NativeSuiteEvaluation、WorkbenchEvaluation、FixedEvaluation 及对应测试 | 双目标新一键/分步最终通过；markdownLite当前全回归 |
-| 差异/失败定位章节、修订、刷新索引及来源复核 | KnowledgeRevision、SourceRevision、v15流程恢复测试 | 真实来源任务尚有MISMATCH/UNRESOLVED；修订后重新核验 |
-| 关联材料来自本地文档/指定链接、库内关联与不适用回退 | WorkbenchMaterials、WorkbenchAssociations、ExternalAssociations 回归通过 | 双目标最终卡片关联查看截图 |
-| 工具链检测、可编辑编译器/标准/包含目录/模块参数、缺依赖提示 | 模块配置贯穿生成/重建/评测/发布；受控及真实gcc双C模块执行通过；缺头文件诊断与匿名下载通过 | 前台参数操作验证 |
-| 同版本取消/恢复、冻结输入、预算累计、旧契约只读 | WorkbenchStages、Pipelines、Publication恢复集成测试 | 当前版本全回归及双目标真实重启/恢复核对 |
-| 固定及可信门禁后才发布，发布不重复 | WorkbenchPublications SQLite/文件事务、受限HTTP下载、v15一键提交已接；返回丢失恢复测试通过 | 真实最终publicationId及导出文件校验 |
-| 不增加账户、主动搜索、框架、向量库或全语言安装包 | 沿用Console/七角色/SQLite/隔离与免登录配置 | 最终部署配置及站点检查 |
-| 单任务/单进程编译、384MiB Node、子进程限额、无隔离不执行 | 现有ModelProcessLane、NativeToolchain与IsolatedCommand；当前重资源任务串行 | 全回归期间资源/取消/清理复核 |
-| 代码、Spec、操作说明、前后截图、报告、真实编号与网站 | 代码/Spec/Operations已持续更新，阶段证据保存在工作台验收目录 | 完整回归报告、最终截图/编号及当前网站更新尚未交付 |
-
-本次原计划对照的轻量回归共26项通过，覆盖卡片身份、索引、编译数据库候选、共用语言执行边界、材料与关联、版本统计、仓库快照和失败诊断。日志为 `/tmp/WorkbenchReadAndDiagnosticsRegression.log`，这不是全测试套件或浏览器验收。真实来源任务 stage-3ac5a7c55407b750e1205020b04657f09b5e4d4590903f6e5592bf3ab3967b48 已完成，结果 UNRESOLVED（7张卡片中2张SOURCE_MISMATCH、4张UNRESOLVED、1张SOURCE_MATCHED）；49次累计模型调用。不能以已有参考用例通过或阶段执行成功宣称整体完成。
-
-当前补充验收：真实gcc双模块固定案例通过；来源摘要绑定与发布防篡改13项、原生评测/修订集成2项、架构8项通过，类型和Spec通过。完整Console发布浏览器验收1项通过，覆盖保存输入选择、免登录发布与下载、刷新后历史、390px窄屏无水平溢出。首次浏览器执行发现App下载白名单缺少workbench-publications，修复后重跑通过，失败trace与成功截图均保留。这是受控模型证据配合真实HTTP/SQLite/文件的页面验收，不是真实卡片发布成功。证据目录 real-knowledge-revision/publication-browser-actual 与 source-digest-clarification。
-
-全量Node自动化回归现已480/480通过，无跳过（303436ms），日志WorkbenchFullRegressionCurrent.log。Console全套首次执行出现操作中心截图变化和仓库分析错误提示写错DOM节点两项失败，进程在第31项后以143退出，不能计为全套通过。4b48c14修复分析回调精确定位状态与按钮，原仓库分析浏览器断言不变重跑通过。新历史输入区域的截图基线已人工查看并更新，正常比较复测仍在进行。
-
-修复后Console分两批正常执行完成：Console.spec.ts 23/23，其余四文件9/9，合计32/32通过，未改断言/容限。审阅后的历史输入区视觉基线提交283a893。当前真实来源修订任务stage-08294ed8fd24c91739942eb07e10a368adb172e70fac9d545965324a8b61952c已启动，输入为已完成来源核验3ac5...；尚不能称修订或真实发布通过。
-
-真实来源修订08294...已完成：2张卡形成ACCEPTED修订版本kv_2071c0226e3c837454c048d4、kv_6a18e759801a9e3c5f74560b，增量索引成功；整体UNRESOLVED风险保留，非发布。累计4次调用/234129报告tokens。新代码重建stage-15b051f11b581d63e72c0dd8fdfc38ddfc860a2e193cec60942a3cce0d0060de已开始，用修订后7版本；行为门禁尚待运行。
-
-修订后jsmn重建15b051...完成，可信评测eb581...31/31通过（复用31并重新验证，0次模型调用），固定评测2ec104...参考与生成11/11通过，原固定预期未改。新整卡来源826fed...正在执行，明确摘要绑定政策首次用于修订后版本，尚无真实发布。
-
-新增混合风险独立修订选择（f822080）：source-correction-selection-v1冻结策略允许在整卡UNRESOLVED时消费同卡无未知风险的明确SOURCE_MISMATCH章节；原Review绑定校验与整卡风险保留。新策略独立任务与旧无policy任务分离；旧恢复不变。Domain/架构11项、模拟DOM面板1项、类型与Spec通过，真实旧报告只读审计从2张可选变为6张、4张风险不变。本次尚未完成原生修订集成及完整浏览器复测；一键混合风险自动推进仍未接，不能把此前480/32当本提交全回归。
-
-一键混合风险推进已接入504ac15（knowledge-pipeline-v16）：来源门禁仍失败但有绑定明确纠正可先修订；UNRESOLVED修订必须已ACCEPTED保存、索引成功、完整替换映射才继续重建。无明确纠正/缺索引/质量拒绝仍停止，关联发布仍要求完整来源通过。受控来源流程5项、Domain/面板9项、固定/发布准备等17项、含v15只读检查11项、架构8项及type/Spec通过（统计有重叠，不作为唯一总数）。原生Application混合风险和完整浏览器复测尚待完成，当前真实来源仍运行。
-
-真实工件补充审计：source correction08294...的两张卡各仅改动获准H2（配套接口与调用契约、公共接口与数据结构），其余H2及前言字节一致，恰好2个index检查点且均updated。可信eval19c898...与eb581...的31个输入/预期逐案一致，新知识绑定生成新testSet且revalidated=true，0新候选，31案实际结果等于预期。证据ScopeAudit.json、TrustedReuseAudit.json及可复验脚本保存在相应真实运行目录；均非最终发布证明。
-
-新增阻碍发现：真实来源826fed中的错误码卡片仍缺tokens=NULL错误路径直接用例，而NativeSuiteEvaluation有inherited时不再propose，当前不能补充新可信测试。来源缺证据的补充测试设计已写入Workbench Spec并明确待实现；必须保留旧可信输入/预期及独立候选拒绝，不能通过清除风险或绕过来源门禁完成验收。
-
-最新验证：混合风险原生WorkbenchEvaluation三场景3/3通过（32528ms），相关操作中心/一键重载浏览器2/2通过。真实source826fed...已完成UNRESOLVED：5卡明确矛盾、2卡未知，44calls/842651tokens/1054423ms；新source-correction-selection-v1修订c32f...已启动，尚无结果。当前仍需补充测试实现及最终全回归/双目标发布部署。
+</details>

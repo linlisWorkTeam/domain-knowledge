@@ -9,7 +9,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createComposition } from '../../src/interfaces/runner/Composition.ts';
-import { associateCards, type AssociationCard } from '../../src/domain/services/association/CardAssociations.ts';
+import { associateCards, type AssociationCard } from '../../src/domain/association/CardAssociations.ts';
 
 test('symbol relations require exact same-revision evidence and never claim replacement', () => {
   const card: AssociationCard = { cardId: 'a', versionId: 'va', bodyDigest: 'da', body: '## Calls\nUse parse with Result.',

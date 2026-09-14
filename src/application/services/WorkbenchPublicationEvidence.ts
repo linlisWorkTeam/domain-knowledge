@@ -3,23 +3,23 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：从持久化任务和卡片准备可审计发布证据，不授予已发布状态。
  */
-import { assertFixedPublicationObservations } from '../../domain/services/evaluation/NativeFixedEvaluation.ts';
-import { assertNativeBehaviorSuite, nativeFunctions, type NativeContract, type NativeBehaviorSuite } from '../../domain/services/evaluation/NativeBehaviorSuite.ts';
-import { canonicalJson } from '../../domain/services/workbench/StageTask.ts';
+import { assertFixedPublicationObservations } from '../../domain/evaluation/NativeFixedEvaluation.ts';
+import { assertNativeBehaviorSuite, nativeFunctions, type NativeContract, type NativeBehaviorSuite } from '../../domain/evaluation/NativeBehaviorSuite.ts';
+import { canonicalJson } from '../../domain/workbench/StageTask.ts';
 import { sha256, type ArtifactRef } from '../../domain/Domain.ts';
-import { assertTrustedPublicationObservations, type TrustedPublicationReport } from '../../domain/services/evaluation/NativeTrustedPublication.ts';
+import { assertTrustedPublicationObservations, type TrustedPublicationReport } from '../../domain/evaluation/NativeTrustedPublication.ts';
 import type { StageModelConfiguration } from '../ports/WorkbenchGenerationPorts.ts';
 import type { NativeLanguageToolchain } from '../ports/LanguageToolchainPorts.ts';
 import type { WorkbenchProjectStore } from '../ports/WorkbenchProjectPorts.ts';
-import { buildConstraints, moduleBuild, moduleFingerprintKey } from '../../domain/services/workbench/WorkbenchProject.ts';
+import { buildConstraints, moduleBuild, moduleFingerprintKey } from '../../domain/workbench/WorkbenchProject.ts';
 import type { NativeTestStore } from '../ports/NativeEvaluationPorts.ts';
-import type { FixedNativeObservation } from '../../domain/services/evaluation/NativeFixedEvaluation.ts';
-import { assertProjectPublication, type ProjectPublicationManifest } from '../../domain/services/workbench/ProjectPublication.ts';
+import type { FixedNativeObservation } from '../../domain/evaluation/NativeFixedEvaluation.ts';
+import { assertProjectPublication, type ProjectPublicationManifest } from '../../domain/workbench/ProjectPublication.ts';
 import { WorkbenchSourcePublication } from './WorkbenchSourcePublication.ts';
 import type { AgentContractValidator, ArtifactStore, FlywheelRepository } from '../ports/ApplicationPorts.ts';
-import type { StageTask } from '../../domain/services/workbench/StageTask.ts';
-import type { PipelineFixedSuite } from '../../domain/services/workbench/WorkbenchPipeline.ts';
-import { publicationEvidence } from '../../domain/services/workbench/WorkbenchPublication.ts';
+import type { StageTask } from '../../domain/workbench/StageTask.ts';
+import type { PipelineFixedSuite } from '../../domain/workbench/WorkbenchPipeline.ts';
+import { publicationEvidence } from '../../domain/workbench/WorkbenchPublication.ts';
 export interface PublicationTaskIds { reconstruction: string; evaluation: string; fixedEvaluation: string; sourceVerification: string }
 export class WorkbenchPublicationEvidence {
   readonly dependencies: {

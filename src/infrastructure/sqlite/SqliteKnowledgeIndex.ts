@@ -9,7 +9,7 @@ import { dirname, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { stringify } from 'yaml';
 import { sha256 } from '../../domain/Domain.ts';
-import type { CardIndexEntry, CardIndexHeader } from '../../domain/services/knowledge/KnowledgeIndex.ts';
+import type { CardIndexEntry, CardIndexHeader } from '../../domain/knowledge/KnowledgeIndex.ts';
 import type { KnowledgeIndexStore } from '../../application/ports/KnowledgeIndexPorts.ts';
 
 /** SQLite 只存索引与审计引用；磁盘 Markdown 可从内容寻址工件恢复。 */

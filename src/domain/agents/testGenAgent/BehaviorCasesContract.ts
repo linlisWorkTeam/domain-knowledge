@@ -1,0 +1,103 @@
+/**
+ * Copyright (c) 2026 linlisWorkTeam
+ * SPDX-License-Identifier: MIT
+ * 文件功能：定义测试生成角色的输入输出契约、输出 Schema 与材料校验。
+ */
+import type { ArtifactRef } from '../../Domain.ts';
+import type { RoleInput } from '../AgentExecution.ts';
+import { requireMaterials } from '../AgentExecution.ts';
+import { assertModuleBehaviorSuite, moduleBehaviorSuiteSchema, type ModuleBehaviorSuite } from './ModuleBehaviorSuite.ts';
+import { assertNativeBehaviorSuite, assertNativeContract, type NativeContract, type NativeBehaviorSuite } from '../../evaluation/NativeBehaviorSuite.ts';
+import { nativeBehaviorSuiteSchema } from '../../evaluation/NativeBehaviorSchema.ts';
+
+/** 角色业务载荷。 */
+export interface Payload {
+  executionContract: 'behavior-cases-v1';
+  /** 提供模块标识信息，供调用方读取或传入。 */
+  moduleId: string;
+  /** 提供源码快照引用信息，供调用方读取或传入。 */
+  sourceSnapshotRef: ArtifactRef;
+  /** 提供publicInterface引用列表信息，供调用方读取或传入。 */
+  publicInterfaceRefs: ArtifactRef[];
+  /** 提供语言标识信息，供调用方读取或传入。 */
+  languageId: string;
+  /** 提供测试策略引用信息，供调用方读取或传入。 */
+  testPolicyRef: ArtifactRef;
+}
+/** 角色输入。 */
+export type Input = RoleInput<Payload>;
+/** 角色输出。 */
+export interface Output {
+  /** 旧记录只保留为未评测候选，不执行模型提供的命令。 */
+  candidateCommands?: Record<string, unknown>[];
+  suite?: ModuleBehaviorSuite;
+  nativeSuite?: NativeBehaviorSuite;
+  oracleRequired: boolean;
+}
+/** 对外提供输出Schema，作为调用方使用的统一约定。 */
+export const outputSchema: Record<string, unknown> = {
+  type: 'object', required: ['oracleRequired'], additionalProperties: false,
+  oneOf: [{ required: ['suite'], properties: { suite: {} } },
+    { required: ['candidateCommands'], properties: { candidateCommands: {} } }],
+  properties: {
+    candidateCommands: { type: 'array', minItems: 1, items: { type: 'object' } },
+    suite: moduleBehaviorSuiteSchema,
+    oracleRequired: { type: 'boolean' },
+  },
+};
+
+/** 构造本次角色执行使用的输出 Schema。 */
+export function schemaFor(input: Input): Record<string, unknown> {
+  const native = nativeContract(input);
+  if (native) return { type: 'object', additionalProperties: false, required: ['oracleRequired', 'nativeSuite'],
+    properties: { oracleRequired: { const: true }, nativeSuite: nativeBehaviorSuiteSchema(native) } };
+  const policy = input.materials.find(({ ref }) => ref.artifactId === input.payload.testPolicyRef.artifactId)?.content;
+  if (policy && typeof policy === 'object' && 'moduleContract' in policy) {
+    const contract = policy.moduleContract;
+    if (!contract || typeof contract !== 'object' || !('modulePath' in contract) || !('exportName' in contract)
+      || typeof contract.modulePath !== 'string' || !input.sourcePaths.includes(contract.modulePath)
+      || typeof contract.exportName !== 'string') throw new Error('TEST_MODULE_CONTRACT_INVALID');
+    return { type: 'object', additionalProperties: false, required: ['suite', 'oracleRequired'],
+      properties: { suite: { ...moduleBehaviorSuiteSchema, properties: {
+        ...(moduleBehaviorSuiteSchema.properties as Record<string, unknown>),
+        modulePath: { const: contract.modulePath }, exportName: { const: contract.exportName },
+      } }, oracleRequired: { const: true } } };
+  }
+  throw new Error('TEST_BEHAVIOR_CONTRACT_REQUIRED');
+}
+
+/** 候选数据必须使用授权模块，且绝不能跳过参考实现验证。 */
+export function validateOutput(output: Output, input: Input): void {
+  if (output.candidateCommands) throw new Error('TEST_LEGACY_COMMANDS_READ_ONLY');
+  const native = nativeContract(input);
+  if (native) {
+    if (output.oracleRequired !== true || output.suite || output.candidateCommands) throw new Error('TEST_ORACLE_REQUIRED');
+    assertNativeBehaviorSuite(output.nativeSuite, native);
+    const policy = input.materials.find(({ ref }) => ref.artifactId === input.payload.testPolicyRef.artifactId)?.content;
+    if (policy && typeof policy === 'object' && 'knowledge' in policy && Array.isArray(policy.knowledge)) {
+      const sections = new Set(policy.knowledge.flatMap((card: { sections?: string[] }) => card.sections ?? []));
+      if (output.nativeSuite.cases.some((test) => test.sections.some((section) => !sections.has(section)))) throw new Error('TEST_SECTION_INVALID');
+    }
+    return;
+  }
+  if (output.nativeSuite) throw new Error('TEST_NATIVE_CONTRACT_REQUIRED');
+  if (output.suite) {
+    assertModuleBehaviorSuite(output.suite, input.sourcePaths);
+    if (output.oracleRequired !== true) throw new Error('TEST_ORACLE_REQUIRED');
+  }
+}
+
+/** 原生策略可绑定知识正文，参考源码仍留在独立oracle侧。 */
+export function nativeContract(input: Input): NativeContract | null {
+  const policy = input.materials.find(({ ref }) => ref.artifactId === input.payload.testPolicyRef.artifactId)?.content;
+  if (!policy || typeof policy !== 'object' || !('nativeContract' in policy)) return null;
+  const contract = policy.nativeContract as NativeContract; assertNativeContract(contract);
+  if (contract.language !== input.payload.languageId) throw new Error('TEST_NATIVE_CONTRACT_INVALID');
+  return contract;
+}
+
+/** 检查本角色必需字段及所引用材料是否完整。 */
+export function validateInput(input: Input): void {
+  if (input.payload.executionContract !== 'behavior-cases-v1' || Object.hasOwn(input.payload, 'allowedTestPaths')) throw new Error('TESTGEN_EXECUTION_CONTRACT_INVALID');
+  requireMaterials(input.payload, input.materials, ['moduleId', 'sourceSnapshotRef', 'publicInterfaceRefs', 'languageId', 'testPolicyRef']);
+}

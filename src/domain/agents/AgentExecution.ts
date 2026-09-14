@@ -7,7 +7,7 @@ import type { ArtifactRef } from '../Domain.ts';
 import type { AgentCommand, AgentId } from './AgentContracts.ts';
 
 // 执行语义改变时更新版本，阻止旧 checkpoint 在不同角色实现下继续运行。
-export const ROLE_EXECUTION_VERSION = 'seven-role-mvp-v5';
+export const ROLE_EXECUTION_VERSION = 'domain-agents-v11-workbench-evidence';
 /** 受信材料。 */
 export interface Material { ref: ArtifactRef; content: unknown }
 /** Application 已加载并校验的角色材料；不包含通用工作流状态或存储实现。 */
@@ -41,8 +41,11 @@ export interface ModelRequest {
   tools: readonly string[];
   /** 提供确定本角色允许读取的文件路径信息，供调用方读取或传入。 */
   readablePaths: string[];
+  /** Check 在角色内统一修正预算，Provider 每次只输出一次。 */
+  outputAttempts?: 1;
+  reportAttempt?: number;
 }
-/** 模型运行 Port：Adapter 负责格式重试；角色只对显式可修正的语义问题反馈，二者共享阶段信号和截止时间。 */
+/** Adapter 默认负责格式重试；Check 以 outputAttempts=1 接管报告预算。角色语义修复共享阶段信号与截止时间。 */
 export interface ModelExecutionPort {
   /** 执行当前角色或业务阶段并返回结构化结果。 */
   execute(request: ModelRequest, signal?: AbortSignal): Promise<Record<string, unknown>>;
@@ -124,4 +127,18 @@ export function materialsFor(payload: object, materials: Material[]): Material[]
   };
   visit(payload);
   return materials.filter(({ ref }) => ids.has(ref.artifactId));
+}
+
+/** 非法模型原始响应只用于角色内部修正及受限证据，不混入错误日志。 */
+export class ModelResponseError extends Error {
+  readonly rawOutput: string;
+  readonly parsedOutputs: readonly Record<string, unknown>[];
+  constructor(message: string, rawOutput: string, parsedOutputs: readonly Record<string, unknown>[] = []) {
+    super(message); this.rawOutput = rawOutput; this.parsedOutputs = parsedOutputs;
+  }
+}
+/** 失败也需保留报告尝试；持久化仍由 Application 完成。 */
+export class AgentReportFailure extends Error {
+  readonly artifacts: PendingArtifact[];
+  constructor(message: string, artifacts: PendingArtifact[]) { super(message); this.artifacts = artifacts; }
 }

@@ -7,7 +7,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { WorkbenchProjectStore } from '../../application/ports/WorkbenchProjectPorts.ts';
-import type { WorkbenchProjectSnapshot } from '../../domain/services/workbench/WorkbenchProject.ts';
+import type { WorkbenchProjectSnapshot } from '../../domain/workbench/WorkbenchProject.ts';
 export class SqliteWorkbenchProjects implements WorkbenchProjectStore {
   private readonly db: DatabaseSync;
   constructor(filename: string) {

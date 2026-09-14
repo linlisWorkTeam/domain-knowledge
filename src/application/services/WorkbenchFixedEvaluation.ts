@@ -3,12 +3,12 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：冻结固定测试并分别评测参考与重建实现，逐案保留恢复证据。
  */
-import { moduleBuild, moduleFingerprintKey } from '../../domain/services/workbench/WorkbenchProject.ts';
+import { moduleBuild, moduleFingerprintKey } from '../../domain/workbench/WorkbenchProject.ts';
 import { sha256, type ArtifactRef } from '../../domain/Domain.ts';
-import { canonicalJson, type JsonValue, type StageInput } from '../../domain/services/workbench/StageTask.ts';
-import { assertNativeBehaviorSuite, nativeFunctions, type NativeBehaviorSuite, type NativeContract } from '../../domain/services/evaluation/NativeBehaviorSuite.ts';
-import { FIXED_EVALUATION_CONTRACT, fixedModuleCoverage, fixedCardCoverage, fixedNativePassed } from '../../domain/services/evaluation/NativeFixedEvaluation.ts';
-import { compareNativeInterfaces } from '../../domain/services/evaluation/NativeInterfaceComparison.ts';
+import { canonicalJson, type JsonValue, type StageInput } from '../../domain/workbench/StageTask.ts';
+import { assertNativeBehaviorSuite, nativeFunctions, type NativeBehaviorSuite, type NativeContract } from '../../domain/evaluation/NativeBehaviorSuite.ts';
+import { FIXED_EVALUATION_CONTRACT, fixedModuleCoverage, fixedCardCoverage, fixedNativePassed } from '../../domain/evaluation/NativeFixedEvaluation.ts';
+import { compareNativeInterfaces } from '../../domain/evaluation/NativeInterfaceComparison.ts';
 import type { NativeLanguageToolchain, NativeToolchainInput, ToolchainFile } from '../ports/LanguageToolchainPorts.ts';
 import type { NativeCaseObservation } from '../ports/NativeEvaluationPorts.ts';
 import type { WorkbenchEvaluation } from './WorkbenchEvaluation.ts';

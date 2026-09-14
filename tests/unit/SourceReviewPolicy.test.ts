@@ -5,9 +5,9 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SOURCE_REVIEW_POLICY, readSourceReviewPolicy, sourceReviewTimeoutMs } from '../../src/domain/services/knowledge/SourceReviewPolicy.ts';
+import { SOURCE_REVIEW_POLICY, readSourceReviewPolicy, sourceReviewTimeoutMs } from '../../src/domain/knowledge/SourceReviewPolicy.ts';
 import { execute } from '../../src/domain/agents/reviewAgent/ReviewAgent.ts';
-import type { Input } from '../../src/domain/agents/reviewAgent/ReviewAgentContract.ts';
+import type { Input } from '../../src/domain/agents/reviewAgent/WorkbenchReviewContract.ts';
 import type { StageAttempt } from '../../src/domain/agents/AgentExecution.ts';
 import { sha256 } from '../../src/domain/Domain.ts';
 import { roleExample } from '../helpers/RoleExample.ts';
@@ -21,7 +21,7 @@ test('source review policy has a fixed upper bound and cannot extend other revie
 });
 test('Review records the frozen deadline, preserves the legacy deadline and still honours cancellation', async () => {
   for (const extended of [false, true]) {
-    const sample = roleExample<Input>('review');
+    const sample = roleExample<Input>('review', 'src/domain/agents/reviewAgent/examples/WorkbenchReviewSample.json');
     const material = sample.input.materials.find(item => item.ref.artifactId === sample.input.payload.criteriaRef.artifactId)!;
     material.content = { ...(material.content as object), phase: 'FINAL_SOURCE_REVIEW', ...(extended ? { sourceReviewPolicy: SOURCE_REVIEW_POLICY } : {}) };
     const bytes = JSON.stringify(material.content); const digest = sha256(bytes);

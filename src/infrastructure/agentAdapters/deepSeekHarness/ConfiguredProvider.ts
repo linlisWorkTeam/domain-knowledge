@@ -104,7 +104,7 @@ export class ConfiguredDshProvider implements AgentProvider {
           method: 'POST', body: Buffer.concat(chunks), dispatcher, redirect: 'manual', signal: abort.signal,
           // 使用本次原生会话的稳定标识，工具往返保持一致，重试和其他角色各自隔离。
           headers: { 'content-type': 'application/json', 'user-agent': 'domain-knowledge/0.2.0',
-            'x-opencode-session': sessionId, ...(settings.apiKey ? { authorization: `Bearer ${settings.apiKey}` } : {}) },
+            ...(endpoint.url.hostname === 'opencode.ai' ? { 'x-opencode-session': sessionId } : {}), ...(settings.apiKey ? { authorization: `Bearer ${settings.apiKey}` } : {}) },
         });
         streamDiagnostics.headers();
         if (response.status >= 300 && response.status < 400) {

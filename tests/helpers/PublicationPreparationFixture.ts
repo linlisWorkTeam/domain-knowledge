@@ -3,18 +3,18 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：验证发布准备重读卡片并拒绝缺失或被篡改的递归工件。
  */
-import { SOURCE_EXECUTION_SCOPE, sourceExecutionScope } from '../../src/domain/services/knowledge/SourceExecutionScope.ts';
-import { sourceEvidenceBindings } from '../../src/domain/services/knowledge/SourceEvidenceBindings.ts';
+import { SOURCE_EXECUTION_SCOPE, sourceExecutionScope } from '../../src/domain/knowledge/SourceExecutionScope.ts';
+import { sourceEvidenceBindings } from '../../src/domain/knowledge/SourceEvidenceBindings.ts';
 import assert from 'node:assert/strict';
 import { sha256, type ArtifactRef, type KnowledgeVersion } from '../../src/domain/Domain.ts';
 import { WorkbenchPublicationEvidence } from '../../src/application/services/WorkbenchPublicationEvidence.ts';
 import { JsonSchemaAgentContractValidator } from '../../src/infrastructure/agentAdapters/contracts/JsonSchemaAgentContractValidator.ts';
-import { publicationFixture, publicationBody, publicationConfiguration, publicationApi } from '../helpers/WorkbenchPublicationFixture.ts';
-import { buildConstraints, createProjectSnapshot, type WorkbenchProjectSnapshot } from '../../src/domain/services/workbench/WorkbenchProject.ts';
-import { sourceSectionObservations } from '../../src/domain/services/knowledge/KnowledgeSourceVerification.ts';
-import type { NativeBehaviorSuite } from '../../src/domain/services/evaluation/NativeBehaviorSuite.ts';
-import { nativeTestKeys, type NativeTestSet } from '../../src/domain/services/evaluation/NativeTestCache.ts';
-import { canonicalJson, createStageTask } from '../../src/domain/services/workbench/StageTask.ts';
+import { publicationFixture, publicationBody, publicationConfiguration, publicationApi } from './WorkbenchPublicationFixture.ts';
+import { buildConstraints, createProjectSnapshot, type WorkbenchProjectSnapshot } from '../../src/domain/workbench/WorkbenchProject.ts';
+import { sourceSectionObservations } from '../../src/domain/knowledge/KnowledgeSourceVerification.ts';
+import type { NativeBehaviorSuite } from '../../src/domain/evaluation/NativeBehaviorSuite.ts';
+import { nativeTestKeys, type NativeTestSet } from '../../src/domain/evaluation/NativeTestCache.ts';
+import { canonicalJson, createStageTask } from '../../src/domain/workbench/StageTask.ts';
 export async function createPublicationPreparationFixture(options: { sourceEvidencePolicy?: string; executionScope?: boolean } = {}) {
   const seed = publicationFixture(); const contents = new Map<string, Buffer>(); let puts = 0;
   const put = async (data: Uint8Array, mediaType: string): Promise<ArtifactRef> => {

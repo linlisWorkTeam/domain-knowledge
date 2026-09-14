@@ -44,7 +44,7 @@
     "corrections": [
       {
         "correctionId": "COR-0001",
-        "knowledgePath": "knowledge/markdown-diff.md#Behavior",
+        "knowledgePath": "knowledge/markdown-diff.md",
         "criterion": "Document CRLF normalization with an example",
         "evidenceRefs": [
           {
@@ -53,7 +53,8 @@
         ],
         "risk": "False change reports for equivalent newlines"
       }
-    ]
+    ],
+    "workerCount": 0
   },
   "materials": {
     "source": {
@@ -87,48 +88,12 @@
     }
   },
   "modelOutput": {
+    "body": "# Markdown diff\n\n## Purpose\nCompare two Markdown documents and report changed sections with line ranges.\n\n## Behavior\nIdentical inputs return empty hunks. CRLF is normalized before comparison. Insertions and deletions preserve the old and new line coordinates. The implementation uses bounded processing for large inputs.\n",
     "title": "Markdown diff",
     "description": "Document comparison semantics",
-    "sections": [
-      {
-        "sectionId": "section-2",
-        "body": "Identical inputs return empty hunks. CRLF is normalized before comparison; for example, \"a\\r\\nb\" and \"a\\nb\" produce no changed sections. Insertions and deletions preserve the old and new line coordinates. The implementation uses bounded processing for large inputs.\n"
-      }
+    "keywords": [
+      "Markdown",
+      "diff"
     ]
-  },
-  "modelStages": {
-    "outline": {
-      "title": "Markdown diff",
-      "description": "Document comparison semantics",
-      "sections": [
-        {
-          "heading": "Purpose",
-          "purpose": "State the exported function purpose"
-        },
-        {
-          "heading": "Behavior",
-          "purpose": "Explain comparison and normalization behavior"
-        }
-      ]
-    },
-    "body": {
-      "title": "Markdown diff",
-      "description": "Document comparison semantics",
-      "sections": [
-        {
-          "sectionId": "section-1",
-          "body": "Compare two Markdown documents and report changed sections with line ranges.\n\n"
-        },
-        {
-          "sectionId": "section-2",
-          "body": "Identical inputs return empty hunks. CRLF is normalized before comparison; for example, \"a\\r\\nb\" and \"a\\nb\" produce no changed sections. Insertions and deletions preserve the old and new line coordinates. The implementation uses bounded processing for large inputs.\n"
-        }
-      ]
-    }
-  },
-  "expectedOutput": {
-    "body": "# Markdown diff\n\n## Purpose\nCompare two Markdown documents and report changed sections with line ranges.\n\n## Behavior\nIdentical inputs return empty hunks. CRLF is normalized before comparison; for example, \"a\\r\\nb\" and \"a\\nb\" produce no changed sections. Insertions and deletions preserve the old and new line coordinates. The implementation uses bounded processing for large inputs.\n",
-    "title": "Markdown diff",
-    "description": "Document comparison semantics"
   }
 }

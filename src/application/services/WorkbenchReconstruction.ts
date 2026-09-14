@@ -3,14 +3,14 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：从固定卡片与公开接口启动隔离重建，保存代码和接口比较证据。
  */
-import { moduleBuild, moduleFingerprintKey } from '../../domain/services/workbench/WorkbenchProject.ts';
+import { moduleBuild, moduleFingerprintKey } from '../../domain/workbench/WorkbenchProject.ts';
 import type { AgentCommand, AgentResult } from '../../domain/agents/AgentContracts.ts';
 import { sha256, type ArtifactRef, type KnowledgeVersion } from '../../domain/Domain.ts';
-import { canonicalJson, type JsonValue } from '../../domain/services/workbench/StageTask.ts';
-import { compareNativeSources, SOURCE_COMPARISON_CONTRACT } from '../../domain/services/evaluation/NativeSourceComparison.ts';
-import { nativeCodeReuseKey } from '../../domain/services/evaluation/NativeCodeReuse.ts';
-import { canRepairNativeCode } from '../../domain/services/evaluation/NativeCodeRepair.ts';
-import { compareNativeInterfaces } from '../../domain/services/evaluation/NativeInterfaceComparison.ts';
+import { canonicalJson, type JsonValue } from '../../domain/workbench/StageTask.ts';
+import { compareNativeSources, SOURCE_COMPARISON_CONTRACT } from '../../domain/evaluation/NativeSourceComparison.ts';
+import { nativeCodeReuseKey } from '../../domain/evaluation/NativeCodeReuse.ts';
+import { canRepairNativeCode } from '../../domain/evaluation/NativeCodeRepair.ts';
+import { compareNativeInterfaces } from '../../domain/evaluation/NativeInterfaceComparison.ts';
 import type { ArtifactStore, FlywheelRepository } from '../ports/ApplicationPorts.ts';
 import type { WorkbenchProjectStore } from '../ports/WorkbenchProjectPorts.ts';
 import type { NativeLanguageToolchain, ToolchainFile } from '../ports/LanguageToolchainPorts.ts';
@@ -62,7 +62,7 @@ export class WorkbenchReconstruction {
   async start(snapshotId: string, versionIds: string[], options: { retryEvaluationTaskId?: string } = {}) {
     return this.dependencies.stages.start(await this.prepare(snapshotId, versionIds, options));
   }
-  async prepare(snapshotId: string, versionIds: string[], options: { configurationDigest?: string; signal?: AbortSignal; retryEvaluationTaskId?: string } = {}): Promise<import('../../domain/services/workbench/StageTask.ts').StageInput> {
+  async prepare(snapshotId: string, versionIds: string[], options: { configurationDigest?: string; signal?: AbortSignal; retryEvaluationTaskId?: string } = {}): Promise<import('../../domain/workbench/StageTask.ts').StageInput> {
     const { project, versions } = this.selection(snapshotId, versionIds);
     const { artifacts, configuration, snapshot, stages } = this.dependencies;
     const frozen = await configuration.captureStage();
@@ -152,7 +152,7 @@ export class WorkbenchReconstruction {
       const buildContract = { schemaVersion: 'native-build-v1', language, build: moduleBuild(project, module.moduleId), includePath: api.sourcePath,
         allowedGeneratedPaths: module.sourcePaths, scope: api.astFilter, behaviorVerified: false, previousGeneratedAttempt };
       const buildContractRef = await artifacts.put(Buffer.from(JSON.stringify(buildContract)), 'application/json');
-      const payload = { knowledgeRef, publicInterfaceRefs: interfaceRefs, languageId: language, buildContractRef, allowedGeneratedPaths: module.sourcePaths };
+      const payload = { executionContract: 'workbench-code-v1', knowledgeRef, publicInterfaceRefs: interfaceRefs, languageId: language, buildContractRef, allowedGeneratedPaths: module.sourcePaths };
       context.progress({ phase: 'reconstruction', module: module.moduleId, versions: cards.map((card) => card.versionId) });
       const cachedModule = !revision && reusable ? (reusable.result!.summary.modules as unknown as Array<{ moduleId: string; codeRef: ArtifactRef; roleResultRef: ArtifactRef }>).find((item) => item.moduleId === module.moduleId) : undefined;
       let generated: { output: Record<string, unknown>; resultRef: ArtifactRef; rawRef: ArtifactRef };

@@ -540,7 +540,7 @@ function referenceRunRow(run, selected = false) {
 }
 
 function renderRunWorkspace(snapshot) {
-  const { run, events = [], checkpoints = [], workflowNodes = [], evaluations = [], versions = [], latestDecision, progress } = snapshot
+  const { run, events = [], checkpoints = [], workflowNodes = [], evaluations = [], versions = [], latestDecision, progress, workflowStatus } = snapshot
   const automationNodes = workflowNodes.length ? workflowNodes : checkpoints
   const primaryStates = ['CREATED', 'PLANNED', 'GENERATING', 'EVALUATING', 'REVIEWING', 'PUBLISHING', 'VERIFIED']
   const currentIndex = primaryStates.indexOf(run.state)
@@ -558,6 +558,7 @@ function renderRunWorkspace(snapshot) {
         <div class="run-title-actions">${runStatusBadge(run)}<a class="secondary-button" href="/api/v1/runs/${encodeURIComponent(run.runId)}/report" download>导出报告</a><button class="secondary-button" data-refresh-run="${escapeHtml(run.runId)}">刷新</button>${run.canCancel === true && isRunActive(run) ? `<button class="secondary-button" data-cancel-run="${escapeHtml(run.runId)}" type="button" ${state.operatorMode ? '' : 'disabled'}>取消批次</button>` : ''}${run.recovery?.canResume ? `<button class="primary-button" data-resume-run="${escapeHtml(run.runId)}" type="button" ${state.operatorMode ? '' : 'disabled'}>恢复批次</button>` : ''}</div>
       </div>
       <ol class="run-stepper">${steps}</ol>
+      <div class="state-callout"><b>工作流执行：${escapeHtml(displayLabel(workflowStatus?.executionStatus ?? 'UNKNOWN'))}</b><span>${escapeHtml(workflowStatus?.currentNode ? `阶段 ${NODE_LABELS[workflowStatus.currentNode] ?? workflowStatus.currentNode}` : '执行状态暂不可读')}${workflowStatus?.error ? ` · ${escapeHtml(workflowStatus.error)}` : ''}</span></div>
       ${progress?.mode === 'DETERMINATE' ? `<div class="state-callout"><b>已完成步骤：${escapeHtml(progress.completedUnits)} / ${escapeHtml(progress.totalUnits)}</b><span>${isRunActive(run) ? `当前阶段 ${escapeHtml(displayLabel(progress.currentStage))}` : escapeHtml(runStatusLabel(run))} · 暂不提供预计完成时间</span><progress class="progress" value="${escapeHtml(progress.completedUnits)}" max="${escapeHtml(progress.totalUnits)}"></progress></div>` : '<div class="state-callout"><b>进度暂不可确定</b><span>暂时无法计算总步骤，完成比例和剩余时间未知。</span></div>'}
       ${['FAILED', 'UNAVAILABLE', 'NOT_TRACKED'].includes(run.executionStatus) && !TERMINAL.has(run.state) ? `<div class="state-callout ${run.executionStatus === 'FAILED' ? 'failed' : ''}" data-execution-state><b>${escapeHtml(runStatusLabel(run))}</b><span>业务阶段保留：${escapeHtml(displayLabel(run.state))} · 当前没有活动执行</span><span>${escapeHtml(recoveryLabel(run))}</span>${run.executionFailure ? `<span>失败节点：${escapeHtml(NODE_LABELS[run.executionFailure.nodeId] ?? run.executionFailure.nodeId ?? '未记录')} · <code>${escapeHtml(run.executionFailure.code)}</code></span>` : ''}</div>` : ''}
       ${['ITERATING', 'ROLLING_BACK', 'LOW_CONFIDENCE', 'FAILED', 'CANCELLED'].includes(run.state) ? `<div class="state-callout ${run.state.toLowerCase().replaceAll('_', '-')}"><b>当前状态：${escapeHtml(displayLabel(run.state))}</b><span>第 ${escapeHtml(run.iteration + 1)} 轮 · 详情以事件与门禁证据为准</span></div>` : ''}
@@ -567,7 +568,7 @@ function renderRunWorkspace(snapshot) {
         <div class="section-heading"><div><p class="eyebrow">工作流执行记录</p><h2>自动化节点</h2><p>查看每个步骤的执行情况；批次结果见门禁判定。</p></div><span class="counter">${automationNodes.length}</span></div>
         <div class="node-list">${automationNodes.length ? automationNodes.map((node) => `
           <article class="node-card">
-            <div><span class="node-icon">${['COMMITTED', 'COMPLETED'].includes(node.status) ? '✓' : node.status === 'FAILED' ? '!' : '●'}</span><div><b>${escapeHtml(NODE_LABELS[node.nodeId] ?? node.nodeId)}</b><small>${escapeHtml(node.agentId ? `${AGENT_LABELS[node.agentId] ?? node.agentId} · ${node.detail || '等待详情'}` : node.generationKey || node.detail || '确定性节点')}</small></div></div>
+            <div><span class="node-icon">${['COMMITTED', 'COMPLETED'].includes(node.status) ? '✓' : node.status === 'FAILED' ? '!' : '●'}</span><div><b>${escapeHtml(NODE_LABELS[node.nodeId] ?? node.nodeId)}</b><small>${escapeHtml(node.agentId ? `${AGENT_LABELS[node.agentId] ?? node.agentId} · ${node.error || node.detail || '等待详情'}` : node.generationKey || node.detail || '确定性节点')}</small></div></div>
             <div>${badge(node.status, node.status === 'RUNNING' && !isRunActive(run) ? '历史节点状态：运行中' : displayLabel(node.status))}<small>第 ${escapeHtml((node.iteration ?? run.iteration) + 1)} 轮 · 第 ${escapeHtml(node.attempt ?? ((node.retryCount ?? 0) + 1))} 次尝试</small></div>
           </article>`).join('') : emptyState('暂无节点记录', '这个批次可能由命令行创建，或者尚未执行 Agent 节点。')}</div>
       </section>
@@ -1265,11 +1266,12 @@ async function openRun(runId) {
   state.page = 'runs'
   content.innerHTML = '<div class="loading-state"><span class="spinner"></span>正在读取批次快照…</div>'
   const encoded = encodeURIComponent(runId)
-  const [snapshot, progress] = await Promise.all([
+  const [snapshot, progress, workflowStatus] = await Promise.all([
     request(`/api/v1/runs/${encoded}`),
     request(`/api/v1/runs/${encoded}/progress`),
+    request(`/api/v1/runs/${encoded}/workflow-status`).catch(() => ({ executionStatus: 'UNKNOWN' })),
   ])
-  state.selectedRun = { ...snapshot, progress }
+  state.selectedRun = { ...snapshot, progress, workflowStatus }
   renderRunWorkspace(state.selectedRun)
 }
 

@@ -5,7 +5,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { compareNativeSources } from '../../src/domain/services/evaluation/NativeSourceComparison.ts';
+import { compareNativeSources } from '../../src/domain/evaluation/NativeSourceComparison.ts';
 const api = [{ kind: 'FunctionDecl', name: 'add', parameters: [{ name: 'a', type: 'int' }, { name: 'b', type: 'int' }] }];
 const compared = (report: ReturnType<typeof compareNativeSources>) => { const value = report.functions[0]; assert.equal(value?.status, 'COMPARED'); return value; };
 const file = (content: string) => [{ path: 'api.c', content }];

@@ -3,9 +3,9 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：声明语言工具链的独立材料、构建及原始执行报告边界。
  */
-import type { BuildConstraints } from '../../domain/services/workbench/WorkbenchProject.ts';
-import type { NativeDeclaration } from '../../domain/services/sourceScan/PublicInterface.ts';
-export type { NativeDeclaration } from '../../domain/services/sourceScan/PublicInterface.ts';
+import type { BuildConstraints } from '../../domain/workbench/WorkbenchProject.ts';
+import type { NativeDeclaration } from '../../domain/sourceScan/PublicInterface.ts';
+export type { NativeDeclaration } from '../../domain/sourceScan/PublicInterface.ts';
 export interface ToolchainFile { path: string; content: string }
 export interface ToolchainCommandReport {
   exitCode: number | null; timedOut: boolean; outputLimitExceeded: boolean;
@@ -30,8 +30,8 @@ export interface TypeScriptModuleInput {
 }
 export interface NativeCaseInput {
   language: 'c' | 'cpp'; input: NativeToolchainInput;
-  contract: import('../../domain/services/evaluation/NativeBehaviorSuite.ts').NativeContract;
-  test: import('../../domain/services/evaluation/NativeBehaviorSuite.ts').NativeBehaviorCase;
+  contract: import('../../domain/evaluation/NativeBehaviorSuite.ts').NativeContract;
+  test: import('../../domain/evaluation/NativeBehaviorSuite.ts').NativeBehaviorCase;
 }
 export interface TypeScriptCaseInput { language: 'typescript'; input: TypeScriptModuleInput }
 export interface LanguageCaseReport<L extends string, T> {

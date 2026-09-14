@@ -26,11 +26,11 @@ SPDX-License-Identifier: MIT
 
 ## 验证
 
-<!-- 保留实际执行项；未运行的命令写明原因。 -->
+<!-- 按影响范围填写实际检查及结果，不默认全量回归；未验证的相关风险写明原因。若新增永久检查/扩大 CI，按 AGENTS.md 给出 invariant、failure mode、scope、cost、普通测试不足的原因、重构兼容性及明确人工批准。 -->
 
 - [ ] `npm run typecheck`
-- [ ] `npm run validate:specs`
-- [ ] `npm test`
+- [ ] `npm run spec:lint`（静态文档）
+- [ ] 受影响的 unit / contract / integration / UI 检查：
 - [ ] 其他：
 
 ## 文档与限制

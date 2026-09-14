@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：定义阶段任务事务、审计、执行租约与恢复检查点端口。
  */
-import type { JsonValue, StageCheckpoint, StageEvent, StageResult, StageTask, StageUsage } from '../../domain/services/workbench/StageTask.ts';
+import type { JsonValue, StageCheckpoint, StageEvent, StageResult, StageTask, StageUsage } from '../../domain/workbench/StageTask.ts';
 
 /** 同一个持久化任务库只允许一项 RUNNING；leaseId 防止旧执行者写回。 */
 export interface StageTaskStore {

@@ -11,9 +11,9 @@ import { join } from 'node:path';
 import { NativeSuiteEvaluation } from '../../src/application/services/NativeSuiteEvaluation.ts';
 import { LocalCasArtifactStore } from '../../src/infrastructure/sqlite/SqliteCas.ts';
 import { SqliteNativeTests } from '../../src/infrastructure/sqlite/SqliteNativeTests.ts';
-import { buildConstraints } from '../../src/domain/services/workbench/WorkbenchProject.ts';
-import { nativeSupplementTargets } from '../../src/domain/services/evaluation/NativeSupplementTargets.ts';
-import type { NativeBehaviorSuite, NativeContract } from '../../src/domain/services/evaluation/NativeBehaviorSuite.ts';
+import { buildConstraints } from '../../src/domain/workbench/WorkbenchProject.ts';
+import { nativeSupplementTargets } from '../../src/domain/evaluation/NativeSupplementTargets.ts';
+import type { NativeBehaviorSuite, NativeContract } from '../../src/domain/evaluation/NativeBehaviorSuite.ts';
 const suite = (n: number, expected = n + 1): NativeBehaviorSuite => ({ schemaVersion: 'native-cases-v1', cases: [{ caseId: `sum${n}`, description: 'addition', sections: ['card#Behavior'], variables: [],
   calls: [{ function: 'add', arguments: [{ integer: String(n) }, { integer: '1' }], result: 'out' }], observations: [{ name: 'out', kind: 'integer', read: { variable: 'out' } }], expected: { out: String(expected) } }] });
 const contract: NativeContract = { schemaVersion: 'native-contract-v1', language: 'c', includePath: 'api.h', entryPaths: ['api.c'], targetFunctions: ['add'],

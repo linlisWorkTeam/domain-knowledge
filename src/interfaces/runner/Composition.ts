@@ -3,12 +3,12 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：提供Composition的外部入口、参数转换与响应处理。
  */
-import { moduleBuild } from '../../domain/services/workbench/WorkbenchProject.ts';
+import { moduleBuild } from '../../domain/workbench/WorkbenchProject.ts';
 import { WorkbenchPublicationEvidence } from '../../application/services/WorkbenchPublicationEvidence.ts';
 import { WorkbenchPublications } from '../../application/services/WorkbenchPublications.ts';
 import { SqliteWorkbenchPublications } from '../../infrastructure/sqlite/SqliteWorkbenchPublications.ts';
 import { LocalWorkbenchPublicationFiles } from '../../infrastructure/publication/LocalWorkbenchPublicationFiles.ts';
-import { SOURCE_COMPARISON_CONTRACT } from '../../domain/services/evaluation/NativeSourceComparison.ts';
+import { SOURCE_COMPARISON_CONTRACT } from '../../domain/evaluation/NativeSourceComparison.ts';
 import { WorkbenchMaterials } from '../../application/services/WorkbenchMaterials.ts';
 import { SqliteExternalMaterials } from '../../infrastructure/sqlite/SqliteExternalMaterials.ts';
 import { MaterialText } from '../../infrastructure/source/MaterialText.ts';
@@ -24,13 +24,13 @@ import { WorkbenchGeneration } from '../../application/services/WorkbenchGenerat
 import { NativeToolchain } from '../../infrastructure/evaluation/project/NativeToolchain.ts';
 import { WorkbenchAssociations } from '../../application/services/WorkbenchAssociations.ts';
 import { WorkbenchSourceRevision } from '../../application/services/WorkbenchSourceRevision.ts';
-import { SOURCE_REVISION_CONTRACT } from '../../domain/services/knowledge/SourceRevision.ts';
+import { SOURCE_REVISION_CONTRACT } from '../../domain/knowledge/SourceRevision.ts';
 import { WorkbenchSourceVerification } from '../../application/services/WorkbenchSourceVerification.ts';
-import { SOURCE_VERIFICATION_CONTRACT } from '../../domain/services/knowledge/KnowledgeSourceVerification.ts';
+import { SOURCE_VERIFICATION_CONTRACT } from '../../domain/knowledge/KnowledgeSourceVerification.ts';
 import { WorkbenchKnowledgeRevision } from '../../application/services/WorkbenchKnowledgeRevision.ts';
-import { KNOWLEDGE_REVISION_CONTRACT } from '../../domain/services/knowledge/KnowledgeRevision.ts';
+import { KNOWLEDGE_REVISION_CONTRACT } from '../../domain/knowledge/KnowledgeRevision.ts';
 import { WorkbenchFixedEvaluation } from '../../application/services/WorkbenchFixedEvaluation.ts';
-import { FIXED_EVALUATION_CONTRACT } from '../../domain/services/evaluation/NativeFixedEvaluation.ts';
+import { FIXED_EVALUATION_CONTRACT } from '../../domain/evaluation/NativeFixedEvaluation.ts';
 import { WorkbenchEvaluation } from '../../application/services/WorkbenchEvaluation.ts';
 import { WorkbenchReconstruction } from '../../application/services/WorkbenchReconstruction.ts';
 import { WorkbenchRoleExecution } from '../../application/services/WorkbenchRoleExecution.ts';
@@ -45,7 +45,7 @@ import { AgentExampleService } from '../../application/services/AgentExample.ts'
 import { PublicationOperations } from '../../application/services/PublicationOperations.ts';
 import { LocalMarkdownPublisher } from '../../infrastructure/publication/LocalMarkdownPublisher.ts';
 import { createMarkdownLiteScenario } from '../../infrastructure/evaluation/markdownLite/MarkdownLiteScenario.ts';
-import { NODE_BY_AGENT } from '../../domain/services/workflow/AgentDefinitions.ts';
+import { NODE_BY_AGENT } from '../../domain/workflow/AgentDefinitions.ts';
 import { assertModelOutput, modelExecutionFactory } from '../../infrastructure/agentAdapters/ModelExecution.ts';
 import { appendFile, mkdir } from 'node:fs/promises';
 import { readFileSync } from 'node:fs';
@@ -79,18 +79,19 @@ import {
   LocalCasArtifactStore, SQLiteFlywheelRepository,
 } from '../../infrastructure/sqlite/SqliteCas.ts';
 import { SQLiteContentGovernance } from '../../infrastructure/sqlite/SqliteContentGovernance.ts';
-import { SourceScanner } from '../../domain/services/sourceScan/SourceScan.ts';
-import { LocalAgentWorkspace } from '../../domain/services/workspace/LocalAgentWorkspace.ts';
+import { SourceScanner } from '../../domain/sourceScan/SourceScan.ts';
+import { LocalAgentWorkspace } from '../../domain/workspace/LocalAgentWorkspace.ts';
 import {
   EncryptedFileProviderSettingsStore, OpenAiCompatibleProviderProbe,
   PublicHttpsEndpointPolicy,
 } from '../../infrastructure/agentAdapters/provider/ProviderSettings.ts';
 import { ConfiguredDshProvider, DSH_DEFAULT_CONTEXT_WINDOW, DSH_DEFAULT_MAX_SCHEMA_ATTEMPTS, DSH_DEFAULT_MAX_TOKENS } from '../../infrastructure/agentAdapters/deepSeekHarness/ConfiguredProvider.ts';
+import { ConcurrentTasks } from '../../infrastructure/agentAdapters/ConcurrentTasks.ts';
 import { FixtureProjectWorkflowStages } from '../../infrastructure/agentAdapters/scenario/ProjectWorkflowFixture.ts';
 import { writeOpenCodeGoPatch } from '../../infrastructure/agentAdapters/deepSeekHarness/OpencodeGo.ts';
 import { JsonSchemaAgentContractValidator } from '../../infrastructure/agentAdapters/contracts/JsonSchemaAgentContractValidator.ts';
 import { SQLiteOperationalMetrics } from '../../infrastructure/observability/SqliteOperationalMetrics.ts';
-import { migrateLegacyOkf } from '../../domain/services/migration/LegacyOkf.ts';
+import { migrateLegacyOkf } from '../../domain/migration/LegacyOkf.ts';
 import { ConsoleReadModel } from './ConsoleReadModel.ts';
 import { buildDemoReport } from './DemoReport.ts';
 
@@ -159,6 +160,7 @@ export function createComposition(input: {
   fixtureAssetRoot?: string;
   agentProviderMode?: 'fixture' | 'deepseek-harness' | 'company-codeagent-cli';
   runtimeDir?: string;
+  evaluationArtifactsDirectory?: string;
   clock?: () => string;
   providerSettingsStore?: ProviderSettingsStore;
   providerEndpointPolicy?: ProviderEndpointPolicy;
@@ -374,6 +376,7 @@ export function createComposition(input: {
           allowedWorkspaceRoots: [...codeAgentAllowedRoots, agentWorkspaceRoot],
         };
   providerOperations.executionParameters.runtimeSha256 = sha256(JSON.stringify({
+    configuredTransportVersion: 'session-routing-v1',
     profile: 'sdk-minimal', processIsolation, bubblewrapCommand, timeoutMs, maxOutputBytes,
     allowedWorkspaceRoots: [...allowedRoots, agentWorkspaceRoot],
     toolPolicy: sha256(readFileSync(new URL('../../infrastructure/agentAdapters/deepSeekHarness/RoleTools.mjs', import.meta.url))),
@@ -528,10 +531,11 @@ export function createComposition(input: {
               })
             : undefined;
       const stageOptions: ConstructorParameters<typeof ProjectWorkflowStages>[0] = {
+        workerRuntime: { prompts: runConfiguration, observer: workflowObserver, tasks: new ConcurrentTasks() },
         nodeByAgent: NODE_BY_AGENT,
         flywheel: flywheelApp,
         evalRunner: evalRunnerApp,
-        evaluator: new TrustedProjectEvaluator(artifacts),
+        evaluator: new TrustedProjectEvaluator(artifacts, input.evaluationArtifactsDirectory),
         contracts: new JsonSchemaAgentContractValidator(schemaRoot),
         localPublication: publicationOperations,
         ...(agent ? { agent } : {}),
@@ -561,7 +565,8 @@ export function createComposition(input: {
       return executor;
   };
   const agentExample = new AgentExampleService({
-    flywheel: flywheelApp, runConfiguration, evaluator: new TrustedProjectEvaluator(artifacts),
+    tasks: new ConcurrentTasks(),
+    flywheel: flywheelApp, runConfiguration, evaluator: new TrustedProjectEvaluator(artifacts, input.evaluationArtifactsDirectory),
     contracts: new JsonSchemaAgentContractValidator(schemaRoot), observer: workflowObserver,
     nodeByAgent: NODE_BY_AGENT,
     configurePrompt: (role, addon) => { agents.updatePromptAddon(role, addon); },

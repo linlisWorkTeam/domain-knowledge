@@ -14,7 +14,7 @@ import { createComposition } from '../../src/interfaces/runner/Composition.ts';
 import { sha256 } from '../../src/domain/Domain.ts';
 import { assertModelOutput } from '../../src/infrastructure/agentAdapters/ModelExecution.ts';
 import { NativeToolchain } from '../../src/infrastructure/evaluation/project/NativeToolchain.ts';
-import { canRepairNativeCode } from '../../src/domain/services/evaluation/NativeCodeRepair.ts';
+import { canRepairNativeCode } from '../../src/domain/evaluation/NativeCodeRepair.ts';
 
 test('resource failures cannot authorize new generated code', () => {
   const diagnostic = { exitCode: 1, timedOut: false, outputLimitExceeded: false, stderr: 'unknown type name' };

@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：提供项目工作流夹具的基础设施实现与外部系统接入。
  */
+import { taskMaterials } from '../../../domain/agents/orchestratorAgent/OrchestratorAgentContract.ts';
 import { readFileSync, realpathSync } from 'node:fs';
 import { isAbsolute, relative, resolve } from 'node:path';
 import type { ProjectEvaluation, WorkflowStageInput } from '../../../application/ports/ApplicationPorts.ts';
@@ -11,9 +12,8 @@ import { assertModelOutput } from '../ModelExecution.ts';
 import type { ArtifactRef } from '../../../domain/Domain.ts';
 import type { AgentCommand } from '../../../domain/agents/AgentContracts.ts';
 import type { ModelRequest } from '../../../domain/agents/AgentExecution.ts';
-import { taskDependencies } from '../../../domain/agents/orchestratorAgent/OrchestratorAgentContract.ts';
 import { markdownSections } from '../../../domain/agents/docGenAgent/DocGenRevision.ts';
-import { sourceTexts, type Input as WorkerInput } from '../../../domain/agents/docWorkerAgent/DocWorkerAgentContract.ts';
+import { sourceTexts, type Input as WorkerInput } from '../../../domain/agents/docGenAgent/subAgents/docWorkerAgent/SourceFactsContract.ts';
 
 /** 定义夹具项目Scenario的数据结构与类型约束。 */
 export interface FixtureProjectScenario extends AutomatedProjectScenario {
@@ -24,12 +24,11 @@ export interface FixtureProjectScenario extends AutomatedProjectScenario {
     codeV1: string;
     codeV2: string;
     correction: string;
-    /** 显式受控候选案例文件；固定隐藏门禁不作为 TestGen 输出来源。 */
-    testSuite?: string;
     generatedPath: string;
     title: string;
     description: string;
-  };
+  } & ({ testSource: string; testPath: string; testSuite?: never }
+    | { testSuite: string; testSource?: never; testPath?: never });
 }
 
 /** Explicit deterministic test adapter. Never selected as a failed-provider fallback. */
@@ -65,10 +64,12 @@ export class FixtureProjectWorkflowStages {
 
   private async output(input: WorkflowStageInput, scenario: AutomatedProjectScenario, command: AgentCommand, modelRequest: ModelRequest): Promise<Record<string, unknown>> {
     const agentId = command.agentType;
+    const payload = command.payload;
     const assets = (scenario as FixtureProjectScenario).assets;
     if (!assets) throw new Error('WORKFLOW_FIXTURE_ASSETS_REQUIRED');
     let output: Record<string, unknown>;
     if (agentId === 'doc-gen') {
+      if (command.payload.executionContract === 'section-doc-v1') {
       const body = this.asset(input.iteration === 0 ? assets.knowledgeV1 : assets.knowledgeV2);
       output = modelRequest.stage?.split(':')[0] === 'outline'
         ? { title: assets.title, description: assets.description,
@@ -78,6 +79,12 @@ export class FixtureProjectWorkflowStages {
             .filter(({ heading }) => modelRequest.stage?.split(':')[0] !== 'revision' || (command.payload.corrections as Array<{ knowledgePath: string }>).some(({ knowledgePath }) => knowledgePath === `knowledge/${scenario.moduleId}.md#${heading}`))
             .map(({ heading: _heading, ...section }) => section),
         };
+      } else {
+      output = {
+        body: this.asset(input.iteration === 0 ? assets.knowledgeV1 : assets.knowledgeV2),
+        title: assets.title, description: assets.description, keywords: [scenario.moduleId],
+      };
+      }
     } else if (agentId === 'code') {
       output = { files: [{
         path: assets.generatedPath,
@@ -87,17 +94,25 @@ export class FixtureProjectWorkflowStages {
       const ref = input.context[`evaluationEvidenceRef:${input.iteration}`] as ArtifactRef | undefined;
       if (!ref) throw new Error('WORKFLOW_REVIEW_EVALUATION_MISSING');
       const evaluation = JSON.parse(Buffer.from(await this.flywheel.getArtifact(ref)).toString('utf8')) as ProjectEvaluation;
-      output = {
-        blocking: false, recommendation: evaluation.passed ? 'PASS' : 'ITERATE',
-        correction: evaluation.passed ? null : JSON.parse(this.asset(assets.correction)),
+      output = command.payload.executionContract === 'workbench-review-v1'
+        ? { blocking: !evaluation.passed, recommendation: evaluation.passed ? 'PASS' : 'ITERATE',
+          correction: evaluation.passed ? null : JSON.parse(this.asset(assets.correction)) }
+        : {
+        historySummary: `Previous iteration evidence reviewed; current tests ${evaluation.testsPassed}/${evaluation.testsTotal}.`,
+        blocking: false, corrections: evaluation.passed ? [] : [JSON.parse(this.asset(assets.correction))],
       };
     } else if (agentId === 'test-gen') {
-      output = assets.testSuite
-        ? { suite: JSON.parse(this.asset(assets.testSuite)), oracleRequired: true }
-        : { candidateCommands: scenario.finalCommands, oracleRequired: true };
+      if (command.payload.executionContract === 'behavior-cases-v1') {
+        if (!assets.testSuite) throw new Error('WORKFLOW_FIXTURE_SUITE_REQUIRED');
+        output = { suite: JSON.parse(this.asset(assets.testSuite)), oracleRequired: true };
+      } else {
+      if (!assets.testPath || !assets.testSource) throw new Error('WORKFLOW_FIXTURE_TEST_SOURCE_REQUIRED');
+      output = { files: [{ path: assets.testPath, content: this.asset(assets.testSource) }],
+        cases: [{ caseId: 'public-result', entryPoint: 'test_public_result', testPath: assets.testPath, target: 'Public behavior', input: 'calculate()', expected: '4', sourceEvidence: scenario.sourcePaths }] };
+      }
     } else if (agentId === 'check') {
-      output = { blocking: false, findings: [], scope: scenario.allowedGeneratedPaths };
-    } else if (agentId === 'doc-worker') {
+      output = { findings: [], scope: scenario.allowedGeneratedPaths };
+    } else if (agentId === 'doc-worker' && command.payload.executionContract === 'source-facts-v1') {
       const payload = command.payload as unknown as WorkerInput['payload'];
       const materials = await Promise.all(payload.sourceRefs.map(async (ref) => {
         const bytes = Buffer.from(await this.flywheel.getArtifact(ref)).toString('utf8');
@@ -122,14 +137,16 @@ export class FixtureProjectWorkflowStages {
         provenance: [...new Set(facts.map((fact) => fact.sourcePath))], facts,
         unresolvedRisks: facts.length ? [] : ['The controlled fixture has no semantic assertions for this source partition.'],
       };
+    } else if (agentId === 'doc-worker') {
+      const assigned = payload.assignedSourcePaths as string[];
+      output = { workerId: input.workerId,
+        fragment: `Source partition ${input.workerId ?? 'default'} prepared for DocGen.`, provenance: assigned,
+        analysisScope: { moduleId: scenario.moduleId, files: assigned, symbols: [] },
+        sourceEvidence: assigned.map(path => ({ claim: 'Fixture source analysis', path })), unresolvedQuestions: [] };
     } else {
       output = {
         iteration: input.iteration, strategy: 'fixed-knowledge-flywheel-v1',
-        parallel: ['documentation', 'test-generation'],
-        tasks: Object.entries(taskDependencies).map(([role, dependsOn]) => ({
-          role, objective: `Complete the ${role} task for ${scenario.moduleId}.`, dependsOn,
-          sourcePaths: ['doc-worker', 'doc-gen', 'test-gen'].includes(role) ? scenario.sourcePaths : [],
-        })),
+        tasks: Object.entries(taskMaterials).map(([agentType, materials]) => ({ agentType, materials, moduleId: scenario.moduleId })),
       };
     }
     return output;

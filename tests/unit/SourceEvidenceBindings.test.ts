@@ -5,7 +5,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SOURCE_EVIDENCE_POLICY, sourceEvidenceBindings } from '../../src/domain/services/knowledge/SourceEvidenceBindings.ts';
+import { SOURCE_EVIDENCE_POLICY, sourceEvidenceBindings } from '../../src/domain/knowledge/SourceEvidenceBindings.ts';
 import { createPublicationPreparationFixture } from '../helpers/PublicationPreparationFixture.ts';
 test('source evidence distinguishes manifest identity from file content without changing legacy inputs', async () => {
   const { project } = await createPublicationPreparationFixture();

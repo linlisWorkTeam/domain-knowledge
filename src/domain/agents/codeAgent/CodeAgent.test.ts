@@ -43,7 +43,9 @@ test('code: output whitelist and duplicate paths are enforced', async () => {
   sample.context.model.execute = async () => ({ files: [{ path: '../escape.ts', content: 'escape' }] });
   await assert.rejects(execute(sample.input, sample.context), /AGENT_OUTPUT_INVALID|PROJECT_PATH_DENIED/);
   const path = sample.input.payload.allowedGeneratedPaths[0]!;
-  sample.input.payload.allowedGeneratedPaths.push('second.ts');
+  sample.input.payload.allowedGeneratedPaths.push('second.cpp');
+  const config = sample.input.materials.find(({ ref }) => ref.artifactId === sample.input.payload.projectConfigurationRef!.artifactId)!.content as { allowedGeneratedPaths: string[] };
+  config.allowedGeneratedPaths.push('second.cpp');
   sample.context.model.execute = async () => ({ files: [{ path, content: 'a' }, { path, content: 'b' }] });
   await assert.rejects(execute(sample.input, sample.context), /PROJECT_PATH_DUPLICATED/);
 });
@@ -53,7 +55,21 @@ test('code: rejects unsafe caller whitelist and hides unrelated source materials
   sample.input.materials.push({ ref: { ...sample.input.materials[0]!.ref, artifactId: 'reference-source' }, content: 'REFERENCE_SOURCE_SECRET' });
   await execute(sample.input, sample.context);
   assert.doesNotMatch(sample.requests[0]!.prompt, /REFERENCE_SOURCE_SECRET/);
-  assert.deepEqual(sample.requests[0]!.readablePaths, sample.input.publicInterfacePaths);
+  assert.deepEqual(sample.requests[0]!.readablePaths, []);
   sample.input.payload.allowedGeneratedPaths = ['../escape.ts'];
-  await assert.rejects(execute(sample.input, sample.context), /PROJECT_PATH_DENIED/);
+  const config = sample.input.materials.find(({ ref }) => ref.artifactId === sample.input.payload.projectConfigurationRef!.artifactId)!.content as { allowedGeneratedPaths: string[] };
+  config.allowedGeneratedPaths = [...sample.input.payload.allowedGeneratedPaths];
+  await assert.rejects(execute(sample.input, sample.context), /CODE_PATH_INVALID/);
+});
+
+test('code: model sees only knowledge and cropped configuration with no repository reads', async () => {
+  const sample = roleExample<Input>('code');
+  sample.input.sourcePaths = ['secret-original.cpp'];
+  sample.input.publicInterfacePaths = ['secret-interface.hpp'];
+  await execute(sample.input, sample.context);
+  assert.deepEqual(sample.requests[0]!.readablePaths, []);
+  assert.doesNotMatch(sample.requests[0]!.prompt, /secret-original|secret-interface|referenceCommands|testPaths/);
+  assert.match(sample.requests[0]!.prompt, /c\+\+17/);
+  sample.input.payload.languageId = 'typescript';
+  await assert.rejects(execute(sample.input, sample.context), /CODE_LANGUAGE_INVALID/);
 });

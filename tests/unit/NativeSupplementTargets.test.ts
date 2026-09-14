@@ -5,8 +5,8 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { nativeSupplementTargets, nativeSupplementTargetCoverage } from '../../src/domain/services/evaluation/NativeSupplementTargets.ts';
-import type { NativeBehaviorSuite } from '../../src/domain/services/evaluation/NativeBehaviorSuite.ts';
+import { nativeSupplementTargets, nativeSupplementTargetCoverage } from '../../src/domain/evaluation/NativeSupplementTargets.ts';
+import type { NativeBehaviorSuite } from '../../src/domain/evaluation/NativeBehaviorSuite.ts';
 const suite = (sections: string[]): NativeBehaviorSuite => ({ schemaVersion: 'native-cases-v1', cases: [{
   caseId: 'case1', description: 'boundary', sections, variables: [], calls: [], observations: [], expected: {},
 }] });

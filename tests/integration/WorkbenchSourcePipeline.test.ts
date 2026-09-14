@@ -12,8 +12,8 @@ import { WorkbenchPipelines } from '../../src/application/services/WorkbenchPipe
 import { WorkbenchStages } from '../../src/application/services/WorkbenchStages.ts';
 import { SqliteStageTasks } from '../../src/infrastructure/sqlite/SqliteStageTasks.ts';
 import { SqliteWorkbenchPipelines } from '../../src/infrastructure/sqlite/SqliteWorkbenchPipelines.ts';
-import { SOURCE_REVISION_CONTRACT, SOURCE_CORRECTION_POLICY } from '../../src/domain/services/knowledge/SourceRevision.ts';
-import type { StageInput, StageResult, WorkbenchStage } from '../../src/domain/services/workbench/StageTask.ts';
+import { SOURCE_REVISION_CONTRACT, SOURCE_CORRECTION_POLICY } from '../../src/domain/knowledge/SourceRevision.ts';
+import type { StageInput, StageResult, WorkbenchStage } from '../../src/domain/workbench/StageTask.ts';
 import { sourceInput, sourceResult } from '../helpers/WorkbenchSourceFixture.ts';
 function fixture(target: number, stagnant = false, unknown = false, mixed = false, supplement = false) {
   const directory = mkdtempSync(join(tmpdir(), 'source-pipeline-')), db = join(directory, 'state.sqlite');

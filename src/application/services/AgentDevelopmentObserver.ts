@@ -8,6 +8,7 @@ import type { WorkflowObserver, WorkflowStageExecutor, WorkflowStageInput, Workf
 /** 单角色执行也记录节点状态，供 Console 和审计读取；这里不创建 LangGraph。 */
 export async function executeDevelopmentStage(
   input: WorkflowStageInput, executor: WorkflowStageExecutor, observer: WorkflowObserver,
+  detail = 'Agent development example; publication not evaluated',
 ): Promise<WorkflowStageResult> {
   const startedAt = new Date().toISOString();
   const record = (status: 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED', error: string | null = null) => {
@@ -15,7 +16,7 @@ export async function executeDevelopmentStage(
     observer.record({ runId: input.runId, nodeId: input.nodeId, agentId: input.agentId,
       iteration: input.iteration, attempt: input.attempt, status, readyAt: startedAt, startedAt,
       completedAt: status === 'RUNNING' ? null : now, updatedAt: now,
-      detail: 'Agent development example; publication not evaluated', error });
+      detail, error });
   };
   record('RUNNING');
   try {

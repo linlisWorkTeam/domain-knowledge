@@ -10,7 +10,7 @@ LangGraph 编排七角色，DSH 负责模型、会话和工具执行。知识、
 <details lang="en">
 <summary>English summary</summary>
 
-The default role framework is DSH, using its native sdk-minimal profile. Configure and verify the model in the Console, or use OpenCode Go environment variables in a runtime without saved Console settings. The adapter generates a runtime patch containing public parameters and an API-key environment variable name; no repository deployment assets are required. Linux deployments require Bubblewrap. Business contracts, evaluation and publication remain owned by domain-knowledge; live model quality is evaluated separately.
+The default role framework is DSH, using its native sdk-minimal profile. Configure and verify the model in the Console, or use OpenCode Go environment variables in a runtime without saved Console settings. The adapter generates a runtime patch containing public parameters and an API-key environment variable name; no repository deployment assets are required. Linux DSH deployments require Bubblewrap. Native C/C++ case supervision additionally requires Linux x86_64, gcc/nm, retained entry symbols and permitted ptrace. Business contracts, evaluation and publication remain owned by domain-knowledge; live model quality is evaluated separately.
 
 </details>
 
@@ -35,6 +35,16 @@ npm run knowledge -- workflow-run \
 ```
 
 场景字段见[API 说明](specs/interfaces/HttpApi.md)。通用入口不依赖外部项目的固定目录或预写资产。公司 CodeAgent CLI 不作为启动前置，其真实协议适配由 DEV-010 后置处理。
+
+## C/C++ 原生评测要求
+
+自动飞轮的测试集合采用 `native-cases-v2-supervised`：Linux x86_64，系统需有 gcc、所选 C/C++ 编译器和 nm，内核与部署策略必须允许 ptrace / PTRACE_GET_SYSCALL_INFO，测试入口符号不能被剥离。DSH 的 Bubblewrap 隔离与原生评测监督是两层不同能力，前者可用不表示后者可用。
+
+在场景的 agentConfiguration 配置 languageId、standard、testPaths 和 maxTestRepairs（默认 1，范围 0～3）；提供非空 comparisonRules。referenceCommands 和 finalCommands 都须包含显式编译生成测试源文件的 gcc/g++ 命令、唯一 -o 输出，以及对应 binary test 命令。示例见 [Application](specs/application/Application.md)。每条命令独立解释 cwd，未指定则为副本根；参数里的 `..` 只能留在根内。无法解析绑定关系的构建脚本或无法绑定的命令不自动改写。
+
+用例分别在独立进程中运行，不共享前一用例的全局状态。监督器禁止写文件、派生进程、修改其他进程及未知 syscall；项目需要这些能力时，当前执行配置可能不适用，应调整受信适配和验收范围。工具、符号、ptrace 或绑定不可用时明确 STOPPED 并保留失败交接，不降级为 stdout 的 PASS 计数；普通测试失败才按首次候选有限修复策略处理。
+
+`--max-iterations` 包含首轮；修复尝试和同轮恢复不额外占业务轮次。源码未变时固定测试集跨 Run 复用，旧测试协议不静默重新生成；角色版本或冻结配置不兼容的旧 Run 不能恢复，应在保留旧证据的前提下准备新任务，固定测试协议问题需人工迁移。`workflow-resume` 用于恢复同一冻结 Run，不用于切换到修改后的源码。
 
 ## 使用 OpenCode Go
 
@@ -84,4 +94,4 @@ Console 配置使用原生 `sdk-minimal`，项目最后一层工具策略关闭�
 
 ## 边界
 
-角色白名单与 Bubblewrap 控制 Agent 材料可见性。`TrustedProjectEvaluator` 仍只适用于受信项目，不能据此声称已具备敌对生成代码沙箱、公司 CLI live 兼容或生产容量。
+角色白名单与 Bubblewrap 控制 Agent 材料可见性。`TrustedProjectEvaluator` 对生成原生程序提供外部逐入口监督和结果通道约束，参考项目、构建配置与工具链仍须受信；不等同于完整文件读取隔离、通用敌对代码沙箱、公司 CLI live 兼容或生产容量。验证版本及限制见 [验收报告](reports/AgentSpecRepairAndE2E.md)。

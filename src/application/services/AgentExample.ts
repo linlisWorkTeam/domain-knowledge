@@ -9,6 +9,9 @@ import type { ModelExecutionPort, Material } from '../../domain/agents/AgentExec
 import type { AgentContractValidator, ProjectEvaluator, RunConfigurationManager, WorkflowObserver, WorkflowStageInput } from '../ports/ApplicationPorts.ts';
 import type { KnowledgeFlywheelService } from './ApplicationServices.ts';
 import type { AutomatedProjectScenario, ProjectWorkflowStages } from './AutomatedProjectWorkflow.ts';
+import { DocWorkerExecutionService } from './DocWorkerExecution.ts';
+import type { Input as DocGenInput } from '../../domain/agents/docGenAgent/DocGenAgentContract.ts';
+import type { TaskBatchRunner } from '../ports/ApplicationPorts.ts';
 import { RoleExecutionService } from './RoleExecution.ts';
 import { executeDevelopmentStage } from './AgentDevelopmentObserver.ts';
 
@@ -31,11 +34,14 @@ export interface AgentExampleInput {
   modelOutput?: Record<string, unknown>;
   /** 分阶段样例逐阶段提供显式模型响应，禁止在业务代码中跳过概要。 */
   modelStages?: Record<string, Record<string, unknown>>;
+  /** 组合样例按内部任务身份提供模拟输出；真实模式不读取此字段。 */
+  workerModelOutputs?: Record<string, Record<string, unknown>>;
 }
 /** 单角色开发用例：显式装载样例材料，复用生产角色与提交服务，不启动上游角色或发布图。 */
 export class AgentExampleService {
   /** 提供dependencies信息，供调用方读取或传入。 */
   readonly dependencies: {
+    tasks: TaskBatchRunner;
     flywheel: KnowledgeFlywheelService; runConfiguration: RunConfigurationManager;
     evaluator: ProjectEvaluator; contracts: AgentContractValidator; observer: WorkflowObserver;
     nodeByAgent: Record<AgentId, string>;
@@ -95,14 +101,28 @@ export class AgentExampleService {
           input: { payload, materials, sourcePaths: sample.scenario.sourcePaths,
             publicInterfacePaths: sample.scenario.publicInterfacePaths,
             provenance: materials.map(({ ref }) => ref), moduleId: sample.scenario.moduleId },
-          context: { model, command, effectivePrompt: prompt, iteration, signal },
+          context: { model, command, effectivePrompt: prompt, iteration, signal,
+            ...(role === 'doc-gen' ? { docWorkers: new DocWorkerExecutionService({
+              parent: { payload: payload as unknown as DocGenInput['payload'], materials,
+                sourcePaths: sample.scenario.sourcePaths, publicInterfacePaths: sample.scenario.publicInterfacePaths,
+                provenance: materials.map(({ ref }) => ref), moduleId: sample.scenario.moduleId },
+              stage, flywheel, contracts, nodeByAgent, prompts: runConfiguration, observer, tasks: this.dependencies.tasks,
+              model: (command, stage) => {
+                if (sample.provider !== 'fixture') return this.dependencies.model({ command, stage, scenario: sample.scenario });
+                const output = sample.workerModelOutputs?.[stage.workerId!];
+                if (!output) throw new Error(`AGENT_EXAMPLE_WORKER_OUTPUT_MISSING: ${stage.workerId}`);
+                return this.dependencies.fixtureModel(output);
+              },
+            }) } : {}),
+          },
         });
         return { detail: `${role} development output committed` };
       } }, observer);
       const result = JSON.parse(Buffer.from(await flywheel.getArtifact(resultRef!)).toString('utf8')) as AgentResult;
       const outputs = await Promise.all(result.outputRefs.map(async (ref) => ({ ref, content: Buffer.from(await flywheel.getArtifact(ref)).toString('utf8') })));
       return { schemaVersion: '1.0', kind: 'agent-development-example', runId: run.runId, role,
-        provider: sample.provider, publication: 'NOT_EVALUATED', configuration, resultRef: resultRef!, result, outputs };
+        provider: sample.provider, publication: 'NOT_EVALUATED',
+        ...(result.payload['resultKind'] === 'userDecisionRequired' ? { decisionRequired: result.payload } : {}), configuration, resultRef: resultRef!, result, outputs };
     } catch (error) {
       flywheel.transition(run.runId, signal?.aborted ? 'CANCELLED' : 'FAILED');
       throw error;

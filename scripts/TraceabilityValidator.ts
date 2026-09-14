@@ -43,6 +43,8 @@ export function validateTraceabilityMatrix(trace: string, componentRoot: string)
     }
 
     for (const [column, value] of [['implementation', implementation], ['tests', tests]] as const) {
+      // 文案、布局和仓库操作约定可由 review 验证，不强迫新增永久测试。
+      if (column === 'tests' && value === '—') continue;
       const paths = [...value.matchAll(PATH_TOKEN)].map((match) => match[1]);
       invariant(paths.length > 0, `${requirementId} ${column} column must contain at least one backticked path`);
       for (const path of paths) {

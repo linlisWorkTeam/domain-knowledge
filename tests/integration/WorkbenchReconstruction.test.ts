@@ -9,7 +9,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createStageTask } from '../../src/domain/services/workbench/StageTask.ts';
+import { createStageTask } from '../../src/domain/workbench/StageTask.ts';
 import { sha256 } from '../../src/domain/Domain.ts';
 import { createComposition } from '../../src/interfaces/runner/Composition.ts';
 import { assertModelOutput } from '../../src/infrastructure/agentAdapters/ModelExecution.ts';

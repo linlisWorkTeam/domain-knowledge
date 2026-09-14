@@ -6,8 +6,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { sha256 } from '../../src/domain/Domain.ts';
-import { buildConstraints, createProjectSnapshot } from '../../src/domain/services/workbench/WorkbenchProject.ts';
-import { assertProjectPublication, type ProjectPublicationManifest } from '../../src/domain/services/workbench/ProjectPublication.ts';
+import { buildConstraints, createProjectSnapshot } from '../../src/domain/workbench/WorkbenchProject.ts';
+import { assertProjectPublication, type ProjectPublicationManifest } from '../../src/domain/workbench/ProjectPublication.ts';
 function fixture() {
   const ref = { artifactId: `sha256:${sha256('x')}`, sha256: sha256('x'), size: 1, mediaType: 'text/plain' };
   const module = { moduleId: 'm', language: 'c' as const, sourcePaths: ['a.c'], testPaths: [], selectedByDefault: true, reasons: [] };

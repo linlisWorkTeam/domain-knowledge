@@ -6,82 +6,39 @@
 import type { ArtifactRef } from '../../Domain.ts';
 import type { RoleInput } from '../AgentExecution.ts';
 import { requireMaterials } from '../AgentExecution.ts';
-
-/** 角色业务载荷。 */
-export interface Payload {
-  /** 提供策略引用信息，供调用方读取或传入。 */
-  policyRef: ArtifactRef;
-  /** 提供模块引用列表信息，供调用方读取或传入。 */
-  moduleRefs: ArtifactRef[];
-  /** 提供latest报告引用信息，供调用方读取或传入。 */
-  latestReportRef?: ArtifactRef;
-}
-/** 角色输入。 */
+export interface Payload { policyRef: ArtifactRef; moduleRefs: ArtifactRef[]; businessGoalRef: ArtifactRef; projectConfigurationRef: ArtifactRef; progressRef: ArtifactRef }
 export type Input = RoleInput<Payload>;
-/** 固定业务依赖只用于计划校验；角色不能据此改写工作流图。 */
-export const taskDependencies = {
-  'doc-worker': [], 'doc-gen': ['doc-worker'], 'test-gen': [],
-  code: ['doc-gen'], check: ['code'], review: ['check'],
+/** 尚未生成的工件以业务材料槽位描述，实际引用由工作流在上游完成后绑定。 */
+export const taskMaterials = {
+  'doc-gen': ['source', 'interfaces'], 'test-gen': ['source', 'interfaces', 'testPolicy'],
+  code: ['knowledge', 'projectConfiguration'], check: ['source', 'generatedCode', 'comparisonRules'],
+  review: ['knowledge', 'evaluation', 'comparison'],
 } as const;
-/** 模型在授权模块范围内填写任务目的与读源范围。 */
-export interface PlannedTask {
-  /** 固定图中的业务角色。 */
-  role: keyof typeof taskDependencies;
-  /** 本轮应完成且可审计的任务目的。 */
-  objective: string;
-  /** 计划授权的源码路径，不能超过输入范围。 */
-  sourcePaths: string[];
-  /** 必须与固定业务依赖一致。 */
-  dependsOn: Array<keyof typeof taskDependencies>;
-}
-/** 保留计划摘要字段，并明确模型实际规划的六项业务任务。 */
-export interface Output { strategy: string; iteration: number; parallel: string[]; tasks: PlannedTask[]; }
-/** 对外提供输出Schema，作为调用方使用的统一约定。 */
+export interface Task { agentType: keyof typeof taskMaterials; moduleId: string; materials: string[] }
+export interface Output { strategy: string; iteration: number; tasks: Task[] }
+const text = { type: 'string', pattern: '\\S' };
 export const outputSchema: Record<string, unknown> = {
-  type: 'object', required: ['strategy', 'iteration', 'parallel', 'tasks'], additionalProperties: false,
-  properties: {
-    strategy: { type: 'string', minLength: 1 }, iteration: { type: 'integer', minimum: 0 },
-    parallel: { type: 'array', minItems: 1, uniqueItems: true, items: { enum: ['documentation', 'test-generation'] } },
-    tasks: { type: 'array', minItems: 6, maxItems: 6, items: {
-      type: 'object', required: ['role', 'objective', 'sourcePaths', 'dependsOn'], additionalProperties: false,
-      properties: {
-        role: { enum: Object.keys(taskDependencies) }, objective: { type: 'string', minLength: 1 },
-        sourcePaths: { type: 'array', uniqueItems: true, items: { type: 'string', minLength: 1 } },
-        dependsOn: { type: 'array', uniqueItems: true, items: { enum: Object.keys(taskDependencies) } },
-      },
-    } },
-  },
+  type: 'object', required: ['strategy', 'iteration', 'tasks'], additionalProperties: false,
+  properties: { strategy: text, iteration: { type: 'integer', minimum: 0 }, tasks: {
+    type: 'array', minItems: 5, maxItems: 5, items: { type: 'object', additionalProperties: false,
+      required: ['agentType', 'moduleId', 'materials'], properties: { agentType: { enum: Object.keys(taskMaterials) }, moduleId: text,
+        materials: { type: 'array', minItems: 1, uniqueItems: true, items: text } } },
+  } },
 };
-
-/** 构造本次角色执行使用的输出 Schema。 */
-export function schemaFor(_input: Input): Record<string, unknown> {
-  return outputSchema;
-}
-
-/** 检查本角色必需字段及所引用材料是否完整。 */
+export function schemaFor(_input: Input): Record<string, unknown> { return outputSchema; }
 export function validateInput(input: Input): void {
-  requireMaterials(input.payload, input.materials, ['policyRef', 'moduleRefs']);
+  requireMaterials(input.payload, input.materials, ['policyRef', 'moduleRefs', 'businessGoalRef', 'projectConfigurationRef', 'progressRef']);
 }
-
-/** 防止模型漏任务、添加依赖、越权读源码，或把其他轮次的计划混入本轮。 */
-export function validatePlan(output: Output, input: Input, iteration: number): void {
-  if (output.iteration !== iteration) throw new Error('ORCHESTRATOR_ITERATION_MISMATCH');
-  const seen = new Set<string>();
+export function validateOutput(output: Output, input: Input, iteration: number): void {
+  if (output.iteration !== iteration || new Set(output.tasks.map((task) => task.agentType)).size !== 5) throw new Error('ORCHESTRATOR_PLAN_INVALID');
+  const overview = input.payload.moduleRefs.flatMap((ref) => {
+    const material = input.materials.find((item) => item.ref.artifactId === ref.artifactId)?.content as { modules?: { moduleId: string }[] };
+    return material?.modules ?? [];
+  });
+  const allowedModules = overview.length ? overview.map((module) => module.moduleId) : [input.moduleId];
+  if (new Set(output.tasks.map((task) => task.moduleId)).size !== 1) throw new Error('ORCHESTRATOR_MODULE_SELECTION_INVALID');
   for (const task of output.tasks) {
-    if (seen.has(task.role)) throw new Error('ORCHESTRATOR_TASK_DUPLICATE');
-    seen.add(task.role);
-    const expected: readonly string[] = taskDependencies[task.role];
-    if (!expected || expected.length !== task.dependsOn.length
-      || expected.some((role) => !task.dependsOn.includes(role as PlannedTask['role']))) {
-      throw new Error('ORCHESTRATOR_DEPENDENCY_INVALID');
-    }
-    const canReadSource = ['doc-worker', 'doc-gen', 'test-gen'].includes(task.role);
-    if (task.sourcePaths.some((path) => !canReadSource || !input.sourcePaths.includes(path))) {
-      throw new Error('ORCHESTRATOR_SOURCE_SCOPE_DENIED');
-    }
-    if (canReadSource && input.sourcePaths.some((path) => !task.sourcePaths.includes(path))) {
-      throw new Error('ORCHESTRATOR_SOURCE_SCOPE_INCOMPLETE');
-    }
+    const allowed: readonly string[] = taskMaterials[task.agentType];
+    if (!allowedModules.includes(task.moduleId) || task.materials.length !== allowed.length || task.materials.some((key) => !allowed.includes(key))) throw new Error('ORCHESTRATOR_TASK_SCOPE_INVALID');
   }
-  if (seen.size !== Object.keys(taskDependencies).length) throw new Error('ORCHESTRATOR_PLAN_INCOMPLETE');
 }

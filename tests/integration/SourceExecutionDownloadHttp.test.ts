@@ -10,7 +10,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createKnowledgeServer } from '../../src/interfaces/runner/Server.ts';
-import { createStageTask } from '../../src/domain/services/workbench/StageTask.ts';
+import { createStageTask } from '../../src/domain/workbench/StageTask.ts';
 test('scope downloads become available during a source run and survive failure without exposing unrelated CAS', async () => {
   const root = mkdtempSync(join(tmpdir(), 'source-scope-http-'));
   const server = createKnowledgeServer({ runtimeDir: root, anonymousAccess: true });

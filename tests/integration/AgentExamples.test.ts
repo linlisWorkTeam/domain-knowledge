@@ -44,10 +44,11 @@ test('standalone invalid output records failure and retains the failed Run for i
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 
+
 test('standalone first DocGen generation persists outline and body from distinct model stages', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'agent-docgen-stages-'));
   try {
-    const sample = JSON.parse(readFileSync(roleExamplePath('doc-gen'), 'utf8'));
+    const sample = JSON.parse(readFileSync('src/domain/agents/docGenAgent/examples/WorkbenchDocGenSample.json', 'utf8'));
     delete sample.payload.baseKnowledgeRef;
     delete sample.payload.corrections;
     sample.iteration = 0;
@@ -68,5 +69,26 @@ test('standalone first DocGen generation persists outline and body from distinct
     assert.ok(raw, 'raw output artifact must remain readable');
     assert.deepEqual(JSON.parse(raw.content), sample.expectedOutput);
     assert.notEqual(raw.ref.artifactId, outline.ref.artifactId);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
+test('Check exhaustion saves every attempt in CAS without a successful result', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'check-report-exhausted-'));
+  try {
+    const sample = JSON.parse(readFileSync(roleExamplePath('check'), 'utf8'));
+    sample.modelOutput.findings[0].generated.locations[0].startLine = 999;
+    const path = join(directory, 'invalid.json'); writeFileSync(path, JSON.stringify(sample));
+    await assert.rejects(main(['--role', 'check', '--input', path, '--output', directory]), /CHECK_REPORT_REPAIR_EXHAUSTED.*reportEvidence=sha256:/);
+    const runDirectory = join(directory, readdirSync(directory).find((name) => name.startsWith('check-'))!);
+    const failure = JSON.parse(readFileSync(join(runDirectory, 'failure.json'), 'utf8'));
+    const digest = failure.error.match(/reportEvidence=sha256:([a-f0-9]{64})/)[1];
+    const files = (root: string): string[] => readdirSync(root, { withFileTypes: true }).flatMap((entry) => entry.isDirectory() ? files(join(root, entry.name)) : [join(root, entry.name)]);
+    const artifact = files(join(runDirectory, 'runtime')).find((file) => file.endsWith(digest) || file.endsWith(digest + '.json'));
+    assert.ok(artifact, 'failed report evidence must be persisted');
+    const attempts = JSON.parse(readFileSync(artifact, 'utf8')).attempts;
+    assert.equal(attempts.length, 3);
+    assert.equal(attempts[0].raw.findings[0].generated.locations[0].startLine, 999);
+    assert.equal(readdirSync(runDirectory).includes('result.json'), false);
+
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });

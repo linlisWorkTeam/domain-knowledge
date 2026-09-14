@@ -9,7 +9,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createKnowledgeServer } from '../../src/interfaces/runner/Server.ts';
-import { createStageTask } from '../../src/domain/services/workbench/StageTask.ts';
+import { createStageTask } from '../../src/domain/workbench/StageTask.ts';
 import { WorkbenchPublications } from '../../src/application/services/WorkbenchPublications.ts';
 import { LocalWorkbenchPublicationFiles } from '../../src/infrastructure/publication/LocalWorkbenchPublicationFiles.ts';
 import { createPublicationPreparationFixture } from '../helpers/PublicationPreparationFixture.ts';

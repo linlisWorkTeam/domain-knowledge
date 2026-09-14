@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：定义独立协调租约与不可变阶段交接的持久化端口。
  */
-import type { WorkbenchPipeline } from '../../domain/services/workbench/WorkbenchPipeline.ts';
+import type { WorkbenchPipeline } from '../../domain/workbench/WorkbenchPipeline.ts';
 export interface WorkbenchPipelineStore {
   insert(value: WorkbenchPipeline): WorkbenchPipeline;
   get(id: string): WorkbenchPipeline | null;

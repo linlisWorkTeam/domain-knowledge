@@ -5,16 +5,16 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SOURCE_EVIDENCE_POLICY } from '../../src/domain/services/knowledge/SourceEvidenceBindings.ts';
+import { SOURCE_EVIDENCE_POLICY } from '../../src/domain/knowledge/SourceEvidenceBindings.ts';
 import { sha256, type ArtifactRef, type KnowledgeVersion } from '../../src/domain/Domain.ts';
 import { WorkbenchPublicationEvidence } from '../../src/application/services/WorkbenchPublicationEvidence.ts';
 import { JsonSchemaAgentContractValidator } from '../../src/infrastructure/agentAdapters/contracts/JsonSchemaAgentContractValidator.ts';
 import { publicationFixture, publicationBody, publicationConfiguration, publicationApi } from '../helpers/WorkbenchPublicationFixture.ts';
-import { buildConstraints, createProjectSnapshot, type WorkbenchProjectSnapshot } from '../../src/domain/services/workbench/WorkbenchProject.ts';
-import { sourceSectionObservations } from '../../src/domain/services/knowledge/KnowledgeSourceVerification.ts';
-import type { NativeBehaviorSuite } from '../../src/domain/services/evaluation/NativeBehaviorSuite.ts';
-import { nativeTestKeys, type NativeTestSet } from '../../src/domain/services/evaluation/NativeTestCache.ts';
-import { canonicalJson, createStageTask } from '../../src/domain/services/workbench/StageTask.ts';
+import { buildConstraints, createProjectSnapshot, type WorkbenchProjectSnapshot } from '../../src/domain/workbench/WorkbenchProject.ts';
+import { sourceSectionObservations } from '../../src/domain/knowledge/KnowledgeSourceVerification.ts';
+import type { NativeBehaviorSuite } from '../../src/domain/evaluation/NativeBehaviorSuite.ts';
+import { nativeTestKeys, type NativeTestSet } from '../../src/domain/evaluation/NativeTestCache.ts';
+import { canonicalJson, createStageTask } from '../../src/domain/workbench/StageTask.ts';
 import { createPublicationPreparationFixture as setup } from '../helpers/PublicationPreparationFixture.ts';
 
 test('preparation checks recursive CAS graph, binds body and is content-idempotent', async () => {

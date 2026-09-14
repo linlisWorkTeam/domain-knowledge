@@ -4,13 +4,13 @@
  * 文件功能：交接原生候选、参考验证及生成评测，持久化不可变可信测试集。
  */
 import { sha256, type ArtifactRef } from '../../domain/Domain.ts';
-import { canonicalJson } from '../../domain/services/workbench/StageTask.ts';
-import { buildConstraints } from '../../domain/services/workbench/WorkbenchProject.ts';
-import { markdownSections } from '../../domain/services/knowledge/KnowledgeSections.ts';
-import { assertNativeBehaviorSuite, type NativeBehaviorSuite, type NativeContract } from '../../domain/services/evaluation/NativeBehaviorSuite.ts';
-import { nativeTrustedGates, nativeSupplementGates } from '../../domain/services/evaluation/NativeTrustedGates.ts';
-import { nativeTestKeys, nativeOracleTrusted, type NativeTestSet } from '../../domain/services/evaluation/NativeTestCache.ts';
-import { nativeSupplementTargetCoverage, type NativeSupplementTargets } from '../../domain/services/evaluation/NativeSupplementTargets.ts';
+import { canonicalJson } from '../../domain/workbench/StageTask.ts';
+import { buildConstraints } from '../../domain/workbench/WorkbenchProject.ts';
+import { markdownSections } from '../../domain/knowledge/KnowledgeSections.ts';
+import { assertNativeBehaviorSuite, type NativeBehaviorSuite, type NativeContract } from '../../domain/evaluation/NativeBehaviorSuite.ts';
+import { nativeTrustedGates, nativeSupplementGates } from '../../domain/evaluation/NativeTrustedGates.ts';
+import { nativeTestKeys, nativeOracleTrusted, type NativeTestSet } from '../../domain/evaluation/NativeTestCache.ts';
+import { nativeSupplementTargetCoverage, type NativeSupplementTargets } from '../../domain/evaluation/NativeSupplementTargets.ts';
 import type { ArtifactStore } from '../ports/ApplicationPorts.ts';
 import type { NativeCaseRunner, NativeSnapshotter, NativeTestStore, NativeCaseObservation } from '../ports/NativeEvaluationPorts.ts';
 import type { NativeToolchainInput } from '../ports/LanguageToolchainPorts.ts';

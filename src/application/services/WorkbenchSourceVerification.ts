@@ -3,17 +3,17 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：对全部冻结卡片执行独立来源复核，保留纠正意见而不伪造行为失败。
  */
-import { SOURCE_EVIDENCE_POLICY, sourceEvidenceBindings } from '../../domain/services/knowledge/SourceEvidenceBindings.ts';
-import { SOURCE_EXECUTION_SCOPE, sourceExecutionScope } from '../../domain/services/knowledge/SourceExecutionScope.ts';
-import { moduleBuild, type WorkbenchProjectSnapshot } from '../../domain/services/workbench/WorkbenchProject.ts';
+import { SOURCE_EVIDENCE_POLICY, sourceEvidenceBindings } from '../../domain/knowledge/SourceEvidenceBindings.ts';
+import { SOURCE_EXECUTION_SCOPE, sourceExecutionScope } from '../../domain/knowledge/SourceExecutionScope.ts';
+import { moduleBuild, type WorkbenchProjectSnapshot } from '../../domain/workbench/WorkbenchProject.ts';
 import { WorkbenchSourceFindingHistory, type SourceFindingProof } from './WorkbenchSourceFindingHistory.ts';
-import { SOURCE_REVIEW_POLICY, readSourceReviewPolicy } from '../../domain/services/knowledge/SourceReviewPolicy.ts';
+import { SOURCE_REVIEW_POLICY, readSourceReviewPolicy } from '../../domain/knowledge/SourceReviewPolicy.ts';
 import { sha256, type ArtifactRef } from '../../domain/Domain.ts';
-import { canonicalJson, type JsonValue, type StageInput } from '../../domain/services/workbench/StageTask.ts';
-import { markdownSections } from '../../domain/services/knowledge/KnowledgeSections.ts';
-import { SOURCE_VERIFICATION_CONTRACT, sourceSectionObservations, sourceSectionDecision, sourceSectionsOutcome, sourceVerificationOutcome, type SourceCardBinding, type SourceCardResult } from '../../domain/services/knowledge/KnowledgeSourceVerification.ts';
-import type { NativeBehaviorSuite } from '../../domain/services/evaluation/NativeBehaviorSuite.ts';
-import type { Output as ReviewOutput } from '../../domain/agents/reviewAgent/ReviewAgentContract.ts';
+import { canonicalJson, type JsonValue, type StageInput } from '../../domain/workbench/StageTask.ts';
+import { markdownSections } from '../../domain/knowledge/KnowledgeSections.ts';
+import { SOURCE_VERIFICATION_CONTRACT, sourceSectionObservations, sourceSectionDecision, sourceSectionsOutcome, sourceVerificationOutcome, type SourceCardBinding, type SourceCardResult } from '../../domain/knowledge/KnowledgeSourceVerification.ts';
+import type { NativeBehaviorSuite } from '../../domain/evaluation/NativeBehaviorSuite.ts';
+import type { Output as ReviewOutput } from '../../domain/agents/reviewAgent/WorkbenchReviewContract.ts';
 import type { StageModelConfiguration } from '../ports/WorkbenchGenerationPorts.ts';
 import type { WorkbenchEvaluation } from './WorkbenchEvaluation.ts';
 import type { StageExecutionContext } from './WorkbenchStages.ts';
@@ -153,7 +153,7 @@ export class WorkbenchSourceVerification {
             inputRefs.push(...executionMaterials.map(item => item.ref));
             await context.step(`source-materials:${versionId}:${sectionKey}`, async () => ({ artifactRefs: inputRefs, summary: { versionId, heading } }));
             const review = await roles.execute(context, frozen, 'review', `final-source:${versionId}:${sectionKey}`, { moduleId: card.moduleId, sourcePaths: [], publicInterfacePaths: [], provenance: [card.bodyRef, referenceRef],
-              payload: { knowledgeRef: card.bodyRef, evaluationReportRef: reportRef, checkReportRef: referenceRef, criteriaRef },
+              payload: { executionContract: 'workbench-review-v1', knowledgeRef: card.bodyRef, evaluationReportRef: reportRef, checkReportRef: referenceRef, criteriaRef },
               materials: [{ ref: card.bodyRef, content: body }, { ref: referenceRef, content: reference }, { ref: reportRef, content: report }, { ref: criteriaRef, content: criteria }, ...executionMaterials] });
             const opinion = review.output as unknown as ReviewOutput;
             const decision = sourceSectionDecision(card.moduleId, body, heading, opinion);

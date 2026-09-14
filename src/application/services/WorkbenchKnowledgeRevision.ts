@@ -5,10 +5,10 @@
  */
 import type { AgentResult } from '../../domain/agents/AgentContracts.ts';
 import { type ArtifactRef } from '../../domain/Domain.ts';
-import { canonicalJson, type JsonValue, type StageInput, type StageResult } from '../../domain/services/workbench/StageTask.ts';
-import { KNOWLEDGE_REVISION_CONTRACT, knowledgeRevisionDecision, knowledgeRevisionOutcome } from '../../domain/services/knowledge/KnowledgeRevision.ts';
+import { canonicalJson, type JsonValue, type StageInput, type StageResult } from '../../domain/workbench/StageTask.ts';
+import { KNOWLEDGE_REVISION_CONTRACT, knowledgeRevisionDecision, knowledgeRevisionOutcome } from '../../domain/knowledge/KnowledgeRevision.ts';
 import { WorkbenchCardRevision } from './WorkbenchCardRevision.ts';
-import type { Output as ReviewOutput } from '../../domain/agents/reviewAgent/ReviewAgentContract.ts';
+import type { Output as ReviewOutput } from '../../domain/agents/reviewAgent/WorkbenchReviewContract.ts';
 import type { StageModelConfiguration } from '../ports/WorkbenchGenerationPorts.ts';
 import type { WorkbenchEvaluation } from './WorkbenchEvaluation.ts';
 import type { KnowledgeFlywheelService } from './ApplicationServices.ts';
@@ -86,7 +86,7 @@ export class WorkbenchKnowledgeRevision {
         const criteriaRef = await artifacts.put(Buffer.from(JSON.stringify(criteria)), 'application/json');
         const report = await this.load(module.reportRef);
         const review = await roles.execute(context, frozen, 'review', card.versionId, { moduleId: card.moduleId, sourcePaths: [], publicInterfacePaths: [], provenance: [module.reportRef],
-          payload: { knowledgeRef: card.bodyRef, evaluationReportRef: module.reportRef, checkReportRef: referenceRef, criteriaRef },
+          payload: { executionContract: 'workbench-review-v1', knowledgeRef: card.bodyRef, evaluationReportRef: module.reportRef, checkReportRef: referenceRef, criteriaRef },
           materials: [{ ref: card.bodyRef, content: body }, { ref: module.reportRef, content: report }, { ref: criteriaRef, content: criteria }, { ref: referenceRef, content: reference }] });
         const decision = knowledgeRevisionDecision(review.output as unknown as ReviewOutput, card.moduleId, candidate.sections.map((item) => item.heading));
         if (!decision.heading) return { artifactRefs: [review.resultRef, review.rawRef, referenceRef, generatedModule.codeRef], summary: { cardId: candidate.cardId, baseVersionId: card.versionId, outcome: decision.unresolved.length ? 'UNRESOLVED' : 'UNCHANGED', unresolved: decision.unresolved } };

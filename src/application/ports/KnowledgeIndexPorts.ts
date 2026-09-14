@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：定义可恢复的 YAML、Markdown 和卡片检索索引工件边界。
  */
-import type { CardIndexEntry, CardIndexHeader } from '../../domain/services/knowledge/KnowledgeIndex.ts';
+import type { CardIndexEntry, CardIndexHeader } from '../../domain/knowledge/KnowledgeIndex.ts';
 export interface KnowledgeIndexStore {
   get(cardId: string): CardIndexEntry | null;
   list(): CardIndexEntry[];

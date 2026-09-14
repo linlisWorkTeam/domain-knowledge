@@ -5,8 +5,8 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { nativeCandidateHints } from '../../src/domain/services/evaluation/NativeCandidateFeedback.ts';
-import type { NativeBehaviorCase } from '../../src/domain/services/evaluation/NativeBehaviorSuite.ts';
+import { nativeCandidateHints } from '../../src/domain/evaluation/NativeCandidateFeedback.ts';
+import type { NativeBehaviorCase } from '../../src/domain/evaluation/NativeBehaviorSuite.ts';
 test('failed array arguments carry precise advisory locations without rewriting input', () => {
   const sample: NativeBehaviorCase = { caseId: 'buffer', description: 'write', sections: ['API'], variables: [{ name: 'buf', type: 'char', arrayLength: 32 }],
     calls: [{ function: 'write', arguments: [{ address: { variable: 'buf' } }, { address: { variable: 'buf', index: 0 } }, { read: { variable: 'buf' } }] }],

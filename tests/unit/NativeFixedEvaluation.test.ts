@@ -5,8 +5,8 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { fixedModuleCoverage, fixedCardCoverage, fixedNativePassed } from '../../src/domain/services/evaluation/NativeFixedEvaluation.ts';
-import type { NativeBehaviorSuite } from '../../src/domain/services/evaluation/NativeBehaviorSuite.ts';
+import { fixedModuleCoverage, fixedCardCoverage, fixedNativePassed } from '../../src/domain/evaluation/NativeFixedEvaluation.ts';
+import type { NativeBehaviorSuite } from '../../src/domain/evaluation/NativeBehaviorSuite.ts';
 const suite: NativeBehaviorSuite = { schemaVersion: 'native-cases-v1', cases: [{ caseId: 'sum', description: 'sum', sections: ['Behavior'], variables: [], calls: [], observations: [{ name: 'sum', kind: 'integer', read: { variable: 'sum' } }], expected: { sum: '7' } }] };
 const process = { exitCode: 0, timedOut: false, outputLimitExceeded: false };
 const good = { caseId: 'sum', status: 'PASSED' as const, actual: { sum: '7' }, report: { build: process, execution: process } };

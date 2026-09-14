@@ -7,7 +7,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, statfsSync, writeFileSync
 import { join, dirname } from 'node:path';
 import { tmpdir, freemem } from 'node:os';
 import type { NativeLanguageToolchain, NativeToolchainInput, ToolchainFile } from '../../../application/ports/LanguageToolchainPorts.ts';
-import { buildConstraints } from '../../../domain/services/workbench/WorkbenchProject.ts';
+import { buildConstraints } from '../../../domain/workbench/WorkbenchProject.ts';
 import { modelProcessLane } from '../../agentAdapters/ModelProcessLane.ts';
 import { captureIsolated } from '../../runtime/IsolatedCommand.ts';
 import { nativeBuildIssues } from './NativeBuildDiagnostics.ts';

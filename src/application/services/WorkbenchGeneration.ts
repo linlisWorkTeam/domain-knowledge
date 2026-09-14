@@ -3,13 +3,13 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：交接固定源码、接口和现有DocGen角色，逐卡提交并保留恢复材料。
  */
-import { moduleBuild } from '../../domain/services/workbench/WorkbenchProject.ts';
+import { moduleBuild } from '../../domain/workbench/WorkbenchProject.ts';
 import { sha256, type ArtifactRef } from '../../domain/Domain.ts';
-import { executeAgent } from '../../domain/services/workflow/AgentExecutionService.ts';
+import { executeAgent } from '../../domain/workflow/AgentExecutionService.ts';
 import type { AgentCommand } from '../../domain/agents/AgentContracts.ts';
 import type { Material, StageAttempt } from '../../domain/agents/AgentExecution.ts';
-import { knowledgeUnits, cardBodyWithSource } from '../../domain/services/knowledge/KnowledgeUnits.ts';
-import { canonicalJson, type JsonValue } from '../../domain/services/workbench/StageTask.ts';
+import { knowledgeUnits, cardBodyWithSource } from '../../domain/knowledge/KnowledgeUnits.ts';
+import { canonicalJson, type JsonValue } from '../../domain/workbench/StageTask.ts';
 import type { ArtifactStore, AgentContractValidator } from '../ports/ApplicationPorts.ts';
 import type { NativeLanguageToolchain } from '../ports/LanguageToolchainPorts.ts';
 import type { StageConfigurationProvider, StageModelConfiguration, StageModelFactory } from '../ports/WorkbenchGenerationPorts.ts';
@@ -31,7 +31,7 @@ export class WorkbenchGeneration {
   async start(snapshotId: string, scopes: Record<string, GenerationScope> = {}) {
     return this.dependencies.stages.start(await this.prepare(snapshotId, scopes));
   }
-  async prepare(snapshotId: string, scopes: Record<string, GenerationScope> = {}): Promise<import('../../domain/services/workbench/StageTask.ts').StageInput> {
+  async prepare(snapshotId: string, scopes: Record<string, GenerationScope> = {}): Promise<import('../../domain/workbench/StageTask.ts').StageInput> {
     const { projects, artifacts, configuration, stages } = this.dependencies;
     const project = projects.get(snapshotId); if (!project) throw new Error('PROJECT_INPUT_NOT_FOUND');
     if (!scopes || typeof scopes !== 'object' || Array.isArray(scopes)) throw new Error('GENERATION_SCOPE_INVALID');
@@ -100,7 +100,7 @@ export class WorkbenchGeneration {
           const unitFact = { schemaVersion: 'knowledge-unit-v1', unit, repositoryId: project.repositoryId, commit: project.commit,
             sourceFiles, build: moduleBuild(project, module.moduleId), interfaceRef };
           const unitRef = await artifacts.put(Buffer.from(JSON.stringify(unitFact)), 'application/json');
-          const payload = { moduleId: unit.storageModuleId, sourceRefs: sourceFiles.map((file) => file.ref), publicInterfaceRefs: [interfaceRef], workerFragmentRefs: [unitRef] };
+          const payload = { executionContract: 'section-doc-v1', moduleId: unit.storageModuleId, sourceRefs: sourceFiles.map((file) => file.ref), publicInterfaceRefs: [interfaceRef], workerFragmentRefs: [unitRef] };
           const command: AgentCommand = { schemaVersion: '1.0', runId: context.task.taskId, agentType: 'doc-gen', commandId: `cmd-${sha256(key)}`, generationKey: key, payload };
           contracts.assertCommand(command);
           const commandRef = await artifacts.put(Buffer.from(JSON.stringify(command, null, 2)), 'application/json');

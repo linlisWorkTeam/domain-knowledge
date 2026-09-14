@@ -4,7 +4,7 @@
  * 文件功能：用稳定章节标识组装正文，修订只替换授权章节的内容。
  */
 import { StageValidationIssue } from '../StageValidation.ts';
-import type { Outline, Output } from './DocGenAgentContract.ts';
+import type { Outline, DocumentBody } from './DocGenAgentContract.ts';
 import { markdownSections, validateOutlineBody, validateRevision } from './DocGenRevision.ts';
 
 /** 模型不重复生成文档和章节标题，元数据由概要固定；修订仍返回展示元数据。 */
@@ -52,7 +52,7 @@ function validateSection(body: string, field: string): void {
 
 /** 将模型段落放入受信骨架，仍运行既有章节范围检查。 */
 export function assembleSections(raw: SectionOutput, targets: SectionTarget[], outline?: Outline,
-  revision?: { base: string; headings: Set<string> }): Output {
+  revision?: { base: string; headings: Set<string> }): DocumentBody {
   if (/[\r\n]/.test(raw.title)) throw new StageValidationIssue('DOC_GEN_TITLE_INVALID', 'title', '文档标题只能为单行文本。');
   const allowed = new Set(targets.map(({ sectionId }) => sectionId));
   if (raw.sections.some(({ sectionId }) => !allowed.has(sectionId))) throw new Error('DOC_GEN_SECTION_DENIED');

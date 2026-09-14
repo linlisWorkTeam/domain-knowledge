@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：验证Dsh项目Stages的行为、约束及失败场景。
  */
-import { NODE_BY_AGENT } from '../../src/domain/services/workflow/AgentDefinitions.ts';
+import { NODE_BY_AGENT } from '../../src/domain/workflow/AgentDefinitions.ts';
 import { modelExecutionFactory } from '../../src/infrastructure/agentAdapters/ModelExecution.ts';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -14,11 +14,11 @@ import test from 'node:test';
 import { ProjectWorkflowStages, type AutomatedProjectScenario } from '../../src/application/services/AutomatedProjectWorkflow.ts';
 import type { WorkflowStageInput } from '../../src/application/ports/ApplicationPorts.ts';
 import { DeepSeekHarnessSdkAgent, type DeepSeekHarnessAuditRecord } from '../../src/infrastructure/agentAdapters/deepSeekHarness/DeepSeekHarnessSdkAgent.ts';
-import { LocalAgentWorkspace } from '../../src/domain/services/workspace/LocalAgentWorkspace.ts';
+import { LocalAgentWorkspace } from '../../src/domain/workspace/LocalAgentWorkspace.ts';
 import { TrustedProjectEvaluator } from '../../src/infrastructure/evaluation/project/TrustedProjectEvaluator.ts';
 import { JsonSchemaAgentContractValidator } from '../../src/infrastructure/agentAdapters/contracts/JsonSchemaAgentContractValidator.ts';
 import { createComposition } from '../../src/interfaces/runner/Composition.ts';
-import { knowledgeOutline, knowledgePlan, knowledgeSections } from '../helpers/KnowledgeRoleFixture.ts';
+import { orchestratorOutput } from '../helpers/CppScenario.ts';
 import { GOOD_BODY } from '../helpers/Fixture.ts';
 
 function git(root: string, args: string[]): string {
@@ -66,17 +66,14 @@ for (const [moduleId, sourcePath] of [['formatter', 'lib/format.mjs'], ['normali
             run: async (prompt, runOptions) => {
               assert.equal(typeof prompt, 'string');
               const planning = String(prompt).includes('你是知识飞轮中的 orchestrator 节点。');
-              const outline = !planning && String(prompt).includes('当前阶段：outline');
-              calls.push(planning ? 'orchestrator' : outline ? 'doc-gen:outline' : 'doc-gen:body');
+              calls.push(planning ? 'orchestrator' : 'doc-gen');
               if (!planning) assert.match(readFileSync(join(options.cwd!, sourcePath), 'utf8'), new RegExp(moduleId));
               assert.equal(String(prompt).includes('knowledge-v1.md'), false);
               return {
                 sessionId: runOptions!.sessionId!, events: [], notifications: [],
                 finalResponse: JSON.stringify(planning
-                  ? knowledgePlan([sourcePath])
-                  : outline
-                    ? knowledgeOutline({ title: moduleId, description: 'Pinned source documentation.', body: GOOD_BODY })
-                    : knowledgeSections({ title: moduleId, description: 'Pinned source documentation.', body: GOOD_BODY })),
+                  ? orchestratorOutput(moduleId)
+                  : { title: moduleId, description: 'Pinned source documentation.', keywords: [moduleId], body: GOOD_BODY }),
               };
             },
             close: async () => undefined,
@@ -101,8 +98,8 @@ for (const [moduleId, sourcePath] of [['formatter', 'lib/format.mjs'], ['normali
       assert.equal(result.agentType, 'doc-gen');
       assert.equal(result.runId, run.runId);
       assert.equal(result.status, 'SUCCEEDED');
-      assert.deepEqual(calls, ['orchestrator', 'doc-gen:outline', 'doc-gen:body']);
-      assert.equal(new Set(audits.map((record) => record.sessionId)).size, 3);
+      assert.deepEqual(calls, ['orchestrator', 'doc-gen']);
+      assert.equal(new Set(audits.map((record) => record.sessionId)).size, 2);
       assert.ok(audits.every((record) => record.sessionId && record.metadata.runId === run.runId && record.status === 'SUCCEEDED'));
       assert.equal(composition.service.status().publications, 0);
     } finally {

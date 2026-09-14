@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createArtifactRef, type KnowledgeVersion } from '../../src/domain/Domain.ts';
-import { groupKnowledgeCards, currentCardVersions } from '../../src/domain/services/knowledge/KnowledgeCards.ts';
+import { groupKnowledgeCards, currentCardVersions } from '../../src/domain/knowledge/KnowledgeCards.ts';
 import { KnowledgeQueryService } from '../../src/application/services/QueryService.ts';
 import type { ArtifactStore, FlywheelRepository } from '../../src/application/ports/ApplicationPorts.ts';
 

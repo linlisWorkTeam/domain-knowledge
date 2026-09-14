@@ -3,9 +3,9 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：声明原生观察、工具链身份与不可变测试集持久化端口。
  */
-import type { NativeBehaviorCase, NativeContract, NativeScalar } from '../../domain/services/evaluation/NativeBehaviorSuite.ts';
-import type { NativeTestSet } from '../../domain/services/evaluation/NativeTestCache.ts';
-import type { BuildConstraints } from '../../domain/services/workbench/WorkbenchProject.ts';
+import type { NativeBehaviorCase, NativeContract, NativeScalar } from '../../domain/evaluation/NativeBehaviorSuite.ts';
+import type { NativeTestSet } from '../../domain/evaluation/NativeTestCache.ts';
+import type { BuildConstraints } from '../../domain/workbench/WorkbenchProject.ts';
 import type { NativeLanguageToolchain, NativeToolchainInput } from './LanguageToolchainPorts.ts';
 export interface NativeCaseObservation {
   caseId: string; status: 'PASSED' | 'FAILED'; reasonCode: string | null;

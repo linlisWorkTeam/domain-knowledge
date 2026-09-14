@@ -13,7 +13,7 @@ import type {
 } from '../ports/ApplicationPorts.ts';
 import { AGENT_IDS } from '../ports/ApplicationPorts.ts';
 import type { StageModelConfiguration } from '../ports/WorkbenchGenerationPorts.ts';
-import { canonicalJson } from '../../domain/services/workbench/StageTask.ts';
+import { canonicalJson } from '../../domain/workbench/StageTask.ts';
 
 /** 对外提供标识，作为调用方使用的统一约定。 */
 export const AGENT_COMMAND_SCHEMA_ID = 'https://wpknowledge.local/schemas/agent-command/v1' as const;

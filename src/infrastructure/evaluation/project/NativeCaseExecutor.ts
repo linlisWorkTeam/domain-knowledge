@@ -6,7 +6,7 @@
 import type { NativeLanguageToolchain, NativeToolchainInput } from '../../../application/ports/LanguageToolchainPorts.ts';
 import type { NativeCaseObservation } from '../../../application/ports/NativeEvaluationPorts.ts';
 export type { NativeCaseObservation } from '../../../application/ports/NativeEvaluationPorts.ts';
-import { compareNativeObservations, type NativeBehaviorCase, type NativeContract, type NativeScalar } from '../../../domain/services/evaluation/NativeBehaviorSuite.ts';
+import { compareNativeObservations, type NativeBehaviorCase, type NativeContract, type NativeScalar } from '../../../domain/evaluation/NativeBehaviorSuite.ts';
 import { nativeCaseHarness } from './NativeCaseHarness.ts';
 export function parseNativeObservation(stdout: string, test: NativeBehaviorCase): Record<string, NativeScalar> {
   const fail = (): never => { throw new Error('NATIVE_OBSERVATION_INVALID'); };

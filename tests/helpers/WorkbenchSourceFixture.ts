@@ -4,8 +4,8 @@
  * 文件功能：提供协调器测试的来源执行器替身，不作为真实来源验证证据。
  */
 import { sha256 } from '../../src/domain/Domain.ts';
-import { SOURCE_VERIFICATION_CONTRACT } from '../../src/domain/services/knowledge/KnowledgeSourceVerification.ts';
-import type { StageInput, StageTask, StageResult } from '../../src/domain/services/workbench/StageTask.ts';
+import { SOURCE_VERIFICATION_CONTRACT } from '../../src/domain/knowledge/KnowledgeSourceVerification.ts';
+import type { StageInput, StageTask, StageResult } from '../../src/domain/workbench/StageTask.ts';
 export function sourceInput(evaluation: StageTask): StageInput {
   return { ...evaluation.input, stage: 'EVALUATE', parameters: { ...evaluation.input.parameters, operation: 'KNOWLEDGE_SOURCE_VERIFICATION', verificationContract: SOURCE_VERIFICATION_CONTRACT, evaluationTaskId: evaluation.taskId } };
 }

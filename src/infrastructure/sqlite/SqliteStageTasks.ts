@@ -11,7 +11,7 @@ import type { StageTaskStore } from '../../application/ports/StageTaskPorts.ts';
 import {
   STAGE_CONTRACT, assertStageBudget, assertStageResumable, canonicalJson,
   type JsonValue, type StageCheckpoint, type StageEvent, type StageResult, type StageTask, type StageUsage,
-} from '../../domain/services/workbench/StageTask.ts';
+} from '../../domain/workbench/StageTask.ts';
 import { checkpointOwner, checkpointOwnerExited } from './CheckpointOwner.ts';
 
 /** 原子状态迁移及全库单执行槽；不会依据过期时间抢占仍活着的进程。 */

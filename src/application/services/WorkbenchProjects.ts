@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：冻结模块与构建输入，先存源码工件再原子提交项目快照。
  */
-import { projectModuleBuilds, buildConstraints, createProjectSnapshot, selectProjectModules, type ProjectSource } from '../../domain/services/workbench/WorkbenchProject.ts';
+import { projectModuleBuilds, buildConstraints, createProjectSnapshot, selectProjectModules, type ProjectSource } from '../../domain/workbench/WorkbenchProject.ts';
 import type { ArtifactStore } from '../ports/ApplicationPorts.ts';
 import type { RepositorySourceReader } from '../ports/RepositoryAnalysisPorts.ts';
 import type { WorkbenchProjectStore } from '../ports/WorkbenchProjectPorts.ts';

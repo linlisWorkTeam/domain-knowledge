@@ -45,6 +45,9 @@
         "FAILED"
       ]
     },
+    "rawOutputRef": {
+      "$ref": "https://wpknowledge.local/schemas/artifact-ref/v1"
+    },
     "outputRefs": {
       "type": "array",
       "items": {
@@ -53,9 +56,6 @@
     },
     "payload": {
       "type": "object"
-    },
-    "rawOutputRef": {
-      "$ref": "https://wpknowledge.local/schemas/artifact-ref/v1"
     }
   },
   "allOf": [
@@ -95,7 +95,14 @@
                 "const": "doc-gen"
               },
               "payload": {
-                "$ref": "#/$defs/knowledgeCandidatePayload"
+                "oneOf": [
+                  {
+                    "$ref": "#/$defs/knowledgeCandidatePayload"
+                  },
+                  {
+                    "$ref": "#/$defs/docgenDecisionPayload"
+                  }
+                ]
               }
             }
           },
@@ -201,10 +208,21 @@
                 "type": "string",
                 "minLength": 1
               },
+              "moduleId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "materials": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
               "agentType": {
                 "enum": [
                   "doc-gen",
-                  "doc-worker",
                   "test-gen",
                   "code",
                   "check",
@@ -256,6 +274,44 @@
       },
       "additionalProperties": false
     },
+    "docgenDecisionPayload": {
+      "type": "object",
+      "required": [
+        "resultKind",
+        "proposalRef",
+        "reason",
+        "suggestedDocuments",
+        "provenance"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "resultKind": {
+          "const": "userDecisionRequired"
+        },
+        "proposalRef": {
+          "$ref": "#/$defs/artifactRef"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "suggestedDocuments": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "provenance": {
+          "$ref": "#/$defs/artifactRefArray"
+        },
+        "workerResultRefs": {
+          "$ref": "#/$defs/artifactRefArray"
+        }
+      }
+    },
     "knowledgeCandidatePayload": {
       "type": "object",
       "required": [
@@ -270,6 +326,20 @@
         },
         "bodyRef": {
           "$ref": "#/$defs/artifactRef"
+        },
+        "workerResultRefs": {
+          "$ref": "#/$defs/artifactRefArray"
+        },
+        "baseKnowledgeRef": {
+          "$ref": "#/$defs/artifactRef"
+        },
+        "appliedCorrectionIds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^COR-[0-9]{4,}$"
+          }
         },
         "provenance": {
           "$ref": "#/$defs/artifactRefArray"

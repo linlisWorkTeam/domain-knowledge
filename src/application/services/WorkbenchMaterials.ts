@@ -4,7 +4,7 @@
  * 文件功能：捕获用户指定来源的不可变外部材料及审计工件。
  */
 import { sha256 } from '../../domain/Domain.ts';
-import { MATERIAL_CONTRACT, materialIdentity } from '../../domain/services/association/ExternalMaterial.ts';
+import { MATERIAL_CONTRACT, materialIdentity } from '../../domain/association/ExternalMaterial.ts';
 import type { ArtifactStore } from '../ports/ApplicationPorts.ts';
 import type { ExternalMaterialReader, ExternalMaterialStore, MaterialTextExtractor } from '../ports/ExternalMaterialPorts.ts';
 export class WorkbenchMaterials {

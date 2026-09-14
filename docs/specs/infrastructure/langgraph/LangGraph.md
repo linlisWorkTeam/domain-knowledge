@@ -16,7 +16,7 @@ Runtime 在首次运行持久化 `budgetStartedAt` 和 `budgetDeadlineAt`，每�
 
 图的取消 Promise 可能先于节点执行器清理返回。Runtime 额外跟踪完整节点 Promise，在取消、超时或图退出时等待全部节点的清理和审计投影写入完成，再结束 wait/shutdown 或关闭数据库。已取消节点记录 CANCELLED；忽略信号的迟到结果不能记录 COMPLETED。旧取消记录中的陈旧 RUNNING 投影保留为历史证据，不表示仍有进程运行。
 
-同版本恢复从持久 checkpoint 继续，Run 配置不兼容由 Application 拒绝。恢复执行不能跳过已提交结果的 generationKey 去重。SDK 类型不进入 Domain，Console 读取 Registry 投影而非 checkpoint SQLite。
+同版本恢复从持久 checkpoint 继续，Run 配置不兼容由 Application 拒绝。Registry 业务提交与 LangGraph checkpoint 不是同一事务，Graph 在 executor 返回后才保存节点更新。Application 先持久化不可变路由结果，再幂等迁移 Run/保存停止交接；重放返回既有 route-v2 结果，不按已递增的 Run.iteration 重算预算。Gate 已提交而路由未提交时按相同证据取回决定，输入冲突拒绝。`tests/integration/WorkflowRouterReplay.test.ts` 用真实图异常注入及 resume 覆盖这些窗口；不能只凭 Orchestrator 重放测试声明 router 可恢复。SDK 类型不进入 Domain，Console 读取 Registry 投影而非 checkpoint SQLite。
 
 独立角色开发直接调用 Application 和 Domain，不启动该图；基础设施不再提供单角色示例的兼容导出。
 

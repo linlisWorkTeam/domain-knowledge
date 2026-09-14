@@ -5,8 +5,8 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { knowledgeRevisionDecision, knowledgeRevisionOutcome, finalizeKnowledgeRevision, sourceReviewObservations } from '../../src/domain/services/knowledge/KnowledgeRevision.ts';
-import type { Output } from '../../src/domain/agents/reviewAgent/ReviewAgentContract.ts';
+import { knowledgeRevisionDecision, knowledgeRevisionOutcome, finalizeKnowledgeRevision, sourceReviewObservations } from '../../src/domain/knowledge/KnowledgeRevision.ts';
+import type { Output } from '../../src/domain/agents/reviewAgent/WorkbenchReviewContract.ts';
 test('revision only accepts an explicit correction within the evidence-bound headings', () => {
   const review: Output = { blocking: true, recommendation: 'ITERATE', correction: { correctionId: 'COR-0001', knowledgePath: 'knowledge/card.md#Behavior', criterion: 'Explain missing behavior', risk: 'Wrong result' } };
   assert.equal(knowledgeRevisionDecision(review, 'card', ['Behavior']).heading, 'Behavior');

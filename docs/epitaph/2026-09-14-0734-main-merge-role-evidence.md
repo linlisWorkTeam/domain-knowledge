@@ -1,0 +1,17 @@
+# main 集成中的角色证据与前台状态
+
+目标保持五阶段工作台、C/C++真实验收、前台改造、部署，以及最后按包含关系处理PR38/50。PR50仍OPEN/DRAFT，线上仍旧ec72。没有PR合入或关闭，没有启动真实模型任务。
+
+独立工作树 /tmp/domain-knowledge-workbench 正在合并 origin/main 22fe34f。pre-merge HEAD39092ce，backup/workbench-before-main-20260914-0724保留原状态。当前62个未解决文件；不能运行整站/完整回归、不能部署。不要abort或覆盖已合并内容。原/root/projects/domain-knowledge-wxc未改。前轮目录迁移审计/tmp/WorkbenchDomainRelocationAudit.json、脚本/tmp/RelocateWorkbenchDomain.py。保留main直接domain业务分区，不恢复services旧目录。
+
+本轮解决RoleExecution：领域executeAgent分发roleExecutors（含DocWorker），保留stageJournal和公共commitRoleArtifacts，同时在AgentReportFailure时保存失败CAS证据并抛错，不提交成功checkpoint。generation暂定main:contract-v11，AgentExecution已有domain-agents-v11-workbench-evidence；AutomatedProjectWorkflow等冲突文件还含contract-v10，后续统一所有生成键。AgentRequest同时保留maxTokens和outputAttempts；ProjectTool并集保留typescript与gcc/g++/binary。ModelExecution保留串行模型lane、stage键、maxTokens，并加入outputAttempts/reportAttempt及独立report幂等键。
+
+Check采用main report-v2双方证据/固定修正预算/禁止删除降级结论保护，保留工作台constraint-check阶段名。旧位置证据测试改用新报告契约，仍验证真实生成位置及无效/空证据拒绝。AgentResult JSON语义比较后采用main结构并保留knowledgeRisks；DocWorker只作DocGen内部worker，保留worker结果及修订关联。AgentContracts的rawOutputRef保持旧数据可读。
+
+web/App.js合并main执行状态/错误展示，同时保留工作台未知节点UNKNOWN、未知计数、历史RUNNING明确标注及真实终态进度。Composition合并工作台发布和markdownLite导入。未完成浏览器验收/部署。
+
+验证：Node24 bootstrap:worktree:check READY。9个已合并TS文件Node --check通过（/tmp/WorkbenchMergeRoleSyntax.json），App.js语法及本轮相关staged whitespace检查通过。typescript7无旧transpileModule接口，初次临时语法脚本失败，改Node --check完成，不改依赖。Check的12个测试通过/tmp/WorkbenchMergeCheck.log：临时测试/helper只将RoleExample的全角色Registry替换为Check定义，以绕过其他角色冲突；其余断言保留。这不证明全Registry或应用集成。正式CheckEvidence测试另跑/tmp/WorkbenchMergeCheckEvidence.log通过。无活跃测试进程。
+
+重点未解决：Code主线仅C/C++ projectConfigurationRef（裁剪配置、无仓库读取），工作台调用方WorkbenchReconstruction仍knowledgeRef/publicInterfaceRefs/buildContractRef且需TypeScript回归。不能直接选一边或放宽main保护；须显式兼容并同步Schema/生产调用/样例/测试。DocGenRevision双方导出同名validateRevision但签名不同：工作台精确H2字节保护，main校验Correction ID/定位与质量反馈；需合并规则，不能丢授权范围保护。ConfiguredProvider冲突涉及主线opencode稳定请求hash vs工作台原生sessionId，要结合历史已验会话和测试决定。余下主要ProjectFlow/AutomatedProjectWorkflow、角色契约/样例/测试、Specs/架构/CI。
+
+HistoryEpitaph仍在冲突；合并引入更多旧墓志铭。本记录先保留审计，解决History后按规则归档并只留最新三份，不在冲突中删除历史证据。本轮progress，goal active，未宣称验收完成。

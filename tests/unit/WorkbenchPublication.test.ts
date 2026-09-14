@@ -6,8 +6,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { sha256 } from '../../src/domain/Domain.ts';
-import { publicationEvidence, type PublicationEvidence } from '../../src/domain/services/workbench/WorkbenchPublication.ts';
-import { createStageTask, canonicalJson, type StageTask, type StageInput, type StageResult } from '../../src/domain/services/workbench/StageTask.ts';
+import { publicationEvidence, type PublicationEvidence } from '../../src/domain/workbench/WorkbenchPublication.ts';
+import { createStageTask, canonicalJson, type StageTask, type StageInput, type StageResult } from '../../src/domain/workbench/StageTask.ts';
 import { publicationFixture as fixture, publicationRef as ref } from '../helpers/WorkbenchPublicationFixture.ts';
 function reidentify(task: StageTask) { const identity = createStageTask(task.input, task.limits, task.createdAt); task.taskId = identity.taskId; task.inputDigest = identity.inputDigest; }
 test('joint evidence binds successful stages but never claims transaction publication', () => {

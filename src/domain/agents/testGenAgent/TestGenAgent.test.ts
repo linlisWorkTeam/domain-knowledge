@@ -6,9 +6,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { execute } from './TestGenAgent.ts';
-import type { Input } from './TestGenAgentContract.ts';
+import { schemaFor, validateOutput, type Input } from './TestGenAgentContract.ts';
+import { assertModelOutput } from '../../../../src/infrastructure/agentAdapters/ModelExecution.ts';
 import { roleExample } from '../../../../tests/helpers/RoleExample.ts';
-import { assertModuleBehaviorSuite } from './ModuleBehaviorSuite.ts';
 
 test('test-gen: normal output uses one model call and validates before returning artifacts', async () => {
   const sample = roleExample<Input>('test-gen');
@@ -47,33 +47,36 @@ test('test-gen: unrelated candidate knowledge never reaches the prompt or worksp
   assert.deepEqual(sample.requests[0]!.readablePaths, [...sample.input.sourcePaths, ...sample.input.publicInterfacePaths]);
 });
 
-test('test-gen: declarative cases produce executable reproduction and pending oracle manifest', async () => {
+test('test-gen rejects undeclared test files and invented evidence and stores distinct artifacts', async () => {
   const sample = roleExample<Input>('test-gen');
-  const suite = { schemaVersion: 'module-cases-v1', modulePath: sample.input.sourcePaths[0]!,
-    exportName: 'structuredMarkdownDiff', cases: [{ caseId: 'identical', description: '相同正文无差异',
-      args: ['same', 'same'], expected: { hunks: [], changedSections: [] } }] };
-  sample.context.model.execute = async () => ({ suite, oracleRequired: true });
   const result = await execute(sample.input, sample.context);
-  assert.match(result.artifacts.find((item) => item.key === 'candidate-tests')!.content, /assert.deepEqual/);
-  assert.equal(JSON.parse(result.artifacts.find((item) => item.key === 'case-manifest')!.content).status, 'PENDING_ORACLE');
-  assert.deepEqual(result.payload.caseManifestRef, { pendingArtifact: 'case-manifest' });
-  sample.context.model.execute = async () => ({ suite, oracleRequired: false });
-  await assert.rejects(execute(sample.input, sample.context), /TEST_ORACLE_REQUIRED/);
-});
-
-test('test-gen: rejects duplicate cases, traversal, code claims and oversized JSON data', () => {
-  const suite = { schemaVersion: 'module-cases-v1', modulePath: 'module.ts', exportName: 'render',
-    cases: [{ caseId: 'one', description: 'one', args: ['x'], expected: 'x' }] };
-  assertModuleBehaviorSuite(suite);
-  assert.throws(() => assertModuleBehaviorSuite({ ...suite, modulePath: '../module.ts' }), /SUITE_INVALID/);
-  assert.throws(() => assertModuleBehaviorSuite({ ...suite, cases: [suite.cases[0], suite.cases[0]] }), /SUITE_INVALID/);
-  assert.throws(() => assertModuleBehaviorSuite({ ...suite, cases: [{ ...suite.cases[0], expected: () => true }] }), /SUITE_INVALID/);
-  assert.throws(() => assertModuleBehaviorSuite({ ...suite, cases: [{ ...suite.cases[0], expected: 'a'.repeat(65_537) }] }), /SUITE_INVALID/);
-});
-
-test('test-gen: module policy requires behavior cases instead of legacy commands', async () => {
-  const sample = roleExample<Input>('test-gen');
-  const policy = sample.input.materials.find(({ ref }) => ref.artifactId === sample.input.payload.testPolicyRef.artifactId)!;
-  policy.content = { moduleContract: { modulePath: sample.input.sourcePaths[0], exportName: 'structuredMarkdownDiff' } };
+  assert.deepEqual(result.payload.candidateSetRef, { pendingArtifact: 'tests' });
+  assert.deepEqual(result.payload.caseManifestRef, { pendingArtifact: 'cases' });
+  sample.output.cases[0].sourceEvidence = ['private.cpp'];
+  sample.context.model.execute = async () => sample.output;
   await assert.rejects(execute(sample.input, sample.context), /AGENT_OUTPUT_INVALID/);
+  assert.throws(() => validateOutput(sample.output, sample.input), /CASE_MANIFEST_INVALID/);
+  sample.output.files[0].path = '../source.cpp';
+  await assert.rejects(execute(sample.input, sample.context), /AGENT_OUTPUT_INVALID/);
+  assert.throws(() => validateOutput(sample.output, sample.input), /OUTPUT_PATH_INVALID/);
+});
+
+test('model schema exposes exact evidence and output boundaries before business validation', () => {
+  const sample = roleExample<Input>('test-gen');
+  const schema = schemaFor(sample.input);
+  assert.doesNotThrow(() => assertModelOutput(sample.output, schema));
+  const qualified = structuredClone(sample.output);
+  qualified.cases[0].sourceEvidence = [`${sample.input.sourcePaths[0]}:calculate`];
+  assert.throws(() => assertModelOutput(qualified, schema), /AGENT_OUTPUT_INVALID/);
+  const extra = structuredClone(sample.output);
+  extra.files.push({path: `${extra.files[0].path}.manifest.json`, content: '{}'});
+  assert.throws(() => assertModelOutput(extra, schema), /AGENT_OUTPUT_INVALID/);
+});
+
+test('validated source tests bypass the model even when the prompt changes', async () => {
+  const sample = roleExample<Input>('test-gen');
+  sample.context.effectivePrompt = 'new prompt';
+  sample.context.model.execute = async () => { throw new Error('must reuse'); };
+  const result = await execute(sample.input, { ...sample.context, validatedOutput: sample.output });
+  assert.deepEqual(result.output, sample.output);
 });

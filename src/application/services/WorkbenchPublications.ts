@@ -4,12 +4,12 @@
  * 文件功能：将完整证据准备提交为可恢复的独立本地知识发布。
  */
 import { assertArtifactRef, type ArtifactRef } from '../../domain/Domain.ts';
-import { assertPublicationRecord, createPublication, type PublicationFile } from '../../domain/services/workbench/WorkbenchPublicationRecord.ts';
-import { cardIndexHeader } from '../../domain/services/knowledge/KnowledgeIndex.ts';
+import { assertPublicationRecord, createPublication, type PublicationFile } from '../../domain/workbench/WorkbenchPublicationRecord.ts';
+import { cardIndexHeader } from '../../domain/knowledge/KnowledgeIndex.ts';
 import type { KnowledgeIndexStore } from '../ports/KnowledgeIndexPorts.ts';
 import type { WorkbenchPublicationFiles, WorkbenchPublicationStore } from '../ports/WorkbenchPublicationPorts.ts';
 import type { WorkbenchPublicationEvidence, PublicationTaskIds } from './WorkbenchPublicationEvidence.ts';
-import type { PipelineFixedSuite } from '../../domain/services/workbench/WorkbenchPipeline.ts';
+import type { PipelineFixedSuite } from '../../domain/workbench/WorkbenchPipeline.ts';
 export class WorkbenchPublications {
   readonly dependencies: { evidence: WorkbenchPublicationEvidence; store: WorkbenchPublicationStore; files: WorkbenchPublicationFiles; render: Pick<KnowledgeIndexStore, 'render'> };
   private closing = false;

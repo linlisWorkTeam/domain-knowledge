@@ -4,8 +4,8 @@
  * 文件功能：只读解析编译数据库为可审核的声明式构建候选，不执行命令。
  */
 import { basename, dirname, isAbsolute, relative, resolve } from 'node:path';
-import { buildConstraints } from '../../domain/services/workbench/WorkbenchProject.ts';
-import type { RepositoryBuildCandidate } from '../../domain/services/sourceScan/RepositoryAnalysis.ts';
+import { buildConstraints } from '../../domain/workbench/WorkbenchProject.ts';
+import type { RepositoryBuildCandidate } from '../../domain/sourceScan/RepositoryAnalysis.ts';
 
 function words(command: string): string[] {
   if (command.length > 65536 || /[$`;|&<>\n\r]/.test(command)) throw new Error('命令包含未支持的展开或操作符');

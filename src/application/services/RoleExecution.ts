@@ -4,11 +4,13 @@
  * 文件功能：为生产与独立开发统一执行角色、保存工件并提交结果信封。
  */
 import { commitRoleArtifacts } from './RoleArtifacts.ts';
-import { executeAgent } from '../../domain/services/workflow/AgentExecutionService.ts';
+import { executeAgent } from '../../domain/workflow/AgentExecutionService.ts';
 import type { AgentCommand, AgentId } from '../../domain/agents/AgentContracts.ts';
-import type { ExecutionContext, RoleInput, StageAttempt } from '../../domain/agents/AgentExecution.ts';
-import { assertActive } from '../../domain/agents/AgentExecution.ts';
+import type { ExecutionContext, RoleInput, RoleResult, StageAttempt } from '../../domain/agents/AgentExecution.ts';
+import { assertActive, AgentReportFailure } from '../../domain/agents/AgentExecution.ts';
 import { createEvent, type ArtifactRef } from '../../domain/Domain.ts';
+import type { TestGenContext } from '../../domain/agents/testGenAgent/TestGenAgentContract.ts';
+import type { DocGenContext } from '../../domain/agents/docGenAgent/DocGenAgentContract.ts';
 import type { AgentContractValidator } from '../ports/ApplicationPorts.ts';
 import type { KnowledgeFlywheelService } from './ApplicationServices.ts';
 
@@ -27,7 +29,7 @@ export class RoleExecutionService {
   /** 执行当前角色或业务阶段并返回结构化结果。 */
   async execute(request: {
     command: AgentCommand; nodeId: string; inputRefs: ArtifactRef[];
-    input: RoleInput<Record<string, unknown>>; context: ExecutionContext;
+    input: RoleInput<Record<string, unknown>>; context: DocGenContext & TestGenContext;
   }): Promise<ArtifactRef> {
     const { command, context, input } = request;
     assertActive(context.signal);
@@ -64,9 +66,17 @@ export class RoleExecutionService {
           }, this.flywheel.clock()));
         },
       };
-      const roleResult = await executeAgent(input, { ...context, stageJournal });
+      let roleResult: RoleResult<unknown>;
+      try { roleResult = await executeAgent(input, { ...context, stageJournal }); }
+      catch (error) {
+        if (!(error instanceof AgentReportFailure)) throw error;
+        const refs: ArtifactRef[] = [];
+        for (const artifact of error.artifacts) refs.push(await this.flywheel.putArtifact(Buffer.from(artifact.content), artifact.mediaType));
+        // 保留失败报告的 CAS 证据，不提交成功 checkpoint。
+        throw new Error(`${error.message}; reportEvidence=${refs.map((ref) => ref.artifactId).join(',')}`, { cause: error });
+      }
       const { resultRef, rawRef } = await commitRoleArtifacts(this.flywheel.artifacts, this.contracts, command, commandRef, roleResult,
-        (role) => this.nodeByAgent[role], (role) => `${command.runId}:${this.nodeByAgent[role]}:${context.iteration}:contract-v5`, context.signal);
+        (role) => this.nodeByAgent[role], (role) => `${command.runId}:${this.nodeByAgent[role]}:${context.iteration}:main:contract-v11`, context.signal);
       return [resultRef, rawRef];
     });
     const ref = checkpoint.outputRefs[0];

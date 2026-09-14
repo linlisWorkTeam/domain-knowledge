@@ -12,13 +12,17 @@ SPDX-License-Identifier: MIT
 
 modelExecutionFactory 为每个角色绑定 ModelExecutionPort。输入包括 Prompt、输出 Schema、授权工具和可读路径，Adapter 准备 Workspace，映射 AgentProvider 请求、会话和模型配置。JsonSchemaAgentContractValidator 校验公共命令/结果，DSH 负责授权工具自主调用，Domain 仍控制角色阶段。
 
+## 内部子任务的技术调度
+
+ConcurrentTasks 实现 Application 的 TaskBatchRunner，默认最多三个并发调用。DocGen 决定最多五个 Worker 任务的业务范围，执行器只控制启动与取消；任务失败时取消其余在途调用、停止启动排队任务，并等待所有已启动任务结束。结果保持输入任务顺序。内部 Worker 继续使用 modelExecutionFactory，每个任务拥有独立命令、授权源码路径及隔离工作区。
+
 ## Provider 与运行策略
 
-DSH 原生 SDK 是默认接入后端，Adapter 负责输出提取、闭合 Schema 校验、网络/格式修复重试、超时、取消和调用摘要。角色层不再重复网络重试。模型正常返回仍须检查取消，防止迟到输出提交。受控场景模型注入同一入口，不能通过继承覆盖业务步骤。
+DSH 原生 SDK 是默认接入后端，Adapter 负责输出提取、闭合 Schema 校验、网络/格式修复重试、超时、取消和调用摘要。角色层不再重复网络重试。Check 通过 outputAttempts=1 接管报告的统一修正预算，DSH 每次只尝试一个输出；JSON/Schema 错误以 ModelResponseError 保留原始响应，供 Check 反馈修正，其他角色沿用既有策略。报告尝试追加独立 report-N 幂等后缀及审计字段，不改变冻结命令和授权范围。模型正常返回仍须检查取消，防止迟到输出提交。受控场景模型注入同一入口，不能通过继承覆盖业务步骤。
 
 ConfiguredProvider 解析已验证设置或环境配置。Console 已保存但未启用/未验证的配置阻止新 Run，不静默回退；已有 Run 使用冻结配置。OpenCode Go 根据非秘密参数生成运行目录补丁，补丁只记录密钥环境变量名。配置方式见 Runtime 指南。
 
-模型转发请求使用产品 User-Agent，并在 x-opencode-session 头中传递原生 DSH 会话标识。会话启动回调在首次请求前绑定标识，工具往返保持稳定，格式重试使用新会话；不能将整次飞轮或不同角色共用一个会话。该头来自可信适配器，不从模型或转发请求复制。此行为遵循 [OpenCode Go 客户端要求](https://opencode.ai/docs/go/#where-can-i-use-it)，凭据仍只由父进程注入。
+模型转发请求使用产品 User-Agent，仅对 opencode.ai 在 x-opencode-session 头中传递原生 DSH 会话标识。会话启动回调在首次请求前绑定标识，工具往返保持稳定，格式重试使用新会话；不能将整次飞轮或不同角色共用一个会话。该头来自可信适配器，不从模型或转发请求复制。此行为遵循 [OpenCode Go 客户端要求](https://opencode.ai/docs/go/#where-can-i-use-it)，凭据仍只由父进程注入。
 
 SSE usage 按单次 HTTP 请求的最新累计快照统计，不能逐帧累加；工具往返的不同请求相加，格式重试的调用记录独立计数。旧记录保持原样，若旧适配器对累计快照重复求和，验收证据必须标注其 token 统计不可作为实际用量或计费依据。
 
@@ -30,11 +34,15 @@ SSE usage 按单次 HTTP 请求的最新累计快照统计，不能逐帧累加�
 
 探针与业务模型共用 ECS 串行执行槽，30 秒总期限覆盖排队、模型列表请求及生成，HTTP 客户端断开传递取消。模型列表最多 64 KiB，生成响应及进程输出均有上限；超时、取消与失败等待子进程退出后清理临时目录。失败只返回固定原因码，不返回响应正文、密钥或任意异常消息。受控端点回归证明协议与隔离；不把受控通过当作真实提供方验收。
 
+其他主机不发送此提供方专属头。传输策略版本进入运行配置指纹；已有失败运行不在配置改变后静默恢复。
+
 ## 凭据与材料
 
 ProviderSettings 加密保存凭据，对外只返回配置状态、脱敏摘要和校验结果；密钥不进入浏览器持久化、Prompt 日志或 Run 摘要。PublicHttps 位于独立 http 适配器，模型探针与来源读取共用。材料插件按角色白名单读取；Bubblewrap 隔离和会话限制由运行时实现，不扩大 Domain 工具权限。
 
 read_material 在访问文件系统前校验词法路径，拒绝隐藏路径、穿越及路径中的符号链接，再核对规范路径和普通文件类型。越权请求统一返回 DSH_MATERIAL_DENIED，不因隔离空间内目标不存在而改变分类。原生 DSH 验收使用真实 Bubblewrap，并在子进程内部单独探测授权文件可见、同级参考文件不可见，避免仅凭工具拒绝结果推断进程隔离成立。
+
+2026-09-10 已确认的 CodeAgent 目标见 [CodeAgent](../../domainFunction/agents/codeAgent/CodeAgent.md) 和 [Workspace](../../domainFunction/workspace/Workspace.md)：读取本轮卡片与必要配置，不给原仓库接口授权；工具限制与进程隔离必须同时落实，不能仅设置 cwd。当前默认 DSH 入口启用 Bubblewrap，但底层仍允许 `processIsolation: none`，因此不能把现有可选隔离描述为目标已完成。后续实现应拒绝无法满足隔离的目标运行，并验证提示词材料也没有绕过文件白名单。CodeAgent 不开放 Shell、全局文件读取或直接写入工具；源码由框架校验后落盘。
 
 ## 公司 CLI 的实际边界
 

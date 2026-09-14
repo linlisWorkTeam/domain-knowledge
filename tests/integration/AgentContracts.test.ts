@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：验证角色契约的行为、约束及失败场景。
  */
-import { NODE_BY_AGENT } from '../../src/domain/services/workflow/AgentDefinitions.ts';
+import { NODE_BY_AGENT } from '../../src/domain/workflow/AgentDefinitions.ts';
 import { modelExecutionFactory } from '../../src/infrastructure/agentAdapters/ModelExecution.ts';
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
@@ -31,7 +31,7 @@ test('versioned AgentCommand schema rejects unknown fields and role payload mism
   const command: AgentCommand = {
     schemaVersion: '1.0', commandId: 'command-1', runId: 'run-1',
     agentType: 'orchestrator', generationKey: 'generation-key-0001',
-    payload: { policyRef: artifactRef, moduleRefs: [artifactRef] },
+    payload: { policyRef: artifactRef, moduleRefs: [artifactRef], businessGoalRef: artifactRef, projectConfigurationRef: artifactRef, progressRef: artifactRef },
   };
   contracts.assertCommand(command);
   assert.throws(() => contracts.assertCommand({
@@ -90,7 +90,7 @@ test('command validation runs before checkpoint dispatch and provider invocation
 test('AgentResult binding rejects cross-Run and wrong-command reuse', () => {
   const command: AgentCommand = {
     schemaVersion: '1.0', commandId: 'command-1', runId: 'run-1',
-    agentType: 'code', generationKey: 'run-1:code:0:main:contract-v5',
+    agentType: 'code', generationKey: 'run-1:code:0:main:contract-v10',
     payload: {
       knowledgeRef: artifactRef, publicInterfaceRefs: [artifactRef], languageId: 'typescript',
       buildContractRef: artifactRef, allowedGeneratedPaths: ['src/out.ts'],
@@ -171,4 +171,16 @@ test('committed node output lookup refuses cross-run and uncommitted scenario ch
     assert.throws(() => composition.service.getCommittedNodeOutputs({ ...input, runId: other.runId }), /scope mismatch/);
     assert.throws(() => composition.service.getCommittedNodeOutputs({ ...input, nodeId: 'another-node' }), /scope mismatch/);
   } finally { composition.dispose(); }
+});
+
+
+test('orchestrator plans cannot promote the internal DocWorker to an outer role', () => {
+  const contracts = new JsonSchemaAgentContractValidator(join(process.cwd(), 'docs', 'specs', 'schemas'));
+  const result: AgentResult = { schemaVersion: '1.0', commandId: 'plan', commandRef: artifactRef,
+    runId: 'run', agentType: 'orchestrator', status: 'SUCCEEDED', outputRefs: [], payload: {
+      resultKind: 'plan', nodes: [{ nodeId: 'doc_worker', agentType: 'doc-worker', dependsOn: [],
+        generationKey: 'invalid-outer-worker', inputSchema: 'https://example.com/input',
+        outputSchema: 'https://example.com/output', resourceClaims: ['source:read'], artifactExpectations: ['knowledge-chunk'] }],
+    } };
+  assert.throws(() => contracts.assertResult(result), /AGENT_RESULT_INVALID/);
 });

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：将已验证用例数据放入固定C/C++语法骨架，不复制预期值。
  */
-import { nativeFunctions, nativeReturnType, assertNativeBehaviorSuite, type NativeContract, type NativeBehaviorCase, type NativeArgument, type NativeAccess } from '../../../domain/services/evaluation/NativeBehaviorSuite.ts';
+import { nativeFunctions, nativeReturnType, assertNativeBehaviorSuite, type NativeContract, type NativeBehaviorCase, type NativeArgument, type NativeAccess } from '../../../domain/evaluation/NativeBehaviorSuite.ts';
 const access = (value: NativeAccess) => `${value.variable}${value.index === undefined ? '' : `[${value.index}]`}${(value.members ?? []).map((member) => `.${member}`).join('')}`;
 const string = (value: string) => `"${[...Buffer.from(value)].map((byte) => `\\${byte.toString(8).padStart(3, '0')}`).join('')}"`;
 function argument(value: NativeArgument): string {

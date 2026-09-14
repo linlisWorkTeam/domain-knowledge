@@ -5,8 +5,8 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { nativeCodeReuseKey } from '../../src/domain/services/evaluation/NativeCodeReuse.ts';
-import type { StageInput } from '../../src/domain/services/workbench/StageTask.ts';
+import { nativeCodeReuseKey } from '../../src/domain/evaluation/NativeCodeReuse.ts';
+import type { StageInput } from '../../src/domain/workbench/StageTask.ts';
 test('code cache binds every execution input except the known diagnostic version', () => {
   const input: StageInput = { projectId: 'p', stage: 'FLYWHEEL', sourceRevision: 'commit', sourceDigest: 'source', cardVersionIds: ['v1'], configurationDigest: 'model', parameters: { snapshotId: 'project-and-build', selectionDigest: 'knowledge', configurationRef: 'model', fingerprints: 'tools' } };
   const original = nativeCodeReuseKey(input); assert.ok(original);

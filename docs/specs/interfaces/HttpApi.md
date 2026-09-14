@@ -29,7 +29,7 @@ Available 是已接线路由；Planned 路由不作为当前能力。Available /
 | `GET /api/v1/runs/:runId` | Available | Run、版本、评测、Decision、checkpoint、节点、事件和 publication 快照。 |
 | `GET /api/v1/runs/:runId/events?after=<seq>` | Available | 按 `event_seq` 增量读取运行事件。 |
 | `GET /api/v1/runs/:runId/workflow-nodes` | Available | 返回角色、轮次、尝试、执行状态、`readyAt`、开始和完成时间；历史记录无法证明 `readyAt` 时返回 `null`，不暴露 checkpoint 私有数据。 |
-| `GET /api/v1/runs/:runId/workflow-status` | Available | 工作流执行状态，不替代 FlywheelRun 业务状态。 |
+| `GET /api/v1/runs/:runId/workflow-status` | Available | 工作流执行状态，不替代 FlywheelRun 业务状态。Console 批次详情和工作流图读取 executionStatus/currentNode/error，失败必须显示失败阶段与错误；读取失败显示未知，不能回退为正在运行或等待。 |
 | `GET /api/v1/runs/:runId/report` | Available | 下载脱敏审计报告；已由旧 `demo-report` 路径迁移。 |
 | `POST /api/v1/runs/:runId/resume` | Available | 从同一 checkpoint 恢复。 |
 | `POST /api/v1/runs/:runId/cancel` | Available | 取消运行并传播终止信号。 |

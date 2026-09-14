@@ -1,0 +1,17 @@
+# main 合并的生产类型与独立运行验证
+
+继续0753同一未提交合并；工作树/tmp/domain-knowledge-workbench，原/root/projects/domain-knowledge-wxc不动。PR50仍OPEN/DRAFT，远程最后39092ce，本地main合并未提交/推送/部署。剩余23个冲突文件（17 docs/CI/Spec、6 tests），全部生产src已无冲突标记。goal active，本轮progress；完整C/C++验收、前台深化、网站更新及最后PR38/50条件处理仍未完成，不能仅凭下述检查合并PR。
+
+0753后接续的生产合并：AgentExample保留modelStages与workerModelOutputs；TrustedProjectEvaluator同时保留源文件CAS/interface引用与main manifest content、native监督执行，moduleSuite和testSuite同时出现明确拒绝。ConfiguredProvider保留quota/stream/native session/maxTokens，只有opencode.ai收到真实wp-session header，同会话稳定、重试新会话、其他provider不发；/tmp/WorkbenchMergedProvider.log 7/7受控SDK测试通过。
+
+AutomatedProjectWorkflow已解析/stage：保留main内部Worker、监督native源码测试缓存及非变更式质量路由；TS显式behavior-cases-v1/workbench-code-v1，分离validateModuleOracle，默认native使用main validateOracle。Check/Review默认采用main比较报告协议；工作台独立应用仍显式工作台协议。生成键contract-v11与RoleExecution binder统一。备份/tmp/AutomatedProjectWorkflow.BeforeFinalConflictResolution.ts。ProjectWorkflowFixture分别保留默认main与显式section/source-facts/behavior模式，TS必须显式提供testSuite，禁止旧命令兜底。以上图/整个工作流尚未完整运行。
+
+本轮bootstrap check READY。/tmp/WorkbenchSourceTsconfig.json只包含src非test，显式typeRoots指向本工作树依赖。类型检查发现DocGenRevision将已经结构化Correction强转Record的问题，改为直接使用类型化值，所有运行时scope/evidence/range检查不变。/tmp/WorkbenchMergedSourceTypes.log检查通过（不是全树typecheck）。
+
+解决RunConfiguration与AgentExamples冲突：新版本domain-agents-v11-workbench-evidence，旧版本可读但不得恢复；独立默认7角色、失败产物、workbench DocGen独立outline/body、Check三次失败证据均保留。工作台样例改为显式WorkbenchDocGenSample。/tmp/WorkbenchMergedExamplesConfig.log 17/17通过。
+
+解决DocGenExample冲突，参数化默认与section-doc-v1两条真实生产DSH受控SSE路径，分别1/2调用且两次运行提示词冻结、计量、CAS、未发布检查保留。实际测试发现合并误改历史DOCGEN_SOURCE_PATH为src/domain/markdown-diff.ts；git ls-tree固定3f999204证明应为src/domain/services/markdown-diff.ts，恢复历史路径及测试引用，固定源码SHA与原测试SHA均未修改。参考测试仍从固定75d22094提交读取并仅重定位import。/tmp/WorkbenchMergedDocGenExample.log 5/5通过，其中参考预检真正执行7/7历史测试。不是供应商真实生成验收。
+
+NativeCases持久化缓存测试上轮到真实编译时WORKBENCH_RESOURCE_INSUFFICIENT，/tmp/WorkbenchMergedNativeCache.log终态exit1，无残留进程。NativeToolchain内存上限512MiB+64MiB预留，禁止降低阈值或关闭隔离；未重跑。之前NativeCases4项实际编译通过与当前cache失败区分。继续解决6测试冲突并全树typecheck/工作流回放/TS/安全/Console回归，再真实新v11执行链与部署。旧运行不可跨版本强行恢复，历史卡片/证据保留。
+
+HistoryEpitaph仍冲突，超3交接记录尚未归档，不能删除未提交/未归档证据。当前无本任务活跃模型或编译任务。未删知识、未动无关服务/账户/凭据。

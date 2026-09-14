@@ -6,11 +6,11 @@
 import test from 'node:test';
 import { sourceInput, sourceResult } from '../helpers/WorkbenchSourceFixture.ts';
 import assert from 'node:assert/strict';
-import { createPublication } from '../../src/domain/services/workbench/WorkbenchPublicationRecord.ts';
-import { SOURCE_CORRECTION_POLICY, SOURCE_REVISION_CONTRACT } from '../../src/domain/services/knowledge/SourceRevision.ts';
+import { createPublication } from '../../src/domain/workbench/WorkbenchPublicationRecord.ts';
+import { SOURCE_CORRECTION_POLICY, SOURCE_REVISION_CONTRACT } from '../../src/domain/knowledge/SourceRevision.ts';
 import { createArtifactRef } from '../../src/domain/Domain.ts';
-import { assertPipelinePublication, createPipeline, pipelineFixedFailure, pipelineStageFailure, pipelineStagnant, pipelineSourceFailure, pipelineSourceRevisionFailure, pipelineRevisionFailure, pipelineSourceStagnant, pipelineSupplementStagnant } from '../../src/domain/services/workbench/WorkbenchPipeline.ts';
-import { createStageTask, type WorkbenchStage, type StageResult } from '../../src/domain/services/workbench/StageTask.ts';
+import { assertPipelinePublication, createPipeline, pipelineFixedFailure, pipelineStageFailure, pipelineStagnant, pipelineSourceFailure, pipelineSourceRevisionFailure, pipelineRevisionFailure, pipelineSourceStagnant, pipelineSupplementStagnant } from '../../src/domain/workbench/WorkbenchPipeline.ts';
+import { createStageTask, type WorkbenchStage, type StageResult } from '../../src/domain/workbench/StageTask.ts';
 test('pipeline advancement requires successful artifacts and behavior, not just task completion', () => {
   const task = (stage: WorkbenchStage, summary: StageResult['summary']) => ({ ...createStageTask({ projectId: 'p', stage, sourceRevision: 'r', sourceDigest: 's', configurationDigest: 'c', cardVersionIds: [], parameters: {} }, {}, 'now'), status: 'SUCCEEDED' as const, result: { artifactRefs: [], summary } });
   assert.equal(pipelineStageFailure(task('GENERATE', { cards: [] })), 'PIPELINE_CARDS_MISSING');

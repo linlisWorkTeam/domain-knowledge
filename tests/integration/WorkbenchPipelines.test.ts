@@ -14,8 +14,8 @@ import { WorkbenchPipelines } from '../../src/application/services/WorkbenchPipe
 import { WorkbenchStages } from '../../src/application/services/WorkbenchStages.ts';
 import { SqliteStageTasks } from '../../src/infrastructure/sqlite/SqliteStageTasks.ts';
 import { SqliteWorkbenchPipelines } from '../../src/infrastructure/sqlite/SqliteWorkbenchPipelines.ts';
-import { createPipeline } from '../../src/domain/services/workbench/WorkbenchPipeline.ts';
-import { WORKBENCH_STAGES, type StageInput, type WorkbenchStage } from '../../src/domain/services/workbench/StageTask.ts';
+import { createPipeline } from '../../src/domain/workbench/WorkbenchPipeline.ts';
+import { WORKBENCH_STAGES, type StageInput, type WorkbenchStage } from '../../src/domain/workbench/StageTask.ts';
 const input = (stage: WorkbenchStage): StageInput => ({ projectId: 'test', stage, sourceRevision: 'pinned', sourceDigest: 'source', configurationDigest: 'config', cardVersionIds: [], parameters: { snapshotId: 'snapshot' } });
 test('pipeline preserves children and usage across failure, restart, cancellation and business rejection', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'pipeline-')); const db = join(directory, 'workbench.sqlite');

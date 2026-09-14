@@ -3,17 +3,17 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：将固定重建结果交给原生参考验证与可信评测，不授予发布资格。
  */
-import { moduleBuild, moduleFingerprintKey } from '../../domain/services/workbench/WorkbenchProject.ts';
+import { moduleBuild, moduleFingerprintKey } from '../../domain/workbench/WorkbenchProject.ts';
 import { sha256, type ArtifactRef } from '../../domain/Domain.ts';
-import { canonicalJson, createStageTask, type JsonValue } from '../../domain/services/workbench/StageTask.ts';
-import { nativeSupplementTargets, nativeSupplementTargetCoverage, type NativeSupplementTargets } from '../../domain/services/evaluation/NativeSupplementTargets.ts';
-import { nativeFunctions, assertNativeContract, type NativeContract, type NativeBehaviorSuite } from '../../domain/services/evaluation/NativeBehaviorSuite.ts';
-import { compareNativeObservations, type NativeBehaviorCase, type NativeScalar } from '../../domain/services/evaluation/NativeBehaviorSuite.ts';
-import { nativeRevisionEvidence } from '../../domain/services/evaluation/NativeRevisionEvidence.ts';
-import { nativeSupplementDemand, NATIVE_SUPPLEMENT_CONTRACT, type SupplementSourceFinding } from '../../domain/services/evaluation/NativeSupplementDemand.ts';
-import { SOURCE_VERIFICATION_CONTRACT } from '../../domain/services/knowledge/KnowledgeSourceVerification.ts';
-import { nativeCandidateHints } from '../../domain/services/evaluation/NativeCandidateFeedback.ts';
-import { markdownSections } from '../../domain/services/knowledge/KnowledgeSections.ts';
+import { canonicalJson, createStageTask, type JsonValue } from '../../domain/workbench/StageTask.ts';
+import { nativeSupplementTargets, nativeSupplementTargetCoverage, type NativeSupplementTargets } from '../../domain/evaluation/NativeSupplementTargets.ts';
+import { nativeFunctions, assertNativeContract, type NativeContract, type NativeBehaviorSuite } from '../../domain/evaluation/NativeBehaviorSuite.ts';
+import { compareNativeObservations, type NativeBehaviorCase, type NativeScalar } from '../../domain/evaluation/NativeBehaviorSuite.ts';
+import { nativeRevisionEvidence } from '../../domain/evaluation/NativeRevisionEvidence.ts';
+import { nativeSupplementDemand, NATIVE_SUPPLEMENT_CONTRACT, type SupplementSourceFinding } from '../../domain/evaluation/NativeSupplementDemand.ts';
+import { SOURCE_VERIFICATION_CONTRACT } from '../../domain/knowledge/KnowledgeSourceVerification.ts';
+import { nativeCandidateHints } from '../../domain/evaluation/NativeCandidateFeedback.ts';
+import { markdownSections } from '../../domain/knowledge/KnowledgeSections.ts';
 import type { ArtifactStore, FlywheelRepository } from '../ports/ApplicationPorts.ts';
 import type { WorkbenchProjectStore } from '../ports/WorkbenchProjectPorts.ts';
 import type { NativeLanguageToolchain, ToolchainFile } from '../ports/LanguageToolchainPorts.ts';
@@ -77,7 +77,7 @@ export class WorkbenchEvaluation {
   async start(reconstructionTaskId: string, sourceVerificationTaskId?: string) {
     return this.dependencies.stages.start(await this.prepare(reconstructionTaskId, sourceVerificationTaskId));
   }
-  async prepare(reconstructionTaskId: string, sourceVerificationTaskId?: string): Promise<import('../../domain/services/workbench/StageTask.ts').StageInput> {
+  async prepare(reconstructionTaskId: string, sourceVerificationTaskId?: string): Promise<import('../../domain/workbench/StageTask.ts').StageInput> {
     const { stages, configuration } = this.dependencies;
     const previous = stages.get(reconstructionTaskId);
     if (previous.contractVersion !== 'knowledge-workbench-v1' || previous.input.stage !== 'FLYWHEEL' || previous.input.parameters.operation !== undefined || previous.status !== 'SUCCEEDED' || !previous.result) throw new Error('EVALUATION_RECONSTRUCTION_REQUIRED');
@@ -85,7 +85,7 @@ export class WorkbenchEvaluation {
     await configuration.assertStageCompatible(await this.load<StageModelConfiguration>(configurationRef));
     const supplement = sourceVerificationTaskId ? await this.supplementDemand(sourceVerificationTaskId, reconstructionTaskId) : null;
     const supplementRef = supplement ? await this.dependencies.artifacts.put(Buffer.from(canonicalJson(supplement)), 'application/json') : null;
-    const input: import('../../domain/services/workbench/StageTask.ts').StageInput = { ...previous.input, stage: 'EVALUATE', parameters: { ...previous.input.parameters, reconstructionTaskId,
+    const input: import('../../domain/workbench/StageTask.ts').StageInput = { ...previous.input, stage: 'EVALUATE', parameters: { ...previous.input.parameters, reconstructionTaskId,
       reconstructionDigest: sha256(canonicalJson(previous.result)), ...(supplementRef ? { supplementContract: NATIVE_SUPPLEMENT_CONTRACT,
         sourceVerificationTaskId: sourceVerificationTaskId!, supplementRef: json(supplementRef) } : {}) } };
     // Existing frozen executions retain their identity and consumed budget. Never silently upgrade a retry.
@@ -216,7 +216,7 @@ export class WorkbenchEvaluation {
       const prepared = await evaluation.prepare({ projectSnapshotId: project.snapshotId, sourceRevision: project.commit,
         cardIds: knowledge.map((card) => card.cardId), versionIds: module.cardVersionIds, bodyRefs: cards.map((card) => card!.bodyRef),
         reference, contract, policyDigest, ...(moduleDemands.length ? { supplement: { schemaVersion: 'native-supplement-v1' as const, demandDigest: supplement!.demandDigest, ...(moduleTargets ? { targets: moduleTargets } : {}) } } : {}), expectedToolchainDigest: fingerprint.digest, propose: async () => {
-          const payload = { moduleId: module.moduleId, sourceSnapshotRef, publicInterfaceRefs: [module.interfaceRef], languageId: module.language, testPolicyRef };
+          const payload = { executionContract: 'behavior-cases-v1', moduleId: module.moduleId, sourceSnapshotRef, publicInterfaceRefs: [module.interfaceRef], languageId: module.language, testPolicyRef };
           const result = await roles.execute(context, frozen, 'test-gen', `${module.moduleId}:candidate:${candidateRevision}`, { payload,
             materials: [{ ref: sourceSnapshotRef, content: sourceMetadata }, { ref: module.interfaceRef, content: api }, { ref: testPolicyRef, content: policy }],
             sourcePaths: [], publicInterfacePaths: [], provenance: [sourceSnapshotRef], moduleId: module.moduleId });

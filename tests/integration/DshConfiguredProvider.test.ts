@@ -54,10 +54,12 @@ test('DSH adapter executes through the official native DSH SDK and reports token
   const auditedSessions: string[] = [];
   const streamAudits: unknown[] = [];
   writeFileSync(join(directory, 'source.txt'), 'AUTHORIZED_MATERIAL');
+  let userAgent = '';
   const upstream = createServer(async (request, response) => {
     assert.equal(request.headers['user-agent'], 'domain-knowledge/0.2.0');
     sessionHeaders.push(String(request.headers['x-opencode-session'] ?? ''));
     authorization = request.headers.authorization ?? '';
+    userAgent = request.headers['user-agent'] ?? '';
     receivedPath = request.url ?? '';
     const chunks: Buffer[] = [];
     for await (const chunk of request) chunks.push(Buffer.from(chunk));
@@ -89,7 +91,7 @@ test('DSH adapter executes through the official native DSH SDK and reports token
   const address = upstream.address();
   assert.ok(address && typeof address === 'object');
   const settings: ProviderSettingsRecord = {
-    provider: 'deepseek-harness', apiUrl: `http://provider.invalid:${address.port}/v1`, apiKey: 'test-key',
+    provider: 'deepseek-harness', apiUrl: `http://opencode.ai:${address.port}/v1`, apiKey: 'test-key',
     model: 'test-model', enabled: true, revision: 2, verificationStatus: 'VERIFIED',
     verificationReasonCode: 'READY', lastVerifiedAt: '2026-09-04T00:00:00.000Z',
     verifiedFingerprint: 'test-only', updatedAt: '2026-09-04T00:00:00.000Z',
@@ -122,6 +124,8 @@ test('DSH adapter executes through the official native DSH SDK and reports token
     assert.deepEqual(result, { answer: 'ok' });
     assert.equal(receivedPath, '/v1/chat/completions');
     assert.equal(authorization, 'Bearer test-key');
+    assert.match(userAgent, /^domain-knowledge\//);
+    assert.match(sessionHeaders[0] ?? '', /^wp-[a-f0-9]{32}$/);
     assert.match(receivedBody, /Return the requested object/);
     assert.match(receivedBody, /AUTHORIZED_MATERIAL/);
     assert.equal(JSON.parse(receivedBody).max_tokens, 64, 'request ceiling reaches the actual tool-roundtrip HTTP request');
@@ -145,6 +149,12 @@ test('DSH adapter executes through the official native DSH SDK and reports token
       runId: 'run-pi-test', provider: 'deepseek-harness', model: 'test-model', status: 'SUCCEEDED',
       inputTokens: 19, outputTokens: 7, fixture: false,
     });
+    const followup = { role: 'doc-gen', prompt: 'Return the requested object.', outputSchema: { type: 'object', additionalProperties: false, required: ['answer'], properties: { answer: { type: 'string' } } }, metadata: { runId: 'run-pi-test' }, workspaceRoot: directory };
+    await provider.run({ ...followup, idempotencyKey: 'pi-test-1' });
+    await provider.run({ ...followup, idempotencyKey: 'pi-test-2' });
+    assert.equal(sessionHeaders[1], sessionHeaders[0], 'the conversation keeps its routing identity');
+    assert.notEqual(sessionHeaders[2], sessionHeaders[0], 'a new invocation gets a separate native identity even with the same business key');
+    assert.notEqual(sessionHeaders[3], sessionHeaders[2], 'another business request does not reuse the prior conversation');
   } finally {
     upstream.close();
     await once(upstream, 'close');
@@ -156,6 +166,7 @@ test('DSH adapter does not follow Provider redirects after endpoint approval', a
   const directory = mkdtempSync(join(tmpdir(), 'pi-agent-redirect-'));
   let requests = 0;
   const upstream = createServer((_request, response) => {
+    assert.equal(_request.headers['x-opencode-session'], undefined, 'other providers receive no OpenCode routing header');
     requests += 1;
     response.writeHead(302, { location: '/private-target' });
     response.end();
@@ -223,7 +234,7 @@ test('DSH adapter retries schema-invalid output with a fresh session and audits 
   await once(upstream, 'listening');
   const address = upstream.address();
   assert.ok(address && typeof address === 'object');
-  const apiUrl = `http://provider.invalid:${address.port}/v1`;
+  const apiUrl = `http://opencode.ai:${address.port}/v1`;
   const invocations: ProviderInvocationRecord[] = [];
   const provider = new ConfiguredDshProvider({
     maxTokens: 128,
@@ -268,6 +279,18 @@ test('DSH adapter retries schema-invalid output with a fresh session and audits 
     ]);
     assert.deepEqual(invocations.map((record) => [record.inputTokens, record.outputTokens]), [[3, 2], [3, 2]], 'retry usage is audited separately');
     assert.doesNotMatch(JSON.stringify(invocations), /test-key|Return the same governed business result/);
+    bodies.length = 0;
+    invocations.length = 0;
+    await assert.rejects(provider.run({ ...request, outputAttempts: 1 }), (error: unknown) => {
+      assert.ok(error instanceof Error && 'parsedOutputs' in error && 'rawOutput' in error);
+      assert.match(error.message, /AGENT_OUTPUT_INVALID/);
+      assert.deepEqual(error.parsedOutputs, [{ wrong: true }]);
+      assert.match(String(error.rawOutput), /"wrong"/);
+      return true;
+    });
+    assert.equal(bodies.length, 1, 'role-owned repairs must disable nested provider retries');
+    assert.equal(invocations.length, 1);
+
   } finally {
     upstream.close();
     await once(upstream, 'close');

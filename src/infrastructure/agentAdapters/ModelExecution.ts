@@ -40,11 +40,11 @@ export function modelExecutionFactory(workspaces: AgentWorkspaceProvider): Proje
         readablePaths: request.readablePaths,
       });
       // 保持原命令、幂等键和关联信息，便于把 Adapter 轨迹追溯到同一次角色执行。
-      return modelProcessLane.execute(() => provider.run({ maxTokens: request.maxTokens, authorizedTools: request.tools, role: request.role, prompt: request.prompt, outputSchema: request.outputSchema,
-        idempotencyKey: `${command.generationKey}:${request.stage ?? 'execute'}`, command,
+      return modelProcessLane.execute(() => provider.run({ outputAttempts: request.outputAttempts, maxTokens: request.maxTokens, authorizedTools: request.tools, role: request.role, prompt: request.prompt, outputSchema: request.outputSchema,
+        idempotencyKey: `${command.generationKey}:${request.stage ?? 'execute'}${request.reportAttempt ? `:report-${request.reportAttempt}` : ''}`, command,
         inputRefs: artifactRefs(command.payload), workspaceRoot: workspace.workspaceRoot,
         metadata: { runId: stage.runId, nodeId: stage.nodeId, iteration: stage.iteration,
-          attempt: stage.attempt, workerId: stage.workerId ?? null, commandId: command.commandId,
+          attempt: stage.attempt, reportAttempt: request.reportAttempt ?? null, workerId: stage.workerId ?? null, commandId: command.commandId,
           stage: request.stage ?? 'execute' },
       }, signal), signal);
     },

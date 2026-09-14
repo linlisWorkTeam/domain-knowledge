@@ -16,7 +16,7 @@ import type {
 } from '../../src/application/ports/ApplicationPorts.ts';
 import type { AutomatedProjectScenario } from '../../src/application/services/ApplicationServices.ts';
 import { createComposition } from '../../src/interfaces/runner/Composition.ts';
-import { knowledgeOutline, knowledgePlan, knowledgeSections } from '../helpers/KnowledgeRoleFixture.ts';
+import { cppTestOutput, orchestratorOutput } from '../helpers/CppScenario.ts';
 import { GOOD_BODY } from '../helpers/Fixture.ts';
 
 class MemorySettings implements ProviderSettingsStore {
@@ -34,38 +34,32 @@ function git(root: string, args: string[]): string {
 function agentOutput(agentType: string, stage: string): Record<string, unknown> {
   switch (agentType) {
     case 'orchestrator':
-      return knowledgePlan(['src/module.js', 'src/module.test.js']);
+      return orchestratorOutput('dsh-module');
     case 'doc-worker':
       return {
         workerId: 'worker-1',
         fragment: 'The public contract returns the fixed value four and is covered by a behavior test.',
-        provenance: ['src/module.js'],
-        facts: [
-          { kind: 'interface', statement: 'Exports calculate without parameters.' },
-          { kind: 'behavior', statement: 'calculate returns the number 4.' },
-          { kind: 'boundary', statement: 'Every call returns the same constant.' },
-        ].map((fact) => ({ ...fact, sourcePath: 'src/module.js', startLine: 1, endLine: 1 })),
-        unresolvedRisks: [],
+        provenance: ['src/module.cpp'],
+        analysisScope: { moduleId: 'dsh-module', files: ['src/module.cpp'], symbols: [] },
+        sourceEvidence: ['src/module.cpp'].map((path) => ({ claim: 'Returns four', path })),
+        unresolvedQuestions: [],
       };
     case 'doc-gen': {
       const document = {
         body: `${GOOD_BODY}\n\n## 行为契约\n\n公开函数必须返回固定数值 4，且由隔离行为测试验证。`,
-        title: 'DSH 最小知识批次',
+        title: 'DSH 最小知识批次', keywords: ['DSH'],
         description: '使用真实 DSH SDK 生成并通过确定性门禁的知识。',
       };
-      return stage === 'outline' ? knowledgeOutline(document) : knowledgeSections(document);
+      return document;
     }
     case 'test-gen':
-      return {
-        candidateCommands: [{ tool: 'node', purpose: 'test', args: ['--test', 'src/module.test.js'] }],
-        oracleRequired: true,
-      };
+      return cppTestOutput();
     case 'code':
-      return { files: [{ path: 'src/module.js', content: 'export const calculate = () => 4;\n' }] };
+      return { files: [{ path: 'src/module.cpp', content: 'int calculate() { return 4; }\n' }] };
     case 'check':
-      return { blocking: false, findings: [], scope: ['src/module.js'] };
+      return { findings: [], scope: ['src/module.cpp'] };
     case 'review':
-      return { blocking: false, recommendation: 'PASS', correction: null };
+      return { blocking: false, corrections: [] };
     default:
       throw new Error(`unexpected Agent type: ${agentType}`);
   }
@@ -75,16 +69,7 @@ test('a minimum complete Run sends all seven governed nodes through the real nat
   const repositoryRoot = mkdtempSync(join(tmpdir(), 'dsh-flow-source-'));
   const runtimeDir = mkdtempSync(join(tmpdir(), 'dsh-flow-runtime-'));
   mkdirSync(join(repositoryRoot, 'src'));
-  writeFileSync(join(repositoryRoot, 'package.json'), '{"name":"dsh-flow","type":"module"}\n');
-  writeFileSync(join(repositoryRoot, 'src', 'contract.js'), 'export const expected = 4;\n');
-  writeFileSync(join(repositoryRoot, 'src', 'module.js'), 'export const calculate = () => 4;\n');
-  writeFileSync(join(repositoryRoot, 'src', 'module.test.js'), `
-import assert from 'node:assert/strict';
-import test from 'node:test';
-import { expected } from './contract.js';
-import { calculate } from './module.js';
-test('generated behavior', () => assert.equal(calculate(), expected));
-`.trimStart());
+  writeFileSync(join(repositoryRoot, 'src/module.cpp'), 'int calculate() { return 4; }\n');
   git(repositoryRoot, ['init']);
   git(repositoryRoot, ['config', 'user.email', 'pi-agent@example.invalid']);
   git(repositoryRoot, ['config', 'user.name', 'DSH Acceptance']);
@@ -146,14 +131,17 @@ test('generated behavior', () => assert.equal(calculate(), expected));
     await composition.apps.providerOperations.verify({ expectedRevision: 1 });
     assert.ok(store.value);
     const workflow = await composition.automatedWorkflow();
-    const command = { tool: 'node' as const, purpose: 'test' as const, args: ['--test', 'src/module.test.js'] };
+    const commands = [{ tool: 'g++' as const, purpose: 'check' as const, args: ['-std=c++17', 'src/module.cpp', 'tests/generated.cpp', '-o', 'test-bin'] },
+      { tool: 'binary' as const, purpose: 'test' as const, args: ['test-bin'] }];
     const scenario: AutomatedProjectScenario = {
       schemaVersion: '1.0', name: 'dsh-minimum', moduleId: 'dsh-module',
       repositoryRoot, expectedCommit: commit,
-      sourcePaths: ['src/module.js', 'src/module.test.js'],
-      publicInterfacePaths: ['src/contract.js', 'package.json'],
-      allowedGeneratedPaths: ['src/module.js'], prepareCommands: [],
-      referenceCommands: [command], firstIterationCommands: [command], finalCommands: [command],
+      sourcePaths: ['src/module.cpp'],
+      publicInterfacePaths: [],
+      allowedGeneratedPaths: ['src/module.cpp'], prepareCommands: [],
+      referenceCommands: commands, firstIterationCommands: commands, finalCommands: commands,
+      comparisonRules: [{ id: 'behavior', description: 'Compare public return values' }],
+      agentConfiguration: { languageId: 'cpp', standard: 'c++17', dependencies: [], constraints: [], testPaths: ['tests/generated.cpp'] },
     };
     const handle = await workflow.start(scenario, {
       policyId: 'dsh-acceptance-v1', minimumStability: 1, requireAllTests: true,
@@ -166,8 +154,8 @@ test('generated behavior', () => assert.equal(calculate(), expected));
     assert.deepEqual([...new Set(invokedRoles)].sort(), [
       'check', 'code', 'doc-gen', 'doc-worker', 'orchestrator', 'review', 'test-gen',
     ]);
-    assert.equal(invocations.length, 8);
-    assert.equal(invokedRoles.filter((role) => role === 'doc-gen').length, 2);
+    assert.equal(invocations.length, 7);
+    assert.equal(invokedRoles.filter((role) => role === 'doc-gen').length, 1);
     assert.equal(invocations.every((record) => record.status === 'SUCCEEDED'), true);
     assert.equal(invocations.every((record) => record.inputTokens === 100 && record.outputTokens === 20), true);
     assert.equal(composition.service.status().publications, 1);

@@ -1,15 +1,16 @@
+import type { Output as TestSuite } from '../../domain/agents/testGenAgent/TestGenAgentContract.ts';
 /**
  * Copyright (c) 2026 linlisWorkTeam
  * SPDX-License-Identifier: MIT
  * 文件功能：定义 Application 与存储、运行时、模型及外部能力之间的端口契约。
  */
 /** 统一引用 Domain 拥有的源码发现、工作空间和业务角色定义契约。 */
-import type { KnowledgeDiscoveryCandidate, KnowledgeDiscoveryPort } from '../../domain/services/sourceScan/SourceScan.ts';
-import type { AgentWorkspaceProvider, AgentWorkspaceView } from '../../domain/services/workspace/LocalAgentWorkspace.ts';
-import type { AgentDefinition } from '../../domain/services/workflow/AgentDefinitions.ts';
-export type { KnowledgeDiscoveryCandidate, KnowledgeDiscoveryPort } from '../../domain/services/sourceScan/SourceScan.ts';
-export type { AgentWorkspaceProvider, AgentWorkspaceView } from '../../domain/services/workspace/LocalAgentWorkspace.ts';
-export type { AgentDefinition } from '../../domain/services/workflow/AgentDefinitions.ts';
+import type { KnowledgeDiscoveryCandidate, KnowledgeDiscoveryPort } from '../../domain/sourceScan/SourceScan.ts';
+import type { AgentWorkspaceProvider, AgentWorkspaceView } from '../../domain/workspace/LocalAgentWorkspace.ts';
+import type { AgentDefinition } from '../../domain/workflow/AgentDefinitions.ts';
+export type { KnowledgeDiscoveryCandidate, KnowledgeDiscoveryPort } from '../../domain/sourceScan/SourceScan.ts';
+export type { AgentWorkspaceProvider, AgentWorkspaceView } from '../../domain/workspace/LocalAgentWorkspace.ts';
+export type { AgentDefinition } from '../../domain/workflow/AgentDefinitions.ts';
 import type { AgentId, AgentCommand, AgentResult } from '../../domain/agents/AgentContracts.ts';
 /** 统一导出本模块的公共符号，供其他层通过明确入口引用。 */
 export { AGENT_IDS, type AgentId, type AgentCommand, type AgentResult } from '../../domain/agents/AgentContracts.ts';
@@ -109,6 +110,9 @@ export interface FlywheelRepository {
   listEvents(runId: string): DomainEvent[];
   /** 读取检查点。 */
   getCheckpoint(generationKey: string): NodeCheckpoint | null;
+  /** 已校验测试集按源码身份保存，与 Run 和模型配置无关。 */
+  getValidatedTestSuite(sourceKey: string): ArtifactRef | null;
+  saveValidatedTestSuite(sourceKey: string, suiteRef: ArtifactRef): ArtifactRef;
   /** 申请检查点。 */
   claimCheckpoint(checkpoint: NodeCheckpoint): NodeCheckpoint;
   /** 提供 提交Checkpoint 对应的提交检查点操作。 */
@@ -329,6 +333,8 @@ export interface RunningStateStore {
 export interface AgentRequest {
   /** 本次角色阶段的输出上限，只能收紧已配置的 Provider 限额。 */
   maxTokens?: number;
+  /** 领域角色接管输出修正时，禁用适配器嵌套格式重试。 */
+  outputAttempts?: 1;
   /** 提供authorized工具信息，供调用方读取或传入。 */
   authorizedTools?: readonly string[];
   /** 提供role信息，供调用方读取或传入。 */
@@ -552,7 +558,7 @@ export interface LanguagePlugin {
 }
 
 /** 定义项目工具的数据结构与类型约束。 */
-export type ProjectTool = 'node' | 'pnpm' | 'cargo' | 'typescript';
+export type ProjectTool = 'node' | 'pnpm' | 'cargo' | 'typescript' | 'gcc' | 'g++' | 'binary';
 
 /** 定义项目命令的数据结构与类型约束。 */
 export interface ProjectCommand {
@@ -653,6 +659,7 @@ export interface ProjectEvaluation {
   stability: number;
   /** 提供infrastructureFailure信息，供调用方读取或传入。 */
   infrastructureFailure: boolean;
+  configurationFailure?: string;
   /** 提供工具链指纹信息，供调用方读取或传入。 */
   toolchainFingerprint: string;
   /** 提供generated文件Digests信息，供调用方读取或传入。 */
@@ -677,6 +684,8 @@ export interface ProjectEvaluator {
     label: string;
     snapshot: ProjectSnapshot;
     generatedFiles: GeneratedProjectFile[];
+    replaceSourcePaths?: string[];
+    testSuite?: TestSuite;
     prepareCommands: ProjectCommand[];
     commands: ProjectCommand[];
     /** 受信宿主保管预期值，生成实现进程只收到函数调用参数。 */
@@ -914,4 +923,9 @@ export interface AgentPromptResolver {
   /** Compatibility path for tests without a persisted RunConfigurationSnapshot. */
   /** 读取提示词Addon。 */
   getPromptAddon?(agentId: AgentId): string;
+}
+
+/** 有界任务执行器：失败时取消同批任务，等待在途调用结束后再返回。 */
+export interface TaskBatchRunner {
+  run<T>(tasks: Array<(signal: AbortSignal) => Promise<T>>, signal?: AbortSignal): Promise<T[]>;
 }

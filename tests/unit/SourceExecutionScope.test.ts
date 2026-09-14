@@ -5,7 +5,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { sourceExecutionScope } from '../../src/domain/services/knowledge/SourceExecutionScope.ts';
+import { sourceExecutionScope } from '../../src/domain/knowledge/SourceExecutionScope.ts';
 import { createPublicationPreparationFixture } from '../helpers/PublicationPreparationFixture.ts';
 async function fixture() {
   const { set, contents, project, put } = await createPublicationPreparationFixture();

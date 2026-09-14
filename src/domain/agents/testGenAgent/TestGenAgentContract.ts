@@ -1,100 +1,79 @@
 /**
  * Copyright (c) 2026 linlisWorkTeam
  * SPDX-License-Identifier: MIT
- * 文件功能：定义测试生成角色的输入输出契约、输出 Schema 与材料校验。
+ * 文件功能：定义测试源码和用例清单契约及授权边界。
  */
 import type { ArtifactRef } from '../../Domain.ts';
-import type { RoleInput } from '../AgentExecution.ts';
+import type { RoleInput, ExecutionContext } from '../AgentExecution.ts';
 import { requireMaterials } from '../AgentExecution.ts';
-import { assertModuleBehaviorSuite, moduleBehaviorSuiteSchema, type ModuleBehaviorSuite } from './ModuleBehaviorSuite.ts';
-import { assertNativeBehaviorSuite, assertNativeContract, type NativeContract, type NativeBehaviorSuite } from '../../services/evaluation/NativeBehaviorSuite.ts';
-import { nativeBehaviorSuiteSchema } from '../../services/evaluation/NativeBehaviorSchema.ts';
 
-/** 角色业务载荷。 */
+/** 测试只基于源码；失败候选仅在参考校验失败时显式传回。 */
 export interface Payload {
-  /** 提供模块标识信息，供调用方读取或传入。 */
-  moduleId: string;
-  /** 提供源码快照引用信息，供调用方读取或传入。 */
-  sourceSnapshotRef: ArtifactRef;
-  /** 提供publicInterface引用列表信息，供调用方读取或传入。 */
-  publicInterfaceRefs: ArtifactRef[];
-  /** 提供语言标识信息，供调用方读取或传入。 */
-  languageId: string;
-  /** 提供测试策略引用信息，供调用方读取或传入。 */
-  testPolicyRef: ArtifactRef;
+  moduleId: string; sourceSnapshotRef: ArtifactRef; publicInterfaceRefs: ArtifactRef[];
+  languageId: string; testPolicyRef: ArtifactRef; allowedTestPaths: string[];
+  previousCandidateRef?: ArtifactRef; validationFailureRef?: ArtifactRef;
 }
-/** 角色输入。 */
+export const TEST_CASE_PROTOCOL = 'native-cases-v2-supervised';
 export type Input = RoleInput<Payload>;
-/** 角色输出。 */
+/** 用例与生成文件、源码依据一一建立可审计关系。 */
 export interface Output {
-  /** 旧记录只保留为未评测候选，不执行模型提供的命令。 */
-  candidateCommands?: Record<string, unknown>[];
-  suite?: ModuleBehaviorSuite;
-  nativeSuite?: NativeBehaviorSuite;
-  oracleRequired: boolean;
+  files: { path: string; content: string }[];
+  cases: { caseId: string; entryPoint: string; testPath: string; target: string; input: string; expected: string; sourceEvidence: string[] }[];
 }
-/** 对外提供输出Schema，作为调用方使用的统一约定。 */
-export const outputSchema: Record<string, unknown> = {
-  type: 'object', required: ['oracleRequired'], additionalProperties: false,
-  oneOf: [{ required: ['suite'], properties: { suite: {} } },
-    { required: ['candidateCommands'], properties: { candidateCommands: {} } }],
+export interface TestGenContext extends ExecutionContext { validatedOutput?: Output }
+const text = { type: 'string', pattern: '\\S' };
+export const outputSchema = {
+  type: 'object', required: ['files', 'cases'], additionalProperties: false,
   properties: {
-    candidateCommands: { type: 'array', minItems: 1, items: { type: 'object' } },
-    suite: moduleBehaviorSuiteSchema,
-    oracleRequired: { type: 'boolean' },
+    files: { type: 'array', minItems: 1, items: { type: 'object', required: ['path', 'content'], additionalProperties: false,
+      properties: { path: text, content: text } } },
+    cases: { type: 'array', minItems: 1, items: { type: 'object',
+      required: ['caseId', 'entryPoint', 'testPath', 'target', 'input', 'expected', 'sourceEvidence'], additionalProperties: false,
+      properties: { caseId: {type:'string',pattern:'^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'}, entryPoint: {type:'string',pattern:'^[A-Za-z][A-Za-z0-9_]*$'}, testPath: text, target: text, input: { type: 'string' }, expected: text,
+        sourceEvidence: { type: 'array', minItems: 1, uniqueItems: true, items: text } } } },
   },
 };
-
-/** 构造本次角色执行使用的输出 Schema。 */
 export function schemaFor(input: Input): Record<string, unknown> {
-  const native = nativeContract(input);
-  if (native) return { type: 'object', additionalProperties: false, required: ['oracleRequired', 'nativeSuite'],
-    properties: { oracleRequired: { const: true }, nativeSuite: nativeBehaviorSuiteSchema(native) } };
-  const policy = input.materials.find(({ ref }) => ref.artifactId === input.payload.testPolicyRef.artifactId)?.content;
-  if (policy && typeof policy === 'object' && 'moduleContract' in policy) {
-    const contract = policy.moduleContract;
-    if (!contract || typeof contract !== 'object' || !('modulePath' in contract) || !('exportName' in contract)
-      || typeof contract.modulePath !== 'string' || !input.sourcePaths.includes(contract.modulePath)
-      || typeof contract.exportName !== 'string') throw new Error('TEST_MODULE_CONTRACT_INVALID');
-    return { type: 'object', additionalProperties: false, required: ['suite', 'oracleRequired'],
-      properties: { suite: { ...moduleBehaviorSuiteSchema, properties: {
-        ...(moduleBehaviorSuiteSchema.properties as Record<string, unknown>),
-        modulePath: { const: contract.modulePath }, exportName: { const: contract.exportName },
-      } }, oracleRequired: { const: true } } };
-  }
-  return outputSchema;
+  const { files, cases } = outputSchema.properties;
+  return { ...outputSchema, properties: {
+    files: { ...files, items: { ...files.items, properties: { ...files.items.properties,
+      path: { type: 'string', enum: [...input.payload.allowedTestPaths] },
+    } } },
+    cases: { ...cases, items: { ...cases.items, properties: { ...cases.items.properties,
+      testPath: { type: 'string', enum: input.payload.allowedTestPaths.filter(path => /\.(c|cc|cpp|cxx)$/.test(path)) },
+      sourceEvidence: { ...cases.items.properties.sourceEvidence, items: {
+        type: 'string', enum: [...new Set([...input.sourcePaths, ...input.publicInterfacePaths])],
+      } },
+    } } },
+  } };
 }
-
-/** 候选数据必须使用授权模块，且绝不能跳过参考实现验证。 */
-export function validateOutput(output: Output, input: Input): void {
-  const native = nativeContract(input);
-  if (native) {
-    if (output.oracleRequired !== true || output.suite || output.candidateCommands) throw new Error('TEST_ORACLE_REQUIRED');
-    assertNativeBehaviorSuite(output.nativeSuite, native);
-    const policy = input.materials.find(({ ref }) => ref.artifactId === input.payload.testPolicyRef.artifactId)?.content;
-    if (policy && typeof policy === 'object' && 'knowledge' in policy && Array.isArray(policy.knowledge)) {
-      const sections = new Set(policy.knowledge.flatMap((card: { sections?: string[] }) => card.sections ?? []));
-      if (output.nativeSuite.cases.some((test) => test.sections.some((section) => !sections.has(section)))) throw new Error('TEST_SECTION_INVALID');
-    }
-    return;
-  }
-  if (output.nativeSuite) throw new Error('TEST_NATIVE_CONTRACT_REQUIRED');
-  if (output.suite) {
-    assertModuleBehaviorSuite(output.suite, input.sourcePaths);
-    if (output.oracleRequired !== true) throw new Error('TEST_ORACLE_REQUIRED');
-  }
-}
-
-/** 原生策略可绑定知识正文，参考源码仍留在独立oracle侧。 */
-export function nativeContract(input: Input): NativeContract | null {
-  const policy = input.materials.find(({ ref }) => ref.artifactId === input.payload.testPolicyRef.artifactId)?.content;
-  if (!policy || typeof policy !== 'object' || !('nativeContract' in policy)) return null;
-  const contract = policy.nativeContract as NativeContract; assertNativeContract(contract);
-  if (contract.language !== input.payload.languageId) throw new Error('TEST_NATIVE_CONTRACT_INVALID');
-  return contract;
-}
-
-/** 检查本角色必需字段及所引用材料是否完整。 */
+/** 生成路径不能覆盖原始源码、接口或其他文件。 */
 export function validateInput(input: Input): void {
-  requireMaterials(input.payload, input.materials, ['moduleId', 'sourceSnapshotRef', 'publicInterfaceRefs', 'languageId', 'testPolicyRef']);
+  requireMaterials(input.payload, input.materials, ['moduleId', 'sourceSnapshotRef', 'publicInterfaceRefs', 'languageId', 'testPolicyRef', 'allowedTestPaths']);
+  if (!['c', 'cpp'].includes(input.payload.languageId)) throw new Error('TESTGEN_LANGUAGE_INVALID');
+  for (const path of input.payload.allowedTestPaths) {
+    if (!/^[a-zA-Z0-9_][a-zA-Z0-9_./-]*\.(c|cc|cpp|cxx|h|hpp)$/.test(path)
+      || path.split('/').some((part) => !part || part === '.' || part === '..')
+      || [...input.sourcePaths, ...input.publicInterfacePaths].includes(path)) throw new Error('TESTGEN_PATH_INVALID');
+  }
+  if (Boolean(input.payload.previousCandidateRef) !== Boolean(input.payload.validationFailureRef)) throw new Error('TESTGEN_REPAIR_INPUT_INCOMPLETE');
+}
+/** 校验用例清单不能虚报不存在的文件或越界依据。 */
+export function validateOutput(output: Output, input: Input): void {
+  const paths = output.files.map((file) => file.path);
+  if (new Set(paths).size !== paths.length || paths.some((path) => !input.payload.allowedTestPaths.includes(path))) throw new Error('TESTGEN_OUTPUT_PATH_INVALID');
+  if (!hasExecutableCases(output)) throw new Error('TESTGEN_CASE_ENTRY_INVALID');
+  const ids = output.cases.map((item) => item.caseId);
+  if (new Set(ids).size !== ids.length || output.cases.some((item) => !/\.(c|cc|cpp|cxx)$/.test(item.testPath) || !paths.includes(item.testPath)
+    || item.sourceEvidence.some((path) => ![...input.sourcePaths, ...input.publicInterfacePaths].includes(path)))
+    || paths.some((path) => /\.(c|cc|cpp|cxx)$/.test(path) && !output.cases.some((item) => item.testPath === path))) throw new Error('TESTGEN_CASE_MANIFEST_INVALID');
+}
+
+/** 旧清单不能继承新协议的成功状态，也不能默默重新生成同源测试。 */
+export function hasExecutableCases(output: Output): boolean {
+  return Array.isArray(output.cases) && output.cases.length > 0
+    && output.cases.every(c => /^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/.test(c.caseId)
+      && typeof c.entryPoint === 'string' && /^[A-Za-z][A-Za-z0-9_]*$/.test(c.entryPoint) && c.entryPoint !== 'main')
+    && new Set(output.cases.map(c => c.entryPoint)).size === output.cases.length
+    && new Set(output.cases.map(c => c.caseId)).size === output.cases.length;
 }

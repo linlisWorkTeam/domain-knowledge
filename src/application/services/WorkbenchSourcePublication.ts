@@ -3,19 +3,19 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：逐卡逐章重读来源Review原始证据并要求正文完整覆盖。
  */
-import { sourceEvidenceBindings } from '../../domain/services/knowledge/SourceEvidenceBindings.ts';
-import { SOURCE_EXECUTION_SCOPE, sourceExecutionScope } from '../../domain/services/knowledge/SourceExecutionScope.ts';
-import { moduleBuild } from '../../domain/services/workbench/WorkbenchProject.ts';
+import { sourceEvidenceBindings } from '../../domain/knowledge/SourceEvidenceBindings.ts';
+import { SOURCE_EXECUTION_SCOPE, sourceExecutionScope } from '../../domain/knowledge/SourceExecutionScope.ts';
+import { moduleBuild } from '../../domain/workbench/WorkbenchProject.ts';
 import { sha256, type ArtifactRef } from '../../domain/Domain.ts';
 import type { AgentCommand, AgentResult } from '../../domain/agents/AgentContracts.ts';
-import type { Output as ReviewOutput } from '../../domain/agents/reviewAgent/ReviewAgentContract.ts';
-import { assertSourcePublicationSection } from '../../domain/services/knowledge/SourcePublication.ts';
-import type { WorkbenchProjectSnapshot } from '../../domain/services/workbench/WorkbenchProject.ts';
-import type { NativeTestSet } from '../../domain/services/evaluation/NativeTestCache.ts';
-import type { NativeBehaviorSuite } from '../../domain/services/evaluation/NativeBehaviorSuite.ts';
-import { SOURCE_VERIFICATION_CONTRACT, sourceSectionObservations, sourceSectionsOutcome, type SourceCardBinding, type SourceCardOutcome } from '../../domain/services/knowledge/KnowledgeSourceVerification.ts';
-import { markdownSections } from '../../domain/services/knowledge/KnowledgeSections.ts';
-import { canonicalJson, type StageTask } from '../../domain/services/workbench/StageTask.ts';
+import type { Output as ReviewOutput } from '../../domain/agents/reviewAgent/WorkbenchReviewContract.ts';
+import { assertSourcePublicationSection } from '../../domain/knowledge/SourcePublication.ts';
+import type { WorkbenchProjectSnapshot } from '../../domain/workbench/WorkbenchProject.ts';
+import type { NativeTestSet } from '../../domain/evaluation/NativeTestCache.ts';
+import type { NativeBehaviorSuite } from '../../domain/evaluation/NativeBehaviorSuite.ts';
+import { SOURCE_VERIFICATION_CONTRACT, sourceSectionObservations, sourceSectionsOutcome, type SourceCardBinding, type SourceCardOutcome } from '../../domain/knowledge/KnowledgeSourceVerification.ts';
+import { markdownSections } from '../../domain/knowledge/KnowledgeSections.ts';
+import { canonicalJson, type StageTask } from '../../domain/workbench/StageTask.ts';
 import type { AgentContractValidator, ArtifactStore } from '../ports/ApplicationPorts.ts';
 interface Section extends SourceCardBinding {
   section: string; outcome: SourceCardOutcome; carriedForward?: boolean; originEvidence?: unknown;

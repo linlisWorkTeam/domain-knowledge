@@ -4,11 +4,11 @@
  * 文件功能：冻结并验证同正文的既有源码矛盾，不将后续PASS当作问题已修复。
  */
 import { sha256, type ArtifactRef } from '../../domain/Domain.ts';
-import { canonicalJson, type StageInput, type StageTask } from '../../domain/services/workbench/StageTask.ts';
+import { canonicalJson, type StageInput, type StageTask } from '../../domain/workbench/StageTask.ts';
 import type { AgentCommand, AgentResult } from '../../domain/agents/AgentContracts.ts';
-import type { Output as ReviewOutput } from '../../domain/agents/reviewAgent/ReviewAgentContract.ts';
-import { authorizeSourceCorrection } from '../../domain/services/knowledge/SourceRevision.ts';
-import type { SourceCardResult } from '../../domain/services/knowledge/KnowledgeSourceVerification.ts';
+import type { Output as ReviewOutput } from '../../domain/agents/reviewAgent/WorkbenchReviewContract.ts';
+import { authorizeSourceCorrection } from '../../domain/knowledge/SourceRevision.ts';
+import type { SourceCardResult } from '../../domain/knowledge/KnowledgeSourceVerification.ts';
 import type { WorkbenchEvaluation } from './WorkbenchEvaluation.ts';
 export interface SourceFindingProof { taskId: string; checkpointKey: string; checkpointDigest: string }
 export interface HistoricalSourceFinding extends SourceCardResult {

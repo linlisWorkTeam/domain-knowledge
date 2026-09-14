@@ -13,7 +13,7 @@ import { WorkbenchPipelines } from '../../src/application/services/WorkbenchPipe
 import { WorkbenchStages } from '../../src/application/services/WorkbenchStages.ts';
 import { SqliteStageTasks } from '../../src/infrastructure/sqlite/SqliteStageTasks.ts';
 import { SqliteWorkbenchPipelines } from '../../src/infrastructure/sqlite/SqliteWorkbenchPipelines.ts';
-import type { StageInput, StageResult, WorkbenchStage } from '../../src/domain/services/workbench/StageTask.ts';
+import type { StageInput, StageResult, WorkbenchStage } from '../../src/domain/workbench/StageTask.ts';
 function fixture(target: number, stagnant = false) {
   const directory = mkdtempSync(join(tmpdir(), 'pipeline-rounds-')), db = join(directory, 'workbench.sqlite');
   let blocked = false, revisionStarted = false, calls = 0; let selectedVersions: string[] | undefined;

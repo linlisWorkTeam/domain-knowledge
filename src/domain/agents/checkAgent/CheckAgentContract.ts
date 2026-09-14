@@ -1,66 +1,109 @@
 /**
  * Copyright (c) 2026 linlisWorkTeam
  * SPDX-License-Identifier: MIT
- * 文件功能：定义只读检查角色的输入输出契约、输出 Schema 与材料校验。
+ * 文件功能：约束模型定位和比较结论，组装带冻结源码的报告。
  */
 import type { ArtifactRef } from '../../Domain.ts';
 import type { RoleInput } from '../AgentExecution.ts';
 import { requireMaterials } from '../AgentExecution.ts';
-
-/** 角色业务载荷。 */
-export interface Payload {
-  /** 提供diff引用信息，供调用方读取或传入。 */
-  diffRef: ArtifactRef;
-  /** 提供criteria引用信息，供调用方读取或传入。 */
-  criteriaRef: ArtifactRef;
-  /** 提供publicInterface引用列表信息，供调用方读取或传入。 */
-  publicInterfaceRefs: ArtifactRef[];
-}
-/** 角色输入。 */
+import { extractEvidence, type Location, type CodeEvidence } from './CheckEvidence.ts';
+export interface Payload { sourceSnapshotRef: ArtifactRef; generatedCodeRef: ArtifactRef; comparisonRulesRef: ArtifactRef }
 export type Input = RoleInput<Payload>;
-/** 角色输出。 */
-export interface CheckEvidence {
-  criterionId: string; path: string; line: number; message: string; severity: 'BLOCKER' | 'INFO';
+export type Side = { status: 'present'; locations: Location[] } | { status: 'missing'; checkedPaths: string[]; reason: string };
+export interface Finding { ruleId: string; original: Side; generated: Side; message: string; severity: 'BLOCKER' | 'INFO' }
+export interface Draft { scope: string[]; findings: Finding[] }
+export type EvidenceSide = { status: 'present'; excerpts: CodeEvidence[] } | Extract<Side, { status: 'missing' }>;
+export interface ReportFinding extends Omit<Finding, 'original' | 'generated'> { original: EvidenceSide; generated: EvidenceSide }
+export interface Output { reportVersion: 'check-report-v2'; scope: string[]; findings: ReportFinding[]; blocking: boolean }
+export interface Attempt { attempt: number; raw: unknown; errors: string[]; validEvidence: EvidenceSide[] }
+export type FindingConclusion = Pick<Finding, 'ruleId' | 'message' | 'severity'>;
+const text = { type: 'string', pattern: '\\S' };
+function read<T>(input: Input, ref: ArtifactRef): T { return input.materials.find((m) => m.ref.artifactId === ref.artifactId)!.content as T; }
+/** 外围字段或证据格式错误不能抹去已可识别的规则、分析及严重程度。 */
+export function retainConclusions(raw: unknown, input: Input, retained: Map<number, FindingConclusion>): void {
+  if (!raw || typeof raw !== 'object' || !('findings' in raw) || !Array.isArray(raw.findings)) return;
+  const rules = read<{ id: string }[]>(input, input.payload.comparisonRulesRef);
+  raw.findings.forEach((finding: unknown, index: number) => {
+    if (retained.has(index) || !finding || typeof finding !== 'object') return;
+    const f = finding as Record<string, unknown>;
+    if (typeof f.ruleId === 'string' && rules.some((rule) => rule.id === f.ruleId)
+      && typeof f.message === 'string' && /\S/.test(f.message) && (f.severity === 'BLOCKER' || f.severity === 'INFO')) {
+      retained.set(index, { ruleId: f.ruleId, message: f.message, severity: f.severity });
+    }
+  });
 }
-/** 检查证据指向本轮生成文件中的确切行。 */
-export interface Output { blocking: boolean; findings: string[]; scope: string[]; evidence?: CheckEvidence[]; }
-/** 对外提供输出Schema，作为调用方使用的统一约定。 */
-export const outputSchema: Record<string, unknown> = {
-  type: 'object', required: ['blocking', 'findings', 'scope'], additionalProperties: false,
-  properties: {
-    blocking: { type: 'boolean' }, findings: { type: 'array', items: { type: 'string' } },
-    scope: { type: 'array', items: { type: 'string', minLength: 1 } },
-    evidence: { type: 'array', items: { type: 'object', additionalProperties: false,
-      required: ['criterionId', 'path', 'line', 'message', 'severity'], properties: {
-        criterionId: { type: 'string', minLength: 1 }, path: { type: 'string', minLength: 1 },
-        line: { type: 'integer', minimum: 1 }, message: { type: 'string', minLength: 1 },
-        severity: { enum: ['BLOCKER', 'INFO'] },
-      } } },
-  },
-};
-
-/** 构造本次角色执行使用的输出 Schema。 */
-export function schemaFor(_input: Input): Record<string, unknown> {
-  return outputSchema;
+export function sources(input: Input) {
+  return { original: read<{ files: { path: string; content?: string }[] }>(input, input.payload.sourceSnapshotRef).files,
+    generated: read<{ files: { path: string; content: string }[] }>(input, input.payload.generatedCodeRef).files };
 }
-
-/** 检查本角色必需字段及所引用材料是否完整。 */
+export function schemaFor(input: Input): Record<string, unknown> {
+  const files = sources(input);
+  const side = (paths: string[]) => ({ oneOf: [
+    { type: 'object', required: ['status', 'locations'], additionalProperties: false, properties: {
+      status: { const: 'present' }, locations: { type: 'array', minItems: 1, items: {
+        type: 'object', required: ['path', 'startLine', 'endLine', 'kind'], additionalProperties: false,
+        properties: { path: { enum: paths }, startLine: { type: 'integer', minimum: 1 }, endLine: { type: 'integer', minimum: 1 }, kind: { enum: ['function', 'declaration'] } },
+      } },
+    } },
+    { type: 'object', required: ['status', 'checkedPaths', 'reason'], additionalProperties: false, properties: {
+      status: { const: 'missing' }, checkedPaths: { type: 'array', minItems: 1, uniqueItems: true, items: { enum: paths } }, reason: text,
+    } },
+  ] });
+  const generatedPaths = files.generated.map((f) => f.path);
+  const rules = read<{ id: string }[]>(input, input.payload.comparisonRulesRef);
+  return { type: 'object', required: ['scope', 'findings'], additionalProperties: false, properties: {
+    scope: { type: 'array', minItems: 1, uniqueItems: true, items: { enum: generatedPaths } },
+    findings: { type: 'array', items: { type: 'object', required: ['ruleId', 'original', 'generated', 'message', 'severity'], additionalProperties: false,
+      properties: { ruleId: { enum: rules.map((r) => r.id) }, original: side([...input.sourcePaths, ...input.publicInterfacePaths]), generated: side(generatedPaths), message: text, severity: { enum: ['BLOCKER', 'INFO'] } },
+    } },
+  } };
+}
 export function validateInput(input: Input): void {
-  requireMaterials(input.payload, input.materials, ['diffRef', 'criteriaRef', 'publicInterfaceRefs']);
+  requireMaterials(input.payload, input.materials, ['sourceSnapshotRef', 'generatedCodeRef', 'comparisonRulesRef']);
+  const rules = read<{ id: string; description: string }[]>(input, input.payload.comparisonRulesRef);
+  if (!Array.isArray(rules) || !rules.length || rules.some((r) => !r.id?.trim() || !r.description?.trim())
+    || new Set(rules.map((r) => r.id)).size !== rules.length) throw new Error('CHECK_RULES_REQUIRED');
+  const files = sources(input);
+  const paths = [...input.sourcePaths, ...input.publicInterfacePaths];
+  if (!files.original || !files.generated?.length || paths.some((path) => typeof files.original.find((f) => f.path === path)?.content !== 'string')
+    || files.generated.some((f) => !f.path || typeof f.content !== 'string')
+    || new Set(files.generated.map((f) => f.path)).size !== files.generated.length) throw new Error('CHECK_MATERIAL_CONTENT_MISSING');
 }
-
-/** 模型不能报告脱离生成工件、超出文件行数或没有依据的阻塞问题。 */
-export function validateOutput(output: Output, input: Input): void {
-  const material = input.materials.find(({ ref }) => ref.artifactId === input.payload.diffRef.artifactId)?.content;
-  const files = (material && typeof material === 'object' && 'files' in material && Array.isArray(material.files))
-    ? material.files as { path: string; content: string }[] : [];
-  const evidence = output.evidence ?? [];
-  if (output.blocking && !evidence.some((item) => item.severity === 'BLOCKER')) throw new Error('CHECK_BLOCKING_EVIDENCE_REQUIRED');
-  if (!output.blocking && evidence.some((item) => item.severity === 'BLOCKER')) throw new Error('CHECK_BLOCKING_CONTRADICTION');
-  if (output.findings.length && !evidence.length) throw new Error('CHECK_FINDING_EVIDENCE_REQUIRED');
-  for (const item of evidence) {
-    const file = files.find((file) => file.path === item.path);
-    if (!output.scope.includes(item.path) || !file || typeof file.content !== 'string'
-      || item.line > file.content.split('\n').length) throw new Error('CHECK_EVIDENCE_LOCATION_INVALID');
-  }
+/** 缓存只属于本次冻结输入；修正不重写有效证据，任何错误都不能提交部分成功报告。 */
+export function assembleReport(draft: Draft, input: Input, cache = new Map<string, EvidenceSide>()): { output: Output; errors: string[] } {
+  const files = sources(input), paths = files.generated.map((f) => f.path), errors: string[] = [];
+  if (draft.scope.length !== paths.length || paths.some((p) => !draft.scope.includes(p))) errors.push('CHECK_SCOPE_INVALID: scope must include all generated files');
+  const side = (value: Side, which: 'original' | 'generated', at: string): EvidenceSide | undefined => {
+    const key = JSON.stringify([which, value]);
+    if (cache.has(key)) return cache.get(key)!;
+    try {
+      const allowed = which === 'original' ? [...input.sourcePaths, ...input.publicInterfacePaths] : paths;
+      let evidence: EvidenceSide;
+      if (value.status === 'missing') {
+        if (value.checkedPaths.some((p) => !allowed.includes(p))) throw new Error('CHECK_EVIDENCE_INVALID: checked path is not authorized');
+        if (allowed.some((p) => !value.checkedPaths.includes(p))) throw new Error('CHECK_MISSING_SCOPE_INCOMPLETE: list the complete authorized side before claiming absence');
+        evidence = { ...value, checkedPaths: [...value.checkedPaths] };
+      } else {
+        evidence = { status: 'present', excerpts: value.locations.map((location) => {
+          if (!allowed.includes(location.path)) throw new Error('CHECK_EVIDENCE_INVALID: path is not authorized');
+          const file = files[which].find((f) => f.path === location.path);
+          if (typeof file?.content !== 'string') throw new Error('CHECK_MATERIAL_CONTENT_MISSING');
+          return extractEvidence(location, file.content);
+        }) };
+      }
+      cache.set(key, evidence); return evidence;
+    } catch (error) { errors.push(`${at}: ${error instanceof Error ? error.message : String(error)}`); return undefined; }
+  };
+  const findings: ReportFinding[] = [];
+  draft.findings.forEach((f, i) => {
+    if (f.original.status === 'missing' && f.generated.status === 'missing') { errors.push(`findings[${i}]: CHECK_BOTH_SIDES_MISSING`); return; }
+    const original = side(f.original, 'original', `findings[${i}].original`);
+    const generated = side(f.generated, 'generated', `findings[${i}].generated`);
+    if (original && generated) findings.push({ ...f, original, generated });
+  });
+  return { output: { reportVersion: 'check-report-v2', scope: [...draft.scope], findings, blocking: findings.some((f) => f.severity === 'BLOCKER') }, errors };
+}
+export function renderEvidence(side: EvidenceSide): string {
+  return side.status === 'missing' ? `未找到对应实现（Check 判断，程序未证明缺失）；检查范围：${side.checkedPaths.join(', ')}\n${side.reason}`
+    : side.excerpts.map((e) => `${e.path}:${e.startLine}-${e.endLine}\n${e.content}`).join('\n\n');
 }

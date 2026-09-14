@@ -33,13 +33,48 @@ Orchestrator.executionForRun 组合工作流执行事实和 RunConfiguration 兼
 
 纯规则、真实注册表 API 与受控浏览器分别由 RunExecutionPresentation、RunExecutionHttp 和 RunExecutionConsole 测试覆盖；受控执行视图不声明真实模型验收。
 
+DocWorkerExecutionService 实现 DocGen 的内部 Worker 执行端口，生产与独立样例共用。它校验任务范围、加载冻结的 Worker 提示词、通过 RoleExecutionService 提交独立结果，并读取已提交片段返回给 DocGen。ConcurrentTasks 在 Infrastructure 中提供默认三个逻辑并发槽；ECS 模型与构建仍通过共享外部执行槽串行运行；任一任务失败取消同批调用并等待在途任务结束。它不决定源码如何分组或文档如何汇总。
+
+WorkerMaterials 按分配源码与公开接口裁剪独立源码清单，再保存子任务 CAS 引用；同一路径材料冲突以 WORKER_SOURCE_CONFLICT 拒绝。Prompt 正文、子任务 sourceRefs/publicInterfaceRefs 和可读工作区使用同一授权集合，父级历史/纠正材料不进入 Worker；重试与复用以包含载荷、冻结 Prompt 的 subagent-v4 键绑定该范围。
+
+## 路由、停止与跨存储恢复
+
+Orchestrator 从场景授权模块中选择一个，Application 将模块、固定提交快照和任务材料绑定到 Run，后续轮次不能换模块。maxIterations 包含首轮，入口与质量/Gate 继续条件共用 Domain IterationBudget；模型格式重试、TestGen 修复及同轮重放不消费新业务轮次。
+
+workflow_router 先用 runId、输入 iteration、route-v2 的 generation key 保存不可变结果及输入身份，再幂等推进 ITERATING/LOW_CONFIDENCE 和停止交接，最后返回 LangGraph 更新。恢复不依据已经推进的 Run.iteration 重算结论；已提交评测/Gate 按相同输入和证据取回，冲突拒绝。Registry 与 Graph checkpoint 无跨库事务，故障窗口由真实图恢复测试覆盖，详见 [Workflow](../domainFunction/workflow/Workflow.md)。
+
+测试校验/修复失败、DocGen 文档范围提案、质量耗尽、Gate STOPPED 四类人工停止均保存精简 CAS 交接，包含问题、下一步建议和有效证据；已有 Review 历史时带 historySummary。ReviewHandoffPrepared 事件及待办按交接键去重。早期停止可由 Application 根据事实组织摘要，无须强行调用 Review；自动资料清理与历史最佳回退仍未实现。
+
 ## 当前内容质量策略
 
 DeterministicQualityPolicy 位于 Application：来源证据 30%、结构 25%、可验证性 20%、正文量 15%、可读性 10%，默认阈值 70。KnowledgeWritingGuide 报告模板化表达和超长段落；弱项形成反馈送回 DocGen。质量拒绝跳过 Code，质量通过不等于行为 Gate PASS。
 
+## 项目配置与角色材料分发
+
+当前配置保存在冻结场景的 agentConfiguration 中，由 ProjectAgentConfiguration 校验，场景与源码快照进入 CAS。Code 只收到 languageId、standard、dependencies、constraints 和 allowedGeneratedPaths，TestGen 只收到语言、标准和测试路径策略。运行中读取冻结场景；独立 ProjectProfile.json 文件加载仍属后续配置管理能力。依赖和构建说明不写入知识卡片。
+
+| 配置内容 | 用途与接收方 |
+| --- | --- |
+| 项目标识、版本、场景及环境选择 | Application 定位本次运行使用的配置；本服务器与公司环境可选择不同工具链和路径 |
+| C/C++ 标准、依赖声明、影响代码编写的约束 | 裁剪后传给 CodeAgent；不混入原始业务实现、参考测试或答案 |
+| 编译器、依赖位置、编译/链接参数、宏定义及构建入口 | 完整配置交编译、评测执行器，CodeAgent 只获得其中必要的编写约束 |
+| CodeAgent 可读材料规则、允许输出的相对路径范围 | Application 与 Workspace 解析并执行；具体白名单由框架确定，模型不能扩权 |
+
+用户发起任务时选择知识卡片、项目和场景。同项目只换知识卡片且运行条件不变时可复用项目配置；模块或构建方式不同则选用场景差异；切换业务项目使用其对应配置，保留原项目配置。
+
+每次启动按以下顺序准备材料：
+
+1. 解析项目与场景，校验语言、依赖、构建配置及路径规则；场景差异不能扩大受信权限。
+2. 固定本轮知识卡片版本与摘要、项目配置版本与摘要、选定场景和实际生效配置。
+3. 分配独立工作区，将授权卡片和必要配置准备为角色材料，记录实际可读文件白名单、输出根目录及允许生成的相对路径。
+4. 按角色裁剪 Prompt 材料与工具读取范围；CodeAgent 不再接收整份项目场景、独立接口文件或其他角色材料。
+5. 保存运行快照再执行。后续修改配置只影响新任务；恢复任务使用冻结材料，无法恢复对应版本时明确失败，不能静默切换为新配置。
+
+实际路径写在本轮运行快照中，项目配置保存权限规则；相同知识在不同环境运行可以得到不同绝对目录，但不能混用其他运行的文件。CodeAgent 返回文件列表后，由框架统一校验输出 Schema、相对路径、重复路径和输出范围，全部通过才落盘到本轮临时输出目录；编译、评测及发布继续沿用各自用例。隔离约束见 [Workspace](../domainFunction/workspace/Workspace.md)，验收见 AC-CONFIG-001、AC-CODE-001、002。
+
 ## 配置与独立运行
 
-RunConfiguration 冻结 Prompt、Schema、Provider 和 roleExecutionVersion 摘要，配置改变影响新 Run；旧版本拒绝恢复但不阻止查询历史。AgentExample 保存独立开发 Run、配置、工件与脱敏轨迹，不启动 LangGraph、评测或发布。所有角色样例均通过 AgentExample 执行，不再为 DocGen 提供专用应用服务。固定源码检查只在 DocGen 自己的样例测试中执行。
+RunConfiguration 冻结 Prompt、Schema、Provider 和 roleExecutionVersion 摘要，配置改变影响新 Run；旧版本拒绝恢复但不阻止查询历史。AgentExample 保存独立开发 Run、配置、工件与脱敏轨迹，不启动 LangGraph、评测或发布。所有角色样例均通过 AgentExample 执行，DocGen 内部 Worker 的提交适配复用公共角色执行服务。固定源码检查只在 DocGen 自己的样例测试中执行。
 
 ProviderOperationsApp 只在用户显式验证时调用 ProviderConnectionProbe，并贯穿 HTTP 取消信号。30 秒总期限从应用入口开始，覆盖配置修订队列和 DNS 校验；取消的队列项提前返回，但不能放行仍在前序操作后的其他配置修改。模型列表与最小生成均 PASSED、reasonCode 为 GENERATION_READY 才保存已验证指纹并启用；两阶段证据保存在设置和脱敏审计中。旧版 READY 记录可读，但对外显示 UNVERIFIED / GENERATION_VERIFICATION_REQUIRED，不能成为新 Run 的默认配置，读取时不触发生成或修改旧记录。配置修订号和 HTTP 幂等约束继续阻止重复操作产生额外调用。技术预算和临时空间见[模型适配设计](../infrastructure/agentAdapters/AgentAdapters.md#显式连接验证)。
 
@@ -61,7 +96,7 @@ Console 通过应用边界读取发布设置、枚举服务器授权目录、读
 
 ## 工作台阶段与索引
 
-WorkbenchStages 通过 StageTaskStore 调度版本化任务；输入身份、恢复条件和预算规则位于 Domain [Workbench](../domainFunction/services/workbench/Workbench.md)。单阶段执行结果与检查点可独立等待，不复用 AgentExampleService 的每次新建 Run 行为。当前 GENERATE（C/C++）与 INDEX handler 已接通；FLYWHEEL已接通重建和接口比较部分；EVALUATE已接通参考验证和生成行为评测，自动修订与关联执行器仍待接通。
+WorkbenchStages 通过 StageTaskStore 调度版本化任务；输入身份、恢复条件和预算规则位于 Domain [Workbench](../domainFunction/workbench/Workbench.md)。单阶段执行结果与检查点可独立等待，不复用 AgentExampleService 的每次新建 Run 行为。当前 GENERATE（C/C++）与 INDEX handler 已接通；FLYWHEEL已接通重建和接口比较部分；EVALUATE已接通参考验证和生成行为评测，自动修订与关联执行器仍待接通。
 
 KnowledgeIndexService 读取冻结卡片版本，协调 YAML/Markdown 工件、增量索引、恢复与摘要查询。索引失败保留知识和已提交子步骤。查询只访问摘要和版本元数据，正文由详情按需加载；不调用模型、发布或外部搜索。
 
@@ -92,3 +127,26 @@ WorkbenchEvaluation 已接通：接受成功重建taskId，冻结其结果摘要
 候选参考拒绝保存独立报告与检查点，任务以TEST_CANDIDATE_REJECTED失败；恢复使用递增候选修订键重新生成已拒绝候选，保留同任务累计消耗。尚在验证中发生资源中断的候选不重新生成。完整报告留CAS，阶段与模块检查点仅含计数/引用，避免大报告超过阶段状态的256KiB上限；后续模块失败不丢失前序模块报告。所有行为通过仍不等于完成发布门禁。
 
 外部材料捕获由 WorkbenchMaterials 协调：通过 ExternalMaterialReader 读取用户登记来源及固定修订，验证原文摘要，调用文本转换端口，写入原文/正文 CAS，再通过 ExternalMaterialStore 追加不可变快照。Domain 定义材料身份和适用条件约束，Application 不解析 HTML、不读文件或发 HTTP 请求。读取快照前验证两个工件完整性，失败不返回伪造正文。此捕获用例尚不自动生成关联，关联任务需显式选择材料。
+
+### C/C++ 场景字段
+
+```json
+{
+  "agentConfiguration": {
+    "languageId": "cpp", "standard": "c++17",
+    "dependencies": [], "constraints": [],
+    "testPaths": ["tests/generated.cpp"], "maxTestRepairs": 1
+  },
+  "allowedGeneratedPaths": ["src/module.cpp"],
+  "comparisonRules": [{ "id": "behavior", "description": "比较公开函数的行为与返回值" }],
+  "businessGoal": "生成该模块的知识文档并验证",
+  "referenceCommands": [
+    { "tool": "g++", "purpose": "check", "args": ["-std=c++17", "src/module.cpp", "tests/generated.cpp", "-o", "test-bin"] },
+    { "tool": "binary", "purpose": "test", "args": ["test-bin"] }
+  ]
+}
+```
+
+finalCommands 使用同一套编译/测试入口测评生成代码；firstIterationCommands 仅保留为旧场景兼容字段，自动飞轮各轮均使用 finalCommands。编译命令放在 check 阶段；prepareCommands 用于环境准备，其失败不会触发 TestGen 改写测试。C 配置使用 languageId=c、例如 standard=c17 和 gcc。
+
+配置了 moduleContract 的 TypeScript 独立模块使用 section-doc-v1、source-facts-v1、behavior-cases-v1、workbench-code-v1 和 workbench-review-v1 显式协议，仍由同一七角色注册执行。原生通用项目继续使用默认角色协议。新运行冻结 domain-agents-v11-workbench-evidence，旧版本只读，不跨版本恢复。

@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：验收独立模块真实隔离评测、可信候选晋升、H2 修订和自动本地发布。
  */
+import { ConcurrentTasks } from '../../src/infrastructure/agentAdapters/ConcurrentTasks.ts';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -12,7 +13,7 @@ import test from 'node:test';
 import type { ArtifactRef } from '../../src/domain/Domain.ts';
 import type { ModelRequest } from '../../src/domain/agents/AgentExecution.ts';
 import type { ModuleBehaviorSuite } from '../../src/domain/agents/testGenAgent/ModuleBehaviorSuite.ts';
-import { NODE_BY_AGENT } from '../../src/domain/services/workflow/AgentDefinitions.ts';
+import { NODE_BY_AGENT } from '../../src/domain/workflow/AgentDefinitions.ts';
 import { AutomatedProjectWorkflowService, ProjectWorkflowStages } from '../../src/application/services/AutomatedProjectWorkflow.ts';
 import { FixtureProjectWorkflowStages, type FixtureProjectScenario } from '../../src/infrastructure/agentAdapters/scenario/ProjectWorkflowFixture.ts';
 import { JsonSchemaAgentContractValidator } from '../../src/infrastructure/agentAdapters/contracts/JsonSchemaAgentContractValidator.ts';
@@ -84,6 +85,7 @@ async function runModule(options: Options, verify: (context: {
   const composition = createComposition({ runtimeDir: join(root, 'runtime'), repositoryRoot });
   try {
     const dependencies = {
+      workerRuntime: { prompts: composition.runConfiguration, observer: composition.workflowObserver, tasks: new ConcurrentTasks() },
       nodeByAgent: NODE_BY_AGENT, flywheel: composition.apps.flywheel, evalRunner: composition.apps.evalRunner,
       evaluator: new TrustedProjectEvaluator(composition.artifacts),
       contracts: new JsonSchemaAgentContractValidator(join(process.cwd(), 'docs/specs/schemas')),
@@ -200,7 +202,7 @@ test('module flywheel: evidence-bound H2 correction repairs a failed implementat
     assert.deepEqual(requests.filter(({ request }) => request.role === 'doc-gen').map(({ request }) => request.stage), ['outline', 'body', 'revision']);
     const first = await checkpointArtifact(composition, `${runId}:evaluation:0`);
     assert.equal(first.value.passed, false);
-    const review = await checkpointArtifact(composition, `${runId}:review:0:main:contract-v5`);
+    const review = await checkpointArtifact(composition, `${runId}:review:0:main:contract-v11`);
     assert.equal(review.value.payload.corrections[0].knowledgePath, 'knowledge/module-acceptance.md#行为契约');
     assert.equal(review.value.payload.corrections[0].evidenceRefs.some((ref: ArtifactRef) => ref.artifactId === first.ref.artifactId), true);
     const versions = composition.service.listKnowledgeVersions().filter((version) => version.moduleId === 'module-acceptance');

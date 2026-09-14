@@ -10,7 +10,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createKnowledgeServer } from '../../src/interfaces/runner/Server.ts';
-import { createStageTask, type WorkbenchStage } from '../../src/domain/services/workbench/StageTask.ts';
+import { createStageTask, type WorkbenchStage } from '../../src/domain/workbench/StageTask.ts';
 test('snapshot and stage filters precede pagination and do not mix old versions', async () => {
   const root = mkdtempSync(join(tmpdir(), 'stage-history-')); const server = createKnowledgeServer({ runtimeDir: root, anonymousAccess: true });
   server.server.listen(0, '127.0.0.1'); await once(server.server, 'listening');

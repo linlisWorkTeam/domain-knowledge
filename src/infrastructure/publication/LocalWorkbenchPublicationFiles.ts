@@ -6,7 +6,7 @@
 import { mkdirSync, mkdtempSync, lstatSync, readFileSync, writeFileSync, renameSync, rmSync, readdirSync, openSync, fsyncSync, closeSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { sha256 } from '../../domain/Domain.ts';
-import { assertPublicationRecord, type PublicationRecord } from '../../domain/services/workbench/WorkbenchPublicationRecord.ts';
+import { assertPublicationRecord, type PublicationRecord } from '../../domain/workbench/WorkbenchPublicationRecord.ts';
 import type { ArtifactStore } from '../../application/ports/ApplicationPorts.ts';
 import type { WorkbenchPublicationFiles } from '../../application/ports/WorkbenchPublicationPorts.ts';
 export class LocalWorkbenchPublicationFiles implements WorkbenchPublicationFiles {

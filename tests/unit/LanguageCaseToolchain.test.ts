@@ -5,7 +5,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { groupRepositoryModules } from '../../src/domain/services/sourceScan/RepositoryAnalysis.ts';
+import { groupRepositoryModules } from '../../src/domain/sourceScan/RepositoryAnalysis.ts';
 import { IsolatedLanguageCases } from '../../src/infrastructure/evaluation/project/IsolatedLanguageCases.ts';
 import type { ArtifactStore, ProjectEvaluation } from '../../src/application/ports/ApplicationPorts.ts';
 import type { NativeCaseInput, TypeScriptModuleInput } from '../../src/application/ports/LanguageToolchainPorts.ts';

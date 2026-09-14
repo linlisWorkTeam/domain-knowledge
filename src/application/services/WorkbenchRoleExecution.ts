@@ -6,7 +6,7 @@
 import { sha256, type ArtifactRef } from '../../domain/Domain.ts';
 import type { AgentCommand, AgentId } from '../../domain/agents/AgentContracts.ts';
 import type { StageAttempt, RoleInput } from '../../domain/agents/AgentExecution.ts';
-import { executeAgent } from '../../domain/services/workflow/AgentExecutionService.ts';
+import { executeAgent } from '../../domain/workflow/AgentExecutionService.ts';
 import type { ArtifactStore, AgentContractValidator } from '../ports/ApplicationPorts.ts';
 import type { StageModelConfiguration, StageModelFactory } from '../ports/WorkbenchGenerationPorts.ts';
 import type { StageExecutionContext } from './WorkbenchStages.ts';

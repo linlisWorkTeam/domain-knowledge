@@ -4,9 +4,9 @@
  * 文件功能：提供联合证据测试替身，不代表真实发布验收。
  */
 import { sha256 } from '../../src/domain/Domain.ts';
-import type { PublicationEvidence } from '../../src/domain/services/workbench/WorkbenchPublication.ts';
-import { createStageTask, canonicalJson, type StageTask, type StageInput, type StageResult } from '../../src/domain/services/workbench/StageTask.ts';
-import { SOURCE_VERIFICATION_CONTRACT } from '../../src/domain/services/knowledge/KnowledgeSourceVerification.ts';
+import type { PublicationEvidence } from '../../src/domain/workbench/WorkbenchPublication.ts';
+import { createStageTask, canonicalJson, type StageTask, type StageInput, type StageResult } from '../../src/domain/workbench/StageTask.ts';
+import { SOURCE_VERIFICATION_CONTRACT } from '../../src/domain/knowledge/KnowledgeSourceVerification.ts';
 export const publicationConfiguration = { agents: [{ agentId: 'test-gen', effectivePromptSha256: sha256('prompt') }], roleExecutionVersion: 'fixture', contracts: {}, provider: {} };
 export const publicationApi = { sourcePath: 'module.c', declarations: [{ kind: 'FunctionDecl', name: 'value', type: 'int (void)', parameters: [] }] };
 export const publicationBody = '# Card\n\n## Value\nbody';

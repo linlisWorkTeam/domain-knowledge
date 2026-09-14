@@ -7,7 +7,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { WorkbenchPublicationStore } from '../../application/ports/WorkbenchPublicationPorts.ts';
-import { assertPublicationRecord, type PublicationRecord } from '../../domain/services/workbench/WorkbenchPublicationRecord.ts';
+import { assertPublicationRecord, type PublicationRecord } from '../../domain/workbench/WorkbenchPublicationRecord.ts';
 export class SqliteWorkbenchPublications implements WorkbenchPublicationStore {
   private readonly db: DatabaseSync;
   constructor(path: string) {

@@ -3,16 +3,16 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：消费独立来源复核的明确纠正意见，复用定点修订和增量索引。
  */
-import { readSourceReviewPolicy } from '../../domain/services/knowledge/SourceReviewPolicy.ts';
+import { readSourceReviewPolicy } from '../../domain/knowledge/SourceReviewPolicy.ts';
 import { WorkbenchSourceFindingHistory, type SourceFindingProof } from './WorkbenchSourceFindingHistory.ts';
 import { type ArtifactRef } from '../../domain/Domain.ts';
 import type { AgentCommand, AgentResult } from '../../domain/agents/AgentContracts.ts';
-import type { Output as ReviewOutput } from '../../domain/agents/reviewAgent/ReviewAgentContract.ts';
-import { canonicalJson, type JsonValue, type StageInput } from '../../domain/services/workbench/StageTask.ts';
-import { SOURCE_VERIFICATION_CONTRACT, sourceVerificationOutcome, type SourceCardResult } from '../../domain/services/knowledge/KnowledgeSourceVerification.ts';
-import { SOURCE_REVISION_CONTRACT, SOURCE_CORRECTION_POLICY, sourceCorrectionCandidates, authorizeSourceCorrection } from '../../domain/services/knowledge/SourceRevision.ts';
-import { knowledgeRevisionOutcome } from '../../domain/services/knowledge/KnowledgeRevision.ts';
-import type { NativeBehaviorSuite } from '../../domain/services/evaluation/NativeBehaviorSuite.ts';
+import type { Output as ReviewOutput } from '../../domain/agents/reviewAgent/WorkbenchReviewContract.ts';
+import { canonicalJson, type JsonValue, type StageInput } from '../../domain/workbench/StageTask.ts';
+import { SOURCE_VERIFICATION_CONTRACT, sourceVerificationOutcome, type SourceCardResult } from '../../domain/knowledge/KnowledgeSourceVerification.ts';
+import { SOURCE_REVISION_CONTRACT, SOURCE_CORRECTION_POLICY, sourceCorrectionCandidates, authorizeSourceCorrection } from '../../domain/knowledge/SourceRevision.ts';
+import { knowledgeRevisionOutcome } from '../../domain/knowledge/KnowledgeRevision.ts';
+import type { NativeBehaviorSuite } from '../../domain/evaluation/NativeBehaviorSuite.ts';
 import type { StageModelConfiguration } from '../ports/WorkbenchGenerationPorts.ts';
 import type { WorkbenchEvaluation } from './WorkbenchEvaluation.ts';
 import type { KnowledgeFlywheelService } from './ApplicationServices.ts';

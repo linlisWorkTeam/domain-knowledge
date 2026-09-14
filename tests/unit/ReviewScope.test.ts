@@ -6,8 +6,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createArtifactRef } from '../../src/domain/Domain.ts';
-import { schemaFor, outputSchema, correctionTargets, validateInput, validateOutput, type Input } from '../../src/domain/agents/reviewAgent/ReviewAgentContract.ts';
-import { buildPrompt } from '../../src/domain/agents/reviewAgent/ReviewAgentPrompt.ts';
+import { schemaFor, outputSchema, correctionTargets, validateInput, validateOutput, type Input } from '../../src/domain/agents/reviewAgent/WorkbenchReviewContract.ts';
+import { buildPrompt } from '../../src/domain/agents/reviewAgent/WorkbenchReviewPrompt.ts';
 import { assertModelOutput } from '../../src/infrastructure/agentAdapters/ModelExecution.ts';
 function input(paths?: string[]): Input {
   const body = '# Card\n## Behavior\nReturn the sum.\n## Limits\nRepresentable inputs only.';
@@ -16,7 +16,7 @@ function input(paths?: string[]): Input {
   const criteriaRef = createArtifactRef(Buffer.from(JSON.stringify(criteria)), 'application/json');
   const evaluationReportRef = createArtifactRef(Buffer.from('{}'), 'application/json');
   return { moduleId: 'card', sourcePaths: [], publicInterfacePaths: [], provenance: [],
-    payload: { knowledgeRef, criteriaRef, evaluationReportRef }, materials: [{ ref: knowledgeRef, content: body }, { ref: criteriaRef, content: criteria }, { ref: evaluationReportRef, content: {} }] };
+    payload: { executionContract: 'workbench-review-v1', knowledgeRef, criteriaRef, evaluationReportRef }, materials: [{ ref: knowledgeRef, content: body }, { ref: criteriaRef, content: criteria }, { ref: evaluationReportRef, content: {} }] };
 }
 test('evidence headings constrain both advertised and validated Review output before acceptance', () => {
   const value = input(['knowledge/card.md#Behavior']); validateInput(value);

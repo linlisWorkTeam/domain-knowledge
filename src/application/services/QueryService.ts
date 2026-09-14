@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：协调Query服务用例及其依赖的领域规则与端口。
  */
-import { groupKnowledgeCards } from '../../domain/services/knowledge/KnowledgeCards.ts';
+import { groupKnowledgeCards } from '../../domain/knowledge/KnowledgeCards.ts';
 import type { KnowledgeVersion } from '../../domain/Domain.ts';
 import type { ArtifactStore, FlywheelRepository } from '../ports/ApplicationPorts.ts';
 
@@ -43,6 +43,22 @@ export class KnowledgeQueryService {
   constructor(artifacts: ArtifactStore, repository: FlywheelRepository) {
     this.artifacts = artifacts;
     this.repository = repository;
+  }
+
+  /** 索引层只返回调用方已授权版本的描述，不读取正文工件。 */
+  describe(allowedVersionIds: readonly string[]): Record<string, unknown>[] {
+    return [...new Set(allowedVersionIds)].flatMap((id) => {
+      const version = this.repository.getKnowledgeVersion(id);
+      return version ? [{ versionId: version.versionId, moduleId: version.moduleId,
+        title: version.title, description: version.description, keywords: version.tags,
+        status: version.status, bodyRef: version.bodyRef }] : [];
+    });
+  }
+
+  /** 第二阶段仅加载本次明确授权的一份文档，索引不扩大材料权限。 */
+  async loadDocument(versionId: string, allowedVersionIds: readonly string[]): Promise<Record<string, unknown> | null> {
+    if (!allowedVersionIds.includes(versionId)) throw new Error('KNOWLEDGE_DOCUMENT_DENIED');
+    return this.get(versionId);
   }
 
   /** 读取请求。 */

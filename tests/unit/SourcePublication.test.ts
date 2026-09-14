@@ -6,8 +6,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { sha256 } from '../../src/domain/Domain.ts';
-import { assertSourcePublicationSection } from '../../src/domain/services/knowledge/SourcePublication.ts';
-import { SOURCE_VERIFICATION_CONTRACT } from '../../src/domain/services/knowledge/KnowledgeSourceVerification.ts';
+import { assertSourcePublicationSection } from '../../src/domain/knowledge/SourcePublication.ts';
+import { SOURCE_VERIFICATION_CONTRACT } from '../../src/domain/knowledge/KnowledgeSourceVerification.ts';
 function fixture(): Parameters<typeof assertSourcePublicationSection>[0] {
   const body = '# Card\n\n## Purpose\nText\n\n## Limits\nText';
   const ref = (text: string) => ({ artifactId: `sha256:${sha256(text)}`, sha256: sha256(text), size: text.length, mediaType: 'application/json' });

@@ -5,7 +5,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { nativeSupplementDemand, type SupplementSourceFinding } from '../../src/domain/services/evaluation/NativeSupplementDemand.ts';
+import { nativeSupplementDemand, type SupplementSourceFinding } from '../../src/domain/evaluation/NativeSupplementDemand.ts';
 const card = { cardId: 'card', versionId: 'v1', moduleId: 'module', bodyDigest: 'a'.repeat(64), body: '# Card\n\n## Behavior\nA\n\n## Errors\nB' };
 const binding = { cardId: card.cardId, versionId: card.versionId, moduleId: card.moduleId, bodyDigest: card.bodyDigest };
 const finding = (): SupplementSourceFinding => ({ ...binding, outcome: 'UNRESOLVED', sections: [

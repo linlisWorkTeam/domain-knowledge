@@ -5,7 +5,7 @@
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { compareNativeInterfaces } from '../../src/domain/services/evaluation/NativeInterfaceComparison.ts';
+import { compareNativeInterfaces } from '../../src/domain/evaluation/NativeInterfaceComparison.ts';
 const declaration = { kind: 'FunctionDecl', name: 'add', type: 'int (int, int)', parameters: [{ name: 'a', type: 'int' }, { name: 'b', type: 'int' }] };
 test('interface matching tolerates parameter names without claiming behavioral verification', () => {
   const result = compareNativeInterfaces([declaration], [{ ...declaration, parameters: [{ name: 'left', type: 'int' }, { name: 'right', type: 'int' }] }]);

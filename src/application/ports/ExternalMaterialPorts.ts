@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：定义指定来源读取、文本转换与材料持久化边界。
  */
-import type { ExternalMaterial } from '../../domain/services/association/ExternalMaterial.ts';
+import type { ExternalMaterial } from '../../domain/association/ExternalMaterial.ts';
 export interface ExternalMaterialReader {
   readSourceMaterial(sourceId: string): Promise<{ sourceId: string; revision: string; locator: string; title: string; bytes: Uint8Array; mediaType: string }>;
 }

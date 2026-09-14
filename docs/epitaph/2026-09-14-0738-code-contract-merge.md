@@ -1,0 +1,13 @@
+# Code 与计划角色集成进度
+
+继续0734记录同一未提交main合并；当前55个冲突文件（本轮由62减少7）。没有完成merge commit、推送、部署或真实模型验收。PR50仍草稿，目标active。本轮progress。保留原备份与所有已合并修改，不能abort或重置原工作树。
+
+CodeAgentContract已解决：main默认projectConfigurationRef仍只接受C/C++、裁剪配置、无仓库读取；新增显式executionContract=workbench-code-v1，使用knowledgeRef/publicInterfaceRefs/buildContractRef。两种输入不能混用；旧workbench未标版本命令拒绝静默升级。WorkbenchCodeInput.ts校验native-build-v1白名单与buildConstraints、输出路径、上次生成文件/编译诊断；不能夹带完整场景或测试答案。另支持typescript-build-v1的固定ES2022/ESNext/允许路径。Code始终readablePaths=[]，公开接口只内联提供。Code Spec和Prompt已同步。
+
+WorkbenchReconstruction新payload加入executionContract。AutomatedProjectWorkflow的code分支局部冲突已解决：TypeScript单独创建裁剪buildContractRef，原生保留main配置与requiredGeneratedPaths。该文件其他冲突仍在，未stage。AgentCommand.schema.json的codegenPayload局部改为main/显式workbench oneOf，其他角色冲突仍在、未stage；后续必须保留这个局部改动再合并其他段。不要从main整文件覆盖这些进展。Code optional projectConfigurationRef导致原角色测试读取处使用非空断言，运行校验确保引用存在。
+
+Orchestrator五文件采用main业务材料槽位计划（外层5阶段，DocWorker属DocGen内部），保留工作台stage=plan。模型不能写dependsOn/sourcePaths（Schema拒绝），固定图连接由领域生成；原6外层节点断言更新为5节点精确依赖断言，安全测试保留。AgentCommand的orchestrator段还需同步main必需材料。
+
+验证：tests/unit/WorkbenchCodeInput.test.ts正式运行5/5通过，/tmp/WorkbenchMergeCodeInput.log（显式版本、C/C++/TS路径、额外配置/混合契约、材料缺失、修复诊断及模型实际可见材料）。Code角色7/7通过/tmp/WorkbenchMergeCode.log；Orchestrator角色7/7通过/tmp/WorkbenchMergeOrchestrator.log。这两组临时helper只加载对应角色定义以绕过其他Registry导入冲突，断言未省略；不能作为完整Registry/应用集成证明。相关staged diff --check通过；对两个仍冲突文件运行diff --check明确报剩余marker，未宣称全树通过。无活跃测试/模型进程。
+
+后续：合并DocGenRevision/DocGenContract/Review（工作台按H2精确修订与main纠正ID/双侧证据都要保留）、TestGen可信门禁、AutomatedProjectWorkflow回放保护与新版生成键，再修Schemas/fixtures/specs并跑完整验证。Code schema仍待整体验证，TypeScript调用链除Code外仍需保留回归。更早C/C++真实结果与未完来源复核、前台、部署、最终PR38条件见0722及前文。History仍冲突、墓志铭暂多于3份，完成历史合并后按固定commit归档；不要删除未归档证据。

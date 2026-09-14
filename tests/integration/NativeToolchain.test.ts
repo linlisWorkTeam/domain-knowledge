@@ -10,7 +10,7 @@ import { join } from 'node:path';
 import { createServer } from 'node:net';
 import { once } from 'node:events';
 import { NativeToolchain } from '../../src/infrastructure/evaluation/project/NativeToolchain.ts';
-import { buildConstraints } from '../../src/domain/services/workbench/WorkbenchProject.ts';
+import { buildConstraints } from '../../src/domain/workbench/WorkbenchProject.ts';
 import { captureIsolated } from '../../src/infrastructure/runtime/IsolatedCommand.ts';
 
 const native = new NativeToolchain();

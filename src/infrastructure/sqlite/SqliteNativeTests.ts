@@ -7,8 +7,8 @@ import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { NativeTestStore } from '../../application/ports/NativeEvaluationPorts.ts';
-import type { NativeTestSet } from '../../domain/services/evaluation/NativeTestCache.ts';
-import { canonicalJson } from '../../domain/services/workbench/StageTask.ts';
+import type { NativeTestSet } from '../../domain/evaluation/NativeTestCache.ts';
+import { canonicalJson } from '../../domain/workbench/StageTask.ts';
 export class SqliteNativeTests implements NativeTestStore {
   private readonly db: DatabaseSync;
   constructor(filename: string) {

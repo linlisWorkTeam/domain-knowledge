@@ -4,12 +4,12 @@
  * 文件功能：复用定点 DocGen、最终源码复核及候选版本保存，不改变上游纠正意见来源。
  */
 import { sha256, type ArtifactRef, type KnowledgeVersion } from '../../domain/Domain.ts';
-import { type JsonValue, type StageResult } from '../../domain/services/workbench/StageTask.ts';
-import { finalizeKnowledgeRevision, knowledgeRevisionDecision, sourceReviewObservations } from '../../domain/services/knowledge/KnowledgeRevision.ts';
-import { readSourceReviewPolicy } from '../../domain/services/knowledge/SourceReviewPolicy.ts';
-import type { Output as ReviewOutput } from '../../domain/agents/reviewAgent/ReviewAgentContract.ts';
-import type { NativeBehaviorSuite } from '../../domain/services/evaluation/NativeBehaviorSuite.ts';
-import type { WorkbenchProjectSnapshot } from '../../domain/services/workbench/WorkbenchProject.ts';
+import { type JsonValue, type StageResult } from '../../domain/workbench/StageTask.ts';
+import { finalizeKnowledgeRevision, knowledgeRevisionDecision, sourceReviewObservations } from '../../domain/knowledge/KnowledgeRevision.ts';
+import { readSourceReviewPolicy } from '../../domain/knowledge/SourceReviewPolicy.ts';
+import type { Output as ReviewOutput } from '../../domain/agents/reviewAgent/WorkbenchReviewContract.ts';
+import type { NativeBehaviorSuite } from '../../domain/evaluation/NativeBehaviorSuite.ts';
+import type { WorkbenchProjectSnapshot } from '../../domain/workbench/WorkbenchProject.ts';
 import type { StageModelConfiguration } from '../ports/WorkbenchGenerationPorts.ts';
 import type { KnowledgeFlywheelService } from './ApplicationServices.ts';
 import type { WorkbenchEvaluation } from './WorkbenchEvaluation.ts';
@@ -50,7 +50,7 @@ export class WorkbenchCardRevision {
     const api = await this.load(interfaceRef);
     const corrections = [{ ...correction, evidenceRefs: [reportRef, evidenceRef, review.rawRef, referenceRef] }];
     const revised = await roles.execute(context, frozen, 'doc-gen', card.versionId, { moduleId: card.moduleId, sourcePaths: [], publicInterfacePaths: [], provenance: [card.bodyRef],
-      payload: { moduleId: card.moduleId, sourceRefs: sourceFiles.map(file => file.ref), publicInterfaceRefs: [interfaceRef], baseKnowledgeRef: card.bodyRef, corrections },
+      payload: { executionContract: 'section-doc-v1', moduleId: card.moduleId, sourceRefs: sourceFiles.map(file => file.ref), publicInterfaceRefs: [interfaceRef], baseKnowledgeRef: card.bodyRef, corrections },
       materials: [{ ref: card.bodyRef, content: body }, { ref: reportRef, content: report }, { ref: interfaceRef, content: api }, { ref: evidenceRef, content: evidence }, { ref: review.rawRef, content: review.output }, { ref: referenceRef, content: reference }, ...sourceMaterials] });
     const document = revised.output as unknown as { body: string; title: string; description: string };
     document.body = finalizeKnowledgeRevision(body, document.body, heading, typeof card.metadata.symbol === 'string' ? { commit: project.commit, symbol: card.metadata.symbol } : undefined);
@@ -70,7 +70,7 @@ export class WorkbenchCardRevision {
     await context.step(`revision-source-materials:${card.versionId}`, async () => ({ artifactRefs: [draftRef, sourceReferenceRef, sourceEvaluationRef, sourceCriteriaRef, suiteRef, oracleRef], summary: { versionId: card.versionId, heading: heading!, evaluationReportRef: json(sourceEvaluationRef) } }));
     const sourceReview = await roles.execute(context, frozen, 'review', `${card.versionId}:source-review`, {
       moduleId: card.moduleId, sourcePaths: [], publicInterfacePaths: [], provenance: [draftRef, sourceReferenceRef],
-      payload: { knowledgeRef: draftRef, evaluationReportRef: sourceEvaluationRef, checkReportRef: sourceReferenceRef, criteriaRef: sourceCriteriaRef },
+      payload: { executionContract: 'workbench-review-v1', knowledgeRef: draftRef, evaluationReportRef: sourceEvaluationRef, checkReportRef: sourceReferenceRef, criteriaRef: sourceCriteriaRef },
       materials: [{ ref: draftRef, content: document.body }, { ref: sourceEvaluationRef, content: sourceEvaluation },
         { ref: sourceReferenceRef, content: sourceReference }, { ref: sourceCriteriaRef, content: sourceCriteria }] });
     const sourceOpinion = sourceReview.output as unknown as ReviewOutput;

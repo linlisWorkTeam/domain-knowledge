@@ -6,7 +6,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { sha256, type ArtifactRef } from '../../src/domain/Domain.ts';
-import { authorizeSourceCorrection, sourceCorrectionCandidates, SOURCE_CORRECTION_POLICY } from '../../src/domain/services/knowledge/SourceRevision.ts';
+import { authorizeSourceCorrection, sourceCorrectionCandidates, SOURCE_CORRECTION_POLICY } from '../../src/domain/knowledge/SourceRevision.ts';
 const body = '# Parser\n## Behavior\nReturn the difference.\n';
 const ref = (digest: string): ArtifactRef => ({ artifactId: digest, sha256: digest, mediaType: 'application/json', size: 1 });
 const correction = { correctionId: 'provider-label', knowledgePath: 'knowledge/parser.md#Behavior', criterion: 'Return the sum shown by fixed source.', risk: 'Wrong operation.' };

@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os';
 import { readdir, realpath, stat } from 'node:fs/promises';
 import { dirname, join, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildConstraints, type BuildConstraints } from '../../../domain/services/workbench/WorkbenchProject.ts';
+import { buildConstraints, type BuildConstraints } from '../../../domain/workbench/WorkbenchProject.ts';
 import { sha256 } from '../../../domain/Domain.ts';
 import { modelProcessLane } from '../../agentAdapters/ModelProcessLane.ts';
 import { captureIsolated } from '../../runtime/IsolatedCommand.ts';

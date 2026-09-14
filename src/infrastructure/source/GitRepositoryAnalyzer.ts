@@ -7,7 +7,7 @@ import { spawn } from 'node:child_process';
 import { realpathSync, readFileSync, statfsSync } from 'node:fs';
 import { freemem } from 'node:os';
 import { relative, isAbsolute, basename, extname } from 'node:path';
-import { groupRepositoryModules } from '../../domain/services/sourceScan/RepositoryAnalysis.ts';
+import { groupRepositoryModules } from '../../domain/sourceScan/RepositoryAnalysis.ts';
 import { compilationCandidates } from './CompilationDatabase.ts';
 import { sha256 } from '../../domain/Domain.ts';
 import type { RepositoryAnalyzer, RepositorySourceReader, RepositoryAnalysis, RepositoryFile, SourceLanguage } from '../../application/ports/RepositoryAnalysisPorts.ts';

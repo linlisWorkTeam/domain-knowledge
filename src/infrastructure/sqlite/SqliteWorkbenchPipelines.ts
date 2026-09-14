@@ -8,8 +8,8 @@ import { randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { WorkbenchPipelineStore } from '../../application/ports/WorkbenchPipelinePorts.ts';
-import { PIPELINE_CONTRACT, type WorkbenchPipeline } from '../../domain/services/workbench/WorkbenchPipeline.ts';
-import { canonicalJson } from '../../domain/services/workbench/StageTask.ts';
+import { PIPELINE_CONTRACT, type WorkbenchPipeline } from '../../domain/workbench/WorkbenchPipeline.ts';
+import { canonicalJson } from '../../domain/workbench/StageTask.ts';
 import { checkpointOwner, checkpointOwnerExited } from './CheckpointOwner.ts';
 export class SqliteWorkbenchPipelines implements WorkbenchPipelineStore {
   private readonly db: DatabaseSync;

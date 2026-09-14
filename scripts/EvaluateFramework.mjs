@@ -11,7 +11,7 @@ const node = process.execPath;
 const checks = [
   {
     id: 'architecture-boundaries',
-    claim: 'DDD dependency direction and the fixed seven-Agent ownership remain enforced',
+    claim: 'Domain, Application and Infrastructure preserve inward dependency direction',
     args: ['--test', 'tests/contract/Architecture.test.ts'],
     evidence: ['tests/contract/Architecture.test.ts'],
   },
@@ -48,9 +48,9 @@ const checks = [
   },
   {
     id: 'schema-conformance',
-    claim: 'Versioned schemas, positive/negative role fixtures and P0 traceability remain valid',
-    args: ['scripts/ValidateSpecs.ts'],
-    evidence: ['scripts/ValidateSpecs.ts'],
+    claim: 'Versioned schemas and positive/negative runtime contract fixtures remain valid',
+    args: ['scripts/ValidateContracts.ts'],
+    evidence: ['scripts/ValidateContracts.ts'],
   },
   {
     id: 'fixture-end-to-end',

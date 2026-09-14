@@ -6,9 +6,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { sha256, type ArtifactRef } from '../../src/domain/Domain.ts';
-import { nativeRevisionEvidence } from '../../src/domain/services/evaluation/NativeRevisionEvidence.ts';
-import type { NativeTestSet } from '../../src/domain/services/evaluation/NativeTestCache.ts';
-import type { NativeBehaviorSuite } from '../../src/domain/services/evaluation/NativeBehaviorSuite.ts';
+import { nativeRevisionEvidence } from '../../src/domain/evaluation/NativeRevisionEvidence.ts';
+import type { NativeTestSet } from '../../src/domain/evaluation/NativeTestCache.ts';
+import type { NativeBehaviorSuite } from '../../src/domain/evaluation/NativeBehaviorSuite.ts';
 function fixture() {
   const body = '# Card\n\n## Behavior\nReturns one.\n\n## Limits\nIntegers only.\n';
   const cards = [{ cardId: 'card', versionId: 'v1', body, bodyDigest: sha256(body) }];

@@ -12,9 +12,9 @@ import { join } from 'node:path';
 import { NativeToolchain } from '../../src/infrastructure/evaluation/project/NativeToolchain.ts';
 import { NativeCaseExecutor } from '../../src/infrastructure/evaluation/project/NativeCaseExecutor.ts';
 import { createComposition } from '../../src/interfaces/runner/Composition.ts';
-import { moduleBuild, moduleFingerprintKey, projectModuleBuilds } from '../../src/domain/services/workbench/WorkbenchProject.ts';
-import type { NativeBehaviorSuite } from '../../src/domain/services/evaluation/NativeBehaviorSuite.ts';
-import { canonicalJson, createStageTask, type JsonValue } from '../../src/domain/services/workbench/StageTask.ts';
+import { moduleBuild, moduleFingerprintKey, projectModuleBuilds } from '../../src/domain/workbench/WorkbenchProject.ts';
+import type { NativeBehaviorSuite } from '../../src/domain/evaluation/NativeBehaviorSuite.ts';
+import { canonicalJson, createStageTask, type JsonValue } from '../../src/domain/workbench/StageTask.ts';
 import { sha256, type ArtifactRef } from '../../src/domain/Domain.ts';
 const nativeMode = process.env.WP_TEST_NATIVE_MODULE_BUILDS === '1';
 test(`two C modules freeze separate settings and execute fixed cases (${nativeMode ? 'real gcc' : 'controlled runner'})`, async () => {

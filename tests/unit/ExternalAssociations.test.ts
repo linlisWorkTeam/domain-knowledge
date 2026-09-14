@@ -6,8 +6,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { sha256 } from '../../src/domain/Domain.ts';
-import { associateExternalMaterials } from '../../src/domain/services/association/ExternalAssociations.ts';
-import type { AssociationCard } from '../../src/domain/services/association/CardAssociations.ts';
+import { associateExternalMaterials } from '../../src/domain/association/ExternalAssociations.ts';
+import type { AssociationCard } from '../../src/domain/association/CardAssociations.ts';
 
 test('external references require a selected exact symbol and retain negative-context evidence without claiming equivalence', () => {
   const card: AssociationCard = { cardId: 'card', versionId: 'version', bodyDigest: 'body', body: '# Parse', symbol: 'parse', repositoryId: 'repo', sourceRevision: 'commit', applicability: 'Complete buffers' };
