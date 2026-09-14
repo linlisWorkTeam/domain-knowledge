@@ -17,3 +17,5 @@ CommandResourceGroup仅在已有cgroup2父目录下创建自己命名的资源�
 
 
 原生可信用例启用 AddressSanitizer/UndefinedBehaviorSanitizer。IsolatedCommand 的显式 addressSpaceBytes 只用于虚拟地址空间，必须同时提供 processLimit 以启用物理内存/进程 cgroup；小于物理上限或超过 128 TiB 的值拒绝。原默认地址空间限制不变，原生检测模式仍保留 128 MiB 物理内存、16 进程、3 秒运行超时及进程组取消。检测器不是隔离替代，缺失依赖时构建失败，不自动退回无检测模式。
+
+GitHub临时runner通过 `scripts/RunIsolatedCi.sh` 在独立systemd服务内运行现有代码、Console和验收检查。服务只委派memory/pids控制器，仍使用原runner的UID/GID；启动器先进入委派组的runner叶节点，再启用自己父组的控制器，并设置WP_EVALUATION_CGROUP_ROOT。后续受限子进程只在同一委派树内迁移，不修改宿主祖先权限、不以root运行测试、不关闭cgroup或Bubblewrap。systemd传播命令退出码并清理临时服务；委派不可用时失败，不降级。该脚本拒绝普通非CI调用；不在ECS网站部署中执行。

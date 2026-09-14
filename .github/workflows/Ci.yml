@@ -81,8 +81,14 @@ jobs:
       - name: Run scoped checks
         env:
           VERIFICATION_SCOPES: ${{ steps.changes.outputs.scopes }}
+          VERIFICATION_RUNTIME: ${{ steps.changes.outputs.runtime }}
         # Acceptance runs below in its own environment.
-        run: node scripts/VerificationRouter.ts --run "${VERIFICATION_SCOPES//,acceptance/}"
+        run: |
+          if [ "$VERIFICATION_RUNTIME" = true ]; then
+            bash scripts/RunIsolatedCi.sh node scripts/VerificationRouter.ts --run "${VERIFICATION_SCOPES//,acceptance/}"
+          else
+            node scripts/VerificationRouter.ts --run "${VERIFICATION_SCOPES//,acceptance/}"
+          fi
 
       - name: Install Chinese fonts for affected UI
         if: steps.changes.outputs.web == 'true'
@@ -94,7 +100,7 @@ jobs:
 
       - name: Run Console browser tests
         if: steps.changes.outputs.web == 'true'
-        run: npm run test:ui
+        run: bash scripts/RunIsolatedCi.sh npm run test:ui
 
       - name: Preserve failed visual comparisons
         if: failure() && steps.changes.outputs.web == 'true'
@@ -144,4 +150,4 @@ jobs:
             execFileSync('git', ['fetch', '--no-tags', '--depth=1', 'origin', commit], { stdio: 'inherit' });
           }
           NODE
-      - run: npm run test:acceptance
+      - run: bash scripts/RunIsolatedCi.sh npm run test:acceptance
