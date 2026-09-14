@@ -10,6 +10,8 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createComposition } from '../../src/interfaces/runner/Composition.ts';
 import { associateCards, type AssociationCard } from '../../src/domain/association/CardAssociations.ts';
+import { createStageTask } from '../../src/domain/workbench/StageTask.ts';
+import { sha256 } from '../../src/domain/Domain.ts';
 
 test('symbol relations require exact same-revision evidence and never claim replacement', () => {
   const card: AssociationCard = { cardId: 'a', versionId: 'va', bodyDigest: 'da', body: '## Calls\nUse parse with Result.',
@@ -21,6 +23,23 @@ test('symbol relations require exact same-revision evidence and never claim repl
   assert.equal(associateCards([{ ...card, body: 'ResultExtra namespace::Result' }, target]).length, 0);
   assert.equal(associateCards([card, { ...target, sourceRevision: 'other' }]).length, 0);
   assert.equal(associateCards([card, { ...target, repositoryId: 'other' }]).length, 0);
+});
+
+test('qualified C++ member references resolve only within the same complete owner scope', () => {
+  const from: AssociationCard = { cardId: 'integer', versionId: 'v-int', bodyDigest: 'int-body', body: '## Related\nUse XMLUtil::ToFloat for floating point.',
+    symbol: 'tinyxml2::XMLUtil::ToInt', repositoryId: 'repo', sourceRevision: 'commit', applicability: 'Integer conversion' };
+  const to = { ...from, cardId: 'float', versionId: 'v-float', bodyDigest: 'float-body', body: '## Float\nParse floating point.', symbol: 'tinyxml2::XMLUtil::ToFloat' };
+  const relations = associateCards([from, to]);
+  assert.equal(relations.length, 1);
+  assert.equal(relations[0]?.evidence.symbol, to.symbol);
+  assert.equal(relations[0]?.evidence.matchedSymbol, 'XMLUtil::ToFloat');
+  assert.equal(relations[0]?.evidence.line, 2);
+  assert.match(relations[0]!.evidence.excerpt, /XMLUtil::ToFloat/);
+  assert.equal(relations[0]?.replacementVerified, false);
+  for (const body of ['other::XMLUtil::ToFloat', 'XMLUtil::ToFloatExtra', 'ToFloat']) assert.equal(associateCards([{ ...from, body }, to]).length, 0);
+  assert.equal(associateCards([{ ...from, symbol: 'other::XMLUtil::ToInt' }, to]).length, 0);
+  assert.equal(associateCards([from, { ...to, symbol: 'tinyxml2::Other::ToFloat' }]).length, 0);
+  assert.equal(associateCards([from, { ...to, sourceRevision: 'other-commit' }]).length, 0);
 });
 
 test('association stage retains JSON evidence across restart and invalidates old version recommendations', async () => {
@@ -36,7 +55,21 @@ test('association stage retains JSON evidence across restart and invalidates old
     const ids = [first.version.versionId, second.version.versionId, third.version.versionId, fourth.version.versionId];
     const index = composition.apps.workbenchStages.start(composition.apps.knowledgeIndex.prepare(ids));
     assert.equal((await composition.apps.workbenchStages.wait(index.taskId)).status, 'SUCCEEDED');
+    const legacyInput = { ...composition.apps.workbenchAssociations.prepare(ids), configurationDigest: sha256('card-associations-v1'), parameters: { associationContract: 'card-associations-v1' } };
+    const legacy = composition.apps.workbenchStages.store.insert(createStageTask(legacyInput, {}, new Date().toISOString()));
+    const legacyCards = await Promise.all(ids.map(async id => {
+      const version = composition.repository.getKnowledgeVersion(id)!;
+      return { cardId: String(version.metadata.cardId), versionId: id, bodyDigest: version.bodyRef.sha256,
+        body: Buffer.from(await composition.artifacts.get(version.bodyRef)).toString(), symbol: String(version.metadata.symbol),
+        repositoryId: 'repo', sourceRevision: 'commit', applicability: 'Public API' };
+    }));
+    const legacyRef = await composition.artifacts.put(Buffer.from(JSON.stringify({ schemaVersion: 'card-associations-v1', relations: associateCards(legacyCards), scope: 'INTERNAL_ONLY' })), 'application/json');
+    const lease = composition.apps.workbenchStages.store.claim(legacy.taskId)!;
+    composition.apps.workbenchStages.store.finish(legacy.taskId, lease.leaseId, 'SUCCEEDED', { artifactRefs: [legacyRef], summary: { relations: 2 } }, null);
+    assert.equal((await composition.apps.workbenchAssociations.candidates('card-parse')).relations.length, 1, 'legacy evidence remains readable before any new association task');
+    assert.throws(() => composition.apps.workbenchStages.resume(legacy.taskId, legacy.inputDigest), /STAGE_CONTRACT_INCOMPATIBLE/);
     const task = composition.apps.workbenchStages.start(composition.apps.workbenchAssociations.prepare(ids));
+    assert.notEqual(task.taskId, legacy.taskId);
     const done = await composition.apps.workbenchStages.wait(task.taskId);
     assert.equal(done.status, 'SUCCEEDED', done.reasonCode ?? ''); assert.equal(done.result?.summary.relations, 2);
     assert.equal(done.result?.summary.externalMaterials, 0);
@@ -46,7 +79,7 @@ test('association stage retains JSON evidence across restart and invalidates old
     assert.equal(candidates.relations.length, 1); assert.equal(candidates.relations[0]?.toVersionId, second.version.versionId);
     await ingest('Result', '# Result\n## Fields\nA revised integer value.');
     const stale = await composition.apps.workbenchAssociations.candidates('card-parse');
-    assert.equal(stale.relations.length, 0); assert.equal(stale.staleTasks, 1);
+    assert.equal(stale.relations.length, 0); assert.equal(stale.staleTasks, 2, 'both legacy and current indexes retain the revised card version');
     assert.equal((await composition.apps.workbenchAssociations.candidates('card-encode')).relations.length, 1, 'unaffected pair remains readable');
   } finally { await composition.close(); rmSync(runtimeDir, { recursive: true, force: true }); }
 });
@@ -66,7 +99,7 @@ test('explicit material selection binds frozen evidence, survives source deletio
     const ids = [card.version.versionId]; const stages = composition.apps.workbenchStages;
     await stages.wait(stages.start(composition.apps.knowledgeIndex.prepare(ids)).taskId);
     const input = composition.apps.workbenchAssociations.prepare(ids, [material.materialId]);
-    assert.equal(input.parameters.associationContract, 'card-associations-v2');
+    assert.equal(input.parameters.associationContract, 'card-associations-v3');
     assert.throws(() => composition.apps.workbenchAssociations.prepare(ids, ['missing']), /MATERIAL_NOT_FOUND/);
     assert.throws(() => composition.apps.workbenchAssociations.prepare(ids, [material.materialId, material.materialId]), /SELECTION_INVALID/);
     rmSync(path);

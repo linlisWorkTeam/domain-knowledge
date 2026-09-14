@@ -5,7 +5,7 @@
  */
 import { sha256, type ArtifactRef } from '../../domain/Domain.ts';
 import { AssociationDomainService } from '../../domain/association/AssociationDomainService.ts';
-import { type AssociationCard, type CardAssociation } from '../../domain/association/CardAssociations.ts';
+import { CARD_ASSOCIATION_CONTRACT, type AssociationCard, type CardAssociation } from '../../domain/association/CardAssociations.ts';
 import { cardIndexSourceDigest } from '../../domain/knowledge/KnowledgeIndex.ts';
 import { groupKnowledgeCards } from '../../domain/knowledge/KnowledgeCards.ts';
 import { canonicalJson, type StageInput } from '../../domain/workbench/StageTask.ts';
@@ -14,8 +14,8 @@ import type { KnowledgeIndexService } from './KnowledgeIndex.ts';
 import type { WorkbenchStages, StageExecutionContext } from './WorkbenchStages.ts';
 import type { WorkbenchMaterials } from './WorkbenchMaterials.ts';
 import type { ExternalAssociation } from '../../domain/association/ExternalAssociations.ts';
-const contract = 'card-associations-v1';
-const externalContract = 'card-associations-v2';
+const contract = CARD_ASSOCIATION_CONTRACT;
+const readableContracts = ['card-associations-v1', 'card-associations-v2', contract];
 export class WorkbenchAssociations {
   readonly repository: FlywheelRepository; readonly artifacts: ArtifactStore;
   readonly index: KnowledgeIndexService; readonly stages: WorkbenchStages; readonly materials: WorkbenchMaterials;
@@ -29,7 +29,7 @@ export class WorkbenchAssociations {
       const ids = [...materialIds].sort();
       const materials = ids.map((id) => { const value = this.materials.store.get(id); if (!value) throw new Error('MATERIAL_NOT_FOUND'); return value; });
       return { ...input, stage: 'ASSOCIATE', sourceDigest: sha256(canonicalJson([input.sourceDigest, materials])),
-        configurationDigest: sha256(externalContract), parameters: { associationContract: externalContract, materialIds: ids } };
+        configurationDigest: sha256(contract), parameters: { associationContract: contract, materialIds: ids } };
     }
     return { ...input, stage: 'ASSOCIATE', configurationDigest: sha256(contract), parameters: { associationContract: contract } };
   }
@@ -82,11 +82,11 @@ export class WorkbenchAssociations {
     };
     for (const task of this.stages.store.list()) {
       if (task.input.stage !== 'ASSOCIATE' || task.status !== 'SUCCEEDED' || !task.result) continue;
-      if (![contract, externalContract].some((value) => task.input.configurationDigest === sha256(value))) { staleTasks++; continue; }
+      if (!readableContracts.some((value) => task.input.configurationDigest === sha256(value))) { staleTasks++; continue; }
       const ref = task.result.artifactRefs[0] as ArtifactRef;
       if (!ref || !await this.artifacts.verify(ref)) throw new Error('STAGE_ARTIFACT_CORRUPT');
       const data = JSON.parse(Buffer.from(await this.artifacts.get(ref)).toString('utf8')) as { schemaVersion: string; relations: CardAssociation[]; externalRelations?: ExternalAssociation[] };
-      if (![contract, externalContract].includes(data.schemaVersion)) continue;
+      if (!readableContracts.includes(data.schemaVersion)) continue;
       let stale = false;
       for (const relation of data.relations) {
         if (!valid(relation.fromCardId, relation.fromVersionId, relation.fromBodyDigest) || !valid(relation.toCardId, relation.toVersionId, relation.toBodyDigest)) { stale = true; continue; }
