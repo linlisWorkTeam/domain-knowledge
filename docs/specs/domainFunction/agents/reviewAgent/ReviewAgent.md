@@ -9,7 +9,7 @@ SPDX-License-Identifier: MIT
 
 Review 阅读本轮知识文档、Check 比较报告和实际评测报告，找出需要修订的文档问题，向 DocGen 提供修改位置、原因和建议。
 
-Review 不读取原始仓库，不自行查询未授权历史，也不直接修改文档或批准发布。最终判定由 Gate 完成。
+Review 不自行遍历原始仓库或查询未授权历史，也不直接修改文档或批准发布。工作台来源复核可读取 Application 内联提供的固定参考源码和参考执行观察；材料已绑定冻结版本，不能扩大到未授权文件。最终判定由独立门禁完成。
 
 ## 2. 输入与输出
 
@@ -37,6 +37,12 @@ Review 不读取原始仓库，不自行查询未授权历史，也不直接修�
 > 修改“返回值”一节，将返回值更正为 4，并说明适用条件。当前描述与本轮比较报告及失败测试矛盾。
 
 模型应根据证据解释问题，不能为了凑格式生成没有依据的意见。Prompt 同时要求在存在历史时总结哪些尝试有效、是否出现回归以及下一步建议。
+
+### 复核固定来源
+
+FINAL_SOURCE_REVIEW 与 REVISION_SOURCE_REVIEW 使用 workbench-review-v1 的单章节契约。checkReportRef 在这里指固定源码，evaluationReportRef 指参考实现观察，criteriaRef 指定授权 H2、来源绑定及适用的冻结策略；不要求普通模式的生成代码对比报告或历史总结。完整正文供理解上下文，只有授权章节及显式授权前言属于当前判断范围。
+
+source-assessment-v1 随任务输入冻结。源码和摘要绑定可以证明静态事实，运行覆盖声明必须由对应参考观察支持；没有专用行为用例不能自动否定已由源码证明的签名。未覆盖的平台和宏组合仍不得宣称已验证。publicationVerified=false 表示尚未获发布授权，不是编译失败。旧输入不补写新提示词，来源修订必须继承原策略，具体规则见 [Workbench](../../workbench/Workbench.md)。
 
 ### 将意见交给下一轮
 
@@ -69,11 +75,11 @@ Review 不读取原始仓库，不自行查询未授权历史，也不直接修�
 
 ## 6. 未实现与待定事项
 
-真实模型对文档问题的定位、因果分析和历史总结质量尚未验收。自动清理和完整治理展示仍按 [Knowledge](../../knowledge/Knowledge.md) 保留为未完成能力。
+真实模型对文档问题的定位、因果分析和历史总结质量尚未完成验收。当前 C 来源实测仍出现将已确认事实或诚实说明的范围限制放进 unresolvedRisks 的结果；输出结构合法不等于事实判断正确。这些结果保持原状态，不能通过结构转换清除风险。自动清理和完整治理展示仍按 [Knowledge](../../knowledge/Knowledge.md) 保留为未完成能力。
 
 ## 7. 实现及测试索引
 
-角色 ID：`review`，readablePaths 为空。输入为 knowledgeRef、evaluationReportRef、comparisonReportRef，历史正文包由 previousCorrectionRefs 引用。输出为 blocking、corrections 和有历史时必需的 historySummary；完整意见字段见 Contract。
+角色 ID：`review`。默认项目模式 readablePaths 为空，工作台模式仅开放输入声明的公开接口路径；来源复核依赖内联固定材料。默认模式输入为 knowledgeRef、evaluationReportRef、comparisonReportRef，历史正文包由 previousCorrectionRefs 引用。输出为 blocking、corrections 和有历史时必需的 historySummary；完整意见字段见 Contract。
 
 STOPPED 保存 ReviewHandoffPrepared 事件及 CAS 交接，包含 summary、historySummary、evidenceRefs、handoffRef。规则对应：报告与意见为 IO-15、IO-16；停止交接为 AC-AGENT-106；资料清理为 IO-19。
 
@@ -81,6 +87,8 @@ STOPPED 保存 ReviewHandoffPrepared 事件及 CAS 交接，包含 summary、his
 - 四类停止交接及去重：[StoppedHandoff.test.ts](../../../../../tests/integration/StoppedHandoff.test.ts)。
 - Gate 独立判定：[Domain.test.ts](../../../../../tests/unit/Domain.test.ts)。
 - 修订和再评测流程：[AgentRevisionFlow.test.ts](../../../../../tests/acceptance/AgentRevisionFlow.test.ts)。
+- 工作台来源期限与策略：[SourceReviewPolicy.test.ts](../../../../../tests/unit/SourceReviewPolicy.test.ts)。
+- 固定构建材料与旧输入保留：[SourceExecutionPreparation.test.ts](../../../../../tests/integration/SourceExecutionPreparation.test.ts)。
 - 既往执行版本与产物：[AgentSpecRepairAndE2E.md](../../../../reports/AgentSpecRepairAndE2E.md)。
 
 代码位置：[执行入口](../../../../../src/domain/agents/reviewAgent/ReviewAgent.ts)、[输入输出契约](../../../../../src/domain/agents/reviewAgent/ReviewAgentContract.ts)、[提示词与读取范围](../../../../../src/domain/agents/reviewAgent/ReviewAgentPrompt.ts)、[角色测试](../../../../../src/domain/agents/reviewAgent/ReviewAgent.test.ts)、[独立样例](../../../../../src/domain/agents/reviewAgent/examples/ReviewAgentSample.json)。
