@@ -25,7 +25,7 @@ interface Section extends SourceCardBinding {
 export class WorkbenchSourcePublication {
   readonly dependencies: { artifacts: Pick<ArtifactStore, 'get' | 'verify'>; contracts: AgentContractValidator };
   constructor(dependencies: WorkbenchSourcePublication['dependencies']) { this.dependencies = dependencies; }
-  async verify(task: StageTask, cards: Array<SourceCardBinding & { bodyRef: ArtifactRef }>, project: WorkbenchProjectSnapshot, sourceModules: Record<string, string>, sets: Array<{ moduleId: string; set: NativeTestSet }>) {
+  async verify(task: StageTask, cards: Array<SourceCardBinding & { bodyRef: ArtifactRef }>, project: WorkbenchProjectSnapshot, sourceModules: Record<string, string>, sets: Array<{ moduleId: string; set: NativeTestSet }>, historicalConcerns: Array<{ concernId: string; criterion: string; risk: string; versionId: string; heading: string }> = []) {
     const { artifacts, contracts } = this.dependencies;
     const load = async <T>(ref: ArtifactRef): Promise<T> => {
       if (!ref || !await artifacts.verify(ref)) throw new Error('PUBLICATION_SOURCE_ARTIFACT_CORRUPT');
@@ -81,7 +81,7 @@ export class WorkbenchSourcePublication {
         contracts.assertResult(envelope);
         const command = await load<AgentCommand>(envelope.commandRef); contracts.assertCommand(command);
         const criteria = await load<Record<string, unknown>>(section.criteriaRef);
-        const expectedConcerns = concerns.filter(p => p.versionId === card.versionId && p.heading === section.section).map(({ concernId, criterion, risk }) => ({ concernId, criterion, risk }));
+        const expectedConcerns = [...concerns, ...historicalConcerns].filter(p => p.versionId === card.versionId && p.heading === section.section).map(({ concernId, criterion, risk }) => ({ concernId, criterion, risk }));
         if (canonicalJson(criteria.pendingReviewConcerns) !== canonicalJson(expectedConcerns)) throw new Error('PUBLICATION_SOURCE_CONCERNS_CHANGED');
         validateConcernResolutions(raw, { moduleId: card.moduleId, sourcePaths: [], publicInterfacePaths: [], provenance: [],
           payload: { executionContract: 'workbench-review-v1', knowledgeRef: card.bodyRef, checkReportRef: section.referenceRef, evaluationReportRef: section.referenceObservationsRef, criteriaRef: section.criteriaRef },

@@ -178,7 +178,7 @@ v5 在已有生成结果存在时，冻结同源码快照内当前后代卡片�
 
 源码复核的 evaluationReportRef 指向明确标识 PINNED_REFERENCE 的可信参考观察投影；旧生成实现报告仍通过原评测任务读取，两者不得混用。
 
-`POST /api/v1/source-verifications` 接受 `{evaluationTaskId}`，返回202阶段任务。输入必须是成功的普通原生评测；行为通过时也允许启动。读取、取消、同版本恢复和材料下载复用 stage-tasks 接口。结果逐卡返回冻结版本、正文摘要、来源结论和角色证据；publicationVerified 始终为 false。未知来源复核契约不可恢复。
+`POST /api/v1/source-verifications` 接受 `{evaluationTaskId, reassessHistoricalFindings?}`，可选字段必须为布尔值，返回202阶段任务。显式true冻结source-historical-review-v1，独立核实已经绑定的历史意见；无历史意见返回409。默认执行仍继承原矛盾，不自动重判；新任务保留旧意见并要求逐条回应，不能用没有引用的PASS替代。输入必须是成功的普通原生评测；行为通过时也允许启动。读取、取消、同版本恢复和材料下载复用 stage-tasks 接口。结果逐卡返回冻结版本、正文摘要、来源结论和角色证据；publicationVerified 始终为 false。未知来源复核契约不可恢复。
 
 `POST /api/v1/source-revisions` 接受 `{sourceVerificationTaskId}`，返回202独立 FLYWHEEL 任务（KNOWLEDGE_SOURCE_REVISION）。缺少明确来源矛盾返回409；原始角色证据失配拒绝执行。取消、恢复及产物下载沿用 stage-tasks。新版本重建以新版本集合直接启动，不冒充行为失败重试。
 

@@ -41,3 +41,20 @@ for (const mode of ['current', 'unavailable', 'legacy', 'waiting']) test(`source
     assert.equal(requests.some(url => url.includes('/artifacts/')), false)
   }
 })
+
+test('historical reassessment is an explicit action rather than a resume of the old task', async () => {
+  const panel = { innerHTML: '' }, posts = []; let click;
+  const task = { taskId: 'source', status: 'SUCCEEDED', contractVersion: 'knowledge-workbench-v1', usage: {},
+    input: { cardVersionIds: ['v'], parameters: { operation: 'KNOWLEDGE_SOURCE_VERIFICATION', verificationContract: 'knowledge-source-verification-v5', evaluationTaskId: 'eval' } },
+    result: { artifactRefs: [], summary: { outcome: 'SOURCE_MISMATCH', cards: [{ versionId: 'v', outcome: 'SOURCE_MISMATCH', sections: [{ section: 'Value', outcome: 'SOURCE_MISMATCH', concernResolutions: [{ disposition: 'DISPROVED', reason: '固定源码明确声明了接口。' }] }] }] } } };
+  const app = createSourceVerificationPanel({ root: { querySelector: selector => selector === '[data-source-verification-panel]' ? panel : null, addEventListener: (_, fn) => { click = fn } },
+    selection: () => 'eval', isEditable: () => true, escapeHtml: String, request: async (url, options) => {
+      if (options) posts.push({ url, body: JSON.parse(options.body) });
+      return url === '/api/v1/stage-tasks' ? { items: [task] } : { task, checkpoints: [], events: [] };
+    } });
+  app.refresh(); await new Promise(resolve => setImmediate(resolve));
+  assert.match(panel.innerHTML, /重新核实历史意见/);
+  assert.match(panel.innerHTML, /意见核实：已反驳 · 固定源码明确声明了接口/);
+  await click({ target: { closest: selector => selector === '[data-source-verification-action]' ? { dataset: { sourceVerificationAction: 'reassess' } } : null } });
+  assert.deepEqual(posts, [{ url: '/api/v1/source-verifications', body: { evaluationTaskId: 'eval', reassessHistoricalFindings: true } }]);
+});

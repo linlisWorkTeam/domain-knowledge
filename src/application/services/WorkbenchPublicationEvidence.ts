@@ -21,8 +21,9 @@ import { buildConstraints, moduleBuild, moduleFingerprintKey } from '../../domai
 import type { NativeTestStore } from '../ports/NativeEvaluationPorts.ts';
 import type { FixedNativeObservation } from '../../domain/evaluation/NativeFixedEvaluation.ts';
 import { assertProjectPublication, type ProjectPublicationManifest } from '../../domain/workbench/ProjectPublication.ts';
-import { assertSourceReviewHistory } from './WorkbenchSourceFindingHistory.ts';
+import { assertSourceReviewHistory, validateSourceFinding, type SourceFindingProof } from './WorkbenchSourceFindingHistory.ts';
 import type { StageTaskStore } from '../ports/StageTaskPorts.ts';
+import { historicalReviewConcern, SOURCE_HISTORICAL_REVIEW_POLICY } from '../../domain/knowledge/SourceReviewPolicy.ts';
 import { WorkbenchSourcePublication } from './WorkbenchSourcePublication.ts';
 import type { AgentContractValidator, ArtifactStore, FlywheelRepository } from '../ports/ApplicationPorts.ts';
 import type { StageTask } from '../../domain/workbench/StageTask.ts';
@@ -31,7 +32,7 @@ import { publicationEvidence } from '../../domain/workbench/WorkbenchPublication
 export interface PublicationTaskIds { reconstruction: string; evaluation: string; fixedEvaluation: string; sourceVerification: string }
 export class WorkbenchPublicationEvidence {
   readonly dependencies: {
-    stages: { get(id: string): StageTask; store: Pick<StageTaskStore, 'events'> };
+    stages: { get(id: string): StageTask; store: Pick<StageTaskStore, 'events'> & Partial<Pick<StageTaskStore, 'checkpoints'>> };
     tests: Pick<NativeTestStore, 'get'>;
     projects: Pick<WorkbenchProjectStore, 'get'>;
     contracts: AgentContractValidator;
@@ -39,6 +40,25 @@ export class WorkbenchPublicationEvidence {
     artifacts: Pick<ArtifactStore, 'get' | 'put' | 'verify'>;
   };
   constructor(dependencies: WorkbenchPublicationEvidence['dependencies']) { this.dependencies = dependencies; }
+  private async historicalConcerns(task: StageTask) {
+    if (task.input.parameters.historicalReviewPolicy === undefined) return [];
+    const { artifacts, repository, contracts, stages } = this.dependencies;
+    if (task.input.parameters.historicalReviewPolicy !== SOURCE_HISTORICAL_REVIEW_POLICY || !stages.store.checkpoints) throw new Error('SOURCE_HISTORICAL_REVIEW_POLICY_INVALID');
+    const ref = task.input.parameters.priorFindingsRef as unknown as ArtifactRef;
+    if (!ref || !await artifacts.verify(ref) || !task.result?.artifactRefs.some(item => canonicalJson(item) === canonicalJson(ref))) throw new Error('SOURCE_HISTORY_ARTIFACT_INVALID');
+    const proofs = JSON.parse(Buffer.from(await artifacts.get(ref)).toString()) as SourceFindingProof[];
+    if (!Array.isArray(proofs) || !proofs.length || proofs.length > 1000) throw new Error('SOURCE_HISTORY_BINDING_INVALID');
+    const concerns: ReturnType<typeof historicalReviewConcern>[] = [], seen = new Set<string>();
+    for (const proof of proofs) {
+      const value = await validateSourceFinding({ artifacts, repository, contracts, stages: { get: id => stages.get(id), store: { events: id => stages.store.events(id), checkpoints: id => stages.store.checkpoints!(id) } } }, proof, task.input);
+      const key = canonicalJson([value.finding.versionId, value.finding.section]);
+      if (seen.has(key)) throw new Error('SOURCE_HISTORY_BINDING_INVALID');
+      seen.add(key);
+      const raw = JSON.parse(Buffer.from(await artifacts.get(value.finding.reviewRef)).toString());
+      concerns.push(historicalReviewConcern(proof, value.finding, raw));
+    }
+    return concerns;
+  }
   async verifyResume(preparationRef: ArtifactRef): Promise<void> {
     const { artifacts, stages } = this.dependencies;
     if (!await artifacts.verify(preparationRef)) throw new Error('PUBLICATION_ARTIFACT_CORRUPT');
@@ -52,6 +72,7 @@ export class WorkbenchPublicationEvidence {
       if (task.inputDigest !== binding.inputDigest || sha256(canonicalJson(task.result)) !== binding.resultDigest) throw new Error('PUBLICATION_TASK_BINDING_CHANGED');
       if (task.input.parameters.operation === 'KNOWLEDGE_SOURCE_VERIFICATION') {
         sourceCount++;
+        await this.historicalConcerns(task);
         await assertSourceReviewHistory(artifacts, stages.store.events(task.taskId));
       }
     }
@@ -220,7 +241,8 @@ export class WorkbenchPublicationEvidence {
       if (candidate && nativeTrustedGates([suite, candidate]).digest !== nativeTrustedGates([suite]).digest) throw new Error('PUBLICATION_SUPPLIED_CANDIDATES_MISSING');
       assertTrustedPublicationObservations(set, suite, await load<FixedNativeObservation[]>(set.oracleRef), report);
     }
-    await new WorkbenchSourcePublication({ artifacts, contracts: this.dependencies.contracts }).verify(sourceVerification, cards.map((card, index) => ({ ...card, bodyRef: bodies[index]! })), project, sourceModules, (evaluation.result!.summary.modules as Array<Record<string, unknown>>).map(module => ({ moduleId: String(module.moduleId), set: trustedSets.find(set => set.testSetId === module.testSetId)! })));
+    const historicalConcerns = await this.historicalConcerns(sourceVerification);
+    await new WorkbenchSourcePublication({ artifacts, contracts: this.dependencies.contracts }).verify(sourceVerification, cards.map((card, index) => ({ ...card, bodyRef: bodies[index]! })), project, sourceModules, (evaluation.result!.summary.modules as Array<Record<string, unknown>>).map(module => ({ moduleId: String(module.moduleId), set: trustedSets.find(set => set.testSetId === module.testSetId)! })), historicalConcerns);
     const prepared = { schemaVersion: 'workbench-publication-preparation-v8', state: 'PREPARED', evidence, trustedSets, projectSnapshot: project,
       verifiedArtifactRefs: queue.sort((a, b) => a.sha256.localeCompare(b.sha256)), publicationVerified: false };
     const artifactRef = await artifacts.put(Buffer.from(JSON.stringify(prepared)), 'application/json');

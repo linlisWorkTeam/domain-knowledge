@@ -17,6 +17,8 @@ export function createSourceVerificationPanel({ root, request, escapeHtml: escap
     REVIEW_CORRECTION_RANGE_INVALID: '修订内容没有覆盖完整的授权章节，需要修正段落范围。',
     REVIEW_REPAIR_FACTS_CHANGED: '格式修正改变了原有判断或风险，结果已被拒绝；需先核对保留的原始意见。',
     REVIEW_PASS_CONTRADICTION: '复核仍有风险或修订意见，不能同时判定通过。',
+    SOURCE_REASSESSMENT_NO_FINDINGS: '没有可重新核实的历史意见。',
+    SOURCE_HISTORICAL_REVIEW_POLICY_INVALID: '历史意见复核的执行版本不匹配，原记录保留。',
     SOURCE_HISTORY_BINDING_INVALID: '历史来源意见与当前源码或卡片版本不一致，已停止复用。',
     SOURCE_CONCERN_BINDING_INVALID: '待核实问题与原任务证据不一致，已停止执行。',
     STAGE_ARTIFACT_CORRUPT: '输入或证据文件校验失败，请检查原始文件；已完成结果保留。',
@@ -49,8 +51,9 @@ export function createSourceVerificationPanel({ root, request, escapeHtml: escap
       ${scopeHtml()}
       ${inputs ? `<details><summary>最近处理卡片的固定输入</summary><button class="text-button" type="button" data-version-id="${escape(inputs.summary.versionId)}">查看输入卡片</button>${inputs.artifactRefs.map((ref, index) => `<button class="secondary-button" type="button" data-download-artifact="/api/v1/stage-tasks/${escape(task.taskId)}/artifacts/${escape(ref.sha256)}">下载${['卡片正文', '固定源码', '参考观察', '复核准则', '可信测试集', '参考执行报告'][index] ?? '输入材料'}</button>`).join('')}</details>` : ''}
       ${events.filter(event => event.detail?.phase === 'role-stage-attempt' && ['FAILED', 'REJECTED'].includes(event.detail.status)).map(event => `<p>角色尝试 ${escape(event.detail.taskAttempt)} / ${escape(event.detail.attempt)} · ${escape(reasons[event.detail.issueCode] ?? event.detail.issueHint ?? '执行未完成')} <button class="secondary-button" type="button" data-download-artifact="/api/v1/stage-tasks/${escape(task.taskId)}/artifacts/${escape(event.detail.artifactRef.sha256)}">下载复核尝试</button></p>`).join('')}
-      ${cards.map(card => `<article><button class="text-button" type="button" data-version-id="${escape(card.versionId)}">查看冻结卡片</button><p>${escape(card.moduleId)} · ${escape(outcomes[card.outcome] ?? '未知')}</p><p>${escape(card.heading ?? '')} · ${escape(card.criterion ?? '')} ${(card.unresolved ?? []).map(escape).join('；')}</p>${card.reviewRef ? `<button class="secondary-button" type="button" data-download-artifact="/api/v1/stage-tasks/${escape(task.taskId)}/artifacts/${escape(card.reviewRef.sha256)}">下载来源意见</button>` : ''}${(card.sections ?? []).map(section => `<details><summary>${escape(section.section)} · ${escape(outcomes[section.outcome] ?? '未知')}</summary>${section.carriedForward ? `<p>沿用同一正文已有的来源矛盾，尚待修订。原任务 <code>${escape(section.originEvidence?.taskId ?? '')}</code></p>` : ''}<p>${escape(section.criterion ?? '')} ${(section.unresolved ?? []).map(escape).join('；')}</p>${section.reviewRef ? `<button class="secondary-button" type="button" data-download-artifact="/api/v1/stage-tasks/${escape(task.taskId)}/artifacts/${escape(section.reviewRef.sha256)}">下载章节复核</button>` : ''}</details>`).join('')}</article>`).join('')}
+      ${cards.map(card => `<article><button class="text-button" type="button" data-version-id="${escape(card.versionId)}">查看冻结卡片</button><p>${escape(card.moduleId)} · ${escape(outcomes[card.outcome] ?? '未知')}</p><p>${escape(card.heading ?? '')} · ${escape(card.criterion ?? '')} ${(card.unresolved ?? []).map(escape).join('；')}</p>${card.reviewRef ? `<button class="secondary-button" type="button" data-download-artifact="/api/v1/stage-tasks/${escape(task.taskId)}/artifacts/${escape(card.reviewRef.sha256)}">下载来源意见</button>` : ''}${(card.sections ?? []).map(section => `<details><summary>${escape(section.section)} · ${escape(outcomes[section.outcome] ?? '未知')}</summary>${section.carriedForward ? `<p>沿用同一正文已有的来源矛盾，尚待修订。原任务 <code>${escape(section.originEvidence?.taskId ?? '')}</code></p>` : ''}<p>${escape(section.criterion ?? '')} ${(section.unresolved ?? []).map(escape).join('；')}</p>${(section.concernResolutions ?? []).map(item => `<p>意见核实：${escape({ CONFIRMED: '已确认', DISPROVED: '已反驳', UNRESOLVED: '仍无法判断' }[item.disposition] ?? '未知')} · ${escape(item.reason ?? '')}</p>`).join('')}${section.reviewRef ? `<button class="secondary-button" type="button" data-download-artifact="/api/v1/stage-tasks/${escape(task.taskId)}/artifacts/${escape(section.reviewRef.sha256)}">下载章节复核</button>` : ''}</details>`).join('')}</article>`).join('')}
       ${current() && task.status === 'SUCCEEDED' && cards.some(card => card.sections?.some(section => section.outcome === 'UNRESOLVED')) && onSupplement ? `<button class="secondary-button" type="button" data-source-verification-action="supplement" ${busy || !isEditable() ? 'disabled' : ''}>补充验证用例</button><p>针对未解决章节新增候选用例，先在参考实现上验证，再评测重建代码。</p>` : ''}
+      ${current() && task.status === 'SUCCEEDED' && cards.some(card => card.sections?.some(section => section.outcome === 'SOURCE_MISMATCH')) ? `<button class="secondary-button" type="button" data-source-verification-action="reassess" ${busy || !isEditable() ? 'disabled' : ''}>重新核实历史意见</button><p>保留原意见与证据，逐条说明确认、反驳或仍无法判断的理由。</p>` : ''}
       ${active() ? `<button class="secondary-button" type="button" data-source-verification-action="cancel" ${busy || !isEditable() ? 'disabled' : ''}>取消来源复核</button>` : ''}
       ${current() && ['FAILED', 'PAUSED', 'CANCELLED'].includes(task.status) ? `<button class="secondary-button" type="button" data-source-verification-action="resume" ${busy || !isEditable() ? 'disabled' : ''}>恢复来源复核</button>` : ''}` : ''}<section data-source-revision-panel></section>`
     revision.refresh()
@@ -82,9 +85,10 @@ export function createSourceVerificationPanel({ root, request, escapeHtml: escap
   }
   root.addEventListener('click', async event => {
     const action = event.target.closest('[data-source-verification-action]')?.dataset.sourceVerificationAction
-    if (!['start', 'cancel', 'resume', 'supplement'].includes(action) || busy || !isEditable()) return
+    if (!['start', 'reassess', 'cancel', 'resume', 'supplement'].includes(action) || busy || !isEditable()) return
     const parent = selection(); if (!parent || (action !== 'start' && !task)) return
     if (action !== 'start' && !current()) return
+    if (action === 'reassess' && task.status !== 'SUCCEEDED') return
     busy = true; notice = ''; render()
     try {
       if (action === 'supplement') {
@@ -93,7 +97,7 @@ export function createSourceVerificationPanel({ root, request, escapeHtml: escap
         if (selection() === parent) await onSupplement(result.task)
         return
       }
-      const result = await request(action === 'start' ? '/api/v1/source-verifications' : `/api/v1/stage-tasks/${encodeURIComponent(task.taskId)}/${action}`, { method: 'POST', body: JSON.stringify(action === 'start' ? { evaluationTaskId: parent } : action === 'resume' ? { inputDigest: task.inputDigest } : {}) })
+      const result = await request(['start', 'reassess'].includes(action) ? '/api/v1/source-verifications' : `/api/v1/stage-tasks/${encodeURIComponent(task.taskId)}/${action}`, { method: 'POST', body: JSON.stringify(['start', 'reassess'].includes(action) ? { evaluationTaskId: parent, ...(action === 'reassess' ? { reassessHistoricalFindings: true } : {}) } : action === 'resume' ? { inputDigest: task.inputDigest } : {}) })
       if (selection() !== parent) return
       task = result.task; await observe()
     } catch (error) { if (selection() === parent) notice = `来源复核操作未完成：${error.code ?? '连接失败'}` }

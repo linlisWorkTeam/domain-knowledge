@@ -311,6 +311,7 @@ export function mapHttpError(error: unknown, id = 'req_unknown'): { status: numb
   if (['STAGE_OWNER_UNAVAILABLE', 'STAGE_SHUTDOWN'].includes(code)) return { status: 503, body: errorBody(code, message, id) };
   if (['NATIVE_SUPPLIED_CANDIDATES_INVALID', 'NATIVE_BEHAVIOR_SUITE_INVALID', 'NATIVE_CONTRACT_INVALID'].includes(code)) return { status: 422, body: errorBody(code, '补充用例格式或模块、接口、章节范围无效。', id) };
   if (['NATIVE_SUPPLEMENT_SOURCE_REQUIRED', 'NATIVE_SUPPLEMENT_BINDING_INVALID'].includes(code)) return { status: 409, body: errorBody(code, '补充用例需要同一源码和卡片版本的已完成来源核验。', id) };
+  if (['SOURCE_HISTORICAL_REVIEW_POLICY_INVALID', 'SOURCE_REASSESSMENT_NO_FINDINGS'].includes(code)) return { status: 409, body: errorBody(code, '没有可重新核实的历史意见，或复核执行版本不匹配。', id) };
   if (code.startsWith('DIRECTORY_')) return { status: 422, body: errorBody(code, code, id) };
   if (code.startsWith('REPOSITORY_')) return { status: 422, body: errorBody(code, code, id) };
   if (code.startsWith('PROJECT_')) return { status: 422, body: errorBody(code, code, id) };
@@ -632,9 +633,10 @@ export function createKnowledgeServer(input: {
           send(response, 202, { task: await composition.apps.workbenchFixedEvaluation.start(payload.reconstructionTaskId, payload.suites as unknown as import('../../application/services/WorkbenchFixedEvaluation.ts').FixedModuleSuite[]) }); return;
         }
         if (request.method === 'POST' && url.pathname === '/api/v1/source-verifications') {
-          const payload = await body(request); requireOnlyKeys(payload, ['evaluationTaskId']);
+          const payload = await body(request); requireOnlyKeys(payload, ['evaluationTaskId', 'reassessHistoricalFindings']);
+          if (payload.reassessHistoricalFindings !== undefined && typeof payload.reassessHistoricalFindings !== 'boolean') throw new Error('PAYLOAD_INVALID');
           if (typeof payload.evaluationTaskId !== 'string') throw new Error('PAYLOAD_INVALID');
-          send(response, 202, { task: await composition.apps.workbenchSourceVerification.start(payload.evaluationTaskId) }); return;
+          send(response, 202, { task: await composition.apps.workbenchSourceVerification.start(payload.evaluationTaskId, payload.reassessHistoricalFindings as boolean | undefined) }); return;
         }
         if (request.method === 'POST' && url.pathname === '/api/v1/knowledge-revisions') {
           const payload = await body(request); requireOnlyKeys(payload, ['evaluationTaskId']);

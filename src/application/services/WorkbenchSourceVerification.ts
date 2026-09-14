@@ -7,7 +7,7 @@ import { SOURCE_EVIDENCE_POLICY, sourceEvidenceBindings } from '../../domain/kno
 import { SOURCE_EXECUTION_SCOPE, sourceExecutionScope } from '../../domain/knowledge/SourceExecutionScope.ts';
 import { moduleBuild, type WorkbenchProjectSnapshot } from '../../domain/workbench/WorkbenchProject.ts';
 import { WorkbenchSourceFindingHistory, assertSourceReviewHistory, type SourceFindingProof, type SourceReviewConcernProof } from './WorkbenchSourceFindingHistory.ts';
-import { SOURCE_ASSESSMENT_POLICY, readSourceAssessmentPolicy, SOURCE_REVIEW_POLICY, readSourceReviewPolicy } from '../../domain/knowledge/SourceReviewPolicy.ts';
+import { SOURCE_HISTORICAL_REVIEW_POLICY, historicalReviewConcern, SOURCE_ASSESSMENT_POLICY, readSourceAssessmentPolicy, SOURCE_REVIEW_POLICY, readSourceReviewPolicy } from '../../domain/knowledge/SourceReviewPolicy.ts';
 import { sha256, type ArtifactRef } from '../../domain/Domain.ts';
 import { canonicalJson, type JsonValue, type StageInput } from '../../domain/workbench/StageTask.ts';
 import { markdownSections } from '../../domain/knowledge/KnowledgeSections.ts';
@@ -27,7 +27,7 @@ export class WorkbenchSourceVerification {
     if (!ref || !await artifacts.verify(ref)) throw new Error('STAGE_ARTIFACT_CORRUPT');
     return JSON.parse(Buffer.from(await artifacts.get(ref)).toString('utf8')) as T;
   }
-  async start(evaluationTaskId: string) { return this.evaluation.dependencies.stages.start(await this.prepare(evaluationTaskId)); }
+  async start(evaluationTaskId: string, reassessHistoricalFindings = false) { return this.evaluation.dependencies.stages.start(await this.prepare(evaluationTaskId, reassessHistoricalFindings)); }
   private async executionScopes(project: WorkbenchProjectSnapshot, modules: Array<{ moduleId: string; testSetId: string }>) {
     const scopes = [];
     for (const module of modules) {
@@ -39,16 +39,19 @@ export class WorkbenchSourceVerification {
     }
     return scopes.sort((a, b) => a.moduleId.localeCompare(b.moduleId));
   }
-  async prepare(evaluationTaskId: string): Promise<StageInput> {
+  async prepare(evaluationTaskId: string, reassessHistoricalFindings = false): Promise<StageInput> {
+    if (typeof reassessHistoricalFindings !== 'boolean') throw new Error('SOURCE_HISTORICAL_REVIEW_POLICY_INVALID');
     const { stages, artifacts, configuration } = this.evaluation.dependencies;
     const parent = stages.get(evaluationTaskId);
     if (parent.input.stage !== 'EVALUATE' || parent.input.parameters.operation !== undefined || parent.status !== 'SUCCEEDED' || !parent.result) throw new Error('SOURCE_VERIFICATION_EVALUATION_REQUIRED');
     const existing = stages.store.list(parent.input.projectId).find(task => task.input.parameters.operation === 'KNOWLEDGE_SOURCE_VERIFICATION'
-      && task.input.parameters.verificationContract === SOURCE_VERIFICATION_CONTRACT && task.input.parameters.evaluationTaskId === evaluationTaskId);
+      && task.input.parameters.verificationContract === SOURCE_VERIFICATION_CONTRACT && task.input.parameters.evaluationTaskId === evaluationTaskId
+      && task.input.parameters.historicalReviewPolicy === (reassessHistoricalFindings ? SOURCE_HISTORICAL_REVIEW_POLICY : undefined));
     // Active/failed executions keep their frozen input and accumulated usage. A completed
     // execution may contribute a new proven contradiction, which needs its own frozen input.
     if (existing && (existing.status !== 'SUCCEEDED' || existing.input.parameters.sourceExecutionPolicy === undefined)) return existing.input;
     const priorFindings = await new WorkbenchSourceFindingHistory(this.evaluation).collect(parent);
+    if (reassessHistoricalFindings && !priorFindings.length) throw new Error('SOURCE_REASSESSMENT_NO_FINDINGS');
     if (existing && canonicalJson(await this.load(existing.input.parameters.priorFindingsRef as unknown as ArtifactRef)) === canonicalJson(priorFindings)) return existing.input;
     const evidence = await this.evaluation.revisionEvidence(evaluationTaskId);
     const configurationRef = parent.input.parameters.configurationRef as unknown as ArtifactRef;
@@ -60,6 +63,7 @@ export class WorkbenchSourceVerification {
     if (!project) throw new Error('STAGE_INPUT_CHANGED');
     const executionScopesRef = await artifacts.put(Buffer.from(canonicalJson(await this.executionScopes(project, evidence.modules))), 'application/json');
     return { ...parent.input, parameters: { operation: 'KNOWLEDGE_SOURCE_VERIFICATION', verificationContract: SOURCE_VERIFICATION_CONTRACT,
+      ...(reassessHistoricalFindings ? { historicalReviewPolicy: SOURCE_HISTORICAL_REVIEW_POLICY } : {}),
       sourceAssessmentPolicy: SOURCE_ASSESSMENT_POLICY, sourceReviewPolicy: json(SOURCE_REVIEW_POLICY), sourceEvidencePolicy: SOURCE_EVIDENCE_POLICY,
       sourceExecutionPolicy: SOURCE_EXECUTION_SCOPE, executionScopesRef: json(executionScopesRef),
       evaluationTaskId, evaluationDigest: sha256(canonicalJson(parent.result)), snapshotId: parent.input.parameters.snapshotId!,
@@ -68,6 +72,7 @@ export class WorkbenchSourceVerification {
   async verify(context: StageExecutionContext) {
     const { stages, projects, repository, artifacts, roles, configuration } = this.evaluation.dependencies;
     const parameters = context.task.input.parameters;
+    if (parameters.historicalReviewPolicy !== undefined && parameters.historicalReviewPolicy !== SOURCE_HISTORICAL_REVIEW_POLICY) throw new Error('SOURCE_HISTORICAL_REVIEW_POLICY_INVALID');
     await assertSourceReviewHistory(artifacts, stages.store.events(context.task.taskId));
     if (parameters.sourceExecutionPolicy !== undefined && parameters.sourceExecutionPolicy !== SOURCE_EXECUTION_SCOPE) throw new Error('SOURCE_EXECUTION_POLICY_INVALID');
     const sourceAssessmentPolicy = readSourceAssessmentPolicy(parameters.sourceAssessmentPolicy);
@@ -105,8 +110,13 @@ export class WorkbenchSourceVerification {
       if (preserved.has(key)) throw new Error('SOURCE_HISTORY_BINDING_INVALID');
       preserved.set(key, { proof, value });
     }
+    const historicalConcerns: ReturnType<typeof historicalReviewConcern>[] = [];
+    if (parameters.historicalReviewPolicy) for (const { proof, value } of preserved.values()) {
+      historicalConcerns.push(historicalReviewConcern(proof, value.finding, await this.load<ReviewOutput>(value.finding.reviewRef)));
+    }
     const expected: SourceCardBinding[] = [], results: Array<SourceCardResult & Record<string, unknown>> = [];
     const refs: ArtifactRef[] = [parameters.evidenceRef as unknown as ArtifactRef, priorFindingsRef, pendingConcernsRef];
+    if (parameters.historicalReviewPolicy) refs.push(...[...preserved.values()].flatMap(item => item.value.result.artifactRefs));
     if (parameters.sourceExecutionPolicy) refs.push(parameters.executionScopesRef as unknown as ArtifactRef);
     for (const versionId of context.task.input.cardVersionIds) {
       const card = repository.getKnowledgeVersion(versionId);
@@ -143,7 +153,7 @@ export class WorkbenchSourceVerification {
           const sectionKey = sha256(heading).slice(0, 24);
           const section = await context.step(`source-section:${versionId}:${sectionKey}`, async () => {
             const prior = preserved.get(canonicalJson([versionId, heading]));
-            if (prior) return { artifactRefs: [...prior.value.result.artifactRefs, priorFindingsRef],
+            if (prior && !parameters.historicalReviewPolicy) return { artifactRefs: [...prior.value.result.artifactRefs, priorFindingsRef],
               summary: { ...prior.value.result.summary, originEvidence: json(prior.proof), carriedForward: true } };
 
             const report = { schemaVersion: 'native-source-review-evidence-v3', sourceRevision: project.commit, sourceDigest: project.sourceDigest,
@@ -151,8 +161,8 @@ export class WorkbenchSourceVerification {
               ...sourceSectionObservations(suite, oracle, binding.cardId, heading) };
             const reportRef = await artifacts.put(Buffer.from(JSON.stringify(report)), 'application/json');
             const digestBindings = sourceEvidenceBindings(parameters.sourceEvidencePolicy, project, module.moduleId);
-            const criteria = { pendingReviewConcerns: pendingConcerns.filter(p => p.versionId === versionId && p.heading === heading).map(({ concernId, criterion, risk }) => ({ concernId, criterion, risk })),
-              concernInstruction: '待核实线索来自旧失败输出，不代表事实。逐条回应concernResolutions；确认时保留修订，否定时给出本轮固定源码的逐字引用和理由，无法决定则保留未知风险，不能忽略线索。',
+            const criteria = { pendingReviewConcerns: [...pendingConcerns, ...historicalConcerns].filter(p => p.versionId === versionId && p.heading === heading).map(({ concernId, criterion, risk }) => ({ concernId, criterion, risk })),
+              concernInstruction: '待核实线索来自旧意见；历史已接受意见也可能判断有误，引用和审计有效不等于推理正确。逐条回应concernResolutions；确认时保留修订，否定时给出本轮固定源码的逐字引用和理由，无法决定则保留未知风险，不能忽略线索。',
               schemaVersion: SOURCE_VERIFICATION_CONTRACT, phase: 'FINAL_SOURCE_REVIEW', binding,
               ...(executionScope ? { executionScope, executionScopeInstruction: '本次参考测试使用executionScope中的固定构建与平台；definitions列出声明式编译定义，不是编译器全部预定义宏。SINGLE_FROZEN_BUILD不证明其他宏组合或平台已测试。结合源码判断该配置下的事实，不凭空补充覆盖，也不清除实际未知风险。' } : {}),
               ...(digestBindings ? { sourceEvidenceBindings: digestBindings } : {}),

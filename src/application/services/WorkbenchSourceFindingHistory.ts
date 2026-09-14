@@ -77,33 +77,7 @@ export class WorkbenchSourceFindingHistory {
   }
   async validate(proof: SourceFindingProof, input: StageInput) {
     const { stages, repository, artifacts, roles } = this.evaluation.dependencies;
-    const source = stages.get(proof.taskId);
-    await assertSourceReviewHistory(artifacts, stages.store.events(source.taskId));
-    if (source.input.stage !== 'EVALUATE' || source.input.parameters.operation !== 'KNOWLEDGE_SOURCE_VERIFICATION'
-      || !['knowledge-source-verification-v2', 'knowledge-source-verification-v3', 'knowledge-source-verification-v4', 'knowledge-source-verification-v5'].includes(String(source.input.parameters.verificationContract))
-      || source.input.projectId !== input.projectId || source.input.sourceRevision !== input.sourceRevision || source.input.sourceDigest !== input.sourceDigest
-      || source.input.parameters.snapshotId !== input.parameters.snapshotId
-      || source.inputDigest !== sha256(canonicalJson({ contractVersion: source.contractVersion, input: source.input, limits: source.limits }))) throw new Error('SOURCE_HISTORY_BINDING_INVALID');
-    const checkpoint = stages.store.checkpoints(proof.taskId).find(item => item.key === proof.checkpointKey);
-    if (!checkpoint || sha256(canonicalJson(checkpoint.result)) !== proof.checkpointDigest) throw new Error('SOURCE_HISTORY_BINDING_INVALID');
-    const finding = checkpoint.result.summary as unknown as HistoricalSourceFinding;
-    const card = repository.getKnowledgeVersion(finding.versionId);
-    if (!card || finding.originEvidence || finding.outcome !== 'SOURCE_MISMATCH' || typeof finding.section !== 'string'
-      || !source.input.cardVersionIds.includes(card.versionId) || !input.cardVersionIds.includes(card.versionId)
-      || card.metadata.cardId !== finding.cardId || card.moduleId !== finding.moduleId || card.bodyRef.sha256 !== finding.bodyDigest
-      || card.metadata.projectSnapshotId !== input.parameters.snapshotId
-      || checkpoint.key !== `source-section:${card.versionId}:${sha256(finding.section).slice(0, 24)}`) throw new Error('SOURCE_HISTORY_BINDING_INVALID');
-    for (const ref of [...checkpoint.result.artifactRefs, card.bodyRef]) if (!await artifacts.verify(ref)) throw new Error('SOURCE_HISTORY_ARTIFACT_INVALID');
-    const raw = await this.load<ReviewOutput>(finding.reviewRef), result = await this.load<AgentResult>(finding.reviewResultRef);
-    roles.dependencies.contracts.assertResult(result);
-    const command = await this.load<AgentCommand>(result.commandRef); roles.dependencies.contracts.assertCommand(sourceHistoryCommandView(command, source.input.parameters.verificationContract, source.input.parameters.sourceAssessmentPolicy));
-    for (const [key, ref] of [['checkReportRef', finding.referenceRef], ['evaluationReportRef', finding.referenceObservationsRef], ['criteriaRef', finding.criteriaRef]] as const) {
-      if (!ref || (command.payload[key] as ArtifactRef | undefined)?.sha256 !== ref.sha256 || !checkpoint.result.artifactRefs.some(item => item.sha256 === ref.sha256)) throw new Error('SOURCE_HISTORY_BINDING_INVALID');
-    }
-    const body = Buffer.from(await artifacts.get(card.bodyRef)).toString('utf8');
-    const instruction = authorizeSourceCorrection({ sourceTaskId: source.taskId, card: finding, body, raw, rawRef: finding.reviewRef, result, command });
-    if (instruction.heading !== finding.section) throw new Error('SOURCE_HISTORY_BINDING_INVALID');
-    return { finding, result: checkpoint.result };
+    return validateSourceFinding({ stages, repository, artifacts, contracts: roles.dependencies.contracts }, proof, input);
   }
   async collect(parent: StageTask): Promise<SourceFindingProof[]> {
     const { stages } = this.evaluation.dependencies;
@@ -143,4 +117,39 @@ export async function assertSourceReviewHistory(artifacts: Pick<ArtifactStore, '
     const values = groups.get(d.key) ?? []; values.push(attempt.output as unknown as ReviewOutput); groups.set(d.key, values);
   }
   for (const values of groups.values()) assertReviewFormatHistory(values);
+}
+
+export async function validateSourceFinding(dependencies: { stages: { get(id: string): StageTask; store: Pick<import('../ports/StageTaskPorts.ts').StageTaskStore, 'events' | 'checkpoints'> }; repository: Pick<import('../ports/ApplicationPorts.ts').FlywheelRepository, 'getKnowledgeVersion'>; artifacts: Pick<ArtifactStore, 'get' | 'verify'>; contracts: import('../ports/ApplicationPorts.ts').AgentContractValidator }, proof: SourceFindingProof, input: StageInput) {
+  const { stages, repository, artifacts, contracts } = dependencies;
+  const load = async <T>(ref: ArtifactRef): Promise<T> => {
+    if (!ref || !await artifacts.verify(ref)) throw new Error('SOURCE_HISTORY_ARTIFACT_INVALID');
+    return JSON.parse(Buffer.from(await artifacts.get(ref)).toString('utf8')) as T;
+  };
+  const source = stages.get(proof.taskId);
+  await assertSourceReviewHistory(artifacts, stages.store.events(source.taskId));
+  if (source.input.stage !== 'EVALUATE' || source.input.parameters.operation !== 'KNOWLEDGE_SOURCE_VERIFICATION'
+    || !['knowledge-source-verification-v2', 'knowledge-source-verification-v3', 'knowledge-source-verification-v4', 'knowledge-source-verification-v5'].includes(String(source.input.parameters.verificationContract))
+    || source.input.projectId !== input.projectId || source.input.sourceRevision !== input.sourceRevision || source.input.sourceDigest !== input.sourceDigest
+    || source.input.parameters.snapshotId !== input.parameters.snapshotId
+    || source.inputDigest !== sha256(canonicalJson({ contractVersion: source.contractVersion, input: source.input, limits: source.limits }))) throw new Error('SOURCE_HISTORY_BINDING_INVALID');
+  const checkpoint = stages.store.checkpoints(proof.taskId).find(item => item.key === proof.checkpointKey);
+  if (!checkpoint || sha256(canonicalJson(checkpoint.result)) !== proof.checkpointDigest) throw new Error('SOURCE_HISTORY_BINDING_INVALID');
+  const finding = checkpoint.result.summary as unknown as HistoricalSourceFinding;
+  const card = repository.getKnowledgeVersion(finding.versionId);
+  if (!card || finding.originEvidence || finding.outcome !== 'SOURCE_MISMATCH' || typeof finding.section !== 'string'
+    || !source.input.cardVersionIds.includes(card.versionId) || !input.cardVersionIds.includes(card.versionId)
+    || card.metadata.cardId !== finding.cardId || card.moduleId !== finding.moduleId || card.bodyRef.sha256 !== finding.bodyDigest
+    || card.metadata.projectSnapshotId !== input.parameters.snapshotId
+    || checkpoint.key !== `source-section:${card.versionId}:${sha256(finding.section).slice(0, 24)}`) throw new Error('SOURCE_HISTORY_BINDING_INVALID');
+  for (const ref of [...checkpoint.result.artifactRefs, card.bodyRef]) if (!await artifacts.verify(ref)) throw new Error('SOURCE_HISTORY_ARTIFACT_INVALID');
+  const raw = await load<ReviewOutput>(finding.reviewRef), result = await load<AgentResult>(finding.reviewResultRef);
+  contracts.assertResult(result);
+  const command = await load<AgentCommand>(result.commandRef); contracts.assertCommand(sourceHistoryCommandView(command, source.input.parameters.verificationContract, source.input.parameters.sourceAssessmentPolicy));
+  for (const [key, ref] of [['checkReportRef', finding.referenceRef], ['evaluationReportRef', finding.referenceObservationsRef], ['criteriaRef', finding.criteriaRef]] as const) {
+    if (!ref || (command.payload[key] as ArtifactRef | undefined)?.sha256 !== ref.sha256 || !checkpoint.result.artifactRefs.some(item => item.sha256 === ref.sha256)) throw new Error('SOURCE_HISTORY_BINDING_INVALID');
+  }
+  const body = Buffer.from(await artifacts.get(card.bodyRef)).toString('utf8');
+  const instruction = authorizeSourceCorrection({ sourceTaskId: source.taskId, card: finding, body, raw, rawRef: finding.reviewRef, result, command });
+  if (instruction.heading !== finding.section) throw new Error('SOURCE_HISTORY_BINDING_INVALID');
+  return { finding, result: checkpoint.result };
 }

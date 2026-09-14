@@ -65,8 +65,9 @@ for (const { rejectSourceReview, mixedSourceRisks, overCapacity = false } of [{ 
         sectionCalls.set(sectionKey, (sectionCalls.get(sectionKey) ?? 0) + 1);
         if (criteria.section === 'Limits' && interruptSourceSection) { interruptSourceSection = false; throw new Error('TEST_SOURCE_SECTION_INTERRUPTION'); }
         if (exposeMixedRisk && criteria.section === 'Limits') return { blocking: true, recommendation: 'ITERATE', correction: null, unresolvedRisks: ['Independent Limits evidence remains unknown.'] };
-        return !acceptFalseSource && body.includes('The difference') && criteria.section === 'Behavior' ? { blocking: true, recommendation: 'ITERATE', correction: { correctionId: 'source-error', knowledgePath: 'knowledge/unit-add.md#Behavior', criterion: 'Pinned source adds the arguments.', risk: 'Incorrect operation.' }, unresolvedRisks: [] }
+        const opinion = !acceptFalseSource && body.includes('The difference') && criteria.section === 'Behavior' ? { blocking: true, recommendation: 'ITERATE', correction: { correctionId: 'source-error', knowledgePath: 'knowledge/unit-add.md#Behavior', criterion: 'Pinned source adds the arguments.', risk: 'Incorrect operation.' }, unresolvedRisks: [] }
           : { blocking: false, recommendation: 'PASS', correction: null, unresolvedRisks: [] };
+        return { ...opinion, ...(criteria.pendingReviewConcerns?.length && !acceptFalseSource ? { concernResolutions: criteria.pendingReviewConcerns.map((item: any) => ({ concernId: item.concernId, disposition: 'CONFIRMED', reason: 'The fixed source adds; the unchanged paragraph says difference.', sourceQuotes: [] })) } : {}) };
       }
       if (request.role === 'review' && request.prompt.includes('REVISION_SOURCE_REVIEW')) { sourceReviewCalls++; const sourceRef = _command.payload.evaluationReportRef as any; const sourceReport = JSON.parse(Buffer.from(await composition.artifacts.get(sourceRef)).toString('utf8')); assert.equal(sourceReport.observedImplementation, 'PINNED_REFERENCE'); assert.ok(composition.apps.workbenchStages.store.checkpoints(_command.runId).some(row => row.key.startsWith('revision-source-materials:')), 'source review inputs persist before invoking the model'); assert.equal(sourceReport.cases[0].observation.actual.sum, '7'); assert.doesNotMatch(request.prompt, /\"sum\":\"-1\"/); usage('source-review', 3); if (rejectSourceReview) return { blocking: true, recommendation: 'ITERATE', correction: null, unresolvedRisks: ['Candidate contradicts the fixed source.'] }; return { blocking: false, recommendation: 'PASS', correction: null, unresolvedRisks: [] }; }
       if (request.role === 'review') { reviewCalls++; usage(`review-${reviewCalls}`, 3); if (reviewKeepsKnowledge) { wrongCode = false; return { blocking: false, recommendation: 'PASS', correction: null, unresolvedRisks: [] }; } return { blocking: true, recommendation: 'ITERATE', correction: { correctionId: 'fix-arithmetic-operation', targetHeading: 'Behavior', replacementMarkdown: '## Behavior\nReturn the sum of the representable signed arguments.', knowledgePath: 'knowledge/unit-add.md#Behavior', criterion: 'Describe addition rather than subtraction according to the trusted sum observation.', risk: 'Incorrect arithmetic operation' }, unresolvedRisks: [] }; }
@@ -265,6 +266,25 @@ for (const { rejectSourceReview, mixedSourceRisks, overCapacity = false } of [{ 
     const history = new WorkbenchSourceFindingHistory(composition.apps.workbenchEvaluation);
     await assert.rejects(history.validate({ ...carriedCard.originEvidence, checkpointDigest: '0'.repeat(64) }, falseSource.input), /SOURCE_HISTORY_BINDING_INVALID/);
     await assert.rejects(history.validate(carriedCard.originEvidence, { ...falseSource.input, cardVersionIds: [] }), /SOURCE_HISTORY_BINDING_INVALID/);
+    const originalSourceSnapshot = composition.apps.workbenchStages.get(originalSourceTaskId);
+    const rejectReassessment = !mixedSourceRisks && !rejectSourceReview;
+    if (!rejectReassessment) acceptFalseSource = false;
+    const reconsidered = await composition.apps.workbenchSourceVerification.start(luckyTask.taskId, true);
+    assert.notEqual(reconsidered.taskId, falseSource.taskId);
+    assert.equal(reconsidered.input.parameters.historicalReviewPolicy, 'source-historical-review-v1');
+    const reconsideredResult = await composition.apps.workbenchStages.wait(reconsidered.taskId);
+    if (rejectReassessment) {
+      assert.equal(reconsideredResult.status, 'FAILED', 'a fresh PASS without a historical response is rejected');
+    } else {
+      assert.equal(reconsideredResult.status, 'SUCCEEDED', reconsideredResult.reasonCode ?? '');
+      const section = (reconsideredResult.result!.summary.cards as any[])[0].sections.find((item: any) => item.section === 'Behavior');
+      assert.equal(section.outcome, 'SOURCE_MISMATCH');
+      assert.equal(section.carriedForward, undefined);
+      assert.equal(section.concernResolutions[0].disposition, 'CONFIRMED');
+    }
+    assert.ok(sectionCalls.get(`${reconsidered.taskId}:Behavior`));
+    assert.equal((await composition.apps.workbenchSourceVerification.start(luckyTask.taskId, true)).taskId, reconsidered.taskId);
+    assert.deepEqual(composition.apps.workbenchStages.get(originalSourceTaskId), originalSourceSnapshot);
     acceptFalseSource = false;
 
     const sourceIndexWrite = composition.apps.knowledgeIndex.index.write.bind(composition.apps.knowledgeIndex.index);

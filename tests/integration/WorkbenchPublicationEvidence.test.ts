@@ -299,3 +299,49 @@ test('publication refuses a supplied candidate absent from the accepted trusted 
   const { f } = await supplementalPublicationFixture(true, true);
   await assert.rejects(f.service.prepare(f.ids, f.input.fixedSuites), /PUBLICATION_SUPPLIED_CANDIDATES_MISSING/);
 });
+
+
+test('explicit historical reassessment publishes only with a bound rebuttal and rechecks original evidence on resume', async () => {
+  const f = await setup();
+  const { historicalReviewConcern } = await import('../../src/domain/knowledge/SourceReviewPolicy.ts');
+  const original = structuredClone(f.input.sourceVerification);
+  const section = f.sourceSections[0]!;
+  const load = async (ref: any) => JSON.parse(Buffer.from(await f.service.dependencies.artifacts.get(ref)).toString());
+  const correction = { correctionId: 'COR-0001', knowledgePath: 'knowledge/knowledge-unit.md#Value', criterion: 'The reference does not define value.', risk: 'Wrong interface claim.' };
+  const oldRaw = { recommendation: 'ITERATE', blocking: true, correction, unresolvedRisks: [] };
+  const oldRawRef = await f.put(Buffer.from(JSON.stringify(oldRaw)), 'application/json');
+  const oldEnvelope = await load(section.reviewResultRef);
+  oldEnvelope.rawOutputRef = oldRawRef; oldEnvelope.outputRefs = [oldRawRef];
+  oldEnvelope.payload.corrections = [{ ...correction, evidenceRefs: [section.referenceRef] }];
+  const oldResultRef = await f.put(Buffer.from(JSON.stringify(oldEnvelope)), 'application/json');
+  const finding: any = { ...section, outcome: 'SOURCE_MISMATCH', reviewRef: oldRawRef, reviewResultRef: oldResultRef };
+  const checkpoint = { key: `source-section:version:${sha256('Value').slice(0,24)}`, result: {
+    artifactRefs: [f.card.bodyRef, oldRawRef, oldResultRef, section.referenceRef, section.referenceObservationsRef, section.criteriaRef], summary: finding,
+  } };
+  const proof = { taskId: original.taskId, checkpointKey: checkpoint.key, checkpointDigest: sha256(canonicalJson(checkpoint.result)) };
+  const proofRef = await f.put(Buffer.from(JSON.stringify([proof])), 'application/json');
+  const concern = historicalReviewConcern(proof, finding, oldRaw as any);
+  const { versionId: _version, heading: _heading, ...promptConcern } = concern;
+  const criteria = await load(section.criteriaRef); criteria.pendingReviewConcerns = [promptConcern];
+  section.criteriaRef = await f.put(Buffer.from(JSON.stringify(criteria)), 'application/json');
+  const raw = { recommendation: 'PASS', blocking: false, correction: null, concernResolutions: [{ concernId: concern.concernId, disposition: 'DISPROVED', reason: 'The fixed source defines the function explicitly.', sourceQuotes: [{ path: 'module.c', quote: 'int value(void) { return 1; }' }] }] };
+  section.reviewRef = await f.put(Buffer.from(JSON.stringify(raw)), 'application/json');
+  Object.assign(f.input.sourceVerification.input.parameters, { historicalReviewPolicy: 'source-historical-review-v1', priorFindingsRef: proofRef });
+  const identity = createStageTask(f.input.sourceVerification.input, {}, 'now');
+  Object.assign(f.input.sourceVerification, { taskId: identity.taskId, inputDigest: identity.inputDigest }); f.ids.sourceVerification = identity.taskId;
+  f.command.runId = identity.taskId; f.command.payload.criteriaRef = section.criteriaRef;
+  const commandRef = await f.put(Buffer.from(JSON.stringify(f.command)), 'application/json');
+  const envelope = await load(section.reviewResultRef);
+  Object.assign(envelope, { runId: identity.taskId, commandRef, rawOutputRef: section.reviewRef, outputRefs: [section.reviewRef] });
+  section.reviewResultRef = await f.put(Buffer.from(JSON.stringify(envelope)), 'application/json');
+  f.input.sourceVerification.result!.artifactRefs.push(proofRef, section.criteriaRef, section.reviewRef, section.reviewResultRef);
+  const get = f.service.dependencies.stages.get;
+  f.service.dependencies.stages.get = id => id === original.taskId ? original : get(id);
+  f.service.dependencies.stages.store.checkpoints = () => [checkpoint] as any;
+  const prepared = await f.service.prepare(f.ids, f.input.fixedSuites);
+  assert.equal(prepared.state, 'PREPARED');
+  await f.service.verifyResume(prepared.artifactRef);
+  checkpoint.result.summary.bodyDigest = sha256('changed');
+  await assert.rejects(f.service.verifyResume(prepared.artifactRef), /SOURCE_HISTORY_BINDING_INVALID/);
+  await assert.rejects(f.service.prepare(f.ids, f.input.fixedSuites), /SOURCE_HISTORY_BINDING_INVALID/);
+});

@@ -93,3 +93,10 @@ test('failed review clues bind the original event, immutable card version and wo
   f.contents.set(rawRef.sha256, Buffer.from('corrupted'));
   await assert.rejects(history.validateConcerns(concerns, f.input.evaluation.input), /SOURCE_HISTORY_ARTIFACT_INVALID/);
 });
+
+test('explicit reassessment cannot silently reuse an ordinary task or start without historical findings', async () => {
+  const { f, old, service } = await setup(true);
+  await assert.rejects(service.prepare(f.ids.evaluation, true), /SOURCE_REASSESSMENT_NO_FINDINGS/);
+  assert.deepEqual(await service.prepare(f.ids.evaluation), old.input);
+  await assert.rejects(service.prepare(f.ids.evaluation, 'future' as any), /SOURCE_HISTORICAL_REVIEW_POLICY_INVALID/);
+});
