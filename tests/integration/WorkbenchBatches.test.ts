@@ -1,0 +1,54 @@
+/**
+ * Copyright (c) 2026 linlisWorkTeam
+ * SPDX-License-Identifier: MIT
+ * 文件功能：验证可读批次编号、幂等创建与跨连接模块租约。
+ */
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { batchSchedule } from '../../src/domain/workbench/WorkbenchBatch.ts';
+import { SqliteWorkbenchBatches } from '../../src/infrastructure/sqlite/SqliteWorkbenchBatches.ts';
+
+test('readable batch sequence survives restart and creation retries do not allocate extra batches', () => {
+  const root = mkdtempSync(join(tmpdir(), 'batch-identities-'));
+  let store = new SqliteWorkbenchBatches(join(root, 'batches.sqlite'));
+  const input = { projectId: 'project-a', snapshotId: 'snapshot-a', moduleId: 'markdown-lite', schedule: { enabled: false, intervalMinutes: null } };
+  try {
+    const first = store.create(input, 'create-1', '2026-09-13T16:00:00.000Z');
+    assert.equal(first.batchId, 'markdown-lite-20260914-1'); assert.equal(first.status, 'READY'); assert.equal(first.rounds.length, 0);
+    assert.deepEqual(store.create(input, 'create-1', '2026-09-15T00:00:00.000Z'), first);
+    assert.throws(() => store.create({ ...input, moduleId: 'other' }, 'create-1', first.createdAt), /IDEMPOTENCY_CONFLICT/);
+    store.close(); store = new SqliteWorkbenchBatches(join(root, 'batches.sqlite'));
+    assert.equal(store.create(input, 'create-2', '2026-09-14T15:59:59.000Z').batchId, 'markdown-lite-20260914-2');
+    assert.equal(store.create(input, 'create-3', '2026-09-14T16:00:00.000Z').batchId, 'markdown-lite-20260915-1');
+    assert.equal(store.list('project-a').length, 3);
+    assert.throws(() => batchSchedule({ enabled: true, intervalMinutes: 0 }), /BATCH_SCHEDULE_INVALID/);
+    assert.throws(() => batchSchedule({ enabled: false, intervalMinutes: 1 }), /BATCH_SCHEDULE_INVALID/);
+  } finally { store.close(); rmSync(root, { recursive: true, force: true }); }
+});
+
+test('module leases serialize same-module batches across connections and permit different modules', () => {
+  const root = mkdtempSync(join(tmpdir(), 'batch-module-leases-'));
+  const path = join(root, 'batches.sqlite'), first = new SqliteWorkbenchBatches(path), second = new SqliteWorkbenchBatches(path);
+  const now = '2026-09-14T01:00:00.000Z';
+  const input = { projectId: 'project-a', snapshotId: 'snapshot-a', moduleId: 'parser', schedule: { enabled: true, intervalMinutes: 60 } };
+  try {
+    const a = first.create(input, 'a', now), b = second.create(input, 'b', now);
+    const c = second.create({ ...input, moduleId: 'xml' }, 'c', now);
+    const leaseA = first.claim(a.batchId, now)!; assert.ok(leaseA);
+    assert.equal(second.claim(a.batchId, now), null); assert.equal(second.claim(b.batchId, now), null);
+    assert.ok(second.claim(c.batchId, now));
+    assert.throws(() => first.enqueue(a.batchId, now), /BATCH_ROUND_ACTIVE/);
+    assert.throws(() => second.save(leaseA.batch, 'wrong-lease', false), /BATCH_LEASE_LOST/);
+    assert.throws(() => first.save(leaseA.batch, leaseA.leaseId, true), /BATCH_ROUND_INVALID/);
+    assert.throws(() => first.save({ ...leaseA.batch, moduleId: 'xml' }, leaseA.leaseId, false), /BATCH_INPUT_CHANGED/);
+    leaseA.batch.status = 'SUCCEEDED'; leaseA.batch.rounds[0]!.status = 'SUCCEEDED'; leaseA.batch.rounds[0]!.completedAt = now;
+    first.save(leaseA.batch, leaseA.leaseId, true);
+    assert.ok(second.claim(b.batchId, now));
+    const next = first.enqueue(a.batchId, now); assert.equal(next.rounds.length, 2);
+    assert.equal(next.rounds[0]!.status, 'SUCCEEDED'); assert.notEqual(next.rounds[0]!.executionKey, next.rounds[1]!.executionKey);
+    assert.equal(first.claim(a.batchId, now), null);
+  } finally { first.close(); second.close(); rmSync(root, { recursive: true, force: true }); }
+});
