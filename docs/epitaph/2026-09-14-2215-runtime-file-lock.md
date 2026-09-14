@@ -1,9 +1,0 @@
-# 公共运行入口接入跨进程维护锁
-
-目标active，独立/tmp/domain-knowledge-workbench。线上仍d869e1a，本次未部署、未删除用户数据、未运行模型。PR50 Draft保持，不合并。
-
-RuntimeFileLock以Linux flock和父进程持有的共享open-file-description实现生命周期共享锁；维护非阻塞升级独占，其他Composition仍打开时拒绝；恢复共享失败或锁inode/根目录身份变化时available=false。锁文件保留，进程退出内核释放。Composition在存储初始化之前获取锁，路径canonicalize；RuntimeMaintenance在入口关闭后isolate执行idle复核及工作。close等待独占操作结束后关存储、最后释放锁。普通Console和CLI允许共存。未覆盖旧版本进程或外部直接SQLite访问，部署必须停止旧服务。
-
-RuntimeLockTests.log19/19：真实子进程持锁阻止维护、SIGKILL释放、异常恢复共享、锁inode替换失败关闭、两个Composition阻止维护和恢复、HTTP与架构回归。RuntimeLockTypes.log类型通过；RuntimeLockSpecs.log通过。尚无生产删除API调用这套完整文件/数据库协调器。
-
-下一步接生产删除应用授权根与参与者，核对源码路径不得与清理根重叠，补其他执行目录的真实归属；HTTP预览/二次确认/删除和前台、启动恢复及恢复后队列推进待完成。此前发布文件备份审计与统一恢复v4见2202/2151。C/C++最新修订后的来源质量、可信/固定门禁与最终发布仍未完成，不应复用旧通过状态。

@@ -14,6 +14,7 @@ import type { SqliteDeletionRunStates } from './SqliteDeletionRunStates.ts';
 import { CasDeletionFiles } from './CasDeletionFiles.ts';
 import { PublishedDeletionFiles } from './PublishedDeletionFiles.ts';
 import { publishedDeletionManifest } from './PublishedDeletionManifest.ts';
+import { sessionDeletionManifest } from './SessionDeletionManifest.ts';
 import { workspaceDeletionManifest } from './WorkspaceDeletionManifest.ts';
 import { assertDeletionDirectoryScope } from './DeletionDirectoryScope.ts';
 
@@ -23,6 +24,7 @@ export function sqliteRuntimeDeletions(input: {
   casRoot: string; publicationRoots: Record<string, string>; indexRoot: string; workbenchRoot: string; legacyRoots: string[];
   allowedRoots: string[]; sourceRoots: () => string[];
   workspaces?: { rootNames: string[]; audits: () => unknown[] };
+  sessions?: { rootName: string; audits: () => unknown[] };
   runStates: () => Promise<Record<string, SqliteDeletionRunStates>>;
   exclusive: BatchDeletionStore['exclusive'];
 }): SqliteBatchDeletions {
@@ -35,6 +37,7 @@ export function sqliteRuntimeDeletions(input: {
     if (!input.publicationRoots[name]) throw new Error('DELETION_WORKSPACE_ROOT_UNAUTHORIZED');
     return [name, input.publicationRoots[name]!];
   }));
+  if (input.sessions && !input.publicationRoots[input.sessions.rootName]) throw new Error('DELETION_SESSION_ROOT_UNAUTHORIZED');
   const cas = new CasDeletionFiles(input.casRoot), files = new PublishedDeletionFiles(input.publicationRoots);
   const graph = new SqliteGraphDeletion(input.graph.name, input.graph.database);
   let snapshot: Awaited<ReturnType<typeof sqliteDeletionSnapshot>> | null = null;
@@ -59,8 +62,12 @@ export function sqliteRuntimeDeletions(input: {
   return new SqliteBatchDeletions({ recovery, exclusive: input.exclusive, inventory: async () => {
     assertScope(); snapshot = null; states = await input.runStates();
     snapshot = await sqliteDeletionSnapshot({ databases: input.databases, graph, runStates: states, reader: cas,
-      published: { files, additional: input.workspaces ? inventory => workspaceDeletionManifest({ roots: workspaceRoots,
-        inventory, audits: input.workspaces!.audits() }) : undefined, manifest: inventory => publishedDeletionManifest({ databases: input.databases, inventory,
+      published: { files, additional: inventory => {
+        const workspace = input.workspaces ? workspaceDeletionManifest({ roots: workspaceRoots, inventory, audits: input.workspaces.audits() }) : { files: [], protectedNodes: [] };
+        const session = input.sessions ? sessionDeletionManifest({ rootName: input.sessions.rootName,
+          root: input.publicationRoots[input.sessions.rootName]!, inventory, audits: input.sessions.audits() }) : { files: [], protectedNodes: [] };
+        return { files: [...workspace.files, ...session.files], protectedNodes: [...workspace.protectedNodes, ...session.protectedNodes] };
+      }, manifest: inventory => publishedDeletionManifest({ databases: input.databases, inventory,
         roots: input.publicationRoots, indexRoot: input.indexRoot, workbenchRoot: input.workbenchRoot, legacyRoots: input.legacyRoots }) } });
     assertScope(); return snapshot.nodes;
   } });
