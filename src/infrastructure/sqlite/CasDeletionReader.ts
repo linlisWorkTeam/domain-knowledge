@@ -11,6 +11,13 @@ export class CasDeletionReader implements DeletionArtifactReader {
   private readonly root: string;
   constructor(root: string) { this.root = root; }
   async read(artifactId: string, maxBytes: number): Promise<Uint8Array | null> {
+    return this.visit(artifactId, maxBytes, file => file.bytes);
+  }
+  /** 同步回调期间保持目录及文件句柄，调用者仍须排除其他写入进程。 */
+  protected visit<T>(artifactId: string, maxBytes: number,
+    consume: (file: { bytes: Buffer; handle: number; parent: number; name: string;
+      verified: { dev: bigint; ino: bigint; size: bigint; mtimeNs: bigint; ctimeNs: bigint } }) => T,
+    missing?: (parent: number) => void): T | null {
     if (!/^sha256:[a-f0-9]{64}$/.test(artifactId)) throw new Error('DELETION_ARTIFACT_ID_INVALID');
     if (!Number.isSafeInteger(maxBytes) || maxBytes < 0 || maxBytes > 32 * 1024 * 1024) throw new Error('DELETION_ARTIFACT_LIMIT');
     if (process.platform !== 'linux') throw new Error('DELETION_ARTIFACT_PLATFORM_UNSUPPORTED');
@@ -24,7 +31,7 @@ export class CasDeletionReader implements DeletionArtifactReader {
           const flags = name === digest ? constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK : directoryFlags;
           handles.push(openSync(`/proc/self/fd/${handles.at(-1)!}/${name}`, flags));
         } catch (error) {
-          if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+          if ((error as NodeJS.ErrnoException).code === 'ENOENT') { missing?.(handles.at(-1)!); return null; }
           throw new Error('DELETION_ARTIFACT_ACCESS_FAILED');
         }
       }
@@ -41,7 +48,7 @@ export class CasDeletionReader implements DeletionArtifactReader {
       const after = fstatSync(handle, { bigint: true });
       if (before.size !== after.size || before.mtimeNs !== after.mtimeNs || before.ctimeNs !== after.ctimeNs) throw new Error('DELETION_ARTIFACT_CHANGED');
       if (sha256(bytes) !== digest) throw new Error('DELETION_ARTIFACT_CORRUPT');
-      return bytes;
+      return consume({ bytes, handle, parent: handles.at(-2)!, name: digest, verified: after });
     } finally { for (const handle of handles.reverse()) closeSync(handle); }
   }
 }

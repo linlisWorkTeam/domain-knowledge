@@ -1,0 +1,13 @@
+# 合并图引用与CAS清理
+
+目标active。独立/tmp/domain-knowledge-workbench；线上仍d869e1a，无本轮部署、真实模型任务或用户数据删除。PR50 Draft，38/50不合并。
+
+SqliteDeletionSnapshot合并普通SQLite、图内部记录、递归CAS。补齐业务表到内部checkpoint及CAS到checkpoint引用，扫描前后重读记录摘要防止异步扫描使用变化记录。SqliteDeletionInventory增加服务器内部externalIdentities参数供合并使用。
+
+DeletionGraphCasAudit.json基于不可变部署备份的临时数据库副本+只读原CAS：2107记录=966原记录+1141图记录；336文件全部存在，5725914bytes，0missing，0unknown tables。新增274图种子没有增加唯一CAS文件，但补齐了归属/引用。临时副本删除，源备份无写入。该结果仅数据库/CAS，不代表发布Markdown和其他目录全覆盖。
+
+CasDeletionFiles冻结cas-deletion-files-v1见证，只接受plan选中的sha文件ID；capture核实存在状态，clean先全量预检再逐文件校验摘要/句柄身份、unlink与目录fsync。共享文件不删除；原缺失后出现拒绝；已部分删除重试继续并fsync缺失父目录。CasDeletionReader提供protected同步visit保持FD及验证后的stat。完整跨进程写入排他仍须调用者实现，不能把校验当锁。
+
+DeletionFilesRegression.log32/32，涵盖图/合并引用、CAS清理/读取、库存、递归及架构；DeletionFilesFinalTests.log最终7项，DeletionFilesTypes2.log最终类型，Spec日志DeletionFilesSpecs.log。最初DeletionSnapshotTests/Types因缺右括号失败，Tests2/Types2已修复并通过，不混用旧失败证据。
+
+未完成：CAS见证持久化接入跨库恢复、完整生产应用/API二次确认/UI；发布文件与索引镜像/其他执行目录归属清理；全写入排他；恢复后队列重启。C新版本重建/门禁、C++来源质量及最终发布仍未通过，没有新模型验收。下一轮优先统一生产删除用例而非继续孤立适配器。

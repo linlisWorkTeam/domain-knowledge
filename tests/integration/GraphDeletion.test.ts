@@ -15,6 +15,9 @@ import { SqliteGraphDeletion } from '../../src/infrastructure/sqlite/SqliteGraph
 import { sqliteDeletionInventory } from '../../src/infrastructure/sqlite/SqliteDeletionInventory.ts';
 import { SqliteDeletionRecovery } from '../../src/infrastructure/sqlite/SqliteDeletionRecovery.ts';
 import { planBatchDeletion } from '../../src/domain/workbench/BatchDeletion.ts';
+import { sqliteDeletionSnapshot } from '../../src/infrastructure/sqlite/SqliteDeletionSnapshot.ts';
+import { LocalCasArtifactStore } from '../../src/infrastructure/sqlite/SqliteCas.ts';
+import { CasDeletionReader } from '../../src/infrastructure/sqlite/CasDeletionReader.ts';
 
 async function fixture() {
   const root = mkdtempSync(join(tmpdir(), 'graph-deletion-')), filename = join(root, 'graph.sqlite');
@@ -129,4 +132,49 @@ test('cross-database recovery does not repeat a committed graph cleanup after a 
     const restarted = recovery(); restarted.applyRecords(plan.planId); restarted.completeAfterFiles(plan.planId);
     assert.equal(removals, 1); assert.equal(restarted.get(plan.planId)!.phase, 'COMPLETE');
   } finally { journal.close(); f.close(); }
+});
+test('combined snapshot expands internal graph CAS references and preserves shared descendants', async () => {
+  const f = await fixture();
+  try {
+    const cas = new LocalCasArtifactStore(join(f.root, 'cas'));
+    const leaf = await cas.put(Buffer.from('shared content'), 'text/plain');
+    const parent = await cas.put(Buffer.from(JSON.stringify({ childRef: leaf })), 'application/json');
+    await f.put('a', 'artifact-owner', { artifactRef: parent });
+    await f.put('b', 'shared-leaf', { artifactRef: leaf });
+    const inventory = await sqliteDeletionSnapshot({ databases: { registry: f.registry }, graph: f.adapter, reader: new CasDeletionReader(cas.root) });
+    assert.deepEqual(inventory.missingArtifacts, []);
+    const plan = planBatchDeletion(inventory.records.find(row => row.table === 'runs' && row.key.run_id === 'a')!.id, inventory.nodes);
+    assert.ok(plan.deleteIds.includes(`cas/${parent.artifactId}`));
+    assert.ok(plan.preservedIds.includes(`cas/${leaf.artifactId}`));
+    assert.equal(plan.reclaimableBytes, parent.size);
+  } finally { f.close(); }
+});
+test('business rows and recursively loaded CAS both protect referenced graph checkpoints', async () => {
+  const f = await fixture();
+  try {
+    const cas = new LocalCasArtifactStore(join(f.root, 'cas'));
+    f.registry.exec('CREATE TABLE events(event_id TEXT PRIMARY KEY,run_id TEXT,event_json TEXT)');
+    f.registry.prepare('INSERT INTO events VALUES(?,?,?)').run('consumer-event', 'b', JSON.stringify({ checkpointId: f.a.checkpoint.id }));
+    const scan = () => sqliteDeletionSnapshot({ databases: { registry: f.registry }, graph: f.adapter, reader: new CasDeletionReader(cas.root) });
+    let inventory = await scan();
+    const target = inventory.records.find(row => row.table === 'runs' && row.key.run_id === 'a')!.id;
+    assert.throws(() => planBatchDeletion(target, inventory.nodes), /DELETION_TARGET_REFERENCED/);
+    f.registry.exec('DELETE FROM events');
+    const linked = await cas.put(Buffer.from(JSON.stringify({ checkpointId: f.a.checkpoint.id })), 'application/json');
+    await f.put('b', 'cas-link', { artifactRef: linked });
+    inventory = await scan();
+    assert.throws(() => planBatchDeletion(target, inventory.nodes), /DELETION_TARGET_REFERENCED/);
+  } finally { f.close(); }
+});
+test('combined snapshot rejects database changes during asynchronous artifact expansion', async () => {
+  const f = await fixture();
+  try {
+    const cas = new LocalCasArtifactStore(join(f.root, 'cas'));
+    const ref = await cas.put(Buffer.from('payload'), 'text/plain');
+    await f.put('a', 'race', { artifactRef: ref });
+    const reader = new CasDeletionReader(cas.root);
+    await assert.rejects(sqliteDeletionSnapshot({ databases: { registry: f.registry }, graph: f.adapter, reader: {
+      read: async (id, limit) => { f.registry.exec("UPDATE runs SET state='VERIFIED' WHERE run_id='a'"); return reader.read(id, limit); },
+    } }), /DELETION_RECORD_CHANGED/);
+  } finally { f.close(); }
 });

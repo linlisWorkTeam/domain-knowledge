@@ -392,3 +392,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 [2100 HTTP维护与调度屏障](https://github.com/linlisWorkTeam/domain-knowledge/blob/6c09e43/docs/epitaph/2026-09-14-2100-maintenance-http-and-scheduler.md)：持久删除未恢复时阻止HTTP数据访问、SSE轮询与批次调度，启动不恢复阶段/流程队列，相关回归20项通过。该记录中旧运行按业务阶段判断空闲的限制由2130执行核验改善，跨进程写排他、完整删除和恢复后队列重启仍未完成。
 
 [2108 冻结行与执行墓碑](https://github.com/linlisWorkTeam/domain-knowledge/blob/a166a6a/docs/epitaph/2026-09-14-2108-frozen-deletion-rows-and-tombstones.md)：引入跨库恢复v2冻结见证及工作台执行墓碑，19项存储/架构测试通过。旧runs后续已扩展为v2行见证并接入真实执行核验；当时生产文件清理及HTTP删除尚未开放，该限制仍需最终串联解决。
+
+[2126 旧运行审计与异步维护](https://github.com/linlisWorkTeam/domain-knowledge/blob/ec67776/docs/epitaph/2026-09-14-2126-legacy-deletion-audit-and-maintenance.md)：旧runs支持审计墓碑和配置/用量保留，维护屏障增加锁内异步状态检查；37项旧删除回归与4项维护单测通过。实际执行核验和图库清理后续已补适配器，生产删除及完整真实C/C++验收仍未完成。

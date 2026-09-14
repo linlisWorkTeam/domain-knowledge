@@ -66,7 +66,8 @@ function strings(value: unknown): string[] {
  * 调用者负责以同一快照读取各库；本函数不建立跨库写事务，也不执行删除。
  * 输出只涵盖数据库记录。CAS 递归引用、发布文件和墓碑仍须加入最终删除清单。
  */
-export function sqliteDeletionInventory(databases: Record<string, DatabaseSync>, runStates: Record<string, SqliteDeletionRunStates> = {}): DeletionRecordInventory {
+export function sqliteDeletionInventory(databases: Record<string, DatabaseSync>, runStates: Record<string, SqliteDeletionRunStates> = {},
+  externalIdentities: Array<{ value: string; nodeId: string }> = []): DeletionRecordInventory {
   const entries: Entry[] = [], unclassifiedTables: string[] = [];
   for (const [database, db] of Object.entries(databases).sort(([a], [b]) => a.localeCompare(b))) {
     runStates[database]?.assertCurrent(db);
@@ -96,6 +97,9 @@ export function sqliteDeletionInventory(databases: Record<string, DatabaseSync>,
     }
   }
   const byTable = new Map<string, Entry[]>(), identities = new Map<string, Set<string>>();
+  for (const { value, nodeId } of externalIdentities) {
+    const ids = identities.get(value) ?? new Set<string>(); ids.add(nodeId); identities.set(value, ids);
+  }
   for (const entry of entries) {
     const list = byTable.get(entry.table) ?? []; list.push(entry); byTable.set(entry.table, list);
     if (Object.keys(entry.key).length === 1) for (const key of Object.values(entry.key)) if (typeof key === 'string') {
