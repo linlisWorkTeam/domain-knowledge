@@ -1299,7 +1299,7 @@ body.drawer-active { overflow: hidden; }
 .pipeline-prerequisite h3 { margin: 0 0 6px; font-size: 16px; }
 .pipeline-prerequisite p { margin: 0; color: var(--muted); font-size: 13px; }
 .pipeline-prerequisite button { flex-shrink: 0; }
-.pipeline-prerequisite button:disabled { background: var(--surface-2); border-color: var(--border); color: var(--muted); cursor: not-allowed; }
+:root .pipeline-prerequisite button:disabled { background: var(--surface-2); border-color: var(--border); color: var(--muted); cursor: not-allowed; filter: none; box-shadow: none; }
 .workbench-history-heading { margin: 26px 0 12px; }
 .workbench-history-heading h2 { margin: 0 0 4px; font-size: 17px; }
 .workbench-history-heading p { font-size: 12px; }

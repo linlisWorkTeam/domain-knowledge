@@ -12,6 +12,16 @@
 
 浏览器、真实C/C++新契约链路、来源质量、关联/联合发布及新版部署仍待完成。PR #50 保持草稿，未处理 PR #38 的关闭或合入。
 
+## 当前前台复验（2026-09-14，fd811d9 后样式修复）
+
+免登录入口的一键执行按钮修复了浅色主题优先级：无项目输入时保持禁用外观。人工对照新旧操作中心截图后更新原截图基线，原布局、交互断言和1%像素阈值未变。
+
+先前直接调用 `playwright test` 漏传仓库的 `Playwright.config.ts`，导致基线路径和初始主题不符；该轮21/23不作为正式配置结果。正式命令为 `npm run test:ui -- tests/e2e/Console.spec.ts tests/e2e/WorkbenchEntry.spec.ts tests/e2e/WorkbenchPublication.spec.ts --workers=1`，测试进程堆192MiB，产品限制不变。
+
+正式组合25项中23通过、2失败，日志 `/tmp/WorkbenchConfiguredBrowser.log`：移动导航、主题持久化、200%缩放、七页、来源、索引、关联、入口和受控免登录发布/下载通过。失败为旧入口截图基线及长流程30秒超时。更新已人工检查的截图后，原截图断言独立复验通过（4.2秒）；长流程再度超时，在来源下载完成后切换窄屏处，未放宽时限或删减断言。日志 `/tmp/WorkbenchConfiguredBrowserRetest.log`，原组合截图和trace保存在 `/tmp/WorkbenchConfiguredBrowserEvidence/`。尚需拆分长流程，当前不能宣称Console全绿。浏览器结果仅证明受控数据的页面与接口操作，不证明真实模型、最终知识质量或部署。
+
+C++ v11重建首次启动在冻结工具链时触发ENOENT：指纹引擎清单仍引用重构前的 `domain/services/evaluation` 和 `domain/services/knowledge`。现已改为当前领域文件路径，真实工具链摘要生成通过，新重建任务 `stage-e6d45b8c9d720b62500ca5841e9b22df594ad0a938afebea451afb35dee4f6db` 已启动，尚不记录为成功。首次失败发生于建任务/模型调用之前，日志 `/tmp/CppV11Reconstruction.log`；修正后 `/tmp/CppV11ReconstructionAfterPaths.log`，证据目录 `cpp-v11-reconstruction/`。旧来源、可信与固定报告保留，不跨执行契约恢复旧任务。
+
 ## 固定目标与当前真实结果
 
 | 目标 | 固定提交 | 当前卡片数 | 可信用例 | 固定用例 | 来源及发布 |
