@@ -1,0 +1,13 @@
+# C++ 四卡修订完成，新重建编译修复
+
+前轮verified wait；本轮source修订终态与4卡/增量索引审计完成，启动重建并从真实编译诊断恢复，属于progress。原目标全部保持，尚未完成。
+
+stage-83b367fb2ab4c6a9d6c4d24b439ef61a0f922ae807b27ec7a3ac5101227ed918现SUCCEEDED/UNRESOLVED，10调用1454683tokens/539193ms。SQLite与SourceCorrection.json一致。/tmp/AuditCppRevisionCurrent.ts重新运行成功，RevisionAudit.json为最终：4张ACCEPTED候选各只改获准H2、前言与其他H2相同，indexed=true；精确4个index检查点updated，没有重建其他5张索引。
+
+当前9版本：kv_d4cb628f2792d5b31241387a、kv_f9657d616d68e9f5563d07e0、kv_9b1d15b9b3c614b03d136a71、kv_9f334f987fe62c0760346c60、kv_bda9ce1a448c30d26f60f11b、kv_cf819c448f95fa537a821d63、kv_f5387a8712f766c1052ed7f6、kv_e3ff2aca0395714ed5bc32b3、kv_3be0e60d4a38a2a2ecedefb1。不能套用旧17d6的37+40报告。
+
+新重建stage-6281e9051e3291bf624e9cb84a7a5d4e1dc26a14b9097472d56594ff423b0590，driver /tmp/RunCppReconstructionAfterCorrection.ts，从完成修订的versionIds读取。首次FAILED/NATIVE_INTERFACE_COMPILE_FAILED，1调用40245tokens/18232ms，旧PID3904931退出。CAS诊断9d9b284ae100c7e0c8ce4dcf7a7fc8b2862cb67f2796667d1fd99362499ad40a验证543bytes，生成头文件INT_MAX及isspace未声明，exit1/non-timeout/non-output-limit；应用code-rejection检查点repairable=true。
+
+已从同task/input恢复Code，session69202/PID3906574，日志/tmp/CppReconstructionAfterCorrectionResume.log。当前RUNNING，第2调用，累计仍保留40245tokens。下一轮先poll该PID；不要重复启动或等待终止的revision进程3898714。旧编译失败日志/tmp/CppReconstructionAfterCorrection.log保留。成功后用已准备的/tmp/RunCppEvaluationAfterCorrection.ts及/tmp/RunCppFixedAfterCorrection.ts顺序执行，二者绑定6281；fixed复用原不可变suite。未执行的脚本不算证据。
+
+产品基线e66ec50尾注修复，18/18相关检查与typecheck/Spec在前轮通过；本轮仅真实运行、审计与报告，没有额外测试或更改断言。证据根/root/projects/domain-knowledge-releases/2026-09-10-workbench-progress/real-knowledge-revision（cpp-*-after-source-correction），runtime/tmp/workbench-revision-acceptance-20260911。网站仍ec72，e66ec50/0ae56fe未部署。C source54a待修订；全套回归、浏览器、一键分步、关联与发布仍未齐，目标active。

@@ -298,3 +298,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 - 2026-09-14-0243：C++来源508961首次非JSON失败14调用后同任务恢复，保留13完成段落和累计用量；随后持续推进，最新handle见0332。[原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/49f8a6f28dadfbf5aff2533af407239e5c066fcb/docs/epitaph/2026-09-14-0243-cpp-source-resume.md)。
 
 - [2026-09-14-0258-cpp-source-second-resume.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/3e1c73880dc5d4600c46e0649e01268a2c2b338e/docs/epitaph/2026-09-14-0258-cpp-source-second-resume.md)：C++ source508在32调用后第二次恢复，同输入保留用量；当时仅32段中间结果，未发布。后续最终63段结果见0646交接。
+
+- [2026-09-14-0313-cpp-source-third-resume.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/906b84ed0f6d9c9387e7801786fbc2f2ff20d1d3/docs/epitaph/2026-09-14-0313-cpp-source-third-resume.md)：C++ source508在50调用后第三次恢复，保留旧输入与用量，47段为中间证据；最终63段及后续四卡修订见0646/0654交接，未发布。
