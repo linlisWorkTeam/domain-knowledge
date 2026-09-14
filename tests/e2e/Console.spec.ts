@@ -329,7 +329,10 @@ test('Provider 配置与验证通过真实 API fail closed，且密钥不回填�
   await page.goto(baseUrl);
   await enterGovernance(page);
   await navigateTo(page, 'Agent 设置');
-  await expect(page.getByRole('heading', { name: '补充 Agent 提示词' })).toBeVisible();
+  await expect(page.locator('.agent-prompts > summary')).toHaveText('补充 Agent 提示词');
+  await expect(page.locator('.agent-prompts')).not.toHaveAttribute('open', '');
+  await expect(page.locator('.provider-card')).not.toHaveAttribute('open', '');
+  await page.locator('.provider-card > summary').click();
   await expect(page.locator('.settings-list')).toContainText('DeepSeek Harness');
 
   await expect(page.locator('.provider-card .form-note')).toContainText('调用模型生成一段短文本');
@@ -518,12 +521,17 @@ test('Evaluation Rule 将 scope 作为对象提交并生成新修订', async ({ 
   await page.goto(baseUrl);
   await enterGovernance(page);
   await navigateTo(page, '评测');
+  await expect(page.locator('.evaluation-settings')).not.toHaveAttribute('open', '');
+  await page.locator('.evaluation-settings > summary').click();
   const rule = page.locator('.rule-card').first();
   await expect(rule).toBeVisible();
   const initialRevision = Number(await rule.getAttribute('data-revision'));
   assert.ok(initialRevision >= 1);
-  assert.deepEqual(JSON.parse(await rule.getByLabel('适用范围').inputValue()), { kind: 'GLOBAL' });
-  await rule.getByLabel('适用范围').fill('{"kind":"GLOBAL"}');
+  await expect(rule).toContainText('全局');
+  await expect(rule.locator('textarea')).toHaveCount(0);
+  await rule.locator('[name=minimumStability]').fill('0.8');
+  await rule.locator('.field-help > summary').filter({ hasText: '?' }).first().click();
+  await expect(rule.locator('.field-help[open]')).toContainText('全局');
 
   page.on('dialog', (dialog) => {
     if (dialog.type() === 'prompt') return dialog.accept('E2E 验证 scope 对象');
@@ -539,6 +547,8 @@ test('Evaluation Rule 将 scope 作为对象提交并生成新修订', async ({ 
   const requestBody = patchResponse.request().postDataJSON();
   assert.deepEqual(requestBody.scope, { kind: 'GLOBAL' });
   assert.equal(typeof requestBody.scope, 'object');
+  assert.equal(requestBody.config.minimumStability, 0.8);
+  assert.equal(typeof requestBody.config.requireAllTests, 'boolean');
   await expect(page.locator('#toast')).toHaveText('评测规则的新修订已保存。');
   await expect(page.locator('.rule-card').first()).toHaveAttribute('data-revision', String(initialRevision + 1));
 });

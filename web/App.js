@@ -848,6 +848,21 @@ function openGraphNode(agentId, returnFocus) {
   openDrawer(returnFocus)
 }
 
+function evaluationRuleForm(rule, canEdit) {
+  const help = (key, label, description, control) => `<div class="rule-field"><div><label for="rule-${escapeHtml(rule.ruleId)}-${key}">${label}<small>${key}</small></label><details class="field-help"><summary aria-label="${label}的用途">?</summary><p>${description}</p></details></div>${control}</div>`
+  const input = (key, attributes = '') => `<input id="rule-${escapeHtml(rule.ruleId)}-${key}" name="${key}" value="${escapeHtml(rule.config?.[key] ?? '')}" ${attributes} ${canEdit ? '' : 'disabled'}>`
+  return `<form class="rule-card" data-rule-id="${escapeHtml(rule.ruleId)}" data-revision="${escapeHtml(rule.revision)}">
+    <div class="card-heading"><b>${escapeHtml(rule.name ?? rule.ruleId)}</b><small>修订 ${escapeHtml(rule.revision)}</small></div>
+    ${help('kind', '适用范围', '这条发布门禁应用于全局；现有评测保留执行时绑定的规则修订。', '<span>全局</span>')}
+    ${help('policyId', '策略标识', '标识本条门禁策略，创建后不可修改。', `<span>${escapeHtml(rule.config?.policyId)}</span>`)}
+    ${help('minimumStability', '最低稳定性', '评测报告中的稳定性低于此值时，门禁不能通过。取值范围为 0 到 1。', input('minimumStability', 'type="number" min="0" max="1" step="any" required'))}
+    ${help('requireAllTests', '要求全部测试通过', '启用后，只要有测试未通过，门禁就不能通过。', `<select id="rule-${escapeHtml(rule.ruleId)}-requireAllTests" name="requireAllTests" ${canEdit ? '' : 'disabled'}><option value="true" ${rule.config?.requireAllTests ? 'selected' : ''}>是</option><option value="false" ${rule.config?.requireAllTests ? '' : 'selected'}>否</option></select>`)}
+    ${help('maxIterations', '最大轮次', '传统批次门禁允许的最大迭代次数；不代表五阶段工作台的固定总轮数。', input('maxIterations', 'type="number" min="0" step="1" required'))}
+    <label class="inline-check"><input name="enabled" type="checkbox" ${rule.enabled ? 'checked' : ''} ${canEdit ? '' : 'disabled'}>启用这条规则</label>
+    <button class="secondary-button" type="submit" ${canEdit ? '' : 'disabled'}>保存新修订</button>
+  </form>`
+}
+
 async function renderEvidence(append = false) {
   content.innerHTML = '<div class="loading-state"><span class="spinner"></span>正在读取评测记录…</div>'
   const evaluationQuery = new URLSearchParams({ limit: '50' })
@@ -878,26 +893,18 @@ async function renderEvidence(append = false) {
   const canEdit = Boolean(state.operatorMode && state.capabilities?.writeEnabled)
   content.innerHTML = `
     ${errors.length ? partialNotice('部分评测资源读取失败；已读取的不可变事实仍可查看。') : ''}
-    <form id="evaluation-filter-form" class="resource-filter"><label>批次<input name="runId" value="${escapeHtml(state.evaluationFilters.runId)}" placeholder="批次标识"></label><label>知识模块<input name="moduleId" value="${escapeHtml(state.evaluationFilters.moduleId)}" placeholder="模块标识"></label><label>门禁<select name="gate"><option value="">全部</option>${['PASS', 'ITERATE', 'STOPPED'].map((value) => `<option value="${value}" ${state.evaluationFilters.gate === value ? 'selected' : ''}>${displayLabel(value)}</option>`).join('')}</select></label><label>状态<select name="status"><option value="">全部</option>${['PASSED', 'FAILED', 'ERROR'].map((value) => `<option value="${value}" ${state.evaluationFilters.status === value ? 'selected' : ''}>${displayLabel(value)}</option>`).join('')}</select></label><label>开始日期<input name="from" type="date" value="${escapeHtml(state.evaluationFilters.from)}"></label><label>结束日期<input name="to" type="date" value="${escapeHtml(state.evaluationFilters.to)}"></label><button class="secondary-button" type="submit">筛选</button></form>
+    <form id="evaluation-filter-form" class="resource-filter"><label>批次<select name="runId"><option value="">全部批次</option>${[...new Set([...state.runs.map(run => run.runId), state.evaluationFilters.runId].filter(Boolean))].map(id => `<option value="${escapeHtml(id)}" ${state.evaluationFilters.runId === id ? 'selected' : ''}>${escapeHtml(id)}</option>`).join('')}</select></label><label>知识模块<input name="moduleId" value="${escapeHtml(state.evaluationFilters.moduleId)}" placeholder="模块标识"></label><label>门禁<select name="gate"><option value="">全部</option>${['PASS', 'ITERATE', 'STOPPED'].map((value) => `<option value="${value}" ${state.evaluationFilters.gate === value ? 'selected' : ''}>${displayLabel(value)}</option>`).join('')}</select></label><label>状态<select name="status"><option value="">全部</option>${['PASSED', 'FAILED', 'ERROR'].map((value) => `<option value="${value}" ${state.evaluationFilters.status === value ? 'selected' : ''}>${displayLabel(value)}</option>`).join('')}</select></label><label>开始日期<input name="from" type="date" value="${escapeHtml(state.evaluationFilters.from)}"></label><label>结束日期<input name="to" type="date" value="${escapeHtml(state.evaluationFilters.to)}"></label><button class="secondary-button" type="submit">筛选</button></form>
     <section class="reference-metrics"><article><small>评测记录</small><b class="mint">${state.evaluations.length}</b><p>包含各批次的评测结果</p></article><article><small>门禁通过</small><b>${passed}</b><p>${state.evaluations.length ? `${formatNumber(passed / state.evaluations.length * 100, 1)}%` : '无样本'}</p></article><article><small>测试样本</small><b>${formatNumber(tests)}</b><p>各次评测的测试数量合计</p></article><article><small>评测规则</small><b>${state.evaluationRules.length}</b><p>${canEdit ? '可创建新修订' : '当前只读'}</p></article></section>
-    <div class="quality-layout">
-      <section class="panel"><div class="section-heading"><h2>评测记录</h2><span class="counter">${state.evaluations.length}</span></div>
-        <div class="evidence-grid">${state.evaluations.length ? state.evaluations.map((record) => `<article class="evidence-card">
+    <div class="evaluation-workspace">
+      <section class="panel"><div class="section-heading"><h2>评测记录</h2><span class="counter">${state.evaluations.length}</span>      <details class="evaluation-settings"><summary class="secondary-button">设置</summary><div class="rule-list">${state.evaluationRules.length ? state.evaluationRules.map(rule => evaluationRuleForm(rule, canEdit)).join('') : emptyState('没有评测规则', '服务端尚未建立规则记录。')}</div></details></div>
+        <div class="evidence-grid">${state.evaluations.length ? [...state.evaluations].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map((record, index) => `${index === 1 ? '<details class="evaluation-history"><summary>历史评测记录</summary>' : ''}<article class="evidence-card">
           <div class="card-heading"><div><b>${escapeHtml(record.moduleId || record.versionId)}</b><small>${escapeHtml(shortId(record.runId, 20))}</small></div>${badge(record.gate ?? record.status)}</div>
           <strong>${escapeHtml(record.tests?.passed ?? '—')} / ${escapeHtml(record.tests?.total ?? '—')}</strong><span>测试通过</span>
           <dl><div><dt>稳定性</dt><dd>${escapeHtml(record.stability ?? '—')}</dd></div><div><dt>评测时间</dt><dd>${escapeHtml(formatDate(record.createdAt))}</dd></div></dl>
           <button class="text-button" data-evaluation-id="${escapeHtml(record.evaluationId)}">检查证据 →</button>
-        </article>`).join('') : emptyState('没有评测记录', '批次进入行为评测后，记录会显示在这里。')}</div>${state.evaluationEnvelope?.nextCursor ? '<button class="secondary-button load-more" data-load-evaluations type="button">加载更多评测</button>' : ''}
+        </article>${index === state.evaluations.length - 1 && index > 0 ? '</details>' : ''}` ).join('') : emptyState('没有评测记录', '批次进入行为评测后，记录会显示在这里。')}</div>${state.evaluationEnvelope?.nextCursor ? '<button class="secondary-button load-more" data-load-evaluations type="button">加载更多评测</button>' : ''}
       </section>
-      <section class="panel"><div class="section-heading"><h2>评测规则</h2><span class="counter">${state.evaluationRules.length}</span></div>
-        <div class="rule-list">${state.evaluationRules.length ? state.evaluationRules.map((rule) => `<form class="rule-card" data-rule-id="${escapeHtml(rule.ruleId)}" data-revision="${escapeHtml(rule.revision)}">
-        <div class="card-heading"><div><b>${escapeHtml(rule.name ?? rule.ruleId)}</b><small>修订 ${escapeHtml(rule.revision)} · ${escapeHtml(typeof rule.scope === 'string' ? rule.scope : JSON.stringify(rule.scope ?? {}))}</small></div>${badge(rule.enabled ? 'ACTIVE' : 'DISABLED')}</div>
-          <label>适用范围<input name="scope" value="${escapeHtml(typeof rule.scope === 'string' ? rule.scope : JSON.stringify(rule.scope ?? {}))}" ${canEdit ? '' : 'disabled'}></label>
-          <label>规则配置<textarea name="config" rows="4" ${canEdit ? '' : 'disabled'}>${escapeHtml(JSON.stringify(rule.config ?? {}, null, 2))}</textarea></label>
-          <label class="inline-check"><input name="enabled" type="checkbox" ${rule.enabled ? 'checked' : ''} ${canEdit ? '' : 'disabled'}> 启用这条规则</label>
-          <div><span>旧修订和既有报告保持不变</span><button class="secondary-button" type="submit" ${canEdit ? '' : 'disabled'}>保存新修订</button></div>
-        </form>`).join('') : emptyState('没有评测规则', '服务端尚未建立规则记录。')}</div>
-      </section>
+
     </div>`
 }
 
@@ -943,19 +950,14 @@ async function saveEvaluationRule(form) {
     return
   }
   const data = new FormData(form)
-  let scope
-  let config
-  try {
-    scope = JSON.parse(String(data.get('scope') || '{}'))
-    if (!scope || Array.isArray(scope) || typeof scope !== 'object') throw new Error('invalid scope')
-  } catch {
-    showToast('适用范围必须是有效的 JSON 对象。', 'warning')
-    return
-  }
-  try {
-    config = JSON.parse(String(data.get('config') || '{}'))
-  } catch {
-    showToast('规则配置必须是有效的 JSON。', 'warning')
+  const rule = state.evaluationRules.find(item => item.ruleId === form.dataset.ruleId)
+  if (!rule) return
+  const scope = rule.scope
+  const config = { ...rule.config, minimumStability: Number(data.get('minimumStability')),
+    maxIterations: Number(data.get('maxIterations')), requireAllTests: data.get('requireAllTests') === 'true' }
+  if (!Number.isFinite(config.minimumStability) || config.minimumStability < 0 || config.minimumStability > 1
+    || !Number.isSafeInteger(config.maxIterations) || config.maxIterations < 0) {
+    showToast('最低稳定性应在 0 到 1 之间，最大轮次应为非负整数。', 'warning')
     return
   }
   const reason = window.prompt('说明本次规则修订原因。')?.trim()
@@ -1097,6 +1099,7 @@ async function updateSource(form) {
 }
 
 function renderAgents() {
+  const expanded = [...content.querySelectorAll('.provider-card[open], .agent-prompts[open]')].map(element => element.classList.contains('provider-card') ? '.provider-card' : '.agent-prompts')
   if (state.resourceErrors.agents) {
     content.innerHTML = errorState('无法读取 Agent 目录', state.resourceErrors.agents, '<button class="primary-button" data-reload type="button">重新连接</button>')
     return
@@ -1116,25 +1119,22 @@ function renderAgents() {
   content.innerHTML = `
     ${operationErrorKeys.length ? partialNotice(`${operationErrorLabels}暂不可用；其他已读取数据仍可查看。`) : ''}
     <section class="reference-metrics"><article><small>Agent 数量</small><b class="mint">${state.agents.length}</b><p>各角色分工固定</p></article><article><small>服务提供方</small><b>${escapeHtml(providerLabel)}</b><p>${escapeHtml(provider?.model ?? '未选择模型')}</p></article><article><small>配置状态</small><b>${escapeHtml(settings?.verification?.status ? displayLabel(settings.verification.status) : '未读取')}</b><p>${settings?.enabled ? '新批次将使用此配置' : '尚未启用'}</p></article><article><small>统计批次</small><b>${formatNumber(runSamples)}</b><p>${escapeHtml(displayLabel(runs?.cohort?.kind ?? 'EMPTY'))}</p></article></section>
-    <section class="panel publication-panel"><div class="section-heading"><h2>本地发布与 Git 同步</h2><button class="secondary-button" data-load-publications type="button" ${canEdit ? '' : 'disabled'}>查看发布设置</button></div><p>知识通过门禁后，会自动保存为本地 Markdown 文件。需要同步到 Git 时，先启用同步，再手动发起。</p><div id="publication-settings"></div></section>
-    <div class="provider-layout">
-      <section class="panel provider-card"><div class="section-heading"><h2>模型服务配置</h2>${provider?.availability ? badge(provider.availability) : badge('UNKNOWN')}</div>
+    <section class="panel publication-panel"><div class="section-heading"><h2>知识发布设置</h2><button class="secondary-button" data-load-publications type="button" ${canEdit ? '' : 'disabled'}>查看发布设置</button></div><p>知识通过门禁后，会自动保存为本地 Markdown 文件。需要同步到 Git 时，先启用同步，再手动发起。</p><div id="publication-settings"></div></section>
+    <details class="panel provider-card"><summary>模型服务配置</summary>
         <dl class="settings-list"><div><dt>当前执行方式</dt><dd>${escapeHtml(executionProviderLabel)}</dd></div><div><dt>认证状态</dt><dd>${escapeHtml(displayLabel(provider?.authentication ?? 'UNKNOWN'))}</dd></div><div><dt>接口地址</dt><dd>${escapeHtml(settings?.apiUrlMasked ?? '未配置')}</dd></div><div><dt>模型</dt><dd>${escapeHtml(settings?.model ?? provider?.model ?? '未配置')}</dd></div><div><dt>最近验证</dt><dd>${escapeHtml(formatDate(settings?.verification?.checkedAt))}</dd></div></dl>
         <form id="provider-settings-form" data-revision="${escapeHtml(settings?.revision ?? 0)}"><label>API 地址<input name="apiUrl" type="url" required placeholder="${escapeHtml(settings?.apiUrlMasked ? `重新输入完整地址；当前 ${settings.apiUrlMasked}` : 'https://模型服务地址/v1')}" ${canEdit ? '' : 'disabled'}></label><label>API Key<input name="apiKey" type="password" autocomplete="new-password" placeholder="${settings?.apiKeyConfigured ? '留空表示保留现有密钥' : '输入服务密钥'}" ${canEdit ? '' : 'disabled'}></label><label>模型<input name="model" value="${escapeHtml(settings?.model ?? '')}" placeholder="模型标识" ${canEdit ? '' : 'disabled'}></label><label class="inline-check"><input name="clearApiKey" type="checkbox" ${canEdit ? '' : 'disabled'}> 清除已保存的 API Key</label><button class="secondary-button" type="submit" ${canEdit ? '' : 'disabled'}>保存配置</button></form>
         <dl class="provider-checks"><div><dt>模型列表</dt><dd>${escapeHtml(displayLabel(settings?.verification?.checks?.modelList ?? 'NOT_RUN'))}</dd></div><div><dt>生成测试</dt><dd>${escapeHtml(displayLabel(settings?.verification?.checks?.generation ?? 'NOT_RUN'))}</dd></div></dl>
         ${settings?.verification?.reasonCode === 'GENERATION_VERIFICATION_REQUIRED' ? '<p class="notice">尚未完成最小生成验证，请重新验证后启用。</p>' : ''}
         <button class="primary-button verify-provider" data-verify-provider type="button" ${canEdit && settings?.revision > 0 && !state.providerVerifying ? '' : 'disabled'}>${state.providerVerifying ? '正在验证…' : '验证并启用'}</button>
         <p class="form-note">验证会调用模型生成一段短文本，最多输出 64 个 token，可能产生少量费用，失败后不会自动重试。修改配置后，需要再次验证才能用于新批次。</p>
-      </section>
+      </details>
+    <div class="provider-layout">
       <section class="panel metrics-card"><div class="section-heading"><h2>运行统计</h2><label>统计窗口<select id="metrics-window"><option value="24h" ${state.metricsWindow === '24h' ? 'selected' : ''}>24 小时</option><option value="7d" ${state.metricsWindow === '7d' ? 'selected' : ''}>7 天</option><option value="30d" ${state.metricsWindow === '30d' ? 'selected' : ''}>30 天</option></select></label></div>
         <div class="compact-metrics"><div><span>批次耗时 P50 / P95</span><b>${formatDuration(runs?.runDurationMs?.p50)} / ${formatDuration(runs?.runDurationMs?.p95)}</b><small>${sampleHint(runs?.runDurationMs)}</small></div><div><span>节点耗时 P50 / P95</span><b>${formatDuration(runs?.nodeDurationMs?.p50)} / ${formatDuration(runs?.nodeDurationMs?.p95)}</b><small>${sampleHint(runs?.nodeDurationMs)}</small></div><div><span>排队耗时 P50 / P95</span><b>${formatDuration(runs?.queueDurationMs?.p50)} / ${formatDuration(runs?.queueDurationMs?.p95)}</b><small>${sampleHint(runs?.queueDurationMs)}</small></div><div><span>服务提供方调用</span><b>${sampledNumber(runs?.providerCalls)}</b><small>${sampleHint(runs?.providerCalls)}</small></div><div><span>Token</span><b>${sampledNumber(runs?.tokens)}</b><small>${sampleHint(runs?.tokens)}</small></div><div><span>估算成本</span><b>${Number(runs?.estimatedCostUsd?.sampleSize ?? 0) > 0 ? `$${formatNumber(runs.estimatedCostUsd.total, 4)}` : '—'}</b><small>${sampleHint(runs?.estimatedCostUsd)}</small></div><div><span>模型调用重试</span><b>${sampledNumber(runs?.providerCalls, 'retries')}</b><small>${sampleHint(runs?.providerCalls)}</small></div><div><span>工作流节点重试</span><b>${sampledNumber(runs?.workflowNodeRetries)}</b><small>${sampleHint(runs?.workflowNodeRetries)}</small></div></div>
       </section>
-    </div>
     <section class="panel governance-metrics"><div class="section-heading"><h2>修订与处理结果</h2><span>${escapeHtml(displayLabel(governance?.cohort?.kind ?? 'EMPTY'))}</span></div><div class="compact-metrics"><div><span>首次修订通过率</span><b>${formatRate(governance?.firstRevisionPassRate)}</b><small>${sampleHint(governance?.firstRevisionPassRate)}</small></div><div><span>三轮内通过率</span><b>${formatRate(governance?.threeIterationConvergenceRate)}</b><small>${sampleHint(governance?.threeIterationConvergenceRate)}</small></div><div><span>人工介入比例</span><b>${formatRate(governance?.humanInterventionRate)}</b><small>${sampleHint(governance?.humanInterventionRate)}</small></div><div><span>平均处理时间</span><b>${formatDuration(governance?.meanResolutionTimeMs?.value)}</b><small>${sampleHint(governance?.meanResolutionTimeMs)}</small></div><div><span>短期复发率</span><b>${formatRate(governance?.shortTermRecurrenceRate)}</b><small>${sampleHint(governance?.shortTermRecurrenceRate)}</small></div></div>${metricDefinitions(runs, governance)}</section>
-    <section class="agent-boundary panel">
-      <div><h2>补充 Agent 提示词</h2><p>可以补充写作要求或注意事项，保存后用于后续执行。角色分工、执行顺序、输入输出、工具权限和基础提示词保持固定。</p></div>
-      ${badge(canEdit ? 'VERIFIED' : 'CANDIDATE', canEdit ? '可编辑提示词' : '只读查看')}
-    </section>
+    </div>
+    <details class="panel agent-prompts"><summary>补充 Agent 提示词</summary>
     <section class="agent-grid">${state.agents.map((agent) => `<article class="agent-card panel">
       <div class="card-heading"><h2>${escapeHtml(AGENT_LABELS[agent.agentId] ?? agent.displayName)}</h2>${badge('CANDIDATE', '职责固定')}</div>
       <p class="agent-responsibility">${escapeHtml(agent.responsibility)}</p>
@@ -1150,7 +1150,8 @@ function renderAgents() {
         </label>
         <div><span>仅影响后续执行</span><button class="secondary-button" type="submit" ${canEdit ? '' : 'disabled'}>保存提示词</button></div>
       </form>
-    </article>`).join('')}</section>`
+    </article>`).join('')}</section></details>`
+  for (const selector of expanded) content.querySelector(selector)?.setAttribute('open', '')
 }
 
 async function loadAgentOperations(force = false) {

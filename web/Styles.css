@@ -1352,3 +1352,24 @@ body.drawer-active { overflow: hidden; }
 [data-workbench-publication-panel] article { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); }
 [data-project-history] { min-width: 0; overflow-wrap: anywhere; }
 [data-project-history-select], [data-build-scope] { width: 100%; min-width: 0; max-width: 100%; }
+
+/* 设置折叠与键值规则编辑；窄屏保持表单在文档流内。 */
+.provider-card > summary, .agent-prompts > summary { cursor: pointer; font-weight: 650; padding: 4px 0; }
+.provider-card[open] > summary, .agent-prompts[open] > summary { margin-bottom: 20px; }
+.evaluation-workspace > .panel > .section-heading { flex-wrap: wrap; }
+.evaluation-settings { margin-left: auto; }
+.evaluation-settings > summary { cursor: pointer; }
+.evaluation-settings[open] { flex-basis: 100%; margin: 0; }
+.evaluation-settings[open] > summary { width: fit-content; margin-left: auto; }
+.evaluation-settings .rule-list { margin-top: 16px; }
+.rule-field { display: grid; grid-template-columns: minmax(150px, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; padding: 12px 0; }
+.rule-field > div { display: flex; gap: 8px; align-items: start; }
+.rule-field label { margin: 0; }
+.rule-field small { display: block; color: var(--muted); }
+.field-help { margin-left: auto; max-width: 260px; }
+.field-help summary { cursor: pointer; border: 1px solid currentColor; border-radius: 50%; width: 22px; text-align: center; list-style: none; }
+.field-help p { font-size: 13px; line-height: 1.6; }
+.evaluation-history { grid-column: 1 / -1; }
+.evaluation-history > summary { cursor: pointer; padding: 12px 0; }
+.evaluation-history .evidence-card { margin-top: 12px; }
+@media (max-width: 640px) { .rule-field { grid-template-columns: 1fr; gap: 8px; } }
