@@ -132,3 +132,9 @@ C++ v11重建e6d45已成功：接口兼容，生成代码3558ef78ac2159520edb30d
 [CI 34827215087](https://github.com/linlisWorkTeam/domain-knowledge/actions/runs/34827215087)的verify已通过，包括Console；acceptance为24/25。唯一失败AgentRevisionFlow仍用旧READY探针模拟返回，无法通过现有GENERATION_READY及modelList/generation双检查。已同步受控探针并增加启用状态断言，不改生产验证要求或原流程断言；本地该完整SDK修订流程1/1通过（`/tmp/WorkbenchAgentRevisionProbeRetest.log`）。这是受控模型验收，不能代表真实供应商质量。
 
 C++当前v11可信评测`stage-03dc1c087c74a95bd631009a12b2e6ce16d842d24aab141f93df95959bc807a5`已成功，37/37、复用37、新增0，报告BEHAVIOR_PASSED，publicationVerified仍为false。81份引用工件摘要和大小逐一通过检查，证据`cpp-v11-evaluation/ArtifactAudit.json`。固定评测`stage-79e38c35042c352024afa7b29593269a728deede2ab676b7e384380c3a37d1b5`绑定同一重建和原固定测试集，首次保存14条参考用例检查点后因资源不足暂停，现从原检查点串行继续。来源复核、关联、发布及新网站仍未完成。
+
+## 网站更新（2026-09-14 17:30）
+
+网站已切换到提交`f543c59f922a522a8998506553788619778da1c1`，目录`/root/projects/domain-knowledge-releases/2026-09-14-workbench-f543c59/app`。保留原tunnel；本机及公网`/health`均200。通过进程cwd确认新代码，原8条Run、1张卡片保留，stage-tasks仍为0。完整数据和启动脚本备份在同发行目录的`pre-deploy-backup`，备份保留符号链接，未改v0.2.0或覆盖旧发行。备份初次误跟随运行目录中的依赖链接，已停止该备份进程并删除本次未完成副本，改为保留链接后完成；原始数据未删除。
+
+本次是部署和HTTP健康确认，尚未执行部署后的真实页面浏览器检查。真实C/C++任务仍在独立运行库，尚未导入网站，不宣称网站已有完整真实链路。固定79e38保留14条参考用例后，两次无进展恢复已停止；来源86fde3已开始，日志`/tmp/CppV11Source.log`。最新CI34828092897仍运行，不能称全绿。

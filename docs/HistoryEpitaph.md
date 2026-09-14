@@ -352,3 +352,7 @@ This document summarizes older handoffs, milestones and architectural decisions 
 ## 2026-09-14 CI与Spec合并交接归档
 
 [1613原文](https://github.com/linlisWorkTeam/domain-knowledge/blob/26b001956bbcc43cc4dd5a6ad04597f03ed0440a/docs/epitaph/2026-09-14-1613-spec-ci-merge.md)：合并main的验证路由、显式角色契约和当前Domain目录，保留Bubblewrap与安全约束；当时仍有两份文档冲突及搬迁链接待修，尚无远程CI或真实验收结论。后续合并和回归结果见保留记录。
+
+## 2026-09-14 17:30 归档
+
+[1616 main集成交接](https://github.com/linlisWorkTeam/domain-knowledge/blob/f543c59f922a522a8998506553788619778da1c1/docs/epitaph/2026-09-14-1616-main-integration-checkpoint.md)：合并main并联合Spec和历史，静态检查通过，保留v0.2.0；当时尚未全量回归、部署或合入PR。当前推进仍不能以静态检查代替C/C++真实验收。
