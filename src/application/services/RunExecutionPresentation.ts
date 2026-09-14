@@ -34,6 +34,11 @@ function failureCode(error: string | null): string {
   return /^([A-Z][A-Z0-9_]{1,79})(?::|$)/.exec(error ?? '')?.[1] ?? 'WORKFLOW_EXECUTION_FAILED';
 }
 
+/** 状态接口与列表使用同一错误码投影，原始错误仍留在持久化执行记录中。 */
+export function presentWorkflowStatus(view: WorkflowExecutionView): WorkflowExecutionView {
+  return { ...view, error: view.error === null ? null : failureCode(view.error) };
+}
+
 /** 纯展示规则；不修改业务状态、不把陈旧节点投影当成活动进程。 */
 export function presentRunExecution(
   businessState: string,

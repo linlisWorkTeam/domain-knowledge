@@ -22,6 +22,10 @@ test('run list, filters and detail expose execution failure without rewriting bu
     assert.equal(failed.isActive, false); assert.equal(failed.canCancel, false); assert.equal(failed.recovery.canResume, true);
     assert.deepEqual(failed.executionFailure, { code: 'DOC_WORKER_SOURCE_EVIDENCE_INVALID', nodeId: 'doc_worker' });
     assert.equal(JSON.stringify(items).includes('private-'), false);
+    const status = await (await fetch(base + '/api/v1/runs/' + ids.failed + '/workflow-status')).json();
+    assert.equal(status.error, 'DOC_WORKER_SOURCE_EVIDENCE_INVALID');
+    assert.equal(JSON.stringify(status).includes('private-'), false);
+    assert.match(fixture.views.get(ids.failed)!.error!, /private-upstream-response/, 'public projection must preserve the original audit record');
     assert.equal(items.find((run: { runId: string }) => run.runId === ids.untracked).executionStatus, 'NOT_TRACKED');
     assert.equal(items.find((run: { runId: string }) => run.runId === ids.unavailable).executionStatus, 'UNAVAILABLE');
     const failures = await (await fetch(base + '/api/v1/runs?executionStatus=FAILED')).json();

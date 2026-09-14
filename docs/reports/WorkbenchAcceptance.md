@@ -120,3 +120,9 @@ src/tests当前501项已通过；仍需补齐scripts目录、Console及浏览器
 Composition将同一schema根下的同步无业务状态契约校验器共享给阶段、工作流和评测装配，避免重复编译。相同192MiB堆条件下测量，初始化RSS从247,283,712降至218,546,176字节；这只是一次对照，不证明所有资源不足已解决。日志 `/tmp/WorkbenchMemoryProfile.log` 与 `/tmp/WorkbenchSharedContractsMemory.log`。契约与阶段/修复组合13/14通过，剩余legacy修复场景因本机WORKBENCH_RESOURCE_INSUFFICIENT暂停；未放宽门槛。类型检查通过。
 
 Server集成测试清理现在先await composition.shutdown，再关闭HTTP并删除目录，与服务端信号停机路径一致；复验7/7通过，`/tmp/WorkbenchServerCleanupRetest.log`。没有加入删除重试来掩盖未完成的后台任务。
+
+## CI回归与错误投影（2026-09-14）
+
+[CI 34825909370](https://github.com/linlisWorkTeam/domain-knowledge/actions/runs/34825909370)通过完整代码检查，Console 38/39通过；唯一失败是批次工作流状态直接显示私有上游错误。现状态API复用安全原因码投影，前台使用run.executionFailure.code；原始持久化错误不改写。HTTP补充验证状态响应不含私有文本且原记录保留，2/2通过；原浏览器恢复/失败/预算两项2/2通过；类型与Spec检查通过。日志 `/tmp/WorkbenchWorkflowPrivacyHttp.log`、`/tmp/WorkbenchWorkflowPrivacyBrowser.log`。
+
+C++ v11重建e6d45已成功：接口兼容，生成代码3558ef78ac2159520edb30dbcf257d801d0e30030ff1d38ff2b8ed17ae4913a8，累计2调用82,552tokens，9份检查点工件摘要/大小已审计（cpp-v11-reconstruction/ArtifactAudit.json）。新可信评测03dc1c087c74a95bd631009a12b2e6ce16d842d24aab141f93df95959bc807a5已通过参考基础构建并保存部分用例检查点，仍因内存不足暂停；不能记录37/37。指纹复用缓冲区试改内存收益不足，已撤回，无任务指纹变更。临时驱动对年轻代8MiB的测量有改善，但仍不足以证明全部资源暂停已解决；编译内存门槛不变。

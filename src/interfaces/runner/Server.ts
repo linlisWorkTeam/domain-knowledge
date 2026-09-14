@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：提供服务端的外部入口、参数转换与响应处理。
  */
+import { presentWorkflowStatus } from '../../application/services/RunExecutionPresentation.ts';
 import { createServer as createHttpServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { readFileSync } from 'node:fs';
 import { extname, join, resolve } from 'node:path';
@@ -908,7 +909,7 @@ export function createKnowledgeServer(input: {
           return;
         }
         if (child === 'workflow-status') {
-          send(response, 200, await composition.apps.orchestrator.status(runId));
+          send(response, 200, presentWorkflowStatus(await composition.apps.orchestrator.status(runId)));
           return;
         }
         if (child === 'progress') {
