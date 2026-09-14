@@ -2,6 +2,16 @@
 
 截至2026-09-14，完整验收尚未完成。真实目标证据的历史代码基线为 `e66ec50`；下列结果只证明各自明确列出的版本、任务和范围，不代表全部知识已验证发布。
 
+## C++当前契约复验与来源复核缺陷（2026-09-14）
+
+重建 `stage-cf78101126884ae4e6af2fa2c8808b5fa94e9958a0b6d6743cb7b536585839b6` 同任务修复后成功，接口兼容，2调用88890tokens，14份引用摘要验证通过。可信评测 `stage-eb7e2c4256a141d3231700f83367e4c89d90368740c446d622f239cf325adb43` 为37/37，旧新测试集suiteRef相同，复用37、新增0并重新验证。固定评测 `stage-ab722ff21705a271849bfaead8716860d17f22137a76a0559f6447aa837b2376` 为40/40，suiteRefs与原固定集相同，87份引用摘要验证通过。两项均绑定cf781重建，不能代表来源复核通过。
+
+来源任务 `stage-348de05f2fc7689e65c0baddf323cc2c68c8acfaee3338d936acbe27d3e0a5f2` 首次返回仅H3子节的replacementMarkdown，被范围校验拒绝。有限反馈修复后，同任务第二次输出改判PASS，丢失第一次指出的源码差异。人工核对固定提交8224e42：tinyxml2.h第1326/1651行只有FloatAttribute/FloatText声明，定义在tinyxml2.cpp第1687/1910行；卡片kv_3be0e60d4a38a2a2ecedefb1第25行却称其在头文件内联。该SOURCE_MATCHED不可靠。任务已主动取消，6调用400236tokens及全部产物保留；没有发布。
+
+781cc6b增加格式反馈及旧失败输出反馈恢复，124项角色回归通过。887c79b进一步禁止格式修复改变原结论、修订位置、原因和风险，也拒绝重放与旧格式失败相矛盾的PASS，19项定向测试及类型/Spec通过。尚须在来源应用复用章节检查点时接入同等审计，不能直接恢复已含错误SOURCE_MATCHED的任务，也不能重置旧尝试或把格式失败自动当作可信纠正。真实来源修订及最终发布未完成。
+
+证据位于服务器real-knowledge-revision下的cpp-current-contract-reconstruction、cpp-current-contract-evaluation、cpp-current-contract-fixed、cpp-current-contract-source；源复核日志为/tmp/CppCurrentContractSource.log及CppCurrentContractSourceResume1.log。
+
 ## 网站更新（2026-09-14，2c55117）
 
 当前部署提交为 `2c55117b693fcab4bf94081cdd2a2504819e796d`。[CI 34858435148](https://github.com/linlisWorkTeam/domain-knowledge/actions/runs/34858435148) 的代码检查713/713、Console44/44、隔离验收25/25通过；受控验收不等于C/C++真实模型最终发布通过。此前只读CAS文件故意损坏用例在非root CI遇到EACCES，已仅修正临时样例的写权限，原保护断言未改，并以nobody身份复验5/5。
