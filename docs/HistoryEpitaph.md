@@ -366,3 +366,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 [2026-09-14-1658-browser-and-native-ci.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/5c72fa527bec86d7b6a254abd9f68e210b5dea47/docs/epitaph/2026-09-14-1658-browser-and-native-ci.md)：记录旧前台回归、C++ v11 重建和 CI cgroup 委派修复；当时 CI 与真实固定/来源验收尚未完成，网站仍 ec72c43。后续结果见最新交接；保留原隔离要求及原始证据。
 
 [2026-09-14-1730-deployed-and-native-acceptance.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/8492076d787bbfa759232337d59c621685016771/docs/epitaph/2026-09-14-1730-deployed-and-native-acceptance.md)：记录f543c59切换、保留符号链接备份、当时C++固定内存暂停及来源运行状态；后续固定和部署结果由最新交接取代，真实来源及最终发布仍未完成。
+
+[1801 容量恢复与原生门禁](https://github.com/linlisWorkTeam/domain-knowledge/blob/77f8ab6bde0bc78cdfb8107f15397937241911f9/docs/epitaph/2026-09-14-1801-capacity-recovery-and-native-gates.md)：记录C++固定40/40、来源24匹配39未知、补证77条超过64条及恢复修复。旧网站和未获停止服务授权的状态已经过时；后续部署、C门禁、明确获准停止三套旧服务以及新来源复核见1857、1904和1923交接。原用例与未知风险不得删除。
