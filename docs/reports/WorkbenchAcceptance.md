@@ -203,6 +203,14 @@ C++固定任务79e38从14条参考检查点恢复后一次完成80条参考/生�
 
 只读扫描 d869e1a 部署前备份的 registry、workbench、publications 三库，共966条记录；10个历史知识版本全部找到生成归属，未发现未分类表。输出仅为计数和引用摘要，未复制配置值，也未修改备份或线上数据。记录级审计为 `/tmp/DeletionInventoryBackupAudit.json`。
 
-递归工件扫描在一条历史 action_items 的缺失引用处明确停止：`sha256:4292ee379fb4bfaf06b2925361cde072c0a4eba6acd82505a0dcdc5c94f2a0e0` 在备份CAS中不存在。不能把记录级扫描成功说成完整工件清理可用；缺失历史工件处理、墓碑、跨库恢复、物理清理与二次确认HTTP/UI仍待完成。
+（20:53复核已更正：下述标识是指纹，不是文件引用。）当时递归工件扫描在一条历史 action_items 的引用处停止：`sha256:4292ee379fb4bfaf06b2925361cde072c0a4eba6acd82505a0dcdc5c94f2a0e0` 在备份CAS中不存在。不能把记录级扫描成功说成完整工件清理可用；缺失历史工件处理、墓碑、跨库恢复、物理清理与二次确认HTTP/UI仍待完成。
 
 删除相关14项测试与架构5项共19/19通过，覆盖共享阶段及嵌套文件、来源保护、旧版本归属、未知表/损坏JSON、引用损坏、回执回滚和重启恢复；类型及Spec通过。日志 `/tmp/DeletionGraphRegression.log`、`/tmp/DeletionGraphTypes.log`、`/tmp/DeletionGraphSpecs.log`。本轮新增代码尚未用于线上删除，网站仍为d869e1a。
+
+### 指纹误判更正与跨库恢复（2026-09-14 20:53）
+
+重新检查字段来源，之前报告的两个 action_items 标识实际来自 fingerprint，第三个标识来自 toolchainFingerprint，均不是CAS文件引用。引用扫描已按字段语义识别工件，不再仅凭sha256前缀判断。重新只读扫描d869部署前备份：966条记录、336个真实引用工件，全部通过大小与摘要校验，共5725914字节，缺失0、未分类表0。证据 `/tmp/DeletionRecursiveBackupAuditV3.json`；此前V1/V2的缺失判断不成立，没有修补或写入备份。
+
+新增锚定目录描述符的CAS只读适配器，拒绝链接、非普通文件、超限及损坏；真实缺失单独列出且不补空文件。缺失文件恢复后清单摘要变化，原确认失效。跨库恢复协调器采用持久意图与各库本地回执，磁盘测试覆盖第二库失败、中央进度丢失、重启、投影契约变化、用量保留和重复提交；它不提供跨库原子性，尚须服务维护屏障及真实投影接入。
+
+删除与架构相关26/26通过，类型和Spec通过；日志 `/tmp/DeletionRecoveryRegression.log`、`/tmp/DeletionRecoveryTypes.log`、`/tmp/DeletionRecoverySpecs.log`。生产删除、文件清理与二次确认界面尚未完成，本轮未部署、未删除线上或备份数据。当前网站仍为d869e1a。

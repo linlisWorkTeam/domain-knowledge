@@ -34,6 +34,7 @@ const kinds: Record<string, DeletionKind> = {
   evaluation_rules: 'configuration', evaluation_rule_bindings: 'configuration', command_receipts: 'configuration',
   content_command_receipts: 'configuration', schema_migrations: 'configuration', wb_deletion_receipts: 'configuration',
   validated_test_suites: 'testSet', wb_native_test_heads: 'configuration',
+  deletion_recovery_intents: 'configuration', deletion_participant_receipts: 'configuration',
 };
 const identifier = (value: string) => `"${value.replaceAll('"', '""')}"`;
 const jsonColumns = new Set(['value', 'record', 'snapshot', 'delta', 'json']);
