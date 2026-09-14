@@ -131,3 +131,31 @@ test('successful one-click execution reaches all five stages and reuses task ide
 
   } finally { await app.shutdown(); await stages.shutdown(); store.close(); stageStore.close(); rmSync(directory, { recursive: true, force: true }); }
 });
+
+test('batch execution key reuses frozen pipeline after restart even when current configuration changes', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'pipeline-batch-key-')), db = join(directory, 'workbench.sqlite');
+  let configurations = 0, calls = 0;
+  const open = () => {
+    const store = new SqliteWorkbenchPipelines(db), stageStore = new SqliteStageTasks(db);
+    const stages = new WorkbenchStages(stageStore, { GENERATE: async context => {
+      calls++; context.account('model', { modelCalls: 1, tokens: 42 }); throw new Error('TEST_STOP_AFTER_CALL');
+    } });
+    const app = new WorkbenchPipelines({ store, stages, materials: { get: () => null }, environment: async () => 'environment',
+      generation: { prepare: async () => ({ ...input('GENERATE'), configurationDigest: `config-${++configurations}` }) },
+      index: { prepare: () => input('INDEX') }, reconstruction: { prepare: async () => input('FLYWHEEL') },
+      evaluation: { prepare: async () => input('EVALUATE') }, associations: { prepare: () => input('ASSOCIATE') } });
+    return { app, close: async () => { await app.shutdown(); await stages.shutdown(); store.close(); stageStore.close(); } };
+  };
+  let runtime = open();
+  try {
+    const first = await runtime.app.start('snapshot', {}, [], [], 'batch/round/1'); await runtime.app.wait(first.pipelineId);
+    assert.equal(calls, 1); assert.equal(configurations, 1);
+    await runtime.close(); runtime = open();
+    const replay = await runtime.app.start('snapshot', {}, [], [], 'batch/round/1');
+    assert.equal(replay.pipelineId, first.pipelineId); assert.equal(configurations, 1); assert.equal(calls, 1);
+    assert.equal(runtime.app.detail(replay.pipelineId).usage.tokens, 42);
+    await assert.rejects(runtime.app.start('another-snapshot', {}, [], [], 'batch/round/1'), /IDEMPOTENCY_CONFLICT/);
+    const next = await runtime.app.start('snapshot', {}, [], [], 'batch/round/2'); await runtime.app.wait(next.pipelineId);
+    assert.notEqual(next.pipelineId, first.pipelineId); assert.equal(calls, 2);
+  } finally { await runtime.close(); rmSync(directory, { recursive: true, force: true }); }
+});

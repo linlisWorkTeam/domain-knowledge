@@ -128,7 +128,20 @@ test('repository analysis API freezes a reusable manifest and rejects cross-site
     assert.equal(listed.snapshots[0].snapshotId, project.snapshotId);
     const detail = await (await fetch(url.replace('repository-analyses', `projects/${project.snapshotId}`))).json();
     assert.equal(detail.commit, fixture.commit);
-    assert.equal(instance.composition.apps.workbenchStages.store.list().length, 0, 'analysis does not start generation');
+    const batchesUrl = url.replace('repository-analyses', 'workbench-batches');
+    const batchRequest = { method: 'POST', headers: { 'content-type': 'application/json', 'idempotency-key': 'module-batch-create' },
+      body: JSON.stringify({ snapshotId: project.snapshotId, moduleId: 'parser', schedule: { enabled: false } }) };
+    const batchResponse = await fetch(batchesUrl, batchRequest); assert.equal(batchResponse.status, 201);
+    const { batch } = await batchResponse.json(); assert.equal(batch.status, 'READY'); assert.equal(batch.moduleId, 'parser');
+    assert.match(batch.batchId, /^parser-\d{8}-1$/);
+    assert.equal((await (await fetch(batchesUrl, batchRequest)).json()).batch.batchId, batch.batchId);
+    assert.equal((await (await fetch(`${batchesUrl}?projectId=${project.projectId}`)).json()).items.length, 1);
+    const invalidModule = await fetch(batchesUrl, { ...batchRequest, headers: { ...batchRequest.headers, 'idempotency-key': 'invalid-module' },
+      body: JSON.stringify({ snapshotId: project.snapshotId, moduleId: 'outside', schedule: { enabled: false } }) });
+    assert.equal(invalidModule.status, 422);
+    const crossSiteBatch = await fetch(batchesUrl, { ...batchRequest, headers: { ...batchRequest.headers, origin: 'https://other.test' } });
+    assert.equal(crossSiteBatch.status, 503);
+    assert.equal(instance.composition.apps.workbenchStages.store.list().length, 0, 'analysis and manual batch creation do not start generation');
   } finally {
     await instance.composition.shutdown(); instance.server.close(); await once(instance.server, 'close');
     rmSync(runtimeDir, { recursive: true, force: true }); rmSync(fixture.root, { recursive: true, force: true });

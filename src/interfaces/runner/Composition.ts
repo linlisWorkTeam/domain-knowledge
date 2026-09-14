@@ -3,6 +3,8 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：提供Composition的外部入口、参数转换与响应处理。
  */
+import { WorkbenchBatches } from '../../application/services/WorkbenchBatches.ts';
+import { SqliteWorkbenchBatches } from '../../infrastructure/sqlite/SqliteWorkbenchBatches.ts';
 import { moduleBuild } from '../../domain/workbench/WorkbenchProject.ts';
 import { WorkbenchPublicationEvidence } from '../../application/services/WorkbenchPublicationEvidence.ts';
 import { WorkbenchPublications } from '../../application/services/WorkbenchPublications.ts';
@@ -179,6 +181,7 @@ export function createComposition(input: {
   const repositoryReader = new GitRepositoryAnalyzer(directoryRoots, runtimeDir);
   const repositoryAnalysis = new RepositoryAnalysisService(repositoryReader, artifacts);
   const projectStore = new SqliteWorkbenchProjects(join(runtimeDir, 'workbench.sqlite'));
+  const batchStore = new SqliteWorkbenchBatches(join(runtimeDir, 'workbench.sqlite'));
   const workbenchProjects = new WorkbenchProjects(projectStore, repositoryAnalysis, repositoryReader, artifacts);
   const publisher = new LocalMarkdownPublisher({ runtimeDir, directoryRoots,
     defaultDirectory: process.env.WP_KNOWLEDGE_OUTPUT_DIRECTORY ?? join(runtimeDir, 'knowledge'),
@@ -461,6 +464,7 @@ export function createComposition(input: {
     }
     return sha256(JSON.stringify(fingerprints));
   }, store: pipelineStore, stages: workbenchStages, generation: workbenchGeneration, reconstruction: workbenchReconstruction, evaluation: workbenchEvaluation, revision: workbenchKnowledgeRevision, sourceVerification: workbenchSourceVerification, sourceRevision: workbenchSourceRevision, index: knowledgeIndex, associations: workbenchAssociations });
+  const workbenchBatches = new WorkbenchBatches({ store: batchStore, projects: projectStore, pipelines: workbenchPipelines });
   const projectStages = () => {
       const auditDirectory = join(runtimeDir, 'demo');
       const auditPath = join(auditDirectory, 'agent-runs.jsonl');
@@ -614,6 +618,7 @@ export function createComposition(input: {
       publicationOperations,
       workbenchStages,
       workbenchPipelines,
+      workbenchBatches,
       workbenchPublications,
       knowledgeIndex,
       workbenchAssociations,
@@ -659,11 +664,12 @@ export function createComposition(input: {
     runConfiguration,
     agentProviderMode,
     automatedWorkflow: workflow,
-    shutdown: async () => { await workbenchPipelines.shutdown(); await workbenchStages.shutdown(); await workbenchPublications.shutdown(); if (workflowPromise) await (await workflowPromise).shutdown(); },
+    shutdown: async () => { workbenchBatches.stop(); await workbenchPipelines.shutdown(); await workbenchBatches.shutdown(); await workbenchStages.shutdown(); await workbenchPublications.shutdown(); if (workflowPromise) await (await workflowPromise).shutdown(); },
     close: () => {
-      const release = () => { publicationStore.close(); pipelineStore.close(); nativeTestStore.close(); projectStore.close(); indexStore.close(); stageStore.close(); publisher.close(); repository.close(); };
-      if (workbenchPipelines.idle && workbenchStages.idle && workbenchPublications.idle) { void workbenchPipelines.shutdown(); void workbenchStages.shutdown(); void workbenchPublications.shutdown(); release(); }
-      else return workbenchPipelines.shutdown().then(() => workbenchStages.shutdown()).then(() => workbenchPublications.shutdown()).then(release);
+      workbenchBatches.stop();
+      const release = () => { batchStore.close(); publicationStore.close(); pipelineStore.close(); nativeTestStore.close(); projectStore.close(); indexStore.close(); stageStore.close(); publisher.close(); repository.close(); };
+      if (workbenchBatches.idle && workbenchPipelines.idle && workbenchStages.idle && workbenchPublications.idle) { void workbenchPipelines.shutdown(); void workbenchStages.shutdown(); void workbenchPublications.shutdown(); release(); }
+      else return workbenchPipelines.shutdown().then(() => workbenchBatches.shutdown()).then(() => workbenchStages.shutdown()).then(() => workbenchPublications.shutdown()).then(release);
     },
   };
 }

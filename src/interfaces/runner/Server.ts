@@ -284,6 +284,10 @@ export function mapHttpError(error: unknown, id = 'req_unknown'): { status: numb
   if (code === 'MATERIAL_NOT_FOUND') return { status: 404, body: errorBody(code, '材料不存在', id) };
   if (code.startsWith('ASSOCIATION_')) return { status: 422, body: errorBody(code, code, id) };
   if (code.startsWith('MATERIAL_')) return { status: 422, body: errorBody(code, code, id) };
+  if (code === 'BATCH_NOT_FOUND') return { status: 404, body: errorBody(code, '批次不存在', id) };
+  if (['BATCH_ROUND_ACTIVE', 'BATCH_INPUT_CHANGED', 'BATCH_LEASE_LOST'].includes(code)) return { status: 409, body: errorBody(code, code, id) };
+  if (code === 'BATCH_OWNER_UNAVAILABLE') return { status: 503, body: errorBody(code, '无法确认执行进程身份', id) };
+  if (code.startsWith('BATCH_')) return { status: 422, body: errorBody(code, code, id) };
   if (code === 'PIPELINE_INPUT_INVALID') return { status: 422, body: errorBody(code, '流程输入无效', id) };
   if (code === 'PIPELINE_NOT_FOUND') return { status: 404, body: errorBody(code, '流程不存在', id) };
   if (['PIPELINE_CARD_SELECTION_INVALID', 'PIPELINE_CARD_SNAPSHOT_CHANGED', 'PIPELINE_CARD_LINEAGE_CHANGED', 'PIPELINE_CONTRACT_INCOMPATIBLE', 'PIPELINE_INPUT_CHANGED', 'PIPELINE_NOT_RESUMABLE'].includes(code)) return { status: 409, body: errorBody(code, code, id) };
@@ -354,6 +358,7 @@ export function createKnowledgeServer(input: {
   const idempotencyResults = new Map<string, { fingerprint: string; status: number; value: unknown }>();
   composition.apps.workbenchStages.recover();
   composition.apps.workbenchPipelines.recover();
+  composition.apps.workbenchBatches.start();
   const server = createHttpServer(async (request, response) => {
     const url = new URL(request.url ?? '/', 'http://127.0.0.1');
     const currentRequestId = requestId(request);
@@ -379,7 +384,7 @@ export function createKnowledgeServer(input: {
       }
       // 目录、配置和写入仅允许直接本机访问，或携带远程访问令牌。
       const localClient = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(request.socket.remoteAddress ?? '');
-      const workbenchRoute = /^\/api\/v1\/(external-materials|workbench-publications|workbench-pipelines|stage-tasks|index-builds|knowledge-index|repository-analyses|projects|generations|reconstructions|native-evaluations|fixed-evaluations|knowledge-revisions|source-verifications|source-revisions|associations)(\/|$)/.test(url.pathname);
+      const workbenchRoute = /^\/api\/v1\/(workbench-batches|external-materials|workbench-publications|workbench-pipelines|stage-tasks|index-builds|knowledge-index|repository-analyses|projects|generations|reconstructions|native-evaluations|fixed-evaluations|knowledge-revisions|source-verifications|source-revisions|associations)(\/|$)/.test(url.pathname);
       const productRoute = url.pathname.startsWith('/api/v1/publications')
         || url.pathname === '/api/v1/server-directories' || url.pathname === '/api/v1/runs/markdown-lite';
       if (url.pathname.startsWith('/api/') && (!localClient || productRoute || workbenchRoute) && !authorized(request, writeToken, anonymousAccess)) {
@@ -435,6 +440,28 @@ export function createKnowledgeServer(input: {
         }
         const materialRoute = /^\/api\/v1\/external-materials\/([^/]+)$/.exec(url.pathname);
         if (materialRoute && request.method === 'GET') { send(response, 200, await materials.read(decodeURIComponent(materialRoute[1]!))); return; }
+        const batches = composition.apps.workbenchBatches;
+        if (url.pathname === '/api/v1/workbench-batches' && request.method === 'GET') {
+          send(response, 200, { items: batches.store.list(url.searchParams.get('projectId') ?? undefined), schedulerError: batches.lastError }); return;
+        }
+        if (url.pathname === '/api/v1/workbench-batches' && request.method === 'POST') {
+          const payload = await body(request); requireOnlyKeys(payload, ['snapshotId', 'moduleId', 'schedule']);
+          const commandId = request.headers['idempotency-key'];
+          if (typeof commandId !== 'string' || !commandId.trim() || commandId.length > 256) throw new Error('IDEMPOTENCY_KEY_REQUIRED');
+          if (typeof payload.snapshotId !== 'string' || typeof payload.moduleId !== 'string') throw new Error('PAYLOAD_INVALID');
+          send(response, 201, { batch: batches.create({ snapshotId: payload.snapshotId, moduleId: payload.moduleId, schedule: payload.schedule }, commandId) }); return;
+        }
+        const batchRoute = /^\/api\/v1\/workbench-batches\/([^/]+)(?:\/(rounds|cancel|resume))?$/.exec(url.pathname);
+        if (batchRoute && request.method === 'GET' && !batchRoute[2]) {
+          const batch = batches.store.get(decodeURIComponent(batchRoute[1]!)); if (!batch) throw new Error('BATCH_NOT_FOUND');
+          send(response, 200, { batch }); return;
+        }
+        if (batchRoute && request.method === 'POST' && batchRoute[2]) {
+          requireOnlyKeys(await body(request), []); const id = decodeURIComponent(batchRoute[1]!);
+          const commandId = request.headers['idempotency-key'];
+          if (typeof commandId !== 'string' || !commandId.trim() || commandId.length > 256) throw new Error('IDEMPOTENCY_KEY_REQUIRED');
+          send(response, 202, { batch: batchRoute[2] === 'rounds' ? batches.enqueue(id, commandId) : batchRoute[2] === 'resume' ? batches.resume(id, commandId) : batches.cancel(id, commandId) }); return;
+        }
         const pipelines = composition.apps.workbenchPipelines;
         if (url.pathname === '/api/v1/workbench-pipelines' && request.method === 'GET') {
           send(response, 200, { items: pipelines.dependencies.store.list() }); return;

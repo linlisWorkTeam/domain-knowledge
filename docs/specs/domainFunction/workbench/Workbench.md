@@ -262,4 +262,8 @@ WorkbenchSourceVerification新任务冻结sourceExecutionPolicy及executionScope
 
 模块批次采用独立的 `workbench-batch-v1` 记录，固定项目、源码快照和模块身份，包含调度设置和有序轮次。编号按模块名、北京时间日期、当日递增序号生成；旧路径型模块名称将 `/` 显示为 `-`。相同显示名称共用数据库序列避免编号冲突。创建幂等键与输入摘要绑定，重复请求不增加序号，冲突输入拒绝。未自动运行的批次初始为 READY；自动运行批次具有明确的分钟频率和待执行轮次。
 
-SQLite 用事务分配编号，以项目与模块为范围建立唯一执行租约，同模块最多领取一个批次，不同模块可以分别领取。领取不等于模型或编译同时执行，实际任务仍服从现有资源限制。历史轮次不可修改，新轮次有独立执行标识；释放租约必须已经结束或暂停当前轮次，不能使两个活动批次占用同一个模块。批次持久化端口位于 [WorkbenchBatchPorts.ts](../../../../src/application/ports/WorkbenchBatchPorts.ts)，规则位于 [WorkbenchBatch.ts](../../../../src/domain/workbench/WorkbenchBatch.ts)，SQLite 实现在 [SqliteWorkbenchBatches.ts](../../../../src/infrastructure/sqlite/SqliteWorkbenchBatches.ts)。本节队列基础已实现，执行器、自动调度恢复与前台入口接入仍待后续验收，不声明已支持在线创建定时批次。
+SQLite 用事务分配编号，以项目与模块为范围建立唯一执行租约，同模块最多领取一个批次，不同模块可以分别领取。领取不等于模型或编译同时执行，实际任务仍服从现有资源限制。历史轮次不可修改，新轮次有独立执行标识；释放租约必须已经结束或暂停当前轮次，不能使两个活动批次占用同一个模块。批次持久化端口位于 [WorkbenchBatchPorts.ts](../../../../src/application/ports/WorkbenchBatchPorts.ts)，规则位于 [WorkbenchBatch.ts](../../../../src/domain/workbench/WorkbenchBatch.ts)，SQLite 实现在 [SqliteWorkbenchBatches.ts](../../../../src/infrastructure/sqlite/SqliteWorkbenchBatches.ts)。批次应用通过固定的单模块源码快照调用同一个五阶段协调器；前台入口与真实模型验收尚未完成。
+
+调度器对已成功轮次按完成时间计算下次运行时间；失败、取消或质量暂停不会自动另起一轮。进程租约记录 Linux 启动身份，只有确认旧进程退出后才能接管；恢复保留轮次、executionKey 与 pipelineId。显式恢复调用原流程恢复入口，沿用冻结输入和累计用量；新增轮次才产生新执行标识。创建、新增轮次、恢复和取消均有持久化幂等命令。
+
+协调器接受内部可选 executionKey，通过唯一索引绑定轮次和原流程；重启重放在读取当前模型配置前寻找原记录，输入请求摘要不一致则拒绝。该摘要为哈希，不将固定测试正文复制到阶段参数。未提供 executionKey 的原有流程身份保持不变。批次 API 位于 `/api/v1/workbench-batches`，应用在 [WorkbenchBatches.ts](../../../../src/application/services/WorkbenchBatches.ts)。

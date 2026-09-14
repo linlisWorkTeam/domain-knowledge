@@ -5,6 +5,7 @@
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -51,4 +52,58 @@ test('module leases serialize same-module batches across connections and permit 
     assert.equal(next.rounds[0]!.status, 'SUCCEEDED'); assert.notEqual(next.rounds[0]!.executionKey, next.rounds[1]!.executionKey);
     assert.equal(first.claim(a.batchId, now), null);
   } finally { first.close(); second.close(); rmSync(root, { recursive: true, force: true }); }
+});
+
+test('new round commands remain idempotent after the original round finishes', () => {
+  const root = mkdtempSync(join(tmpdir(), 'batch-round-commands-')), store = new SqliteWorkbenchBatches(join(root, 'batches.sqlite'));
+  const now = '2026-09-14T00:00:00.000Z';
+  try {
+    const batch = store.create({ projectId: 'p', snapshotId: 's', moduleId: 'parser', schedule: { enabled: false, intervalMinutes: null } }, 'create', now);
+    store.enqueue(batch.batchId, now, 'round-command'); const lease = store.claim(batch.batchId, now)!;
+    lease.batch.status = 'SUCCEEDED'; lease.batch.rounds[0]!.status = 'SUCCEEDED'; store.save(lease.batch, lease.leaseId, true);
+    assert.equal(store.enqueue(batch.batchId, now, 'round-command').rounds.length, 1);
+    assert.equal(store.enqueue(batch.batchId, now, 'another-round').rounds.length, 2);
+  } finally { store.close(); rmSync(root, { recursive: true, force: true }); }
+});
+
+
+test('only a confirmed exited batch owner can be recovered and the same round identity is retained', () => {
+  const root = mkdtempSync(join(tmpdir(), 'batch-owner-recovery-')), path = join(root, 'batches.sqlite'), store = new SqliteWorkbenchBatches(path);
+  const now = '2026-09-14T00:00:00.000Z';
+  try {
+    const input = { projectId: 'p', snapshotId: 's', moduleId: 'parser', schedule: { enabled: true, intervalMinutes: 10 } };
+    const dead = store.create(input, 'dead', now), live = store.create({ ...input, moduleId: 'live' }, 'live', now);
+    const active = store.claim(live.batchId, now)!;
+    execFileSync(process.execPath, ['--input-type=module', '-e', `
+      import { SqliteWorkbenchBatches } from './src/infrastructure/sqlite/SqliteWorkbenchBatches.ts';
+      const store = new SqliteWorkbenchBatches(process.argv[1]); const lease = store.claim(process.argv[2], process.argv[3]);
+      lease.batch.rounds[0].pipelineId = 'existing-pipeline'; store.save(lease.batch, lease.leaseId, false); store.close();
+    `, path, dead.batchId, now], { cwd: process.cwd(), stdio: 'pipe' });
+    store.recover(now);
+    const recovered = store.get(dead.batchId)!;
+    assert.equal(recovered.status, 'QUEUED'); assert.equal(recovered.rounds.length, 1);
+    assert.equal(recovered.rounds[0]!.executionKey, dead.rounds[0]!.executionKey);
+    assert.equal(recovered.rounds[0]!.pipelineId, 'existing-pipeline');
+    assert.equal(store.get(live.batchId)!.status, 'RUNNING');
+    assert.equal(store.claim(active.batch.batchId, now), null);
+  } finally { store.close(); rmSync(root, { recursive: true, force: true }); }
+});
+
+
+test('resume retains the same round and control retries cannot cancel a resumed run', () => {
+  const root = mkdtempSync(join(tmpdir(), 'batch-resume-controls-')), store = new SqliteWorkbenchBatches(join(root, 'batches.sqlite'));
+  const now = '2026-09-14T00:00:00.000Z';
+  try {
+    const batch = store.create({ projectId: 'p', snapshotId: 's', moduleId: 'parser', schedule: { enabled: true, intervalMinutes: 60 } }, 'create', now);
+    const lease = store.claim(batch.batchId, now)!; lease.batch.rounds[0]!.pipelineId = 'original-pipeline';
+    lease.batch.status = 'PAUSED'; lease.batch.rounds[0]!.status = 'PAUSED'; store.save(lease.batch, lease.leaseId, true);
+    store.cancel(batch.batchId, now, 'cancel-original');
+    const resumed = store.resume(batch.batchId, now, 'resume-original');
+    assert.equal(resumed.rounds.length, 1); assert.equal(resumed.rounds[0]!.pipelineId, 'original-pipeline');
+    assert.equal(resumed.rounds[0]!.executionKey, batch.rounds[0]!.executionKey); assert.equal(resumed.rounds[0]!.resumeRequested, true);
+    const active = store.claim(batch.batchId, now)!;
+    assert.equal(store.cancel(batch.batchId, now, 'cancel-original').cancelRequested, false);
+    assert.equal(store.resume(batch.batchId, now, 'resume-original').status, 'RUNNING');
+    assert.equal(store.get(active.batch.batchId)!.rounds.length, 1);
+  } finally { store.close(); rmSync(root, { recursive: true, force: true }); }
 });

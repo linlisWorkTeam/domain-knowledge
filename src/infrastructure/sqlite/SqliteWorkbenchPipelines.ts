@@ -17,6 +17,7 @@ export class SqliteWorkbenchPipelines implements WorkbenchPipelineStore {
     mkdirSync(dirname(path), { recursive: true }); this.db = new DatabaseSync(path);
     this.db.exec(`PRAGMA journal_mode=WAL; PRAGMA busy_timeout=3000;
       CREATE TABLE IF NOT EXISTS wb_pipelines(id TEXT PRIMARY KEY, record TEXT NOT NULL, lease_id TEXT, owner TEXT);
+      CREATE UNIQUE INDEX IF NOT EXISTS wb_pipeline_execution_key ON wb_pipelines(json_extract(record,'$.children.GENERATE.input.parameters.executionKey')) WHERE json_extract(record,'$.children.GENERATE.input.parameters.executionKey') IS NOT NULL;
       CREATE TABLE IF NOT EXISTS wb_pipeline_events(sequence INTEGER PRIMARY KEY AUTOINCREMENT, pipeline_id TEXT NOT NULL, record TEXT NOT NULL);`);
   }
   private transaction<T>(work: () => T): T {
@@ -36,6 +37,15 @@ export class SqliteWorkbenchPipelines implements WorkbenchPipelineStore {
   }
   insert(value: WorkbenchPipeline): WorkbenchPipeline {
     return this.transaction(() => {
+      const executionKey = value.children.GENERATE?.input.parameters.executionKey;
+      if (executionKey) {
+        const row = this.db.prepare("SELECT record FROM wb_pipelines WHERE json_extract(record,'$.children.GENERATE.input.parameters.executionKey')=?").get(String(executionKey));
+        if (row) {
+          const existing = JSON.parse(String(row.record)) as WorkbenchPipeline;
+          if (existing.children.GENERATE?.input.parameters.executionRequest !== value.children.GENERATE?.input.parameters.executionRequest) throw new Error('IDEMPOTENCY_CONFLICT');
+          return existing;
+        }
+      }
       const prior = this.get(value.pipelineId); if (prior) return prior;
       this.db.prepare('INSERT INTO wb_pipelines(id,record) VALUES(?,?)').run(value.pipelineId, canonicalJson(value)); this.write(value); return value;
     });

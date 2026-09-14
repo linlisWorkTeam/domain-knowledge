@@ -211,3 +211,9 @@ GET /api/v1/stage-tasks 支持 snapshotId、stage 查询参数，与 projectId �
 补证容量拒绝报告可含candidateConstraint：code=NATIVE_TRUSTED_GATE_LIMIT、maximumCases、retainedCases、requiredCases。该报告的候选未执行，不含伪造参考观察；阶段以TEST_CANDIDATE_REJECTED结束，通过原同输入恢复入口生成新候选。旧引擎指纹的暂停任务仍不可跨指纹恢复。
 
 POST /api/v1/projects 新增可选 moduleDefinitions，形如 `[{moduleId:"parser",directories:["src/parser"]}]`，与 moduleIds 互斥。目录相对固定仓库根目录，`.` 表示根目录；拒绝绝对路径、父目录跳转、空范围、重复名称和不存在的目录。自定义模块从固定清单递归选择源码，测试文件仅保留路径、不作为生成源码。首批执行仍限定 C/C++ 单一实现语言，模块名称与目录定义进入不可变快照身份；不提供此字段时保留旧输入身份及行为。
+
+## 模块批次接口
+
+`GET /api/v1/workbench-batches?projectId=...` 返回批次列表与调度器错误状态，`GET /api/v1/workbench-batches/:id` 返回记录。`POST /api/v1/workbench-batches` 接受 snapshotId、moduleId 和 schedule（enabled 及启用时的 intervalMinutes，范围 1 到 525600）。服务端验证模块属于快照，固定单模块输入。关闭自动运行时仅创建 READY 记录；启用时加入调度队列。
+
+`POST /api/v1/workbench-batches/:id/rounds` 新增一轮，`/resume` 恢复原轮次，`/cancel` 取消并关闭自动运行。写请求要求 Idempotency-Key；重复命令不新增轮次，不重置既有用量。所有接口复用工作台权限和跨站写入限制。模块不存在或频率非法返回 422，批次不存在为 404，轮次活动或租约冲突为 409。执行前仍需现有工具链、模型配置和可信门禁；创建记录不等于执行成功。

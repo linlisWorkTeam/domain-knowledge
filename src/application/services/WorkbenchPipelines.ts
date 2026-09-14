@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：通过独立持久化协调记录串联现有五阶段用例。
  */
+import { sha256 } from '../../domain/Domain.ts';
 import type { WorkbenchPublications } from './WorkbenchPublications.ts';
 import type { ArtifactStore } from '../ports/ApplicationPorts.ts';
 import type { WorkbenchFixedEvaluation, FixedModuleSuite } from './WorkbenchFixedEvaluation.ts';
@@ -42,7 +43,7 @@ export class WorkbenchPipelines {
       usage: tasks.reduce((sum, task) => ({ modelCalls: sum.modelCalls + task.usage.modelCalls, tokens: sum.tokens + task.usage.tokens,
         reservedTokens: sum.reservedTokens + task.usage.reservedTokens, elapsedMs: sum.elapsedMs + task.usage.elapsedMs }), { modelCalls: 0, tokens: 0, reservedTokens: 0, elapsedMs: 0 }) };
   }
-  async start(snapshotId: string, scopes: Record<string, GenerationScope> = {}, materialIds: string[] = [], fixedSuites: FixedModuleSuite[] = []) {
+  async start(snapshotId: string, scopes: Record<string, GenerationScope> = {}, materialIds: string[] = [], fixedSuites: FixedModuleSuite[] = [], executionKey?: string) {
     if (!Array.isArray(materialIds) || materialIds.length > 32 || materialIds.some((id) => typeof id !== 'string' || !id) || new Set(materialIds).size !== materialIds.length) throw new Error('PIPELINE_INPUT_INVALID');
     if (!Array.isArray(fixedSuites) || fixedSuites.length > 200 || fixedSuites.some(item => !item || typeof item.moduleId !== 'string' || !item.moduleId || Object.keys(item).some(key => !['moduleId', 'suite'].includes(key))
       || item.suite?.schemaVersion !== 'native-cases-v1' || !Array.isArray(item.suite.cases) || !item.suite.cases.length || item.suite.cases.length > 64)
@@ -56,7 +57,19 @@ export class WorkbenchPipelines {
     const selectedMaterials = [...materialIds].sort();
     for (const id of selectedMaterials) if (!this.dependencies.materials.get(id)) throw new Error('MATERIAL_NOT_FOUND');
     if (this.closing) throw new Error('PIPELINE_SHUTDOWN');
+    if (executionKey !== undefined && (typeof executionKey !== 'string' || !executionKey || executionKey.length > 512)) throw new Error('PIPELINE_EXECUTION_KEY_INVALID');
+    const executionRequest = sha256(canonicalJson({ snapshotId, scopes, materialIds: selectedMaterials, fixedSuites: fixedInputs }));
+    if (executionKey) {
+      const prior = this.dependencies.store.list().find(item => item.children.GENERATE?.input.parameters.executionKey === executionKey);
+      if (prior) {
+        if (prior.contractVersion !== PIPELINE_CONTRACT) throw new Error('PIPELINE_CONTRACT_INCOMPATIBLE');
+        if (prior.children.GENERATE?.input.parameters.executionRequest !== executionRequest) throw new Error('IDEMPOTENCY_CONFLICT');
+        if (prior.status === 'PENDING') this.schedule(prior.pipelineId, false);
+        return prior;
+      }
+    }
     const input = await this.dependencies.generation.prepare(snapshotId, scopes);
+    if (executionKey) input.parameters = { ...input.parameters, executionKey, executionRequest };
     const environment = await this.dependencies.environment(snapshotId);
     if (this.closing) throw new Error('PIPELINE_SHUTDOWN');
     const generated = this.dependencies.stages.store.get(createStageTask(input, {}, new Date().toISOString()).taskId);

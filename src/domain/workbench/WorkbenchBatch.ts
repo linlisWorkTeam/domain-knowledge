@@ -7,11 +7,13 @@ export const BATCH_CONTRACT = 'workbench-batch-v1';
 export type BatchStatus = 'READY' | 'QUEUED' | 'RUNNING' | 'PAUSED' | 'SUCCEEDED' | 'FAILED' | 'CANCELLED';
 export interface BatchSchedule { enabled: boolean; intervalMinutes: number | null }
 export interface BatchRound {
+  resumeRequested?: boolean;
   number: number; executionKey: string; pipelineId: string | null; status: BatchStatus;
   createdAt: string; startedAt: string | null; completedAt: string | null; reasonCode: string | null;
 }
 export interface WorkbenchBatch {
   contractVersion: typeof BATCH_CONTRACT; batchId: string; projectId: string; snapshotId: string; moduleId: string;
+  cancelRequested?: boolean;
   schedule: BatchSchedule; nextRunAt: string | null; status: BatchStatus; rounds: BatchRound[];
   createdAt: string; updatedAt: string;
 }
@@ -42,7 +44,7 @@ export function appendBatchRound(batch: WorkbenchBatch, now: string): WorkbenchB
   const number = batch.rounds.length + 1;
   const round: BatchRound = { number, executionKey: `${batch.projectId}/${batch.batchId}/${number}`, pipelineId: null,
     status: 'QUEUED', createdAt: now, startedAt: null, completedAt: null, reasonCode: null };
-  return { ...batch, status: 'QUEUED', rounds: [...batch.rounds, round], updatedAt: now };
+  return { ...batch, cancelRequested: false, status: 'QUEUED', rounds: [...batch.rounds, round], updatedAt: now };
 }
 export function nextBatchRun(schedule: BatchSchedule, now: string): string | null {
   if (!schedule.enabled) return null;
