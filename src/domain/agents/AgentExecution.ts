@@ -7,7 +7,7 @@ import type { ArtifactRef } from '../Domain.ts';
 import type { AgentCommand, AgentId } from './AgentContracts.ts';
 
 // 执行语义改变时更新版本，阻止旧 checkpoint 在不同角色实现下继续运行。
-export const ROLE_EXECUTION_VERSION = 'domain-agents-v9-check-evidence';
+export const ROLE_EXECUTION_VERSION = 'domain-agents-v10-check-evidence-guards';
 /** 受信材料。 */
 export interface Material { ref: ArtifactRef; content: unknown }
 /** Application 已加载并校验的角色材料；不包含通用工作流状态或存储实现。 */
@@ -107,7 +107,10 @@ export function materialsFor(payload: object, materials: Material[]): Material[]
 /** 非法模型原始响应只用于角色内部修正及受限证据，不混入错误日志。 */
 export class ModelResponseError extends Error {
   readonly rawOutput: string;
-  constructor(message: string, rawOutput: string) { super(message); this.rawOutput = rawOutput; }
+  readonly parsedOutputs: readonly Record<string, unknown>[];
+  constructor(message: string, rawOutput: string, parsedOutputs: readonly Record<string, unknown>[] = []) {
+    super(message); this.rawOutput = rawOutput; this.parsedOutputs = parsedOutputs;
+  }
 }
 /** 失败也需保留报告尝试；持久化仍由 Application 完成。 */
 export class AgentReportFailure extends Error {

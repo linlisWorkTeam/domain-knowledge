@@ -105,3 +105,63 @@ test('Check cannot hide a failed citation by deleting or downgrading its finding
   });
   assert.equal(calls, 3);
 });
+
+test('Check preserves conclusions before schema validation, including provider-rejected parsed output', async () => {
+  for (const providerRejected of [false, true]) for (const repair of ['delete', 'downgrade', 'fix-scope']) {
+    const s = sample(); let calls = 0;
+    s.context.model.execute = async () => {
+      calls++;
+      const output = structuredClone(s.output);
+      if (calls === 1) {
+        output.scope = [];
+        if (providerRejected) throw new ModelResponseError('AGENT_OUTPUT_INVALID: scope is empty', JSON.stringify(output), [output]);
+      } else if (repair === 'delete') output.findings = [];
+      else if (repair === 'downgrade') output.findings[0].severity = 'INFO';
+      return output;
+    };
+    if (repair === 'fix-scope') {
+      const result = await execute(s.input, s.context);
+      assert.equal(calls, 2); assert.equal(result.output.blocking, true);
+      assert.equal(result.output.findings[0]!.message, s.output.findings[0].message);
+    } else {
+      await assert.rejects(execute(s.input, s.context), (error: unknown) => {
+        assert.ok(error instanceof AgentReportFailure);
+        assert.match(error.artifacts[0]!.content, /CHECK_REPAIR_CONCLUSION_CHANGED/);
+        return true;
+      });
+      assert.equal(calls, 3);
+    }
+  }
+});
+
+test('A malformed sibling or location does not discard a recognizable blocking conclusion', async () => {
+  for (const brokenLocation of [false, true]) {
+    const s = sample(); let calls = 0;
+    s.context.model.execute = async () => {
+      const output = structuredClone(s.output);
+      if (++calls === 1) {
+        if (brokenLocation) output.findings[0].generated.locations[0].startLine = 0;
+        else output.findings.push({ message: 'incomplete sibling' });
+      } else output.findings = [];
+      return output;
+    };
+    await assert.rejects(execute(s.input, s.context), (error: unknown) => {
+      assert.ok(error instanceof AgentReportFailure);
+      assert.match(error.artifacts[0]!.content, /CHECK_REPAIR_CONCLUSION_CHANGED/);
+      return true;
+    });
+  }
+});
+
+test('A rejected downgrade does not prevent the final repair from restoring the original conclusion', async () => {
+  const s = sample(); let calls = 0;
+  s.context.model.execute = async () => {
+    const output = structuredClone(s.output);
+    if (++calls === 1) output.scope = [];
+    else if (calls === 2) output.findings[0].severity = 'INFO';
+    return output;
+  };
+  const result = await execute(s.input, s.context);
+  assert.equal(calls, 3); assert.equal(result.output.blocking, true);
+  assert.match(JSON.parse(result.artifacts[0]!.content).attempts[1].errors.join(), /CHECK_REPAIR_CONCLUSION_CHANGED/);
+});

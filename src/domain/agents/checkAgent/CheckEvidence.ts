@@ -39,10 +39,16 @@ function spans(source: string): Span[] {
     if (char === '{') {
       const start = first(segmentStart());
       const header = text.slice(start, i).trim();
+      // 初始化列表中的花括号不是函数体；尚不能可靠解析时，不能从后续逗号处重启函数。
+      if (!stack.some((item) => item.function)
+        && /\)\s*(?:noexcept(?:\s*\([^{}]*\))?\s*)?(?:try\s*)?:(?!:)/.test(header)) {
+        throw new Error('CHECK_SOURCE_BOUNDARY_INVALID: constructor initializer list is unsupported');
+      }
       const isFunction = !stack.some((item) => item.function)
         && /\)\s*(?:(?:const|volatile|override|final|noexcept)\b\s*|&&?\s*|->\s*[^{};]+)*$/.test(header)
         && !/^(?:if|for|while|switch|catch)\s*\(/.test(header) && !/[=]\s*\[/.test(header);
-      stack.push({ start, segment: i + 1, function: isFunction, declaration: /^(?:typedef\s+)?(?:struct|union|enum|class)\b/.test(header) });
+      stack.push({ start, segment: i + 1, function: isFunction,
+        declaration: /^(?:template\s*<[\s\S]*>\s*)?(?:typedef\s+)?(?:struct|union|enum|class)\b/.test(header) });
     } else if (char === '}') {
       const item = stack.pop();
       if (!item) throw new Error('CHECK_SOURCE_BOUNDARY_INVALID: unmatched closing brace');
@@ -67,7 +73,7 @@ export function extractEvidence(location: Location, source: string): CodeEvidenc
   const matches = spans(source).filter((span) => span.kind === location.kind
     && line(span.start) <= location.startLine && line(span.end - 1) >= location.endLine);
   matches.sort((a, b) => (a.end - a.start) - (b.end - b.start));
-  if (matches.length > 1 && location.kind === 'function') throw new Error('CHECK_LOCATION_INVALID: ambiguous same-line code boundaries');
+  if (matches.length > 1) throw new Error('CHECK_LOCATION_INVALID: ambiguous code boundaries');
   const span = matches[0];
   if (!span) throw new Error(`CHECK_LOCATION_INVALID: ${location.path}:${location.startLine}-${location.endLine} is not inside one complete ${location.kind}`);
   const start = source.lastIndexOf('\n', span.start - 1) + 1;

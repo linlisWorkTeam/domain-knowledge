@@ -27,3 +27,23 @@ test('Extraction never accepts invalid, unmatched or ambiguous locations', () =>
   assert.throws(() => extractEvidence(at(1),'int f() { return 1;'), /CHECK_SOURCE_BOUNDARY_INVALID/);
   assert.throws(() => extractEvidence(at(1),'int longer_function() { return 123; } int g() { return 2; }'), /CHECK_LOCATION_INVALID/);
 });
+
+test('Extraction refuses constructor initializer lists instead of returning a suffix as a function', () => {
+  for (const signature of ['C::C() : x{1}, y(2)', 'C::C() noexcept : x{1}, y(2)', 'C::C() : x(1), y(2)']) {
+    const source = `${signature} {\n do_work();\n}`;
+    assert.throws(() => extractEvidence(at(2), source), /CHECK_SOURCE_BOUNDARY_INVALID/);
+  }
+});
+
+test('Extraction expands template members to the complete enclosing type declaration', () => {
+  for (const prefix of ['template<typename T>', 'template<typename T = Box<int>>']) {
+    const source = `${prefix}\nstruct Box {\n T value;\n int flag;\n};`;
+    assert.equal(extractEvidence(at(3, 3, 'declaration'), source).content, source);
+  }
+});
+
+test('Extraction refuses indistinguishable same-line declarations and accepts unique line ranges', () => {
+  assert.throws(() => extractEvidence(at(1, 1, 'declaration'), 'int very_long_name = 1; int b = 2;'), /CHECK_LOCATION_INVALID/);
+  const source = 'int very_long_name = 1;\nint b = 2;';
+  assert.equal(extractEvidence(at(2, 2, 'declaration'), source).content, 'int b = 2;');
+});

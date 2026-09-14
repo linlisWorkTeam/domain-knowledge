@@ -16,8 +16,22 @@ export type EvidenceSide = { status: 'present'; excerpts: CodeEvidence[] } | Ext
 export interface ReportFinding extends Omit<Finding, 'original' | 'generated'> { original: EvidenceSide; generated: EvidenceSide }
 export interface Output { reportVersion: 'check-report-v2'; scope: string[]; findings: ReportFinding[]; blocking: boolean }
 export interface Attempt { attempt: number; raw: unknown; errors: string[]; validEvidence: EvidenceSide[] }
+export type FindingConclusion = Pick<Finding, 'ruleId' | 'message' | 'severity'>;
 const text = { type: 'string', pattern: '\\S' };
 function read<T>(input: Input, ref: ArtifactRef): T { return input.materials.find((m) => m.ref.artifactId === ref.artifactId)!.content as T; }
+/** 外围字段或证据格式错误不能抹去已可识别的规则、分析及严重程度。 */
+export function retainConclusions(raw: unknown, input: Input, retained: Map<number, FindingConclusion>): void {
+  if (!raw || typeof raw !== 'object' || !('findings' in raw) || !Array.isArray(raw.findings)) return;
+  const rules = read<{ id: string }[]>(input, input.payload.comparisonRulesRef);
+  raw.findings.forEach((finding: unknown, index: number) => {
+    if (retained.has(index) || !finding || typeof finding !== 'object') return;
+    const f = finding as Record<string, unknown>;
+    if (typeof f.ruleId === 'string' && rules.some((rule) => rule.id === f.ruleId)
+      && typeof f.message === 'string' && /\S/.test(f.message) && (f.severity === 'BLOCKER' || f.severity === 'INFO')) {
+      retained.set(index, { ruleId: f.ruleId, message: f.message, severity: f.severity });
+    }
+  });
+}
 export function sources(input: Input) {
   return { original: read<{ files: { path: string; content?: string }[] }>(input, input.payload.sourceSnapshotRef).files,
     generated: read<{ files: { path: string; content: string }[] }>(input, input.payload.generatedCodeRef).files };

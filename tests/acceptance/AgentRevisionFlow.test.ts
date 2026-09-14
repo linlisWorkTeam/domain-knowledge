@@ -66,11 +66,10 @@ function agentOutput(agentType: string, prompt: string): Record<string, unknown>
     case 'code':
       return { files: [{ path: 'src/module.cpp', content: `int calculate() { return ${count === 1 ? 3 : 4}; }\n` }] };
     case 'check':
-      if (count === 1) return { malformedReport: true };
       return { findings: count <= 3 ? [{ ruleId: 'behavior',
         original: { status: 'present', locations: [{ path: 'src/module.cpp', startLine: 1, endLine: 1, kind: 'function' }] },
         generated: { status: 'present', locations: [{ path: 'src/module.cpp', startLine: count === 2 ? 999 : 1, endLine: count === 2 ? 999 : 1, kind: 'function' }] },
-        message: 'The generated return value contradicts the source.', severity: 'BLOCKER' }] : [], scope: ['src/module.cpp'] };
+        message: 'The generated return value contradicts the source.', severity: 'BLOCKER' }] : [], scope: count === 1 ? [] : ['src/module.cpp'] };
     case 'review':
       assert.match(prompt, /check-report-v2/);
       if (count === 1) assert.match(prompt, /int calculate/);

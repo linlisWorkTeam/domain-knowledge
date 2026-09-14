@@ -295,7 +295,7 @@ function validateOutput(
   const output = [...candidates].reverse().find((candidate) => validate(candidate));
   if (!output) {
     validate(candidates.at(-1));
-    throw new ModelResponseError(`AGENT_OUTPUT_INVALID: ${ajv.errorsText(validate.errors)}`, stdout);
+    throw new ModelResponseError(`AGENT_OUTPUT_INVALID: ${ajv.errorsText(validate.errors)}`, stdout, candidates);
   }
   return output;
 }
