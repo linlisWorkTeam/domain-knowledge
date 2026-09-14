@@ -34,14 +34,12 @@ export class RuntimeDeletionOperations {
     const execute = async () => {
       const sourceRoots = await options.sourceRoots(), root = options.runtimeDir;
       if (options.evaluationArtifactsDirectory && existsSync(options.evaluationArtifactsDirectory) && readdirSync(options.evaluationArtifactsDirectory).length) throw new Error('DELETION_RETAINED_EVALUATION_UNSUPPORTED');
-      const populated = ['dsh', 'dsh-configured'].filter(name => existsSync(join(root, name)) && readdirSync(join(root, name)).length);
-      if (populated.length > 1) throw new Error('DELETION_MULTIPLE_DSH_ROOTS_UNSUPPORTED');
-      const dshRoot = join(root, populated[0] ?? 'dsh-configured');
+      const dshRoots = { 'dsh-homes': join(root, 'dsh'), 'dsh-homes-configured': join(root, 'dsh-configured') };
       const roots = { legacy: options.publicationDirectory(), index: join(root, 'card-index'), workbench: join(root, 'publications'),
         workspaces: join(root, 'agent-workspaces'), sessions: join(root, 'codeagent', 'sessions') };
       const casRoot = join(root, 'cas');
-      assertDeletionDirectoryScope({ roots: [casRoot, ...Object.values(roots), dshRoot], allowedRoots: options.allowedRoots, sourceRoots });
-      for (const directory of [...Object.values(roots), dshRoot, join(root, 'workflow')]) mkdirSync(directory, { recursive: true, mode: 0o700 });
+      assertDeletionDirectoryScope({ roots: [casRoot, ...Object.values(roots), ...Object.values(dshRoots)], allowedRoots: options.allowedRoots, sourceRoots });
+      for (const directory of [...Object.values(roots), ...Object.values(dshRoots), join(root, 'workflow')]) mkdirSync(directory, { recursive: true, mode: 0o700 });
       const opened: DatabaseSync[] = [];
       const open = (path: string) => { const database = new DatabaseSync(path); opened.push(database); database.exec('PRAGMA busy_timeout=3000'); return database; };
       try {
@@ -52,7 +50,7 @@ export class RuntimeDeletionOperations {
         const store = sqliteRuntimeDeletions({ databases, graph: { name: 'graph', database: graph }, journal, casRoot,
           publicationRoots: roots, indexRoot: 'index', workbenchRoot: 'workbench', legacyRoots: ['legacy'],
           allowedRoots: options.allowedRoots, sourceRoots: () => sourceRoots,
-          workspaces: { rootNames: ['workspaces'], audits }, sessions: { rootName: 'sessions', audits }, dshHomes: { root: dshRoot, audits },
+          workspaces: { rootNames: ['workspaces'], audits }, sessions: { rootName: 'sessions', audits }, dshHomes: { roots: dshRoots, audits },
           runStates: async () => ({ registry: await options.runStates(databases.registry) }),
           exclusive: async action => action() }); // 外层已经持有完整维护排他，不能再次获取。
         return await work(new BatchDeletions(store), () => store.pending());

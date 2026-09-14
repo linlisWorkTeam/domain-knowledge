@@ -21,9 +21,12 @@ function identity(stat: BigIntStats, directory: boolean): string {
 }
 export class DshHomeDeletionFiles {
   readonly contract = 'dsh-home-files-v1';
+  readonly name: string;
   readonly scope: string;
   private readonly root: string;
-  constructor(root: string) {
+  constructor(root: string, name = 'dsh-homes') {
+    if (!/^dsh-homes(?:-[a-z0-9]+)*$/.test(name) || name.length > 63) throw new Error('DELETION_HOME_NAMESPACE_INVALID');
+    this.name = name;
     if (process.platform !== 'linux') throw new Error('DELETION_ARTIFACT_PLATFORM_UNSUPPORTED');
     this.root = resolve(root); const fd = openSync(this.root, flags);
     try { this.scope = sha256(`${this.root}:${identity(fstatSync(fd, { bigint: true }), true)}`); } finally { closeSync(fd); }
@@ -103,7 +106,7 @@ export class DshHomeDeletionFiles {
     for (const name of names) {
       if (!homePattern.test(name)) continue;
       const request = requests.get(name.slice(0, 24)); if (!request?.owners.size) continue;
-      const entries = this.scan(name), id = `dsh-homes/${sha256(JSON.stringify([this.scope, name]))}`;
+      const entries = this.scan(name), id = `${this.name}/${sha256(JSON.stringify([this.scope, name]))}`;
       count += entries.length; const bytes = entries.reduce((sum, entry) => sum + entry.size, 0); total += bytes;
       if (count > 100000 || total > 128 * 1024 * 1024) throw new Error('DELETION_INVENTORY_TOO_LARGE');
       const ownedBy = [...request.owners].sort(); homes.push({ id, name, entries, ownedBy });
@@ -123,10 +126,10 @@ export class DshHomeDeletionFiles {
     const witness = value as Witness;
     if (plan.schemaVersion !== 'batch-deletion-v2' || !witness || witness.contract !== this.contract || witness.scope !== this.scope || witness.planId !== plan.planId
       || !Array.isArray(witness.homes) || witness.homes.length > 100000
-      || !same(witness.homes.map(home => home.id).sort(), plan.deleteIds.filter(id => id.startsWith('dsh-homes/')).sort())) throw new Error('DELETION_FILE_WITNESS_INVALID');
+      || !same(witness.homes.map(home => home.id).sort(), plan.deleteIds.filter(id => id.startsWith(`${this.name}/`)).sort())) throw new Error('DELETION_FILE_WITNESS_INVALID');
     let count = 0;
     for (const home of witness.homes) {
-      if (!homePattern.test(home.name) || home.id !== `dsh-homes/${sha256(JSON.stringify([this.scope, home.name]))}` || !Array.isArray(home.entries)) throw new Error('DELETION_FILE_WITNESS_INVALID');
+      if (!homePattern.test(home.name) || home.id !== `${this.name}/${sha256(JSON.stringify([this.scope, home.name]))}` || !Array.isArray(home.entries)) throw new Error('DELETION_FILE_WITNESS_INVALID');
       count += home.entries.length;
       if (count > 100000 || new Set(home.entries.map(entry => entry.path)).size !== home.entries.length || home.entries[0]?.path !== '' || home.entries[0]?.kind !== 'directory') throw new Error('DELETION_FILE_WITNESS_INVALID');
       for (const entry of home.entries) if (typeof entry.path !== 'string' || entry.path && entry.path.split('/').some(part => !part || part === '.' || part === '..' || /[\\\0\r\n]/.test(part))

@@ -26,13 +26,14 @@ export function sqliteRuntimeDeletions(input: {
   allowedRoots: string[]; sourceRoots: () => string[];
   workspaces?: { rootNames: string[]; audits: () => unknown[] };
   sessions?: { rootName: string; audits: () => unknown[] };
-  dshHomes?: { root: string; audits: () => unknown[] };
+  dshHomes?: { roots: Record<string, string>; audits: () => unknown[] };
   runStates: () => Promise<Record<string, SqliteDeletionRunStates>>;
   exclusive: BatchDeletionStore['exclusive'];
 }): SqliteBatchDeletions {
   input = { ...input, databases: { ...input.databases }, graph: { ...input.graph },
-    publicationRoots: { ...input.publicationRoots }, allowedRoots: [...input.allowedRoots], legacyRoots: [...input.legacyRoots] };
-  const assertScope = () => assertDeletionDirectoryScope({ roots: [input.casRoot, ...Object.values(input.publicationRoots), ...(input.dshHomes ? [input.dshHomes.root] : [])],
+    publicationRoots: { ...input.publicationRoots },
+    dshHomes: input.dshHomes ? { ...input.dshHomes, roots: { ...input.dshHomes.roots } } : undefined, allowedRoots: [...input.allowedRoots], legacyRoots: [...input.legacyRoots] };
+  const assertScope = () => assertDeletionDirectoryScope({ roots: [input.casRoot, ...Object.values(input.publicationRoots), ...Object.values(input.dshHomes?.roots ?? {})],
     allowedRoots: input.allowedRoots, sourceRoots: input.sourceRoots() });
   assertScope();
   const workspaceRoots = Object.fromEntries((input.workspaces?.rootNames ?? []).map(name => {
@@ -41,11 +42,12 @@ export function sqliteRuntimeDeletions(input: {
   }));
   if (input.sessions && !input.publicationRoots[input.sessions.rootName]) throw new Error('DELETION_SESSION_ROOT_UNAUTHORIZED');
   const cas = new CasDeletionFiles(input.casRoot), files = new PublishedDeletionFiles(input.publicationRoots);
-  const dsh = input.dshHomes ? new DshHomeDeletionFiles(input.dshHomes.root) : null;
-  let homes: ReturnType<DshHomeDeletionFiles['observe']>['homes'] = [];
-  const dshParticipants: DeletionFileParticipant[] = dsh ? [{ name: 'dsh-homes', contract: dsh.contract, scope: dsh.scope,
-    capture: plan => { assertScope(); current(); return dsh.capture(plan, homes); },
-    clean: (plan, witness) => { assertScope(); dsh.clean(plan, witness); } }] : [];
+  const dsh = Object.entries(input.dshHomes?.roots ?? {}).sort(([a], [b]) => a.localeCompare(b)).map(([name, root]) => ({
+    files: new DshHomeDeletionFiles(root, name), homes: [] as ReturnType<DshHomeDeletionFiles['observe']>['homes'],
+  }));
+  const dshParticipants: DeletionFileParticipant[] = dsh.map(item => ({ name: item.files.name, contract: item.files.contract, scope: item.files.scope,
+    capture: plan => { assertScope(); current(); return item.files.capture(plan, item.homes); },
+    clean: (plan, witness) => { assertScope(); item.files.clean(plan, witness); } }));
   const graph = new SqliteGraphDeletion(input.graph.name, input.graph.database);
   let snapshot: Awaited<ReturnType<typeof sqliteDeletionSnapshot>> | null = null;
   let states: Record<string, SqliteDeletionRunStates> = {};
@@ -73,8 +75,13 @@ export function sqliteRuntimeDeletions(input: {
         const workspace = input.workspaces ? workspaceDeletionManifest({ roots: workspaceRoots, inventory, audits: input.workspaces.audits() }) : { files: [], protectedNodes: [] };
         const session = input.sessions ? sessionDeletionManifest({ rootName: input.sessions.rootName,
           root: input.publicationRoots[input.sessions.rootName]!, inventory, audits: input.sessions.audits() }) : { files: [], protectedNodes: [] };
-        const dshInventory = dsh ? dsh.observe(input.dshHomes!.audits(), inventory) : { homes: [], nodes: [] }; homes = dshInventory.homes;
-        return { files: [...workspace.files, ...session.files], nodes: [...workspace.protectedNodes, ...session.protectedNodes, ...dshInventory.nodes] };
+        const audit = input.dshHomes?.audits() ?? [];
+        const dshInventories = dsh.map(item => { const observed = item.files.observe(audit, inventory); item.homes = observed.homes; return observed; });
+        let entries = 0, bytes = 0;
+        for (const observed of dshInventories) for (const home of observed.homes) for (const entry of home.entries) { entries++; bytes += entry.size; }
+        if (entries > 100000 || bytes > 128 * 1024 * 1024) throw new Error('DELETION_INVENTORY_TOO_LARGE');
+        const dshNodes = dshInventories.flatMap(observed => observed.nodes);
+        return { files: [...workspace.files, ...session.files], nodes: [...workspace.protectedNodes, ...session.protectedNodes, ...dshNodes] };
       }, manifest: inventory => publishedDeletionManifest({ databases: input.databases, inventory,
         roots: input.publicationRoots, indexRoot: input.indexRoot, workbenchRoot: input.workbenchRoot, legacyRoots: input.legacyRoots }) } });
     assertScope(); return snapshot.nodes;

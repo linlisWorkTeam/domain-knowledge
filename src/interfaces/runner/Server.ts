@@ -292,7 +292,6 @@ export function mapHttpError(error: unknown, id = 'req_unknown'): { status: numb
       : code === 'DELETION_PUBLICATION_ROOT_UNAUTHORIZED' ? '历史发布文件位于当前授权目录之外，请先核对发布目录设置。'
       : code === 'DELETION_SOURCE_DIRECTORY_OVERLAP' ? '产物目录与源码目录重叠，已停止删除。'
       : code === 'DELETION_RETAINED_EVALUATION_UNSUPPORTED' ? '检测到单独保留的评测目录，其清理范围尚未确认。'
-      : code === 'DELETION_MULTIPLE_DSH_ROOTS_UNSUPPORTED' ? '检测到多套模型执行目录，其清理范围尚未确认。'
       : '无法确认完整删除范围或文件状态，数据已保留。请检查后重试。';
     return { status: code === 'DELETION_TARGET_NOT_FOUND' ? 404 : 409, body: errorBody(code, message, id) };
   }

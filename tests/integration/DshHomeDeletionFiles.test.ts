@@ -105,3 +105,20 @@ test('persisted recovery reuses the original link witness after cleanup acknowle
     assert.equal(readFileSync(join(f.source, 'dependency.js'), 'utf8'), 'keep dependency');
   } finally { db.close(); journal.close(); f.close(); }
 });
+
+test('different DSH namespaces cannot exchange persisted file witnesses', () => {
+  const f = fixture();
+  try {
+    const otherRoot = join(f.root, 'other-homes'); mkdirSync(join(otherRoot, f.name), { recursive: true });
+    writeFileSync(join(otherRoot, f.name, 'RoleTools.mjs'), 'other policy');
+    const other = new DshHomeDeletionFiles(otherRoot, 'dsh-homes-configured');
+    const second = other.observe([f.audit], f.inventory);
+    const plan = planBatchDeletion('registry/run', [...f.inventory.nodes, ...f.observed.nodes, ...second.nodes]);
+    const firstWitness = f.cleaner.capture(plan, f.observed.homes), secondWitness = other.capture(plan, second.homes);
+    assert.throws(() => f.cleaner.clean(plan, secondWitness), /WITNESS_INVALID/);
+    assert.throws(() => other.clean(plan, firstWitness), /WITNESS_INVALID/);
+    assert.equal(readFileSync(join(f.home, 'RoleTools.mjs'), 'utf8'), 'policy');
+    assert.equal(readFileSync(join(otherRoot, f.name, 'RoleTools.mjs'), 'utf8'), 'other policy');
+    f.cleaner.clean(plan, firstWitness); other.clean(plan, secondWitness);
+  } finally { f.close(); }
+});

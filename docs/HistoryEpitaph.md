@@ -424,3 +424,7 @@ This document summarizes older handoffs, milestones and architectural decisions 
 ## 2026-09-14 归档：工作区删除清单
 
 [2235 原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/14da3c19d0ed6da2e8fe2745b1ee336f7f56fa25/docs/epitaph/2026-09-14-2235-workspace-deletion-manifest.md)：审计归属与角色工作区清单进入文件恢复协议，未知/共享保护；29项测试和类型/Spec通过。后续会话与DSH home清理已推进，公共入口与前台在新记录中交付；无审计归属目录不自动删除，C/C++最终验收仍未完成。
+
+## 2026-09-14 归档：会话清理与DSH审计
+
+[2245 原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/84d738bdef5e880efb0d0ee98be9175540715a38/docs/epitaph/2026-09-14-2245-session-deletion-manifest.md)：CodeAgent会话纳入清理，25项测试通过；只读备份初步识别75个DSH home和36375链接。后续已实现链接见证清理与HTTP/UI，未知归属不自动删除；全目标验收仍未完成。
