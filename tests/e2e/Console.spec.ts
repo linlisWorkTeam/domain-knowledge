@@ -208,10 +208,10 @@ test('工作流图由标准节点 API 支撑并保持只读', async ({ page }) =
   const requests: string[] = [];
   page.on('request', (request) => requests.push(new URL(request.url()).pathname));
   await page.goto(baseUrl);
-  await page.getByRole('button', { name: /^飞轮批次$/ }).click();
+  await page.getByRole('button', { name: /^知识飞轮管理$/ }).click();
   await page.locator('.reference-run-item').first().click();
   await page.locator('[data-legacy-graph] > summary').click();
-  await expect(page.getByRole('heading', { name: '飞轮批次', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '知识飞轮管理', level: 1 })).toBeVisible();
   await expect(page.getByLabel('只读 Agent 工作流图')).toBeVisible();
   await expect(page.locator('[data-legacy-graph]')).toHaveAttribute('open', '');
   await expect(page.locator('.workflow-graph')).toHaveCount(1);
@@ -250,7 +250,7 @@ test('merged Console navigation keeps one H1 and does not scan Sources on entry'
   await expect(page.getByText('browser-contract').first()).toBeVisible();
   await expect(page.getByText(/项需要确认/)).toBeVisible();
 
-  const labels = ['操作中心', '飞轮批次', '知识', '评测', '来源', 'Agent 设置'];
+  const labels = ['操作中心', '知识飞轮管理', '知识治理', '评测', '来源', 'Agent 设置'];
   for (const label of labels) {
     await expect(page.getByRole('button', { name: new RegExp(label) }).first()).toBeVisible();
     if (label !== '操作中心') await page.getByRole('button', { name: new RegExp(`^${label}$`) }).click();
@@ -472,7 +472,7 @@ test('Knowledge Health 保持 0..100 总分与 0..1 比率的真实 API 口径',
 
 test('Knowledge lineage/diff 可反向进入版本、批次与评测事实', async ({ page }) => {
   await page.goto(baseUrl);
-  await navigateTo(page, '知识');
+  await navigateTo(page, '知识治理');
   await expect(page.locator(`#knowledge-list [data-version-id="${firstVersionId}"]`)).toHaveCount(0);
   await page.locator(`#knowledge-list [data-version-id="${latestVersionId}"]`).click();
   await page.getByText('历史版本 · 1', { exact: true }).click();
@@ -504,10 +504,10 @@ test('Knowledge lineage/diff 可反向进入版本、批次与评测事实', asy
   const runButton = drawer.getByRole('button', { name: new RegExp(`查看批次 ${lineageRunId.slice(0, 8)}`) });
   await expect(runButton).toBeVisible();
   await runButton.click();
-  await expect(page.getByRole('heading', { name: '飞轮批次', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '知识飞轮管理', level: 1 })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'browser-contract', level: 2 })).toBeVisible();
 
-  await navigateTo(page, '知识');
+  await navigateTo(page, '知识治理');
   await page.locator(`#knowledge-list [data-version-id="${latestVersionId}"]`).click();
   drawer = page.getByRole('dialog');
   const evaluationButton = drawer.getByRole('button', { name: new RegExp(`查看评测 ${lineageEvaluationId.slice(0, 8)}`) });
@@ -718,7 +718,7 @@ test('light and dark themes keep successful API states across all seven pages an
     expect(background).not.toBe('rgba(0, 0, 0, 0)');
     themeBackgrounds.set(theme, background);
     await expect(page.locator('#registry-label')).toHaveText('服务已连接');
-    for (const label of ['操作中心', '飞轮批次', '知识', '评测', '来源', 'Agent 设置']) {
+    for (const label of ['操作中心', '知识飞轮管理', '知识治理', '评测', '来源', 'Agent 设置']) {
       if (label !== '操作中心') await page.getByRole('button', { name: new RegExp(`^${label}$`) }).click();
       await expect(page.locator('h1')).toHaveCount(1);
       await expect(page.locator('.error-state')).toHaveCount(0);
@@ -787,9 +787,9 @@ test('mobile navigation, theme persistence and 200 percent zoom preserve core pa
   await page.goto(baseUrl);
   const navToggle = page.getByRole('button', { name: '打开主导航' });
   await navToggle.click();
-  await expect(page.getByRole('button', { name: /^飞轮批次$/ })).toBeVisible();
-  await page.getByRole('button', { name: /^飞轮批次$/ }).click();
-  await expect(page.getByRole('heading', { name: '飞轮批次', level: 1 })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^知识飞轮管理$/ })).toBeVisible();
+  await page.getByRole('button', { name: /^知识飞轮管理$/ }).click();
+  await expect(page.getByRole('heading', { name: '知识飞轮管理', level: 1 })).toBeVisible();
   await expect(page.getByText('第 1 轮').first()).toBeVisible();
 
   const themeButton = page.locator('#theme-button');
@@ -804,9 +804,9 @@ test('mobile navigation, theme persistence and 200 percent zoom preserve core pa
   const session = await context.newCDPSession(page);
   await session.send('Emulation.setPageScaleFactor', { pageScaleFactor: 2 });
   await page.getByRole('button', { name: '打开主导航' }).click();
-  await page.getByRole('button', { name: /^飞轮批次$/ }).focus();
+  await page.getByRole('button', { name: /^知识飞轮管理$/ }).focus();
   await page.keyboard.press('Enter');
-  await expect(page.getByRole('heading', { name: '飞轮批次', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '知识飞轮管理', level: 1 })).toBeVisible();
   await expect(page.getByText('browser-contract').first()).toBeVisible();
 });
 
@@ -821,7 +821,7 @@ test('通用场景 API 保留路径校验；浏览器固定模块入口不要求
   try {
     await page.goto(baseUrl);
     await enterGovernance(page);
-    await navigateTo(page, '飞轮批次');
+    await navigateTo(page, '知识飞轮管理');
     await expect(page.getByLabel('项目场景 JSON')).toHaveCount(0);
     await expect(page.locator('#workflow-start-form')).toHaveCount(0);
     await expect(page.locator('#page-content')).toContainText('请先在左上角选择项目');
@@ -850,7 +850,7 @@ test('evaluation explains knowledge risk separately from code check failure', as
     await route.fulfill({ response, json: detail });
   });
   await page.goto(baseUrl);
-  await navigateTo(page, '知识');
+  await navigateTo(page, '知识治理');
   await page.locator(`#knowledge-list [data-version-id="${latestVersionId}"]`).click();
   await page.getByRole('dialog').getByRole('button', { name: new RegExp(`查看评测 ${lineageEvaluationId.slice(0, 8)}`) }).click();
   await expect(page.getByRole('dialog').getByText('知识风险尚未解决', { exact: true })).toBeVisible();
@@ -863,7 +863,7 @@ test('知识阅读器提供正文目录、可展开证据和原文，窄屏不�
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(baseUrl);
   await page.getByRole('button', { name: '打开主导航' }).click();
-  await page.getByRole('button', { name: '知识', exact: true }).click();
+  await page.getByRole('button', { name: '知识治理', exact: true }).click();
   const card = page.locator(`[data-version-id="${latestVersionId}"]`).first();
   await card.click();
   await expect(page.locator('.knowledge-body h3').filter({hasText:'修订说明'})).toBeVisible();
@@ -901,13 +901,13 @@ test('操作中心分类筛选真实事项并允许恢复全部', async ({ page 
 test('workflow uses executionStatus and reports missing execution facts as unknown', async ({ page }) => {
   await page.route('**/workflow-status', (route) => route.fulfill({ json: { executionStatus: 'COMPLETED' } }));
   await page.goto(baseUrl);
-  await navigateTo(page, '飞轮批次');
+  await navigateTo(page, '知识飞轮管理');
   await page.locator('.reference-run-item').first().click();
   await page.locator('[data-legacy-graph] > summary').click();
   await expect(page.locator('.reference-node-detail')).toContainText('工作流 已完成');
   await page.route('**/workflow-status', (route) => route.fulfill({ status: 503, json: {} }));
   await page.reload();
-  await navigateTo(page, '飞轮批次');
+  await navigateTo(page, '知识飞轮管理');
   await page.locator('.reference-run-item').first().click();
   await page.locator('[data-legacy-graph] > summary').click();
   await expect(page.locator('.reference-node-detail')).toContainText('工作流 未知');
@@ -946,7 +946,7 @@ test('知识索引可独立构建、试检索并预览 YAML，命中后才读取
   });
   await page.goto(baseUrl);
   await enterGovernance(page);
-  await navigateTo(page, '知识');
+  await navigateTo(page, '知识治理');
   await page.getByText('卡片搜索设置', { exact: true }).click();
   await page.getByRole('button', { name: '更新搜索目录', exact: true }).click();
   await expect(page.locator('[data-index-task]')).toContainText('已完成');
@@ -1050,7 +1050,7 @@ test.describe.serial('工作台固定仓库完整流程', () => {
       return request.stage?.startsWith('outline') ? { title, description, sections: [{ heading: 'Behavior', purpose: 'Interface and limits' }] }
         : { title, description, sections: [{ sectionId: 'section-1', body: 'The parse function takes no arguments and returns the integer one. Its public interface is int parse(void). The fixed source contains no external dependencies or mutable state. This card describes only the provided function and does not establish behavior for any other parser. Behavioral evaluation and publication approval remain pending.' }] };
     } });
-    await page.getByRole('button', { name: /^飞轮批次$/ }).click();
+    await page.getByRole('button', { name: /^知识飞轮管理$/ }).click();
     await page.getByRole('button', { name: '阶段操作', exact: true }).click();
     await page.getByRole('button', { name: '生成知识库', exact: true }).click();
     await expect(page.locator('[data-generation-task]')).toContainText('已生成 1 张');
@@ -1165,7 +1165,7 @@ test.describe.serial('工作台固定仓库完整流程', () => {
     await page.screenshot({ path: test.info().outputPath('repository-analysis-desktop.png'), fullPage: true });
     await page.setViewportSize({ width: 390, height: 844 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-    await expect(page.getByRole('button', { name: '返回飞轮批次', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: '返回知识飞轮管理', exact: true })).toBeVisible();
     await page.screenshot({ path: test.info().outputPath('repository-analysis-mobile.png'), fullPage: true });
   });
   test('一键门禁拒绝与重载恢复前序产物', async () => {
@@ -1190,7 +1190,7 @@ test.describe.serial('工作台固定仓库完整流程', () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await page.reload(); await enterGovernance(page);
     await page.getByRole('button', { name: '打开主导航', exact: true }).click();
-    await page.getByRole('button', { name: /^飞轮批次$/ }).click();
+    await page.getByRole('button', { name: /^知识飞轮管理$/ }).click();
     await page.getByRole('button', { name: '阶段操作', exact: true }).click();
     await expect(page.locator('[data-generation-task]')).toContainText('已生成 1 张');
     await expect(page.locator('[data-generation-task]').getByRole('button', { name: 'Parser generated card', exact: true })).toBeVisible();
@@ -1204,7 +1204,7 @@ test.describe.serial('工作台固定仓库完整流程', () => {
     await expect(page.locator('[data-repository-notice]')).toContainText('目录不存在或不可访问');
     await expect(page.locator('[data-repository-result]')).not.toContainText(commit);
     await page.getByRole('button', { name: '打开主导航', exact: true }).click();
-    await page.getByRole('button', { name: /^飞轮批次$/ }).click();
+    await page.getByRole('button', { name: /^知识飞轮管理$/ }).click();
     await page.getByRole('button', { name: '阶段操作', exact: true }).click();
   });
   test('知识修订保留失败审计并重建绑定版本', async () => {
@@ -1300,7 +1300,7 @@ test('关联阶段可独立执行并在卡片详情查看真实引用候选', as
   const registered = await instance.composition.apps.contentGovernance.createSource({ kind: 'FILE', locator, displayName: 'External parser guide' }, { idempotencyKey: 'external-guide', fingerprint: 'external-guide', actor: 'test' });
   const material = await instance.composition.apps.workbenchMaterials.capture(String(registered.resourceId), '仅适用于示例解析接口');
 
-  await page.goto(baseUrl); await enterGovernance(page); await navigateTo(page, '知识');
+  await page.goto(baseUrl); await enterGovernance(page); await navigateTo(page, '知识治理');
   await page.getByText('卡片搜索设置', { exact: true }).click();
   await page.getByRole('button', { name: '更新搜索目录', exact: true }).click();
   await expect(page.locator('[data-index-task]')).toContainText('已完成');
@@ -1340,14 +1340,14 @@ test('已完成的一键流程重载展示评测和关联数量', async ({ page 
   } }));
   const errors: string[] = []; page.on('pageerror', (error) => errors.push(error.message));
   await page.goto(baseUrl);
-  await page.getByRole('button', { name: /^飞轮批次$/ }).click();
+  await page.getByRole('button', { name: /^知识飞轮管理$/ }).click();
   await page.getByRole('button', { name: '阶段操作', exact: true }).click();
   const panel = page.locator('[data-workbench-pipeline-panel]');
   await expect(panel).toContainText('通过 31/31');
   await expect(panel).toContainText('40 条关系');
   await expect(panel).toContainText('累计模型调用 15 次');
   await page.reload();
-  await page.getByRole('button', { name: /^飞轮批次$/ }).click();
+  await page.getByRole('button', { name: /^知识飞轮管理$/ }).click();
   await page.getByRole('button', { name: '阶段操作', exact: true }).click();
   await expect(panel).toContainText('40 条关系');
   expect(errors).toEqual([]);

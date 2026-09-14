@@ -41,7 +41,7 @@ test('project selector owns repository inputs and overview retains historical he
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await page.screenshot({ path: test.info().outputPath('workbench-entry-narrow.png'), fullPage: true });
     await page.getByRole('button', { name: '打开主导航', exact: true }).click();
-    await page.getByRole('button', { name: '知识', exact: true }).click();
+    await page.getByRole('button', { name: '知识治理', exact: true }).click();
     await page.setViewportSize({ width: 1363, height: 936 });
     await expect(page.getByRole('button', { name: 'Agent 设置', exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Agent 设置', exact: true }).click();

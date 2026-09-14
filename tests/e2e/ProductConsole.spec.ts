@@ -39,7 +39,7 @@ async function openSettings(page: Page) {
   await page.goto(baseUrl);
   await enterGovernance(page);
   await page.getByRole('button', { name: /^Agent 设置$/ }).click();
-  await page.getByRole('button', { name: '查看发布设置' }).click();
+  await page.locator('.publication-panel > summary').click();
   await expect(page.locator('#publication-settings-form')).toBeVisible();
   await expect(page.getByLabel('服务器知识目录')).toHaveValue(knowledgeDirectory);
 }
@@ -139,11 +139,11 @@ test.afterAll(async () => {
 test('项目入口浏览服务器目录，旧批次保留进度与取消能力', async ({ page }) => {
   const control = await controlledProductApi(page);
   await page.goto(baseUrl);
-  await page.getByRole('button', { name: /^飞轮批次$/ }).click();
+  await page.getByRole('button', { name: /^知识飞轮管理$/ }).click();
   await page.getByRole('button', { name: '选择项目', exact: true }).click();
   await expect(page.getByRole('button', { name: '读取目录', exact: true })).toBeDisabled();
   await enterGovernance(page);
-  await page.getByRole('button', { name: /^飞轮批次$/ }).click();
+  await page.getByRole('button', { name: /^知识飞轮管理$/ }).click();
   await page.getByRole('button', { name: '选择项目', exact: true }).click();
   await expect(page.getByLabel('项目场景 JSON')).toHaveCount(0);
   await page.getByRole('button', { name: '浏览代码目录', exact: true }).click();
@@ -154,7 +154,7 @@ test('项目入口浏览服务器目录，旧批次保留进度与取消能力',
   await expect(page.locator('#workflow-start-form')).toHaveCount(0);
   const handle = await page.evaluate(async ({ token, projectDirectory }) => (await fetch('/api/v1/runs/markdown-lite', { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify({ repositoryRoot: projectDirectory }) })).json(), { token, projectDirectory });
   await page.reload(); await enterGovernance(page);
-  await page.getByRole('button', { name: /^飞轮批次$/ }).click();
+  await page.getByRole('button', { name: /^知识飞轮管理$/ }).click();
   await page.locator(`.reference-run-item[data-run-id="${handle.runId}"]`).click();
   await expect(page.getByRole('heading', { name: 'markdown-lite-controlled', exact: true })).toBeVisible();
   expect(control.starts).toEqual([{ repositoryRoot: projectDirectory }]);

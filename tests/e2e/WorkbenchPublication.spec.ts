@@ -35,7 +35,7 @@ test('saved project to verified publication remains usable without login on desk
   const openStages = async () => {
     const menu = page.getByRole('button', { name: '打开主导航', exact: true });
     if (await menu.isVisible()) await menu.click();
-    await page.getByRole('button', { name: /^飞轮批次$/ }).click();
+    await page.getByRole('button', { name: /^知识飞轮管理$/ }).click();
     await page.getByRole('button', { name: '阶段操作', exact: true }).click();
   };
   try {

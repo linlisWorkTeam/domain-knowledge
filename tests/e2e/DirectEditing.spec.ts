@@ -37,12 +37,13 @@ test('免登录前台不要求治理令牌，代理访问可直接保存且跨�
     await expect(card.locator('textarea')).toHaveValue('使用简洁中文，保留技术事实。');
     const publicationHelp = page.getByRole('button', { name: '知识发布设置说明' });
     await expect(page.locator('#publication-help')).toBeHidden();
+    await expect(page.locator('.publication-panel')).not.toHaveAttribute('open', '');
     await publicationHelp.hover();
     await expect(page.locator('#publication-help')).toBeVisible();
     await expect(page.locator('#publication-help')).toContainText('知识通过门禁后');
-    await page.getByRole('button', { name: '查看发布设置' }).hover();
+    await page.mouse.move(0, 0);
     await expect(page.locator('#publication-help')).toBeHidden();
-    await page.getByRole('button', { name: '查看发布设置' }).click();
+    await page.locator('.publication-panel > summary').click();
     await expect(page.locator('#publication-settings-form')).toBeVisible();
     await page.getByRole('button', { name: '＋ 新建批次' }).click();
     await expect(page.locator('[data-module-batches]')).toContainText('左上角选择项目');

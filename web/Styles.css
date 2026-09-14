@@ -1354,8 +1354,8 @@ body.drawer-active { overflow: hidden; }
 [data-project-history-select], [data-build-scope] { width: 100%; min-width: 0; max-width: 100%; }
 
 /* 设置折叠与键值规则编辑；窄屏保持表单在文档流内。 */
-.provider-card > summary, .agent-prompts > summary { cursor: pointer; font-weight: 650; padding: 4px 0; }
-.provider-card[open] > summary, .agent-prompts[open] > summary { margin-bottom: 20px; }
+.provider-card > summary, .agent-prompts > summary, .publication-panel > summary { cursor: pointer; font-weight: 650; padding: 4px 0; }
+.provider-card[open] > summary, .agent-prompts[open] > summary, .publication-panel[open] > summary { margin-bottom: 20px; }
 .evaluation-workspace > .panel > .section-heading { flex-wrap: wrap; }
 .evaluation-settings { margin-left: auto; }
 .evaluation-settings > summary { cursor: pointer; }

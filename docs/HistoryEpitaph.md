@@ -374,3 +374,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 [1904 C可信与固定门禁](https://github.com/linlisWorkTeam/domain-knowledge/blob/9117c441445ef60aa78ecd327bc137b659653755/docs/epitaph/2026-09-14-1904-c-gates-after-deployment.md)：C原7卡可信31/31、固定11/11、库内关联40条，工件分别69和29个校验通过；来源和最终发布未完成。这些结果不能覆盖随后修订的卡片版本。网站5c72fa5；运行控制进程临时降堆以满足预检，编译隔离未降低。
 
 [1923 来源判断与历史证据](https://github.com/linlisWorkTeam/domain-knowledge/blob/dab50a5f9b2304caab6423a366b2575a5944ec3c/docs/epitaph/2026-09-14-1923-source-assessment-and-legacy-evidence.md)：来源判断策略版本化并保留旧Review证据只读兼容，三套旧cjson服务已获准停止且完成。该记录的C来源运行中状态已被后续终态取代，来源与最终发布门禁仍未全部通过。
+
+[1954 中文原因及入口缺失](https://github.com/linlisWorkTeam/domain-knowledge/blob/bf7aa3f/docs/epitaph/2026-09-14-1954-frontend-reasons-and-remaining-work.md)：补充中文处理原因和发布截图；当时阶段入口未挂载、C修订UNRESOLVED。阶段入口后来恢复并以dab50a5部署，删除机制与真实最终验收尚未完成。
