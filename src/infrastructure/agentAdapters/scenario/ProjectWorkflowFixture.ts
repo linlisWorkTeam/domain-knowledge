@@ -91,7 +91,7 @@ export class FixtureProjectWorkflowStages {
         workerId: input.workerId,
         fragment: `Source partition ${input.workerId ?? 'default'} prepared for DocGen.`,
         provenance: payload['assignedSourcePaths'],
-        analysisScope: { moduleId: scenario.moduleId, files: payload['assignedSourcePaths'], symbols: [] },
+        analysisScope: { moduleId: scenario.moduleId, symbols: [] },
         sourceEvidence: (payload['assignedSourcePaths'] as string[]).map((path) => ({ claim: 'Fixture source analysis', path })),
         unresolvedQuestions: [],
       };

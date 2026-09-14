@@ -67,9 +67,6 @@
       ],
       "analysisScope": {
         "moduleId": "markdown-diff",
-        "files": [
-          "src/domain/knowledge/MarkdownDiff.ts"
-        ],
         "symbols": []
       },
       "sourceEvidence": [
@@ -88,9 +85,6 @@
       ],
       "analysisScope": {
         "moduleId": "markdown-diff",
-        "files": [
-          "src/domain/Domain.ts"
-        ],
         "symbols": []
       },
       "sourceEvidence": [

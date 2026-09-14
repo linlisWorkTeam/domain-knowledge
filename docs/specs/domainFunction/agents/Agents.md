@@ -85,7 +85,7 @@ SearchAgent 也还未实现：目标是由 Application 的 KnowledgeSearchApp �
 
 Prompt 由角色基础指令、冻结的 promptAddon、适用治理指令、本轮 AgentCommand 和授权工件正文组成；DocGen 另带内部汇总载荷。材料限制同时落实到提示词、工件和工具工作区，不能只写“禁止读取”。应用层保存正文并将 pending 引用换成实际工件引用，Domain 不直接操作 CAS、数据库或发布。
 
-当前执行版本为 `domain-agents-v10-check-evidence-guards`，命令键为 `contract-v10`；不兼容的旧结果不能作为当前成功结果恢复。
+当前执行版本为 `domain-agents-v11-worker-derived-scope`，命令键为 `contract-v11`；不兼容的旧结果不能作为当前成功结果恢复。
 
 独立入口示例：`npm run agent:run -- --role code --input src/domain/agents/codeAgent/examples/CodeAgentSample.json --output /tmp/code-agent-run`。默认样例使用预设回答；`--provider dsh` 需要真实接入配置。独立角色结果不自动评测或发布，操作见 [AgentDevelopment](../../../AgentDevelopment.md)。
 

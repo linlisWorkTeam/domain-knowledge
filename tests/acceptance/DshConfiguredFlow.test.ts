@@ -40,7 +40,7 @@ function agentOutput(agentType: string): Record<string, unknown> {
         workerId: 'worker-1',
         fragment: 'The public contract returns the fixed value four and is covered by a behavior test.',
         provenance: ['src/module.cpp'],
-        analysisScope: { moduleId: 'dsh-module', files: ['src/module.cpp'], symbols: [] },
+        analysisScope: { moduleId: 'dsh-module', symbols: [] },
         sourceEvidence: ['src/module.cpp'].map((path) => ({ claim: 'Returns four', path })),
         unresolvedQuestions: [],
       };

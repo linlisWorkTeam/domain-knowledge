@@ -5,6 +5,16 @@ SPDX-License-Identifier: MIT
 -->
 # Agent Spec 修复与端到端测试报告
 
+## 2026-09-14：Worker 分配范围由框架补齐
+
+用户确认 analysisScope.files 不应由模型生成，分配源码与参考接口的区别由框架掌握。本次在独立工作树 `/tmp/domain-knowledge-worker-scope`、分支 `fix/docworker-derived-scope` 实现：模型 Draft/Schema 不再包含 files，Domain 入口在校验回答后复制 assignedSourcePaths，未提供时复制 input.sourcePaths，组装成完整 Output/knowledgeChunk 再保存并交给 DocGen。Prompt 明确模型只写分析内容、不回填该字段；旧模型回答不能覆盖框架分配。
+
+每个分配文件至少一项 sourceEvidence、证据/provenance 路径授权及模块一致性检查继续保留。空、重复、越界分配在模型调用前拒绝。没有将参考头文件禁止读取，也没有删掉缺失依据检查。同步独立样例、内部 Worker fixture 和受控 SDK 回答；角色执行版本升级为 `domain-agents-v11-worker-derived-scope` / `contract-v11`，内部键为 `subagent-v4`，旧产物保持可读但不静默恢复为新协议。
+
+先用不含 files 的模型回答验证旧入口拒绝，再实现组装。Node 24.13.0 独立 bootstrap READY；Worker 角色测试 9/9，涵盖 cJSON 目标配两个参考头文件、显式/默认分配、输出不改写模型回答、缺少第二文件依据和越权拒绝。DocGen 子任务/材料边界/配置/独立入口集成 20/20；DSH SDK 与 LangGraph 受控流程 4/4，其中包括测试修复、知识修订与 Gate 发布。TypeScript、Spec（17 schemas / 53 p0）及差异格式检查通过。验证结果属于框架契约与接线，模型响应受控，没有调用外部真实模型或新建 cJSON 验收 Run，没有新增永久 CI。
+
+本节修复仅处理 Worker 字段职责。下节 v10 真实批次的 FAIL、原始模型回答和 runtime 原样保留；本次没有解决 TestGen 超时或节点终态持久化，也不改写旧验收结论。IO-09 与 AC-AGENT-104 的实现/测试关联更新在 [Worker Spec](../specs/domainFunction/agents/docGenAgent/subAgents/docWorkerAgent/DocWorkerAgent.md)。
+
 ## 2026-09-14：v10 cJSON Utils 真实完整验收，未通过
 
 已更新[原验收计划](../specs/infrastructure/evaluation/Evaluation.md#2026-09-14-修复后新一次完整验收)并实际启动用户授权的一次新 Run：`cb4a4f5a-d24f-47a1-87ca-37aba9a35786`。北京时间 12:04:28—12:15:08，639.622 秒，最终 `FAILED`，停在 iteration 0。DocWorker 的覆盖范围声明无效，随后并行 TestGen 达到 10 分钟节点超时。完整知识飞轮仍未通过；本次没有候选知识、评测记录、Gate 决策或发布，不把旧知识和 v9 独立 Check 的成功导入本次运行。

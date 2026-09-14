@@ -41,7 +41,7 @@ export class DocWorkerExecutionService implements DocWorkerExecutionPort {
       const payload = { moduleId: parent.moduleId, sourceRefs: [scoped[0]!.ref],
         publicInterfaceRefs: [scoped[1]!.ref], assignedSourcePaths: task.sourcePaths };
       // 同一 Run 的固定源码任务跨正文修订复用；任务范围或冻结提示词变化产生不同提交键。
-      const generationKey = `${stage.runId}:doc_gen/doc_worker:${task.workerId}:${sha256(JSON.stringify({ payload, prompt }))}:subagent-v3`;
+      const generationKey = `${stage.runId}:doc_gen/doc_worker:${task.workerId}:${sha256(JSON.stringify({ payload, prompt }))}:subagent-v4`;
       const command: AgentCommand = { schemaVersion: '1.0', runId: stage.runId, agentType: 'doc-worker',
         generationKey, commandId: `cmd:${sha256(`${generationKey}:${JSON.stringify(payload)}`)}`, payload };
       const nodeId = `${nodeByAgent['doc-worker']}:${task.workerId}`;

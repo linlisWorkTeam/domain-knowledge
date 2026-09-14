@@ -29,7 +29,7 @@ ProjectWorkflowStages 负责解析场景上下文、读取历史工件、构造�
 
 DocWorkerExecutionService 实现 DocGen 的内部 Worker 执行端口，生产与独立样例共用。它校验任务范围、加载冻结的 Worker 提示词、通过 RoleExecutionService 提交独立结果，并读取已提交片段返回给 DocGen。ConcurrentTasks 在 Infrastructure 中提供默认三个并发槽；任一任务失败取消同批调用并等待在途任务结束。它不决定源码如何分组或文档如何汇总。
 
-WorkerMaterials 按分配源码与公开接口裁剪独立源码清单，再保存子任务 CAS 引用；同一路径材料冲突以 WORKER_SOURCE_CONFLICT 拒绝。Prompt 正文、子任务 sourceRefs/publicInterfaceRefs 和可读工作区使用同一授权集合，父级历史/纠正材料不进入 Worker；重试与复用以包含载荷、冻结 Prompt 的 subagent-v3 键绑定该范围。
+WorkerMaterials 按分配源码与公开接口裁剪独立源码清单，再保存子任务 CAS 引用；同一路径材料冲突以 WORKER_SOURCE_CONFLICT 拒绝。Prompt 正文、子任务 sourceRefs/publicInterfaceRefs 和可读工作区使用同一授权集合，父级历史/纠正材料不进入 Worker；重试与复用以包含载荷、冻结 Prompt 的 subagent-v4 键绑定该范围。
 
 ## 路由、停止与跨存储恢复
 
