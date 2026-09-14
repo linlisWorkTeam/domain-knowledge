@@ -31,6 +31,7 @@ export interface Output {
   blocking: boolean; recommendation: 'PASS' | 'ITERATE';
   correction: { correctionId: string; knowledgePath: string; criterion: string; risk: string; targetHeading?: string; replacementMarkdown?: string } | null;
   unresolvedRisks?: string[];
+  concernResolutions?: Array<{ concernId: string; disposition: 'CONFIRMED' | 'DISPROVED' | 'UNRESOLVED'; reason: string; sourceQuotes: Array<{ path: string; quote: string }> }>;
 }
 /** 对外提供输出Schema，作为调用方使用的统一约定。 */
 export const outputSchema: Record<string, unknown> = {
@@ -38,6 +39,10 @@ export const outputSchema: Record<string, unknown> = {
   properties: {
     blocking: { type: 'boolean' }, recommendation: { enum: ['PASS', 'ITERATE'], description: 'PASS 仅适用于无阻塞、无修订、无未解决风险；存在任一问题必须 ITERATE。' },
     unresolvedRisks: { type: 'array', items: { type: 'string', minLength: 1 } },
+    concernResolutions: { type: 'array', maxItems: 0, items: { type: 'object', additionalProperties: false,
+      required: ['concernId', 'disposition', 'reason', 'sourceQuotes'], properties: { concernId: { type: 'string', minLength: 1 },
+        disposition: { enum: ['CONFIRMED', 'DISPROVED', 'UNRESOLVED'] }, reason: { type: 'string', minLength: 1 },
+        sourceQuotes: { type: 'array', maxItems: 20, items: { type: 'object', additionalProperties: false, required: ['path', 'quote'], properties: { path: { type: 'string', minLength: 1 }, quote: { type: 'string', minLength: 1 } } } } } } },
     correction: {
       type: ['object', 'null'],
       properties: {
@@ -53,13 +58,23 @@ export const outputSchema: Record<string, unknown> = {
 /** 构造本次角色执行使用的输出 Schema。 */
 export function schemaFor(input: Input): Record<string, unknown> {
   const allowed = scopedPaths(input);
-  if (!allowed) return outputSchema;
+  if (!allowed && !pendingConcerns(input).length) return outputSchema;
   const schema = structuredClone(outputSchema);
   const properties = (schema.properties as Record<string, unknown>);
   const correction = properties.correction as Record<string, unknown>;
   const fields = correction.properties as Record<string, Record<string, unknown>>;
-  fields.knowledgePath!.enum = correctionTargets(input).map(target => target.knowledgePath);
-  fields.targetHeading!.enum = correctionTargets(input).map(target => target.heading);
+  if (allowed) {
+    fields.knowledgePath!.enum = correctionTargets(input).map(target => target.knowledgePath);
+    fields.targetHeading!.enum = correctionTargets(input).map(target => target.heading);
+  }
+  const concerns = pendingConcerns(input);
+  if (concerns.length) {
+    schema.required = [...schema.required as string[], 'concernResolutions'];
+    const resolutions = properties.concernResolutions as Record<string, unknown>;
+    resolutions.minItems = concerns.length; resolutions.maxItems = concerns.length;
+    const fields = (resolutions.items as Record<string, unknown>).properties as Record<string, Record<string, unknown>>;
+    fields.concernId!.enum = concerns.map(c => c.concernId);
+  }
   return schema;
 }
 function scopedPaths(input: Input): string[] | undefined {
@@ -89,6 +104,7 @@ export function validateInput(input: Input): void {
 
 /** 纠正意见必须定位已有 H2；缺乏定位证据时交付未解决问题，不能凭空扩大修订范围。 */
 export function validateOutput(output: Output, input: Input): void {
+  validateConcernResolutions(output, input);
   if (output.recommendation === 'PASS' && (output.blocking || output.correction || output.unresolvedRisks?.length)) {
     throw new StageValidationIssue('REVIEW_PASS_CONTRADICTION', 'recommendation/blocking/correction/unresolvedRisks',
       'PASS 必须同时 blocking=false、correction=null、unresolvedRisks=[]。仍有风险时应返回 ITERATE 并保留风险；不能为满足结构而删除风险或宣称证据已存在。');
@@ -126,5 +142,36 @@ export function assertReviewFormatHistory(outputs: Output[]): void {
     const heading = correction.knowledgePath.slice(correction.knowledgePath.indexOf('#') + 1);
     const sections = markdownSections(correction.replacementMarkdown);
     if (sections.length !== 1 || sections[0]!.heading !== heading || sections[0]!.start !== 0) baseline ??= facts(output);
+  }
+}
+
+export interface PendingReviewConcern { concernId: string; criterion: string; risk: string }
+export function pendingConcerns(input: Input): PendingReviewConcern[] {
+  const criteria = input.materials.find(({ ref }) => ref.artifactId === input.payload.criteriaRef.artifactId)?.content;
+  if (!criteria || typeof criteria !== 'object' || !('pendingReviewConcerns' in criteria)) return [];
+  const values = criteria.pendingReviewConcerns;
+  if (!Array.isArray(values) || values.length > 1000 || values.some(v => !v || typeof v !== 'object'
+    || typeof v.concernId !== 'string' || !v.concernId || typeof v.criterion !== 'string' || !v.criterion || typeof v.risk !== 'string' || !v.risk)
+    || new Set(values.map(v => v.concernId)).size !== values.length) throw new Error('REVIEW_PENDING_CONCERNS_INVALID');
+  return values;
+}
+/** 线索不是裁决；否定必须给出固定源码中确实存在的引用，判断本身仍由Review承担。 */
+export function validateConcernResolutions(output: Output, input: Input): void {
+  const concerns = pendingConcerns(input);
+  if (!concerns.length) {
+    if (output.concernResolutions?.length) throw new Error('REVIEW_CONCERN_UNBOUND');
+    return;
+  }
+  const resolutions = output.concernResolutions;
+  const invalid = (hint: string): never => { throw new StageValidationIssue('REVIEW_CONCERN_UNRESOLVED', 'concernResolutions', hint); };
+  if (!Array.isArray(resolutions) || resolutions.length !== concerns.length || new Set(resolutions.map(v => v.concernId)).size !== concerns.length
+    || resolutions.some(v => !concerns.some(c => c.concernId === v.concernId))) invalid('必须逐条回应所有待核实线索，保留原concernId；不能遗漏或虚构线索。');
+  const reference = input.materials.find(({ ref }) => ref.artifactId === input.payload.checkReportRef?.artifactId)?.content as { files?: Array<{ path: string; content: string }> } | undefined;
+  for (const resolution of resolutions!) {
+    if (!['CONFIRMED', 'DISPROVED', 'UNRESOLVED'].includes(resolution.disposition) || !resolution.reason?.trim() || !Array.isArray(resolution.sourceQuotes)) invalid('回应需要结论、理由和sourceQuotes数组。');
+    if (resolution.sourceQuotes.some(q => !q.quote?.trim() || !reference?.files?.some(f => f.path === q.path && f.content.includes(q.quote)))) invalid('源码引用必须逐字存在于本轮checkReportRef的固定文件中，不能引用其他材料或虚构文本。');
+    if (resolution.disposition === 'DISPROVED' && !resolution.sourceQuotes.length) invalid('否定线索必须提供固定源码的具体引用和理由，不能仅因测试通过而否定。');
+    if (resolution.disposition === 'CONFIRMED' && (!output.correction || output.recommendation !== 'ITERATE')) invalid('确认线索需要保留定位修订意见和ITERATE结论。');
+    if (resolution.disposition === 'UNRESOLVED' && (!output.unresolvedRisks?.length || output.recommendation !== 'ITERATE')) invalid('尚不能决定的线索需要保留unresolvedRisks与ITERATE，不能宣称通过。');
   }
 }

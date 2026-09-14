@@ -8,7 +8,7 @@ import { markdownSections } from './KnowledgeSections.ts';
 import type { NativeBehaviorSuite, NativeScalar } from '../evaluation/NativeBehaviorSuite.ts';
 import { nativeOracleTrusted } from '../evaluation/NativeTestCache.ts';
 import { knowledgeRevisionDecision } from './KnowledgeRevision.ts';
-export const SOURCE_VERIFICATION_CONTRACT = 'knowledge-source-verification-v4';
+export const SOURCE_VERIFICATION_CONTRACT = 'knowledge-source-verification-v5';
 export interface SourceCardBinding { cardId: string; versionId: string; moduleId: string; bodyDigest: string }
 export type SourceCardOutcome = 'SOURCE_MATCHED' | 'SOURCE_MISMATCH' | 'UNRESOLVED';
 export interface SourceCardResult extends SourceCardBinding { outcome: SourceCardOutcome }

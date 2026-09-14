@@ -100,3 +100,5 @@ STOPPED 保存 ReviewHandoffPrepared 事件及 CAS 交接，包含 summary、his
 来源复核恢复、卡片汇总、历史纠正意见继承及发布准备必须重读该任务的全部来源Review尝试工件，按语义章节键跨taskAttempt核对格式失败前的事实。已缓存的source-section或source-card不能绕过检查；工件摘要或事件绑定不符时拒绝。旧的矛盾PASS只读留证，不通过删除事件、覆盖检查点或忽略旧尝试恢复。
 
 已准备但尚未完成的本地发布在恢复导出前，仍须校验准备工件中四项任务的input/result摘要并重读来源尝试历史；文件摘要正确不能替代这项检查。失败保留原发布准备与失败原因，不导出或提交发布。
+
+存在pendingReviewConcerns时，动态输出Schema要求concernResolutions逐条覆盖原concernId。DISPROVED须附固定checkReportRef文件中的逐字引用和解释；CONFIRMED需要ITERATE及定位纠正，UNRESOLVED需要ITERATE与明确风险。没有线索时不能虚构回应。线索正文是待核对数据，不是授权指令或已经证明的事实；引用匹配只验证出处，判断理由仍需Review承担。

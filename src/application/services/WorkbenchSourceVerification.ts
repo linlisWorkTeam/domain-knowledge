@@ -6,7 +6,7 @@
 import { SOURCE_EVIDENCE_POLICY, sourceEvidenceBindings } from '../../domain/knowledge/SourceEvidenceBindings.ts';
 import { SOURCE_EXECUTION_SCOPE, sourceExecutionScope } from '../../domain/knowledge/SourceExecutionScope.ts';
 import { moduleBuild, type WorkbenchProjectSnapshot } from '../../domain/workbench/WorkbenchProject.ts';
-import { WorkbenchSourceFindingHistory, assertSourceReviewHistory, type SourceFindingProof } from './WorkbenchSourceFindingHistory.ts';
+import { WorkbenchSourceFindingHistory, assertSourceReviewHistory, type SourceFindingProof, type SourceReviewConcernProof } from './WorkbenchSourceFindingHistory.ts';
 import { SOURCE_ASSESSMENT_POLICY, readSourceAssessmentPolicy, SOURCE_REVIEW_POLICY, readSourceReviewPolicy } from '../../domain/knowledge/SourceReviewPolicy.ts';
 import { sha256, type ArtifactRef } from '../../domain/Domain.ts';
 import { canonicalJson, type JsonValue, type StageInput } from '../../domain/workbench/StageTask.ts';
@@ -44,13 +44,13 @@ export class WorkbenchSourceVerification {
     const parent = stages.get(evaluationTaskId);
     if (parent.input.stage !== 'EVALUATE' || parent.input.parameters.operation !== undefined || parent.status !== 'SUCCEEDED' || !parent.result) throw new Error('SOURCE_VERIFICATION_EVALUATION_REQUIRED');
     const existing = stages.store.list(parent.input.projectId).find(task => task.input.parameters.operation === 'KNOWLEDGE_SOURCE_VERIFICATION'
-      && task.input.parameters.verificationContract === SOURCE_VERIFICATION_CONTRACT && task.input.parameters.evaluationTaskId === evaluationTaskId
-      && task.input.parameters.sourceExecutionPolicy === undefined);
+      && task.input.parameters.verificationContract === SOURCE_VERIFICATION_CONTRACT && task.input.parameters.evaluationTaskId === evaluationTaskId);
     if (existing) return existing.input;
     const evidence = await this.evaluation.revisionEvidence(evaluationTaskId);
     const configurationRef = parent.input.parameters.configurationRef as unknown as ArtifactRef;
     await configuration.assertStageCompatible(await this.load<StageModelConfiguration>(configurationRef));
     const priorFindingsRef = await artifacts.put(Buffer.from(JSON.stringify(await new WorkbenchSourceFindingHistory(this.evaluation).collect(parent))), 'application/json');
+    const pendingConcernsRef = await artifacts.put(Buffer.from(JSON.stringify(await new WorkbenchSourceFindingHistory(this.evaluation).collectConcerns(parent))), 'application/json');
     const evidenceRef = await artifacts.put(Buffer.from(canonicalJson(evidence)), 'application/json');
     const project = this.evaluation.dependencies.projects.get(String(parent.input.parameters.snapshotId));
     if (!project) throw new Error('STAGE_INPUT_CHANGED');
@@ -59,7 +59,7 @@ export class WorkbenchSourceVerification {
       sourceAssessmentPolicy: SOURCE_ASSESSMENT_POLICY, sourceReviewPolicy: json(SOURCE_REVIEW_POLICY), sourceEvidencePolicy: SOURCE_EVIDENCE_POLICY,
       sourceExecutionPolicy: SOURCE_EXECUTION_SCOPE, executionScopesRef: json(executionScopesRef),
       evaluationTaskId, evaluationDigest: sha256(canonicalJson(parent.result)), snapshotId: parent.input.parameters.snapshotId!,
-      priorFindingsRef: json(priorFindingsRef), evidenceRef: json(evidenceRef), configurationRef: json(configurationRef) } };
+      pendingConcernsRef: json(pendingConcernsRef), priorFindingsRef: json(priorFindingsRef), evidenceRef: json(evidenceRef), configurationRef: json(configurationRef) } };
   }
   async verify(context: StageExecutionContext) {
     const { stages, projects, repository, artifacts, roles, configuration } = this.evaluation.dependencies;
@@ -92,6 +92,9 @@ export class WorkbenchSourceVerification {
     const proofs = await this.load<SourceFindingProof[]>(priorFindingsRef);
     if (!Array.isArray(proofs) || proofs.length > 1000) throw new Error('SOURCE_HISTORY_BINDING_INVALID');
     const history = new WorkbenchSourceFindingHistory(this.evaluation);
+    const pendingConcernsRef = parameters.pendingConcernsRef as unknown as ArtifactRef;
+    const pendingConcerns = await this.load<SourceReviewConcernProof[]>(pendingConcernsRef);
+    await history.validateConcerns(pendingConcerns, context.task.input);
     const preserved = new Map<string, { proof: SourceFindingProof; value: Awaited<ReturnType<WorkbenchSourceFindingHistory['validate']>> }>();
     for (const proof of proofs) {
       const value = await history.validate(proof, context.task.input); const key = canonicalJson([value.finding.versionId, value.finding.section]);
@@ -99,7 +102,7 @@ export class WorkbenchSourceVerification {
       preserved.set(key, { proof, value });
     }
     const expected: SourceCardBinding[] = [], results: Array<SourceCardResult & Record<string, unknown>> = [];
-    const refs: ArtifactRef[] = [parameters.evidenceRef as unknown as ArtifactRef, priorFindingsRef];
+    const refs: ArtifactRef[] = [parameters.evidenceRef as unknown as ArtifactRef, priorFindingsRef, pendingConcernsRef];
     if (parameters.sourceExecutionPolicy) refs.push(parameters.executionScopesRef as unknown as ArtifactRef);
     for (const versionId of context.task.input.cardVersionIds) {
       const card = repository.getKnowledgeVersion(versionId);
@@ -144,7 +147,9 @@ export class WorkbenchSourceVerification {
               ...sourceSectionObservations(suite, oracle, binding.cardId, heading) };
             const reportRef = await artifacts.put(Buffer.from(JSON.stringify(report)), 'application/json');
             const digestBindings = sourceEvidenceBindings(parameters.sourceEvidencePolicy, project, module.moduleId);
-            const criteria = { schemaVersion: SOURCE_VERIFICATION_CONTRACT, phase: 'FINAL_SOURCE_REVIEW', binding,
+            const criteria = { pendingReviewConcerns: pendingConcerns.filter(p => p.versionId === versionId && p.heading === heading).map(({ concernId, criterion, risk }) => ({ concernId, criterion, risk })),
+              concernInstruction: '待核实线索来自旧失败输出，不代表事实。逐条回应concernResolutions；确认时保留修订，否定时给出本轮固定源码的逐字引用和理由，无法决定则保留未知风险，不能忽略线索。',
+              schemaVersion: SOURCE_VERIFICATION_CONTRACT, phase: 'FINAL_SOURCE_REVIEW', binding,
               ...(executionScope ? { executionScope, executionScopeInstruction: '本次参考测试使用executionScope中的固定构建与平台；definitions列出声明式编译定义，不是编译器全部预定义宏。SINGLE_FROZEN_BUILD不证明其他宏组合或平台已测试。结合源码判断该配置下的事实，不凭空补充覆盖，也不清除实际未知风险。' } : {}),
               ...(digestBindings ? { sourceEvidenceBindings: digestBindings } : {}),
               ...(sourceReviewPolicy ? { sourceReviewPolicy } : {}),
@@ -160,7 +165,7 @@ export class WorkbenchSourceVerification {
               materials: [{ ref: card.bodyRef, content: body }, { ref: referenceRef, content: reference }, { ref: reportRef, content: report }, { ref: criteriaRef, content: criteria }, ...executionMaterials] });
             const opinion = review.output as unknown as ReviewOutput;
             const decision = sourceSectionDecision(card.moduleId, body, heading, opinion);
-            return { artifactRefs: [...inputRefs, review.resultRef, review.rawRef], summary: { ...binding, section: heading, ...decision, criterion: opinion.correction?.criterion ?? null, referenceRef: json(referenceRef), referenceObservationsRef: json(reportRef), criteriaRef: json(criteriaRef), reviewResultRef: json(review.resultRef), reviewRef: json(review.rawRef) } };
+            return { artifactRefs: [...inputRefs, review.resultRef, review.rawRef], summary: { ...binding, section: heading, ...decision, concernResolutions: json(opinion.concernResolutions ?? []), criterion: opinion.correction?.criterion ?? null, referenceRef: json(referenceRef), referenceObservationsRef: json(reportRef), criteriaRef: json(criteriaRef), reviewResultRef: json(review.resultRef), reviewRef: json(review.rawRef) } };
           });
           sections.push(section.summary as unknown as typeof sections[number]); sectionRefs.push(...section.artifactRefs);
           context.progress({ phase: 'source-section', versionId, heading, completed: sectionIndex + 1, total: headings.length });

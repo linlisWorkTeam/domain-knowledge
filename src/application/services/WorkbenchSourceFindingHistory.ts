@@ -3,16 +3,18 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：冻结并验证同正文的既有源码矛盾，不将后续PASS当作问题已修复。
  */
+import { markdownSections } from '../../domain/knowledge/KnowledgeSections.ts';
 import { sha256, type ArtifactRef } from '../../domain/Domain.ts';
 import { canonicalJson, type StageInput, type StageTask } from '../../domain/workbench/StageTask.ts';
 import type { AgentCommand, AgentResult } from '../../domain/agents/AgentContracts.ts';
-import { assertReviewFormatHistory, type Output as ReviewOutput } from '../../domain/agents/reviewAgent/WorkbenchReviewContract.ts';
+import { assertReviewFormatHistory, type PendingReviewConcern, type Output as ReviewOutput } from '../../domain/agents/reviewAgent/WorkbenchReviewContract.ts';
 import { authorizeSourceCorrection, sourceHistoryCommandView } from '../../domain/knowledge/SourceRevision.ts';
 import type { SourceCardResult } from '../../domain/knowledge/KnowledgeSourceVerification.ts';
 import type { ArtifactStore } from '../ports/ApplicationPorts.ts';
 import type { StageEvent } from '../../domain/workbench/StageTask.ts';
 import type { StageAttempt } from '../../domain/agents/AgentExecution.ts';
 import type { WorkbenchEvaluation } from './WorkbenchEvaluation.ts';
+export interface SourceReviewConcernProof extends PendingReviewConcern { sourceTaskId: string; eventSequence: number; rawRef: ArtifactRef; versionId: string; heading: string }
 export interface SourceFindingProof { taskId: string; checkpointKey: string; checkpointDigest: string }
 export interface HistoricalSourceFinding extends SourceCardResult {
   section: string; reviewRef: ArtifactRef; reviewResultRef: ArtifactRef; referenceRef: ArtifactRef;
@@ -26,12 +28,59 @@ export class WorkbenchSourceFindingHistory {
     if (!ref || !await artifacts.verify(ref)) throw new Error('SOURCE_HISTORY_ARTIFACT_INVALID');
     return JSON.parse(Buffer.from(await artifacts.get(ref)).toString('utf8')) as T;
   }
+  private async concern(source: StageTask, event: StageEvent, input: StageInput): Promise<SourceReviewConcernProof | null> {
+    const d = event.detail;
+    if (!d || typeof d !== 'object' || Array.isArray(d) || d.phase !== 'role-stage-attempt' || d.role !== 'review'
+      || typeof d.key !== 'string' || !d.key.startsWith('final-source:') || d.stage !== 'evidence-attribution'
+      || !['FAILED', 'REJECTED'].includes(String(d.status))) return null;
+    if (source.input.parameters.operation !== 'KNOWLEDGE_SOURCE_VERIFICATION'
+      || !['knowledge-source-verification-v2', 'knowledge-source-verification-v3', 'knowledge-source-verification-v4', 'knowledge-source-verification-v5'].includes(String(source.input.parameters.verificationContract))
+      || source.inputDigest !== sha256(canonicalJson({ contractVersion: source.contractVersion, input: source.input, limits: source.limits }))
+      || source.input.projectId !== input.projectId || source.input.sourceDigest !== input.sourceDigest
+      || source.input.sourceRevision !== input.sourceRevision || source.input.parameters.snapshotId !== input.parameters.snapshotId) throw new Error('SOURCE_CONCERN_BINDING_INVALID');
+    const versionId = d.key.split(':')[1]!;
+    if (!source.input.cardVersionIds.includes(versionId) || !input.cardVersionIds.includes(versionId)) return null;
+    const card = this.evaluation.dependencies.repository.getKnowledgeVersion(versionId);
+    if (!card || card.metadata.projectSnapshotId !== input.parameters.snapshotId || !await this.evaluation.dependencies.artifacts.verify(card.bodyRef)) throw new Error('SOURCE_CONCERN_BINDING_INVALID');
+    const body = Buffer.from(await this.evaluation.dependencies.artifacts.get(card.bodyRef)).toString('utf8');
+    const heading = markdownSections(body).find(s => d.key === `final-source:${versionId}:${sha256(s.heading).slice(0,24)}`)?.heading;
+    if (!heading) throw new Error('SOURCE_CONCERN_BINDING_INVALID');
+    const rawRef = d.artifactRef as unknown as ArtifactRef;
+    const record = await this.load<StageAttempt>(rawRef);
+    if (record.stage !== d.stage || record.attempt !== d.attempt || record.status !== d.status) throw new Error('SOURCE_CONCERN_BINDING_INVALID');
+    const correction = (record.output as unknown as ReviewOutput | undefined)?.correction;
+    if (!correction || correction.knowledgePath !== `knowledge/${card.moduleId}.md#${heading}`) return null;
+    if (typeof correction.criterion !== 'string' || !correction.criterion.trim() || typeof correction.risk !== 'string' || !correction.risk.trim()) return null;
+    return { concernId: `concern-${sha256(canonicalJson([source.taskId, rawRef.sha256, versionId]))}`, sourceTaskId: source.taskId,
+      eventSequence: event.sequence, rawRef, versionId, heading, criterion: correction.criterion, risk: correction.risk };
+  }
+  async collectConcerns(parent: StageTask): Promise<SourceReviewConcernProof[]> {
+    const { stages } = this.evaluation.dependencies; const concerns = new Map<string, SourceReviewConcernProof>();
+    for (const task of stages.store.list(parent.input.projectId)) {
+      if (task.input.parameters.operation !== 'KNOWLEDGE_SOURCE_VERIFICATION' || task.input.sourceDigest !== parent.input.sourceDigest
+        || task.input.sourceRevision !== parent.input.sourceRevision || task.input.parameters.snapshotId !== parent.input.parameters.snapshotId) continue;
+      for (const event of stages.store.events(task.taskId)) {
+        const concern = await this.concern(task, event, parent.input);
+        if (concern) concerns.set(concern.concernId, concern);
+        if (concerns.size > 1000) throw new Error('SOURCE_CONCERN_LIMIT');
+      }
+    }
+    return [...concerns.values()].sort((a,b) => a.concernId.localeCompare(b.concernId));
+  }
+  async validateConcerns(proofs: SourceReviewConcernProof[], input: StageInput): Promise<void> {
+    if (!Array.isArray(proofs) || proofs.length > 1000 || new Set(proofs.map(p => p.concernId)).size !== proofs.length) throw new Error('SOURCE_CONCERN_BINDING_INVALID');
+    for (const proof of proofs) {
+      const source = this.evaluation.dependencies.stages.get(proof.sourceTaskId);
+      const event = this.evaluation.dependencies.stages.store.events(source.taskId).find(e => e.sequence === proof.eventSequence);
+      if (!event || canonicalJson(await this.concern(source, event, input)) !== canonicalJson(proof)) throw new Error('SOURCE_CONCERN_BINDING_INVALID');
+    }
+  }
   async validate(proof: SourceFindingProof, input: StageInput) {
     const { stages, repository, artifacts, roles } = this.evaluation.dependencies;
     const source = stages.get(proof.taskId);
     await assertSourceReviewHistory(artifacts, stages.store.events(source.taskId));
     if (source.input.stage !== 'EVALUATE' || source.input.parameters.operation !== 'KNOWLEDGE_SOURCE_VERIFICATION'
-      || !['knowledge-source-verification-v2', 'knowledge-source-verification-v3', 'knowledge-source-verification-v4'].includes(String(source.input.parameters.verificationContract))
+      || !['knowledge-source-verification-v2', 'knowledge-source-verification-v3', 'knowledge-source-verification-v4', 'knowledge-source-verification-v5'].includes(String(source.input.parameters.verificationContract))
       || source.input.projectId !== input.projectId || source.input.sourceRevision !== input.sourceRevision || source.input.sourceDigest !== input.sourceDigest
       || source.input.parameters.snapshotId !== input.parameters.snapshotId
       || source.inputDigest !== sha256(canonicalJson({ contractVersion: source.contractVersion, input: source.input, limits: source.limits }))) throw new Error('SOURCE_HISTORY_BINDING_INVALID');

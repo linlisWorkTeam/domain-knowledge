@@ -23,7 +23,7 @@ import { createPublicationPreparationFixture as setup } from '../helpers/Publica
 test('preparation checks recursive CAS graph, binds body and is content-idempotent', async () => {
   const f = await setup(); const prepared = await f.service.prepare(f.ids, f.input.fixedSuites);
   assert.equal(prepared.state, 'PREPARED'); assert.equal(prepared.publicationVerified, false);
-  assert.equal(prepared.verifiedArtifactRefs.length, 20);
+  assert.equal(prepared.verifiedArtifactRefs.length, 21);
   assert.equal((await f.service.prepare(f.ids, f.input.fixedSuites)).artifactRef.sha256, prepared.artifactRef.sha256);
 });
 test('corrupt nested artifact and changed persistent body reject before writing preparation', async () => {

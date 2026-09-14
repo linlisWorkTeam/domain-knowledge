@@ -72,13 +72,15 @@ export async function createPublicationPreparationFixture(options: { sourceEvide
   const executionScope = options.executionScope ? sourceExecutionScope(set, JSON.parse(contents.get(referenceRef.sha256)!.toString()), JSON.parse(contents.get(fingerprintRef.sha256)!.toString()), project.build) : undefined;
   const executionScopesRef = executionScope ? await put(Buffer.from(canonicalJson([{ moduleId: 'module', scope: executionScope }])), 'application/json') : undefined;
   if (executionScopesRef) { input.sourceVerification.input.parameters.sourceExecutionPolicy = SOURCE_EXECUTION_SCOPE; input.sourceVerification.input.parameters.executionScopesRef = JSON.parse(JSON.stringify(executionScopesRef)); }
+  const pendingConcernsRef = await put(Buffer.from('[]'), 'application/json');
+  input.sourceVerification.input.parameters.pendingConcernsRef = JSON.parse(JSON.stringify(pendingConcernsRef));
   const sourceIdentity = createStageTask(input.sourceVerification.input, {}, 'now');
   input.sourceVerification.taskId = sourceIdentity.taskId; input.sourceVerification.inputDigest = sourceIdentity.inputDigest;
-  const sourceReferenceRef = await put(Buffer.from(JSON.stringify({ schemaVersion: 'knowledge-source-verification-v4', sourceRevision: 'commit', sourceDigest: project.sourceDigest, files: [{ path: 'module.c', content: sourceContent }] })), 'application/json');
+  const sourceReferenceRef = await put(Buffer.from(JSON.stringify({ schemaVersion: 'knowledge-source-verification-v5', sourceRevision: 'commit', sourceDigest: project.sourceDigest, files: [{ path: 'module.c', content: sourceContent }] })), 'application/json');
   const sourceObservations = { schemaVersion: 'native-source-review-evidence-v3', sourceRevision: project.commit, sourceDigest: project.sourceDigest, suiteRef, oracleRef,
     ...sourceSectionObservations(suite as NativeBehaviorSuite, observations as Parameters<typeof sourceSectionObservations>[1], 'card', 'Value') };
   const observationsRef = await put(Buffer.from(JSON.stringify(sourceObservations)), 'application/json');
-  const criteriaRef = await put(Buffer.from(JSON.stringify({ schemaVersion: 'knowledge-source-verification-v4', phase: 'FINAL_SOURCE_REVIEW', binding: input.cards[0],
+  const criteriaRef = await put(Buffer.from(JSON.stringify({ schemaVersion: 'knowledge-source-verification-v5', pendingReviewConcerns: [], phase: 'FINAL_SOURCE_REVIEW', binding: input.cards[0],
     ...(options.sourceEvidencePolicy ? { sourceEvidenceBindings: sourceEvidenceBindings(options.sourceEvidencePolicy, project, 'module') } : {}),
     ...(executionScope ? { executionScope } : {}),
     section: 'Value', verifyPreamble: true, allowedKnowledgePaths: ['knowledge/knowledge-unit.md#Value'] })), 'application/json');
@@ -91,7 +93,7 @@ export async function createPublicationPreparationFixture(options: { sourceEvide
   const sourceSections = [{ ...input.cards[0], section: 'Value', outcome: 'SOURCE_MATCHED', reviewRef: rawRef, reviewResultRef: resultRef,
     referenceRef: sourceReferenceRef, referenceObservationsRef: observationsRef, criteriaRef }];
   (input.sourceVerification.result!.summary.cards as Array<Record<string, unknown>>)[0]!.sections = sourceSections;
-  input.sourceVerification.result!.artifactRefs = [rawRef, resultRef, sourceReferenceRef, observationsRef, criteriaRef, ...(executionScopesRef ? [executionScopesRef, referenceRef, fingerprintRef] : [])];
+  input.sourceVerification.result!.artifactRefs = [pendingConcernsRef, rawRef, resultRef, sourceReferenceRef, observationsRef, criteriaRef, ...(executionScopesRef ? [executionScopesRef, referenceRef, fingerprintRef] : [])];
   const records = [input.reconstruction, input.evaluation, input.fixedEvaluation, input.sourceVerification];
   const card = { versionId: 'version', moduleId: 'knowledge-unit', bodyRef, title: 'Value', description: 'Returns a value', tags: ['c'], provenance: [{ path: 'module.c', commit: 'commit' }], metadata: { cardId: 'card', sourceModule: 'module', projectSnapshotId: project.snapshotId } } as unknown as KnowledgeVersion;
   const service = new WorkbenchPublicationEvidence({ contracts: new JsonSchemaAgentContractValidator('docs/specs/schemas'), projects: { get: () => structuredClone(project) }, tests: { get: id => id === set.testSetId ? structuredClone(set) : null }, stages: { store: { events: () => [] }, get(id) { const task = records.find(task => task.taskId === id); assert.ok(task); return structuredClone(task); } },

@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { execute } from './ReviewAgent.ts';
 import { buildPrompt } from './WorkbenchReviewPrompt.ts';
-import type { Input } from './WorkbenchReviewContract.ts';
+import { validateOutput, type Input } from './WorkbenchReviewContract.ts';
 import { roleExample } from '../../../../tests/helpers/RoleExample.ts';
 
 test('review: normal output uses one model call and validates before returning artifacts', async () => {
@@ -166,4 +166,20 @@ test('review: persisted format failure also prevents replaying a later contradic
   sample.context.model.execute = async () => { calls++; return original; };
   await assert.rejects(execute(sample.input, sample.context), /REVIEW_REPAIR_FACTS_CHANGED/);
   assert.equal(calls, 0);
+});
+
+test('review: pending concerns cannot disappear and disproof quotes must exist in the frozen source', () => {
+  const sample = roleExample<Input>('review', 'src/domain/agents/reviewAgent/examples/WorkbenchReviewSample.json');
+  const criteria = sample.input.materials.find(m => m.ref.artifactId === sample.input.payload.criteriaRef.artifactId)!;
+  criteria.content = { ...(criteria.content as object), pendingReviewConcerns: [{ concernId: 'concern-1', criterion: 'A declaration was described as inline', risk: 'Wrong location' }] };
+  const source = sample.input.materials.find(m => m.ref.artifactId === sample.input.payload.evaluationReportRef.artifactId)!;
+  sample.input.payload.checkReportRef = source.ref; source.content = { files: [{ path: 'api.h', content: 'inline int value() { return 1; }' }] };
+  const pass = { blocking: false, recommendation: 'PASS' as const, correction: null, unresolvedRisks: [] };
+  assert.throws(() => validateOutput(pass, sample.input), /REVIEW_CONCERN_UNRESOLVED/);
+  const resolution = { concernId: 'concern-1', disposition: 'DISPROVED' as const, reason: 'The function is defined inline here.', sourceQuotes: [{ path: 'api.h', quote: 'inline int value() { return 1; }' }] };
+  assert.doesNotThrow(() => validateOutput({ ...pass, concernResolutions: [resolution] }, sample.input));
+  assert.throws(() => validateOutput({ ...pass, concernResolutions: [{ ...resolution, sourceQuotes: [{ path: 'api.h', quote: 'invented source' }] }] }, sample.input), /REVIEW_CONCERN_UNRESOLVED/);
+  assert.throws(() => validateOutput({ ...pass, concernResolutions: [{ ...resolution, disposition: 'CONFIRMED' }] }, sample.input), /REVIEW_CONCERN_UNRESOLVED/);
+  assert.throws(() => validateOutput({ ...pass, concernResolutions: [{ ...resolution, disposition: 'UNRESOLVED' }] }, sample.input), /REVIEW_CONCERN_UNRESOLVED/);
+  assert.throws(() => validateOutput({ ...pass, concernResolutions: [resolution, resolution] }, sample.input), /REVIEW_CONCERN_UNRESOLVED/);
 });

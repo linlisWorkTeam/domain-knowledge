@@ -3,12 +3,13 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：逐卡逐章重读来源Review原始证据并要求正文完整覆盖。
  */
+import type { SourceReviewConcernProof } from './WorkbenchSourceFindingHistory.ts';
 import { sourceEvidenceBindings } from '../../domain/knowledge/SourceEvidenceBindings.ts';
 import { SOURCE_EXECUTION_SCOPE, sourceExecutionScope } from '../../domain/knowledge/SourceExecutionScope.ts';
 import { moduleBuild } from '../../domain/workbench/WorkbenchProject.ts';
 import { sha256, type ArtifactRef } from '../../domain/Domain.ts';
 import type { AgentCommand, AgentResult } from '../../domain/agents/AgentContracts.ts';
-import type { Output as ReviewOutput } from '../../domain/agents/reviewAgent/WorkbenchReviewContract.ts';
+import { validateConcernResolutions, type Output as ReviewOutput } from '../../domain/agents/reviewAgent/WorkbenchReviewContract.ts';
 import { assertSourcePublicationSection } from '../../domain/knowledge/SourcePublication.ts';
 import type { WorkbenchProjectSnapshot } from '../../domain/workbench/WorkbenchProject.ts';
 import type { NativeTestSet } from '../../domain/evaluation/NativeTestCache.ts';
@@ -30,6 +31,9 @@ export class WorkbenchSourcePublication {
       if (!ref || !await artifacts.verify(ref)) throw new Error('PUBLICATION_SOURCE_ARTIFACT_CORRUPT');
       return JSON.parse(Buffer.from(await artifacts.get(ref)).toString('utf8')) as T;
     };
+    const concernsRef = task.input.parameters.pendingConcernsRef as unknown as ArtifactRef;
+    const concerns = await load<SourceReviewConcernProof[]>(concernsRef);
+    if (!Array.isArray(concerns) || !task.result?.artifactRefs.some(r => r.sha256 === concernsRef.sha256)) throw new Error('PUBLICATION_SOURCE_CONCERNS_CHANGED');
     if (task.input.parameters.sourceExecutionPolicy !== undefined) {
       if (task.input.parameters.sourceExecutionPolicy !== SOURCE_EXECUTION_SCOPE) throw new Error('SOURCE_EXECUTION_POLICY_INVALID');
       const scopeRef = task.input.parameters.executionScopesRef as unknown as ArtifactRef;
@@ -77,6 +81,11 @@ export class WorkbenchSourcePublication {
         contracts.assertResult(envelope);
         const command = await load<AgentCommand>(envelope.commandRef); contracts.assertCommand(command);
         const criteria = await load<Record<string, unknown>>(section.criteriaRef);
+        const expectedConcerns = concerns.filter(p => p.versionId === card.versionId && p.heading === section.section).map(({ concernId, criterion, risk }) => ({ concernId, criterion, risk }));
+        if (canonicalJson(criteria.pendingReviewConcerns) !== canonicalJson(expectedConcerns)) throw new Error('PUBLICATION_SOURCE_CONCERNS_CHANGED');
+        validateConcernResolutions(raw, { moduleId: card.moduleId, sourcePaths: [], publicInterfacePaths: [], provenance: [],
+          payload: { executionContract: 'workbench-review-v1', knowledgeRef: card.bodyRef, checkReportRef: section.referenceRef, evaluationReportRef: section.referenceObservationsRef, criteriaRef: section.criteriaRef },
+          materials: [{ ref: card.bodyRef, content: body }, { ref: section.referenceRef, content: reference }, { ref: section.criteriaRef, content: criteria }] });
         if (task.input.parameters.sourceExecutionPolicy) {
           const expectedScope = sourceExecutionScope(set, await load(set.referenceRef), await load(set.fingerprintRef), moduleBuild(project, module.moduleId));
           if (canonicalJson(criteria.executionScope) !== canonicalJson(expectedScope)
