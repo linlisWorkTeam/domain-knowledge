@@ -1,0 +1,13 @@
+# C++固定门禁完成及补证容量恢复
+
+目标active，本轮progress。原用户树不动，worktree/tmp/domain-knowledge-workbench，PR50仍Draft，未关闭合入38/50。最后需完整真实验收、网站后比较38包含关系。f543c59 CI34828092897全绿601代码/39Console/25acceptance，日志/tmp/WorkbenchCi34828092897Passed.log。3c0b310记录真实线上截图，网站/app仍f543c59，127.0.0.1:4310和既有contract-strict-warren-theories.trycloudflare.com健康，原8Run/1卡，真实验收runtime尚未导入。桌面/390px入口及旧知识详情只读检查通过，截图docs/reports/workbenchScreenshots/Deployed*.png，/tmp/WorkbenchDeployedBrowserRetest.log。tmux当前Console PID4120697。
+
+用户新增授权只删不用的tmux，明确work和ljy保留；检查发现wxc、wxz空闲Codex提示符、无任务子进程，已删除并确认进程退出。cjson-real/v10/v12 Console/tunnel仍运行所以保留；mvp Console/tunnel保留。内存由585至682MiB，后来约720。未删源文件或知识数据。
+
+真实C++同一e6d45重建：可信03dc37/37；固定stage-79e38c35042c352024afa7b29593269a728deede2ab676b7e384380c3a37d1b5恢复成功40/40、80用例检查点，0calls135722ms，报告24a51dd8afc13f36b3b90d1f68f5ea95a4628570f838acc28a565acf27082fa0。/tmp/CppV11FixedAfterTmuxContinuation.log。来源stage-86fde3b43f3d752129f83426ac106b5c899b9fac1b973c66c038eb836d1cda61成功执行但UNRESOLVED：9卡63节，24匹配39未知，65calls4296142tokens，377工件审计通过。原范围错误同任务有效第二尝试通过。/tmp/CppV11SourceRangeResume.log、cpp-v11-source/Source.json、ArtifactAudit.json。不能发布。库内关联stage-5339101251b19897c3164088d0278a30f4e21fcc9c646348425cb5aac5297465执行成功但真实0关系、无外部材料；疑因正文多为XMLUtil::ToX而元数据tinyxml2::XMLUtil::ToX，仅查完全限定符号，尚未实现更改，不能编造关系。
+
+补证stage-e6ec12264144435c594030acee7f24767f4071d7e4c7f3ff6ebf006482800200 PAUSED/NATIVE_TRUSTED_GATE_LIMIT：40新候选+37旧可信=77大于64，1call67340tokens，/tmp/CppV11Supplement.log、cpp-v11-supplement/Evaluation.json。发现程序未转候选拒绝，resume重复已接受模型输出。当前修改NativeTrustedGates增加含容量的错误类（不用TS parameter property，Node strip-only不支持）；NativeSuiteEvaluation仅捕获新候选合并容量错误，保存REJECTED/空oracle/candidateConstraint；WorkbenchEvaluation保存并反馈容量与历史保留数，走TEST_CANDIDATE_REJECTED正常递增候选键。历史自身超限和期望冲突仍原样抛错，64上限未改，不删可信用例。前台KnowledgeEvaluation展示容量、候选未执行和重新生成动作。Spec/HTTP/UI/Operations已同步。
+
+验证：底层NativeSupplement+NativeTrustedGates5/5；WorkbenchEvaluation原3变体通过，新增capacity变体初因caseId带连字符触发AGENT_OUTPUT_INVALID，改下划线后定向1/1，验证重启、容量反馈、减少候选成功、连续累计用量。/tmp/WorkbenchCapacityRecoveryIntegration.log（3pass1失败测试数据）、/tmp/WorkbenchCapacityRecoveryRetest.log（新变体pass）。SupplementTargetPanel2/2，typecheck通过/tmp/WorkbenchCapacityTypes.log。当前修改尚待最终Spec/diff检查、提交推送、CI。修复引擎文件改变原生工具链指纹；旧真实任务不得跨指纹恢复，不把旧40/40描述为新引擎通过。所有真实/控制器进程已终态：source35147、after-source23461、supplement65880；没有模型或编译任务在跑。测试79925终态失败，60266定向成功，type26076成功。
+
+下一步提交此恢复修复并运行现有CI，之后新引擎真实验证。尚未执行/tmp/RunCV11Reconstruction.ts（冻结7个C旧卡并检查当前身份）、/tmp/RunCppV11Supplement.ts不能直接resume旧e6ec因指纹改变。/tmp/RunCurrentCardAssociations.ts已执行Cpp一次0结果。C新链、C++补证/再复核及关联实际可用结果、线上真实任务一键/分步发布验收仍待完成。不要反复仅报告状态或跨指纹重启旧任务。不要随意修改卡片、预期或放宽来源门禁。来源复核有大量仅源代码可证明而被模型标未知的问题，可能需要证据交接改进；现在不宣称已解决。

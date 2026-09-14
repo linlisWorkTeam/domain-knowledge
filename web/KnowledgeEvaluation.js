@@ -20,7 +20,7 @@ export function createKnowledgeEvaluationPanel({ root, request, escapeHtml: esca
     NATIVE_TRUSTED_GATE_LIMIT: '历史可信用例总数超出当前执行上限，任务已暂停，未删减门禁。',
     AGENT_OUTPUT_INVALID: '模型返回的候选测试缺少必填字段或不符合协议。前序结果已保留，可恢复原任务重新提出。',
     DSH_AGENT_OUTPUT_NOT_JSON: '模型返回内容不完整或格式错误。前序结果已保留，可恢复原任务。',
-    TEST_CANDIDATE_REJECTED: '候选用例未通过补证目标检查或参考验证，不能用于评测生成代码，也不能据此判定知识错误。可重新生成候选，累计用量保留。',
+    TEST_CANDIDATE_REJECTED: '候选用例未通过容量、补证目标检查或参考验证，不能用于评测生成代码，也不能据此判定知识错误。可重新生成候选，累计用量保留。',
     NATIVE_REFERENCE_BASELINE_FAILED: '参考实现基础构建或启动失败，请下载报告并检查构建参数和依赖。候选测试尚未生成。',
     NATIVE_TEST_TOOLCHAIN_CHANGED: '工具链已变化，请按当前环境重新重建代码，再启动评测。',
     PROVIDER_QUOTA_EXHAUSTED: '供应商额度不足，补充额度后可恢复。已完成用例保留。',
@@ -70,6 +70,7 @@ export function createKnowledgeEvaluationPanel({ root, request, escapeHtml: esca
       ${task.reasonCode ? `<p>${escape(reasons[task.reasonCode] ?? task.reasonCode)}</p>` : ''}
       ${modules.map((module) => `<section><h4>${escape(module.moduleId)} · ${escape({ BEHAVIOR_PASSED: '可信用例全部通过', BEHAVIOR_FAILED: '可信用例存在失败', CANDIDATE_REJECTED: '候选未通过验证', TRUSTED_GATE_CONFLICT: '历史可信门禁与当前参考冲突' }[module.status] ?? module.status)}</h4>
       <p>新增 ${escape(module.proposed ?? 0)} 个候选；复用 ${escape(module.reused ?? 0)} 个用例${module.revalidated ? '，已重新验证参考实现' : ''}。</p>
+      ${module.candidateConstraint?.code === 'NATIVE_TRUSTED_GATE_LIMIT' ? `<p>合并后需要 ${escape(module.candidateConstraint.requiredCases)} 条用例，超过 ${escape(module.candidateConstraint.maximumCases)} 条容量；已保留 ${escape(module.candidateConstraint.retainedCases)} 条可信用例。本批候选未执行，请重新生成较少的候选测试。</p>` : ''}
       ${module.targetCoverage ? `<p>补证段落引用命中 ${escape(module.targetCoverage.matchedSectionIds.length)} 个；未命中 ${escape(module.targetCoverage.unmatchedSectionIds.length)} 个。引用命中不代表语义验证通过。</p>${!module.targetCoverage.candidateEligible ? '<p>候选未命中指定段落，未执行候选测试。</p>' : ''}<p>未命中段落：${module.targetCoverage.unmatchedSectionIds.map(escape).join('、') || '无'}</p>` : ''}
       ${module.report ? `<p>通过 ${escape(module.report.passed)}/${escape(module.report.total)}${module.interfaceCompatible === false ? '；公开接口存在差异' : ''}</p>` : ''}
       ${download(module.reportRef, '下载评测报告')}${download(module.oracleRef, '下载参考验证')}

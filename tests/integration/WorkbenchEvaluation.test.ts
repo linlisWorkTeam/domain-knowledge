@@ -16,7 +16,7 @@ import { assertModelOutput } from '../../src/infrastructure/agentAdapters/ModelE
 import { NativeToolchain } from '../../src/infrastructure/evaluation/project/NativeToolchain.ts';
 import { NativeCaseExecutor } from '../../src/infrastructure/evaluation/project/NativeCaseExecutor.ts';
 
-for (const { rejectSourceReview, mixedSourceRisks } of [{ rejectSourceReview: false, mixedSourceRisks: false }, { rejectSourceReview: true, mixedSourceRisks: false }, { rejectSourceReview: false, mixedSourceRisks: true }]) test(`native stage rejects bad candidates, resumes trusted cases after restart and maps generated failures to revised cards (source rejection=${rejectSourceReview}, mixed risks=${mixedSourceRisks})`, async () => {
+for (const { rejectSourceReview, mixedSourceRisks, overCapacity = false } of [{ rejectSourceReview: false, mixedSourceRisks: false }, { rejectSourceReview: true, mixedSourceRisks: false }, { rejectSourceReview: false, mixedSourceRisks: true }, { rejectSourceReview: false, mixedSourceRisks: true, overCapacity: true }]) test(`native stage rejects bad candidates, resumes trusted cases after restart and maps generated failures to revised cards (source rejection=${rejectSourceReview}, mixed risks=${mixedSourceRisks}, capacity=${overCapacity})`, async () => {
   const root = mkdtempSync(join(tmpdir(), 'evaluation-source-')); const runtimeDir = mkdtempSync(join(tmpdir(), 'evaluation-runtime-'));
   const git = (...args: string[]) => execFileSync('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.test', ...args], { cwd: root, encoding: 'utf8' }).trim();
   git('init', '-q'); writeFileSync(join(root, 'math.h'), 'int add(int a,int b);');
@@ -25,6 +25,7 @@ for (const { rejectSourceReview, mixedSourceRisks } of [{ rejectSourceReview: fa
   let composition = createComposition({ runtimeDir }); let testCalls = 0, codeCalls = 0, generatedRuns = 0, reviewCalls = 0, revisionCalls = 0, sourceReviewCalls = 0;
   let supplementMissesTarget = true; let supplementRequested = false; let exposeMixedRisk = false; let acceptFalseSource = false; let interruptSourceSection = true; const sectionCalls = new Map<string, number>();
   let wrongCandidate = true, wrongCode = false, interrupt = true, reviewKeepsKnowledge = false;
+  let capacityRequested = false, capacityRepaired = false;
   const install = () => {
     const deps = composition.apps.workbenchReconstruction.dependencies;
     deps.snapshot = async (language, build) => ({ schemaVersion: 'native-toolchain-v1', language, build, architecture: 'test', files: [], digest: sha256('fixed-tools') });
@@ -79,6 +80,9 @@ for (const { rejectSourceReview, mixedSourceRisks } of [{ rejectSourceReview: fa
         assert.match(request.prompt, /missing|unknown/); assert.match(request.prompt, /card-add#Limits/);
         assert.match(request.prompt, /native-supplement-targets-v1/);
         if (!supplementMissesTarget) { assert.match(request.prompt, /targetCoverage/); assert.match(request.prompt, /unmatchedSectionIds/); }
+        if (capacityRequested) return { oracleRequired: true, nativeSuite: { schemaVersion: 'native-cases-v1', cases: Array.from({ length: 64 }, (_, index) => ({ caseId: `capacity_${index}`, description: 'Capacity candidate', sections: ['card-add#Limits'], variables: [],
+          calls: [{ function: 'add', arguments: [{ integer: String(index + 10) }, { integer: '1' }], result: 'sum' }], observations: [{ name: 'sum', kind: 'integer', read: { variable: 'sum' } }], expected: { sum: String(index + 11) } })) } };
+        if (capacityRepaired) { assert.match(request.prompt, /NATIVE_TRUSTED_GATE_LIMIT/); assert.match(request.prompt, /maximumCases/); assert.match(request.prompt, /retainedCases/); }
         return { oracleRequired: true, nativeSuite: { schemaVersion: 'native-cases-v1', cases: [{ caseId: 'zero', description: 'Zero boundary', sections: [supplementMissesTarget ? 'card-add#Behavior' : 'card-add#Limits'], variables: [],
           calls: [{ function: 'add', arguments: [{ integer: '0' }, { integer: '0' }], result: 'sum' }], observations: [{ name: 'sum', kind: 'integer', read: { variable: 'sum' } }], expected: { sum: '0' } }] } };
       }
@@ -350,16 +354,31 @@ for (const { rejectSourceReview, mixedSourceRisks } of [{ rejectSourceReview: fa
       assert.equal((await composition.apps.workbenchEvaluation.start(sourceRebuilt.taskId, rechecked.taskId)).taskId, supplemental.taskId);
       await composition.close(); composition = createComposition({ runtimeDir }); install();
       supplementMissesTarget = false;
+      let previousAttempt = rejected;
+      if (overCapacity) {
+        capacityRequested = true;
+        composition.apps.workbenchStages.resume(supplemental.taskId, supplemental.inputDigest);
+        const constrained = await composition.apps.workbenchStages.wait(supplemental.taskId);
+        assert.equal(constrained.status, 'FAILED'); assert.equal(constrained.reasonCode, 'TEST_CANDIDATE_REJECTED');
+        assert.equal(constrained.usage.modelCalls, rejected.usage.modelCalls + 1);
+        assert.equal(constrained.usage.tokens, rejected.usage.tokens + 5);
+        const saved = composition.apps.workbenchStages.store.checkpoints(supplemental.taskId).filter(item => item.key.startsWith('candidate-rejection:')).at(-1)!;
+        const capacityReport = JSON.parse(Buffer.from(await composition.artifacts.get(saved.result.artifactRefs[0]!)).toString());
+        assert.deepEqual(capacityReport.candidateConstraint, { code: 'NATIVE_TRUSTED_GATE_LIMIT', maximumCases: 64, retainedCases: 1, requiredCases: 65 });
+        assert.ok(capacityReport.cases.every((item: any) => item.observation === undefined));
+        await composition.close(); composition = createComposition({ runtimeDir }); install();
+        capacityRequested = false; capacityRepaired = true; previousAttempt = constrained;
+      }
       composition.apps.workbenchStages.resume(supplemental.taskId, supplemental.inputDigest);
       const done = await composition.apps.workbenchStages.wait(supplemental.taskId);
-      assert.equal(done.usage.modelCalls, rejected.usage.modelCalls + 1);
-      assert.equal(done.usage.tokens, rejected.usage.tokens + 5);
+      assert.equal(done.usage.modelCalls, previousAttempt.usage.modelCalls + 1);
+      assert.equal(done.usage.tokens, previousAttempt.usage.tokens + 5);
       assert.equal(done.status, 'SUCCEEDED', done.reasonCode ?? '');
       const report = (done.result!.summary.modules as any[])[0];
       assert.equal(report.proposed, 1); assert.equal(report.reused, 1); assert.equal(report.passed, 2);
-      assert.equal(testCalls, 4);
+      assert.equal(testCalls, overCapacity ? 5 : 4);
       assert.equal((await composition.apps.workbenchEvaluation.start(sourceRebuilt.taskId, rechecked.taskId)).taskId, supplemental.taskId);
-      assert.equal(testCalls, 4);
+      assert.equal(testCalls, overCapacity ? 5 : 4);
       await assert.rejects(composition.apps.workbenchEvaluation.prepare(changedCode.taskId, rechecked.taskId), /NATIVE_SUPPLEMENT_BINDING_INVALID/);
     }
   } finally { await composition.close(); rmSync(root, { recursive: true, force: true }); rmSync(runtimeDir, { recursive: true, force: true }); }

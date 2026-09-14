@@ -356,3 +356,7 @@ This document summarizes older handoffs, milestones and architectural decisions 
 ## 2026-09-14 17:30 归档
 
 [1616 main集成交接](https://github.com/linlisWorkTeam/domain-knowledge/blob/f543c59f922a522a8998506553788619778da1c1/docs/epitaph/2026-09-14-1616-main-integration-checkpoint.md)：合并main并联合Spec和历史，静态检查通过，保留v0.2.0；当时尚未全量回归、部署或合入PR。当前推进仍不能以静态检查代替C/C++真实验收。
+
+## 2026-09-14 18:01 归档
+
+[1626 回归与资源限制](https://github.com/linlisWorkTeam/domain-knowledge/blob/3c0b31070167c5334c05b8ddfc8a8140b4a76eae/docs/epitaph/2026-09-14-1626-regression-fixes-and-resource-limit.md)：当时完整回归600项577通过，修复契约样例及Code编译诊断交接；原生专项仍受512+64MiB资源预检限制，未降门槛。后来f543c59的CI代码601/601、Console39/39、acceptance25/25已通过；当前新增容量修复尚待CI及新引擎真实验收。

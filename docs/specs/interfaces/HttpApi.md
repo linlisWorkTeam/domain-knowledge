@@ -207,3 +207,5 @@ GET /api/v1/stage-tasks 支持 snapshotId、stage 查询参数，与 projectId �
 原生补证评测新任务在服务端冻结supplementTargets（native-supplement-targets-v1），前端不编辑该策略。评测报告可包含targetCoverage的matchedSectionIds、unmatchedSectionIds、candidateEligible与semanticCoverageProven=false。未命中仍返回TEST_CANDIDATE_REJECTED，保留原任务恢复入口和累计用量；已存在的旧补证任务不自动升级或替换。
 
 新来源复核任务在服务端冻结sourceExecutionPolicy=source-execution-scope-v1和executionScopesRef，关联本轮可信测试集的参考构建与工具链记录。阶段工件下载包含原记录；保留旧任务输入，不自动跨策略恢复。发布阶段重新核对逐章Review准则与冻结构建范围；单一构建不声明全部宏组合或平台通过。
+
+补证容量拒绝报告可含candidateConstraint：code=NATIVE_TRUSTED_GATE_LIMIT、maximumCases、retainedCases、requiredCases。该报告的候选未执行，不含伪造参考观察；阶段以TEST_CANDIDATE_REJECTED结束，通过原同输入恢复入口生成新候选。旧引擎指纹的暂停任务仍不可跨指纹恢复。

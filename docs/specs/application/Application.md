@@ -150,3 +150,5 @@ WorkbenchEvaluation 已接通：接受成功重建taskId，冻结其结果摘要
 finalCommands 使用同一套编译/测试入口测评生成代码；firstIterationCommands 仅保留为旧场景兼容字段，自动飞轮各轮均使用 finalCommands。编译命令放在 check 阶段；prepareCommands 用于环境准备，其失败不会触发 TestGen 改写测试。C 配置使用 languageId=c、例如 standard=c17 和 gcc。
 
 配置了 moduleContract 的 TypeScript 独立模块使用 section-doc-v1、source-facts-v1、behavior-cases-v1、workbench-code-v1 和 workbench-review-v1 显式协议，仍由同一七角色注册执行。原生通用项目继续使用默认角色协议。新运行冻结 domain-agents-v11-workbench-evidence，旧版本只读，不跨版本恢复。
+
+补证候选容量拒绝沿用TEST_CANDIDATE_REJECTED及候选修订检查点，拒绝报告增加candidateConstraint（原因码、最大容量、保留用例数及合并所需容量）。恢复时作为未可信反馈传给TestGen，并要求保留历史预期、减少新增候选；一条用例只能引用其实际验证的章节。没有参考观察不得伪造通过结果。执行器变更会改变工具链指纹，旧指纹任务不得跨指纹恢复。

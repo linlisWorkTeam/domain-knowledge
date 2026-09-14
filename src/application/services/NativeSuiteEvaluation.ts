@@ -8,7 +8,7 @@ import { canonicalJson } from '../../domain/workbench/StageTask.ts';
 import { buildConstraints } from '../../domain/workbench/WorkbenchProject.ts';
 import { markdownSections } from '../../domain/knowledge/KnowledgeSections.ts';
 import { assertNativeBehaviorSuite, type NativeBehaviorSuite, type NativeContract } from '../../domain/evaluation/NativeBehaviorSuite.ts';
-import { nativeTrustedGates, nativeSupplementGates } from '../../domain/evaluation/NativeTrustedGates.ts';
+import { nativeTrustedGates, nativeSupplementGates, NativeTrustedGateLimit } from '../../domain/evaluation/NativeTrustedGates.ts';
 import { nativeTestKeys, nativeOracleTrusted, type NativeTestSet } from '../../domain/evaluation/NativeTestCache.ts';
 import { nativeSupplementTargetCoverage, type NativeSupplementTargets } from '../../domain/evaluation/NativeSupplementTargets.ts';
 import type { ArtifactStore } from '../ports/ApplicationPorts.ts';
@@ -16,6 +16,7 @@ import type { NativeCaseRunner, NativeSnapshotter, NativeTestStore, NativeCaseOb
 import type { NativeToolchainInput } from '../ports/LanguageToolchainPorts.ts';
 import type { StageExecutionContext } from './WorkbenchStages.ts';
 type Prepared = { set: NativeTestSet; reused: number; proposed: number; revalidated: boolean; rejection: 'TRUSTED_GATE_CONFLICT' | 'CANDIDATE_REJECTED' | null;
+  candidateConstraint?: { code: string; maximumCases: number; retainedCases: number; requiredCases: number };
   targetCoverage?: ReturnType<typeof nativeSupplementTargetCoverage> };
 type Context = Partial<Pick<StageExecutionContext, 'signal' | 'step' | 'progress'>>;
 export class NativeSuiteEvaluation {
@@ -100,9 +101,14 @@ export class NativeSuiteEvaluation {
     if (proposedSuite) assertNativeBehaviorSuite(proposedSuite, input.contract);
     let candidateObservations: NativeCaseObservation[] | undefined;
     let candidateRejected = false;
+    let candidateConstraint: Prepared['candidateConstraint'];
     const targetCoverage = input.supplement?.targets && proposedSuite ? nativeSupplementTargetCoverage(input.supplement.targets, proposedSuite) : undefined;
     if (input.supplement && proposedSuite) {
-      nativeSupplementGates(historicalSuites, proposedSuite);
+      try { nativeSupplementGates(historicalSuites, proposedSuite); }
+      catch (error) {
+        if (!(error instanceof NativeTrustedGateLimit)) throw error;
+        candidateConstraint = { code: error.message, maximumCases: error.maximumCases, retainedCases: reused, requiredCases: error.requiredCases };
+      }
       const ref = await this.put(proposedSuite);
       if (targetCoverage) {
         const persist = async () => ({ artifactRefs: [await this.put(targetCoverage), ref],
@@ -110,9 +116,9 @@ export class NativeSuiteEvaluation {
         if (context.step) await context.step(`native:supplement-targets:${sha256(canonicalJson(binding))}:${ref.sha256}`, persist);
         else await persist();
       }
-      candidateObservations = targetCoverage && !targetCoverage.candidateEligible ? []
+      candidateObservations = candidateConstraint || (targetCoverage && !targetCoverage.candidateEligible) ? []
         : await this.cases('reference', `supplement:${sha256(canonicalJson(binding))}:${ref.sha256}`, input.reference, input.contract, proposedSuite, context);
-      candidateRejected = targetCoverage?.candidateEligible === false || !nativeOracleTrusted(proposedSuite, candidateObservations);
+      candidateRejected = Boolean(candidateConstraint) || targetCoverage?.candidateEligible === false || !nativeOracleTrusted(proposedSuite, candidateObservations);
     }
     const gates = input.supplement && proposedSuite && !candidateRejected
       ? nativeSupplementGates(historicalSuites, proposedSuite) : nativeTrustedGates(proposedSuite ? [proposedSuite] : historicalSuites);
@@ -148,6 +154,7 @@ export class NativeSuiteEvaluation {
       parentTestSetId: parent?.testSetId ?? null, originVersionIds: [...input.versionIds], projectSnapshotId: input.projectSnapshotId, sourceRevision: input.sourceRevision,
       binding: bound, inheritedTestSetIds: inherited.map((item) => item.testSetId), sectionBindings, status: nativeOracleTrusted(suite, observations) ? 'TRUSTED' : 'REJECTED', suiteRef, oracleRef, referenceRef, fingerprintRef, createdAt: new Date().toISOString() });
     return { set, reused, proposed: proposedSuite?.cases.length ?? 0, revalidated: Boolean(inherited.length),
+      ...(candidateConstraint ? { candidateConstraint } : {}),
       ...(targetCoverage ? { targetCoverage } : {}),
       rejection: set.status === 'TRUSTED' ? null : candidateRejected || !inherited.length ? 'CANDIDATE_REJECTED' : 'TRUSTED_GATE_CONFLICT' };
   }

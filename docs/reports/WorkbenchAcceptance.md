@@ -148,3 +148,13 @@ f543c59实际部署的只读浏览器检查通过，覆盖1363×936桌面和390�
 C++可信测试集与历史不可变套件逐字节摘要一致，仍为161328520660adbfd51e3021a847c841bb806086d7bf55f501ef97687cbcf5f7，审计`cpp-v11-evaluation/ImmutableSuiteAudit.json`。为串行运行浏览器，来源86fde3协作取消后同任务恢复，累计7calls469229tokens保留，日志`/tmp/CppV11SourceAfterBrowser.log`；没有重建新任务或重置用量。
 
 [CI 34828092897](https://github.com/linlisWorkTeam/domain-knowledge/actions/runs/34828092897)已完成并全部通过，测试提交f543c59：代码601/601、Console39/39、acceptance25/25。完整日志`/tmp/WorkbenchCi34828092897Passed.log`。此结果解决本轮回归失败，不替代TinyXML2/jsmn真实模型来源复核、固定门禁和完整发布验收。
+
+## 完成固定测试与补证容量恢复修复（2026-09-14 18:01）
+
+经用户授权确认空闲后删除tmux的wxc、wxz，会话和其空闲Codex进程均退出；保留work、ljy及仍运行Console/tunnel的会话。可用内存测量由585增至682MiB，后续约720MiB。原知识、工作树、配置和证据未删除。
+
+C++固定任务79e38从14条参考检查点恢复后一次完成80条参考/生成检查点，FIXED_PASSED，40/40、接口兼容、参考通过；累计135722ms、0模型调用。报告24a51dd8afc13f36b3b90d1f68f5ea95a4628570f838acc28a565acf27082fa0，日志`/tmp/CppV11FixedAfterTmuxContinuation.log`。来源86fde3完成9卡63节：24 SOURCE_MATCHED、39 UNRESOLVED，65calls4296142tokens；377工件摘要/大小通过审计，cpp-v11-source/ArtifactAudit.json。途中REVIEW_CORRECTION_RANGE_INVALID保留失败输出，同任务后续有效尝试通过，未放宽范围校验。关联5339101251b19897c3164088d0278a30f4e21fcc9c646348425cb5aac5297465成功执行但0条关系、无外部材料，真实结果保留。不能把这些结果称作最终发布。
+
+补证e6ec12264144435c594030acee7f24767f4071d7e4c7f3ff6ebf006482800200提出40例，与37例可信用例合并需要77例，因64例上限暂停；1call67340tokens。发现容量错误没有走候选拒绝反馈，恢复会复用同一超限候选。现在保留原64上限及历史期望，将新候选造成的超限保存为REJECTED、空参考观察、容量报告，恢复通过递增候选键反馈TestGen重新提案；历史集合自身超限及期望冲突仍按原规则停止。前台展示容量及未执行事实。
+
+底层门禁/补证5/5通过，原完整阶段3个变体通过，新增容量变体修正测试caseId后1/1通过，覆盖服务重启后容量反馈、较小候选晋升及连续用量；页面2/2、typecheck通过。日志`/tmp/WorkbenchCapacityRejectionRetest.log`、`/tmp/WorkbenchCapacityRecoveryIntegration.log`（前三通过、第四测试数据格式失败）、`/tmp/WorkbenchCapacityRecoveryRetest.log`（第四通过）、`/tmp/WorkbenchCapacityTypes.log`。执行器变化改变原生指纹，因此上述真实通过仅证明修复前冻结版本；旧补证不得直接跨指纹恢复，新引擎真实验收仍待完成，网站仍f543c59。

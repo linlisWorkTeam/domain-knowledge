@@ -191,9 +191,9 @@ export class WorkbenchEvaluation {
         .sort((a, b) => Number(a.key.split(':').at(-1)) - Number(b.key.split(':').at(-1))).at(-1);
       let rejectedCandidate: unknown = null;
       if (rejection) {
-        const report = await this.load<{ moduleId: string; status: string; targetCoverage?: ReturnType<typeof nativeSupplementTargetCoverage>; cases: Array<{ input: NativeBehaviorSuite['cases'][number]; observation?: { status: string; reasonCode: string | null; actual: unknown; mismatches: string[] } }> }>(rejection.result.artifactRefs[0]!);
+        const report = await this.load<{ moduleId: string; status: string; candidateConstraint?: { code: string; maximumCases: number; retainedCases: number; requiredCases: number }; targetCoverage?: ReturnType<typeof nativeSupplementTargetCoverage>; cases: Array<{ input: NativeBehaviorSuite['cases'][number]; observation?: { status: string; reasonCode: string | null; actual: unknown; mismatches: string[] } }> }>(rejection.result.artifactRefs[0]!);
         if (report.moduleId !== module.moduleId || report.status !== 'CANDIDATE_REJECTED') throw new Error('STAGE_ARTIFACT_CORRUPT');
-        rejectedCandidate = { trusted: false, ...(report.targetCoverage ? { targetCoverage: report.targetCoverage } : {}), cases: report.cases.map(({ input, observation }) => ({ input, constructionHints: nativeCandidateHints(input, observation?.reasonCode ?? null),
+        rejectedCandidate = { trusted: false, ...(report.candidateConstraint ? { candidateConstraint: report.candidateConstraint, instruction: 'The candidate was not executed because the combined suite exceeds capacity. Preserve all retained trusted tests and their expectations. Propose fewer new cases; a case may cite multiple sections only when it actually tests their behavior. Do not claim missing evidence has been verified.' } : {}), ...(report.targetCoverage ? { targetCoverage: report.targetCoverage } : {}), cases: report.cases.map(({ input, observation }) => ({ input, constructionHints: nativeCandidateHints(input, observation?.reasonCode ?? null),
           observation: observation ? { status: observation.status, reasonCode: observation.reasonCode, actual: observation.actual, mismatches: observation.mismatches } : null })) };
       }
       const moduleDemands = supplement?.demands.filter(item => module.cardVersionIds.includes(item.versionId)) ?? [];
@@ -232,6 +232,7 @@ export class WorkbenchEvaluation {
         const conflict = prepared.rejection === 'TRUSTED_GATE_CONFLICT';
         const rejected = { moduleId: module.moduleId, testSetId: prepared.set.testSetId, status: conflict ? 'TRUSTED_GATE_CONFLICT' : 'CANDIDATE_REJECTED', proposed: prepared.proposed, reused: prepared.reused,
           oracleRef: prepared.set.oracleRef, suiteRef: prepared.set.suiteRef, generatedEvaluated: false, knowledgeErrorProven: false,
+          ...(prepared.candidateConstraint ? { candidateConstraint: prepared.candidateConstraint } : {}),
           ...(targetCoverage ? { targetCoverage } : {}),
           cases: suite.cases.map((input) => ({ input, expected: input.expected, sectionBindings: prepared.set.sectionBindings.filter((item) => input.sections.includes(item.sectionId)), observation: observations.find((item) => item.caseId === input.caseId) })) };
         const rejectionRef = await artifacts.put(Buffer.from(JSON.stringify(rejected)), 'application/json');

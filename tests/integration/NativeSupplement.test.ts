@@ -67,6 +67,21 @@ test('supplement validates candidates separately, keeps rejected history immutab
     assert.equal(targetedPromotion.targetCoverage?.semanticCoverageProven, false);
     assert.ok(calls.includes('sum3'));
     assert.equal(JSON.stringify(store.get(original.set.testSetId)), preserved);
+    const capacityInput = { ...input, supplement: { ...supplement, demandDigest: 'd'.repeat(64) } };
+    const oversized: NativeBehaviorSuite = { schemaVersion: 'native-cases-v1', cases: Array.from({ length: 62 }, (_, index) => suite(index + 10).cases[0]!) };
+    const overCapacity = await evaluation.prepare({ ...capacityInput, propose: async () => oversized });
+    assert.equal(overCapacity.set.status, 'REJECTED');
+    assert.equal(overCapacity.rejection, 'CANDIDATE_REJECTED');
+    assert.deepEqual(overCapacity.candidateConstraint, { code: 'NATIVE_TRUSTED_GATE_LIMIT', maximumCases: 64, retainedCases: 3, requiredCases: 65 });
+    assert.equal(calls.includes('sum10'), false, 'over-capacity candidates are rejected before execution');
+    assert.deepEqual(JSON.parse(Buffer.from(await artifacts.get(overCapacity.set.oracleRef)).toString()), []);
+    assert.equal(JSON.stringify(store.get(original.set.testSetId)), preserved);
+    const capacityRepair = await evaluation.prepare({ ...capacityInput, propose: async () => suite(10) });
+    assert.equal(capacityRepair.set.status, 'TRUSTED');
+    const repairedGates = JSON.parse(Buffer.from(await artifacts.get(capacityRepair.set.suiteRef)).toString()) as NativeBehaviorSuite;
+    assert.deepEqual(repairedGates.cases.map(item => item.expected.out).sort(), ['11', '2', '3', '4']);
+    assert.equal(store.get(overCapacity.set.testSetId)?.status, 'REJECTED');
+    assert.equal(JSON.stringify(store.get(original.set.testSetId)), preserved);
     brokenReference = true;
     const changedBody = await artifacts.put(Buffer.from('# Card\n\n## Behavior\nAdds integers, revised.'), 'text/markdown');
     const conflict = await evaluation.prepare({ ...input, bodyRefs: [changedBody], versionIds: ['v2'], supplement,
