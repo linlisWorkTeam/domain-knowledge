@@ -50,7 +50,7 @@ function spans(source: string): Span[] {
       if (item.function || (!item.declaration && !/^\s*;/.test(text.slice(i + 1)))) advance(i + 1);
     } else if (char === ';' && parens === 0 && !stack.some((item) => item.function)) {
       const start = first(segmentStart());
-      if (start < i) result.push({ start, end: i + 1, kind: 'declaration' });
+      if (start < i && !stack.some((item) => item.declaration)) result.push({ start, end: i + 1, kind: 'declaration' });
       advance(i + 1);
     }
   }
@@ -67,7 +67,7 @@ export function extractEvidence(location: Location, source: string): CodeEvidenc
   const matches = spans(source).filter((span) => span.kind === location.kind
     && line(span.start) <= location.startLine && line(span.end - 1) >= location.endLine);
   matches.sort((a, b) => (a.end - a.start) - (b.end - b.start));
-  if (matches.length > 1 && matches[0]!.start !== matches[1]!.start && matches[0]!.end <= matches[1]!.start) throw new Error('CHECK_LOCATION_INVALID: ambiguous same-line code boundaries');
+  if (matches.length > 1 && location.kind === 'function') throw new Error('CHECK_LOCATION_INVALID: ambiguous same-line code boundaries');
   const span = matches[0];
   if (!span) throw new Error(`CHECK_LOCATION_INVALID: ${location.path}:${location.startLine}-${location.endLine} is not inside one complete ${location.kind}`);
   const start = source.lastIndexOf('\n', span.start - 1) + 1;
