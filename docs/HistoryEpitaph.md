@@ -87,3 +87,7 @@ This document summarizes older handoffs, milestones and architectural decisions 
 - [2026-09-08-1442-domain-feature-layout.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/a79b385e16284ba8b4e76751f54c196b8fa7b33e/docs/epitaph/2026-09-08-1442-domain-feature-layout.md)：去掉 Domain services 分组与总导出，按 workflow、evaluation、association、knowledge 等功能组织，同步引用和设计；当时仅做类型、路径、Schema 与固定样例静态检查，未运行测试或模型。
 - [2026-09-10-1001-development-progress.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/9e66776cfbadbb1ec56f60991ef01e7e43139cbd/docs/epitaph/2026-09-10-1001-development-progress.md)：在 Status 登记四阶段、S2 子步骤、依赖及证据索引；当时通过文档链接、清单及 diff 静态核对，未运行角色或业务验收。CodeAgent 后续确认由 1038 交接补充，其他输入输出继续逐项确认。
 - [2026-09-10-1032-knowledge-generation-agent-baseline.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/a79b385e16284ba8b4e76751f54c196b8fa7b33e/docs/epitaph/2026-09-10-1032-knowledge-generation-agent-baseline.md)：记录知识生成分支的基线和数据流调研，独立 worktree bootstrap READY；当时未修改业务实现、未运行真实模型或端到端。全仓模块发现、TestGen oracle 晋升、Review findings 接入及业务质量仍待细化；Worker 归属随后由 1046 交接更新。
+
+## 2026-09-14 验收交接归档
+
+[2026-09-10-1046-docgen-internal-workers.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/22fe34fdf1ee9e37c08d0bd17a03b2c7e4103cf0/docs/epitaph/2026-09-10-1046-docgen-internal-workers.md)：将 DocWorker 收入 DocGen 内部调用，保留七角色身份、白名单材料与 workerResultRefs；当时 Node 24 READY、定向 35 项和组合 fixture 通过，全量 227/229，两项 Site 问题在基线复现。该任务未调用真实模型或发布；固定文件拆分、语义汇总质量及当时尚未接入的 TestGen/Review 能力不得由该历史记录推定完成。其“尚未提交”是当时状态，后续以实际 Git 和报告为准。

@@ -48,9 +48,11 @@ testSuite 使用 `native-cases-v2-supervised` 协议，含 files 与 cases，cas
 
 新目录为 `/root/projects/domain-knowledge/.workpanel/acceptance/2026-09-14-cjson-v10-real/`，独立 `Run.mjs` 导入新工作树，使用全新 runtime/SQLite/CAS。从旧固定源码本地 clone，核对 HEAD、全部 229 个受控文件 SHA-256 及 1481 行目标；独立补充用例和上游基线重新执行。旧候选测试通过状态、v8 checkpoint 和 v9 独立 Check 结果均不导入。
 
-预算为一次新 Run、最多 3 个业务轮次（含首轮）、从 workflow.start 调用起 30 分钟、单角色 10 分钟、DocWorker=1、构建串行、TestGen 最多一次修复；Check 首次输出后最多两次报告修正，共三次，outputAttempts=1 且 SDK 网络重试为零。其他角色沿用最多两次 Schema 尝试。生产配置 SDK 超时实际按尝试计算，因此验收入口另按 RUNNING 角色 checkpoint 累计时间监控，达到 10 分钟取消整次 Run，不叠加预算。DocGen 计时包含内部 Worker；这是更保守的验收上界。maxTokens=32768、contextWindow=128000，真实 deepseek-v4-flash，经配置提供方、生产角色入口和 DSH SDK/Bubblewrap；不使用 fixture 或预设回答。
+预算为一次新 Run、最多 3 个业务轮次（含首轮）、从 workflow.start 调用起 30 分钟、单角色 10 分钟、DocWorker=1、构建串行、TestGen 最多一次修复；Check 首次输出后最多两次报告修正，共三次，outputAttempts=1 且 SDK 网络重试为零。其他角色沿用最多两次 Schema 尝试。SDK 超时按尝试计算，LangGraph 的 Graph.ts 另有原生节点 timeout=600000；验收入口还按 RUNNING 角色 checkpoint 累计时间监控，达到 10 分钟取消整次 Run，不叠加预算。DocGen 节点计时包含内部 Worker。本批最终由原生 TestGen 节点超时结束，外层补充 watchdog 没有触发。maxTokens=32768、contextWindow=128000，真实 deepseek-v4-flash，经配置提供方、生产角色入口和 DSH SDK/Bubblewrap；不使用 fixture 或预设回答。
 
 Node 24.13.0 独立 bootstrap 已达到 READY，启动前再次检查。先保存原实现上游、独立 18 项和转义路径复现基线，再验证提供方连接并启动；通过事件和 checkpoint 观察实际 Check、评测、Review、Gate，未到达的阶段明确标注。任何失败先保存原始回答、编译日志、逐项结果、节点事件和摘要，不手工修补模型代码，不自动新开批次。旧 4311 服务保留，本批匹配版本只读前台使用 127.0.0.1:4312 和独立 tunnel；实际浏览器核对本批 Run、节点、知识正文与候选/发布标记。敏感 runtime 不上传，结果继续写入原报告。
+
+本批已实际结束：Run `cb4a4f5a-d24f-47a1-87ca-37aba9a35786`，执行 HEAD `4f5c8cc7631cd6f0602a70927e0197a24adbabc7`（仅计划文档提交，生产源码与上述合并提交一致），北京时间 12:04:28—12:15:08，639.622 秒。DocWorker 覆盖声明校验失败，并行 TestGen 触及 10 分钟超时；最终 FAILED，未形成候选知识、测试冻结、重建、Check、Review 或 Gate。两个已完成回答用量 51773 tokens，TestGen 用量未知。前台最终 Run 失败可见，但 TestGen 节点残留 RUNNING，属于本次发现的状态收敛问题。详细证据及未解决项见原报告最新节，本次不追加新模型批次。
 
 #### 固定范围与运行配置
 

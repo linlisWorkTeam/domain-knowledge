@@ -5,9 +5,71 @@ SPDX-License-Identifier: MIT
 -->
 # Agent Spec 修复与端到端测试报告
 
-## 2026-09-14：v10 cJSON Utils 真实完整验收
+## 2026-09-14：v10 cJSON Utils 真实完整验收，未通过
 
-本批计划已补入 [原验收计划](../specs/infrastructure/evaluation/Evaluation.md#2026-09-14-修复后新一次完整验收)。执行源码为 PR #49 合并提交 `22fe34fdf1ee9e37c08d0bd17a03b2c7e4103cf0`，独立工作树 `/tmp/domain-knowledge-cjson-v10`，证据目录 `.workpanel/acceptance/2026-09-14-cjson-v10-real/`。当前为准备状态，尚未宣称完整闭环通过；本节在实际运行后补齐各阶段结果。
+已更新[原验收计划](../specs/infrastructure/evaluation/Evaluation.md#2026-09-14-修复后新一次完整验收)并实际启动用户授权的一次新 Run：`cb4a4f5a-d24f-47a1-87ca-37aba9a35786`。北京时间 12:04:28—12:15:08，639.622 秒，最终 `FAILED`，停在 iteration 0。DocWorker 的覆盖范围声明无效，随后并行 TestGen 达到 10 分钟节点超时。完整知识飞轮仍未通过；本次没有候选知识、评测记录、Gate 决策或发布，不把旧知识和 v9 独立 Check 的成功导入本次运行。
+
+### 版本、材料与实际预算
+
+GitHub 已现场核对 PR #49 为 MERGED，最新 origin/main 是 `22fe34fdf1ee9e37c08d0bd17a03b2c7e4103cf0`。独立分支 `test/cjson-utils-v10-real-e2e` / `/tmp/domain-knowledge-cjson-v10` 从它创建；执行 HEAD 为计划提交 `4f5c8cc7631cd6f0602a70927e0197a24adbabc7`，生产源码、package.json 和 lockfile 与合并提交一致。契约为 `domain-agents-v10-check-evidence-guards` / `contract-v10`，Node 24.13.0 bootstrap/check 均 READY。主工作区及其他工作树未改动。
+
+目标仍为 cJSON v1.7.19 / `c859b25da02955fef659d658b8f324b5cde87be3`，完整 `cJSON_Utils.c` 1481 行、14 个公开 API，moduleId=`cjson-utils-v1-7-19`。从已有固定源码本地 clone，229 个受控文件逐个 SHA-256 核验一致；原、新源码 Git 状态均干净。独立补充用例及转义复现文件摘要与旧版一致，旧测试与原实现未修改。
+
+本次以固定版本实际行为为参考，RFC 符合性单独记录；TestGen 指令明确分别推导 Pointer 与 Patch 的路径行为、保留转义路径覆盖，不以标准预期替换原实现结果。Code 的生产输入边界仍仅限知识和编写配置，但本次未到达 Code，不能声称本批验证了它的实际隔离。
+
+采用配置的真实 deepseek-v4-flash、生产角色入口、DSH SDK、Bubblewrap，全新独立 runtime。冻结预算为最多 3 轮（含首轮）、workflow.start 起 30 分钟、角色/节点 10 分钟、DocWorker=1、构建串行、TestGen 最多一次修复；Check 共最多三次报告尝试，outputAttempts=1、无嵌套重试；其他角色最多两次 Schema 尝试。SDK 每次尝试 timeout=600000，LangGraph 本身也设节点 timeout=600000，入口另有 checkpoint 累计监控。本次原生 TestGen 节点超时先结束 Run，外层 30 分钟和补充 watchdog 均未触发；没有第二轮、Schema 重试、TestGen 修复或 Check 报告修正。
+
+### 实际节点与模型用量
+
+| 阶段 | 实际结果 |
+| --- | --- |
+| Orchestrator | SUCCEEDED，39.329 秒；真实选择固定模块并提交计划 |
+| DocWorker | SDK 返回结构有效回答，328.616 秒；Domain 拒绝 `DOCWORKER_COVERAGE_INVALID`，未提交成功结果 |
+| DocGen | 内部 Worker 失败后停止，未调用汇总模型，未创建候选知识 |
+| TestGen | SDK `DSH_AGENT_TIMEOUT`，600.002 秒；LangGraph 错误为 `Node "test_gen" exceeded its run timeout of 600000ms`，没有成功提交测试集 |
+| 参考测试校验、Code、Check、重建评测、Review、Gate、发布 | 均未执行；不能根据旧批次或独立结果补记节点成功 |
+
+共 3 个真实模型会话。Orchestrator usage 为 input=2191、output=2457、total=4648；Worker 为 input=19771、output=27354、total=47125。已知聚合 input=21962、output=29811、total=51773 tokens，仅覆盖两次完整回答。TestGen 会话以 aborted/disposed 结束，没有最终 usage，整批实际总用量和费用未知，不把 51773 称为完整总消耗或账单值。
+
+### 失败原文与归因
+
+Worker 的输入 assignedSourcePaths 只有 `cJSON_Utils.c`；模型的 analysisScope.files 为 `cJSON_Utils.c`、`cJSON_Utils.h`、`cJSON.h`。两个头文件属于授权参考材料，可以用于 provenance/sourceEvidence，但不能扩大必须精确匹配分配源码的 coverage 字段。模块 ID 正确，失败不是旧批次的 moduleId 配置错误，也不是非法读取头文件。使用当前 `DocWorkerAgentContract.validateOutput` 和原始回答再次复现同一错误，没有删字段或修改输出。
+
+直接原因是模型字段违反 Domain 契约；产品侧的静态 Schema 仅校验非空文件数组，没有把本次分配集合写入动态 Schema，基础 Prompt 要求覆盖每个分配文件但没有明确排除参考头文件。后置业务校验没有统一修正环节，导致 SDK Schema 成功仍使整个知识分支停止。这是后续应评估的约束表达与错误恢复问题，本次没有放宽校验或实现新修复。
+
+原始 Worker 分析片段为 5028 字符，完整原回答、调用命令和校验复现均保存；其语义充分性未评测，也不是候选知识版本。TestGen 中断消息标有 interrupted=true，正文 19168 字符，JSON 因字符串未闭合不可解析；无合法用例清单，不能人工补全后当作模型成功结果。直接停止原因是执行超时，未观察到连接失败或编译环境错误；模型/提供方延迟的更细原因未确认。
+
+### 编译、测试与发布事实
+
+| 检查 | 结果 |
+| --- | --- |
+| 原实现独立补充基线 | 18/18，当前 v10 TrustedProjectEvaluator、真实 gcc C99 与外部逐入口监督；日志和每项 entered/returned/value 保存 |
+| 原实现上游固定回归 | json_patch_tests、old_utils_tests、misc_utils_tests 均编译成功、退出 0，Unity 分组 3/5/1、零失败；JSON 121 条、4 条原始禁用，不把组数当作逐项监督数量 |
+| 原实现转义 Patch 复现 | `replace /a~1b` 返回 13，`{"a/b":1}` 不变，确认旧差异仍存在 |
+| 新生成测试参考校验与冻结 | 未执行；TestGen 无有效最终输出，不继承历史 48/49 或任何冻结状态 |
+| 重建编译、行为与上游回归 | 未执行，未生成重建代码；旧版缺 stdbool.h 不能当作本批编译结果 |
+| Review 自动知识修订 | 未发生 |
+| Gate 与发布 | 数据库 gate_decisions=0、publications=0；没有 PASS/ITERATE/STOPPED 决策，最终为执行 FAILED |
+
+### 前台、状态不一致与产物
+
+[本批只读前台](https://attractive-feelings-relationships-catherine.trycloudflare.com/)转发 `127.0.0.1:4312`，使用本工作树的 Server.ts，数据来自 `/root/projects/domain-knowledge/.workpanel/acceptance/2026-09-14-cjson-v10-real/runtime/registry.sqlite` 和同目录 CAS。旧 4311 服务及历史数据保持原样。公网 health、Run API、能力声明和实际浏览器均核对；页面只包含本批 Run，writeEnabled=false，无页面脚本错误。前台与模型执行使用同一生产源码版本。
+
+最终页面顶部正确显示“工作流执行：失败”和 TestGen 超时，Worker/DocGen 节点显示覆盖错误，但 TestGen 行仍显示“运行中”，对应 Registry checkpoint 和节点投影确实残留 RUNNING；进程已经退出。业务聚合 state 同时保留 GENERATING。没有手改数据库。Graph.ts 的原生 timeout errorHandler 更新图执行状态，节点失败观察器通常在 createNode 的 catch 写入；入口 workflow.wait 返回后关闭 composition。具体取消、清理与投影落库竞态需单独回归定位，当前只确认实测不一致，不把推测当已验证根因。前台节点状态一致性验收未通过。
+
+知识列表实际为空，knowledge_versions=0，评测记录为 0。浏览器已打开空知识页并截图；因此无法展示本批知识正文或候选标记，不能将 Worker 未提交片段注入知识库来补齐展示。页面展示本批 Run 和全局失败已验证，知识产物展示及全部节点终态要求未满足。
+
+证据目录：主工作区 `.workpanel/acceptance/2026-09-14-cjson-v10-real/`，仅本地保留，不上传包含凭据的 runtime。
+
+- `Run.mjs`、`Attempt1/`、`Run.log`、`FinalSummary.json`：新入口、代码 SHA、冻结配置、Run、时间、全部事件与最终结果；只有一个新批次。
+- `SourceIntegrity.json`、`BaselineIntegrity.json`、`Baseline.json`、`baseline/`、`Independent-reference.json`、`independent-evaluations/`、`PointerReproduction.json`：材料摘要、真实原实现编译/逐项监督及差异复现。
+- `ModelAudit.json`、DSH `session.jsonl`、`DocWorkerRawOutput.*`、`DocWorkerFragment.md`、`DocWorkerCommand.json`、`DocWorkerValidationReproduction.json`、`TestGenInterruptedOutput.txt`：原始回答、部分输出、usage、契约复现及诊断。加密提供方设置仅保留在受限 runtime。
+- `CasIntegrity.json`：本次工作流 23 个 CAS 文件逐个摘要匹配；失败回答保留在 SDK 日志和单独导出文件，没有伪造成功 CAS checkpoint。`EvidenceManifest.json` 单独记录非凭据文件摘要。
+- `BrowserRunning.json`、`BrowserFinal.json`、`Console*png`、`TerminalStateDiagnosis.json`：新 Run、真实失败、空知识页、节点投影不一致及只读能力证据。
+
+前台由 tmux `cjson-v10-console` / `cjson-v10-tunnel` 维持；主机或进程停止后地址失效。停止分别使用 `tmux kill-session -t cjson-v10-tunnel`、`tmux kill-session -t cjson-v10-console`，不删除证据。原始工件下载继续受应用鉴权限制。
+
+本次只更新验收文档与本地证据，没有修改生产实现、永久 CI 或模型产物。验证包括 READY、Spec 校验（17 schemas / 53 p0）、差异格式、源码/材料/CAS 摘要、真实原实现基线、生产 Worker 校验器复现和公网浏览器；未执行无关全量回归。后续需要处理 Worker 范围字段表达、TestGen 超时和终态持久化，再另行明确新批次原因与预算；本批结束后未继续调用模型。
 
 ## 2026-09-14：Check 报告证据与有限修正验收
 
