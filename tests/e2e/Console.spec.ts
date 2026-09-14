@@ -729,7 +729,7 @@ test('light and dark themes keep successful API states across all seven pages an
   expect(themeBackgrounds.get('light')).not.toBe(themeBackgrounds.get('dark'));
   await page.evaluate(() => localStorage.setItem('wp-knowledge-theme', 'light'));
   await page.reload();
-  await page.getByRole('button', { name: /^知识$/ }).click();
+  await page.getByRole('button', { name: /^知识治理$/ }).click();
   await page.getByRole('combobox', { name: '知识状态' }).selectOption('');
   await page.getByRole('button', { name: /浏览器验收知识/ }).first().click();
   await expect(page.getByRole('dialog')).toBeVisible();
