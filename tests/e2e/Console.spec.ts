@@ -1005,6 +1005,7 @@ test.describe.serial('工作台固定仓库完整流程', () => {
     writeFileSync(join(directory, 'compile_commands.json'), JSON.stringify([{ directory, file: 'parser.c', arguments: ['gcc', '-std=c99', '-DFEATURE=1', '-c', 'parser.c'] }, { directory, file: 'parser.c', arguments: ['gcc', '-pthread', '-c', 'parser.c'] }]));
     git(['add', '.']); git(['commit', '-qm', 'Fixed source']); commit = git(['rev-parse', 'HEAD']);
     await page.goto(baseUrl); await enterGovernance(page);
+    await page.getByRole('button', { name: '选择项目', exact: true }).click();
     await page.getByLabel('服务器仓库目录', { exact: true }).fill(directory);
     await page.getByLabel('源码版本', { exact: true }).fill(commit);
     await page.getByRole('button', { name: '分析仓库', exact: true }).click();
@@ -1173,6 +1174,8 @@ test.describe.serial('工作台固定仓库完整流程', () => {
     await page.screenshot({ path: test.info().outputPath('pipeline-mobile.png'), fullPage: true });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await page.reload(); await enterGovernance(page);
+    await page.getByRole('button', { name: '打开主导航', exact: true }).click();
+    await page.getByRole('button', { name: '选择项目', exact: true }).click();
     await expect(page.locator('[data-generation-task]')).toContainText('已生成 1 张');
     await expect(page.locator('[data-generation-task]').getByRole('button', { name: 'Parser generated card', exact: true })).toBeVisible();
     await expect(page.locator('[data-reconstruction-panel]')).toContainText('重建及接口检查完成');

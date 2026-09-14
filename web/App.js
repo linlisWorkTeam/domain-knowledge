@@ -56,6 +56,7 @@ applyTheme(initialTheme)
 
 const PAGE_META = {
   overview: '操作中心',
+  projects: '项目',
   runs: '飞轮批次',
   knowledge: '知识',
   graph: '工作流图',
@@ -224,6 +225,7 @@ const state = {
   operatorMode: false,
   selectedRun: null,
   selectedRound: null,
+  selectedProject: null,
   discovery: null,
   resourceErrors: {},
   loadedAt: null,
@@ -436,10 +438,9 @@ function setPageMeta(page) {
   }
 }
 
-const repositoryAnalysisPanel = createRepositoryAnalysisPanel({ root: content, request, escapeHtml, isEditable: () => Boolean(state.capabilities?.directEditing || state.token) })
+const repositoryAnalysisPanel = createRepositoryAnalysisPanel({ root: content, request, escapeHtml, isEditable: () => Boolean(state.capabilities?.directEditing || state.token), onProjectSelected(project) { state.selectedProject = project; try { localStorage.setItem('workbench-project-input', project.snapshotId) } catch {} document.querySelector('#selected-project-name').textContent = project.directory.split('/').at(-1); document.querySelector('#project-selector').title = project.directory } })
 
 function renderOverview() {
-  const repositoryFocus = repositoryAnalysisPanel.focus()
   const focusedQueueFilter = document.activeElement?.dataset?.queueFilter
   const active = state.runs.filter(isRunActive)
   const attention = state.actionItems.filter((item) => item.status !== 'RESOLVED')
@@ -478,8 +479,7 @@ function renderOverview() {
     <button class="pulse-row" ${activity.runId ? `data-run-id="${escapeHtml(activity.runId)}"` : 'disabled'} type="button"><i class="${activity.severity === 'HIGH' ? 'warning' : 'success'}"></i><span><b>${escapeHtml(EVENT_LABELS[activity.type] ?? activity.summary)}</b><small>${escapeHtml(formatDate(activity.occurredAt))}</small></span></button>`).join('')
   content.innerHTML = `
     ${notices.length ? partialNotice(`${notices.map((key) => RESOURCE_LABELS[key] ?? key).join('、')}获取失败；其余区域仍展示已读取的服务端事实。`) : ''}
-    ${repositoryAnalysisPanel.html()}
-    <header class="workbench-history-heading"><h2>历史运行与知识健康</h2><p>既有批次的待处理事项，与上方当前知识任务分开查看。</p></header>
+    <header class="workbench-history-heading"><h2>历史运行与知识健康</h2></header>
     <section class="overview-summary-grid" aria-label="关键摘要">
       <article class="attention-summary">
         <span class="attention-orb"><i></i></span>
@@ -501,7 +501,7 @@ function renderOverview() {
       </section>
       <aside class="overview-rail">
         <article class="current-run-card ${latestRun && needsAttention(latestRun) ? 'needs-attention' : ''}">
-          <header><small><i></i> 飞轮${active.length ? '运行中' : '状态'}</small><button class="text-button" data-page-link="runs">打开批次 ↗</button></header>
+          <header><small><i></i> 最新飞轮状态</small><button class="text-button" data-page-link="runs">打开批次 ↗</button></header>
           ${latestRun ? `<h3>${escapeHtml(shortId(latestRun.runId, 18))}</h3><p>${escapeHtml(latestRun.moduleId)} · ${escapeHtml(runStatusLabel(latestRun))}</p><div class="run-state-meta"><b>${escapeHtml(runStatusLabel(latestRun))}</b></div>` : emptyState('暂无批次', '启动飞轮后，可在这里查看进度和结果。')}
           <div class="latest-result"><span>已记录进度</span><strong>${state.latestProgress?.mode === 'DETERMINATE' ? `${state.latestProgress.completedUnits} / ${state.latestProgress.totalUnits}` : '暂无进度数据'}</strong><small>暂不提供预计完成时间</small><small>${latestRun?.latestDecision?.outcome ? `最近门禁：${escapeHtml(displayLabel(latestRun.latestDecision.outcome))}` : '打开批次查看评测与发布记录'}</small></div>
           ${latestRun ? `<button class="wide" data-run-id="${escapeHtml(latestRun.runId)}">查看本次结果 →</button>` : ''}
@@ -509,7 +509,6 @@ function renderOverview() {
         <article class="recent-pulse"><header><h3>最近动态</h3><span>${state.activityStream ? '实时连接' : '轮询更新'}</span></header>${pulseRows || '<div class="pulse-empty"><b>暂无动态</b><small>运行记录将在这里显示</small></div>'}</article>
       </aside>
     </div>`
-  repositoryAnalysisPanel.restore(repositoryFocus)
   // 轮询刷新不能打断正在使用分类按钮的键盘用户。
   if (focusedQueueFilter !== undefined) content.querySelector(`[data-queue-filter="${CSS.escape(focusedQueueFilter)}"]`)?.focus({ preventScroll: true })
 }
@@ -1249,6 +1248,7 @@ async function navigate(page) {
   state.selectedRound = null
   setPageMeta(page)
   closeDrawer()
+  if (page === 'projects') { content.innerHTML = repositoryAnalysisPanel.html(); repositoryAnalysisPanel.restore(null) }
   if (page === 'overview') renderOverview()
   if (page === 'runs') renderRuns()
   if (page === 'knowledge') renderKnowledge()
@@ -1482,6 +1482,8 @@ async function startWorkflow(form) {
   await openRun(runId)
 }
 
+document.querySelector('#project-selector').addEventListener('click', () => { navigate('projects').catch(showFatal) })
+
 nav.addEventListener('click', (event) => {
   const button = event.target.closest('[data-page]')
   if (button) navigate(button.dataset.page).catch(showFatal)
@@ -1543,7 +1545,7 @@ content.addEventListener('click', (event) => {
   const browseDirectory = event.target.closest('[data-browse-directory]')
   if (browseDirectory) browseServerDirectory(browseDirectory.dataset.browseDirectory, browseDirectory.dataset.path).catch(productError)
   const selectDirectory = event.target.closest('[data-select-directory]')
-  if (selectDirectory) { document.querySelector(`[name="${selectDirectory.dataset.field}"]`).value = selectDirectory.dataset.selectDirectory; document.querySelector('#directory-browser').innerHTML = '' }
+  if (selectDirectory) { const field = document.querySelector(`[name="${CSS.escape(selectDirectory.dataset.field)}"]`); field.value = selectDirectory.dataset.selectDirectory; field.dispatchEvent(new Event('input', { bubbles: true })); document.querySelector('#directory-browser').innerHTML = '' }
   const publication = event.target.closest('[data-publication-key]')
   if (publication) openPublication(publication.dataset.publicationKey).catch(productError)
   const lineageRun = event.target.closest('[data-lineage-run]')
@@ -1860,6 +1862,10 @@ async function boot() {
   if (state.runs[0]) {
     state.latestProgress = await request(`/api/v1/runs/${encodeURIComponent(state.runs[0].runId)}/progress`).catch(() => null)
   }
+  try {
+    const snapshotId = localStorage.getItem('workbench-project-input')
+    if (snapshotId) repositoryAnalysisPanel.selectProject(await request(`/api/v1/projects/${encodeURIComponent(snapshotId)}`))
+  } catch { /* 已保存输入不可用时由用户重新选择，不能猜测其他项目。 */ }
   state.loadedAt = new Date().toISOString()
   const partial = Object.values(state.resourceErrors).some(Boolean)
   registryIndicator.className = `health-dot ${partial ? 'pending' : 'healthy'}`

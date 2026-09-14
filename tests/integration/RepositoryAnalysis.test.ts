@@ -134,3 +134,32 @@ test('repository analysis API freezes a reusable manifest and rejects cross-site
     rmSync(runtimeDir, { recursive: true, force: true }); rmSync(fixture.root, { recursive: true, force: true });
   }
 });
+
+test('custom folder modules freeze their identity and source range across restart', async () => {
+  const fixture = repository(); const runtimeDir = mkdtempSync(join(tmpdir(), 'custom-project-modules-'));
+  let composition = createComposition({ runtimeDir });
+  try {
+    mkdirSync(join(fixture.root, 'core')); mkdirSync(join(fixture.root, 'core-extra'));
+    writeFileSync(join(fixture.root, 'core', 'value.c'), 'int value(void) { return 1; }\n');
+    writeFileSync(join(fixture.root, 'core', 'value.h'), 'int value(void);\n');
+    writeFileSync(join(fixture.root, 'core-extra', 'outside.c'), 'int outside(void) { return 2; }\n');
+    fixture.git(['add', '.']); fixture.git(['commit', '-qm', 'Folder scopes']);
+    const revision = fixture.git(['rev-parse', 'HEAD']);
+    const request = { directory: fixture.root, revision, moduleDefinitions: [{ moduleId: '核心-parser', directories: ['core'] }] };
+    const first = await composition.apps.workbenchProjects.create(request);
+    assert.deepEqual(first.modules.map(module => [module.moduleId, module.sourcePaths]), [['核心-parser', ['core/value.c', 'core/value.h']]]);
+    assert.ok(!first.sourceFiles.some(file => file.path.startsWith('core-extra/')));
+    assert.deepEqual(first.moduleDefinitions, request.moduleDefinitions);
+    const renamed = await composition.apps.workbenchProjects.create({ ...request, moduleDefinitions: [{ moduleId: 'new-name', directories: ['core'] }] });
+    assert.notEqual(renamed.snapshotId, first.snapshotId); assert.equal(renamed.projectId, first.projectId);
+    for (const directories of [['../core'], ['/core'], ['core/../core'], ['missing'], ['core/value.c']]) {
+      await assert.rejects(composition.apps.workbenchProjects.create({ ...request, moduleDefinitions: [{ moduleId: 'invalid', directories }] }), /PROJECT_MODULE_(DEFINITION_INVALID|DIRECTORY_NOT_FOUND)/);
+    }
+    await assert.rejects(composition.apps.workbenchProjects.create({ ...request, moduleDefinitions: [...request.moduleDefinitions, ...request.moduleDefinitions] }), /PROJECT_MODULE_DEFINITION_INVALID/);
+    await assert.rejects(composition.apps.workbenchProjects.create({ ...request, moduleIds: ['parser'] }), /PROJECT_MODULE_DEFINITION_INVALID/);
+    await assert.rejects(composition.apps.workbenchProjects.create({ ...request, moduleDefinitions: [{ moduleId: 'mixed', directories: ['.'] }] }), /PROJECT_MODULE_UNSUPPORTED/);
+    await composition.close(); composition = createComposition({ runtimeDir });
+    assert.deepEqual(composition.apps.workbenchProjects.store.get(first.snapshotId), first);
+    assert.deepEqual(await composition.apps.workbenchProjects.create(request), first);
+  } finally { await composition.close(); rmSync(runtimeDir, { recursive: true, force: true }); rmSync(fixture.root, { recursive: true, force: true }); }
+});

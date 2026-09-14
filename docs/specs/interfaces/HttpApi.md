@@ -209,3 +209,5 @@ GET /api/v1/stage-tasks 支持 snapshotId、stage 查询参数，与 projectId �
 新来源复核任务在服务端冻结sourceExecutionPolicy=source-execution-scope-v1和executionScopesRef，关联本轮可信测试集的参考构建与工具链记录。阶段工件下载包含原记录；保留旧任务输入，不自动跨策略恢复。发布阶段重新核对逐章Review准则与冻结构建范围；单一构建不声明全部宏组合或平台通过。
 
 补证容量拒绝报告可含candidateConstraint：code=NATIVE_TRUSTED_GATE_LIMIT、maximumCases、retainedCases、requiredCases。该报告的候选未执行，不含伪造参考观察；阶段以TEST_CANDIDATE_REJECTED结束，通过原同输入恢复入口生成新候选。旧引擎指纹的暂停任务仍不可跨指纹恢复。
+
+POST /api/v1/projects 新增可选 moduleDefinitions，形如 `[{moduleId:"parser",directories:["src/parser"]}]`，与 moduleIds 互斥。目录相对固定仓库根目录，`.` 表示根目录；拒绝绝对路径、父目录跳转、空范围、重复名称和不存在的目录。自定义模块从固定清单递归选择源码，测试文件仅保留路径、不作为生成源码。首批执行仍限定 C/C++ 单一实现语言，模块名称与目录定义进入不可变快照身份；不提供此字段时保留旧输入身份及行为。

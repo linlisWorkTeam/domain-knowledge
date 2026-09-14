@@ -12,10 +12,12 @@ export interface BuildConstraints {
   cStandard: 'c99' | 'c11' | 'c17'; cppStandard: 'c++11' | 'c++14' | 'c++17' | 'c++20';
   includeDirectories: string[]; definitions: string[];
 }
+export interface ProjectModuleDefinition { moduleId: string; directories: string[] }
 export interface ProjectSource { path: string; objectId: string; kind: 'source' | 'build'; ref: ArtifactRef }
 export interface WorkbenchProjectSnapshot {
   schemaVersion: 'workbench-project-v1'; projectId: string; snapshotId: string;
   repositoryId: string; directory: string; commit: string; sourceDigest: string;
+  moduleDefinitions?: ProjectModuleDefinition[];
   modules: RepositoryModule[]; build: BuildConstraints; moduleBuilds?: Record<string, BuildConstraints>; sourceFiles: ProjectSource[];
   manifestRef: ArtifactRef; createdAt: string;
 }
@@ -43,6 +45,35 @@ export function selectProjectModules(report: RepositoryAnalysis, moduleIds?: str
   if (modules.some((module) => !module || !module.selectedByDefault)) throw new Error('PROJECT_MODULE_UNSUPPORTED');
   return modules as RepositoryModule[];
 }
+/** 自定义模块仅从固定清单中选文件，不读取路径、符号链接或测试正文。 */
+export function defineProjectModules(report: RepositoryAnalysis, input: unknown): { definitions: ProjectModuleDefinition[]; modules: RepositoryModule[] } {
+  if (!Array.isArray(input) || !input.length || input.length > 200) throw new Error('PROJECT_MODULE_DEFINITION_INVALID');
+  const definitions: ProjectModuleDefinition[] = input.map(value => {
+    if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).some(key => !['moduleId', 'directories'].includes(key))
+      || typeof value.moduleId !== 'string' || !/^[\p{L}\p{N}][\p{L}\p{N}_.-]{0,127}$/u.test(value.moduleId)
+      || !Array.isArray(value.directories) || !value.directories.length || value.directories.length > 200
+      || value.directories.some((path: unknown) => typeof path !== 'string' || !path || path.length > 1024 || (path !== '.' && (path.startsWith('/') || path.includes('\\') || path.split('/').some(part => !part || part === '.' || part === '..'))))) {
+      throw new Error('PROJECT_MODULE_DEFINITION_INVALID');
+    }
+    return { moduleId: value.moduleId, directories: [...new Set<string>(value.directories)].sort() };
+  }).sort((a, b) => a.moduleId.localeCompare(b.moduleId));
+  if (new Set(definitions.map(item => item.moduleId)).size !== definitions.length) throw new Error('PROJECT_MODULE_DEFINITION_INVALID');
+  const modules = definitions.map(definition => {
+    const selected = (path: string) => definition.directories.some(directory => directory === '.' || path.startsWith(`${directory}/`));
+    if (definition.directories.some(directory => directory !== '.' && !report.files.some(file => file.path.startsWith(`${directory}/`)))) throw new Error('PROJECT_MODULE_DIRECTORY_NOT_FOUND');
+    const files = report.files.filter(file => file.kind === 'source' && selected(file.path));
+    if (!files.length) throw new Error('PROJECT_MODULE_EMPTY');
+    const implementations = files.filter(file => /\.(?:c|cpp|cc|cxx|ts|tsx)$/.test(file.path));
+    const languages = new Set((implementations.length ? implementations : files).map(file => file.language));
+    if (languages.size !== 1 || files.some(file => file.language === 'unsupported' || file.size > 1_048_576)) throw new Error('PROJECT_MODULE_UNSUPPORTED');
+    const language = [...languages][0]!;
+    if (!['c', 'cpp'].includes(language)) throw new Error('PROJECT_MODULE_UNSUPPORTED');
+    return { moduleId: definition.moduleId, language, sourcePaths: files.map(file => file.path).sort(),
+      testPaths: report.files.filter(file => file.kind === 'test' && selected(file.path)).map(file => file.path).sort(), selectedByDefault: true, reasons: [] };
+  });
+  return { definitions, modules };
+}
+
 export function createProjectSnapshot(input: Omit<WorkbenchProjectSnapshot, 'schemaVersion' | 'projectId' | 'snapshotId' | 'createdAt'>, now: string): WorkbenchProjectSnapshot {
   if (input.moduleBuilds && canonicalJson(projectModuleBuilds(input.moduleBuilds, input.modules, buildConstraints(input.build))) !== canonicalJson(input.moduleBuilds)) throw new Error('PROJECT_MODULE_BUILD_INVALID');
   const identity = { schemaVersion: 'workbench-project-v1' as const, ...input };
