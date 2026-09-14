@@ -296,3 +296,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 - 2026-09-14-0216：C++同17d6生成代码可信37/37、固定4db04 40/40通过，来源508961启动，scope/fingerprint/reference CAS及检查点绑定已核验，单构建不是全宏验证。[原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/3ded0a172ff46849b54278e30ef5416551954067/docs/epitaph/2026-09-14-0216-cpp-source-started.md)。
 
 - 2026-09-14-0243：C++来源508961首次非JSON失败14调用后同任务恢复，保留13完成段落和累计用量；随后持续推进，最新handle见0332。[原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/49f8a6f28dadfbf5aff2533af407239e5c066fcb/docs/epitaph/2026-09-14-0243-cpp-source-resume.md)。
+
+- [2026-09-14-0258-cpp-source-second-resume.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/3e1c73880dc5d4600c46e0649e01268a2c2b338e/docs/epitaph/2026-09-14-0258-cpp-source-second-resume.md)：C++ source508在32调用后第二次恢复，同输入保留用量；当时仅32段中间结果，未发布。后续最终63段结果见0646交接。

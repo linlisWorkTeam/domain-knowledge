@@ -1,7 +1,0 @@
-# C++ 来源第二次同任务恢复
-
-前轮为 verified wait。本轮旧PID3656587已消失，/tmp/CppSourceCurrentProviderResume.log终态FAILED/DSH_AGENT_OUTPUT_NOT_JSON，stage-5089612faaa3ef67a2d36d24f4cc188e9f7408133e825775be1f872840d1fee6累计32calls2131168tokens/reserved7569982/elapsed2501793ms。与第一次失败14calls相比已有18次有效推进，未将同一无进展错误无限重试。已明确终态后才恢复。
-
-现仍同stage/input，driver /tmp/RunCppSourceCurrentProvider.ts 带原stageId参数，session36446/PID3661538，日志/tmp/CppSourceCurrentProviderResume2.log。恢复首条RUNNING保留32calls2131168tokens。cpp-source-current-provider/Resume2UsageAudit.json验证累计用量不下降，读取时已有32个完成段落：24匹配/6差异/2未知；这是中间态，不代表全部卡片通过。前两段日志与所有检查点保留。下一轮poll36446/PID3661538，不再等待91373/3656587。
-
-源码37+40门禁及冻结scope见0216，C源差异/未知仍待实际修订。网站ec72未含0ae56fe修复。完整回归、浏览器、一键分步、关联和发布未齐，目标继续。本轮未改产品或断言，diff通过。

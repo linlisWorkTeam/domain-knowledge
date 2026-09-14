@@ -1,0 +1,13 @@
+# C++ 来源终态与尾注修订恢复
+
+目标已由用户明确为完成五阶段知识工作台、C/C++完整真实链路并部署，保持全部原验收范围。上轮状态说明无进展；本轮取得source最终CAS审计、三张修订候选、真实失败定位及产品修复，属于progress。工作树/tmp/domain-knowledge-workbench，原-wxc不改，Node24/384MiB，串行重任务。
+
+source5089612faaa3ef67a2d36d24f4cc188e9f7408133e825775be1f872840d1fee6终态SUCCEEDED/UNRESOLVED，67调用4576536tokens，63段50匹配/8差异/5未知。cpp-source-current-provider/FinalCheckpointAudit.json确认SQLite终态一致、335份CAS摘要及大小，非发布。
+
+新修订stage-83b367fb2ab4c6a9d6c4d24b439ef61a0f922ae807b27ec7a3ac5101227ed918首次FAILED/DOC_GEN_SECTION_HEADING_INVALID，8调用1180628tokens/299290ms，旧PID3887762已退出。前三张候选已保存：kv_d4cb628f2792d5b31241387a、kv_f9657d616d68e9f5563d07e0、kv_f5387a8712f766c1052ed7f6；RevisionAudit.json校验各自只改一个获准H2、前言和其他章节相同，尚未索引。第四张ToFloat来源尾注原始输出中的空行+---被错误识别为标题。
+
+产品修复e66ec50bbc649b992f24ad88552491bf39bccf82允许空行隔开的横线分隔符，仍拒绝紧接正文的潜在Setext、H1/H2/孤立CR；原断言未改。18/18相关测试/tmp/CppSourceFooterTests.log，typecheck与Spec通过。报告已更新。没有改写失败原始输出来提交版本。
+
+确认旧进程终止后已同task/input恢复，session82613/PID3898714，/tmp/CppSourceCorrectionCurrentResume.log；首条保留8调用1180628tokens。driver /tmp/RunCppSourceCorrectionCurrent.ts带原taskId；三张成功检查点复用。下一轮先poll该PID/session，不重启仍活进程；最终成功后运行/tmp/AuditCppRevisionCurrent.ts检查全部修订与indexed，再按返回versionIds启动重建/可信与固定评测。不可直接套用旧Code17d6的37+40为新版本证据。若再失败先读权威reason，保留用量，不无进展重试。
+
+证据根/root/projects/domain-knowledge-releases/2026-09-10-workbench-progress/real-knowledge-revision；runtime/tmp/workbench-revision-acceptance-20260911。C的source54a仍5差异/5未知待修订。全套回归/Console/浏览器/一键分步/关联发布未齐；网站仍ec72，0ae56fe与e66ec50未部署。无删除知识库或新外部消息。目标保持active，不标完成或blocked。
