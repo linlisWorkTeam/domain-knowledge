@@ -447,11 +447,11 @@ export function createKnowledgeServer(input: {
           send(response, 200, { items: batches.list(url.searchParams.get('projectId') ?? undefined), schedulerError: batches.lastError }); return;
         }
         if (url.pathname === '/api/v1/workbench-batches' && request.method === 'POST') {
-          const payload = await body(request); requireOnlyKeys(payload, ['snapshotId', 'moduleId', 'schedule']);
+          const payload = await body(request); requireOnlyKeys(payload, ['snapshotId', 'moduleId', 'schedule', 'execution']);
           const commandId = request.headers['idempotency-key'];
           if (typeof commandId !== 'string' || !commandId.trim() || commandId.length > 256) throw new Error('IDEMPOTENCY_KEY_REQUIRED');
           if (typeof payload.snapshotId !== 'string' || typeof payload.moduleId !== 'string') throw new Error('PAYLOAD_INVALID');
-          send(response, 201, { batch: batches.create({ snapshotId: payload.snapshotId, moduleId: payload.moduleId, schedule: payload.schedule }, commandId) }); return;
+          send(response, 201, { batch: batches.create({ snapshotId: payload.snapshotId, moduleId: payload.moduleId, schedule: payload.schedule, execution: payload.execution }, commandId) }); return;
         }
         const batchRoute = /^\/api\/v1\/workbench-batches\/([^/]+)(?:\/(rounds|cancel|resume))?$/.exec(url.pathname);
         if (batchRoute && request.method === 'GET' && !batchRoute[2]) {

@@ -4,7 +4,7 @@
  * 文件功能：将固定模块批次交给五阶段执行器，保留轮次身份与恢复记录。
  */
 import { createProjectSnapshot } from '../../domain/workbench/WorkbenchProject.ts';
-import { batchSchedule, nextBatchRun, type WorkbenchBatch } from '../../domain/workbench/WorkbenchBatch.ts';
+import { batchExecution, batchSchedule, nextBatchRun, type WorkbenchBatch } from '../../domain/workbench/WorkbenchBatch.ts';
 import type { WorkbenchBatchStore } from '../ports/WorkbenchBatchPorts.ts';
 import type { WorkbenchProjectStore } from '../ports/WorkbenchProjectPorts.ts';
 import type { WorkbenchPipelines } from './WorkbenchPipelines.ts';
@@ -16,9 +16,10 @@ export class WorkbenchBatches {
   private readonly pending = new Map<string, Promise<void>>();
   private timer: ReturnType<typeof setInterval> | null = null;
   private closing = false;
+  private readonly materials?: { get(id: string): unknown };
   lastError: string | null = null;
-  constructor(input: { store: WorkbenchBatchStore; projects: WorkbenchProjectStore; pipelines: WorkbenchBatches['pipelines']; clock?: () => string }) {
-    this.store = input.store; this.projects = input.projects; this.pipelines = input.pipelines; this.clock = input.clock ?? (() => new Date().toISOString());
+  constructor(input: { store: WorkbenchBatchStore; projects: WorkbenchProjectStore; pipelines: WorkbenchBatches['pipelines']; clock?: () => string; materials?: { get(id: string): unknown } }) {
+    this.materials = input.materials; this.store = input.store; this.projects = input.projects; this.pipelines = input.pipelines; this.clock = input.clock ?? (() => new Date().toISOString());
   }
   list(projectId?: string) {
     return this.store.list(projectId).map(batch => {
@@ -32,19 +33,24 @@ export class WorkbenchBatches {
           for (const task of evaluations) if (task?.result) for (const id of task.input.cardVersionIds) versions.add(id);
         } catch { metadataError = true; }
       }
-      return { ...batch, verified, evaluatedVersionCount: metadataError ? null : versions.size, evaluatedVersionIds: [...versions].sort(), metadataError };
+      const { execution, ...record } = batch;
+      const executionSummary = execution ? { scope: execution.scope, materialIds: execution.materialIds, fixedCaseCount: execution.fixedSuite?.cases.length ?? 0 } : null;
+      return { ...record, executionSummary, verified, evaluatedVersionCount: metadataError ? null : versions.size, evaluatedVersionIds: [...versions].sort(), metadataError };
     });
   }
-  create(input: { snapshotId: string; moduleId: string; schedule: unknown }, commandId: string) {
+  create(input: { snapshotId: string; moduleId: string; schedule: unknown; execution?: unknown }, commandId: string) {
+    const execution = batchExecution(input.execution);
+    for (const id of execution?.materialIds ?? []) if (!this.materials?.get(id)) throw new Error('MATERIAL_NOT_FOUND');
     const project = this.projects.get(input.snapshotId); if (!project) throw new Error('PROJECT_INPUT_NOT_FOUND');
     const module = project.modules.find(item => item.moduleId === input.moduleId); if (!module) throw new Error('PROJECT_MODULES_INVALID');
+    if (execution?.scope.entryPath && !module.sourcePaths.includes(execution.scope.entryPath)) throw new Error('BATCH_EXECUTION_INVALID');
     const { schemaVersion: _schema, projectId: _projectId, snapshotId: _snapshotId, createdAt: _created, moduleBuilds: _moduleBuilds, ...source } = project;
     const selected = this.projects.save(createProjectSnapshot({ ...source, modules: [module],
       ...(project.moduleDefinitions ? { moduleDefinitions: project.moduleDefinitions.filter(item => item.moduleId === module.moduleId) } : {}),
       ...(project.moduleBuilds && Object.hasOwn(project.moduleBuilds, module.moduleId) ? { moduleBuilds: { [module.moduleId]: project.moduleBuilds[module.moduleId] } } : {}),
       sourceFiles: project.sourceFiles.filter(file => file.kind === 'build' || module.sourcePaths.includes(file.path)),
     }, this.clock()));
-    const batch = this.store.create({ projectId: selected.projectId, snapshotId: selected.snapshotId, moduleId: module.moduleId, schedule: batchSchedule(input.schedule) }, commandId, this.clock());
+    const batch = this.store.create({ projectId: selected.projectId, snapshotId: selected.snapshotId, moduleId: module.moduleId, schedule: batchSchedule(input.schedule), ...(execution ? { execution } : {}) }, commandId, this.clock());
     this.tick(); return batch;
   }
   enqueue(id: string, commandId?: string) { const batch = this.store.enqueue(id, this.clock(), commandId); this.tick(); return batch; }
@@ -79,8 +85,9 @@ export class WorkbenchBatches {
     const round = batch.rounds.at(-1)!;
     let monitor: ReturnType<typeof setInterval> | null = null;
     try {
+      batchExecution(batch.execution);
       if (batch.cancelRequested) throw new Error('BATCH_CANCELLED');
-      let pipeline = round.pipelineId ? this.pipelines.get(round.pipelineId) : await this.pipelines.start(batch.snapshotId, {}, [], [], round.executionKey);
+      let pipeline = round.pipelineId ? this.pipelines.get(round.pipelineId) : await this.pipelines.start(batch.snapshotId, batch.execution ? { [batch.moduleId]: batch.execution.scope } : {}, batch.execution?.materialIds ?? [], batch.execution?.fixedSuite ? [{ moduleId: batch.moduleId, suite: batch.execution.fixedSuite }] : [], round.executionKey);
       round.pipelineId = pipeline.pipelineId; this.store.save(batch, leaseId, false);
       if (['PAUSED', 'FAILED', 'CANCELLED'].includes(pipeline.status) && (round.resumeRequested || ['PIPELINE_PROCESS_EXITED', 'PIPELINE_SHUTDOWN'].includes(pipeline.reasonCode ?? ''))) pipeline = this.pipelines.resume(pipeline.pipelineId, pipeline.inputDigest);
       round.resumeRequested = false; this.store.save(batch, leaseId, false);

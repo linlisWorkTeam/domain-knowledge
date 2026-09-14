@@ -465,7 +465,7 @@ export function createComposition(input: {
     }
     return sha256(JSON.stringify(fingerprints));
   }, store: pipelineStore, stages: workbenchStages, generation: workbenchGeneration, reconstruction: workbenchReconstruction, evaluation: workbenchEvaluation, revision: workbenchKnowledgeRevision, sourceVerification: workbenchSourceVerification, sourceRevision: workbenchSourceRevision, index: knowledgeIndex, associations: workbenchAssociations });
-  const workbenchBatches = new WorkbenchBatches({ store: batchStore, projects: projectStore, pipelines: workbenchPipelines });
+  const workbenchBatches = new WorkbenchBatches({ store: batchStore, projects: projectStore, pipelines: workbenchPipelines, materials: workbenchMaterials.store });
   const projectStages = () => {
       const auditDirectory = join(runtimeDir, 'demo');
       const auditPath = join(auditDirectory, 'agent-runs.jsonl');

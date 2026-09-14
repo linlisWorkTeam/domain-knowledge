@@ -5,7 +5,7 @@
  */
 import { DatabaseSync } from 'node:sqlite';
 import { randomUUID } from 'node:crypto';
-import { BATCH_CONTRACT, appendBatchRound, batchDate, batchName, batchSchedule, type WorkbenchBatch } from '../../domain/workbench/WorkbenchBatch.ts';
+import { BATCH_CONTRACT, appendBatchRound, batchDate, batchName, batchSchedule, batchExecution, type WorkbenchBatch } from '../../domain/workbench/WorkbenchBatch.ts';
 import { checkpointOwner, checkpointOwnerExited } from './CheckpointOwner.ts';
 import { canonicalJson } from '../../domain/workbench/StageTask.ts';
 import type { BatchCreation, WorkbenchBatchStore } from '../../application/ports/WorkbenchBatchPorts.ts';
@@ -38,6 +38,8 @@ export class SqliteWorkbenchBatches implements WorkbenchBatchStore {
   }
   create(input: BatchCreation, commandId: string, now: string): WorkbenchBatch {
     if (!commandId || commandId.length > 256 || !input.projectId || !input.snapshotId || !input.moduleId) throw new Error('BATCH_INPUT_INVALID');
+    const execution = batchExecution(input.execution);
+    input = { ...input, ...(execution ? { execution } : {}) };
     const schedule = batchSchedule(input.schedule), fingerprint = canonicalJson({ ...input, schedule });
     return this.transaction(() => {
       const previous = this.db.prepare('SELECT fingerprint,batch_id FROM wb_batch_commands WHERE command_id=?').get(commandId);
@@ -83,7 +85,7 @@ export class SqliteWorkbenchBatches implements WorkbenchBatchStore {
     this.transaction(() => {
       const current = this.get(batch.batchId);
       if (!current || current.projectId !== batch.projectId || current.moduleId !== batch.moduleId || current.snapshotId !== batch.snapshotId
-        || current.contractVersion !== batch.contractVersion || current.createdAt !== batch.createdAt) throw new Error('BATCH_INPUT_CHANGED');
+        || canonicalJson(current.execution ?? null) !== canonicalJson(batch.execution ?? null) || current.contractVersion !== batch.contractVersion || current.createdAt !== batch.createdAt) throw new Error('BATCH_INPUT_CHANGED');
       const last = batch.rounds.at(-1);
       if (!last || batch.rounds.length !== current.rounds.length || last.executionKey !== current.rounds.at(-1)?.executionKey
         || JSON.stringify(batch.rounds.slice(0, -1)) !== JSON.stringify(current.rounds.slice(0, -1))

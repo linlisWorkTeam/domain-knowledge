@@ -9,7 +9,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { batchSchedule } from '../../src/domain/workbench/WorkbenchBatch.ts';
+import { batchExecution, batchSchedule } from '../../src/domain/workbench/WorkbenchBatch.ts';
 import { SqliteWorkbenchBatches } from '../../src/infrastructure/sqlite/SqliteWorkbenchBatches.ts';
 
 test('readable batch sequence survives restart and creation retries do not allocate extra batches', () => {
@@ -105,5 +105,28 @@ test('resume retains the same round and control retries cannot cancel a resumed 
     assert.equal(store.cancel(batch.batchId, now, 'cancel-original').cancelRequested, false);
     assert.equal(store.resume(batch.batchId, now, 'resume-original').status, 'RUNNING');
     assert.equal(store.get(active.batch.batchId)!.rounds.length, 1);
+  } finally { store.close(); rmSync(root, { recursive: true, force: true }); }
+});
+
+
+test('batch execution inputs survive restart, bind idempotency and cannot change during a round', () => {
+  const root = mkdtempSync(join(tmpdir(), 'batch-inputs-')), path = join(root, 'batches.sqlite');
+  let store = new SqliteWorkbenchBatches(path);
+  const now = '2026-09-14T00:00:00.000Z';
+  const execution = batchExecution({ schemaVersion: 'module-execution-v1', scope: { entryPath: 'parser.h', astFilter: 'Parser', symbols: ['parse'] }, materialIds: ['material-b', 'material-a'], fixedSuite: { schemaVersion: 'native-cases-v1', cases: [{ caseId: 'fixed' }] } })!;
+  try {
+    const input = { projectId: 'p', snapshotId: 's', moduleId: 'parser', schedule: { enabled: false, intervalMinutes: null }, execution };
+    const batch = store.create(input, 'create', now);
+    execution.materialIds.push('not-frozen');
+    assert.deepEqual(store.get(batch.batchId)!.execution!.materialIds, ['material-a', 'material-b']);
+    store.close(); store = new SqliteWorkbenchBatches(path);
+    assert.equal(store.get(batch.batchId)!.execution!.fixedSuite!.cases[0]!.caseId, 'fixed');
+    assert.throws(() => store.create(input, 'create', now), /IDEMPOTENCY_CONFLICT/);
+    store.enqueue(batch.batchId, now); const lease = store.claim(batch.batchId, now)!;
+    lease.batch.execution!.fixedSuite!.cases[0]!.caseId = 'changed';
+    assert.throws(() => store.save(lease.batch, lease.leaseId, false), /BATCH_INPUT_CHANGED/);
+    assert.throws(() => batchExecution({ schemaVersion: 'unknown' }), /BATCH_EXECUTION_INVALID/);
+    assert.throws(() => batchExecution({ schemaVersion: 'module-execution-v1', scope: { entryPath: '../private' } }), /BATCH_EXECUTION_INVALID/);
+    assert.throws(() => batchExecution({ schemaVersion: 'module-execution-v1', materialIds: ['a', 'a'] }), /BATCH_EXECUTION_INVALID/);
   } finally { store.close(); rmSync(root, { recursive: true, force: true }); }
 });
