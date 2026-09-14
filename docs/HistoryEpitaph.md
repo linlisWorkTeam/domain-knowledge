@@ -394,3 +394,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 [2108 冻结行与执行墓碑](https://github.com/linlisWorkTeam/domain-knowledge/blob/a166a6a/docs/epitaph/2026-09-14-2108-frozen-deletion-rows-and-tombstones.md)：引入跨库恢复v2冻结见证及工作台执行墓碑，19项存储/架构测试通过。旧runs后续已扩展为v2行见证并接入真实执行核验；当时生产文件清理及HTTP删除尚未开放，该限制仍需最终串联解决。
 
 [2126 旧运行审计与异步维护](https://github.com/linlisWorkTeam/domain-knowledge/blob/ec67776/docs/epitaph/2026-09-14-2126-legacy-deletion-audit-and-maintenance.md)：旧runs支持审计墓碑和配置/用量保留，维护屏障增加锁内异步状态检查；37项旧删除回归与4项维护单测通过。实际执行核验和图库清理后续已补适配器，生产删除及完整真实C/C++验收仍未完成。
+
+[2130 实际执行删除核验](https://github.com/linlisWorkTeam/domain-knowledge/blob/292ff0f/docs/epitaph/2026-09-14-2130-live-deletion-execution-check.md)：维护锁内读取原始工作流状态并结合检查点执行者，避免混淆业务阶段与执行存活，30项相关回归通过。该核验仍不能替代跨进程写入排他，最终删除UI/发布文件清理及真实C/C++验收未完成。

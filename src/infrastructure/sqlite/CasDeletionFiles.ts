@@ -3,7 +3,9 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：从确认清单冻结CAS文件，核验内容后清理，并支持部分清理后的恢复。
  */
-import { fstatSync, fsyncSync, lstatSync, unlinkSync } from 'node:fs';
+import { closeSync, constants, fstatSync, fsyncSync, lstatSync, openSync, unlinkSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { sha256 } from '../../domain/Domain.ts';
 import type { BatchDeletionPlan, DeletionNode } from '../../domain/workbench/BatchDeletion.ts';
 import { CasDeletionReader } from './CasDeletionReader.ts';
 
@@ -12,7 +14,21 @@ interface FileWitness { contract: 'cas-deletion-files-v1'; planId: string; files
 /** 仅在记录提交后、持有维护屏障及完整写入排他时清理；不接收文件路径。 */
 export class CasDeletionFiles extends CasDeletionReader {
   readonly contract = 'cas-deletion-files-v1';
+  readonly scope: string;
+  private readonly directory: string;
+  constructor(root: string) {
+    super(resolve(root)); this.directory = resolve(root); this.scope = this.currentScope();
+  }
+  private currentScope(): string {
+    const handle = openSync(this.directory, constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW);
+    try {
+      const stat = fstatSync(handle, { bigint: true });
+      return sha256(JSON.stringify({ path: this.directory, device: String(stat.dev), inode: String(stat.ino) }));
+    } finally { closeSync(handle); }
+  }
+  private assertScope(): void { if (this.currentScope() !== this.scope) throw new Error('DELETION_FILE_SCOPE_CHANGED'); }
   capture(plan: BatchDeletionPlan, nodes: DeletionNode[]): FileWitness {
+    this.assertScope();
     if (plan.schemaVersion !== 'batch-deletion-v2') throw new Error('DELETION_CONTRACT_INCOMPATIBLE');
     const byId = new Map(nodes.map(node => [node.id, node]));
     const files = plan.deleteIds.filter(id => id.startsWith('cas/')).sort().map(id => {
@@ -32,6 +48,7 @@ export class CasDeletionFiles extends CasDeletionReader {
     return witness;
   }
   clean(plan: BatchDeletionPlan, witness: unknown): void {
+    this.assertScope();
     const frozen = this.validate(plan, witness);
     // 在清理任何文件前检查全部剩余文件；损坏或已出现的新文件不能被当成成功。
     for (const entry of frozen.files) this.inspect(entry, false);
