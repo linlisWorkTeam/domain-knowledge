@@ -464,3 +464,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 - [2026-09-15-0030 部署与来源质量](https://github.com/linlisWorkTeam/domain-knowledge/blob/c3d54cd/docs/epitaph/2026-09-15-0030-deployed-source-quality.md)：956fe26部署及数据保留已验证；来源执行完成但质量未通过。后续43例正式补证完成，来源旧意见复核和完整发布仍待完成。
 
 - [2026-09-15-0034 指定候选补证入口](https://github.com/linlisWorkTeam/domain-knowledge/blob/4c34ead/docs/epitaph/2026-09-15-0034-supplied-candidate-stage.md)：冻结候选并交参考验证的入口；后续28fc任务43/43成功，原37例不变，不再按旧记录重启。
+
+- [2026-09-15-0041 C++正式补证](https://github.com/linlisWorkTeam/domain-knowledge/blob/37fc9d9273e851845dd60223065cef30b49f9391/docs/epitaph/2026-09-15-0041-cpp-formal-supplement.md)：43例正式补证成功、原37例保持不变；后续显式历史复核已启动并恢复，补证成功不代表来源质量通过，禁止重复恢复已成功的28fc任务。
