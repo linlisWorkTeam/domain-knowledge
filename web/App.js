@@ -223,6 +223,7 @@ const state = {
   token: '',
   operatorMode: false,
   selectedRun: null,
+  selectedRound: null,
   discovery: null,
   resourceErrors: {},
   loadedAt: null,
@@ -541,7 +542,12 @@ function referenceRunRow(run, selected = false) {
 
 function renderRunWorkspace(snapshot) {
   const { run, events = [], checkpoints = [], workflowNodes = [], evaluations = [], versions = [], latestDecision, progress, workflowStatus } = snapshot
-  const automationNodes = workflowNodes.length ? workflowNodes : checkpoints
+  const allNodes = workflowNodes.length ? workflowNodes : checkpoints
+  const rounds = [...new Set([run.iteration, ...allNodes.map(node => node.iteration ?? run.iteration)])].sort((a, b) => a - b)
+  const selectedRound = rounds.includes(state.selectedRound) ? state.selectedRound : run.iteration
+  const automationNodes = allNodes.filter(node => (node.iteration ?? run.iteration) === selectedRound)
+    .sort((a, b) => String(a.startedAt ?? a.readyAt ?? a.updatedAt ?? '').localeCompare(String(b.startedAt ?? b.readyAt ?? b.updatedAt ?? '')))
+  const openedNodes = new Set([...content.querySelectorAll('[data-node-record][open]')].map(element => element.dataset.nodeRecord))
   const primaryStates = ['CREATED', 'PLANNED', 'GENERATING', 'EVALUATING', 'REVIEWING', 'PUBLISHING', 'VERIFIED']
   const currentIndex = primaryStates.indexOf(run.state)
   const steps = primaryStates.map((item, index) => {
@@ -565,12 +571,15 @@ function renderRunWorkspace(snapshot) {
     </section>
     <div class="run-workspace-grid">
       <section class="panel">
-        <div class="section-heading"><div><p class="eyebrow">工作流执行记录</p><h2>自动化节点</h2><p>查看每个步骤的执行情况；批次结果见门禁判定。</p></div><span class="counter">${automationNodes.length}</span></div>
-        <div class="node-list">${automationNodes.length ? automationNodes.map((node) => `
-          <article class="node-card">
-            <div><span class="node-icon">${['COMMITTED', 'COMPLETED'].includes(node.status) ? '✓' : node.status === 'FAILED' ? '!' : '●'}</span><div><b>${escapeHtml(NODE_LABELS[node.nodeId] ?? node.nodeId)}</b><small>${escapeHtml(node.agentId ? `${AGENT_LABELS[node.agentId] ?? node.agentId} · ${node.error || node.detail || '等待详情'}` : node.generationKey || node.detail || '确定性节点')}</small></div></div>
-            <div>${badge(node.status, node.status === 'RUNNING' && !isRunActive(run) ? '历史节点状态：运行中' : displayLabel(node.status))}<small>第 ${escapeHtml((node.iteration ?? run.iteration) + 1)} 轮 · 第 ${escapeHtml(node.attempt ?? ((node.retryCount ?? 0) + 1))} 次尝试</small></div>
-          </article>`).join('') : emptyState('暂无节点记录', '这个批次可能由命令行创建，或者尚未执行 Agent 节点。')}</div>
+        <div class="section-heading"><h2>轮次执行记录</h2><span class="counter">${automationNodes.length} 个节点</span></div>
+        <div class="round-tabs" aria-label="选择轮次">${rounds.map(round => `<button type="button" class="secondary-button" data-run-round="${round}" aria-pressed="${round === selectedRound}">第 ${round + 1} 轮</button>`).join('')}</div>
+        <div class="node-list">${automationNodes.length ? automationNodes.map(node => {
+          const key = `${node.iteration ?? run.iteration}:${node.nodeId}:${node.attempt ?? 1}`
+          return `<details class="node-record ${node.status === 'RUNNING' && isRunActive(run) ? 'node-running' : ''}" data-node-record="${escapeHtml(key)}" ${openedNodes.has(key) ? 'open' : ''}>
+            <summary class="node-card"><span><b>${escapeHtml(NODE_LABELS[node.nodeId] ?? '执行节点')}</b>${badge(node.status ?? 'UNKNOWN', node.status === 'RUNNING' && !isRunActive(run) ? '历史节点状态：运行中' : displayLabel(node.status ?? 'UNKNOWN'))}</span><span><small>开始 ${escapeHtml(formatDate(node.startedAt))}</small><small>结束 ${escapeHtml(formatDate(node.completedAt))}</small></span></summary>
+            <div class="node-execution-log"><h3>运行日志</h3><dl><div><dt>记录时间</dt><dd>${escapeHtml(formatDate(node.updatedAt))}</dd></div><div><dt>执行记录</dt><dd>${escapeHtml(node.detail || '尚无详细执行记录')}</dd></div>${node.error ? `<div><dt>错误</dt><dd>${escapeHtml(node.error)}</dd></div>` : ''}</dl></div>
+          </details>`
+        }).join('') : emptyState('暂无节点记录', '当前轮次尚未记录执行节点。')}</div>
       </section>
       <aside class="panel gate-summary">
         <p class="eyebrow">最近一次门禁判定</p>
@@ -1237,6 +1246,7 @@ async function navigate(page) {
   if (!PAGE_META[page]) return
   state.page = page
   state.selectedRun = null
+  state.selectedRound = null
   setPageMeta(page)
   closeDrawer()
   if (page === 'overview') renderOverview()
@@ -1263,6 +1273,7 @@ async function navigate(page) {
 }
 
 async function openRun(runId) {
+  if (state.selectedRun?.run?.runId !== runId) state.selectedRound = null
   setPageMeta('runs')
   state.page = 'runs'
   content.innerHTML = '<div class="loading-state"><span class="spinner"></span>正在读取批次快照…</div>'
@@ -1275,6 +1286,31 @@ async function openRun(runId) {
   state.selectedRun = { ...snapshot, progress, workflowStatus }
   renderRunWorkspace(state.selectedRun)
 }
+
+let refreshingRun = false
+async function refreshSelectedRun() {
+  if (refreshingRun || state.page !== 'runs' || !state.selectedRun) return
+  const runId = state.selectedRun.run.runId
+  refreshingRun = true
+  try {
+    const encoded = encodeURIComponent(runId)
+    const [snapshot, progress, workflowStatus] = await Promise.all([
+      request(`/api/v1/runs/${encoded}`), request(`/api/v1/runs/${encoded}/progress`),
+      request(`/api/v1/runs/${encoded}/workflow-status`).catch(() => ({ executionStatus: 'UNKNOWN' })),
+    ])
+    if (state.page !== 'runs' || state.selectedRun?.run.runId !== runId) return
+    const focused = document.activeElement
+    const round = focused?.dataset?.runRound
+    const nodeKey = focused?.closest('[data-node-record]')?.dataset.nodeRecord
+    state.selectedRun = { ...snapshot, progress, workflowStatus }
+    renderRunWorkspace(state.selectedRun)
+    if (round !== undefined) content.querySelector(`[data-run-round="${CSS.escape(round)}"]`)?.focus({ preventScroll: true })
+    else if (nodeKey) content.querySelector(`[data-node-record="${CSS.escape(nodeKey)}"] > summary`)?.focus({ preventScroll: true })
+  } catch {
+    // 连接恢复后重新读取；保留此前已取得的执行证据。
+  } finally { refreshingRun = false }
+}
+setInterval(() => { void refreshSelectedRun() }, 5_000)
 
 async function performActionItem(button) {
   if (!state.operatorMode || (!state.token && !state.capabilities?.directEditing)) {
@@ -1452,6 +1488,8 @@ nav.addEventListener('click', (event) => {
 })
 
 content.addEventListener('click', (event) => {
+  const round = event.target.closest('[data-run-round]')
+  if (round && state.selectedRun) { state.selectedRound = Number(round.dataset.runRound); renderRunWorkspace(state.selectedRun); return }
   const download = event.target.closest('[data-download-artifact]')
   if (download) { downloadArtifact(download.dataset.downloadArtifact).catch((error) => showToast(userFacingError(error, '无法下载阶段证据。'), 'danger')); return }
   const queueFilter = event.target.closest('[data-queue-filter]')

@@ -86,3 +86,29 @@ test('恢复和取消更新执行计数，保留原始预算与历史证据', as
   await page.getByRole('button', { name: '← 返回批次列表' }).click();
   await expect(page.locator('.reference-metrics article').first().locator('b')).toHaveText('1');
 });
+
+test('轮次隔离节点，展开日志并自动刷新实际执行状态', async ({ page }) => {
+  const runId = fixture.ids.active;
+  const record = (iteration: number, status: 'RUNNING' | 'COMPLETED', detail: string) => fixture.instance.composition.workflowObserver.record({
+    runId, nodeId: 'code', agentId: 'code', status, iteration, attempt: 1, detail, error: null, readyAt: null,
+    startedAt: `2026-09-09T00:0${iteration}:00.000Z`, completedAt: status === 'COMPLETED' ? '2026-09-09T00:05:00.000Z' : null,
+    updatedAt: '2026-09-09T00:05:00.000Z',
+  });
+  record(0, 'RUNNING', '正在构建生成代码');
+  record(1, 'COMPLETED', '第二轮构建记录');
+  await page.goto(baseUrl);
+  await page.getByRole('button', { name: /^飞轮批次$/ }).click();
+  await page.locator(`.reference-run-item[data-run-id="${runId}"]`).click();
+  await expect(page.locator('[data-node-record]')).toHaveCount(1);
+  await expect(page.locator('.node-running')).toHaveCount(1);
+  await page.locator('[data-node-record] > summary').click();
+  await expect(page.locator('.node-execution-log')).toContainText('正在构建生成代码');
+  record(0, 'COMPLETED', '构建已完成');
+  await expect(page.locator('.node-running')).toHaveCount(0, { timeout: 12_000 });
+  await expect(page.locator('[data-node-record]')).toHaveAttribute('open', '');
+  await expect(page.locator('.node-execution-log')).toContainText('构建已完成');
+  await page.getByRole('button', { name: '第 2 轮', exact: true }).click();
+  await page.locator('[data-node-record] > summary').click();
+  await expect(page.locator('.node-execution-log')).toContainText('第二轮构建记录');
+  await expect(page.locator('.node-list')).not.toContainText('次尝试');
+});

@@ -1373,3 +1373,12 @@ body.drawer-active { overflow: hidden; }
 .evaluation-history > summary { cursor: pointer; padding: 12px 0; }
 .evaluation-history .evidence-card { margin-top: 12px; }
 @media (max-width: 640px) { .rule-field { grid-template-columns: 1fr; gap: 8px; } }
+.round-tabs { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 12px; }
+.round-tabs button { flex-shrink: 0; }
+.round-tabs button[aria-pressed=true] { border-color: currentColor; font-weight: bold; }
+.node-record > summary { cursor: pointer; }
+.node-record > summary > span { display: grid; gap: 6px; }
+.node-execution-log { padding: 16px; overflow-wrap: anywhere; }
+.node-running > summary::before { content: ''; width: 10px; height: 10px; border-radius: 50%; background: currentColor; animation: node-pulse 1.5s ease-in-out infinite; }
+@keyframes node-pulse { 50% { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { .node-running > summary::before { animation: none; } }
