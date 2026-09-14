@@ -46,7 +46,7 @@ export function createKnowledgeGenerationPanel({ root, request, escapeHtml: esca
       ${interfaceDiagnosticsHtml(events, task.taskId, escape)}
       ${active() ? `<button class="secondary-button" data-generation-action="cancel" ${busy || task.cancelRequested || !isEditable() ? 'disabled' : ''} type="button">取消生成</button>` : ''}
       ${resume ? `<button class="secondary-button" data-generation-action="resume" ${busy || !isEditable() ? 'disabled' : ''} type="button">恢复生成</button>` : ''}
-      ${cards.length ? '<p>下一步：在知识页面「知识索引与试检索」中建立索引。</p>' : ''}
+      ${cards.length ? '<p>下一步：在知识页面「卡片搜索设置」中建立索引。</p>' : ''}
       <details><summary>输入与执行记录</summary><code>${escape(task.taskId)}</code><p>源码 ${escape(task.input.sourceRevision)}；累计模型请求 ${escape(task.usage.modelCalls)} 次，已报告 Token ${escape(task.usage.tokens)}，预留 ${escape(task.usage.reservedTokens)}。未报告的用量不视为零。</p></details>`
   }
   function html() {

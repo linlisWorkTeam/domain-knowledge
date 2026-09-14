@@ -4,6 +4,7 @@
  * 文件功能：提供app页面的展示、交互或样式资源。
  */
 import { nodeExplanation, executionNote } from './WorkbenchLabels.js'
+import { createKnowledgeGenerationPanel } from './KnowledgeGeneration.js'
 import { createModuleBatches } from './ModuleBatches.js'
 import { publicationDownloadName } from './WorkbenchPublication.js'
 import { createRepositoryAnalysisPanel } from './RepositoryAnalysis.js'
@@ -59,6 +60,7 @@ applyTheme(initialTheme)
 const PAGE_META = {
   overview: '操作中心',
   projects: '项目设置',
+  stages: '阶段操作',
   runs: '飞轮批次',
   knowledge: '知识',
   graph: '工作流图',
@@ -444,6 +446,14 @@ function setPageMeta(page) {
 const repositoryAnalysisPanel = createRepositoryAnalysisPanel({ root: content, request, escapeHtml, isEditable: () => Boolean(state.capabilities?.directEditing || state.token), onProjectSelected(project) { state.selectedProject = project; try { localStorage.setItem('workbench-project-input', project.snapshotId) } catch {} document.querySelector('#selected-project-name').textContent = project.directory.split('/').at(-1); document.querySelector('#project-selector').title = project.directory } })
 
 const moduleBatches = createModuleBatches({ root: content, request, escapeHtml, project: () => state.selectedProject, isEditable: () => Boolean(state.capabilities?.directEditing || state.token), formatDate })
+
+const stageOperations = createKnowledgeGenerationPanel({ root: content, request, escapeHtml, isEditable: () => Boolean(state.capabilities?.directEditing || state.token) })
+function renderStageOperations() {
+  const project = state.selectedProject
+  content.innerHTML = `<section class="panel"><button type="button" class="secondary-button" data-stage-back>返回飞轮批次</button><h2>阶段操作</h2>${project ? `<p>当前项目范围：${project.modules.map(module => escapeHtml(module.moduleId)).join('、')}</p><p>使用已保存的源码与构建参数；可查看历史产物并独立执行各阶段。</p>${stageOperations.html()}` : '<p>请先在左上角选择项目并保存模块范围。</p>'}</section>`
+  stageOperations.setProject(project)
+  stageOperations.refresh()
+}
 
 function renderOverview() {
   const focusedQueueFilter = document.activeElement?.dataset?.queueFilter
@@ -1264,6 +1274,7 @@ async function navigate(page) {
   setPageMeta(page)
   closeDrawer()
   if (page === 'projects') { content.innerHTML = repositoryAnalysisPanel.html(); repositoryAnalysisPanel.restore(null) }
+  if (page === 'stages') renderStageOperations()
   if (page === 'overview') renderOverview()
   if (page === 'runs') renderRuns()
   if (page === 'knowledge') renderKnowledge()
@@ -1536,6 +1547,8 @@ content.addEventListener('click', (event) => {
   }
   const actionButton = event.target.closest('[data-action-item]')
   if (actionButton) performActionItem(actionButton)
+  if (event.target.closest('[data-stage-operations]')) void navigate('stages')
+  if (event.target.closest('[data-stage-back]')) void navigate('runs')
   if (event.target.closest('[data-run-back]')) { state.selectedRun = null; renderRuns() }
   const refresh = event.target.closest('[data-refresh-run]')
   if (refresh) openRun(refresh.dataset.refreshRun).catch(showFatal)
@@ -1797,13 +1810,14 @@ globalSearchButton.addEventListener('click', async () => {
   document.querySelector('#knowledge-search')?.focus()
 })
 
-operatorForm.addEventListener('submit', (event) => {
+operatorForm.addEventListener('submit', async (event) => {
   event.preventDefault()
   if (!operatorToken.value.trim()) return
   state.token = operatorToken.value.trim()
   state.operatorMode = true
   operatorToken.value = ''
   operatorDialog.close()
+  await restoreSelectedProject()
   updateMode()
   refreshControlPlane().then(() => state.page === 'overview' && renderOverview()).catch((error) => showToast(userFacingError(error, '无法刷新控制面数据。'), 'danger'))
   showToast('令牌已载入当前页面内存。', 'success')
@@ -1858,6 +1872,16 @@ function showFatal(error) {
   content.innerHTML = emptyState('无法读取知识飞轮', userFacingError(error, '无法连接控制面服务。'), '<button class="primary-button" data-reload>重新连接</button>')
 }
 
+async function restoreSelectedProject() {
+  if (state.selectedProject) return
+  try {
+    const snapshotId = localStorage.getItem('workbench-project-input')
+    if (!snapshotId) return
+    const project = await request(`/api/v1/projects/${encodeURIComponent(snapshotId)}`)
+    if (!state.selectedProject && localStorage.getItem('workbench-project-input') === snapshotId) repositoryAnalysisPanel.selectProject(project)
+  } catch { /* 未授权或输入不可用时保留原选择标识，授权后可重试。 */ }
+}
+
 async function boot() {
   const keys = ['status', 'capabilities', 'runs', 'knowledge', 'agents', 'actionItems', 'activities', 'components', 'knowledgeHealth']
   const results = await Promise.allSettled([
@@ -1881,10 +1905,7 @@ async function boot() {
   if (state.runs[0]) {
     state.latestProgress = await request(`/api/v1/runs/${encodeURIComponent(state.runs[0].runId)}/progress`).catch(() => null)
   }
-  try {
-    const snapshotId = localStorage.getItem('workbench-project-input')
-    if (snapshotId) repositoryAnalysisPanel.selectProject(await request(`/api/v1/projects/${encodeURIComponent(snapshotId)}`))
-  } catch { /* 已保存输入不可用时由用户重新选择，不能猜测其他项目。 */ }
+  await restoreSelectedProject()
   state.loadedAt = new Date().toISOString()
   const partial = Object.values(state.resourceErrors).some(Boolean)
   registryIndicator.className = `health-dot ${partial ? 'pending' : 'healthy'}`

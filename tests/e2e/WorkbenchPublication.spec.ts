@@ -32,11 +32,18 @@ test('saved project to verified publication remains usable without login on desk
   instance.composition.apps.workbenchStages.store.insert({ ...generated, status: 'SUCCEEDED', result: { artifactRefs: [], summary: { cards: [{ cardId: 'card', versionId: 'version', title: 'Fixture card', quality: 'CANDIDATE' }] } } });
   instance.server.listen(0, '127.0.0.1'); await once(instance.server, 'listening');
   const address = instance.server.address(); if (!address || typeof address === 'string') throw new Error('TEST_SERVER_ADDRESS_INVALID');
+  const openStages = async () => {
+    const menu = page.getByRole('button', { name: '打开主导航', exact: true });
+    if (await menu.isVisible()) await menu.click();
+    await page.getByRole('button', { name: /^飞轮批次$/ }).click();
+    await page.getByRole('button', { name: '阶段操作', exact: true }).click();
+  };
   try {
     await page.goto(`http://127.0.0.1:${address.port}`);
     await page.locator('#project-selector').click();
     await page.locator('[data-project-history-select]').selectOption(fixture.project.snapshotId);
     await expect(page.locator('[data-project-history]')).toContainText('已载入冻结输入');
+    await openStages();
     const panel = page.locator('[data-workbench-publication-panel]');
     await panel.locator('[data-publication-select="evaluation"]').selectOption(fixture.ids.evaluation);
     await panel.locator('[data-publication-select="fixed"]').selectOption(fixture.ids.fixedEvaluation);
@@ -59,6 +66,7 @@ test('saved project to verified publication remains usable without login on desk
     await page.getByRole('button', { name: '打开主导航', exact: true }).click();
     await page.locator('#project-selector').click();
     await page.locator('[data-project-history-select]').selectOption(fixture.project.snapshotId);
+    await openStages();
     await expect(page.locator('[data-workbench-publication-panel]')).toContainText('已验证并发布');
     expect(publications.list().length).toBe(1);
   } finally {

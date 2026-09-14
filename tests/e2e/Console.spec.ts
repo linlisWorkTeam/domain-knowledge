@@ -1017,10 +1017,12 @@ test.describe.serial('工作台固定仓库完整流程', () => {
     git(['add', '.']); git(['commit', '-qm', 'Fixed source']); commit = git(['rev-parse', 'HEAD']);
     await page.goto(baseUrl); await enterGovernance(page);
     await page.getByRole('button', { name: '选择项目', exact: true }).click();
-    await page.getByLabel('服务器仓库目录', { exact: true }).fill(directory);
-    await page.getByLabel('源码版本', { exact: true }).fill(commit);
-    await page.getByRole('button', { name: '分析仓库', exact: true }).click();
-    await expect(page.locator('[data-repository-result]')).toContainText(commit);
+    await page.getByLabel('本地代码目录', { exact: true }).fill(directory);
+    const analysisResponse = page.waitForResponse(response => response.url().endsWith('/api/v1/repository-analyses'));
+    await page.getByRole('button', { name: '读取目录', exact: true }).click();
+    commit = (await (await analysisResponse).json()).commit;
+    expect(commit).toMatch(/^directory:[a-f0-9]{64}$/);
+    await expect(page.locator('[data-repository-result]')).toContainText('已冻结 2 个项目文件');
     await expect(page.locator('[data-repository-result]')).toContainText('parser');
     await expect(page.locator('[data-repository-result]')).toContainText('gcc');
     await expect(page.getByRole('heading', { name: '模块候选' })).toBeVisible();
@@ -1048,6 +1050,8 @@ test.describe.serial('工作台固定仓库完整流程', () => {
       return request.stage?.startsWith('outline') ? { title, description, sections: [{ heading: 'Behavior', purpose: 'Interface and limits' }] }
         : { title, description, sections: [{ sectionId: 'section-1', body: 'The parse function takes no arguments and returns the integer one. Its public interface is int parse(void). The fixed source contains no external dependencies or mutable state. This card describes only the provided function and does not establish behavior for any other parser. Behavioral evaluation and publication approval remain pending.' }] };
     } });
+    await page.getByRole('button', { name: /^飞轮批次$/ }).click();
+    await page.getByRole('button', { name: '阶段操作', exact: true }).click();
     await page.getByRole('button', { name: '生成知识库', exact: true }).click();
     await expect(page.locator('[data-generation-task]')).toContainText('已生成 1 张');
     await expect(page.locator('[data-generation-task]')).toContainText('已完成');
@@ -1161,7 +1165,7 @@ test.describe.serial('工作台固定仓库完整流程', () => {
     await page.screenshot({ path: test.info().outputPath('repository-analysis-desktop.png'), fullPage: true });
     await page.setViewportSize({ width: 390, height: 844 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-    await expect(page.getByRole('button', { name: '分析仓库', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: '返回飞轮批次', exact: true })).toBeVisible();
     await page.screenshot({ path: test.info().outputPath('repository-analysis-mobile.png'), fullPage: true });
   });
   test('一键门禁拒绝与重载恢复前序产物', async () => {
@@ -1186,17 +1190,22 @@ test.describe.serial('工作台固定仓库完整流程', () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await page.reload(); await enterGovernance(page);
     await page.getByRole('button', { name: '打开主导航', exact: true }).click();
-    await page.getByRole('button', { name: '选择项目', exact: true }).click();
+    await page.getByRole('button', { name: /^飞轮批次$/ }).click();
+    await page.getByRole('button', { name: '阶段操作', exact: true }).click();
     await expect(page.locator('[data-generation-task]')).toContainText('已生成 1 张');
     await expect(page.locator('[data-generation-task]').getByRole('button', { name: 'Parser generated card', exact: true })).toBeVisible();
     await expect(page.locator('[data-reconstruction-panel]')).toContainText('重建及接口检查完成');
     await expect(page.locator('[data-native-evaluation-panel]')).toContainText('可信用例存在失败');
     await expect(page.locator('[data-workbench-pipeline-panel]')).toContainText('可信行为测试未通过');
-    await page.getByLabel('服务器仓库目录', { exact: true }).fill(directory);
-    await page.getByLabel('源码版本', { exact: true }).fill('missing-commit-for-analysis');
-    await page.getByRole('button', { name: '分析仓库', exact: true }).click();
-    await expect(page.locator('[data-repository-notice]')).toContainText('无法读取这个源码版本');
+    await page.getByRole('button', { name: '打开主导航', exact: true }).click();
+    await page.getByRole('button', { name: '选择项目', exact: true }).click();
+    await page.getByLabel('本地代码目录', { exact: true }).fill(join(directory, 'missing-directory'));
+    await page.getByRole('button', { name: '读取目录', exact: true }).click();
+    await expect(page.locator('[data-repository-notice]')).toContainText('目录不存在或不可访问');
     await expect(page.locator('[data-repository-result]')).not.toContainText(commit);
+    await page.getByRole('button', { name: '打开主导航', exact: true }).click();
+    await page.getByRole('button', { name: /^飞轮批次$/ }).click();
+    await page.getByRole('button', { name: '阶段操作', exact: true }).click();
   });
   test('知识修订保留失败审计并重建绑定版本', async () => {
     const { directory, originalModel, originalNative, reconstruction, originalReconstruction, nativeEvaluation, originalEvaluation, git } = fixture;
@@ -1318,7 +1327,10 @@ test('关联阶段可独立执行并在卡片详情查看真实引用候选', as
 });
 
 test('已完成的一键流程重载展示评测和关联数量', async ({ page }) => {
-  const pipeline = { pipelineId: 'pipeline-browser-summary', status: 'SUCCEEDED', currentStage: 'ASSOCIATE', contractVersion: 'knowledge-pipeline-v1', children: {} };
+  const snapshotId = 'project-input-browser-summary';
+  await page.addInitScript(id => localStorage.setItem('workbench-project-input', id), snapshotId);
+  await page.route('**/api/v1/projects/project-input-browser-summary', route => route.fulfill({ json: { snapshotId, projectId: 'browser-summary-project', directory: '/controlled/parser', commit: 'fixed', sourceDigest: 'fixed', modules: [{ moduleId: 'parser', language: 'c' }], build: {} } }));
+  const pipeline = { pipelineId: 'pipeline-browser-summary', status: 'SUCCEEDED', currentStage: 'ASSOCIATE', contractVersion: 'knowledge-pipeline-v1', children: { GENERATE: { input: { parameters: { snapshotId } } } } };
   await page.route('**/api/v1/workbench-pipelines', (route) => route.fulfill({ json: { items: [pipeline] } }));
   await page.route('**/api/v1/workbench-pipelines/pipeline-browser-summary', (route) => route.fulfill({ json: {
     pipeline, checkpoints: {}, usage: { modelCalls: 15, tokens: 218936 }, tasks: [
@@ -1328,13 +1340,15 @@ test('已完成的一键流程重载展示评测和关联数量', async ({ page 
   } }));
   const errors: string[] = []; page.on('pageerror', (error) => errors.push(error.message));
   await page.goto(baseUrl);
-  await page.locator('#project-selector').click();
+  await page.getByRole('button', { name: /^飞轮批次$/ }).click();
+  await page.getByRole('button', { name: '阶段操作', exact: true }).click();
   const panel = page.locator('[data-workbench-pipeline-panel]');
   await expect(panel).toContainText('通过 31/31');
   await expect(panel).toContainText('40 条关系');
   await expect(panel).toContainText('累计模型调用 15 次');
   await page.reload();
-  await page.locator('#project-selector').click();
+  await page.getByRole('button', { name: /^飞轮批次$/ }).click();
+  await page.getByRole('button', { name: '阶段操作', exact: true }).click();
   await expect(panel).toContainText('40 条关系');
   expect(errors).toEqual([]);
 });
