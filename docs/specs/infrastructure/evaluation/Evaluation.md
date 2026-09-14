@@ -40,6 +40,16 @@ testSuite 使用 `native-cases-v2-supervised` 协议，含 files 与 cases，cas
 
 本节是本次手动验收计划，不新增永久 CI。用户已确认使用真实模型分析有代表性的开源模块，并要求先记录计划再执行。执行结果追加到 [Agent 验收报告](../../../reports/AgentSpecRepairAndE2E.md)，计划不等于通过证据。
 
+#### 2026-09-14 v12 分批 TestGen 修复后再次完整验收
+
+用户在完成 Worker 分配范围与 TestGen 分批/推理传输审计修复后明确要求“重新跑完cJSON验收”，授权本次新的完整批次。基线为 `099ce794e92202dc006af5df2b631bba9233c720`，包含最新 origin/main `22fe34fdf1ee9e37c08d0bd17a03b2c7e4103cf0` 与两项本地修复；修复尚未合并。本次独立工作树 `/tmp/domain-knowledge-cjson-v12`，分支 `test/cjson-utils-v12-real-e2e`，执行协议 `domain-agents-v12-testgen-batches` / `contract-v12`。启动前提交本节计划，实际执行 HEAD 记录在 Execution.json；不覆盖历史工作树或 runtime。
+
+新证据目录 `/root/projects/domain-knowledge/.workpanel/acceptance/2026-09-14-cjson-v12-real/`。新 Run.mjs 使用当前入口，TestGen 提示遵守计划/批次 Schema，每批最多四项；不沿用旧原子输出要求。229 个源码摘要、1481 行完整目标与独立补充用例先核对，再重跑原实现基线。固定版本实际行为为依据，RFC 差异单列，保留转义路径覆盖；新测试由真实模型重新生成，不导入任何旧候选通过状态、知识或 Check 结果。
+
+预算仍是一个新 Run、含首轮最多三轮、workflow.start 起 30 分钟、各角色/节点总计 10 分钟（DocGen 包含 Worker，TestGen 包含所有批次）、DocWorker=1、构建串行、TestGen 最多一次修复。真实 deepseek-v4-flash、生产角色、DSH SDK/Bubblewrap、thinking=disabled；maxTokens=32768，contextWindow=128000。Check 最多三个报告尝试，每次 outputAttempts=1，无底层叠加重试；其他角色最多两次 Schema 尝试。600 秒由角色/图负责取消，入口 605 秒只作取消清理失效的补充 watchdog，不给模型额外生成预算。新增 reasoningTransport 审计记录实际参数与响应计数，不能依据小型探针的结果假定长任务关闭推理一定生效。
+
+新匹配版本只读前台使用 127.0.0.1:4313、新 SQLite/CAS 和独立临时隧道，实际浏览器核对当前 Run、节点、候选正文、通过/未通过标记。按原完整验收标准观察 Check、参考校验、真实重建编译/行为评测、Review 修订与 Gate；失败保存原始输出、逐项诊断、事件和 CAS 摘要，不手工修改模型代码，不循环新建 Run。结果补充到原报告。
+
 #### 2026-09-14 修复后新一次完整验收
 
 本批由用户重新授权，不受上次“第四个最后批次”的结束约定限制。GitHub 已核对 PR #49 合并于 `22fe34fdf1ee9e37c08d0bd17a03b2c7e4103cf0`，分支最终修复 `0b6a0d51fec2bbe76e581c4602659ddb82fa6b26`。从当前 origin/main 创建 `test/cjson-utils-v10-real-e2e` / `/tmp/domain-knowledge-cjson-v10`；执行源码为该合并提交，启动前只更新本计划和报告，最终记录实际 HEAD。契约为 `domain-agents-v10-check-evidence-guards` / `contract-v10`。
