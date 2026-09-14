@@ -64,11 +64,13 @@ export function executionNote(value) {
   if (/\p{Script=Han}/u.test(text)) return text.replaceAll('DocGen', '知识生成').replaceAll('TestGen', '测试生成').replaceAll('Review', '问题复核')
   return '已保存一条技术执行记录，具体内容见下方原始日志'
 }
-const fieldNames = { status: '状态', outcome: '结果', role: '执行角色', stage: '执行阶段', phase: '处理步骤', attempt: '执行次数', taskAttempt: '任务执行次数', modelCalls: '模型调用次数', tokens: '实际用量', reservedTokens: '预留用量', elapsedMs: '已用时间（毫秒）', generated: '生成数量', indexed: '已更新搜索目录', passed: '通过数量', total: '总数', testsPassed: '通过用例数', testsTotal: '用例总数', reused: '复用数量', failed: '失败数量', updated: '更新数量', added: '新增数量', publicationVerified: '是否已验证发布', section: '知识章节', heading: '知识章节', cardCount: '卡片数量', associationCount: '关联数量', fixedCaseCount: '固定用例数' }
+const fieldNames = { message: '过程说明', reasonCode: '处理原因', status: '状态', outcome: '结果', role: '执行角色', stage: '执行阶段', phase: '处理步骤', attempt: '执行次数', taskAttempt: '任务执行次数', modelCalls: '模型调用次数', tokens: '实际用量', reservedTokens: '预留用量', elapsedMs: '已用时间（毫秒）', generated: '生成数量', indexed: '已更新搜索目录', passed: '通过数量', total: '总数', testsPassed: '通过用例数', testsTotal: '用例总数', reused: '复用数量', failed: '失败数量', updated: '更新数量', added: '新增数量', publicationVerified: '是否已验证发布', section: '知识章节', heading: '知识章节', cardCount: '卡片数量', associationCount: '关联数量', fixedCaseCount: '固定用例数' }
 const resultNames = { SOURCE_MATCHED: '来源匹配', SOURCE_MISMATCH: '存在源码事实矛盾', UNRESOLVED: '证据不足，仍需处理', BEHAVIOR_PASSED: '行为评测通过', PASS: '通过', ITERATE: '需要修订', STOPPED: '已停止', REJECTED: '未通过', MATCHED: '匹配', STARTED: '开始执行', COMPLETED: '执行完成', SUCCEEDED: '执行完成', FAILED: '失败', RUNNING: '运行中', PENDING: '等待执行', CANCELLED: '已取消', PAUSED: '已暂停', 'role-command': '准备角色输入', 'role-stage-attempt': '执行角色步骤', 'evidence-attribution': '依据证据定位问题' }
 export function readableRecord(value) {
   return Object.entries(value ?? {}).filter(([key]) => fieldNames[key]).map(([key, raw]) => {
     let text = typeof raw === 'boolean' ? raw ? '是' : '否' : typeof raw === 'number' ? String(raw) : Object.hasOwn(resultNames, raw) ? resultNames[raw] : undefined
+    if (key === 'message') text = executionNote(raw)
+    if (key === 'reasonCode') text = executionReason(raw)
     if (!text && ['role', 'stage'].includes(key)) text = nodeExplanation(raw).name
     if (!text && typeof raw === 'string' && /\p{Script=Han}/u.test(raw)) text = raw
     return { label: fieldNames[key], value: text ?? '详见原始记录' }
@@ -77,4 +79,30 @@ export function readableRecord(value) {
 export function checkpointLabel(key) {
   const prefix = String(key).split(':')[0]
   return ({ 'source-execution-scope': '确认参考构建范围', 'source-materials': '准备章节来源材料', 'source-section': '保存章节复核结果', 'source-card': '汇总卡片复核结果', role: '保存角色输出', 'revision-card': '保存卡片修订', 'revision-source-materials': '准备修订复核材料', 'trusted-case': '保存可信用例结果', 'generated-case': '保存生成实现测试结果', 'reference-case': '保存参考实现测试结果', 'index-build': '保存搜索目录', module: '保存模块结果' })[prefix] ?? '保存阶段处理结果'
+}
+
+const reasons = {
+  ALL_DETERMINISTIC_GATES_PASSED: '所有确定性检查均已通过',
+  PIPELINE_BEHAVIOR_FAILED: '生成代码未通过可信行为测试，请查看失败用例。',
+  PIPELINE_FIXED_FAILED: '固定测试未通过，请查看参考实现与生成实现的测试结果。',
+  PIPELINE_INTERFACE_MISMATCH: '生成代码与公开接口不一致，请查看接口差异。',
+  PIPELINE_SOURCE_MISMATCH: '知识描述与参考源码存在矛盾，请查看章节复核意见。',
+  PIPELINE_SOURCE_UNRESOLVED: '来源证据仍有未解决项，尚不能确认知识与源码一致。',
+  PIPELINE_REVISION_UNRESOLVED: '本次修订仍有未解决项，请查看修订结果。',
+  PIPELINE_REVISION_QUALITY_REJECTED: '修订内容未通过质量检查，请查看拒绝原因。',
+  PIPELINE_CARDS_MISSING: '没有生成可用卡片，请检查知识生成结果。',
+  PIPELINE_INDEX_FAILED: '部分卡片的搜索目录更新失败，请查看索引记录。',
+  PIPELINE_RESULT_MISSING: '缺少后续步骤需要的结果，请检查前序节点。',
+  STAGE_PROCESS_EXITED: '上次执行进程已退出，已保存的结果保留，可恢复执行。',
+  STAGE_BUDGET_EXHAUSTED: '累计执行预算已耗尽，已保存的结果保留。',
+  PROVIDER_QUOTA_EXHAUSTED: '模型服务额度不足，补充额度后可恢复执行。',
+  WORKBENCH_RESOURCE_INSUFFICIENT: '服务器可用内存或磁盘不足，释放资源后可恢复执行。',
+  DSH_CONFIGURATION_UNAVAILABLE: '模型配置不可用，请在 Agent 设置中配置并验证。',
+  DSH_CONFIGURATION_CHANGED: '模型配置已变化，恢复执行需要与冻结输入一致的配置。',
+  STAGE_CANCELLED: '执行已取消，前序结果保留。',
+  STAGE_FAILED: '该阶段执行失败，请查看节点日志。',
+  STAGE_PAUSED: '该阶段已暂停，请查看节点日志中的恢复条件。',
+}
+export function executionReason(code) {
+  return Object.hasOwn(reasons, code) ? reasons[code] : '执行需要处理，具体原因见原始原因代码和节点日志。'
 }

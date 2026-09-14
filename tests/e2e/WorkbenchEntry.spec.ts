@@ -136,12 +136,15 @@ test('project folder module saves through HTTP and restores selected project aft
       await page.locator('[data-batch-node]').first().click();
       await expect(page.locator('[data-batch-log]')).toHaveAttribute('open', '');
       await expect(page.locator('[data-batch-log]')).toContainText('开始执行');
-      await page.locator('[data-batch-log] .node-execution-log details').last().locator('summary').click();
+      await expect(page.locator('[data-batch-log] .node-execution-log')).toContainText('过程说明');
       await expect(page.locator('[data-batch-log]')).toContainText('已读取固定模块范围');
       stages.finish(taskLease!.task.taskId, taskLease!.leaseId, 'SUCCEEDED', { artifactRefs: [], summary: { cards: [] } }, null);
-      pipelineLease!.value.status = 'PAUSED'; pipelineLease!.value.reasonCode = 'CONTROLLED_QUALITY_PAUSE';
+      pipelineLease!.value.status = 'PAUSED'; pipelineLease!.value.reasonCode = 'PIPELINE_SOURCE_UNRESOLVED';
       pipelines.dependencies.store.save(pipelineLease!.value, pipelineLease!.leaseId, true);
-      await expect(page.locator('.batch-detail')).toContainText('CONTROLLED_QUALITY_PAUSE', { timeout: 12_000 });
+      await expect(page.locator('.batch-detail')).toContainText('来源证据仍有未解决项', { timeout: 12_000 });
+      await expect(page.locator('.batch-detail').getByText('PIPELINE_SOURCE_UNRESOLVED', { exact: true })).not.toBeVisible();
+      await page.locator('.batch-detail').getByText('原始原因代码', { exact: true }).click();
+      await expect(page.locator('.batch-detail').getByText('PIPELINE_SOURCE_UNRESOLVED', { exact: true })).toBeVisible();
       await expect(page.locator('.batch-mini-graph .node-running')).toHaveCount(0);
       await expect(page.locator('[data-batch-log]')).toHaveAttribute('open', '');
       await expect(page.locator('[data-batch-log] > summary')).toContainText('结束时间');

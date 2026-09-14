@@ -141,7 +141,7 @@ test('项目入口浏览服务器目录，旧批次保留进度与取消能力',
   await page.goto(baseUrl);
   await page.getByRole('button', { name: /^飞轮批次$/ }).click();
   await page.getByRole('button', { name: '选择项目', exact: true }).click();
-  await expect(page.getByRole('button', { name: '分析仓库', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: '读取目录', exact: true })).toBeDisabled();
   await enterGovernance(page);
   await page.getByRole('button', { name: /^飞轮批次$/ }).click();
   await page.getByRole('button', { name: '选择项目', exact: true }).click();
@@ -150,7 +150,7 @@ test('项目入口浏览服务器目录，旧批次保留进度与取消能力',
   await page.getByRole('button', { name: 'projects/', exact: true }).click();
   await page.getByRole('button', { name: 'ohMyWorkPanel/', exact: true }).click();
   await page.getByRole('button', { name: '选择当前目录' }).click();
-  await expect(page.getByLabel('服务器仓库目录', { exact: true })).toHaveValue(projectDirectory);
+  await expect(page.getByLabel('本地代码目录', { exact: true })).toHaveValue(projectDirectory);
   await expect(page.locator('#workflow-start-form')).toHaveCount(0);
   const handle = await page.evaluate(async ({ token, projectDirectory }) => (await fetch('/api/v1/runs/markdown-lite', { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify({ repositoryRoot: projectDirectory }) })).json(), { token, projectDirectory });
   await page.reload(); await enterGovernance(page);
