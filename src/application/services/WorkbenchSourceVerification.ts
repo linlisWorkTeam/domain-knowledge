@@ -6,7 +6,7 @@
 import { SOURCE_EVIDENCE_POLICY, sourceEvidenceBindings } from '../../domain/knowledge/SourceEvidenceBindings.ts';
 import { SOURCE_EXECUTION_SCOPE, sourceExecutionScope } from '../../domain/knowledge/SourceExecutionScope.ts';
 import { moduleBuild, type WorkbenchProjectSnapshot } from '../../domain/workbench/WorkbenchProject.ts';
-import { WorkbenchSourceFindingHistory, type SourceFindingProof } from './WorkbenchSourceFindingHistory.ts';
+import { WorkbenchSourceFindingHistory, assertSourceReviewHistory, type SourceFindingProof } from './WorkbenchSourceFindingHistory.ts';
 import { SOURCE_ASSESSMENT_POLICY, readSourceAssessmentPolicy, SOURCE_REVIEW_POLICY, readSourceReviewPolicy } from '../../domain/knowledge/SourceReviewPolicy.ts';
 import { sha256, type ArtifactRef } from '../../domain/Domain.ts';
 import { canonicalJson, type JsonValue, type StageInput } from '../../domain/workbench/StageTask.ts';
@@ -64,6 +64,7 @@ export class WorkbenchSourceVerification {
   async verify(context: StageExecutionContext) {
     const { stages, projects, repository, artifacts, roles, configuration } = this.evaluation.dependencies;
     const parameters = context.task.input.parameters;
+    await assertSourceReviewHistory(artifacts, stages.store.events(context.task.taskId));
     if (parameters.sourceExecutionPolicy !== undefined && parameters.sourceExecutionPolicy !== SOURCE_EXECUTION_SCOPE) throw new Error('SOURCE_EXECUTION_POLICY_INVALID');
     const sourceAssessmentPolicy = readSourceAssessmentPolicy(parameters.sourceAssessmentPolicy);
     const sourceReviewPolicy = readSourceReviewPolicy(parameters.sourceReviewPolicy);
@@ -169,6 +170,7 @@ export class WorkbenchSourceVerification {
           outcome: sourceSectionsOutcome(body, sections), unresolved: [...new Set(sections.flatMap(section => section.unresolved))], sections: json(sections) } };
 
       });
+      await assertSourceReviewHistory(artifacts, stages.store.events(context.task.taskId));
       results.push(output.summary as unknown as SourceCardResult & Record<string, unknown>); refs.push(...output.artifactRefs);
     }
     return { artifactRefs: uniqueRefs(refs), summary: { operation: 'KNOWLEDGE_SOURCE_VERIFICATION', evaluationTaskId: parent.taskId,

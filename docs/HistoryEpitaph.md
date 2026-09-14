@@ -440,3 +440,7 @@ This document summarizes older handoffs, milestones and architectural decisions 
 ## 2026-09-14 归档：多DSH根删除
 
 [2330 原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/887c79b/docs/epitaph/2026-09-14-2330-multiple-dsh-roots.md)：多根独立见证与故障恢复20项通过，后续已部署2c55117；旧owner缺失仍阻挡删除，C/C++最终验收未完成。
+
+## 2026-09-14 归档：网站更新与旧owner阻挡
+
+[2335 原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/21d1e1f/docs/epitaph/2026-09-14-2335-deployed-legacy-owner-block.md)：2c55117网站切换、完整备份、公网资源及数据核对完成；旧无owner检查点阻挡删除，未绕过。后续诊断修复已提交未部署，C++来源复核出现独立格式反馈缺陷，后续记录继续处理。

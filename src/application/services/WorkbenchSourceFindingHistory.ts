@@ -6,9 +6,12 @@
 import { sha256, type ArtifactRef } from '../../domain/Domain.ts';
 import { canonicalJson, type StageInput, type StageTask } from '../../domain/workbench/StageTask.ts';
 import type { AgentCommand, AgentResult } from '../../domain/agents/AgentContracts.ts';
-import type { Output as ReviewOutput } from '../../domain/agents/reviewAgent/WorkbenchReviewContract.ts';
+import { assertReviewFormatHistory, type Output as ReviewOutput } from '../../domain/agents/reviewAgent/WorkbenchReviewContract.ts';
 import { authorizeSourceCorrection, sourceHistoryCommandView } from '../../domain/knowledge/SourceRevision.ts';
 import type { SourceCardResult } from '../../domain/knowledge/KnowledgeSourceVerification.ts';
+import type { ArtifactStore } from '../ports/ApplicationPorts.ts';
+import type { StageEvent } from '../../domain/workbench/StageTask.ts';
+import type { StageAttempt } from '../../domain/agents/AgentExecution.ts';
 import type { WorkbenchEvaluation } from './WorkbenchEvaluation.ts';
 export interface SourceFindingProof { taskId: string; checkpointKey: string; checkpointDigest: string }
 export interface HistoricalSourceFinding extends SourceCardResult {
@@ -26,6 +29,7 @@ export class WorkbenchSourceFindingHistory {
   async validate(proof: SourceFindingProof, input: StageInput) {
     const { stages, repository, artifacts, roles } = this.evaluation.dependencies;
     const source = stages.get(proof.taskId);
+    await assertSourceReviewHistory(artifacts, stages.store.events(source.taskId));
     if (source.input.stage !== 'EVALUATE' || source.input.parameters.operation !== 'KNOWLEDGE_SOURCE_VERIFICATION'
       || !['knowledge-source-verification-v2', 'knowledge-source-verification-v3', 'knowledge-source-verification-v4'].includes(String(source.input.parameters.verificationContract))
       || source.input.projectId !== input.projectId || source.input.sourceRevision !== input.sourceRevision || source.input.sourceDigest !== input.sourceDigest
@@ -69,4 +73,22 @@ export class WorkbenchSourceFindingHistory {
     }
     return [...selected.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([, proof]) => proof);
   }
+}
+
+/** 在复用章节、聚合卡片和发布前重读全任务尝试；taskAttempt不能隔离格式失败的事实。 */
+export async function assertSourceReviewHistory(artifacts: Pick<ArtifactStore, 'get' | 'verify'>, events: StageEvent[]): Promise<void> {
+  const groups = new Map<string, ReviewOutput[]>();
+  for (const event of events) {
+    const d = event.detail;
+    if (!d || typeof d !== 'object' || Array.isArray(d)) continue;
+    if (d.phase !== 'role-stage-attempt' || d.role !== 'review' || typeof d.key !== 'string'
+      || !d.key.startsWith('final-source:') || d.stage !== 'evidence-attribution') continue;
+    const ref = d.artifactRef as unknown as ArtifactRef;
+    if (!ref || !await artifacts.verify(ref)) throw new Error('SOURCE_HISTORY_ARTIFACT_INVALID');
+    const attempt = JSON.parse(Buffer.from(await artifacts.get(ref)).toString('utf8')) as StageAttempt;
+    if (attempt.schemaVersion !== 'role-stage-v1' || attempt.stage !== d.stage || attempt.attempt !== d.attempt || attempt.status !== d.status) throw new Error('SOURCE_HISTORY_BINDING_INVALID');
+    if (!attempt.output) continue;
+    const values = groups.get(d.key) ?? []; values.push(attempt.output as unknown as ReviewOutput); groups.set(d.key, values);
+  }
+  for (const values of groups.values()) assertReviewFormatHistory(values);
 }

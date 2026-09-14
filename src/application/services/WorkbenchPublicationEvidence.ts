@@ -15,6 +15,8 @@ import { buildConstraints, moduleBuild, moduleFingerprintKey } from '../../domai
 import type { NativeTestStore } from '../ports/NativeEvaluationPorts.ts';
 import type { FixedNativeObservation } from '../../domain/evaluation/NativeFixedEvaluation.ts';
 import { assertProjectPublication, type ProjectPublicationManifest } from '../../domain/workbench/ProjectPublication.ts';
+import { assertSourceReviewHistory } from './WorkbenchSourceFindingHistory.ts';
+import type { StageTaskStore } from '../ports/StageTaskPorts.ts';
 import { WorkbenchSourcePublication } from './WorkbenchSourcePublication.ts';
 import type { AgentContractValidator, ArtifactStore, FlywheelRepository } from '../ports/ApplicationPorts.ts';
 import type { StageTask } from '../../domain/workbench/StageTask.ts';
@@ -23,7 +25,7 @@ import { publicationEvidence } from '../../domain/workbench/WorkbenchPublication
 export interface PublicationTaskIds { reconstruction: string; evaluation: string; fixedEvaluation: string; sourceVerification: string }
 export class WorkbenchPublicationEvidence {
   readonly dependencies: {
-    stages: { get(id: string): StageTask };
+    stages: { get(id: string): StageTask; store: Pick<StageTaskStore, 'events'> };
     tests: Pick<NativeTestStore, 'get'>;
     projects: Pick<WorkbenchProjectStore, 'get'>;
     contracts: AgentContractValidator;
@@ -31,11 +33,30 @@ export class WorkbenchPublicationEvidence {
     artifacts: Pick<ArtifactStore, 'get' | 'put' | 'verify'>;
   };
   constructor(dependencies: WorkbenchPublicationEvidence['dependencies']) { this.dependencies = dependencies; }
+  async verifyResume(preparationRef: ArtifactRef): Promise<void> {
+    const { artifacts, stages } = this.dependencies;
+    if (!await artifacts.verify(preparationRef)) throw new Error('PUBLICATION_ARTIFACT_CORRUPT');
+    const prepared = JSON.parse(Buffer.from(await artifacts.get(preparationRef)).toString('utf8')) as {
+      schemaVersion: string; evidence?: { tasks?: Array<{ taskId: string; inputDigest: string; resultDigest: string }> } };
+    if (prepared.schemaVersion !== 'workbench-publication-preparation-v8' || !Array.isArray(prepared.evidence?.tasks)
+      || prepared.evidence.tasks.length !== 4) throw new Error('PUBLICATION_TASK_BINDING_CHANGED');
+    let sourceCount = 0;
+    for (const binding of prepared.evidence.tasks) {
+      const task = stages.get(binding.taskId);
+      if (task.inputDigest !== binding.inputDigest || sha256(canonicalJson(task.result)) !== binding.resultDigest) throw new Error('PUBLICATION_TASK_BINDING_CHANGED');
+      if (task.input.parameters.operation === 'KNOWLEDGE_SOURCE_VERIFICATION') {
+        sourceCount++;
+        await assertSourceReviewHistory(artifacts, stages.store.events(task.taskId));
+      }
+    }
+    if (sourceCount !== 1) throw new Error('PUBLICATION_TASK_BINDING_CHANGED');
+  }
   async prepare(ids: PublicationTaskIds, fixedSuites: PipelineFixedSuite[]) {
     fixedSuites = structuredClone(fixedSuites);
     const { stages, repository, artifacts } = this.dependencies;
     const reconstruction = stages.get(ids.reconstruction); const evaluation = stages.get(ids.evaluation);
     const fixedEvaluation = stages.get(ids.fixedEvaluation); const sourceVerification = stages.get(ids.sourceVerification);
+    await assertSourceReviewHistory(this.dependencies.artifacts, stages.store.events(sourceVerification.taskId));
     const project = this.dependencies.projects.get(String(reconstruction.input.parameters.snapshotId));
     if (!project || project.projectId !== reconstruction.input.projectId || project.snapshotId !== reconstruction.input.parameters.snapshotId
       || project.commit !== reconstruction.input.sourceRevision || project.sourceDigest !== reconstruction.input.sourceDigest) throw new Error('PUBLICATION_PROJECT_BINDING_CHANGED');

@@ -6,6 +6,7 @@
 import type { ArtifactRef } from '../../Domain.ts';
 import type { RoleInput } from '../AgentExecution.ts';
 import { requireMaterials } from '../AgentExecution.ts';
+import { canonicalJson } from '../../workbench/StageTask.ts';
 import { StageValidationIssue } from '../StageValidation.ts';
 import { markdownSections } from '../docGenAgent/DocGenRevision.ts';
 
@@ -110,5 +111,20 @@ export function validateOutput(output: Output, input: Input): void {
       throw new StageValidationIssue('REVIEW_CORRECTION_RANGE_INVALID', 'correction.replacementMarkdown',
         'replacementMarkdown 若提供，必须以目标的 ## 二级标题开头，包含该章节完整正文，且不能包含其他二级章节；不能只返回 ### 子节。保留本章其他事实，不扩大修订范围；若无法给出完整替换，可省略这个可选字段，保留有证据的 criterion、risk 和未解决问题。');
     }
+  }
+}
+
+/** 格式修复不会重新授权结论、原因和风险；跨任务尝试读取时同样适用。 */
+export function assertReviewFormatHistory(outputs: Output[]): void {
+  const facts = (output: Output) => canonicalJson({ ...output, correction: output.correction
+    ? Object.fromEntries(Object.entries(output.correction).filter(([key]) => key !== 'replacementMarkdown')) : null });
+  let baseline: string | undefined;
+  for (const output of outputs) {
+    if (baseline !== undefined && facts(output) !== baseline) throw new Error('REVIEW_REPAIR_FACTS_CHANGED');
+    const correction = output.correction;
+    if (!correction || typeof correction.replacementMarkdown !== 'string' || typeof correction.knowledgePath !== 'string') continue;
+    const heading = correction.knowledgePath.slice(correction.knowledgePath.indexOf('#') + 1);
+    const sections = markdownSections(correction.replacementMarkdown);
+    if (sections.length !== 1 || sections[0]!.heading !== heading || sections[0]!.start !== 0) baseline ??= facts(output);
   }
 }

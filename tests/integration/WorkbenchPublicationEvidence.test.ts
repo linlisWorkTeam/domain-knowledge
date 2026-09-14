@@ -7,6 +7,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { SOURCE_EVIDENCE_POLICY } from '../../src/domain/knowledge/SourceEvidenceBindings.ts';
 import { sha256, type ArtifactRef, type KnowledgeVersion } from '../../src/domain/Domain.ts';
+import { WorkbenchSourceVerification } from '../../src/application/services/WorkbenchSourceVerification.ts';
+import type { WorkbenchEvaluation } from '../../src/application/services/WorkbenchEvaluation.ts';
+import type { StageExecutionContext } from '../../src/application/services/WorkbenchStages.ts';
 import { WorkbenchPublicationEvidence } from '../../src/application/services/WorkbenchPublicationEvidence.ts';
 import { JsonSchemaAgentContractValidator } from '../../src/infrastructure/agentAdapters/contracts/JsonSchemaAgentContractValidator.ts';
 import { publicationFixture, publicationBody, publicationConfiguration, publicationApi } from '../helpers/WorkbenchPublicationFixture.ts';
@@ -164,4 +167,33 @@ test('publication rechecks frozen execution scope against the actual trusted ref
   section.criteriaRef = await f.put(Buffer.from(JSON.stringify(criteria)), 'application/json');
   f.input.sourceVerification.result!.artifactRefs.push(section.criteriaRef);
   await assert.rejects(f.service.prepare(f.ids, f.input.fixedSuites), /PUBLICATION_SOURCE_EXECUTION_CHANGED/);
+});
+
+test('publication rejects a cached PASS that discarded a prior format-failed correction across task attempts', async () => {
+  const f = await setup();
+  const preparedBeforeAudit = await f.service.prepare(f.ids, f.input.fixedSuites);
+  const baselinePuts = f.puts();
+  const failed = { schemaVersion: 'role-stage-v1', stage: 'evidence-attribution', attempt: 1,
+    startedAt: 0, deadlineAt: 1000, status: 'FAILED', output: { blocking: false, recommendation: 'ITERATE', unresolvedRisks: [],
+      correction: { correctionId: 'correction', knowledgePath: 'knowledge/module.md#Purpose', criterion: 'Declaration differs', risk: 'Wrong implementation location', replacementMarkdown: '### Detail\nOnly a fragment' } } };
+  const passed = { ...failed, status: 'PASSED', output: { blocking: false, recommendation: 'PASS', unresolvedRisks: [], correction: null } };
+  const events = [failed, passed].map((record, i) => {
+    const bytes = Buffer.from(JSON.stringify(record)); const digest = sha256(bytes); f.contents.set(digest, bytes);
+    return { sequence: i + 1, taskId: f.ids.sourceVerification, kind: 'PROGRESS', createdAt: '2026-09-14T00:00:00Z',
+      detail: { phase: 'role-stage-attempt', role: 'review', key: 'final-source:version:section', taskAttempt: i + 1,
+        stage: record.stage, attempt: record.attempt, status: record.status,
+        artifactRef: { artifactId: `sha256:${digest}`, sha256: digest, mediaType: 'application/json', size: bytes.length } } };
+  });
+  f.service.dependencies.stages.store.events = () => events;
+  await assert.rejects(f.service.prepare(f.ids, f.input.fixedSuites), /REVIEW_REPAIR_FACTS_CHANGED/);
+  assert.equal(f.puts(), baselinePuts);
+  await assert.rejects(f.service.verifyResume(preparedBeforeAudit.artifactRef), /REVIEW_REPAIR_FACTS_CHANGED/);
+  const source = new WorkbenchSourceVerification({ dependencies: { artifacts: f.service.dependencies.artifacts,
+    stages: f.service.dependencies.stages } } as unknown as WorkbenchEvaluation);
+  let cachedReads = 0;
+  await assert.rejects(source.verify({ task: f.input.sourceVerification, step: async () => { cachedReads++; throw new Error('must not reuse cached card'); } } as unknown as StageExecutionContext), /REVIEW_REPAIR_FACTS_CHANGED/);
+  assert.equal(cachedReads, 0);
+  const before = events.map(e => e.detail.artifactRef.sha256);
+  await assert.rejects(f.service.prepare(f.ids, f.input.fixedSuites), /REVIEW_REPAIR_FACTS_CHANGED/);
+  assert.deepEqual(events.map(e => e.detail.artifactRef.sha256), before);
 });

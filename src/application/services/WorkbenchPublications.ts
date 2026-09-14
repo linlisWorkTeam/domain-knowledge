@@ -80,6 +80,7 @@ export class WorkbenchPublications {
     const { store, files, evidence } = this.dependencies; const record = this.get(id); assertPublicationRecord(record);
     try {
       for (const ref of [record.preparationRef, ...record.files.map(file => file.ref)]) if (!await evidence.dependencies.artifacts.verify(ref)) throw new Error('PUBLICATION_ARTIFACT_CORRUPT');
+      await evidence.verifyResume(record.preparationRef);
       await files.publish(record);
       if (!await files.verify(record)) throw new Error('PUBLICATION_FILES_INVALID');
       return store.commit(id);
