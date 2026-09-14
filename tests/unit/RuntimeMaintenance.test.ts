@@ -30,3 +30,28 @@ test('a failed deletion with a durable intent stays closed until explicit recove
   await gate.recover(async () => { assert.equal(gate.status, 'MAINTENANCE'); pending = false; });
   assert.equal(gate.status, 'AVAILABLE');
 });
+test('async execution checks hold the maintenance barrier and reject an expired request', async () => {
+  let resolve!: (idle: boolean) => void;
+  const gate = new RuntimeMaintenance({ needsRecovery: () => false, idle: () => true,
+    verifyIdle: () => new Promise<boolean>(done => { resolve = done; }) });
+  const request = gate.enter();
+  const operation = request.exclusive(async () => assert.fail('expired request cannot delete'));
+  assert.equal(gate.status, 'MAINTENANCE');
+  assert.throws(() => gate.enter(), /RUNTIME_MAINTENANCE/);
+  await assert.rejects(gate.recover(async () => {}), /RUNTIME_OPERATIONS_ACTIVE/);
+  request.release(); resolve(true);
+  await assert.rejects(operation, /RUNTIME_OPERATION_EXPIRED/);
+  assert.equal(gate.available, true);
+});
+test('failed or unavailable execution probes block deletion and recovery without opening pending data', async () => {
+  let pending = false, unavailable = false;
+  const gate = new RuntimeMaintenance({ needsRecovery: () => pending, idle: () => true,
+    verifyIdle: async () => { if (unavailable) throw new Error('status unavailable'); return false; } });
+  const request = gate.enter();
+  await assert.rejects(request.exclusive(async () => assert.fail('active')), /RUNTIME_OPERATIONS_ACTIVE/);
+  unavailable = true;
+  await assert.rejects(request.exclusive(async () => assert.fail('unknown')), /status unavailable/);
+  request.release(); pending = true;
+  await assert.rejects(gate.recover(async () => assert.fail('unknown')), /status unavailable/);
+  assert.equal(gate.status, 'RECOVERY_REQUIRED');
+});

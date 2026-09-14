@@ -34,6 +34,7 @@ export class BatchDeletions {
     return this.complete(receipt);
   }
   private async complete(receipt: BatchDeletionReceipt): Promise<BatchDeletionReceipt> {
+    if (receipt.plan.schemaVersion !== 'batch-deletion-v2') throw new Error('DELETION_CONTRACT_INCOMPATIBLE');
     if (receipt.status === 'DELETED') return receipt;
     try { return await this.store.cleanup(receipt.plan.planId); }
     catch {

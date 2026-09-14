@@ -69,6 +69,8 @@ export function sqliteDeletionInventory(databases: Record<string, DatabaseSync>)
   const entries: Entry[] = [], unclassifiedTables: string[] = [];
   for (const [database, db] of Object.entries(databases).sort(([a], [b]) => a.localeCompare(b))) {
     const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all();
+    const deletedRuns = new Set(tables.some(table => table.name === 'deletion_execution_tombstones')
+      ? db.prepare("SELECT execution_id FROM deletion_execution_tombstones WHERE table_name='runs'").all().map(row => String(row.execution_id)) : []);
     for (const item of tables) {
       const table = String(item.name), kind = kinds[table] ?? 'configuration';
       if (!kinds[table]) unclassifiedTables.push(`${database}.${table}`);
@@ -79,9 +81,10 @@ export function sqliteDeletionInventory(databases: Record<string, DatabaseSync>)
         if (entries.length >= 100000) throw new Error('DELETION_INVENTORY_TOO_LARGE');
         const key = Object.fromEntries(primary.map(name => [name, row[name]]));
         const value = decode(row, table), id = `${database}/${table}/${sha256(JSON.stringify(key))}`;
-        const node: DeletionNode = { id, kind, revision: sha256(JSON.stringify(row)), ownedBy: [], references: [] };
+        const rowKind = table === 'runs' && deletedRuns.has(String(row.run_id)) ? 'configuration' : kind;
+        const node: DeletionNode = { id, kind: rowKind, revision: sha256(JSON.stringify(row)), ownedBy: [], references: [] };
         const record = object(value.value ?? value.record ?? value.snapshot);
-        if (kind === 'run') node.active = !['VERIFIED', 'LOW_CONFIDENCE', 'FAILED', 'CANCELLED'].includes(String(row.state));
+        if (rowKind === 'run') node.active = !['VERIFIED', 'LOW_CONFIDENCE', 'FAILED', 'CANCELLED'].includes(String(row.state));
         if (['batch', 'pipeline', 'stage'].includes(kind)) node.active = !!row.lease_id
           || !['READY', 'SUCCEEDED', 'FAILED', 'CANCELLED', 'PAUSED'].includes(String(record.status))
           || kind === 'batch' && object(record.schedule).enabled === true;
@@ -106,6 +109,14 @@ export function sqliteDeletionInventory(databases: Record<string, DatabaseSync>)
     for (const [column, [table, key]] of Object.entries(ownerColumns)) if (entry.table !== table
       && !['source', 'configuration'].includes(entry.node.kind)) own(entry, find(table, key, entry.row[column]));
     if (entry.table === 'checkpoint_owners') own(entry, find('checkpoints', 'generation_key', entry.row.generation_key));
+    if (entry.table === 'action_items') own(entry, find('events', 'event_id', entry.row.source_event_id));
+    if (entry.table === 'events' && entry.row.event_type === 'ArtifactCommitted') {
+      const event = object(entry.value.event_json), payload = object(event.payload);
+      for (const version of find('knowledge_versions', 'version_id', payload.versionId)) {
+        if (entry.row.run_id === `catalog:${String(version.row.module_id)}` && event.runId === entry.row.run_id
+          && payload.artifactId === object(version.value.body_ref_json).artifactId) own(entry, [version]);
+      }
+    }
     if (entry.table === 'knowledge_versions') {
       const metadata = object(entry.value.metadata_json);
       // 修订元数据可能保留旧 stageTaskId；修订版本归本次修订任务。
@@ -129,7 +140,11 @@ export function sqliteDeletionInventory(databases: Record<string, DatabaseSync>)
     }
     if (entry.table === 'wb_card_index') own(entry, find('knowledge_versions', 'version_id', object(entry.value.snapshot).versionId));
     if (entry.table === 'feedback') own(entry, find('knowledge_versions', 'version_id', entry.row.version_id));
-    if (entry.table === 'publications') own(entry, find('knowledge_versions', 'version_id', entry.row.version_id));
+    if (entry.table === 'publications') own(entry, find('gate_decisions', 'decision_id', entry.row.decision_id));
+    if (entry.table === 'local_publications_v1') {
+      const runId = object(entry.value.input_json).runId;
+      if (typeof runId === 'string' && runId === object(entry.value.receipt_json).runId) own(entry, find('runs', 'run_id', runId));
+    }
   }
   for (const entry of entries) {
     entry.node.ownedBy = [...new Set(entry.node.ownedBy)].sort();
@@ -139,6 +154,19 @@ export function sqliteDeletionInventory(databases: Record<string, DatabaseSync>)
       if (id !== entry.node.id) entry.node.references.push(id);
     }
     entry.node.references = [...new Set(entry.node.references)].sort();
+  }
+  // 只有明确的用量/配置/幂等父键是审计关系；JSON中的功能引用仍按硬依赖保护。
+  const auditOwners: Record<string, [string, string, string]> = {
+    run_configuration_snapshots: ['run_id', 'runs', 'run_id'], provider_invocations: ['run_id', 'runs', 'run_id'],
+    wb_stage_usage: ['task_id', 'wb_stage_tasks', 'task_id'], wb_batch_commands: ['batch_id', 'wb_batches', 'batch_id'],
+    wb_batch_controls: ['batch_id', 'wb_batches', 'batch_id'], wb_batch_round_commands: ['batch_id', 'wb_batches', 'batch_id'],
+  };
+  for (const entry of entries) {
+    const rule = auditOwners[entry.table]; if (!rule) continue;
+    const [column, table, key] = rule;
+    const audits = find(table, key, entry.row[column]).filter(parent => ['batch', 'run', 'pipeline', 'stage'].includes(parent.node.kind)).map(parent => parent.node.id);
+    entry.node.auditReferences = audits;
+    entry.node.references = entry.node.references.filter(id => !audits.includes(id));
   }
   return { nodes: entries.map(entry => entry.node).sort((a, b) => a.id.localeCompare(b.id)),
     records: entries.map(({ node, database, table, key }) => ({ id: node.id, database, table, key })), unclassifiedTables,

@@ -58,6 +58,7 @@ export class SqliteBatchDeletions implements BatchDeletionStore {
   private async clean(planId: string): Promise<BatchDeletionReceipt> {
     const receipt = this.receipt(planId);
     if (!receipt) throw new Error('DELETION_RECEIPT_NOT_FOUND');
+    if (receipt.plan.schemaVersion !== 'batch-deletion-v2') throw new Error('DELETION_CONTRACT_INCOMPATIBLE');
     if (receipt.status === 'DELETED') return receipt;
     this.db.prepare('UPDATE wb_deletion_receipts SET cleanup_attempts=cleanup_attempts+1,updated_at=? WHERE plan_id=?')
       .run(new Date().toISOString(), planId);

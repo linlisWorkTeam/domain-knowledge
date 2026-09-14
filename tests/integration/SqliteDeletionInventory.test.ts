@@ -56,8 +56,11 @@ test('legacy ownership uses candidate checkpoint output, never module name or ev
     assert.deepEqual(inventory.nodes.find(node => node.id === id('knowledge_versions', 'version'))!.ownedBy, [id('runs', 'producer')]);
     assert.ok(inventory.nodes.find(node => node.id === id('evaluations', 'report'))!.references.includes(id('knowledge_versions', 'version')));
     assert.doesNotMatch(JSON.stringify(inventory), /PRIVATE_TEST_VALUE/);
-    // 预算和配置的引用尚需墓碑替代，不能宣称可删后绕过这些引用。
-    assert.throws(() => planBatchDeletion(id('runs', 'producer'), inventory.nodes), /DELETION_TARGET_REFERENCED/);
+    // 配置父键由持久执行墓碑承接；消费者仍通过硬引用保留共享知识。
+    const plan = planBatchDeletion(id('runs', 'producer'), inventory.nodes);
+    assert.ok(plan.deleteIds.includes(id('runs', 'producer')));
+    assert.ok(plan.preservedIds.includes(id('knowledge_versions', 'version')));
+    assert.deepEqual(inventory.nodes.find(node => node.id === id('run_configuration_snapshots', 'producer'))!.auditReferences, [id('runs', 'producer')]);
   } finally { db.close(); }
 });
 
@@ -73,5 +76,51 @@ test('unknown tables protect references and malformed records stop inventory cre
     assert.throws(() => planBatchDeletion(inventory.nodes.find(node => node.kind === 'run')!.id, inventory.nodes), /DELETION_TARGET_REFERENCED/);
     db.exec("INSERT INTO wb_stage_tasks VALUES('bad','{broken',NULL)");
     assert.throws(() => sqliteDeletionInventory({ registry: db }), /DELETION_RECORD_JSON_INVALID/);
+  } finally { db.close(); }
+});
+
+test('publication ownership follows its issuing run and gate, not a shared knowledge version', () => {
+  const registry = new DatabaseSync(':memory:'), publications = new DatabaseSync(':memory:');
+  try {
+    registry.exec(`CREATE TABLE runs(run_id TEXT PRIMARY KEY,state TEXT);
+      CREATE TABLE knowledge_versions(version_id TEXT PRIMARY KEY,metadata_json TEXT,body_ref_json TEXT);
+      CREATE TABLE gate_decisions(decision_id TEXT PRIMARY KEY,run_id TEXT,version_id TEXT);
+      CREATE TABLE publications(publication_key TEXT PRIMARY KEY,version_id TEXT,decision_id TEXT);
+      INSERT INTO runs VALUES('origin','VERIFIED'),('consumer','VERIFIED');
+      INSERT INTO knowledge_versions VALUES('shared','{}','{}');
+      INSERT INTO gate_decisions VALUES('gate','origin','shared');
+      INSERT INTO publications VALUES('publication','shared','gate')`);
+    publications.exec('CREATE TABLE local_publications_v1(publication_key TEXT PRIMARY KEY,input_json TEXT,receipt_json TEXT)');
+    publications.prepare('INSERT INTO local_publications_v1 VALUES(?,?,?)').run('publication', JSON.stringify({ runId: 'origin', versionId: 'shared' }), JSON.stringify({ runId: 'origin' }));
+    const inventory = sqliteDeletionInventory({ registry, publications });
+    const target = inventory.records.find(record => record.table === 'runs' && record.key.run_id === 'origin')!.id;
+    const plan = planBatchDeletion(target, inventory.nodes);
+    assert.equal(plan.counts.publication, 2);
+    assert.ok(!plan.deleteIds.includes(inventory.records.find(record => record.table === 'knowledge_versions')!.id));
+    publications.prepare('UPDATE local_publications_v1 SET receipt_json=?').run(JSON.stringify({ runId: 'consumer' }));
+    assert.throws(() => planBatchDeletion(target, sqliteDeletionInventory({ registry, publications }).nodes), /DELETION_TARGET_REFERENCED/);
+  } finally { registry.close(); publications.close(); }
+});
+
+test('catalog commit events follow their verified version identity instead of permanently pinning private knowledge', () => {
+  const db = new DatabaseSync(':memory:');
+  try {
+    db.exec(`CREATE TABLE runs(run_id TEXT PRIMARY KEY,state TEXT);
+      CREATE TABLE knowledge_versions(version_id TEXT PRIMARY KEY,module_id TEXT,metadata_json TEXT,body_ref_json TEXT);
+      CREATE TABLE checkpoints(generation_key TEXT PRIMARY KEY,run_id TEXT,node_id TEXT,output_refs_json TEXT);
+      CREATE TABLE events(event_id TEXT PRIMARY KEY,run_id TEXT,event_type TEXT,event_json TEXT);
+      INSERT INTO runs VALUES('producer','FAILED')`);
+    const body = { artifactId: 'sha256:body' };
+    db.prepare('INSERT INTO knowledge_versions VALUES(?,?,?,?)').run('private', 'module', '{}', JSON.stringify(body));
+    db.prepare('INSERT INTO checkpoints VALUES(?,?,?,?)').run('commit', 'producer', 'candidate_knowledge', JSON.stringify([body]));
+    const event = { runId: 'catalog:module', payload: { versionId: 'private', artifactId: body.artifactId } };
+    db.prepare('INSERT INTO events VALUES(?,?,?,?)').run('catalog-event', event.runId, 'ArtifactCommitted', JSON.stringify(event));
+    const inventory = sqliteDeletionInventory({ registry: db }), target = inventory.nodes.find(node => node.kind === 'run')!.id;
+    const plan = planBatchDeletion(target, inventory.nodes);
+    assert.equal(plan.counts.knowledge, 1);
+    assert.ok(plan.deleteIds.includes(inventory.records.find(record => record.table === 'events')!.id));
+    db.prepare('UPDATE events SET event_json=?').run(JSON.stringify({ ...event, payload: { ...event.payload, artifactId: 'different' } }));
+    const uncertain = planBatchDeletion(target, sqliteDeletionInventory({ registry: db }).nodes);
+    assert.equal(uncertain.counts.knowledge, undefined, 'unproven catalog ownership must retain the version');
   } finally { db.close(); }
 });

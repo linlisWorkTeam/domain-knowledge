@@ -12,8 +12,10 @@ export class RuntimeMaintenance {
   private exclusiveActive = false;
   private readonly needsRecovery: () => boolean;
   private readonly idle: () => boolean;
-  constructor(input: { needsRecovery: () => boolean; idle: () => boolean }) {
+  private readonly verifyIdle?: () => Promise<boolean>;
+  constructor(input: { needsRecovery: () => boolean; idle: () => boolean; verifyIdle?: () => Promise<boolean> }) {
     this.needsRecovery = input.needsRecovery; this.idle = input.idle;
+    this.verifyIdle = input.verifyIdle;
   }
   get status(): 'AVAILABLE' | 'MAINTENANCE' | 'RECOVERY_REQUIRED' {
     if (this.exclusiveActive) return 'MAINTENANCE';
@@ -30,13 +32,22 @@ export class RuntimeMaintenance {
         if (this.operations.size !== 1 || !this.idle()) throw new Error('RUNTIME_OPERATIONS_ACTIVE');
         if (this.status !== 'AVAILABLE') throw new Error('DELETION_RECOVERY_REQUIRED');
         this.exclusiveActive = true;
-        try { return await work(); } finally { this.exclusiveActive = false; }
+        try {
+          if (this.verifyIdle && !await this.verifyIdle()) throw new Error('RUNTIME_OPERATIONS_ACTIVE');
+          if (released || !this.operations.has(key)) throw new Error('RUNTIME_OPERATION_EXPIRED');
+          if (!this.idle()) throw new Error('RUNTIME_OPERATIONS_ACTIVE');
+          return await work();
+        } finally { this.exclusiveActive = false; }
       } };
   }
   /** 启动恢复入口专用；正常请求在持久意图未完成时不能进入。 */
   async recover<T>(work: () => Promise<T>): Promise<T> {
     if (this.exclusiveActive || this.operations.size || !this.idle()) throw new Error('RUNTIME_OPERATIONS_ACTIVE');
     this.exclusiveActive = true;
-    try { return await work(); } finally { this.exclusiveActive = false; }
+    try {
+      if (this.verifyIdle && !await this.verifyIdle()) throw new Error('RUNTIME_OPERATIONS_ACTIVE');
+      if (!this.idle()) throw new Error('RUNTIME_OPERATIONS_ACTIVE');
+      return await work();
+    } finally { this.exclusiveActive = false; }
   }
 }

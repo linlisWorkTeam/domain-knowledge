@@ -386,3 +386,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 [2034 新名称与发布折叠上线](https://github.com/linlisWorkTeam/domain-knowledge/blob/2ef007d/docs/epitaph/2026-09-14-2034-renamed-ui-deployed.md)：d869e1a完成代码627、Console41、验收25并部署；原8run/1card保留。该记录的运行PID只作历史定位，操作前仍须核实；真实最终来源验收和历史删除未完。
 
 [2045 删除引用扫描](https://github.com/linlisWorkTeam/domain-knowledge/blob/9e19e00/docs/epitaph/2026-09-14-2045-deletion-reference-inventory.md)：新增966条记录归属扫描和递归CAS图。该记录将指纹误判为缺失工件，结论已被2053复核否定；当前336个真实工件全部校验通过、0缺失。不要据此修补或删除备份。
+
+[2053 恢复与指纹修复](https://github.com/linlisWorkTeam/domain-knowledge/blob/4f51c8b/docs/epitaph/2026-09-14-2053-deletion-recovery-and-fingerprint-fix.md)：校验336个真实CAS工件、0缺失，纠正指纹误报；跨库意图和逐库回执支持中断恢复。生产删除、完整文件清理及真实C/C++最终验收尚未完成，后续契约已升级，不能恢复旧版测试意图。

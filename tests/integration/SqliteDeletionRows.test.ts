@@ -34,7 +34,7 @@ function fixture() {
   const inventory = sqliteDeletionInventory({ workbench: db });
   const selected = inventory.records.filter(record => ['wb_batches', 'wb_stage_tasks', 'wb_stage_events'].includes(record.table));
   // 此处只测试存储执行边界；完整归属图的授权选择由领域测试覆盖，不能据此声明删除端到端完成。
-  const plan: BatchDeletionPlan = { schemaVersion: 'batch-deletion-v1', planId: `delete-${sha256(JSON.stringify(selected))}`,
+  const plan: BatchDeletionPlan = { schemaVersion: 'batch-deletion-v2', planId: `delete-${sha256(JSON.stringify(selected))}`,
     targetId: selected.find(record => record.table === 'wb_batches')!.id, deleteIds: selected.map(record => record.id).sort(),
     preservedIds: [], counts: {}, reclaimableBytes: 0 };
   const recovery = () => new SqliteDeletionRecovery(journal, [{ name: 'workbench', contract: rows.contract, database: db,

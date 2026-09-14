@@ -10,6 +10,7 @@ import {
 import { dirname, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
+import { visibleExecutionSql } from './DeletionTombstones.ts';
 import { checkpointOwner, checkpointOwnerExited } from './CheckpointOwner.ts';
 import {
   assertArtifactRef, assertInvariant, createArtifactRef, sha256,
@@ -593,7 +594,7 @@ export class SQLiteFlywheelRepository implements FlywheelRepository {
 
   /** 读取指定运行的业务状态。 */
   getRun(runId: string): FlywheelRun | null {
-    const row = this.database.prepare('SELECT * FROM runs WHERE run_id = ?').get(runId) as Record<string, unknown> | undefined;
+    const row = this.database.prepare(`SELECT * FROM runs WHERE run_id = ? AND ${visibleExecutionSql(this.database, 'runs', 'runs.run_id')}`).get(runId) as Record<string, unknown> | undefined;
     return row ? this.runFromRow(row) : null;
   }
 
@@ -1016,7 +1017,7 @@ export class SQLiteFlywheelRepository implements FlywheelRepository {
       FROM knowledge_versions
     `).get() as Record<string, unknown>;
     const feedback = this.database.prepare('SELECT COUNT(*) AS count FROM feedback').get() as Record<string, unknown>;
-    const runs = this.database.prepare('SELECT COUNT(*) AS count FROM runs').get() as Record<string, unknown>;
+    const runs = this.database.prepare(`SELECT COUNT(*) AS count FROM runs WHERE ${visibleExecutionSql(this.database, 'runs', 'runs.run_id')}`).get() as Record<string, unknown>;
     const publications = this.database.prepare('SELECT COUNT(*) AS count FROM publications').get() as Record<string, unknown>;
     return {
       ok: true,

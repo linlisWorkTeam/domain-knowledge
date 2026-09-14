@@ -38,3 +38,16 @@ test('inventory validation rejects ambiguous records and canonicalizes object pr
   const reordered: DeletionNode = { bytes: 0, references: [], ownedBy: [], revision: '1', active: false, kind: 'batch', id: 'a' };
   assert.equal(planBatchDeletion('a', [valid]).planId, planBatchDeletion('a', [reordered]).planId);
 });
+
+test('audit links retain configuration without retaining execution results, but cannot weaken artifact dependencies', () => {
+  const records: DeletionNode[] = [node('a', 'run'), node('file', 'artifact', ['a']),
+    { ...node('usage', 'configuration'), auditReferences: ['a'] }];
+  const plan = planBatchDeletion('a', records);
+  assert.deepEqual(plan.deleteIds, ['a', 'file']);
+  const protectedFile = records.map(value => value.id === 'usage' ? { ...value, references: ['file'] } : value);
+  assert.deepEqual(planBatchDeletion('a', protectedFile).preservedIds, ['file']);
+  assert.throws(() => planBatchDeletion('a', records.map(value => value.id === 'usage' ? { ...value, auditReferences: ['file'] } : value)), /DELETION_INVENTORY_INVALID/);
+  assert.throws(() => planBatchDeletion('a', records.map(value => value.id === 'usage' ? { ...value, references: ['a'] } : value)), /DELETION_INVENTORY_INVALID/);
+  assert.throws(() => assertBatchDeletionConfirmation({ ...plan, schemaVersion: 'batch-deletion-v1' } as unknown as typeof plan,
+    { planId: plan.planId, confirmed: true }), /DELETION_CONTRACT_INCOMPATIBLE/);
+});

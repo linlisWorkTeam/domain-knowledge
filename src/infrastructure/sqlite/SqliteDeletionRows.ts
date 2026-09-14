@@ -9,8 +9,8 @@ import type { BatchDeletionPlan } from '../../domain/workbench/BatchDeletion.ts'
 import { sqliteDeletionInventory } from './SqliteDeletionInventory.ts';
 
 interface FrozenRow { id: string; table: string; key: Record<string, string | number>; revision: string; usage: unknown }
-interface RowWitness { contract: 'deletion-rows-v1'; database: string; rows: FrozenRow[] }
-const executionKeys: Record<string, string> = { wb_batches: 'batch_id', wb_pipelines: 'id', wb_stage_tasks: 'task_id' };
+interface RowWitness { contract: 'deletion-rows-v2'; database: string; rows: FrozenRow[] }
+const executionKeys: Record<string, string> = { runs: 'run_id', wb_batches: 'batch_id', wb_pipelines: 'id', wb_stage_tasks: 'task_id' };
 const removable = new Set([
   ...Object.keys(executionKeys), 'wb_stage_events', 'wb_stage_checkpoints', 'wb_pipeline_events', 'wb_card_index',
   'wb_publications', 'wb_publication_events', 'wb_native_test_sets', 'evaluations', 'gate_decisions', 'events',
@@ -21,7 +21,7 @@ const quote = (value: string) => `"${value.replaceAll('"', '""')}"`;
 
 /** 仅在维护屏障与本库写事务内执行 remove；不自行提交，不接收客户端SQL或路径。 */
 export class SqliteDeletionRows {
-  readonly contract = 'deletion-rows-v1';
+  readonly contract = 'deletion-rows-v2';
   private readonly name: string;
   private readonly db: DatabaseSync;
   constructor(name: string, database: DatabaseSync) {
@@ -36,6 +36,12 @@ export class SqliteDeletionRows {
     for (const [table, key] of Object.entries(executionKeys)) if (this.exists(table)) {
       for (const action of ['INSERT', 'UPDATE']) database.exec(`CREATE TRIGGER IF NOT EXISTS ${quote(`deleted_${table}_${action.toLowerCase()}`)}
         BEFORE ${action} ON ${quote(table)} WHEN EXISTS(SELECT 1 FROM deletion_execution_tombstones WHERE table_name='${table}' AND execution_id=NEW.${quote(key)})
+        BEGIN SELECT RAISE(ABORT,'EXECUTION_DELETED'); END`);
+    }
+    // 旧运行保留最小父行以维护配置外键，但不能再向它提交新结果或重新领取检查点。
+    for (const table of ['events', 'evaluations', 'gate_decisions', 'checkpoints', 'workflow_node_projections', 'run_configuration_snapshots']) if (this.exists(table)) {
+      for (const action of ['INSERT', 'UPDATE']) database.exec(`CREATE TRIGGER IF NOT EXISTS ${quote(`deleted_run_${table}_${action.toLowerCase()}`)}
+        BEFORE ${action} ON ${quote(table)} WHEN EXISTS(SELECT 1 FROM deletion_execution_tombstones WHERE table_name='runs' AND execution_id=NEW.run_id)
         BEGIN SELECT RAISE(ABORT,'EXECUTION_DELETED'); END`);
     }
   }
@@ -60,7 +66,7 @@ export class SqliteDeletionRows {
     for (const id of plan.deleteIds.filter(id => id.startsWith(`${this.name}/`))) {
       const locator = records.get(id), node = nodes.get(id);
       if (!locator || !node) throw new Error('DELETION_RECORD_CHANGED');
-      if (!removable.has(locator.table)) throw new Error('DELETION_TABLE_PROTECTED');
+      if (!removable.has(locator.table) || node.kind === 'configuration' || node.kind === 'source') throw new Error('DELETION_TABLE_PROTECTED');
       if (node.active) throw new Error('DELETION_EXECUTION_ACTIVE');
       const key = locator.key as FrozenRow['key'], row = this.read(locator.table, key);
       if (!row || sha256(JSON.stringify(row)) !== node.revision) throw new Error('DELETION_RECORD_CHANGED');
@@ -71,6 +77,7 @@ export class SqliteDeletionRows {
           || Object.keys(usage).sort().join(',') !== 'elapsedMs,modelCalls,reservedTokens,tokens'
           || Object.values(usage).some(value => !Number.isSafeInteger(value) || Number(value) < 0)) throw new Error('DELETION_USAGE_INVALID');
       }
+      if (locator.table === 'runs') usage = { iteration: row.iteration };
       rows.push({ id, table: locator.table, key, revision: node.revision, usage });
     }
     return { contract: this.contract, database: this.name, rows };
@@ -100,8 +107,13 @@ export class SqliteDeletionRows {
     for (const table of [...tables].sort()) visit(table);
     for (const table of ordered) for (const row of frozen.rows.filter(row => row.table === table)) {
       const executionKey = executionKeys[table];
+      if (table === 'runs') {
+        const changed = this.db.prepare('UPDATE runs SET best_version_id=NULL WHERE run_id=?').run(row.key.run_id!);
+        if (changed.changes !== 1) throw new Error('DELETION_RECORD_CHANGED');
+      }
       if (executionKey) this.db.prepare('INSERT INTO deletion_execution_tombstones VALUES(?,?,?,?,?)')
         .run(table, String(row.key[executionKey]), plan.planId, row.revision, JSON.stringify(row.usage));
+      if (table === 'runs') continue; // 最小父行仅作审计及外键锚点，业务查询不再返回。
       const keys = this.primary(table);
       const removed = this.db.prepare(`DELETE FROM ${quote(table)} WHERE ${keys.map(key => `${quote(key)}=?`).join(' AND ')}`)
         .run(...keys.map(key => row.key[key] as SQLInputValue));

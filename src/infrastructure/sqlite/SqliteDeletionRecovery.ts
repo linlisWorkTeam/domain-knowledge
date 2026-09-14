@@ -53,6 +53,7 @@ export class SqliteDeletionRecovery {
     const intent = JSON.parse(String(row.intent)) as RecoveryIntent;
     if (sha256(String(row.intent)) !== row.fingerprint || intent.contract !== 'deletion-recovery-v2'
       || intent.plan.planId !== planId || !intent.witnesses || typeof intent.witnesses !== 'object'
+      || intent.plan.schemaVersion !== 'batch-deletion-v2'
       || intent.participants.some(participant => !Object.hasOwn(intent.witnesses, participant.name))
       || !['PREPARED', 'RECORDS_COMMITTED', 'COMPLETE'].includes(String(row.phase))) throw new Error('DELETION_RECOVERY_CORRUPT');
     return { intent, fingerprint: String(row.fingerprint), phase: row.phase as DeletionRecoveryPhase };
@@ -64,6 +65,7 @@ export class SqliteDeletionRecovery {
   assertAvailable(): void { if (this.pending().length) throw new Error('DELETION_RECOVERY_REQUIRED'); }
   /** 只能在应用层重新校验引用图和二次确认后调用，不提供客户端直接写清单的接口。 */
   prepare(plan: BatchDeletionPlan): DeletionRecoveryRecord {
+    if (plan.schemaVersion !== 'batch-deletion-v2') throw new Error('DELETION_CONTRACT_INCOMPATIBLE');
     const frozen: BatchDeletionPlan = { schemaVersion: plan.schemaVersion, planId: plan.planId, targetId: plan.targetId,
       deleteIds: [...plan.deleteIds].sort(), preservedIds: [...plan.preservedIds].sort(),
       counts: Object.fromEntries(Object.entries(plan.counts).sort(([a], [b]) => a.localeCompare(b))), reclaimableBytes: plan.reclaimableBytes };

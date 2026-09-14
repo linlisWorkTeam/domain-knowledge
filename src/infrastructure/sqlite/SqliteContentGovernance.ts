@@ -9,6 +9,7 @@ import {
 import { randomUUID } from 'node:crypto';
 import { extname, isAbsolute, relative, resolve, sep } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
+import { visibleExecutionSql } from './DeletionTombstones.ts';
 import { fetch as undiciFetch, type Dispatcher } from 'undici';
 import type {
   ContentCommand, ContentGovernancePort,
@@ -367,7 +368,7 @@ export class SQLiteContentGovernance implements ContentGovernancePort {
     }
     const uniqueRunIds = [...new Set(runIds)];
     const runs = uniqueRunIds.map((runId) => {
-      const row = this.database.prepare('SELECT state, iteration, updated_at FROM runs WHERE run_id = ?')
+      const row = this.database.prepare(`SELECT state, iteration, updated_at FROM runs WHERE run_id = ? AND ${visibleExecutionSql(this.database, 'runs', 'runs.run_id')}`)
         .get(runId) as Row | undefined;
       return row ? {
         runId,

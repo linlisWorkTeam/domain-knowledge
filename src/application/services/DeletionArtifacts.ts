@@ -38,7 +38,7 @@ export async function expandDeletionArtifacts(input: {
   identities: Array<{ value: string; nodeId: string }>;
   reader: DeletionArtifactReader;
 }): Promise<DeletionArtifactGraph> {
-  const nodes = new Map(input.nodes.map(node => [node.id, { ...node, ownedBy: [...node.ownedBy], references: [...node.references] }]));
+  const nodes = new Map<string, DeletionNode>(input.nodes.map(node => [node.id, { ...node, ownedBy: [...node.ownedBy], references: [...node.references], auditReferences: [...(node.auditReferences ?? [])] }]));
   if (nodes.size !== input.nodes.length) throw new Error('DELETION_INVENTORY_INVALID');
   const refs = new Map<string, ArtifactRef>(), queue: string[] = [], queued = new Set<string>(), links = [...input.seeds];
   const missing = new Set<string>(), jsonStates = new Map<string, boolean>();

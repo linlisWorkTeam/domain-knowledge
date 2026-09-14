@@ -4,6 +4,7 @@
  * 文件功能：提供ConsoleRead模型的外部入口、参数转换与响应处理。
  */
 import type { DatabaseSync } from 'node:sqlite';
+import { visibleExecutionSql } from '../../infrastructure/sqlite/DeletionTombstones.ts';
 import type {
   DomainEvent,
   EvaluationReport,
@@ -82,7 +83,7 @@ export class ConsoleReadModel {
         (SELECT decision_json FROM gate_decisions AS decision
           WHERE decision.run_id = runs.run_id
           ORDER BY decision.rowid DESC LIMIT 1) AS latest_decision_json
-      FROM runs ORDER BY updated_at DESC, rowid DESC
+      FROM runs WHERE ${visibleExecutionSql(this.database, 'runs', 'runs.run_id')} ORDER BY updated_at DESC, rowid DESC
     `).all() as Record<string, unknown>[];
     return rows
       .filter((row) => !states?.length || states.includes(String(row.state)))
@@ -100,7 +101,7 @@ export class ConsoleReadModel {
     runId: string,
     versions: KnowledgeVersion[],
   ): Record<string, unknown> | null {
-    const row = this.database.prepare('SELECT * FROM runs WHERE run_id = ?').get(runId) as Record<string, unknown> | undefined;
+    const row = this.database.prepare(`SELECT * FROM runs WHERE run_id = ? AND ${visibleExecutionSql(this.database, 'runs', 'runs.run_id')}`).get(runId) as Record<string, unknown> | undefined;
     if (!row) return null;
     const run = runFromRow(row);
     const evaluations = this.listEvaluations(runId);
@@ -171,7 +172,7 @@ export class ConsoleReadModel {
 
   /** 读取运行Progress。 */
   getRunProgress(runId: string): Record<string, unknown> | null {
-    const run = this.database.prepare('SELECT * FROM runs WHERE run_id = ?').get(runId) as Record<string, unknown> | undefined;
+    const run = this.database.prepare(`SELECT * FROM runs WHERE run_id = ? AND ${visibleExecutionSql(this.database, 'runs', 'runs.run_id')}`).get(runId) as Record<string, unknown> | undefined;
     if (!run) return null;
     const rows = this.database.prepare(`
       SELECT node_id, agent_id, iteration, status, attempt, updated_at FROM workflow_node_projections
