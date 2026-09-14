@@ -151,3 +151,26 @@ test('role stage: a killed checkpoint owner can be recovered before the stage de
       assert.equal(composition.repository.getCheckpoint(sample.context.command.generationKey)?.retryCount, 1);
     } finally { child?.kill('SIGKILL'); if (composition.repository.database.isOpen) composition.close(); rmSync(runtimeDir, { recursive: true, force: true }); }
   });
+
+test('role stage: legacy failed output can provide feedback without rewriting history or refunding an attempt', async () => {
+  const sample = roleExample<RoleInput<Record<string, unknown>>>('doc-gen', 'src/domain/agents/docGenAgent/examples/WorkbenchDocGenSample.json');
+  const original: StageAttempt = { schemaVersion: 'role-stage-v1', stage: 'body', attempt: 1, startedAt: 10,
+    deadlineAt: 1010, status: 'FAILED', output: { value: 'incomplete' } };
+  const events = [structuredClone(original)];
+  sample.context.now = () => 20;
+  sample.context.stageJournal = { read: async () => structuredClone(events), record: async entry => { events.push(structuredClone(entry)); } };
+  sample.context.model.assertOutput = () => {};
+  let calls = 0;
+  sample.context.model.execute = async request => {
+    calls++; assert.equal(request.stage, 'body:attempt-2'); assert.match(request.prompt, /CONTROLLED_INCOMPLETE/);
+    return { value: 'complete' };
+  };
+  const request: ModelRequest & { stage: string } = { role: 'doc-gen', stage: 'body', prompt: 'authorized scope', outputSchema: {}, tools: [], readablePaths: [] };
+  const validate = (raw: Record<string, unknown>) => {
+    if (raw.value !== 'complete') throw new StageValidationIssue('CONTROLLED_INCOMPLETE', 'value', 'Complete the authorized section.');
+    return raw;
+  };
+  assert.deepEqual(await validatedStage(sample.context, request, validate, 1000), { value: 'complete' });
+  assert.equal(calls, 1); assert.deepEqual(events[0], original);
+  assert.equal(events.at(-1)!.attempt, 2); assert.equal(events.at(-1)!.deadlineAt, 1010);
+});

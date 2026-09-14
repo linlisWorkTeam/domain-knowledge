@@ -107,7 +107,8 @@ export function validateOutput(output: Output, input: Input): void {
   if (correction.replacementMarkdown !== undefined) {
     const replacements = markdownSections(correction.replacementMarkdown);
     if (replacements.length !== 1 || replacements[0]!.heading !== heading || replacements[0]!.start !== 0) {
-      throw new Error('REVIEW_CORRECTION_RANGE_INVALID');
+      throw new StageValidationIssue('REVIEW_CORRECTION_RANGE_INVALID', 'correction.replacementMarkdown',
+        'replacementMarkdown 若提供，必须以目标的 ## 二级标题开头，包含该章节完整正文，且不能包含其他二级章节；不能只返回 ### 子节。保留本章其他事实，不扩大修订范围；若无法给出完整替换，可省略这个可选字段，保留有证据的 criterion、risk 和未解决问题。');
     }
   }
 }

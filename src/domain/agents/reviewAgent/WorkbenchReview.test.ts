@@ -115,3 +115,25 @@ test('review: contradictory PASS receives one bounded feedback and preserves unr
   assert.deepEqual(attempts.map(entry => entry.status), ['STARTED', 'REJECTED', 'STARTED', 'PASSED']);
   assert.equal(attempts[0].deadlineAt, attempts[2].deadlineAt);
 });
+
+test('review: an incomplete replacement gets one bounded correction without relaxing section scope', async () => {
+  const sample = roleExample<Input>('review', 'src/domain/agents/reviewAgent/examples/WorkbenchReviewSample.json');
+  const valid = structuredClone(sample.output);
+  let calls = 0;
+  sample.context.model.execute = async request => {
+    calls++;
+    if (calls === 1) return { ...valid, correction: { ...valid.correction, replacementMarkdown: '### Detail\nOnly a subsection' } };
+    assert.match(request.prompt, /REVIEW_CORRECTION_RANGE_INVALID/);
+    assert.match(request.prompt, /correction.replacementMarkdown/);
+    return { ...valid, correction: { ...valid.correction, replacementMarkdown: '## Behavior\nComplete scoped correction' } };
+  };
+  const result = await execute(sample.input, sample.context);
+  assert.equal(calls, 2);
+  assert.equal(result.output.correction?.replacementMarkdown, '## Behavior\nComplete scoped correction');
+  calls = 0;
+  sample.context.model.execute = async () => {
+    calls++; return { ...valid, correction: { ...valid.correction, replacementMarkdown: '### Detail\nStill incomplete' } };
+  };
+  await assert.rejects(execute(sample.input, sample.context), /REVIEW_CORRECTION_RANGE_INVALID/);
+  assert.equal(calls, 2);
+});

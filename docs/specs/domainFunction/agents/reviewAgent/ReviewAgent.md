@@ -92,3 +92,5 @@ STOPPED 保存 ReviewHandoffPrepared 事件及 CAS 交接，包含 summary、his
 - 既往执行版本与产物：[AgentSpecRepairAndE2E.md](../../../../reports/AgentSpecRepairAndE2E.md)。
 
 代码位置：[执行入口](../../../../../src/domain/agents/reviewAgent/ReviewAgent.ts)、[输入输出契约](../../../../../src/domain/agents/reviewAgent/ReviewAgentContract.ts)、[提示词与读取范围](../../../../../src/domain/agents/reviewAgent/ReviewAgentPrompt.ts)、[角色测试](../../../../../src/domain/agents/reviewAgent/ReviewAgent.test.ts)、[独立样例](../../../../../src/domain/agents/reviewAgent/examples/ReviewAgentSample.json)。
+
+工作台复核的可选replacementMarkdown必须覆盖唯一目标H2的完整章节。仅返回H3子节、遗漏目标标题或含其他H2时仍拒绝；校验器给出一次结构化格式反馈，允许补齐授权章节或省略可选替换文本，不得删除风险或扩大范围。同一语义阶段仍最多两次尝试。恢复旧失败输出时可以重新校验以形成反馈，但不将失败输出改为通过、不覆盖原记录、不返还尝试或延长截止时间。

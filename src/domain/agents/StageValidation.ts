@@ -47,6 +47,13 @@ export async function validatedStage<T>(context: ExecutionContext, request: Mode
     const first = Math.max(0, ...history.map((entry) => entry.attempt)) + 1;
     for (let attempt = first; attempt < first + 2 - used; attempt++) {
       active();
+      // 旧失败已留存输出但没有结构化反馈时，只重验以生成提示；不改写原记录或复用失败产物。
+      const previous = history.at(-1);
+      if (!issue && previous?.status === 'FAILED' && previous.output) {
+        try { context.model.assertOutput(previous.output, request.outputSchema); validate(previous.output); }
+        catch (error) { if (error instanceof StageValidationIssue) issue = error.issue; }
+        active();
+      }
       const entry: StageAttempt = { schemaVersion: 'role-stage-v1', stage: request.stage, attempt, startedAt, deadlineAt: startedAt + timeoutMs, status: 'STARTED' };
       // 先持久化占用次数，崩溃或取消后不能免费获得新尝试。
       await context.stageJournal?.record(entry);
