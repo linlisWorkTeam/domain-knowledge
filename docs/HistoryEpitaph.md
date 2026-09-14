@@ -324,3 +324,23 @@ This document summarizes older handoffs, milestones and architectural decisions 
 ## 2026-09-14 状态文档合并
 
 保留 main 的持久路线图，工作台当前未完成范围另列于 Status。合并前 feature 的逐轮发行与验收记录见[固定版本 Status](https://github.com/linlisWorkTeam/domain-knowledge/blob/39092ce/docs/Status.md)，包含 v0.2.0 的 markdownLite 发行结果及后续工作台历史。历史通过只适用于各自固定版本；当前 C/C++ 来源、关联、发布与浏览器验收仍未完成。
+
+## 2026-09-14 合并交接归档
+
+以下原文全部固定于本地合并提交 c5211c53034cfcb68b8b4983b5f73a0de0714684，随分支推送后可在链接查看。各条是历史执行状态；当前状态见最新交接和 Status。
+
+| 原记录 | 已验证与未完成范围 |
+| --- | --- |
+| [2026-09-10-1046-docgen-internal-workers.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/c5211c53034cfcb68b8b4983b5f73a0de0714684/docs/epitaph/2026-09-10-1046-docgen-internal-workers.md) | DocGen内部Worker迁移、冻结材料与子任务复用；当时定向35项通过、全量227/229，结构验证不等于真实质量。 |
+| [2026-09-10-1424-pr41-docs-merge.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/c5211c53034cfcb68b8b4983b5f73a0de0714684/docs/epitaph/2026-09-10-1424-pr41-docs-merge.md) | PR41文档合并保留Domain布局和内部Worker；Code/TestGen输入边界当时仍待实现或确认。 |
+| [2026-09-11-1817-cjson-real-acceptance.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/c5211c53034cfcb68b8b4983b5f73a0de0714684/docs/epitaph/2026-09-11-1817-cjson-real-acceptance.md) | 独立cJSON真实验收整体失败；四批次已终止，参考48/49、Check失败及生成编译错误保留，不属于本次TinyXML2验收。 |
+| [2026-09-14-0703-cpp-gates-current-regression.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/c5211c53034cfcb68b8b4983b5f73a0de0714684/docs/epitaph/2026-09-14-0703-cpp-gates-current-regression.md) | C++修订后可信37/37、固定40/40；source质量仍未闭环，前台与部署待完成。 |
+| [2026-09-14-0712-draft-pr-frontend-followup.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/c5211c53034cfcb68b8b4983b5f73a0de0714684/docs/epitaph/2026-09-14-0712-draft-pr-frontend-followup.md) | PR50已建草稿；优先前台、完整验收后才按包含关系处理PR38/50。 |
+| [2026-09-14-0722-frontend-entry-and-pr-conditions.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/c5211c53034cfcb68b8b4983b5f73a0de0714684/docs/epitaph/2026-09-14-0722-frontend-entry-and-pr-conditions.md) | 工作台入口与桌面窄屏截图已交付，受控入口通过；长Console流程尚待回归，未部署最新UI。 |
+| [2026-09-14-0734-main-merge-role-evidence.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/c5211c53034cfcb68b8b4983b5f73a0de0714684/docs/epitaph/2026-09-14-0734-main-merge-role-evidence.md) | main合并保留Domain角色执行入口与证据审计，合并和真实验收均未完成。 |
+| [2026-09-14-0738-code-contract-merge.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/c5211c53034cfcb68b8b4983b5f73a0de0714684/docs/epitaph/2026-09-14-0738-code-contract-merge.md) | Code显式工作台契约与main原生默认协议并存；角色测试不证明完整闭环。 |
+| [2026-09-14-0742-docgen-contract-merge.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/c5211c53034cfcb68b8b4983b5f73a0de0714684/docs/epitaph/2026-09-14-0742-docgen-contract-merge.md) | DocGen分阶段生成和H2修订保留为显式模式，内部Worker与默认完整输出共用入口。 |
+| [2026-09-14-0745-review-contract-merge.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/c5211c53034cfcb68b8b4983b5f73a0de0714684/docs/epitaph/2026-09-14-0745-review-contract-merge.md) | Review工作台证据修订与main默认列表协议分离，范围和风险校验保留。 |
+| [2026-09-14-0753-worker-testgen-registry-merge.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/c5211c53034cfcb68b8b4983b5f73a0de0714684/docs/epitaph/2026-09-14-0753-worker-testgen-registry-merge.md) | Worker事实模式、TestGen声明式模式与真实Registry集成；角色116/116，原生cache仍未通过。 |
+| [2026-09-14-1604-source-types-example-merge.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/c5211c53034cfcb68b8b4983b5f73a0de0714684/docs/epitaph/2026-09-14-1604-source-types-example-merge.md) | 生产类型、独立运行17/17及DocGen受控SDK5/5通过；固定历史路径修复，整图尚未验证。 |
+| [2026-09-14-1607-flow-regression-merge.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/c5211c53034cfcb68b8b4983b5f73a0de0714684/docs/epitaph/2026-09-14-1607-flow-regression-merge.md) | C++受控图及全树类型通过；TS回归发现内部Worker缺失，未放宽原断言。 |
