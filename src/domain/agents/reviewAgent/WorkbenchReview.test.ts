@@ -137,3 +137,33 @@ test('review: an incomplete replacement gets one bounded correction without rela
   await assert.rejects(execute(sample.input, sample.context), /REVIEW_CORRECTION_RANGE_INVALID/);
   assert.equal(calls, 2);
 });
+
+test('review: format repair cannot discard the correction or revise its factual claim', async () => {
+  for (const change of ['pass', 'criterion']) {
+    const sample = roleExample<Input>('review', 'src/domain/agents/reviewAgent/examples/WorkbenchReviewSample.json');
+    const original = structuredClone(sample.output); let calls = 0;
+    sample.context.model.execute = async request => {
+      calls++;
+      if (calls === 1) return { ...original, correction: { ...original.correction, replacementMarkdown: '### Detail\nFragment' } };
+      assert.match(request.prompt, /其他字段必须保留/);
+      return change === 'pass' ? { blocking: false, recommendation: 'PASS', correction: null, unresolvedRisks: [] }
+        : { ...original, correction: { ...original.correction, criterion: 'Different claim', replacementMarkdown: '## Behavior\nValid format' } };
+    };
+    await assert.rejects(execute(sample.input, sample.context), /REVIEW_REPAIR_FACTS_CHANGED/);
+    assert.equal(calls, 2);
+  }
+});
+
+test('review: persisted format failure also prevents replaying a later contradictory PASS', async () => {
+  const sample = roleExample<Input>('review', 'src/domain/agents/reviewAgent/examples/WorkbenchReviewSample.json');
+  const original = structuredClone(sample.output); let calls = 0;
+  sample.context.stageJournal = { read: async () => [
+    { schemaVersion: 'role-stage-v1', stage: 'evidence-attribution', attempt: 1, startedAt: 0, deadlineAt: 1000, status: 'FAILED',
+      output: { ...original, correction: { ...original.correction, replacementMarkdown: '### Detail\nFragment' } } },
+    { schemaVersion: 'role-stage-v1', stage: 'evidence-attribution', attempt: 2, startedAt: 0, deadlineAt: 1000, status: 'PASSED',
+      output: { blocking: false, recommendation: 'PASS', correction: null, unresolvedRisks: [] } },
+  ], record: async () => { throw new Error('must not rewrite history'); } };
+  sample.context.model.execute = async () => { calls++; return original; };
+  await assert.rejects(execute(sample.input, sample.context), /REVIEW_REPAIR_FACTS_CHANGED/);
+  assert.equal(calls, 0);
+});

@@ -7,7 +7,8 @@ import { sha256 } from '../../Domain.ts';
 import type { ExecutionContext, RoleResult, PendingArtifact } from '../AgentExecution.ts';
 import { assertActive } from '../AgentExecution.ts';
 import { type Input, type Output, schemaFor, validateInput, validateOutput } from './WorkbenchReviewContract.ts';
-import { validatedStage } from '../StageValidation.ts';
+import { validatedStage, StageValidationIssue } from '../StageValidation.ts';
+import { canonicalJson } from '../../workbench/StageTask.ts';
 import { sourceReviewTimeoutMs } from '../../knowledge/SourceReviewPolicy.ts';
 import { definition, buildPrompt, readablePaths } from './WorkbenchReviewPrompt.ts';
 
@@ -18,6 +19,21 @@ export async function execute(input: Input, context: ExecutionContext): Promise<
   validateInput(input);
   const schema = schemaFor(input);
   const criteria = input.materials.find(material => material.ref.artifactId === input.payload.criteriaRef.artifactId)?.content;
+  const facts = (output: Output) => canonicalJson({ ...output, correction: output.correction
+    ? Object.fromEntries(Object.entries(output.correction).filter(([key]) => key !== 'replacementMarkdown')) : null });
+  let preservedFacts: string | undefined;
+  const captureFormatFailure = (output: Output, error: unknown) => {
+    if (error instanceof StageValidationIssue && error.issue.code === 'REVIEW_CORRECTION_RANGE_INVALID') {
+      preservedFacts ??= facts(output);
+      error.issue.hint += ` 本次仅允许改变或省略replacementMarkdown，其他字段必须保留：${preservedFacts}`;
+    }
+  };
+  // 恢复时也保留格式失败前的意见，不能用后续PASS覆盖已提出的风险。
+  for (const previous of await context.stageJournal?.read('evidence-attribution') ?? []) {
+    if (!previous.output || previous.status === 'PASSED') continue;
+    try { context.model.assertOutput(previous.output, schema); validateOutput(previous.output as unknown as Output, input); }
+    catch (error) { captureFormatFailure(previous.output as unknown as Output, error); }
+  }
   // 角色决定本阶段的任务与能力范围；会话、工具执行和格式修复交给模型适配器。
   const output = await validatedStage(context, {
     role: definition.agentId,
@@ -28,7 +44,11 @@ export async function execute(input: Input, context: ExecutionContext): Promise<
     readablePaths: readablePaths(input),
   }, (raw) => {
     const output = raw as unknown as Output;
-    validateOutput(output, input);
+    if (preservedFacts !== undefined && facts(output) !== preservedFacts) {
+      throw new StageValidationIssue('REVIEW_REPAIR_FACTS_CHANGED', 'correction.replacementMarkdown',
+        `格式修复不能改变结论、修订位置、原因、风险或未解决问题。仅允许改变或省略replacementMarkdown；其余字段必须保持：${preservedFacts}`);
+    }
+    try { validateOutput(output, input); } catch (error) { captureFormatFailure(output, error); throw error; }
     return output;
   }, sourceReviewTimeoutMs(criteria));
   // 模型返回后仍需检查取消状态，迟到结果不能被当作成功输出。
