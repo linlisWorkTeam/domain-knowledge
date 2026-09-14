@@ -382,3 +382,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 [2012 前台首次部署](https://github.com/linlisWorkTeam/domain-knowledge/blob/f90d0b7/docs/epitaph/2026-09-14-2012-frontend-deployed-dab.md)：dab50a5完成代码619、Console41、验收25并部署，保留原数据。该记录的视口修复未上线状态已由后续d869部署取代；真实来源门禁与历史删除仍未完成。
 
 [2018 发布折叠与删除契约](https://github.com/linlisWorkTeam/domain-knowledge/blob/3f8147e/docs/epitaph/2026-09-14-2018-publication-fold-and-deletion-contract.md)：875实现发布折叠和导航新名称，之后d869部署。删除领域/应用单库回执当时仍待真实投影；C来源修订3卡、1未知，335工件校验，但新版本未完成后续门禁。
+
+[2034 新名称与发布折叠上线](https://github.com/linlisWorkTeam/domain-knowledge/blob/2ef007d/docs/epitaph/2026-09-14-2034-renamed-ui-deployed.md)：d869e1a完成代码627、Console41、验收25并部署；原8run/1card保留。该记录的运行PID只作历史定位，操作前仍须核实；真实最终来源验收和历史删除未完。

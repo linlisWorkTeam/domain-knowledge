@@ -21,6 +21,7 @@ Available 是已接线路由；Planned 路由不作为当前能力。Available /
 | 路由 | 状态 | 契约 |
 | --- | --- | --- |
 | `GET /health` | Available | 进程存活探针；不返回业务健康分。 |
+| `GET /api/v1/maintenance` | Available | 返回AVAILABLE、MAINTENANCE或RECOVERY_REQUIRED，不包含删除清单或配置；沿用现有访问鉴权。维护期间其他数据接口返回503与中文说明，静态页面及此状态接口可读。 |
 | `GET /api/v1/system/status` | Available | 返回 Registry 业务汇总：知识各状态、反馈、批次与 publication 计数；已由旧 `/api/v1/status` 迁移。分组件健康与采样时间只由 `/api/v1/system/components` 返回。 |
 | `GET /api/v1/system/capabilities` | Available | 返回读写开关、认证方式、Provider 类型和隔离能力；已由旧 `/api/v1/capabilities` 迁移。 |
 | `GET /api/v1/system/components` | Available | 返回分组件健康、reason code、最后成功时间和受控诊断摘要。 |

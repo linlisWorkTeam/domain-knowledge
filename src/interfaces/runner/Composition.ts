@@ -4,6 +4,8 @@
  * 文件功能：提供Composition的外部入口、参数转换与响应处理。
  */
 import { WorkbenchBatches } from '../../application/services/WorkbenchBatches.ts';
+import { RuntimeMaintenance } from '../../application/services/RuntimeMaintenance.ts';
+import { deletionRecoveryPending, deletionExecutionsIdle } from '../../infrastructure/sqlite/DeletionRecoveryPending.ts';
 import { SqliteWorkbenchBatches } from '../../infrastructure/sqlite/SqliteWorkbenchBatches.ts';
 import { moduleBuild } from '../../domain/workbench/WorkbenchProject.ts';
 import { WorkbenchPublicationEvidence } from '../../application/services/WorkbenchPublicationEvidence.ts';
@@ -465,7 +467,12 @@ export function createComposition(input: {
     }
     return sha256(JSON.stringify(fingerprints));
   }, store: pipelineStore, stages: workbenchStages, generation: workbenchGeneration, reconstruction: workbenchReconstruction, evaluation: workbenchEvaluation, revision: workbenchKnowledgeRevision, sourceVerification: workbenchSourceVerification, sourceRevision: workbenchSourceRevision, index: knowledgeIndex, associations: workbenchAssociations });
-  const workbenchBatches = new WorkbenchBatches({ store: batchStore, projects: projectStore, pipelines: workbenchPipelines, materials: workbenchMaterials.store });
+  let maintenance: RuntimeMaintenance;
+  const workbenchBatches = new WorkbenchBatches({ store: batchStore, projects: projectStore, pipelines: workbenchPipelines, materials: workbenchMaterials.store,
+    canSchedule: () => maintenance?.available ?? false });
+  maintenance = new RuntimeMaintenance({ needsRecovery: () => deletionRecoveryPending(join(runtimeDir, 'deletion-recovery.sqlite')),
+    idle: () => workbenchBatches.idle && workbenchPipelines.idle && workbenchStages.idle && workbenchPublications.idle
+      && deletionExecutionsIdle(join(runtimeDir, 'registry.sqlite'), join(runtimeDir, 'workbench.sqlite')) });
   const projectStages = () => {
       const auditDirectory = join(runtimeDir, 'demo');
       const auditPath = join(auditDirectory, 'agent-runs.jsonl');
@@ -620,6 +627,7 @@ export function createComposition(input: {
       workbenchStages,
       workbenchPipelines,
       workbenchBatches,
+      maintenance,
       workbenchPublications,
       knowledgeIndex,
       workbenchAssociations,

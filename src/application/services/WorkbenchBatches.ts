@@ -17,8 +17,10 @@ export class WorkbenchBatches {
   private timer: ReturnType<typeof setInterval> | null = null;
   private closing = false;
   private readonly materials?: { get(id: string): unknown };
+  private readonly canSchedule: () => boolean;
   lastError: string | null = null;
-  constructor(input: { store: WorkbenchBatchStore; projects: WorkbenchProjectStore; pipelines: WorkbenchBatches['pipelines']; clock?: () => string; materials?: { get(id: string): unknown } }) {
+  constructor(input: { store: WorkbenchBatchStore; projects: WorkbenchProjectStore; pipelines: WorkbenchBatches['pipelines']; clock?: () => string; materials?: { get(id: string): unknown }; canSchedule?: () => boolean }) {
+    this.canSchedule = input.canSchedule ?? (() => true);
     this.materials = input.materials; this.store = input.store; this.projects = input.projects; this.pipelines = input.pipelines; this.clock = input.clock ?? (() => new Date().toISOString());
   }
   list(projectId?: string) {
@@ -62,11 +64,11 @@ export class WorkbenchBatches {
   }
   start() {
     if (this.timer || this.closing) return;
-    this.store.recover(this.clock()); this.tick();
+    if (this.canSchedule()) this.store.recover(this.clock()); this.tick();
     this.timer = setInterval(() => this.tick(), 1000); this.timer.unref();
   }
   tick() {
-    if (this.closing) return;
+    if (this.closing || !this.canSchedule()) return;
     try {
       const now = this.clock(); this.store.recover(now);
       for (let batch of this.store.list().reverse()) {

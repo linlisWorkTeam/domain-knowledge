@@ -5,6 +5,7 @@
  * 文件功能：提供服务端的外部入口、参数转换与响应处理。
  */
 import { presentWorkflowStatus } from '../../application/services/RunExecutionPresentation.ts';
+import type { RuntimeOperation } from '../../application/services/RuntimeMaintenance.ts';
 import { createServer as createHttpServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { readFileSync } from 'node:fs';
 import { extname, join, resolve } from 'node:path';
@@ -359,12 +360,15 @@ export function createKnowledgeServer(input: {
     markdownLite: { start(repositoryRoot: string): Promise<unknown> };
   };
   const idempotencyResults = new Map<string, { fingerprint: string; status: number; value: unknown }>();
-  composition.apps.workbenchStages.recover();
-  composition.apps.workbenchPipelines.recover();
+  if (composition.apps.maintenance.available) {
+    composition.apps.workbenchStages.recover();
+    composition.apps.workbenchPipelines.recover();
+  }
   composition.apps.workbenchBatches.start();
   const server = createHttpServer(async (request, response) => {
     const url = new URL(request.url ?? '/', 'http://127.0.0.1');
     const currentRequestId = requestId(request);
+    let operation: RuntimeOperation | undefined;
     try {
       if (request.method === 'GET' && assets.has(url.pathname)) {
         const file = assets.get(url.pathname) as string;
@@ -395,6 +399,10 @@ export function createKnowledgeServer(input: {
           'A valid Bearer token is required for remote access and server directory operations.', currentRequestId));
         return;
       }
+      if (request.method === 'GET' && url.pathname === '/api/v1/maintenance') {
+        send(response, 200, { status: composition.apps.maintenance.status }); return;
+      }
+      if (url.pathname.startsWith('/api/')) operation = composition.apps.maintenance.enter();
       if (workbenchRoute) {
         const publications = composition.apps.workbenchPublications;
         if (url.pathname === '/api/v1/workbench-publications' && request.method === 'GET') {
@@ -814,6 +822,7 @@ export function createKnowledgeServer(input: {
         let cursor = activitySseCursor(request, url);
         openSse(response);
         const flush = () => {
+          if (!composition.apps.maintenance.available) return;
           const pending = composition.apps.flywheel.listActivities()
             .map((item) => ({ item, position: decodeActivityCursor(String(item.cursor)) }))
             .filter((entry) => entry.position > cursor)
@@ -909,6 +918,7 @@ export function createKnowledgeServer(input: {
           let cursor = sseCursor(request, url);
           openSse(response);
           const flush = () => {
+            if (!composition.apps.maintenance.available) return;
             const current = composition.apps.flywheel.getRunSnapshot(runId);
             const pending = ((current?.events ?? []) as { eventSeq: number; event: unknown }[])
               .filter((record) => record.eventSeq > cursor);
@@ -1429,9 +1439,13 @@ export function createKnowledgeServer(input: {
       }
       send(response, 404, errorBody('NOT_FOUND', 'Resource not found.', currentRequestId));
     } catch (error) {
+      if (error instanceof Error && ['DELETION_RECOVERY_REQUIRED', 'RUNTIME_MAINTENANCE', 'RUNTIME_OPERATIONS_ACTIVE'].includes(error.message)) {
+        send(response, 503, errorBody(error.message, error.message === 'DELETION_RECOVERY_REQUIRED'
+          ? '历史删除尚未恢复完成，请先完成恢复。' : '工作台正在维护或有操作执行中，请稍后重试。', currentRequestId, true)); return;
+      }
       const mapped = mapHttpError(error, currentRequestId);
       send(response, mapped.status, mapped.body);
-    }
+    } finally { operation?.release(); }
   });
   server.on('close', composition.close);
   return { server, composition };
