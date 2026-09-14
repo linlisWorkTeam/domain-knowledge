@@ -400,3 +400,7 @@ This document summarizes older handoffs, milestones and architectural decisions 
 [2136 图检查点清理](https://github.com/linlisWorkTeam/domain-knowledge/blob/e2c0936/docs/epitaph/2026-09-14-2136-graph-checkpoint-deletion.md)：新增Graph库存与整线程清理适配器，26项相关回归通过。备份中的1141图记录和274工件种子后来已合入完整数据库/CAS审计，唯一工件仍336个，全部通过；生产其他派生文件和删除界面仍未完成。
 
 [2142 合并库存及CAS清理](https://github.com/linlisWorkTeam/domain-knowledge/blob/22d254a/docs/epitaph/2026-09-14-2142-combined-inventory-and-cas-cleanup.md)：数据库/图/CAS库存合并并补双向引用，2107记录/336CAS审核通过；CAS清理支持冻结见证及恢复。文件见证之后已纳入持久协调器、应用入口也已统一；当时发布文件未覆盖，后续2202新增适配，生产目录范围和UI仍待完成。
+
+## 2026-09-14 归档：持久文件恢复
+
+[2146 原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/a00d9018cd944f022490e3e3e1a5d074d58f8ebf/docs/epitaph/2026-09-14-2146-persisted-file-recovery.md)：文件参与者与首次冻结见证进入恢复协调器；27项及最终11项测试通过，目录身份变化拒绝恢复。其v3现已由统一应用v4替代，生产删除接口、完整执行目录覆盖和真实C/C++最终验收仍未完成。

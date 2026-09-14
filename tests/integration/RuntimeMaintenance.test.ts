@@ -146,3 +146,24 @@ test('composition uses raw workflow status under maintenance without rewriting t
     rmSync(runtimeDir, { recursive: true, force: true });
   }
 });
+
+test('composition peers share normal access but prevent maintenance until the peer closes', async () => {
+  const { createComposition } = await import('../../src/interfaces/runner/Composition.ts');
+  const runtimeDir = mkdtempSync(join(tmpdir(), 'maintenance-peers-'));
+  const first = createComposition({ runtimeDir }), second = createComposition({ runtimeDir });
+  const operation = first.apps.maintenance.enter();
+  let secondClosed = false;
+  try {
+    await assert.rejects(operation.exclusive(async () => assert.fail('peer still owns runtime')), /RUNTIME_OTHER_WRITERS/);
+    assert.equal(first.apps.maintenance.available, true);
+    await second.shutdown(); await second.close(); secondClosed = true;
+    assert.equal(await operation.exclusive(async () => {
+      assert.throws(() => createComposition({ runtimeDir }), /RUNTIME_MAINTENANCE/);
+      return 'exclusive';
+    }), 'exclusive');
+  } finally {
+    operation.release();
+    if (!secondClosed) { await second.shutdown(); await second.close(); }
+    await first.shutdown(); await first.close(); rmSync(runtimeDir, { recursive: true, force: true });
+  }
+});

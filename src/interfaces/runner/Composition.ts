@@ -4,6 +4,7 @@
  * 文件功能：提供Composition的外部入口、参数转换与响应处理。
  */
 import { WorkbenchBatches } from '../../application/services/WorkbenchBatches.ts';
+import { RuntimeFileLock } from '../../infrastructure/sqlite/RuntimeFileLock.ts';
 import { RuntimeMaintenance } from '../../application/services/RuntimeMaintenance.ts';
 import { deletionRecoveryPending, deletionWorkbenchExecutionsIdle } from '../../infrastructure/sqlite/DeletionRecoveryPending.ts';
 import { SqliteDeletionRunStates } from '../../infrastructure/sqlite/SqliteDeletionRunStates.ts';
@@ -161,7 +162,7 @@ export function loadWorkpanelConfig(_repositoryRoot = defaultRepositoryRoot): Wo
 }
 
 /** 创建Composition。 */
-export function createComposition(input: {
+interface CompositionInput {
   repositoryRoot?: string;
   fixtureAssetRoot?: string;
   agentProviderMode?: 'fixture' | 'deepseek-harness' | 'company-codeagent-cli';
@@ -174,11 +175,19 @@ export function createComposition(input: {
   allowedSourceHosts?: string[];
   providerProbe?: ProviderConnectionProbe;
   operationalMetrics?: OperationalMetricsPort;
-} = {}) {
+}
+export function createComposition(input: CompositionInput = {}) {
   const repositoryRoot = resolve(input.repositoryRoot ?? defaultRepositoryRoot);
   const config = loadWorkpanelConfig(repositoryRoot);
   const configuredRuntime = input.runtimeDir ?? process.env.WP_FLYWHEEL_HOME ?? config.runtimeDir;
   const runtimeDir = isAbsolute(configuredRuntime) ? configuredRuntime : join(componentRoot, configuredRuntime);
+  const runtimeLock = new RuntimeFileLock(runtimeDir);
+  try { return composeRuntime(input, repositoryRoot, config, runtimeLock); }
+  catch (error) { runtimeLock.close(); throw error; }
+}
+
+function composeRuntime(input: CompositionInput, repositoryRoot: string, config: ReturnType<typeof loadWorkpanelConfig>, runtimeLock: RuntimeFileLock) {
+  const runtimeDir = runtimeLock.directory;
   const artifacts = new LocalCasArtifactStore(join(runtimeDir, 'cas'));
   const repository = new SQLiteFlywheelRepository(join(runtimeDir, 'registry.sqlite'));
   const directoryRoots = (process.env.WP_KNOWLEDGE_DIRECTORY_ROOTS ?? `${dirname(runtimeDir)}${delimiter}${dirname(repositoryRoot)}`).split(delimiter).filter(Boolean);
@@ -471,7 +480,8 @@ export function createComposition(input: {
   let maintenance: RuntimeMaintenance;
   const workbenchBatches = new WorkbenchBatches({ store: batchStore, projects: projectStore, pipelines: workbenchPipelines, materials: workbenchMaterials.store,
     canSchedule: () => maintenance?.available ?? false });
-  maintenance = new RuntimeMaintenance({ needsRecovery: () => deletionRecoveryPending(join(runtimeDir, 'deletion-recovery.sqlite')),
+  maintenance = new RuntimeMaintenance({ isolate: work => runtimeLock.exclusive(work),
+    needsRecovery: () => !runtimeLock.available || deletionRecoveryPending(join(runtimeDir, 'deletion-recovery.sqlite')),
     idle: () => workbenchBatches.idle && workbenchPipelines.idle && workbenchStages.idle && workbenchPublications.idle
       && deletionWorkbenchExecutionsIdle(join(runtimeDir, 'workbench.sqlite')),
     verifyIdle: async () => (await SqliteDeletionRunStates.inspect(repository.database,
@@ -677,9 +687,10 @@ export function createComposition(input: {
     agentProviderMode,
     automatedWorkflow: workflow,
     shutdown: async () => { workbenchBatches.stop(); await workbenchPipelines.shutdown(); await workbenchBatches.shutdown(); await workbenchStages.shutdown(); await workbenchPublications.shutdown(); if (workflowPromise) await (await workflowPromise).shutdown(); },
-    close: () => {
+    close: function close(): void | Promise<void> {
       workbenchBatches.stop();
-      const release = () => { batchStore.close(); publicationStore.close(); pipelineStore.close(); nativeTestStore.close(); projectStore.close(); indexStore.close(); stageStore.close(); publisher.close(); repository.close(); };
+      if (!runtimeLock.idle) return runtimeLock.whenIdle().then(() => close());
+      const release = () => { batchStore.close(); publicationStore.close(); pipelineStore.close(); nativeTestStore.close(); projectStore.close(); indexStore.close(); stageStore.close(); publisher.close(); repository.close(); runtimeLock.close(); };
       if (workbenchBatches.idle && workbenchPipelines.idle && workbenchStages.idle && workbenchPublications.idle) { void workbenchPipelines.shutdown(); void workbenchStages.shutdown(); void workbenchPublications.shutdown(); release(); }
       else return workbenchPipelines.shutdown().then(() => workbenchBatches.shutdown()).then(() => workbenchStages.shutdown()).then(() => workbenchPublications.shutdown()).then(release);
     },
