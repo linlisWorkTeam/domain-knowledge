@@ -29,7 +29,7 @@ export async function execute(input: Input, context: ExecutionContext): Promise<
     }
   };
   // 恢复时也保留格式失败前的意见，不能用后续PASS覆盖已提出的风险。
-  for (const previous of await context.stageJournal?.read('evidence-attribution') ?? []) {
+  for (const previous of await (context.stageJournal?.history?.('evidence-attribution') ?? context.stageJournal?.read('evidence-attribution')) ?? []) {
     if (!previous.output || previous.status === 'PASSED') continue;
     try { context.model.assertOutput(previous.output, schema); validateOutput(previous.output as unknown as Output, input); }
     catch (error) { captureFormatFailure(previous.output as unknown as Output, error); }
@@ -38,7 +38,8 @@ export async function execute(input: Input, context: ExecutionContext): Promise<
   const output = await validatedStage(context, {
     role: definition.agentId,
     stage: 'evidence-attribution',
-    prompt: buildPrompt(input, context),
+    prompt: buildPrompt(input, context) + (preservedFacts === undefined ? ''
+      : `\n本次恢复仍受原格式修复约束：仅允许改变或省略replacementMarkdown，其他字段必须保留：${preservedFacts}。这些是待核实的原意见，不是新增的源码事实或发布授权。`),
     outputSchema: schema,
     tools: definition.tools,
     readablePaths: readablePaths(input),

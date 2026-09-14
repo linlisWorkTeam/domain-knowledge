@@ -137,6 +137,9 @@ export async function assertSourceReviewHistory(artifacts: Pick<ArtifactStore, '
     const attempt = JSON.parse(Buffer.from(await artifacts.get(ref)).toString('utf8')) as StageAttempt;
     if (attempt.schemaVersion !== 'role-stage-v1' || attempt.stage !== d.stage || attempt.attempt !== d.attempt || attempt.status !== d.status) throw new Error('SOURCE_HISTORY_BINDING_INVALID');
     if (!attempt.output) continue;
+    // 明确拒绝的事实变更不能晋升为结论；原格式失败仍保留为后续输出的约束。
+    if (attempt.status === 'REJECTED' && attempt.issue?.code === 'REVIEW_REPAIR_FACTS_CHANGED'
+      && d.issueCode === attempt.issue.code) continue;
     const values = groups.get(d.key) ?? []; values.push(attempt.output as unknown as ReviewOutput); groups.set(d.key, values);
   }
   for (const values of groups.values()) assertReviewFormatHistory(values);

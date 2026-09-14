@@ -61,6 +61,8 @@ export interface ExecutionContext {
   /** Application 保存阶段尝试，包括失败；同版本恢复使用同一记录。 */
   stageJournal?: {
     read(stage: string): Promise<StageAttempt[]>;
+    /** 跨任务尝试的只读事实约束，不参与当前语义尝试计数或截止时间。 */
+    history?(stage: string): Promise<StageAttempt[]>;
     record(attempt: StageAttempt): Promise<void>;
   };
   /** 提供模型信息，供调用方读取或传入。 */

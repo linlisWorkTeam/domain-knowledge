@@ -34,20 +34,25 @@ export class WorkbenchRoleExecution {
         if (tokens !== null) context.account(`provider:${operationId}`, { tokens });
         context.progress({ phase: 'usage', role, tokensReported: tokens !== null });
       });
+      const readStage = async (stage: string, currentOnly: boolean): Promise<StageAttempt[]> => {
+        const entries: StageAttempt[] = [];
+        for (const event of this.dependencies.events(context.task.taskId)) {
+          const detail = event.detail as Record<string, unknown>;
+          if (detail?.phase !== 'role-stage-attempt' || detail.role !== role || detail.key !== key || detail.stage !== stage
+            || (currentOnly && detail.taskAttempt !== context.task.attempt)) continue;
+          const ref = detail.artifactRef as ArtifactRef;
+          if (!await artifacts.verify(ref)) throw new Error('STAGE_ARTIFACT_CORRUPT');
+          const entry = JSON.parse(Buffer.from(await artifacts.get(ref)).toString('utf8')) as StageAttempt;
+          if (entry.schemaVersion !== 'role-stage-v1' || entry.stage !== stage || entry.attempt !== detail.attempt || entry.status !== detail.status) throw new Error('STAGE_ARTIFACT_BINDING_INVALID');
+          entries.push(entry);
+        }
+        return entries;
+      };
       const started = performance.now();
       const output = await executeAgent(input, { command, effectivePrompt, iteration: 0, signal: context.signal,
         stageJournal: {
-          read: async (stage) => {
-            const entries: StageAttempt[] = [];
-            for (const event of this.dependencies.events(context.task.taskId)) {
-              const detail = event.detail as Record<string, unknown>;
-              if (detail?.phase !== 'role-stage-attempt' || detail.role !== role || detail.key !== key || detail.taskAttempt !== context.task.attempt || detail.stage !== stage) continue;
-              const ref = detail.artifactRef as ArtifactRef;
-              if (!await artifacts.verify(ref)) throw new Error('STAGE_ARTIFACT_CORRUPT');
-              entries.push(JSON.parse(Buffer.from(await artifacts.get(ref)).toString('utf8')) as StageAttempt);
-            }
-            return entries;
-          },
+          read: stage => readStage(stage, true),
+          history: stage => readStage(stage, false),
           record: async (entry) => {
             const ref = await artifacts.put(Buffer.from(JSON.stringify(entry)), 'application/json');
             context.progress({ phase: 'role-stage-attempt', role, key, taskAttempt: context.task.attempt,

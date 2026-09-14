@@ -202,3 +202,23 @@ test('review: newline-only quote mismatches receive repair guidance without acce
     assert.throws(() => validateOutput(output(quote), sample.input), /REVIEW_CONCERN_UNRESOLVED/);
   }
 });
+
+test('review: recovery carries prior format facts without consuming the new attempt slots', async () => {
+  for (const changesFacts of [false, true]) {
+    const sample = roleExample<Input>('review', 'src/domain/agents/reviewAgent/examples/WorkbenchReviewSample.json');
+    const original = structuredClone(sample.output);
+    const previous = { schemaVersion: 'role-stage-v1' as const, stage: 'evidence-attribution', attempt: 1,
+      startedAt: 0, deadlineAt: 1, status: 'REJECTED' as const,
+      output: { ...original, correction: { ...original.correction, replacementMarkdown: '### Detail\nFragment' } } };
+    const before = structuredClone(previous); let calls = 0;
+    sample.context.stageJournal = { read: async () => [], history: async () => [previous], record: async () => {} };
+    sample.context.model.execute = async request => {
+      calls++;
+      assert.match(request.prompt, /本次恢复仍受原格式修复约束/);
+      return changesFacts ? { blocking: false, recommendation: 'PASS', correction: null, unresolvedRisks: [] } : original;
+    };
+    if (changesFacts) { await assert.rejects(execute(sample.input, sample.context), /REVIEW_REPAIR_FACTS_CHANGED/); assert.equal(calls, 2); }
+    else { assert.deepEqual((await execute(sample.input, sample.context)).output, original); assert.equal(calls, 1); }
+    assert.deepEqual(previous, before, 'prior attempts and their deadline remain immutable');
+  }
+});

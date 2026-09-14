@@ -197,3 +197,29 @@ test('publication rejects a cached PASS that discarded a prior format-failed cor
   await assert.rejects(f.service.prepare(f.ids, f.input.fixedSuites), /REVIEW_REPAIR_FACTS_CHANGED/);
   assert.deepEqual(events.map(e => e.detail.artifactRef.sha256), before);
 });
+
+test('source audit retains rejected fact changes but never promotes them to accepted history', async () => {
+  const { assertSourceReviewHistory } = await import('../../src/application/services/WorkbenchSourceFindingHistory.ts');
+  const f = await setup();
+  const output = { blocking: false, recommendation: 'ITERATE', unresolvedRisks: ['Still unknown'],
+    correction: { correctionId: 'original', knowledgePath: 'knowledge/module.md#Purpose', criterion: 'Wrong location', risk: 'Wrong source', replacementMarkdown: '### Fragment' } };
+  const records = [
+    { status: 'REJECTED', output, issue: { code: 'REVIEW_CORRECTION_RANGE_INVALID', field: 'correction.replacementMarkdown', hint: 'Complete the section' } },
+    { status: 'REJECTED', output: { blocking: false, recommendation: 'PASS', correction: null, unresolvedRisks: [] }, issue: { code: 'REVIEW_REPAIR_FACTS_CHANGED', field: 'correction.replacementMarkdown', hint: 'Keep original facts' } },
+    { status: 'PASSED', output: { ...output, correction: { ...output.correction, replacementMarkdown: '## Purpose\nComplete' } }, issue: undefined },
+  ];
+  const events = await Promise.all(records.map(async (record, index) => ({ sequence: index + 1, taskId: f.ids.sourceVerification, kind: 'PROGRESS', createdAt: 'now',
+    detail: { phase: 'role-stage-attempt', role: 'review', key: 'final-source:version:section', taskAttempt: index + 1,
+      stage: 'evidence-attribution', attempt: 1, status: record.status, issueCode: record.issue?.code ?? null,
+      artifactRef: { ...await f.put(Buffer.from(JSON.stringify({ ...record, schemaVersion: 'role-stage-v1', stage: 'evidence-attribution', attempt: 1, startedAt: 0, deadlineAt: 1 })), 'application/json') } } })));
+  const before = structuredClone(events);
+  await assertSourceReviewHistory(f.service.dependencies.artifacts, events);
+  assert.deepEqual(events, before);
+  events[1]!.detail.issueCode = null;
+  await assert.rejects(assertSourceReviewHistory(f.service.dependencies.artifacts, events), /REVIEW_REPAIR_FACTS_CHANGED/);
+  events[1]!.detail.issueCode = 'REVIEW_REPAIR_FACTS_CHANGED';
+  const record = { ...records[1], status: 'PASSED', schemaVersion: 'role-stage-v1', stage: 'evidence-attribution', attempt: 1, startedAt: 0, deadlineAt: 1 };
+  events[1]!.detail.status = 'PASSED';
+  events[1]!.detail.artifactRef = await f.put(Buffer.from(JSON.stringify(record)), 'application/json');
+  await assert.rejects(assertSourceReviewHistory(f.service.dependencies.artifacts, events), /REVIEW_REPAIR_FACTS_CHANGED/);
+});
