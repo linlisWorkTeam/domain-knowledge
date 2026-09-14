@@ -360,3 +360,7 @@ This document summarizes older handoffs, milestones and architectural decisions 
 ## 2026-09-14 18:01 归档
 
 [1626 回归与资源限制](https://github.com/linlisWorkTeam/domain-knowledge/blob/3c0b31070167c5334c05b8ddfc8a8140b4a76eae/docs/epitaph/2026-09-14-1626-regression-fixes-and-resource-limit.md)：当时完整回归600项577通过，修复契约样例及Code编译诊断交接；原生专项仍受512+64MiB资源预检限制，未降门槛。后来f543c59的CI代码601/601、Console39/39、acceptance25/25已通过；当前新增容量修复尚待CI及新引擎真实验收。
+
+## 2026-09-14 模块批次交接归档
+
+[2026-09-14-1658-browser-and-native-ci.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/5c72fa527bec86d7b6a254abd9f68e210b5dea47/docs/epitaph/2026-09-14-1658-browser-and-native-ci.md)：记录旧前台回归、C++ v11 重建和 CI cgroup 委派修复；当时 CI 与真实固定/来源验收尚未完成，网站仍 ec72c43。后续结果见最新交接；保留原隔离要求及原始证据。

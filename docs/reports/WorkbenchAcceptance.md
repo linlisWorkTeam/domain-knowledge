@@ -158,3 +158,17 @@ C++固定任务79e38从14条参考检查点恢复后一次完成80条参考/生�
 补证e6ec12264144435c594030acee7f24767f4071d7e4c7f3ff6ebf006482800200提出40例，与37例可信用例合并需要77例，因64例上限暂停；1call67340tokens。发现容量错误没有走候选拒绝反馈，恢复会复用同一超限候选。现在保留原64上限及历史期望，将新候选造成的超限保存为REJECTED、空参考观察、容量报告，恢复通过递增候选键反馈TestGen重新提案；历史集合自身超限及期望冲突仍按原规则停止。前台展示容量及未执行事实。
 
 底层门禁/补证5/5通过，原完整阶段3个变体通过，新增容量变体修正测试caseId后1/1通过，覆盖服务重启后容量反馈、较小候选晋升及连续用量；页面2/2、typecheck通过。日志`/tmp/WorkbenchCapacityRejectionRetest.log`、`/tmp/WorkbenchCapacityRecoveryIntegration.log`（前三通过、第四测试数据格式失败）、`/tmp/WorkbenchCapacityRecoveryRetest.log`（第四通过）、`/tmp/WorkbenchCapacityTypes.log`。执行器变化改变原生指纹，因此上述真实通过仅证明修复前冻结版本；旧补证不得直接跨指纹恢复，新引擎真实验收仍待完成，网站仍f543c59。
+
+## 模块批次前台与 C++ 关联（2026-09-14）
+
+14a3c8d 将工作流图并入飞轮批次：左上角固定项目，目录模块、可读批次编号、手动/定时批次、按模块租约调度、轮次切换、实时节点状态、开始结束时间及展开日志。Agent 设置折叠、知识发布设置、评测最新记录/历史折叠与键值规则已接入。操作中心保留历史健康和最新飞轮状态。项目目前仍要求 Git 仓库及可识别源码，自定义目录模块首批支持 C/C++；任意非 Git 目录、全部文件作为项目、新批次固定测试/外部材料选项及完整真实发布仍待完成。
+
+本地使用仓库 `Playwright.config.ts`：全量 41 项首轮 38 通过，剩余操作中心截图及两处旧入口测试更新后 3/3 复验通过。截图已人工查看，未改变容差或路径安全断言。先前漏传配置导致的临时截图目录已清理，未作为基线。日志 `/tmp/WorkbenchMergedConfiguredBrowser.log`、`/tmp/WorkbenchMergedFinalRetest.log`。类型和 Spec 通过；批次身份、租约、调度、恢复、流程和关联 15/15 通过，日志 `/tmp/WorkbenchMergedBackend.log`。这是受控浏览器/集成结果，不代表真实模型验收。
+
+5c72fa5 引入关联 v3：完整父作用域相同时解析 C++ `Owner::member` 引用，仍拒绝裸成员名、跨命名空间及前后缀假命中。v1/v2 只读，新任务不跨契约恢复。真实 TinyXML2 九卡运行 `stage-40201f75a9cae4744b7007be1e31a3b52c44729647c8763ba31025156790cf79` 成功，11 条库内关系、无外部材料；关联工件 SHA/大小及引用片段审计通过。证据位于原发行验收目录 `associations-v3/stage-86fde3b43f3d752129f83426ac106b5c899b9fac1b973c66c038eb836d1cda61/`，旧零关系证据保留。关系不证明替代适用性；来源 39 项未知及最终发布尚未解决。
+
+[CI 34834932825](https://github.com/linlisWorkTeam/domain-knowledge/actions/runs/34834932825) 在 5c72fa5 全部通过：代码 612/612、Console 41/41、acceptance 25/25，日志 `/tmp/WorkbenchCi5cPassed.log`。
+
+网站已切换到 5c72fa5，Console PID 22186；本机能力接口和公网 GET 均为 200，三个前台脚本逐字节核对发行目录。原 8 条批次和知识保留；备份位于新发行目录 `pre-deploy-backup`。第一次备份展开了运行目录依赖符号链接，已停止复制并暂时恢复旧服务，删除仅由本次创建的未完成备份后，使用保留链接的备份成功切换；未删除原始数据。
+
+部署后只读浏览器验证通过，桌面及 390px 窄屏的项目入口、导航、主要按钮、旧知识正文可用，无横向溢出和脚本错误。日志 `/tmp/WorkbenchDeployed5cBrowser.log`，发行目录 `browser/Result.json`。人工查看截图确认布局：[改造后桌面](workbenchScreenshots/ModuleWorkbenchDesktop.png)、[改造后窄屏项目入口](workbenchScreenshots/ModuleWorkbenchNarrow.png)；前版截图保留在上文。真实 C/C++ 验收库尚未导入线上，不能将线上旧知识当作新链路通过。
