@@ -12,6 +12,16 @@ export function createSourceVerificationPanel({ root, request, escapeHtml: escap
   const current = () => task?.contractVersion === 'knowledge-workbench-v1' && task?.input.parameters.verificationContract === 'knowledge-source-verification-v5'
   const active = () => current() && ['PENDING', 'RUNNING'].includes(task.status)
   const reasons = { AGENT_STAGE_TIMEOUT: '来源复核超时，已完成章节和输入材料保留。', DSH_AGENT_OUTPUT_NOT_JSON: '模型输出格式错误，前序结果保留，可恢复原任务。', STAGE_PROCESS_EXITED: '上次进程退出，可恢复原任务。', PROVIDER_QUOTA_EXHAUSTED: '供应商额度不足，累计用量和已完成结果保留。' }
+  Object.assign(reasons, {
+    REVIEW_CONCERN_UNRESOLVED: '待核实问题的回应或源码引用未通过校验，原始意见和已完成章节已保留。',
+    REVIEW_CORRECTION_RANGE_INVALID: '修订内容没有覆盖完整的授权章节，需要修正段落范围。',
+    REVIEW_REPAIR_FACTS_CHANGED: '格式修正改变了原有判断或风险，结果已被拒绝；需先核对保留的原始意见。',
+    REVIEW_PASS_CONTRADICTION: '复核仍有风险或修订意见，不能同时判定通过。',
+    SOURCE_HISTORY_BINDING_INVALID: '历史来源意见与当前源码或卡片版本不一致，已停止复用。',
+    SOURCE_CONCERN_BINDING_INVALID: '待核实问题与原任务证据不一致，已停止执行。',
+    STAGE_ARTIFACT_CORRUPT: '输入或证据文件校验失败，请检查原始文件；已完成结果保留。',
+    STAGE_CONTRACT_INCOMPATIBLE: '执行契约已更新，请创建新任务；旧结果保留供查看。',
+  })
   const outcomes = { SOURCE_MATCHED: '来源复核匹配', SOURCE_MISMATCH: '正文与源码存在矛盾', UNRESOLVED: '仍有未解决问题' }
   const scopeAvailable = ref => [...(task?.result?.artifactRefs ?? []), ...checkpoints.flatMap(item => item.result?.artifactRefs ?? [])].some(item => item.sha256 === ref?.sha256)
   const download = (ref, label) => `<button class="secondary-button" type="button" data-download-artifact="/api/v1/stage-tasks/${escape(task.taskId)}/artifacts/${escape(ref.sha256)}">${label}</button>`
@@ -38,7 +48,7 @@ export function createSourceVerificationPanel({ root, request, escapeHtml: escap
       <p>已复核 ${escape(cards.length)}/${escape(task.input.cardVersionIds.length)} 张冻结卡片。</p>${progress ? `<p>最近处理：${escape(progress.heading)} · 完成 ${escape(progress.completed)}/${escape(progress.total)} 章</p>` : ''}
       ${scopeHtml()}
       ${inputs ? `<details><summary>最近处理卡片的固定输入</summary><button class="text-button" type="button" data-version-id="${escape(inputs.summary.versionId)}">查看输入卡片</button>${inputs.artifactRefs.map((ref, index) => `<button class="secondary-button" type="button" data-download-artifact="/api/v1/stage-tasks/${escape(task.taskId)}/artifacts/${escape(ref.sha256)}">下载${['卡片正文', '固定源码', '参考观察', '复核准则', '可信测试集', '参考执行报告'][index] ?? '输入材料'}</button>`).join('')}</details>` : ''}
-      ${events.filter(event => event.detail?.phase === 'role-stage-attempt' && ['FAILED', 'REJECTED'].includes(event.detail.status)).map(event => `<p>角色尝试 ${escape(event.detail.taskAttempt)} / ${escape(event.detail.attempt)} · ${escape(event.detail.issueHint ?? '执行未完成')} <button class="secondary-button" type="button" data-download-artifact="/api/v1/stage-tasks/${escape(task.taskId)}/artifacts/${escape(event.detail.artifactRef.sha256)}">下载复核尝试</button></p>`).join('')}
+      ${events.filter(event => event.detail?.phase === 'role-stage-attempt' && ['FAILED', 'REJECTED'].includes(event.detail.status)).map(event => `<p>角色尝试 ${escape(event.detail.taskAttempt)} / ${escape(event.detail.attempt)} · ${escape(reasons[event.detail.issueCode] ?? event.detail.issueHint ?? '执行未完成')} <button class="secondary-button" type="button" data-download-artifact="/api/v1/stage-tasks/${escape(task.taskId)}/artifacts/${escape(event.detail.artifactRef.sha256)}">下载复核尝试</button></p>`).join('')}
       ${cards.map(card => `<article><button class="text-button" type="button" data-version-id="${escape(card.versionId)}">查看冻结卡片</button><p>${escape(card.moduleId)} · ${escape(outcomes[card.outcome] ?? '未知')}</p><p>${escape(card.heading ?? '')} · ${escape(card.criterion ?? '')} ${(card.unresolved ?? []).map(escape).join('；')}</p>${card.reviewRef ? `<button class="secondary-button" type="button" data-download-artifact="/api/v1/stage-tasks/${escape(task.taskId)}/artifacts/${escape(card.reviewRef.sha256)}">下载来源意见</button>` : ''}${(card.sections ?? []).map(section => `<details><summary>${escape(section.section)} · ${escape(outcomes[section.outcome] ?? '未知')}</summary>${section.carriedForward ? `<p>沿用同一正文已有的来源矛盾，尚待修订。原任务 <code>${escape(section.originEvidence?.taskId ?? '')}</code></p>` : ''}<p>${escape(section.criterion ?? '')} ${(section.unresolved ?? []).map(escape).join('；')}</p>${section.reviewRef ? `<button class="secondary-button" type="button" data-download-artifact="/api/v1/stage-tasks/${escape(task.taskId)}/artifacts/${escape(section.reviewRef.sha256)}">下载章节复核</button>` : ''}</details>`).join('')}</article>`).join('')}
       ${current() && task.status === 'SUCCEEDED' && cards.some(card => card.sections?.some(section => section.outcome === 'UNRESOLVED')) && onSupplement ? `<button class="secondary-button" type="button" data-source-verification-action="supplement" ${busy || !isEditable() ? 'disabled' : ''}>补充验证用例</button><p>针对未解决章节新增候选用例，先在参考实现上验证，再评测重建代码。</p>` : ''}
       ${active() ? `<button class="secondary-button" type="button" data-source-verification-action="cancel" ${busy || !isEditable() ? 'disabled' : ''}>取消来源复核</button>` : ''}
