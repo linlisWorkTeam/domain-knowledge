@@ -460,3 +460,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 - [2026-09-14-2359 UI与来源恢复](https://github.com/linlisWorkTeam/domain-knowledge/blob/679d05b/docs/epitaph/2026-09-14-2359-ui-source-resume.md)：前台v5操作入口与来源恢复的历史交接；后续956fe26已部署，来源434571已执行结束但质量未通过，勿依旧记录恢复已完成任务。
 
 - [2026-09-15-0010 来源恢复边界](https://github.com/linlisWorkTeam/domain-knowledge/blob/20e7949/docs/epitaph/2026-09-15-0010-review-recovery.md)：拒绝记录与原事实恢复保护，固定参考初步反驳裸前缀意见。后续来源已完整执行、质量未通过；六例已通过正式补证，保留历史与未知风险。
+
+- [2026-09-15-0030 部署与来源质量](https://github.com/linlisWorkTeam/domain-knowledge/blob/c3d54cd/docs/epitaph/2026-09-15-0030-deployed-source-quality.md)：956fe26部署及数据保留已验证；来源执行完成但质量未通过。后续43例正式补证完成，来源旧意见复核和完整发布仍待完成。

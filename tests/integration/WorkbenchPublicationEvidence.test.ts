@@ -223,3 +223,79 @@ test('source audit retains rejected fact changes but never promotes them to acce
   events[1]!.detail.artifactRef = await f.put(Buffer.from(JSON.stringify(record)), 'application/json');
   await assert.rejects(assertSourceReviewHistory(f.service.dependencies.artifacts, events), /REVIEW_REPAIR_FACTS_CHANGED/);
 });
+
+
+async function supplementalPublicationFixture(supplied: boolean, missing = false) {
+  const f = await setup();
+  const { workbenchSupplementDemand } = await import('../../src/application/services/WorkbenchEvaluation.ts');
+  const { nativeTestKeys, nativeTestPolicyDigest } = await import('../../src/domain/evaluation/NativeTestCache.ts');
+  const { nativeSupplementTargets } = await import('../../src/domain/evaluation/NativeSupplementTargets.ts');
+  const previousEvaluation = structuredClone(f.input.evaluation), previousSource = structuredClone(f.input.sourceVerification);
+  previousSource.taskId = 'prior-source';
+  const finding = (previousSource.result!.summary.cards as any[])[0];
+  finding.outcome = 'UNRESOLVED'; finding.sections[0].outcome = 'UNRESOLVED'; finding.sections[0].unresolved = ['Boundary evidence needed'];
+  const get = f.service.dependencies.stages.get;
+  f.service.dependencies.stages.get = id => id === previousSource.taskId ? previousSource : id === previousEvaluation.taskId ? previousEvaluation : get(id);
+  const demand = await workbenchSupplementDemand(f.service.dependencies, previousSource.taskId, f.ids.reconstruction);
+  const demandRef = await f.put(Buffer.from(canonicalJson(demand)), 'application/json');
+  const targets = nativeSupplementTargets(demand.demands.map(item => item.sectionId));
+  const params = f.input.evaluation.input.parameters;
+  Object.assign(params, { supplementContract: 'knowledge-test-supplement-v1', sourceVerificationTaskId: previousSource.taskId, supplementRef: demandRef, supplementTargets: targets });
+  let candidateRef: any;
+  if (supplied) {
+    const suite = JSON.parse(Buffer.from(await f.service.dependencies.artifacts.get(f.set.suiteRef)).toString());
+    suite.cases.forEach((item: any) => { item.sections = ['card#Value']; });
+    f.set.suiteRef = await f.put(Buffer.from(JSON.stringify(suite)), 'application/json');
+    f.trustedReport.cases.forEach((item: any, index: number) => { item.input = suite.cases[index]; });
+    const { sourceSectionObservations } = await import('../../src/domain/knowledge/KnowledgeSourceVerification.ts');
+    const oracle = JSON.parse(Buffer.from(await f.service.dependencies.artifacts.get(f.set.oracleRef)).toString());
+    const observations = { ...f.sourceObservations, suiteRef: f.set.suiteRef, ...sourceSectionObservations(suite, oracle, 'card', 'Value') };
+    const observationsRef = await f.put(Buffer.from(JSON.stringify(observations)), 'application/json');
+    const oldObservationsRef = f.sourceSections[0]!.referenceObservationsRef;
+    f.sourceSections[0]!.referenceObservationsRef = observationsRef;
+    f.command.payload.evaluationReportRef = observationsRef;
+    f.input.sourceVerification.result!.artifactRefs = f.input.sourceVerification.result!.artifactRefs.map(ref => ref.sha256 === oldObservationsRef.sha256 ? observationsRef : ref);
+    if (missing) suite.cases[0].description = 'A supplied case absent from the accepted suite';
+    candidateRef = await f.put(Buffer.from(canonicalJson({ schemaVersion: 'native-supplied-candidates-v1', modules: [{ moduleId: 'module', suite }] })), 'application/json');
+    params.suppliedCandidatesRef = candidateRef;
+    f.input.evaluation.result!.artifactRefs.push(candidateRef);
+  }
+  const originalPolicy = f.set.binding.policyDigest;
+  f.set.binding.policyDigest = nativeTestPolicyDigest(originalPolicy, { schemaVersion: 'native-supplement-v1', targets,
+    demandDigest: candidateRef ? sha256(canonicalJson({ demandDigest: demand.demandDigest, suppliedCandidatesDigest: candidateRef.sha256 })) : demand.demandDigest });
+  Object.assign(f.set, nativeTestKeys(f.set.binding));
+  f.set.testSetId = `native-tests-${sha256(`${f.set.cacheKey}:${f.set.suiteRef.sha256}:${f.set.oracleRef.sha256}`)}`;
+  f.trustedReport.testSetId = f.set.testSetId;
+  const reportRef = await f.put(Buffer.from(JSON.stringify(f.trustedReport)), 'application/json');
+  f.input.evaluation.result!.artifactRefs = [reportRef, ...(candidateRef ? [candidateRef] : [])];
+  Object.assign((f.input.evaluation.result!.summary.modules as any[])[0], { testSetId: f.set.testSetId, reportRef });
+  const evaluationIdentity = createStageTask(f.input.evaluation.input, {}, 'now');
+  Object.assign(f.input.evaluation, { taskId: evaluationIdentity.taskId, inputDigest: evaluationIdentity.inputDigest });
+  f.ids.evaluation = evaluationIdentity.taskId;
+  Object.assign(f.input.sourceVerification.input.parameters, { evaluationTaskId: f.ids.evaluation, evaluationDigest: sha256(canonicalJson(f.input.evaluation.result)) });
+  f.input.sourceVerification.result!.summary.evaluationTaskId = f.ids.evaluation;
+  const sourceIdentity = createStageTask(f.input.sourceVerification.input, {}, 'now');
+  Object.assign(f.input.sourceVerification, { taskId: sourceIdentity.taskId, inputDigest: sourceIdentity.inputDigest }); f.ids.sourceVerification = sourceIdentity.taskId;
+  f.command.runId = sourceIdentity.taskId;
+  const commandRef = await f.put(Buffer.from(JSON.stringify(f.command)), 'application/json');
+  const oldRef = f.sourceSections[0]!.reviewResultRef;
+  const envelope = JSON.parse(Buffer.from(await f.service.dependencies.artifacts.get(oldRef)).toString());
+  envelope.runId = sourceIdentity.taskId; envelope.commandRef = commandRef;
+  const resultRef = await f.put(Buffer.from(JSON.stringify(envelope)), 'application/json');
+  f.sourceSections[0]!.reviewResultRef = resultRef;
+  f.input.sourceVerification.result!.artifactRefs = f.input.sourceVerification.result!.artifactRefs.map(ref => ref.sha256 === oldRef.sha256 ? resultRef : ref);
+  return { f, previousSource, originalPolicy };
+}
+for (const supplied of [false, true]) test(`publication retains reference-validated supplement policy (supplied=${supplied})`, async () => {
+  const { f, previousSource, originalPolicy } = await supplementalPublicationFixture(supplied);
+  assert.equal((await f.service.prepare(f.ids, f.input.fixedSuites)).state, 'PREPARED');
+  f.set.binding.policyDigest = originalPolicy;
+  await assert.rejects(f.service.prepare(f.ids, f.input.fixedSuites), /PUBLICATION_TEST_POLICY_CHANGED/);
+  previousSource.result!.summary.cards = [];
+  await assert.rejects(f.service.prepare(f.ids, f.input.fixedSuites), /NATIVE_SUPPLEMENT|SOURCE_VERIFICATION|PUBLICATION_TEST_POLICY/);
+});
+
+test('publication refuses a supplied candidate absent from the accepted trusted suite', async () => {
+  const { f } = await supplementalPublicationFixture(true, true);
+  await assert.rejects(f.service.prepare(f.ids, f.input.fixedSuites), /PUBLICATION_SUPPLIED_CANDIDATES_MISSING/);
+});

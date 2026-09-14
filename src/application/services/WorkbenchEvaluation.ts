@@ -83,7 +83,7 @@ export class WorkbenchEvaluation {
     if (previous.contractVersion !== 'knowledge-workbench-v1' || previous.input.stage !== 'FLYWHEEL' || previous.input.parameters.operation !== undefined || previous.status !== 'SUCCEEDED' || !previous.result) throw new Error('EVALUATION_RECONSTRUCTION_REQUIRED');
     const configurationRef = previous.input.parameters.configurationRef as unknown as ArtifactRef;
     await configuration.assertStageCompatible(await this.load<StageModelConfiguration>(configurationRef));
-    const supplement = sourceVerificationTaskId ? await this.supplementDemand(sourceVerificationTaskId, reconstructionTaskId) : null;
+    const supplement = sourceVerificationTaskId ? await workbenchSupplementDemand(this.dependencies, sourceVerificationTaskId, reconstructionTaskId) : null;
     if (candidateSuites !== undefined && !supplement) throw new Error('NATIVE_SUPPLEMENT_SOURCE_REQUIRED');
     const supplied = candidateSuites === undefined ? null : await this.suppliedCandidates(previous, candidateSuites, supplement!.demands.map(item => item.versionId));
     const suppliedCandidatesRef = supplied ? await this.dependencies.artifacts.put(Buffer.from(canonicalJson(supplied)), 'application/json') : null;
@@ -117,32 +117,11 @@ export class WorkbenchEvaluation {
     }
     return readNativeSuppliedCandidates(value, modules);
   }
-  private async supplementDemand(sourceTaskId: string, reconstructionTaskId: string) {
-    const { stages, repository, artifacts } = this.dependencies;
-    const source = stages.get(sourceTaskId), code = stages.get(reconstructionTaskId);
-    if (source.status !== 'SUCCEEDED' || !source.result || source.input.parameters.operation !== 'KNOWLEDGE_SOURCE_VERIFICATION'
-      || source.input.parameters.verificationContract !== SOURCE_VERIFICATION_CONTRACT) throw new Error('NATIVE_SUPPLEMENT_SOURCE_REQUIRED');
-    const evaluation = stages.get(String(source.input.parameters.evaluationTaskId));
-    if (evaluation.status !== 'SUCCEEDED' || !evaluation.result || evaluation.input.stage !== 'EVALUATE' || evaluation.input.parameters.operation !== undefined
-      || source.input.parameters.evaluationDigest !== sha256(canonicalJson(evaluation.result)) || evaluation.input.parameters.reconstructionTaskId !== reconstructionTaskId
-      || source.input.configurationDigest !== code.input.configurationDigest || source.input.sourceDigest !== code.input.sourceDigest
-      || source.input.sourceRevision !== code.input.sourceRevision || source.input.projectId !== code.input.projectId
-      || canonicalJson(source.input.cardVersionIds) !== canonicalJson(code.input.cardVersionIds)) throw new Error('NATIVE_SUPPLEMENT_BINDING_INVALID');
-    const cards = [];
-    for (const versionId of source.input.cardVersionIds) {
-      const card = repository.getKnowledgeVersion(versionId);
-      if (!card || !await artifacts.verify(card.bodyRef)) throw new Error('STAGE_ARTIFACT_CORRUPT');
-      cards.push({ cardId: String(card.metadata.cardId), versionId, moduleId: card.moduleId, bodyDigest: card.bodyRef.sha256,
-        body: Buffer.from(await artifacts.get(card.bodyRef)).toString('utf8') });
-    }
-    return { sourceTaskId, sourceResultDigest: sha256(canonicalJson(source.result)),
-      ...nativeSupplementDemand(cards, source.result.summary.cards as unknown as SupplementSourceFinding[]) };
-  }
   async evaluate(context: StageExecutionContext) {
     const { projects, repository, artifacts, native, stages, configuration, roles, evaluation } = this.dependencies;
     const parameters = context.task.input.parameters;
     if (parameters.supplementContract !== undefined && parameters.supplementContract !== NATIVE_SUPPLEMENT_CONTRACT) throw new Error('STAGE_CONTRACT_INCOMPATIBLE');
-    const supplement = parameters.supplementContract ? await this.supplementDemand(String(parameters.sourceVerificationTaskId), String(parameters.reconstructionTaskId)) : null;
+    const supplement = parameters.supplementContract ? await workbenchSupplementDemand(this.dependencies, String(parameters.sourceVerificationTaskId), String(parameters.reconstructionTaskId)) : null;
     if (supplement && canonicalJson(supplement) !== canonicalJson(await this.load(parameters.supplementRef as unknown as ArtifactRef))) throw new Error('STAGE_INPUT_CHANGED');
     const targets = parameters.supplementTargets as unknown as NativeSupplementTargets | undefined;
     if (targets) {
@@ -285,4 +264,26 @@ export class WorkbenchEvaluation {
     return { artifactRefs, summary: { snapshotId: project.snapshotId, reconstructionTaskId: previous.taskId, modules: reports,
       completedModules: reports.length, requestedModules: modules.length, publicationVerified: false, revisions: [] } };
   }
+}
+
+export async function workbenchSupplementDemand(dependencies: { stages: Pick<WorkbenchStages, 'get'>; repository: Pick<FlywheelRepository, 'getKnowledgeVersion'>; artifacts: Pick<ArtifactStore, 'get' | 'verify'> }, sourceTaskId: string, reconstructionTaskId: string) {
+  const { stages, repository, artifacts } = dependencies;
+  const source = stages.get(sourceTaskId), code = stages.get(reconstructionTaskId);
+  if (source.status !== 'SUCCEEDED' || !source.result || source.input.parameters.operation !== 'KNOWLEDGE_SOURCE_VERIFICATION'
+    || source.input.parameters.verificationContract !== SOURCE_VERIFICATION_CONTRACT) throw new Error('NATIVE_SUPPLEMENT_SOURCE_REQUIRED');
+  const evaluation = stages.get(String(source.input.parameters.evaluationTaskId));
+  if (evaluation.status !== 'SUCCEEDED' || !evaluation.result || evaluation.input.stage !== 'EVALUATE' || evaluation.input.parameters.operation !== undefined
+    || source.input.parameters.evaluationDigest !== sha256(canonicalJson(evaluation.result)) || evaluation.input.parameters.reconstructionTaskId !== reconstructionTaskId
+    || source.input.configurationDigest !== code.input.configurationDigest || source.input.sourceDigest !== code.input.sourceDigest
+    || source.input.sourceRevision !== code.input.sourceRevision || source.input.projectId !== code.input.projectId
+    || canonicalJson(source.input.cardVersionIds) !== canonicalJson(code.input.cardVersionIds)) throw new Error('NATIVE_SUPPLEMENT_BINDING_INVALID');
+  const cards = [];
+  for (const versionId of source.input.cardVersionIds) {
+    const card = repository.getKnowledgeVersion(versionId);
+    if (!card || !await artifacts.verify(card.bodyRef)) throw new Error('STAGE_ARTIFACT_CORRUPT');
+    cards.push({ cardId: String(card.metadata.cardId), versionId, moduleId: card.moduleId, bodyDigest: card.bodyRef.sha256,
+      body: Buffer.from(await artifacts.get(card.bodyRef)).toString('utf8') });
+  }
+  return { sourceTaskId, sourceResultDigest: sha256(canonicalJson(source.result)),
+    ...nativeSupplementDemand(cards, source.result.summary.cards as unknown as SupplementSourceFinding[]) };
 }

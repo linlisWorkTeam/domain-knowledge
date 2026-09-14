@@ -3,6 +3,12 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：从持久化任务和卡片准备可审计发布证据，不授予已发布状态。
  */
+import { workbenchSupplementDemand } from './WorkbenchEvaluation.ts';
+import { NATIVE_SUPPLEMENT_CONTRACT } from '../../domain/evaluation/NativeSupplementDemand.ts';
+import { nativeSupplementTargets, readNativeSuppliedCandidates, type NativeSuppliedCandidates } from '../../domain/evaluation/NativeSupplementTargets.ts';
+import { nativeTrustedGates } from '../../domain/evaluation/NativeTrustedGates.ts';
+import { nativeTestPolicyDigest } from '../../domain/evaluation/NativeTestCache.ts';
+import { markdownSections } from '../../domain/knowledge/KnowledgeSections.ts';
 import { assertFixedPublicationObservations } from '../../domain/evaluation/NativeFixedEvaluation.ts';
 import { assertNativeBehaviorSuite, nativeFunctions, type NativeContract, type NativeBehaviorSuite } from '../../domain/evaluation/NativeBehaviorSuite.ts';
 import { canonicalJson } from '../../domain/workbench/StageTask.ts';
@@ -127,6 +133,29 @@ export class WorkbenchPublicationEvidence {
       contract.targetFunctions = [...nativeFunctions(contract).keys()];
       nativeContracts.set(String(module.moduleId), contract);
     }
+    const parameters = evaluation.input.parameters;
+    if (parameters.supplementContract !== undefined && parameters.supplementContract !== NATIVE_SUPPLEMENT_CONTRACT) throw new Error('PUBLICATION_TEST_POLICY_CHANGED');
+    const supplement = parameters.supplementContract ? await workbenchSupplementDemand(this.dependencies, String(parameters.sourceVerificationTaskId), reconstruction.taskId) : null;
+    if (supplement && canonicalJson(await load(parameters.supplementRef as unknown as ArtifactRef)) !== canonicalJson(supplement)) throw new Error('PUBLICATION_TEST_POLICY_CHANGED');
+    if (parameters.supplementTargets !== undefined && (!supplement || canonicalJson(parameters.supplementTargets) !== canonicalJson(nativeSupplementTargets(supplement.demands.map(item => item.sectionId))))) throw new Error('PUBLICATION_TEST_POLICY_CHANGED');
+    const suppliedRef = parameters.suppliedCandidatesRef as unknown as ArtifactRef | undefined;
+    let supplied: NativeSuppliedCandidates | null = null;
+    if (suppliedRef) {
+      if (!supplement || !evaluation.result!.artifactRefs.some(ref => canonicalJson(ref) === canonicalJson(suppliedRef))) throw new Error('PUBLICATION_TEST_POLICY_CHANGED');
+      const modules = [];
+      for (const [moduleId, contract] of nativeContracts) {
+        const selected = cards.filter(card => sourceModules[card.versionId] === moduleId);
+        if (!selected.some(card => supplement.demands.some(demand => demand.versionId === card.versionId))) continue;
+        const sectionIds: string[] = [];
+        for (const card of selected) {
+          const index = cards.indexOf(card);
+          const body = Buffer.from(await artifacts.get(bodies[index]!)).toString('utf8');
+          sectionIds.push(...markdownSections(body).map(section => `${card.cardId}#${section.heading}`));
+        }
+        modules.push({ moduleId, contract, sectionIds });
+      }
+      supplied = readNativeSuppliedCandidates(await load(suppliedRef), modules);
+    }
     for (const module of fixedEvaluation.result!.summary.modules as Array<Record<string, unknown>>) {
       const reportRef = module.reportRef as ArtifactRef;
       if (!fixedEvaluation.result!.artifactRefs.some(ref => ref.sha256 === reportRef?.sha256)) throw new Error('PUBLICATION_FIXED_REPORT_UNBOUND');
@@ -180,8 +209,15 @@ export class WorkbenchPublicationEvidence {
         || canonicalJson(buildConstraints(generated.build)) !== canonicalJson(moduleBuild(project, String(module.moduleId)))
         || !Array.isArray(reference.files) || canonicalJson(fileDigests(reference.files)) !== canonicalJson(fileDigests(sourceFiles))) throw new Error('PUBLICATION_PROJECT_IMPLEMENTATION_CHANGED');
       const contract = nativeContracts.get(String(module.moduleId))!;
-      if (set.binding.interfaceDigest !== sha256(canonicalJson(contract)) || set.binding.policyDigest !== policyDigest) throw new Error('PUBLICATION_TEST_POLICY_CHANGED');
+      const demands = supplement?.demands.filter(item => sourceModules[item.versionId] === module.moduleId) ?? [];
+      const expectedPolicyDigest = nativeTestPolicyDigest(policyDigest, demands.length ? {
+        schemaVersion: 'native-supplement-v1', demandDigest: suppliedRef ? sha256(canonicalJson({ demandDigest: supplement!.demandDigest, suppliedCandidatesDigest: suppliedRef.sha256 })) : supplement!.demandDigest,
+        ...(parameters.supplementTargets !== undefined ? { targets: nativeSupplementTargets(demands.map(item => item.sectionId)) } : {}),
+      } : undefined);
+      if (set.binding.interfaceDigest !== sha256(canonicalJson(contract)) || set.binding.policyDigest !== expectedPolicyDigest) throw new Error('PUBLICATION_TEST_POLICY_CHANGED');
       const suite = await load<NativeBehaviorSuite>(set.suiteRef); assertNativeBehaviorSuite(suite, contract);
+      const candidate = supplied?.modules.find(item => item.moduleId === module.moduleId)?.suite;
+      if (candidate && nativeTrustedGates([suite, candidate]).digest !== nativeTrustedGates([suite]).digest) throw new Error('PUBLICATION_SUPPLIED_CANDIDATES_MISSING');
       assertTrustedPublicationObservations(set, suite, await load<FixedNativeObservation[]>(set.oracleRef), report);
     }
     await new WorkbenchSourcePublication({ artifacts, contracts: this.dependencies.contracts }).verify(sourceVerification, cards.map((card, index) => ({ ...card, bodyRef: bodies[index]! })), project, sourceModules, (evaluation.result!.summary.modules as Array<Record<string, unknown>>).map(module => ({ moduleId: String(module.moduleId), set: trustedSets.find(set => set.testSetId === module.testSetId)! })));

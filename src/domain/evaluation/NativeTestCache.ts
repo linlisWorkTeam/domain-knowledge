@@ -32,3 +32,10 @@ export function nativeOracleTrusted(suite: NativeBehaviorSuite, observations: Ar
       return observation?.status === 'PASSED' && observation.actual !== null && compareNativeObservations(test, observation.actual).length === 0;
     });
 }
+
+/** 评测与发布使用相同的冻结策略身份，补证不降级为普通评测。 */
+export function nativeTestPolicyDigest(policyDigest: string, supplement?: {
+  schemaVersion: 'native-supplement-v1'; demandDigest: string; targets?: import('./NativeSupplementTargets.ts').NativeSupplementTargets;
+}): string {
+  return supplement ? sha256(canonicalJson({ policyDigest, supplement })) : policyDigest;
+}

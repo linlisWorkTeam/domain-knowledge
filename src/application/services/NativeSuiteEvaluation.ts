@@ -9,7 +9,7 @@ import { buildConstraints } from '../../domain/workbench/WorkbenchProject.ts';
 import { markdownSections } from '../../domain/knowledge/KnowledgeSections.ts';
 import { assertNativeBehaviorSuite, type NativeBehaviorSuite, type NativeContract } from '../../domain/evaluation/NativeBehaviorSuite.ts';
 import { nativeTrustedGates, nativeSupplementGates, NativeTrustedGateLimit } from '../../domain/evaluation/NativeTrustedGates.ts';
-import { nativeTestKeys, nativeOracleTrusted, type NativeTestSet } from '../../domain/evaluation/NativeTestCache.ts';
+import { nativeTestKeys, nativeOracleTrusted, nativeTestPolicyDigest, type NativeTestSet } from '../../domain/evaluation/NativeTestCache.ts';
 import { nativeSupplementTargetCoverage, type NativeSupplementTargets } from '../../domain/evaluation/NativeSupplementTargets.ts';
 import type { ArtifactStore } from '../ports/ApplicationPorts.ts';
 import type { NativeCaseRunner, NativeSnapshotter, NativeTestStore, NativeCaseObservation } from '../ports/NativeEvaluationPorts.ts';
@@ -73,7 +73,7 @@ export class NativeSuiteEvaluation {
     if (input.supplement?.targets) nativeSupplementTargetCoverage(input.supplement.targets, { schemaVersion: 'native-cases-v1', cases: [] });
     const reference = await this.manifest(input.reference);
     const binding = { cardIds: [...input.cardIds], knowledgeBodyDigests: input.bodyRefs.map((ref) => ref.sha256), referenceDigest: sha256(JSON.stringify(reference)),
-      interfaceDigest: sha256(canonicalJson(input.contract)), policyDigest: input.supplement ? sha256(canonicalJson({ policyDigest: input.policyDigest, supplement: input.supplement })) : input.policyDigest, toolchainDigest: fingerprint.digest };
+      interfaceDigest: sha256(canonicalJson(input.contract)), policyDigest: nativeTestPolicyDigest(input.policyDigest, input.supplement), toolchainDigest: fingerprint.digest };
     const inherited = store.lineage(input.cardIds);
     const historicalSuites: NativeBehaviorSuite[] = [];
     for (const set of inherited) {
