@@ -96,3 +96,7 @@ This document summarizes older handoffs, milestones and architectural decisions 
 ## 2026-09-14 v12 真实验收交接归档
 
 [2026-09-10-1424-pr41-docs-merge.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/22fe34fdf1ee9e37c08d0bd17a03b2c7e4103cf0/docs/epitaph/2026-09-10-1424-pr41-docs-merge.md)：记录 PR #41 文档分支合并 main 并解决六份冲突，保留 Domain 目录和 DocGen 内部 Worker；当时通过 typecheck、Spec、架构与文档链接检查，未重跑完整模型验收，未替用户合并 PR。当时 Code 输入边界与 TestGen 依据仍待实现/确认；后续状态须以当前 Spec、代码及真实验收为准，不能继承旧受控结果作为模型质量证明。
+
+## 2026-09-14 PR #51 收尾归档
+
+[2026-09-11-1817-cjson-real-acceptance.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/6fd7379a5bc373a66a36de4956a77247298a9fff/docs/epitaph/2026-09-11-1817-cjson-real-acceptance.md)：记录最初完整 cJSON Utils 真实模型验收四个有界批次及提供方会话头、TestGen Schema、Console 展示修复；最终 Run a0a2694c-ada1-491d-a10a-2b75b303f48b 的生成测试参考校验修复前后均 48/49，Check 引用无效，模型重建缺 stdbool.h 导致真实编译失败，未到 Review/Gate，知识未发布。独立原实现 18/18 与定向回归通过不代表完整闭环成功。当时固定版本转义 Patch 行为与 RFC 预期待确认，后续已在现有验收计划中明确按固定版本行为重建、RFC 差异单列；Check 后由 PR #49 修复，最新 v12 真实运行另有独立失败，不能覆盖旧证据。旧 /tmp/domain-knowledge-cjson-real、2026-09-11-cjson-real 证据与 4311 临时前台保留；旧批次已结束，不能沿用其预算无限重跑。
