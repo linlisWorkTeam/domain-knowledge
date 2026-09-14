@@ -22,10 +22,10 @@ function fixture() {
   const plan = planBatchDeletion('batch', [{ id: 'batch', kind: 'batch', revision: '1', ownedBy: [], references: [] }]);
   let failSecond = true;
   const coordinator = (contract = 'v1') => new SqliteDeletionRecovery(journal, [
-    { name: 'registry', contract, database: registry, remove: () => {
+    { name: 'registry', contract, database: registry, capture: () => ({ id: 'old' }), remove: () => {
       registry.exec("DELETE FROM result WHERE id='old'; UPDATE budget SET removals=removals+1");
     } },
-    { name: 'workbench', contract, database: workbench, remove: () => {
+    { name: 'workbench', contract, database: workbench, capture: () => ({ id: 'old' }), remove: () => {
       workbench.exec("DELETE FROM result WHERE id='old'; UPDATE budget SET removals=removals+1");
       if (failSecond) throw new Error('controlled second database failure');
     } },

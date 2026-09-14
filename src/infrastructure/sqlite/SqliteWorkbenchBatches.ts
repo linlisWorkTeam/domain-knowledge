@@ -43,7 +43,10 @@ export class SqliteWorkbenchBatches implements WorkbenchBatchStore {
     const schedule = batchSchedule(input.schedule), fingerprint = canonicalJson({ ...input, schedule });
     return this.transaction(() => {
       const previous = this.db.prepare('SELECT fingerprint,batch_id FROM wb_batch_commands WHERE command_id=?').get(commandId);
-      if (previous) { if (previous.fingerprint !== fingerprint) throw new Error('IDEMPOTENCY_CONFLICT'); return this.get(String(previous.batch_id))!; }
+      if (previous) {
+        if (previous.fingerprint !== fingerprint) throw new Error('IDEMPOTENCY_CONFLICT');
+        const batch = this.get(String(previous.batch_id)); if (!batch) throw new Error('BATCH_NOT_FOUND'); return batch;
+      }
       const name = input.moduleId.replaceAll('/', '-'), day = batchDate(now);
       const sequence = Number(this.db.prepare('SELECT value FROM wb_batch_sequences WHERE name=? AND day=?').get(name, day)?.value ?? 0) + 1;
       const batchId = batchName(input.moduleId, now, sequence);

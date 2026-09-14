@@ -9,12 +9,15 @@ import type { BatchDeletionPlan } from '../../domain/workbench/BatchDeletion.ts'
 
 export interface DeletionParticipant {
   name: string; contract: string; database: DatabaseSync;
+  /** 在意图首次持久化前冻结行定位与摘要；恢复不得从剩余数据重新推断删除范围。 */
+  capture(plan: BatchDeletionPlan): unknown;
   /** 已冻结且二次确认的服务端清单；调用期间由本连接持有写事务。 */
-  remove(plan: BatchDeletionPlan): void;
+  remove(plan: BatchDeletionPlan, witness: unknown): void;
 }
 interface RecoveryIntent {
-  contract: 'deletion-recovery-v1'; plan: BatchDeletionPlan;
+  contract: 'deletion-recovery-v2'; plan: BatchDeletionPlan;
   participants: Array<{ name: string; contract: string }>;
+  witnesses: Record<string, unknown>;
 }
 export type DeletionRecoveryPhase = 'PREPARED' | 'RECORDS_COMMITTED' | 'COMPLETE';
 export interface DeletionRecoveryRecord { intent: RecoveryIntent; fingerprint: string; phase: DeletionRecoveryPhase }
@@ -29,7 +32,7 @@ export class SqliteDeletionRecovery {
   constructor(journal: DatabaseSync, participants: DeletionParticipant[]) {
     if (!participants.length || new Set(participants.map(item => item.name)).size !== participants.length
       || new Set([journal, ...participants.map(item => item.database)]).size !== participants.length + 1
-      || participants.some(item => !/^[a-z][a-z0-9_-]{0,63}$/.test(item.name) || !item.contract)) throw new Error('DELETION_PARTICIPANTS_INVALID');
+      || participants.some(item => !/^[a-z][a-z0-9_-]{0,63}$/.test(item.name) || !item.contract || typeof item.capture !== 'function')) throw new Error('DELETION_PARTICIPANTS_INVALID');
     const files: string[] = [];
     for (const database of [journal, ...participants.map(item => item.database)]) {
       const stores = database.prepare('PRAGMA database_list').all().filter(row => row.name !== 'temp');
@@ -48,8 +51,10 @@ export class SqliteDeletionRecovery {
     const row = this.journal.prepare('SELECT * FROM deletion_recovery_intents WHERE plan_id=?').get(planId);
     if (!row) return null;
     const intent = JSON.parse(String(row.intent)) as RecoveryIntent;
-    if (sha256(String(row.intent)) !== row.fingerprint || intent.contract !== 'deletion-recovery-v1'
-      || intent.plan.planId !== planId || !['PREPARED', 'RECORDS_COMMITTED', 'COMPLETE'].includes(String(row.phase))) throw new Error('DELETION_RECOVERY_CORRUPT');
+    if (sha256(String(row.intent)) !== row.fingerprint || intent.contract !== 'deletion-recovery-v2'
+      || intent.plan.planId !== planId || !intent.witnesses || typeof intent.witnesses !== 'object'
+      || intent.participants.some(participant => !Object.hasOwn(intent.witnesses, participant.name))
+      || !['PREPARED', 'RECORDS_COMMITTED', 'COMPLETE'].includes(String(row.phase))) throw new Error('DELETION_RECOVERY_CORRUPT');
     return { intent, fingerprint: String(row.fingerprint), phase: row.phase as DeletionRecoveryPhase };
   }
   pending(): DeletionRecoveryRecord[] {
@@ -62,15 +67,23 @@ export class SqliteDeletionRecovery {
     const frozen: BatchDeletionPlan = { schemaVersion: plan.schemaVersion, planId: plan.planId, targetId: plan.targetId,
       deleteIds: [...plan.deleteIds].sort(), preservedIds: [...plan.preservedIds].sort(),
       counts: Object.fromEntries(Object.entries(plan.counts).sort(([a], [b]) => a.localeCompare(b))), reclaimableBytes: plan.reclaimableBytes };
-    const intent: RecoveryIntent = { contract: 'deletion-recovery-v1', plan: frozen,
-      participants: this.participants.map(({ name, contract }) => ({ name, contract })) };
-    const text = JSON.stringify(intent), fingerprint = sha256(text);
+    const participants = this.participants.map(({ name, contract }) => ({ name, contract }));
     this.journal.exec('BEGIN IMMEDIATE');
     try {
       const prior = this.get(plan.planId);
-      if (prior) { if (prior.fingerprint !== fingerprint) throw new Error('DELETION_RECOVERY_CONTRACT_CHANGED'); }
+      if (prior) {
+        if (JSON.stringify(prior.intent.plan) !== JSON.stringify(frozen)
+          || JSON.stringify(prior.intent.participants) !== JSON.stringify(participants)) throw new Error('DELETION_RECOVERY_CONTRACT_CHANGED');
+      }
       else {
         this.assertAvailable();
+        const witnesses = Object.fromEntries(this.participants.map(participant => {
+          const witness = participant.capture(JSON.parse(JSON.stringify(frozen)) as BatchDeletionPlan);
+          if (witness === undefined || witness && typeof witness === 'object' && 'then' in witness) throw new Error('DELETION_WITNESS_INVALID');
+          return [participant.name, witness];
+        }));
+        const intent: RecoveryIntent = { contract: 'deletion-recovery-v2', plan: frozen, participants, witnesses };
+        const text = JSON.stringify(intent), fingerprint = sha256(text);
         this.journal.prepare("INSERT INTO deletion_recovery_intents VALUES(?,?,?,'PREPARED')").run(plan.planId, fingerprint, text);
       }
       this.journal.exec('COMMIT'); return this.get(plan.planId)!;
@@ -93,7 +106,8 @@ export class SqliteDeletionRecovery {
         } else {
           // 若全库提交后本地回执丢失，不得猜测或对新数据再次执行删除。
           if (record.phase !== 'PREPARED') throw new Error('DELETION_RECOVERY_RECEIPT_MISSING');
-          participant.remove(JSON.parse(JSON.stringify(record.intent.plan)) as BatchDeletionPlan);
+          participant.remove(JSON.parse(JSON.stringify(record.intent.plan)) as BatchDeletionPlan,
+            JSON.parse(JSON.stringify(record.intent.witnesses[participant.name])));
           db.prepare('INSERT INTO deletion_participant_receipts VALUES(?,?,?)').run(planId, record.fingerprint, participant.contract);
         }
         db.exec('COMMIT');
