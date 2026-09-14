@@ -428,3 +428,7 @@ This document summarizes older handoffs, milestones and architectural decisions 
 ## 2026-09-14 归档：会话清理与DSH审计
 
 [2245 原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/84d738bdef5e880efb0d0ee98be9175540715a38/docs/epitaph/2026-09-14-2245-session-deletion-manifest.md)：CodeAgent会话纳入清理，25项测试通过；只读备份初步识别75个DSH home和36375链接。后续已实现链接见证清理与HTTP/UI，未知归属不自动删除；全目标验收仍未完成。
+
+## 2026-09-14 归档：DSH home删除
+
+[2257 原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/2c55117b693fcab4bf94081cdd2a2504819e796d/docs/epitaph/2026-09-14-2257-dsh-home-deletion.md)：审计归属的DSH home文件和符号链接进入冻结见证清理，链接目标保留。后续HTTP/UI、多根恢复和CI已通过并部署；生产旧检查点缺少owner阻挡删除，C/C++最终发布仍待完成。

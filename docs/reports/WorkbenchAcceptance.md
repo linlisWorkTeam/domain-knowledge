@@ -2,6 +2,16 @@
 
 截至2026-09-14，完整验收尚未完成。真实目标证据的历史代码基线为 `e66ec50`；下列结果只证明各自明确列出的版本、任务和范围，不代表全部知识已验证发布。
 
+## 网站更新（2026-09-14，2c55117）
+
+当前部署提交为 `2c55117b693fcab4bf94081cdd2a2504819e796d`。[CI 34858435148](https://github.com/linlisWorkTeam/domain-knowledge/actions/runs/34858435148) 的代码检查713/713、Console44/44、隔离验收25/25通过；受控验收不等于C/C++真实模型最终发布通过。此前只读CAS文件故意损坏用例在非root CI遇到EACCES，已仅修正临时样例的写权限，原保护断言未改，并以nobody身份复验5/5。
+
+[当前工作台](https://contract-strict-warren-theories.trycloudflare.com/)仍转发127.0.0.1:4310，保留免登录和原隧道。停止旧服务后完整备份运行目录，再启动新版本；原8条运行以及项目、阶段、流程、模块批次和知识统计的API数据前后相同，未删除任何用户历史。公网和本地App.js、BatchDeletion.js及HTML逐字节匹配发布目录。浏览器验证导航标题、知识发布设置默认折叠与展开表单、390px弹窗按钮和取消，无页面脚本错误。
+
+现场存在明确未完成项：旧运行 `8d3237f4-de25-423d-8ef4-b0c5228af2d9` 的test_gen检查点仍为RUNNING，且没有checkpoint owner。批次执行视图为FAILED，但该检查点无法证明执行者退出，因此当前维护屏障拒绝所有删除预览，返回RUNTIME_OPERATIONS_ACTIVE。浏览器只验证拒绝及取消，未声称线上成功删除；未补写进程归属、未绕过保护、未改写原历史。需要继续处理旧执行身份缺失的兼容方案及明确的页面原因。
+
+服务器证据目录为 `/root/projects/domain-knowledge-releases/2026-09-14-workbench-2c55117/`：Ci.log、Browser.log、Prepared.json、browser中的桌面/窄屏截图及pre-deploy-backup/data。应用会话mvp-console-review，隧道mvp-console-tunnel；隧道或主机停止会使临时地址失效。C/C++最新修订后的来源质量及最终发布、历史发布目录授权和保留评测目录清理仍待完成。
+
 ## main集成后的回归（2026-09-14）
 
 集成基线 `84c98b3` 完整非浏览器回归共 600 项，577 通过、23 失败，未跳过；该结果不是全绿。原生内存预检、旧样例未选择工作台契约、修订校验函数改名，以及重建修复诊断格式不匹配均保留失败证据。
