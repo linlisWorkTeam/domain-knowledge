@@ -5,6 +5,43 @@ SPDX-License-Identifier: MIT
 -->
 # Agent Spec 修复与端到端测试报告
 
+## 2026-09-14：Check 报告证据与有限修正验收
+
+按逐项确认的 [Check Spec](../specs/domainFunction/agents/checkAgent/CheckAgent.md) 修复报告生成，不改变 Check 的只读比较、Review 的知识修订和 Gate 的发布职责。设计提交 `9324e7a`，实现 `7564f33`，完整类型声明及同一行歧义补充修复 `e11e178`；PR 为 [#49](https://github.com/linlisWorkTeam/domain-knowledge/pull/49)。
+
+模型不再逐字抄写源码，而是提供文件和行范围，程序从冻结材料中提取完整函数及相关声明。最终 `check-report-v2` 支持双方存在和单侧缺失两类证据，明确缺失为 Check 的分析结论；程序不靠名称检索证明实现缺失。正文不限定 Markdown 排版，blocking 根据有效差异计算。报告修正不允许通过删除差异或降低严重程度来掩盖错误。
+
+Check 统一处理首次输出后的两次修正，每次向模型反馈原回答和具体错误，DSH 的嵌套格式重试关闭。成功保存尝试工件，耗尽则保存三次尝试并在 NodeFailed 的 reportEvidence 中记录 CAS 摘要，不提交半份成功报告。旧运行保持只读，执行版本升级为 `domain-agents-v9-check-evidence` / `contract-v9`。
+
+### 实际验证
+
+| 范围 | 结果 |
+| --- | --- |
+| 全量本地回归 | `7564f33` 对应代码的 `npm test` 294/294，通过，147.5 秒 |
+| 报告、单侧缺失、持久化与适配定向组合 | 34/34；包含失败三次原始回答存入 CAS，且无成功结果 |
+| 补强后的完整受控 SDK 流程 | 1/1，14.3 秒。Check 首次 Schema 错误、第二次定位错误、第三次修正成功；后续评测、Review、下一轮及 Gate 正常。Check 共四次输出尝试，Code 和 DocGen 各执行两个业务轮次，没有因报告修正重跑上游 |
+| 完整声明与位置歧义补充修复 | `e11e178` 的角色及提取定向回归 11/11；类型成员位置扩展到完整类型，同一行多个函数不猜测选择 |
+| 静态与 CI | TypeScript、Spec、完整 PR 差异格式校验通过；实现提交 `e11e178` 的 GitHub verify 与 acceptance 均通过，CI run `34801179679` |
+| 真实模型 Check | 下述真实调用 SUCCEEDED，首次输出有效，7 条分析意见、16 段完整源码证据，未触发报告修正 |
+
+### 同一冻结输入的真实模型结果
+
+新 Run：`bb6f598e-e6d4-4507-9eb6-1ef477370741`，执行提交 `e11e178`。通过生产 AgentExample、RoleExecution、已配置 DSH SDK 和 Bubblewrap 调用真实 `deepseek-v4-flash`，北京时间 10:59:19—11:06:50，耗时 450.6 秒。单次调用上限 10 分钟，验收脚本总上限 30 分钟，未改变两次报告修正预算。SDK 报告 inputTokens=39606、outputTokens=26261、totalTokens=65867，非独立计费核算。
+
+输入来自 2026-09-11 Run `a0a2694c-ada1-491d-a10a-2b75b303f48b` 的源码、重建代码和规则工件。三份解析内容均完全一致，各代码文件正文摘要一致。独立入口重新序列化 JSON，导致源码包和生成代码包的 CAS 摘要变化；规则包摘要不变。`FrozenInputVerification.json` 明确记录原、新摘要及正文校验，不将包摘要变化隐去或声称序列化字节一致。
+
+报告为 `check-report-v2`、blocking=true：5 条 BLOCKER、2 条 INFO。程序提取的 16 段证据全部匹配相应冻结文件及行范围；15 个运行 CAS 文件均校验摘要。源码对照复核确认排序链表未断开 next、补丁递归路径丢失对象键/父路径等意见有对应代码依据。此处未补改生成代码或独立运行七项行为复现，不把全部模型意见提升为已执行验证的缺陷；模型严重程度和说明原样保留。
+
+这次报告正常保存、AgentResult 为 SUCCEEDED，原始回答与组装报告分别保留，可供后续消费者读取。真实模型未触发修正，修正路径由上述故障注入 SDK 回归验证；单侧缺失由定向回归验证，不声称本次自然输出覆盖了它。真实验收只执行 Check，publication=NOT_EVALUATED，未再次执行 Review 或 Gate；消费者兼容和完整流程交接由 SDK 回归验证。旧 cJSON 的参考测试 48/49 和编译失败保持原样，整体 cJSON 飞轮仍未验收通过。
+
+启动脚本另有一次配置读取方法名错误，在模型调用前终止；`SetupFailure.json` 保留该记录。修正脚本后才产生上述真实运行，没有隐藏或覆盖失败记录。
+
+### 产物和限制
+
+证据保留在主工作区 `.workpanel/acceptance/2026-09-14-check-report/`，不随 PR 上传：`LiveInput.json`、`InputManifest.json`、`FrozenInputVerification.json` 为输入依据；`Report.json`、`Attempts.json`、`LiveResult.json`、`Events.json` 为报告与提交事实；`EvidenceVerification.json`、`CasIntegrity.json`、`ModelAudit.json`、`EvidenceManifest.json` 为逐段原文、摘要和调用核验；`*Regression.log` 为测试日志。runtime 中包含受限会话和加密提供方配置，不作公开附件。
+
+提取器为有界 C/C++ 词法边界识别，能处理本次模块及覆盖的字符串、注释、原始字符串、声明和宏场景，不展开宏、不进行类型分析，不能识别的完整边界明确失败。它不替代编译器或证明代码等价，也未宣称支持所有 C++ 语法。没有新建永久 CI 流程。验收结论为：本次 Check 报告生成、有限修正和交接修复通过；完整模块行为与知识充分性仍采用后续实际评测结论。
+
 ## 2026-09-11：cJSON Utils 真实模型验收，未通过
 
 先提交[验收计划](../specs/infrastructure/evaluation/Evaluation.md#2026-09-11-cjson-utils-真实模型端到端验收)（`1d4c3e4`），再实际执行。目标为 cJSON `v1.7.19` / `c859b25da02955fef659d658b8f324b5cde87be3` 的完整 `cJSON_Utils.c`（1481 行、14 个公开 API）；基础库和头文件固定，原始源码工作区最终无改动。配套材料包括上游 README、公开头文件和 JSON Pointer/Patch/Merge Patch 标准。不是此前的一行受控测试模块。
