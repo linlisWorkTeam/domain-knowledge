@@ -5,6 +5,7 @@
  */
 import { nodeExplanation, executionNote } from './WorkbenchLabels.js'
 import { createKnowledgeGenerationPanel } from './KnowledgeGeneration.js'
+import { openBatchDeletion, recoverBatchDeletions } from './BatchDeletion.js'
 import { createModuleBatches } from './ModuleBatches.js'
 import { publicationDownloadName } from './WorkbenchPublication.js'
 import { createRepositoryAnalysisPanel } from './RepositoryAnalysis.js'
@@ -581,7 +582,7 @@ function renderRunWorkspace(snapshot) {
       <button class="back-button" data-run-back>← 返回批次列表</button>
       <div class="run-title-row">
         <div><p class="eyebrow">${escapeHtml(shortId(run.runId, 28))}</p><h2>${escapeHtml(run.moduleId)}</h2><p class="subtitle">策略 ${escapeHtml(run.policyId)} · 更新于 ${escapeHtml(formatDate(run.updatedAt))}</p></div>
-        <div class="run-title-actions">${runStatusBadge(run)}<a class="secondary-button" href="/api/v1/runs/${encodeURIComponent(run.runId)}/report" download>导出报告</a><button class="secondary-button" data-refresh-run="${escapeHtml(run.runId)}">刷新</button>${run.canCancel === true && isRunActive(run) ? `<button class="secondary-button" data-cancel-run="${escapeHtml(run.runId)}" type="button" ${state.operatorMode ? '' : 'disabled'}>取消批次</button>` : ''}${run.recovery?.canResume ? `<button class="primary-button" data-resume-run="${escapeHtml(run.runId)}" type="button" ${state.operatorMode ? '' : 'disabled'}>恢复批次</button>` : ''}</div>
+        <div class="run-title-actions">${runStatusBadge(run)}<a class="secondary-button" href="/api/v1/runs/${encodeURIComponent(run.runId)}/report" download>导出报告</a><button class="secondary-button" data-refresh-run="${escapeHtml(run.runId)}">刷新</button><button type="button" class="secondary-button" data-delete-kind="runs" data-delete-id="${escapeHtml(run.runId)}" ${isRunActive(run) || !state.operatorMode ? 'disabled' : ''}>删除批次</button>${run.canCancel === true && isRunActive(run) ? `<button class="secondary-button" data-cancel-run="${escapeHtml(run.runId)}" type="button" ${state.operatorMode ? '' : 'disabled'}>取消批次</button>` : ''}${run.recovery?.canResume ? `<button class="primary-button" data-resume-run="${escapeHtml(run.runId)}" type="button" ${state.operatorMode ? '' : 'disabled'}>恢复批次</button>` : ''}</div>
       </div>
       <ol class="run-stepper">${steps}</ol>
       <div class="state-callout"><b>工作流执行：${escapeHtml(displayLabel(workflowStatus?.executionStatus ?? 'UNKNOWN'))}</b><span>${escapeHtml(workflowStatus?.currentNode ? `阶段 ${NODE_LABELS[workflowStatus.currentNode] ?? workflowStatus.currentNode}` : '执行状态暂不可读')}${run.executionFailure?.code ? ` · ${escapeHtml(run.executionFailure.code)}` : ''}</span></div>
@@ -1524,6 +1525,14 @@ content.addEventListener('toggle', event => {
 }, true)
 
 content.addEventListener('click', (event) => {
+  const deletion = event.target.closest('[data-delete-kind]')
+  if (deletion && !deletion.disabled) {
+    void openBatchDeletion({ request, kind: deletion.dataset.deleteKind, id: deletion.dataset.deleteId, label: deletion.dataset.deleteId }).then(async changed => {
+      if (changed) { state.selectedRun = null; state.runs = collection(await request('/api/v1/runs'), 'runs'); renderRuns(); await moduleBatches.refresh(); showToast('批次删除已完成。', 'success') }
+    }).catch(productError); return
+  }
+  const recovery = event.target.closest('[data-recover-deletions]')
+  if (recovery) { void recoverBatchDeletions(request).then(changed => changed ? boot() : showToast('没有未完成的删除。', 'success')).catch(productError); return }
   const round = event.target.closest('[data-run-round]')
   if (round && state.selectedRun) { state.selectedRound = Number(round.dataset.runRound); renderRunWorkspace(state.selectedRun); return }
   const download = event.target.closest('[data-download-artifact]')
@@ -1888,6 +1897,13 @@ async function restoreSelectedProject() {
 }
 
 async function boot() {
+  try {
+    const maintenance = await request('/api/v1/maintenance')
+    if (maintenance.status === 'RECOVERY_REQUIRED') {
+      content.innerHTML = '<section class="panel"><h2>历史删除尚未完成</h2><p>恢复完成前，数据操作暂停。此前确认的范围与累计用量会保留。</p><button type="button" class="primary-button" data-recover-deletions>恢复未完成删除</button></section>'
+      return
+    }
+  } catch { /* 由常规加载展示连接或认证错误。 */ }
   const keys = ['status', 'capabilities', 'runs', 'knowledge', 'agents', 'actionItems', 'activities', 'components', 'knowledgeHealth']
   const results = await Promise.allSettled([
     request('/api/v1/system/status'), request('/api/v1/system/capabilities'), request('/api/v1/runs'), request('/api/v1/cards'), request('/api/v1/agents'),

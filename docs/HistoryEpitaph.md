@@ -420,3 +420,7 @@ This document summarizes older handoffs, milestones and architectural decisions 
 ## 2026-09-14 归档：删除存储组合
 
 [2224 原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/e619924fcea34d82067ba655d74c560491c8c9af/docs/epitaph/2026-09-14-2224-runtime-deletion-assembly.md)：业务库、图、CAS、发布文件统一组装，33项测试与类型/Spec通过；目录授权与源码双向重叠检查。后续已加入工作区、会话及DSH home参与者，生产接线、前台和C/C++最终验收仍待完成。
+
+## 2026-09-14 归档：工作区删除清单
+
+[2235 原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/14da3c19d0ed6da2e8fe2745b1ee336f7f56fa25/docs/epitaph/2026-09-14-2235-workspace-deletion-manifest.md)：审计归属与角色工作区清单进入文件恢复协议，未知/共享保护；29项测试和类型/Spec通过。后续会话与DSH home清理已推进，公共入口与前台在新记录中交付；无审计归属目录不自动删除，C/C++最终验收仍未完成。

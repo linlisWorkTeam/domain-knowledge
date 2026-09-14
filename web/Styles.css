@@ -1408,3 +1408,9 @@ body.drawer-active { overflow: hidden; }
 [data-batch-dialog] [hidden] { display: none; }
 @media (max-width: 700px) { .batch-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } .batch-execution-layout { grid-template-columns: 1fr; } .batch-table > button { grid-template-columns: minmax(0, 1fr) auto; } }
 @media (prefers-reduced-motion: reduce) { .batch-mini-graph .node-running button { animation: none; } }
+
+[data-deletion-dialog] { width: min(540px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow-y: auto; }
+[data-deletion-dialog] dl { display: grid; grid-template-columns: 1fr auto; gap: 8px 20px; }
+[data-deletion-dialog] dd { margin: 0; text-align: right; }
+[data-deletion-dialog] .run-title-actions { flex-wrap: wrap; }
+[data-deletion-dialog] .danger-button { border: 1px solid #f87171; background: #642a32; color: #fff; }

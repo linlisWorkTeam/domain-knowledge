@@ -4,6 +4,7 @@
  * 文件功能：提供Composition的外部入口、参数转换与响应处理。
  */
 import { WorkbenchBatches } from '../../application/services/WorkbenchBatches.ts';
+import { RuntimeDeletionOperations } from './RuntimeDeletionOperations.ts';
 import { RuntimeFileLock } from '../../infrastructure/sqlite/RuntimeFileLock.ts';
 import { RuntimeMaintenance } from '../../application/services/RuntimeMaintenance.ts';
 import { deletionRecoveryPending, deletionWorkbenchExecutionsIdle } from '../../infrastructure/sqlite/DeletionRecoveryPending.ts';
@@ -619,6 +620,16 @@ function composeRuntime(input: CompositionInput, repositoryRoot: string, config:
     })();
     return workflowPromise;
   };
+  const batchDeletions = new RuntimeDeletionOperations({ runtimeDir, allowedRoots: directoryRoots, maintenance,
+    publicationDirectory: () => publisher.getSettings().directory, evaluationArtifactsDirectory: input.evaluationArtifactsDirectory,
+    sourceRoots: async () => {
+      const roots = [repositoryRoot, ...projectStore.list().map(project => project.directory)];
+      const runs = repository.database.prepare("SELECT DISTINCT run_id FROM checkpoints WHERE node_id='project-scenario' AND status='COMMITTED'").all();
+      for (const run of runs) roots.push((await (await workflow()).scenarioForRun(String(run.run_id))).repositoryRoot);
+      return [...new Set(roots)];
+    },
+    runStates: async database => SqliteDeletionRunStates.inspect(database, async runId => (await workflow()).workflow.status(runId)),
+  });
   const orchestrator = new Orchestrator({
     workflow,
     agents,
@@ -640,7 +651,7 @@ function composeRuntime(input: CompositionInput, repositoryRoot: string, config:
       workbenchStages,
       workbenchPipelines,
       workbenchBatches,
-      maintenance,
+      maintenance, batchDeletions,
       workbenchPublications,
       knowledgeIndex,
       workbenchAssociations,

@@ -83,7 +83,7 @@ export function sqliteDeletionInventory(databases: Record<string, DatabaseSync>,
       for (const row of db.prepare(`SELECT * FROM ${identifier(table)} LIMIT 100001`).all()) {
         if (entries.length >= 100000) throw new Error('DELETION_INVENTORY_TOO_LARGE');
         const key = Object.fromEntries(primary.map(name => [name, row[name]]));
-        const value = decode(row, table), id = `${database}/${table}/${sha256(JSON.stringify(key))}`;
+        const value = decode(row, table), id = sqliteDeletionRecordId(database, table, key);
         const rowKind = table === 'runs' && deletedRuns.has(String(row.run_id)) ? 'configuration' : kind;
         const node: DeletionNode = { id, kind: rowKind, revision: sha256(JSON.stringify(row)), ownedBy: [], references: [] };
         const record = object(value.value ?? value.record ?? value.snapshot);
@@ -178,4 +178,9 @@ export function sqliteDeletionInventory(databases: Record<string, DatabaseSync>,
   return { nodes: entries.map(entry => entry.node).sort((a, b) => a.id.localeCompare(b.id)),
     records: entries.map(({ node, database, table, key }) => ({ id: node.id, database, table, key })), unclassifiedTables,
     artifactSeeds: entries.map(entry => deletionArtifactSeed(entry.node.id, entry.value)).filter(seed => seed.refs.length || seed.artifactIds.length) };
+}
+
+/** 固定记录身份供服务端目标路由复用，不接受客户端SQL。 */
+export function sqliteDeletionRecordId(database: string, table: string, key: Record<string, unknown>): string {
+  return `${database}/${table}/${sha256(JSON.stringify(key))}`;
 }

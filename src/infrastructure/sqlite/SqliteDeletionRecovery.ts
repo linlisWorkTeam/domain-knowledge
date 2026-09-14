@@ -54,11 +54,7 @@ export class SqliteDeletionRecovery {
     if (new Set(files).size !== files.length) throw new Error('DELETION_PARTICIPANTS_INVALID');
     this.journal = journal; this.participants = [...participants].sort((a, b) => a.name.localeCompare(b.name));
     this.files = [...fileParticipants].sort((a, b) => a.name.localeCompare(b.name));
-    journal.exec(`PRAGMA synchronous=FULL;
-      CREATE TABLE IF NOT EXISTS deletion_recovery_intents(plan_id TEXT PRIMARY KEY,fingerprint TEXT NOT NULL,intent TEXT NOT NULL,phase TEXT NOT NULL);
-      CREATE UNIQUE INDEX IF NOT EXISTS deletion_single_pending ON deletion_recovery_intents((1)) WHERE phase <> 'COMPLETE'`);
-    const columns = new Set(journal.prepare('PRAGMA table_info(deletion_recovery_intents)').all().map(row => row.name));
-    for (const column of ['committed_at', 'completed_at']) if (!columns.has(column)) journal.exec(`ALTER TABLE deletion_recovery_intents ADD COLUMN ${column} TEXT`);
+    initializeDeletionRecoveryJournal(journal);
     for (const participant of this.participants) participant.database.exec(`PRAGMA synchronous=FULL;
       CREATE TABLE IF NOT EXISTS deletion_participant_receipts(plan_id TEXT PRIMARY KEY,fingerprint TEXT NOT NULL,contract TEXT NOT NULL)`);
   }
@@ -161,4 +157,13 @@ export class SqliteDeletionRecovery {
     this.journal.prepare("UPDATE deletion_recovery_intents SET phase='COMPLETE',completed_at=? WHERE plan_id=?").run(new Date().toISOString(), planId);
     return this.get(planId)!;
   }
+}
+
+/** 首次维护会话初始化空日志，失败时也不会留下无法识别的空库。 */
+export function initializeDeletionRecoveryJournal(journal: DatabaseSync): void {
+    journal.exec(`PRAGMA synchronous=FULL;
+      CREATE TABLE IF NOT EXISTS deletion_recovery_intents(plan_id TEXT PRIMARY KEY,fingerprint TEXT NOT NULL,intent TEXT NOT NULL,phase TEXT NOT NULL);
+      CREATE UNIQUE INDEX IF NOT EXISTS deletion_single_pending ON deletion_recovery_intents((1)) WHERE phase <> 'COMPLETE'`);
+    const columns = new Set(journal.prepare('PRAGMA table_info(deletion_recovery_intents)').all().map(row => row.name));
+    for (const column of ['committed_at', 'completed_at']) if (!columns.has(column)) journal.exec(`ALTER TABLE deletion_recovery_intents ADD COLUMN ${column} TEXT`);
 }

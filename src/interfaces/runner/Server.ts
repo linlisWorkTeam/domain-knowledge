@@ -48,6 +48,7 @@ const assets = new Map([
   ['/index.html', 'index.html'],
   ['/App.js', 'App.js'],
   ['/ModuleBatches.js', 'ModuleBatches.js'],
+  ['/BatchDeletion.js', 'BatchDeletion.js'],
   ['/WorkbenchLabels.js', 'WorkbenchLabels.js'],
   ['/KnowledgeMarkdown.js', 'KnowledgeMarkdown.js'],
   ['/KnowledgeIndex.js', 'KnowledgeIndex.js'],
@@ -284,6 +285,18 @@ function requireOnlyKeys(payload: Record<string, unknown>, allowed: readonly str
 export function mapHttpError(error: unknown, id = 'req_unknown'): { status: number; body: ApiErrorBody } {
   const message = error instanceof Error ? error.message : String(error);
   const code = message.split(':', 1)[0] || 'INTERNAL_ERROR';
+  if (code.startsWith('DELETION_')) {
+    const message = code === 'DELETION_TARGET_NOT_FOUND' ? '批次不存在，或已被删除。'
+      : code.startsWith('DELETION_CONFIRMATION') ? '删除清单已变化或尚未确认，请重新预览并确认。'
+      : code === 'DELETION_TARGET_REFERENCED' ? '该批次仍被其他记录引用，暂时不能删除。'
+      : code === 'DELETION_PUBLICATION_ROOT_UNAUTHORIZED' ? '历史发布文件位于当前授权目录之外，请先核对发布目录设置。'
+      : code === 'DELETION_SOURCE_DIRECTORY_OVERLAP' ? '产物目录与源码目录重叠，已停止删除。'
+      : code === 'DELETION_RETAINED_EVALUATION_UNSUPPORTED' ? '检测到单独保留的评测目录，其清理范围尚未确认。'
+      : code === 'DELETION_MULTIPLE_DSH_ROOTS_UNSUPPORTED' ? '检测到多套模型执行目录，其清理范围尚未确认。'
+      : '无法确认完整删除范围或文件状态，数据已保留。请检查后重试。';
+    return { status: code === 'DELETION_TARGET_NOT_FOUND' ? 404 : 409, body: errorBody(code, message, id) };
+  }
+  if (code.startsWith('RUNTIME_')) return { status: 503, body: errorBody(code, '还有其他操作或服务进程占用运行目录，请稍后重试。', id, true) };
   if (code === 'MATERIAL_NOT_FOUND') return { status: 404, body: errorBody(code, '材料不存在', id) };
   if (code.startsWith('ASSOCIATION_')) return { status: 422, body: errorBody(code, code, id) };
   if (code.startsWith('MATERIAL_')) return { status: 422, body: errorBody(code, code, id) };
@@ -391,7 +404,7 @@ export function createKnowledgeServer(input: {
       }
       // 目录、配置和写入仅允许直接本机访问，或携带远程访问令牌。
       const localClient = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(request.socket.remoteAddress ?? '');
-      const workbenchRoute = /^\/api\/v1\/(workbench-batches|external-materials|workbench-publications|workbench-pipelines|stage-tasks|index-builds|knowledge-index|repository-analyses|projects|generations|reconstructions|native-evaluations|fixed-evaluations|knowledge-revisions|source-verifications|source-revisions|associations)(\/|$)/.test(url.pathname);
+      const workbenchRoute = /^\/api\/v1\/(batch-deletions|workbench-batches|external-materials|workbench-publications|workbench-pipelines|stage-tasks|index-builds|knowledge-index|repository-analyses|projects|generations|reconstructions|native-evaluations|fixed-evaluations|knowledge-revisions|source-verifications|source-revisions|associations)(\/|$)/.test(url.pathname);
       const productRoute = url.pathname.startsWith('/api/v1/publications')
         || url.pathname === '/api/v1/server-directories' || url.pathname === '/api/v1/runs/markdown-lite';
       if (url.pathname.startsWith('/api/') && (!localClient || productRoute || workbenchRoute) && !authorized(request, writeToken, anonymousAccess)) {
@@ -401,6 +414,31 @@ export function createKnowledgeServer(input: {
       }
       if (request.method === 'GET' && url.pathname === '/api/v1/maintenance') {
         send(response, 200, { status: composition.apps.maintenance.status }); return;
+      }
+      if (request.method === 'GET' && url.pathname === '/api/v1/batch-deletions') {
+        send(response, 200, { items: await composition.apps.batchDeletions.pending() }); return;
+      }
+      if (request.method === 'POST' && url.pathname === '/api/v1/batch-deletions/recover') {
+        const payload = await body(request); requireOnlyKeys(payload, ['planId']);
+        const receipt = await composition.apps.batchDeletions.recoverPending(typeof payload.planId === 'string' ? payload.planId : '');
+        if (receipt.status === 'DELETED' && composition.apps.maintenance.available) {
+          composition.apps.workbenchStages.recover(); composition.apps.workbenchPipelines.recover(); composition.apps.workbenchBatches.tick();
+        }
+        send(response, receipt.status === 'DELETED' ? 200 : 202, receipt); return;
+      }
+      const deletionRoute = /^\/api\/v1\/batch-deletions\/(runs|batches)\/([^/]+)\/(preview|confirm|recover)$/.exec(url.pathname);
+      if (deletionRoute && request.method === 'POST') {
+        const kind = deletionRoute[1] as 'runs' | 'batches', target = decodeURIComponent(deletionRoute[2]!);
+        const action = deletionRoute[3], deletions = composition.apps.batchDeletions;
+        if (action === 'preview') { send(response, 200, await deletions.preview(kind, target)); return; }
+        const payload = await body(request);
+        const receipt = action === 'confirm' ? await deletions.confirm(kind, target, payload)
+          : await deletions.recover(kind, target, typeof payload.planId === 'string' ? payload.planId : '');
+        if (receipt.status === 'DELETED' && composition.apps.maintenance.available) {
+          composition.apps.workbenchStages.recover(); composition.apps.workbenchPipelines.recover();
+          composition.apps.workbenchBatches.tick();
+        }
+        send(response, receipt.status === 'DELETED' ? 200 : 202, receipt); return;
       }
       if (url.pathname.startsWith('/api/')) operation = composition.apps.maintenance.enter();
       if (workbenchRoute) {

@@ -22,6 +22,11 @@ Available 是已接线路由；Planned 路由不作为当前能力。Available /
 | --- | --- | --- |
 | `GET /health` | Available | 进程存活探针；不返回业务健康分。 |
 | `GET /api/v1/maintenance` | Available | 返回AVAILABLE、MAINTENANCE或RECOVERY_REQUIRED，不包含删除清单或配置；沿用现有访问鉴权。维护期间其他数据接口返回503与中文说明，静态页面及此状态接口可读。 |
+| `GET /api/v1/batch-deletions` | Available | 返回未完成删除回执；需通过维护排他检查，鉴权与写操作一致。 |
+| `POST /api/v1/batch-deletions/{runs或batches}/:id/preview` | Available | 只生成删除计划、分类数量及预计释放字节；活动执行和范围不完整时拒绝。 |
+| `POST /api/v1/batch-deletions/{runs或batches}/:id/confirm` | Available | 仅接受planId与confirmed:true；重新计算清单校验，变化返回409。200表示DELETED，202表示持久删除待恢复。 |
+| `POST /api/v1/batch-deletions/{runs或batches}/:id/recover` | Available | planId必须对应此前确认的同一目标，仅恢复原意图。 |
+| `POST /api/v1/batch-deletions/recover` | Available | 仅接受planId，从持久回执取得原目标供重启页面恢复，不接受新删除范围。 |
 | `GET /api/v1/system/status` | Available | 返回 Registry 业务汇总：知识各状态、反馈、批次与 publication 计数；已由旧 `/api/v1/status` 迁移。分组件健康与采样时间只由 `/api/v1/system/components` 返回。 |
 | `GET /api/v1/system/capabilities` | Available | 返回读写开关、认证方式、Provider 类型和隔离能力；已由旧 `/api/v1/capabilities` 迁移。 |
 | `GET /api/v1/system/components` | Available | 返回分组件健康、reason code、最后成功时间和受控诊断摘要。 |
