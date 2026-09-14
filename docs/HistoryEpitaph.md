@@ -348,3 +348,7 @@ This document summarizes older handoffs, milestones and architectural decisions 
 ## 2026-09-14 TypeScript回归交接归档
 
 [1610原文](https://github.com/linlisWorkTeam/domain-knowledge/blob/84c98b3c9310d3a9c84087a0403b5af33432f586/docs/epitaph/2026-09-14-1610-typescript-flow-restored.md)：内部Worker、显式DocGen/Review协议与H2/风险门禁接通，TS完整7/7和C++/停止组合3/3通过；当时仅定向验证，真实目标与部署未完成。后续完整回归结果见最新记录。
+
+## 2026-09-14 CI与Spec合并交接归档
+
+[1613原文](https://github.com/linlisWorkTeam/domain-knowledge/blob/26b001956bbcc43cc4dd5a6ad04597f03ed0440a/docs/epitaph/2026-09-14-1613-spec-ci-merge.md)：合并main的验证路由、显式角色契约和当前Domain目录，保留Bubblewrap与安全约束；当时仍有两份文档冲突及搬迁链接待修，尚无远程CI或真实验收结论。后续合并和回归结果见保留记录。

@@ -22,9 +22,9 @@
 
 长流程随后按原顺序拆为七个串行验收阶段，共享同一浏览器上下文、页面和冻结项目；任一失败停止依赖阶段。每阶段仍为30秒，保留原文件302处expect、3处轮询和20处截图调用。七阶段复验7/7通过（1.7分钟），日志 `/tmp/WorkbenchSplitSevenBrowser.log`，覆盖固定/可信失败证据、来源下载、一键拒绝及重载、知识与来源修订、绑定新版本重建和补充可信用例；随后完整Console+入口+发布组合30/31通过（3.6分钟）；七阶段、截图、免登录入口和发布均通过，原Sources场景触发30秒超时，trace保留。日志 `/tmp/WorkbenchFinalConfiguredBrowser.log`；类型检查通过。
 
-C++ v11重建首次启动在冻结工具链时触发ENOENT：指纹引擎清单仍引用重构前的 `domain/services/evaluation` 和 `domain/services/knowledge`。现已改为当前领域文件路径，真实工具链摘要生成通过，新重建任务 `stage-e6d45b8c9d720b62500ca5841e9b22df594ad0a938afebea451afb35dee4f6db` 已生成代码后因WORKBENCH_RESOURCE_INSUFFICIENT暂停；累计1调用40,075 tokens，Code检查点保留，尚不记录为成功。首次失败发生于建任务/模型调用之前，日志 `/tmp/CppV11Reconstruction.log`；修正后 `/tmp/CppV11ReconstructionAfterPaths.log`，证据目录 `cpp-v11-reconstruction/`。旧来源、可信与固定报告保留，不跨执行契约恢复旧任务。
+C++ v11重建首次启动在冻结工具链时触发ENOENT：指纹引擎清单仍引用重构前的 `domain/services/evaluation` 和 `domain/services/knowledge`。现已改为当前领域文件路径，真实工具链摘要生成通过，新重建任务 `stage-e6d45b8c9d720b62500ca5841e9b22df594ad0a938afebea451afb35dee4f6db` 已生成代码后因WORKBENCH_RESOURCE_INSUFFICIENT暂停；恢复复用了Code检查点并发现缺失TINYXML2_LIB宏的真实编译错误；同任务生成修复后累计2调用82,552 tokens，再因内存不足暂停，原诊断和修复检查点保留，尚不记录为成功。首次失败发生于建任务/模型调用之前，日志 `/tmp/CppV11Reconstruction.log`；修正后 `/tmp/CppV11ReconstructionAfterPaths.log`，证据目录 `cpp-v11-reconstruction/`。旧来源、可信与固定报告保留，不跨执行契约恢复旧任务。
 
-现有CI已手动触发于 `90b6872`：[运行34824671868](https://github.com/linlisWorkTeam/domain-knowledge/actions/runs/34824671868)，静态/Bubblewrap/类型检查通过，但完整回归601项580通过、21失败，原生用例缺少可写委派cgroup而触发PROJECT_RESOURCE_ISOLATION_UNAVAILABLE，浏览器和acceptance未运行。日志 `/tmp/WorkbenchCi34824671868Failed.log`。正在补齐临时runner的委派环境，不降低生产隔离要求。GitHub比较接口确认分支相对main领先、落后0，merge base为22fe34fd；PR仍报告CONFLICTING，未重复合并或强推。
+现有CI已手动触发于 `90b6872`：[运行34824671868](https://github.com/linlisWorkTeam/domain-knowledge/actions/runs/34824671868)，静态/Bubblewrap/类型检查通过，但完整回归601项580通过、21失败，原生用例缺少可写委派cgroup而触发PROJECT_RESOURCE_ISOLATION_UNAVAILABLE，浏览器和acceptance未运行。日志 `/tmp/WorkbenchCi34824671868Failed.log`。26b0019补齐临时runner的委派环境，不降低生产隔离要求；[复验34825340484](https://github.com/linlisWorkTeam/domain-knowledge/actions/runs/34825340484)已启动，尚待结果。GitHub比较接口确认分支相对main领先、落后0，merge base为22fe34fd；PR仍报告CONFLICTING，未重复合并或强推。
 
 ## 固定目标与当前真实结果
 
