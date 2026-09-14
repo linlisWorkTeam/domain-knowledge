@@ -75,3 +75,18 @@ src/tests当前501项已通过；仍需补齐scripts目录、Console及浏览器
 具体页面操作见[操作说明](../Operations.md)。
 
 本次尝试在原长浏览器场景追加构建范围和三类下载断言：新增断言执行后，在后续source-revision截图处超过30秒总时限。未记录通过，未放宽时限；未提交的新增断言已撤回并保存至 `/tmp/WorkbenchSourceScopeBrowserPending.patch`，后续拆分为独立场景。失败日志 `/tmp/WorkbenchSourceScopeBrowser.log` 保留。
+
+## 前台入口改造（2026-09-14）
+
+操作中心现在先展示五阶段顺序及产物，再填写仓库目录和源码版本；已保存输入位于表单之后。无项目输入时，一键执行禁用并说明前置操作；历史运行和健康信息使用独立的次要区域。沿用现有Console与阶段接口，没有新增前端框架。
+
+入口浏览器场景第一次3.5秒通过；最终禁用样式修改后独立重跑28.5秒通过（总35.2秒），`/tmp/WorkbenchEntryBrowserFinal.log`。桌面和390px窄屏均检查五阶段说明、前置状态、输入焦点、操作可见性及无横向溢出。3项关联页面/版本计数测试、typecheck、Spec检查通过。组合重跑的原长流程在初次治理入口点击超时，入口场景随后在导航超时；同期可用内存约217MiB，尚未证实唯一根因，失败日志`/tmp/WorkbenchEntryFlowBrowser.log`保留，不能称原长流程已回归通过。
+
+截图仅对照布局：之前来自旧部署的已有数据，之后来自当前代码的空库受控浏览器场景，不能用来比较运行数量或证明真实模型验收。后续仍需深入阶段操作、卡片/评测/关联详情及部署检查。
+
+| 视图 | 改造前 | 当前入口 |
+| --- | --- | --- |
+| 桌面 | [截图](workbenchScreenshots/BeforeDesktop.png) | [截图](workbenchScreenshots/AfterDesktop.png) |
+| 窄屏 | [截图](workbenchScreenshots/BeforeNarrow.png) | [截图](workbenchScreenshots/AfterNarrow.png) |
+
+最终PR处理遵循用户最新条件：全部实现、真实验收与部署完成后，审查#50与#38是否为完整包含关系；若包含，关闭#38并合入#50；若不包含，解决冲突并保留双方改动、合入两个PR。目前未执行关闭或合入。

@@ -478,6 +478,7 @@ function renderOverview() {
   content.innerHTML = `
     ${notices.length ? partialNotice(`${notices.map((key) => RESOURCE_LABELS[key] ?? key).join('、')}获取失败；其余区域仍展示已读取的服务端事实。`) : ''}
     ${repositoryAnalysisPanel.html()}
+    <header class="workbench-history-heading"><h2>历史运行与知识健康</h2><p>既有批次的待处理事项，与上方当前知识任务分开查看。</p></header>
     <section class="overview-summary-grid" aria-label="关键摘要">
       <article class="attention-summary">
         <span class="attention-orb"><i></i></span>

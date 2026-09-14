@@ -120,10 +120,15 @@ export function createRepositoryAnalysisPanel({ root, request, escapeHtml: escap
   return {
     focus: () => { const element = document.activeElement; return element?.closest('[data-repository-form], [data-project-form], [data-generation-panel]') ? { name: element.name, start: element.selectionStart, end: element.selectionEnd } : null },
     restore: (focus) => { history.refresh(); generation.refresh(); if (!focus) return; const field = root.querySelector(`[name="${CSS.escape(focus.name)}"]`); field?.focus({ preventScroll: true }); if (typeof focus.start === 'number') field?.setSelectionRange(focus.start, focus.end) },
-    html: () => `<section class="repository-panel" data-repository-panel><h2>代码仓</h2><section data-project-history>${history.html()}</section><form data-repository-form>
+    html: () => `<section class="repository-panel" data-repository-panel>
+      <header class="workbench-intro"><h2>从代码仓开始知识任务</h2><p>先固定源码与模块范围，再逐步执行，或一键串联全部阶段。</p></header>
+      <ol class="workbench-route" aria-label="知识任务的五个阶段">
+        ${[['知识库生成', '可阅读的卡片与来源'], ['知识索引', '摘要、索引与问题检索'], ['知识飞轮', '重建代码、差异与修订'], ['知识评测', '可信用例与失败详情'], ['知识关联', '关联原因与替代卡片']].map(([title, artifact], index) => `<li><span aria-hidden="true">${index + 1}</span><div><strong>${title}</strong><small>${artifact}</small></div></li>`).join('')}
+      </ol>
+      <div class="repository-input-heading"><h2>代码仓</h2><p>C / C++ 支持完整工作台；TypeScript 保留模块回归，其他语言尚未支持。</p></div><form data-repository-form>
       <label>服务器仓库目录<input name="repositoryDirectory" value="${escape(directory)}" placeholder="粘贴 Git 仓库根目录" required></label>
       <label>源码版本<input name="repositoryRevision" value="${escape(revision)}" placeholder="分支、标签或提交" maxlength="256" required></label>
       <button class="primary-button" type="submit" ${busy || saving || !isEditable() ? 'disabled' : ''}>${busy ? '分析中…' : '分析仓库'}</button></form>
-      <p role="status" data-repository-notice>${escape(error)}</p><details ${report || error ? 'open' : ''}><summary>分析结果</summary><div data-repository-result>${result() || '<p>分析后显示固定提交、模块候选和环境检查。</p>'}</div></details>${generation.html()}</section>`,
+      <p role="status" data-repository-notice>${escape(error)}</p><section class="repository-history" data-project-history>${history.html()}</section><details ${report || error ? 'open' : ''}><summary>分析结果</summary><div data-repository-result>${result() || '<p>分析后显示固定提交、模块候选和环境检查。</p>'}</div></details>${generation.html()}</section>`,
   }
 }

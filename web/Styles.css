@@ -1283,6 +1283,27 @@ body.drawer-active { overflow: hidden; }
 }
 
 .repository-panel { padding: 18px; margin-bottom: 20px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+.workbench-intro h2 { margin: 0 0 8px; font-size: 23px; line-height: 1.4; }
+.workbench-intro p, .repository-input-heading p, .workbench-history-heading p { color: var(--muted); margin: 0; line-height: 1.6; }
+.workbench-route { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; list-style: none; padding: 18px 0; margin: 16px 0 22px; border-block: 1px solid var(--border); }
+.workbench-route li { display: flex; gap: 9px; min-width: 0; }
+.workbench-route li > span { color: var(--accent); font: 13px ui-monospace, monospace; padding-top: 3px; }
+.workbench-route strong { font-size: 14px; }
+.workbench-route small { margin-top: 5px; font-size: 12px; line-height: 1.5; }
+.repository-input-heading { margin-bottom: 14px; }
+.repository-input-heading h2 { margin: 0 0 5px; font-size: 18px; }
+.repository-input-heading p { font-size: 12px; }
+.repository-history { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; align-items: end; padding-top: 16px; }
+.repository-history p { grid-column: 1 / -1; margin: 0; font-size: 12px; color: var(--muted); }
+.pipeline-prerequisite { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 0; margin-top: 16px; border-top: 1px solid var(--border); }
+.pipeline-prerequisite h3 { margin: 0 0 6px; font-size: 16px; }
+.pipeline-prerequisite p { margin: 0; color: var(--muted); font-size: 13px; }
+.pipeline-prerequisite button { flex-shrink: 0; }
+.pipeline-prerequisite button:disabled { background: var(--surface-2); border-color: var(--border); color: var(--muted); cursor: not-allowed; }
+.workbench-history-heading { margin: 26px 0 12px; }
+.workbench-history-heading h2 { margin: 0 0 4px; font-size: 17px; }
+.workbench-history-heading p { font-size: 12px; }
+.workbench-history-heading + .overview-summary-grid > article { min-height: 140px; padding: 16px; }
 .repository-panel form { display: flex; gap: 12px; align-items: end; }
 .repository-panel label { display: grid; gap: 6px; flex: 1; min-width: 0; }
 .repository-panel input { width: 100%; min-width: 0; }
@@ -1295,6 +1316,13 @@ body.drawer-active { overflow: hidden; }
 .project-build-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 12px 0; }
 .project-build-fields select, .project-build-fields textarea { width: 100%; min-width: 0; }
 @media (max-width: 720px) { .repository-panel form { flex-direction: column; align-items: stretch; } }
+@media (max-width: 720px) {
+  .workbench-intro h2 { font-size: 20px; }
+  .workbench-route { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; margin-block: 12px 18px; padding-block: 14px; }
+  .repository-history { grid-template-columns: minmax(0, 1fr); }
+  .repository-history button { justify-self: start; }
+  .pipeline-prerequisite { align-items: stretch; flex-direction: column; gap: 12px; }
+}
 @media (max-width: 480px) { .project-build-fields { grid-template-columns: minmax(0, 1fr); } }
 
 /* 阶段输入标识和诊断在窄屏换行，接口字段不撑开操作中心。 */

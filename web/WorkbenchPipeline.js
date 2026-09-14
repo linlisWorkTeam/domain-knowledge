@@ -27,7 +27,10 @@ export function createWorkbenchPipelinePanel({ root, request, escapeHtml: escape
     if (selected?.snapshotId !== fixedSnapshot) { fixedSuites.clear(); fixedSnapshot = selected?.snapshotId ?? null }
     const moduleIds = Object.keys(selected?.scopes ?? {})
     const fixedIncomplete = fixedSuites.size > 0 && moduleIds.some(id => !fixedSuites.has(id))
-    if (!selected && !pipeline) { panel.innerHTML = ''; return }
+    if (!selected && !pipeline) {
+      panel.innerHTML = '<div class="pipeline-prerequisite"><div><h3>一键串联五个阶段</h3><p>分析仓库并保存项目输入后即可启动；也可以逐步执行。</p></div><button class="primary-button" type="button" disabled>一键执行全部</button></div>'
+      return
+    }
     const resumable = pipeline && ['FAILED', 'PAUSED', 'CANCELLED'].includes(pipeline.status) && pipeline.contractVersion === 'knowledge-pipeline-v17'
     panel.innerHTML = `<h3>五阶段工作台</h3><p>生成卡片、建立索引、重建代码、执行评测，再建立关联。每一步仍可独立执行。</p>
       ${selected ? `<details><summary>一键流程的外部材料</summary><p>从来源页面捕获快照后选择；启动时冻结所选版本。</p><button type="button" class="secondary-button" data-pipeline-material-refresh>刷新材料</button><p>${escape(materialNotice)}</p>${materials.map((item) => `<label class="inline-check material-choice"><input type="checkbox" data-pipeline-material="${escape(item.materialId)}" ${selectedMaterials.has(item.materialId) ? 'checked' : ''} ${busy || active() ? 'disabled' : ''}><span>${escape(item.title)} · ${escape(item.applicability)}</span><small>${escape(item.sourceRevision)}</small></label>`).join('')}</details>` : ''}
