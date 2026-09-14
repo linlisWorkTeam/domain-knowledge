@@ -444,3 +444,7 @@ This document summarizes older handoffs, milestones and architectural decisions 
 ## 2026-09-14 归档：网站更新与旧owner阻挡
 
 [2335 原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/21d1e1f/docs/epitaph/2026-09-14-2335-deployed-legacy-owner-block.md)：2c55117网站切换、完整备份、公网资源及数据核对完成；旧无owner检查点阻挡删除，未绕过。后续诊断修复已提交未部署，C++来源复核出现独立格式反馈缺陷，后续记录继续处理。
+
+## 2026-09-14 归档：旧身份诊断与C++门禁
+
+[2340 原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/ef65123/docs/epitaph/2026-09-14-2340-owner-diagnostics-cpp-gates.md)：旧owner诊断修复与23项回归完成；C++cf781重建和后续37+40门禁已在后续记录确认通过。旧source348de05已取消，后续已启动独立v5复核，不能按旧记录重启重复任务。
