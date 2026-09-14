@@ -178,3 +178,14 @@ C++固定任务79e38从14条参考检查点恢复后一次完成80条参考/生�
 绑定 a113f9 重建的可信任务 `stage-0187ebe80e13b2637b63bf5d33f9a84662b8a68619029981ec41b409daa2b3d6` 成功，31/31、复用31、新增模型调用0，累计125237ms。控制进程在内存不足时由原检查点继续，未改变512MiB编译隔离/预检；仅临时验收控制进程降低堆上限至128/96MiB，线上默认384MiB不变。参考31、生成31观察保留，69份引用工件SHA及大小审计通过，`c-v11-evaluation/ArtifactAudit.json`。
 
 固定任务 `stage-477154765f51596d9a8d8a60a8993abdba3df430e7831b0a79b2f936583d55eb` 成功，11/11、参考通过、接口兼容，0模型调用、21376ms；复用原固定测试集，29工件审计通过。证据 `c-v11-fixed/`。关联v3任务 `stage-ab5263ef504ddbca838d4e6c53fe9608a5c3b8b83c2535a17e95eccc9d8d169f` 成功，7卡40库内关系、无外部材料，工件审计通过。来源复核和最终发布尚未完成，结果仍未导入线上。
+
+
+## 项目设置与阶段入口部署（2026-09-14 20:12）
+
+网站当前运行 `dab50a5f9b2304caab6423a366b2575a5944ec3c`：[临时工作台](https://contract-strict-warren-theories.trycloudflare.com/)。[CI 34841242834](https://github.com/linlisWorkTeam/domain-knowledge/actions/runs/34841242834) 全部通过：代码619/619、Console41/41、验收25/25。这里的自动化验收不等于真实模型 C/C++ 全链路已通过。
+
+独立发行目录 `2026-09-14-workbench-dab50a5/app` 使用自身 npm ci 依赖，保留原运行目录与 tunnel。切换后 Console PID113062，本机4310及公网能力、运行和卡片接口均可读，免登录编辑仍启用，8个历史运行、1张卡片保留。停机后备份保留符号链接，位于该发行的 `pre-deploy-backup`；未删除用户数据。
+
+公网只读浏览器检查确认独立项目页不含源码版本输入及执行面板，窄屏主要按钮可见、旧知识正文可读，模型及提示词默认折叠，发布说明悬停出现且移开隐藏，无页面脚本错误。证据 `/tmp/WorkbenchDabBrowser2.log` 与发行 `browser/Result.json`；[此前项目页](workbenchScreenshots/ProjectSettingsBeforeDab.png)、[当前项目页](workbenchScreenshots/ProjectSettingsDab.png)、[当前悬停说明](workbenchScreenshots/PublicationHelpDab.png)。此验证未向线上导入验收任务或发起模型调用，线上模型配置显示尚未验证。
+
+首轮公网检查发现窄屏放大到桌面后导航 aria-hidden 未同步。常规桌面和窄屏分别加载通过；视口切换修复已在源代码补上，针对性浏览器1/1通过（`/tmp/ResponsiveNavFix.log`），尚未纳入已部署的 dab50a5。历史批次删除及真实 C/C++ 来源/发布验收仍未完成。

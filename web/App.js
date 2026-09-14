@@ -1803,6 +1803,7 @@ operatorButton.addEventListener('click', async () => {
 themeButton.addEventListener('click', () => {
   applyTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light', true)
 })
+matchMedia('(max-width: 767px)').addEventListener('change', closeNavigation)
 navToggle.addEventListener('click', () => sidebar.classList.contains('open') ? closeNavigation() : openNavigation())
 navBackdrop.addEventListener('click', () => { closeNavigation(); navToggle.focus() })
 globalSearchButton.addEventListener('click', async () => {
