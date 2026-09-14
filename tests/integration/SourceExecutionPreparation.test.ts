@@ -48,6 +48,17 @@ test('existing source task retains legacy input and consumed usage instead of an
   assert.equal(old.input.parameters.sourceAssessmentPolicy, undefined);
   assert.equal(old.input.parameters.sourceExecutionPolicy, undefined);
 });
+test('active and failed v5 tasks keep scoped inputs and usage without recollecting their own clues', async () => {
+  for (const status of ['RUNNING', 'FAILED', 'PAUSED', 'CANCELLED'] as const) {
+    const { f, old, service } = await setup(true);
+    old.status = status;
+    old.input.parameters.sourceExecutionPolicy = 'source-execution-scope-v1';
+    const before = structuredClone(old);
+    service.evaluation.dependencies.stages.store.checkpoints = () => { throw new Error('must not recollect active history'); };
+    assert.deepEqual(await service.prepare(f.ids.evaluation), before.input);
+    assert.deepEqual(old, before);
+  }
+});
 test('corrupt toolchain evidence stops preparation before a new source task is created', async () => {
   const { f, service } = await setup();
   f.contents.set(f.set.fingerprintRef.sha256, Buffer.from('corrupt'));

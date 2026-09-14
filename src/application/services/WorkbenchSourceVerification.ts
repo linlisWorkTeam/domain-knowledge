@@ -45,11 +45,15 @@ export class WorkbenchSourceVerification {
     if (parent.input.stage !== 'EVALUATE' || parent.input.parameters.operation !== undefined || parent.status !== 'SUCCEEDED' || !parent.result) throw new Error('SOURCE_VERIFICATION_EVALUATION_REQUIRED');
     const existing = stages.store.list(parent.input.projectId).find(task => task.input.parameters.operation === 'KNOWLEDGE_SOURCE_VERIFICATION'
       && task.input.parameters.verificationContract === SOURCE_VERIFICATION_CONTRACT && task.input.parameters.evaluationTaskId === evaluationTaskId);
-    if (existing) return existing.input;
+    // Active/failed executions keep their frozen input and accumulated usage. A completed
+    // execution may contribute a new proven contradiction, which needs its own frozen input.
+    if (existing && (existing.status !== 'SUCCEEDED' || existing.input.parameters.sourceExecutionPolicy === undefined)) return existing.input;
+    const priorFindings = await new WorkbenchSourceFindingHistory(this.evaluation).collect(parent);
+    if (existing && canonicalJson(await this.load(existing.input.parameters.priorFindingsRef as unknown as ArtifactRef)) === canonicalJson(priorFindings)) return existing.input;
     const evidence = await this.evaluation.revisionEvidence(evaluationTaskId);
     const configurationRef = parent.input.parameters.configurationRef as unknown as ArtifactRef;
     await configuration.assertStageCompatible(await this.load<StageModelConfiguration>(configurationRef));
-    const priorFindingsRef = await artifacts.put(Buffer.from(JSON.stringify(await new WorkbenchSourceFindingHistory(this.evaluation).collect(parent))), 'application/json');
+    const priorFindingsRef = await artifacts.put(Buffer.from(JSON.stringify(priorFindings)), 'application/json');
     const pendingConcernsRef = await artifacts.put(Buffer.from(JSON.stringify(await new WorkbenchSourceFindingHistory(this.evaluation).collectConcerns(parent))), 'application/json');
     const evidenceRef = await artifacts.put(Buffer.from(canonicalJson(evidence)), 'application/json');
     const project = this.evaluation.dependencies.projects.get(String(parent.input.parameters.snapshotId));
