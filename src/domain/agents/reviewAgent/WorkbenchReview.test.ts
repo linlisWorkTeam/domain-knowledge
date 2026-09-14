@@ -183,3 +183,22 @@ test('review: pending concerns cannot disappear and disproof quotes must exist i
   assert.throws(() => validateOutput({ ...pass, concernResolutions: [{ ...resolution, disposition: 'UNRESOLVED' }] }, sample.input), /REVIEW_CONCERN_UNRESOLVED/);
   assert.throws(() => validateOutput({ ...pass, concernResolutions: [resolution, resolution] }, sample.input), /REVIEW_CONCERN_UNRESOLVED/);
 });
+
+test('review: newline-only quote mismatches receive repair guidance without accepting changed source', () => {
+  const sample = roleExample<Input>('review', 'src/domain/agents/reviewAgent/examples/WorkbenchReviewSample.json');
+  const criteria = sample.input.materials.find(m => m.ref.artifactId === sample.input.payload.criteriaRef.artifactId)!;
+  criteria.content = { pendingReviewConcerns: [{ concernId: 'one', criterion: 'Definition location', risk: 'Wrong location' }] };
+  const source = sample.input.materials.find(m => m.ref.artifactId === sample.input.payload.evaluationReportRef.artifactId)!;
+  sample.input.payload.checkReportRef = source.ref;
+  const content = 'inline int value() {\r\n    return 1;\r\n}';
+  source.content = { files: [{ path: 'api.h', content }] };
+  const output = (quote: string) => ({ blocking: false, recommendation: 'PASS' as const, correction: null,
+    concernResolutions: [{ concernId: 'one', disposition: 'DISPROVED' as const, reason: 'The definition is inline.', sourceQuotes: [{ path: 'api.h', quote }] }] });
+  assert.throws(() => validateOutput(output(content.replaceAll('\r\n', '\n')), sample.input),
+    (error: unknown) => error instanceof Error && 'issue' in error && /CRLF\/LF/.test((error.issue as { hint: string }).hint));
+  assert.doesNotThrow(() => validateOutput(output(content), sample.input));
+  assert.doesNotThrow(() => validateOutput(output('inline int value() {'), sample.input));
+  for (const quote of [content.replace('return 1', 'return 2'), content.replace('    return', '\treturn'), content.replace('value()', 'value( )')]) {
+    assert.throws(() => validateOutput(output(quote), sample.input), /REVIEW_CONCERN_UNRESOLVED/);
+  }
+});

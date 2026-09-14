@@ -169,7 +169,14 @@ export function validateConcernResolutions(output: Output, input: Input): void {
   const reference = input.materials.find(({ ref }) => ref.artifactId === input.payload.checkReportRef?.artifactId)?.content as { files?: Array<{ path: string; content: string }> } | undefined;
   for (const resolution of resolutions!) {
     if (!['CONFIRMED', 'DISPROVED', 'UNRESOLVED'].includes(resolution.disposition) || !resolution.reason?.trim() || !Array.isArray(resolution.sourceQuotes)) invalid('回应需要结论、理由和sourceQuotes数组。');
-    if (resolution.sourceQuotes.some(q => !q.quote?.trim() || !reference?.files?.some(f => f.path === q.path && f.content.includes(q.quote)))) invalid('源码引用必须逐字存在于本轮checkReportRef的固定文件中，不能引用其他材料或虚构文本。');
+    for (const quote of resolution.sourceQuotes) {
+      const file = reference?.files?.find(f => f.path === quote.path);
+      if (quote.quote?.trim() && file?.content.includes(quote.quote)) continue;
+      if (quote.quote?.trim() && file?.content.replaceAll('\r\n', '\n').includes(quote.quote.replaceAll('\r\n', '\n'))) {
+        invalid('源码引用的CRLF/LF换行符与固定文件不一致。保持原结论和理由，从checkReportRef逐字复制引用，在JSON中保留\\r\\n；也可引用足以支持理由的完整单行源码。不要改写源码、移除必要证据或改判PASS。');
+      }
+      invalid('源码引用必须逐字存在于本轮checkReportRef的固定文件中，不能引用其他材料或虚构文本。');
+    }
     if (resolution.disposition === 'DISPROVED' && !resolution.sourceQuotes.length) invalid('否定线索必须提供固定源码的具体引用和理由，不能仅因测试通过而否定。');
     if (resolution.disposition === 'CONFIRMED' && (!output.correction || output.recommendation !== 'ITERATE')) invalid('确认线索需要保留定位修订意见和ITERATE结论。');
     if (resolution.disposition === 'UNRESOLVED' && (!output.unresolvedRisks?.length || output.recommendation !== 'ITERATE')) invalid('尚不能决定的线索需要保留unresolvedRisks与ITERATE，不能宣称通过。');
