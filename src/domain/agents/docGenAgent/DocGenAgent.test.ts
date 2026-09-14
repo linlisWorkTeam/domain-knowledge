@@ -153,3 +153,19 @@ test('doc-gen: multiline outline titles are rejected before entering the body st
   await assert.rejects(execute(sample.input, sample.context), /DOC_GEN_TITLE_INVALID/);
   assert.deepEqual(sample.requests.map(({ stage }) => stage), ['outline', 'outline:attempt-2']);
 });
+
+test('doc-gen: source footer separators are preserved without admitting Setext headings', async () => {
+  for (const revision of [false, true]) {
+    const sample = roleExample<Input>('doc-gen');
+    if (!revision) { delete sample.input.payload.baseKnowledgeRef; delete sample.input.payload.corrections; }
+    const wire = revision ? sample.output : sample.modelStages.body;
+    wire.sections[0].body += '\n\n---\n\n来源提交：固定版本。\n';
+    const result = await execute(sample.input, sample.context);
+    assert.match(result.output.body, /\n\n---\n\n来源提交：固定版本。/);
+  }
+  for (const underline of ['---', '===']) {
+    const sample = roleExample<Input>('doc-gen');
+    sample.output.sections[0].body += `\nInjected heading\n${underline}\n`;
+    await assert.rejects(execute(sample.input, sample.context), /DOC_GEN_SECTION_HEADING_INVALID/);
+  }
+});

@@ -32,14 +32,18 @@ export function sectionSchema(): Record<string, unknown> {
 function validateSection(body: string, field: string): void {
   if (/\r(?!\n)/.test(body)) throw new StageValidationIssue('DOC_GEN_SECTION_LINE_ENDING_INVALID', field, '章节正文使用 LF 或 CRLF，不能以单独 CR 隐藏标题边界。');
   let fence: { marker: string; length: number } | undefined;
-  for (const line of body.split(/\r?\n/)) {
+  const lines = body.split(/\r?\n/);
+  for (const [index, line] of lines.entries()) {
     const marker = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
     if (marker) {
       if (!fence) fence = { marker: marker[1]![0]!, length: marker[1]!.length };
       else if (marker[1]![0] === fence.marker && marker[1]!.length >= fence.length && !marker[2]!.trim()) fence = undefined;
       continue;
     }
-    if (!fence && (/^ {0,3}#{1,2}(?:[ \t]|$)/.test(line) || /^ {0,3}(?:=+|-+)[ \t]*$/.test(line))) {
+    // 空行后的横线是分隔线；紧接正文的横线仍可能把正文变成 Setext H2。
+    const separatedRule = /^ {0,3}-{3,}[ \t]*$/.test(line)
+      && (index === 0 || !lines[index - 1]!.trim());
+    if (!fence && (/^ {0,3}#{1,2}(?:[ \t]|$)/.test(line) || (!separatedRule && /^ {0,3}(?:=+|-+)[ \t]*$/.test(line)))) {
       throw new StageValidationIssue('DOC_GEN_SECTION_HEADING_INVALID', field, '章节标题由系统生成；body 只包含章节内容，子主题使用 ###，示例标题放在闭合代码围栏内。');
     }
   }

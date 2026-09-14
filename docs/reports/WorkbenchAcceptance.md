@@ -7,7 +7,7 @@
 | 目标 | 固定提交 | 当前卡片数 | 可信用例 | 固定用例 | 来源及发布 |
 | --- | --- | --- | --- | --- | --- |
 | jsmn（C） | `25647e692c7906b96ffd2b05ca54c097948e879c` | 7 | 当前重建31/31，复用31、新增0 | 同一重建11/11，参考实现也通过 | 来源复核结束，5个差异与5个未解决段落；未发布 |
-| TinyXML2 XMLUtil 类型转换（C++） | `8224e427b655b83dae5e2298f1e6919523a78737` | 9 | 当前新重建37/37，复用37、新增0 | 同一新重建40/40，参考也通过 | 当前来源复核运行中，已冻结构建范围；未发布 |
+| TinyXML2 XMLUtil 类型转换（C++） | `8224e427b655b83dae5e2298f1e6919523a78737` | 9 | 当前新重建37/37，复用37、新增0 | 同一新重建40/40，参考也通过 | 来源复核结束，8个差异与5个未解决段落；未发布 |
 
 TinyXML2不以整个XML库重建为验收范围。两份C++生成工件经CAS读取比较不相同，不能将较新重建的可信报告与旧重建的固定报告组合为一轮通过。所有参考工件均保留原用例输入与预期，不改写已发布v0.2.0。
 
@@ -29,10 +29,10 @@ TinyXML2不以整个XML库重建为验收范围。两份C++生成工件经CAS读
 - 较新重建：`stage-6c90426ab4e9411531f90f05cf0e2b7f96426de30af1c4e03a212b73b1f82687`，源码比较契约为 `native-source-comparison-v1`。
 - 对应可信评测：`stage-5377823175a28a2f7caa81d377387cb4eab75569b734f32c2f26d6e43d38019f`，37/37。
 - 当前固定评测：`stage-4db04d343b050a929aaf224665e30280d5e3e1f40014fd45da3632aca4a2002e`，40/40、参考通过，绑定当前17d6重建。
-- 当前来源复核：`stage-5089612faaa3ef67a2d36d24f4cc188e9f7408133e825775be1f872840d1fee6`，RUNNING，冻结g++/c++17/x64单构建及可信集，原始材料已通过CAS校验并绑定运行检查点。
+- 当前来源复核：`stage-5089612faaa3ef67a2d36d24f4cc188e9f7408133e825775be1f872840d1fee6`，SUCCEEDED/UNRESOLVED；63段中50匹配、8差异、5未解决，335份引用工件CAS校验通过。冻结g++/c++17/x64单构建及可信集，不代表其他平台和宏配置已验证。
 - 旧固定评测：`stage-0c88144a957f43afb72226de55d7bd034a40f2e0183023ca214e374e4f1f752f`，40/40，但绑定 `stage-fb5de0539cd320c6c3547e69e4af4b1137b7e99027e69141abb6b020af5a3c72`。
 
-另已校验C++与当前C任务冻结配置：角色执行版本、契约和基础提示词一致，但供应商parametersSha256不同，不能直接跨配置继续来源复核。当前已用新配置重建同一组9张卡片，已通过原37个可信用例，已通过原40个固定用例，正在执行新scope来源复核，随后完成整卡来源、必要修订/补证、关联和发布。排队或脚本已准备不算执行通过。
+另已校验C++与当前C任务冻结配置：角色执行版本、契约和基础提示词一致，但供应商parametersSha256不同，不能直接跨配置继续来源复核。当前已用新配置重建同一组9张卡片，已通过原37个可信用例，已通过原40个固定用例，来源复核已结束，正在通过来源修订任务 `stage-83b367fb2ab4c6a9d6c4d24b439ef61a0f922ae807b27ec7a3ac5101227ed918` 处理明确差异。首次执行在保存三张候选版本后因 `DOC_GEN_SECTION_HEADING_INVALID` 停止；实证为来源尾注前空行隔开的 `---` 被误判为 Setext 标题。校验器现区分该分隔线，18项相关测试及类型/Spec检查通过，原始失败输出保留。随后仍须完成索引、必要补证、关联和发布。排队或脚本已准备不算执行通过。
 
 ## 回归证据及限制
 
@@ -61,6 +61,7 @@ TinyXML2不以整个XML库重建为验收范围。两份C++生成工件经CAS读
 - `evaluation-after-target-policy/ImmutableGateAudit.json`：31个可信输入与预期未变。
 - `fixed-after-target-policy/Fixed.json`：当前C固定评测。
 - `source-after-target-policy/Source.json`：已结束来源任务及检查点；`FinalCheckpointAudit.json`保存53段及172份工件审计。
+- `cpp-source-current-provider/FinalCheckpointAudit.json`：与SQLite终态一致，63段结果及335份工件摘要/长度核验。
 - `cpp-current-binding-audit/BindingAudit.json`：C++新旧重建及报告绑定审计，CAS读取校验通过。
 - `supplement-after-selection-v1/CandidateRejectionAudit.json`：旧补证候选拒绝及未命中审计。
 
