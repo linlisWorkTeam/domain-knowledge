@@ -456,3 +456,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 - [2026-09-14-2355 来源v5线索冻结](https://github.com/linlisWorkTeam/domain-knowledge/blob/234919a/docs/epitaph/2026-09-14-2355-source-v5-pending-concerns.md)：同源码/卡片版本冻结2条失败线索，逐条回应并绑定引用；来源继续发现未知风险与格式问题，后续隔离诊断反驳裸0x失败推断，未完成修订发布。
 
 - [2026-09-14-2359 换行引用恢复](https://github.com/linlisWorkTeam/domain-knowledge/blob/956fe2649acc67ac2ad7557a27ff719acd8525fc/docs/epitaph/2026-09-14-2359-source-v5-newline-resume.md)：保留逐字校验并反馈CRLF差异，同任务恢复保留累计用量。后续任务已执行结束但来源质量未解决，不能依据本记录重启。
+
+- [2026-09-14-2359 UI与来源恢复](https://github.com/linlisWorkTeam/domain-knowledge/blob/679d05b/docs/epitaph/2026-09-14-2359-ui-source-resume.md)：前台v5操作入口与来源恢复的历史交接；后续956fe26已部署，来源434571已执行结束但质量未通过，勿依旧记录恢复已完成任务。

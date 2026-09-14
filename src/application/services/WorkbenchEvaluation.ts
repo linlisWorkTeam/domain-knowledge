@@ -6,7 +6,7 @@
 import { moduleBuild, moduleFingerprintKey } from '../../domain/workbench/WorkbenchProject.ts';
 import { sha256, type ArtifactRef } from '../../domain/Domain.ts';
 import { canonicalJson, createStageTask, type JsonValue } from '../../domain/workbench/StageTask.ts';
-import { nativeSupplementTargets, nativeSupplementTargetCoverage, type NativeSupplementTargets } from '../../domain/evaluation/NativeSupplementTargets.ts';
+import { nativeSupplementTargets, nativeSupplementTargetCoverage, readNativeSuppliedCandidates, type NativeSuppliedCandidates, type NativeSupplementTargets } from '../../domain/evaluation/NativeSupplementTargets.ts';
 import { nativeFunctions, assertNativeContract, type NativeContract, type NativeBehaviorSuite } from '../../domain/evaluation/NativeBehaviorSuite.ts';
 import { compareNativeObservations, type NativeBehaviorCase, type NativeScalar } from '../../domain/evaluation/NativeBehaviorSuite.ts';
 import { nativeRevisionEvidence } from '../../domain/evaluation/NativeRevisionEvidence.ts';
@@ -74,25 +74,48 @@ export class WorkbenchEvaluation {
     if (!total) throw new Error('PIPELINE_PROGRESS_UNAVAILABLE');
     return { total, passed, failed: [...new Set(failed)].sort() };
   }
-  async start(reconstructionTaskId: string, sourceVerificationTaskId?: string) {
-    return this.dependencies.stages.start(await this.prepare(reconstructionTaskId, sourceVerificationTaskId));
+  async start(reconstructionTaskId: string, sourceVerificationTaskId?: string, candidateSuites?: unknown) {
+    return this.dependencies.stages.start(await this.prepare(reconstructionTaskId, sourceVerificationTaskId, candidateSuites));
   }
-  async prepare(reconstructionTaskId: string, sourceVerificationTaskId?: string): Promise<import('../../domain/workbench/StageTask.ts').StageInput> {
+  async prepare(reconstructionTaskId: string, sourceVerificationTaskId?: string, candidateSuites?: unknown): Promise<import('../../domain/workbench/StageTask.ts').StageInput> {
     const { stages, configuration } = this.dependencies;
     const previous = stages.get(reconstructionTaskId);
     if (previous.contractVersion !== 'knowledge-workbench-v1' || previous.input.stage !== 'FLYWHEEL' || previous.input.parameters.operation !== undefined || previous.status !== 'SUCCEEDED' || !previous.result) throw new Error('EVALUATION_RECONSTRUCTION_REQUIRED');
     const configurationRef = previous.input.parameters.configurationRef as unknown as ArtifactRef;
     await configuration.assertStageCompatible(await this.load<StageModelConfiguration>(configurationRef));
     const supplement = sourceVerificationTaskId ? await this.supplementDemand(sourceVerificationTaskId, reconstructionTaskId) : null;
+    if (candidateSuites !== undefined && !supplement) throw new Error('NATIVE_SUPPLEMENT_SOURCE_REQUIRED');
+    const supplied = candidateSuites === undefined ? null : await this.suppliedCandidates(previous, candidateSuites, supplement!.demands.map(item => item.versionId));
+    const suppliedCandidatesRef = supplied ? await this.dependencies.artifacts.put(Buffer.from(canonicalJson(supplied)), 'application/json') : null;
     const supplementRef = supplement ? await this.dependencies.artifacts.put(Buffer.from(canonicalJson(supplement)), 'application/json') : null;
     const input: import('../../domain/workbench/StageTask.ts').StageInput = { ...previous.input, stage: 'EVALUATE', parameters: { ...previous.input.parameters, reconstructionTaskId,
-      reconstructionDigest: sha256(canonicalJson(previous.result)), ...(supplementRef ? { supplementContract: NATIVE_SUPPLEMENT_CONTRACT,
+      reconstructionDigest: sha256(canonicalJson(previous.result)), ...(suppliedCandidatesRef ? { suppliedCandidatesRef: json(suppliedCandidatesRef) } : {}), ...(supplementRef ? { supplementContract: NATIVE_SUPPLEMENT_CONTRACT,
         sourceVerificationTaskId: sourceVerificationTaskId!, supplementRef: json(supplementRef) } : {}) } };
     // Existing frozen executions retain their identity and consumed budget. Never silently upgrade a retry.
     if (supplement && !stages.store.get(createStageTask(input, {}, new Date().toISOString()).taskId)) {
       input.parameters.supplementTargets = json(nativeSupplementTargets(supplement.demands.map(item => item.sectionId)));
     }
     return input;
+  }
+  private async suppliedCandidates(previous: ReturnType<WorkbenchStages['get']>, value: unknown, demandedVersionIds: string[]) {
+    const { repository, artifacts } = this.dependencies;
+    if (!previous.result) throw new Error('EVALUATION_RECONSTRUCTION_REQUIRED');
+    const modules = [];
+    for (const module of previous.result.summary.modules as unknown as ModuleResult[]) {
+      if (!module.cardVersionIds.some(id => demandedVersionIds.includes(id))) continue;
+      const api = await this.load<Awaited<ReturnType<NativeLanguageToolchain['publicInterface']>>>(module.interfaceRef);
+      const contract: NativeContract = { schemaVersion: 'native-contract-v1', language: module.language, includePath: api.sourcePath,
+        entryPaths: [], declarations: api.declarations, targetFunctions: [] };
+      contract.targetFunctions = [...nativeFunctions(contract).keys()];
+      const sectionIds: string[] = [];
+      for (const id of module.cardVersionIds) {
+        const card = repository.getKnowledgeVersion(id);
+        if (!card || !previous.input.cardVersionIds.includes(id) || !await artifacts.verify(card.bodyRef)) throw new Error('STAGE_ARTIFACT_CORRUPT');
+        sectionIds.push(...markdownSections(Buffer.from(await artifacts.get(card.bodyRef)).toString('utf8')).map(section => `${card.metadata.cardId}#${section.heading}`));
+      }
+      modules.push({ moduleId: module.moduleId, contract, sectionIds });
+    }
+    return readNativeSuppliedCandidates(value, modules);
   }
   private async supplementDemand(sourceTaskId: string, reconstructionTaskId: string) {
     const { stages, repository, artifacts } = this.dependencies;
@@ -129,6 +152,9 @@ export class WorkbenchEvaluation {
     const previous = stages.get(String(context.task.input.parameters.reconstructionTaskId));
     if (!previous.result || previous.status !== 'SUCCEEDED' || sha256(canonicalJson(previous.result)) !== context.task.input.parameters.reconstructionDigest
       || previous.inputDigest !== sha256(canonicalJson({ contractVersion: previous.contractVersion, input: previous.input, limits: previous.limits }))) throw new Error('STAGE_INPUT_CHANGED');
+    const suppliedRef = parameters.suppliedCandidatesRef as unknown as ArtifactRef | undefined;
+    const supplied: NativeSuppliedCandidates | null = suppliedRef ? await this.suppliedCandidates(previous, await this.load(suppliedRef), supplement?.demands.map(item => item.versionId) ?? []) : null;
+    if (supplied && !supplement) throw new Error('NATIVE_SUPPLEMENT_SOURCE_REQUIRED');
     const project = projects.get(String(context.task.input.parameters.snapshotId));
     if (!project || project.commit !== context.task.input.sourceRevision || project.sourceDigest !== context.task.input.sourceDigest) throw new Error('STAGE_INPUT_CHANGED');
     const configurationRef = context.task.input.parameters.configurationRef as unknown as ArtifactRef;
@@ -137,7 +163,7 @@ export class WorkbenchEvaluation {
     await configuration.assertStageCompatible(frozen);
     const modules = previous.result.summary.modules as unknown as ModuleResult[];
     if (!Array.isArray(modules) || !modules.length) throw new Error('EVALUATION_RECONSTRUCTION_REQUIRED');
-    const reports: JsonValue[] = []; const artifactRefs: ArtifactRef[] = [];
+    const reports: JsonValue[] = []; const artifactRefs: ArtifactRef[] = suppliedRef ? [suppliedRef] : [];
     for (const module of modules) {
       const selected = project.modules.find((item) => item.moduleId === module.moduleId);
       if (!selected || selected.language !== module.language) throw new Error('STAGE_INPUT_CHANGED');
@@ -215,7 +241,9 @@ export class WorkbenchEvaluation {
       context.progress({ phase: 'reference-validation', module: module.moduleId });
       const prepared = await evaluation.prepare({ projectSnapshotId: project.snapshotId, sourceRevision: project.commit,
         cardIds: knowledge.map((card) => card.cardId), versionIds: module.cardVersionIds, bodyRefs: cards.map((card) => card!.bodyRef),
-        reference, contract, policyDigest, ...(moduleDemands.length ? { supplement: { schemaVersion: 'native-supplement-v1' as const, demandDigest: supplement!.demandDigest, ...(moduleTargets ? { targets: moduleTargets } : {}) } } : {}), expectedToolchainDigest: fingerprint.digest, propose: async () => {
+        reference, contract, policyDigest, ...(moduleDemands.length ? { supplement: { schemaVersion: 'native-supplement-v1' as const, demandDigest: suppliedRef ? sha256(canonicalJson({ demandDigest: supplement!.demandDigest, suppliedCandidatesDigest: suppliedRef.sha256 })) : supplement!.demandDigest, ...(moduleTargets ? { targets: moduleTargets } : {}) } } : {}), expectedToolchainDigest: fingerprint.digest, propose: async () => {
+          const suppliedSuite = supplied?.modules.find(item => item.moduleId === module.moduleId)?.suite;
+          if (suppliedSuite) return suppliedSuite;
           const payload = { executionContract: 'behavior-cases-v1', moduleId: module.moduleId, sourceSnapshotRef, publicInterfaceRefs: [module.interfaceRef], languageId: module.language, testPolicyRef };
           const result = await roles.execute(context, frozen, 'test-gen', `${module.moduleId}:candidate:${candidateRevision}`, { payload,
             materials: [{ ref: sourceSnapshotRef, content: sourceMetadata }, { ref: module.interfaceRef, content: api }, { ref: testPolicyRef, content: policy }],

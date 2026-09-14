@@ -381,6 +381,34 @@ for (const { rejectSourceReview, mixedSourceRisks, overCapacity = false } of [{ 
       assert.equal((await composition.apps.workbenchEvaluation.start(sourceRebuilt.taskId, rechecked.taskId)).taskId, supplemental.taskId);
       assert.equal(testCalls, overCapacity ? 5 : 4);
       await assert.rejects(composition.apps.workbenchEvaluation.prepare(changedCode.taskId, rechecked.taskId), /NATIVE_SUPPLEMENT_BINDING_INVALID/);
+      if (!overCapacity) {
+        const candidate: any = { schemaVersion: 'native-supplied-candidates-v1', modules: [{ moduleId: 'math', suite: { schemaVersion: 'native-cases-v1', cases: [{
+          caseId: 'externalBoundary', description: 'Reference counterexample', sections: ['card-add#Limits'], variables: [],
+          calls: [{ function: 'add', arguments: [{ integer: '8' }, { integer: '9' }], result: 'sum' }],
+          observations: [{ name: 'sum', kind: 'integer', read: { variable: 'sum' } }], expected: { sum: '99' },
+        }] } }] };
+        const callsBefore = testCalls, runsBefore = generatedRuns;
+        await assert.rejects(composition.apps.workbenchEvaluation.prepare(sourceRebuilt.taskId, undefined, candidate), /NATIVE_SUPPLEMENT_SOURCE_REQUIRED/);
+        const bad = await composition.apps.workbenchEvaluation.start(sourceRebuilt.taskId, rechecked.taskId, candidate);
+        assert.equal((await composition.apps.workbenchStages.wait(bad.taskId)).reasonCode, 'TEST_CANDIDATE_REJECTED');
+        assert.equal(generatedRuns, runsBefore, 'wrong supplied expectations never reach generated evaluation');
+        assert.equal(testCalls, callsBefore, 'provided candidates are never silently replaced by model output');
+        const frozen = bad.input.parameters.suppliedCandidatesRef as any;
+        candidate.modules[0].suite.cases[0].expected.sum = '17';
+        assert.equal(JSON.parse(Buffer.from(await composition.artifacts.get(frozen)).toString()).modules[0].suite.cases[0].expected.sum, '99');
+        const good = await composition.apps.workbenchEvaluation.start(sourceRebuilt.taskId, rechecked.taskId, candidate);
+        assert.notEqual(good.taskId, bad.taskId);
+        const accepted = await composition.apps.workbenchStages.wait(good.taskId);
+        assert.equal(accepted.status, 'SUCCEEDED', accepted.reasonCode ?? '');
+        assert.equal(accepted.usage.modelCalls, 0);
+        const summary = (accepted.result!.summary.modules as any[])[0];
+        assert.equal(summary.reused, 2); assert.equal(summary.proposed, 1); assert.equal(summary.passed, 3);
+        assert.ok(accepted.result!.artifactRefs.some(ref => ref.sha256 === (good.input.parameters.suppliedCandidatesRef as any).sha256));
+        await composition.close(); composition = createComposition({ runtimeDir }); install();
+        assert.equal((await composition.apps.workbenchEvaluation.start(sourceRebuilt.taskId, rechecked.taskId, candidate)).taskId, good.taskId);
+        assert.equal(testCalls, callsBefore);
+      }
+
     }
   } finally { await composition.close(); rmSync(root, { recursive: true, force: true }); rmSync(runtimeDir, { recursive: true, force: true }); }
 });

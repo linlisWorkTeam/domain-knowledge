@@ -152,3 +152,6 @@ finalCommands 使用同一套编译/测试入口测评生成代码；firstIterat
 配置了 moduleContract 的 TypeScript 独立模块使用 section-doc-v1、source-facts-v1、behavior-cases-v1、workbench-code-v1 和 workbench-review-v1 显式协议，仍由同一七角色注册执行。原生通用项目继续使用默认角色协议。新运行冻结 domain-agents-v11-workbench-evidence，旧版本只读，不跨版本恢复。
 
 补证候选容量拒绝沿用TEST_CANDIDATE_REJECTED及候选修订检查点，拒绝报告增加candidateConstraint（原因码、最大容量、保留用例数及合并所需容量）。恢复时作为未可信反馈传给TestGen，并要求保留历史预期、减少新增候选；一条用例只能引用其实际验证的章节。没有参考观察不得伪造通过结果。执行器变更会改变工具链指纹，旧指纹任务不得跨指纹恢复。
+
+
+补证可提供native-supplied-candidates-v1声明式候选。Application核对成功重建、当前来源需求、模块、固定接口及卡片H2绑定，将规范化候选保存为输入suppliedCandidatesRef；Domain拒绝额外可信标志、未知模块和外部章节。候选摘要参与补证缓存身份，旧阶段输入不自动升级。执行时重读并校验CAS，交给原NativeSuiteEvaluation先验证参考实现，再合并历史可信用例并评测生成代码；不得接受外部观察报告作为oracle。失败候选保持原预期，同输入恢复不会调用模型替换；修改候选是新输入，不改写旧任务或累计用量。无候选的模块仍沿用现有TestGen流程，有候选但无对应补证需求时拒绝。结果保留候选引用，不将精确章节引用等同于语义覆盖，更不授予发布资格。

@@ -309,6 +309,8 @@ export function mapHttpError(error: unknown, id = 'req_unknown'): { status: numb
   if (['PIPELINE_SHUTDOWN', 'PIPELINE_OWNER_UNAVAILABLE'].includes(code)) return { status: 503, body: errorBody(code, code, id) };
   if (['SOURCE_REVISION_VERIFICATION_REQUIRED', 'SOURCE_REVISION_NO_CORRECTION', 'SOURCE_REVISION_BINDING_INVALID', 'SOURCE_VERIFICATION_EVALUATION_REQUIRED', 'SOURCE_VERIFICATION_CARD_UNBOUND', 'SOURCE_VERIFICATION_BINDING_INVALID', 'STAGE_CONTRACT_INCOMPATIBLE', 'STAGE_INPUT_CHANGED', 'STAGE_NOT_RESUMABLE', 'STAGE_BUDGET_EXHAUSTED', 'INDEX_VERSION_NOT_CURRENT', 'EVALUATION_RECONSTRUCTION_REQUIRED', 'RECONSTRUCTION_RETRY_INVALID', 'REVISION_COMPLETED_EVALUATION_REQUIRED', 'REVISION_REFERENCE_NOT_TRUSTED', 'REVISION_REPORT_BINDING_INVALID', 'REVISION_KNOWLEDGE_BINDING_INVALID', 'REVISION_NO_ELIGIBLE_FAILURE', 'REVISION_CARD_CHANGED', 'REVISION_CORRECTION_OUTSIDE_EVIDENCE'].includes(code)) return { status: 409, body: errorBody(code, message, id) };
   if (['STAGE_OWNER_UNAVAILABLE', 'STAGE_SHUTDOWN'].includes(code)) return { status: 503, body: errorBody(code, message, id) };
+  if (['NATIVE_SUPPLIED_CANDIDATES_INVALID', 'NATIVE_BEHAVIOR_SUITE_INVALID', 'NATIVE_CONTRACT_INVALID'].includes(code)) return { status: 422, body: errorBody(code, '补充用例格式或模块、接口、章节范围无效。', id) };
+  if (['NATIVE_SUPPLEMENT_SOURCE_REQUIRED', 'NATIVE_SUPPLEMENT_BINDING_INVALID'].includes(code)) return { status: 409, body: errorBody(code, '补充用例需要同一源码和卡片版本的已完成来源核验。', id) };
   if (code.startsWith('DIRECTORY_')) return { status: 422, body: errorBody(code, code, id) };
   if (code.startsWith('REPOSITORY_')) return { status: 422, body: errorBody(code, code, id) };
   if (code.startsWith('PROJECT_')) return { status: 422, body: errorBody(code, code, id) };
@@ -542,10 +544,10 @@ export function createKnowledgeServer(input: {
           send(response, 200, await composition.apps.workbenchAssociations.candidates(decodeURIComponent(associated[1]!))); return;
         }
         if (request.method === 'POST' && url.pathname === '/api/v1/native-evaluations') {
-          const payload = await body(request); requireOnlyKeys(payload, ['reconstructionTaskId', 'sourceVerificationTaskId']);
+          const payload = await body(request); requireOnlyKeys(payload, ['reconstructionTaskId', 'sourceVerificationTaskId', 'candidateSuites']);
           if (typeof payload.reconstructionTaskId !== 'string') throw new Error('PAYLOAD_INVALID');
           if (payload.sourceVerificationTaskId !== undefined && typeof payload.sourceVerificationTaskId !== 'string') throw new Error('PAYLOAD_INVALID');
-          const task = await composition.apps.workbenchEvaluation.start(payload.reconstructionTaskId, payload.sourceVerificationTaskId as string | undefined);
+          const task = await composition.apps.workbenchEvaluation.start(payload.reconstructionTaskId, payload.sourceVerificationTaskId as string | undefined, payload.candidateSuites);
           send(response, task.status === 'SUCCEEDED' ? 200 : 202, { task }); return;
         }
         if (request.method === 'POST' && url.pathname === '/api/v1/reconstructions') {

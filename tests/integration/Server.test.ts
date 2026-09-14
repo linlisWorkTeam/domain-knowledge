@@ -641,3 +641,27 @@ test('本机无需令牌即可保存提示词，代理和跨站请求不能借�
     rmSync(runtimeDir, { recursive: true, force: true });
   }
 });
+
+
+test('native evaluation HTTP forwards explicit candidates and reports input errors without starting other tasks', async () => {
+  const runtimeDir = mkdtempSync(join(tmpdir(), 'native-candidate-http-'));
+  const instance = createKnowledgeServer({ runtimeDir, anonymousAccess: true });
+  const seen: unknown[][] = [];
+  instance.composition.apps.workbenchEvaluation.start = async (...args) => { seen.push(args); throw new Error('NATIVE_SUPPLIED_CANDIDATES_INVALID'); };
+  instance.server.listen(0, '127.0.0.1'); await once(instance.server, 'listening');
+  const address = instance.server.address(); assert.ok(address && typeof address !== 'string');
+  try {
+    const candidates = { schemaVersion: 'native-supplied-candidates-v1', modules: [] };
+    const response = await fetch(`http://127.0.0.1:${address.port}/api/v1/native-evaluations`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ reconstructionTaskId: 'code', sourceVerificationTaskId: 'source', candidateSuites: candidates }),
+    });
+    assert.equal(response.status, 422);
+    assert.deepEqual(seen, [['code', 'source', candidates]]);
+    assert.equal(mapHttpError(new Error('NATIVE_SUPPLEMENT_SOURCE_REQUIRED')).status, 409);
+  } finally {
+    instance.server.closeAllConnections();
+    await new Promise<void>(resolve => instance.server.close(() => resolve()));
+    rmSync(runtimeDir, { recursive: true, force: true });
+  }
+});
