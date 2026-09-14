@@ -9,7 +9,7 @@ import { createSourceVerificationPanel } from '../../web/KnowledgeSourceVerifica
 for (const mode of ['current', 'unavailable', 'legacy', 'waiting']) test(`source build scope display: ${mode}`, async () => {
   const panel = { innerHTML: '' }, requests = []
   const task = { taskId: 'source', status: 'SUCCEEDED', contractVersion: 'knowledge-workbench-v1', usage: { modelCalls: 7 },
-    input: { cardVersionIds: ['v1'], parameters: { operation: 'KNOWLEDGE_SOURCE_VERIFICATION', verificationContract: 'knowledge-source-verification-v4',
+    input: { cardVersionIds: ['v1'], parameters: { operation: 'KNOWLEDGE_SOURCE_VERIFICATION', verificationContract: mode === 'legacy' ? 'knowledge-source-verification-v4' : 'knowledge-source-verification-v5',
       evaluationTaskId: 'eval', ...(mode === 'legacy' ? {} : { executionScopesRef: { sha256: 'scope' } }) } },
     result: { artifactRefs: ['current', 'unavailable'].includes(mode) ? [{ sha256: 'scope' }] : [], summary: { outcome: 'UNRESOLVED', cards: [] } } }
   const scope = { schemaVersion: 'source-execution-scope-v1', configurationCoverage: 'SINGLE_FROZEN_BUILD', language: 'c', architecture: 'x64',

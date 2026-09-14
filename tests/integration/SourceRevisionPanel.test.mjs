@@ -31,7 +31,7 @@ test('source panel starts supplemental evaluation from the frozen source and han
   const { createSourceVerificationPanel } = await import('../../web/KnowledgeSourceVerification.js')
   const panel = { innerHTML: '' }, listeners = [], posts = []
   const source = { taskId: 'source', contractVersion: 'knowledge-workbench-v1', status: 'SUCCEEDED', usage: { modelCalls: 1 },
-    input: { cardVersionIds: ['v1'], parameters: { operation: 'KNOWLEDGE_SOURCE_VERIFICATION', verificationContract: 'knowledge-source-verification-v4', evaluationTaskId: 'evaluation' } },
+    input: { cardVersionIds: ['v1'], parameters: { operation: 'KNOWLEDGE_SOURCE_VERIFICATION', verificationContract: 'knowledge-source-verification-v5', evaluationTaskId: 'evaluation' } },
     result: { summary: { outcome: 'UNRESOLVED', cards: [{ versionId: 'v1', moduleId: 'm', outcome: 'UNRESOLVED', sections: [{ section: 'Errors', outcome: 'UNRESOLVED', unresolved: ['Missing error behavior'] }] }] } } }
   let handedOff = null
   const app = createSourceVerificationPanel({ root: { querySelector: selector => selector === '[data-source-verification-panel]' ? panel : null, addEventListener: (_name, listener) => listeners.push(listener) },
@@ -49,4 +49,10 @@ test('source panel starts supplemental evaluation from the frozen source and han
   assert.deepEqual(posts, [{ path: '/api/v1/native-evaluations', body: { reconstructionTaskId: 'code', sourceVerificationTaskId: 'source' } }])
   assert.equal(handedOff.taskId, 'supplement')
   source.status = 'FAILED'; app.refresh(); assert.doesNotMatch(panel.innerHTML, /补充验证用例/)
+  source.input.parameters.verificationContract = 'knowledge-source-verification-v4'; app.refresh()
+  assert.match(panel.innerHTML, /旧来源契约/)
+  assert.doesNotMatch(panel.innerHTML, /恢复来源复核|补充验证用例/)
+  const before = posts.length
+  for (const listener of listeners) await listener(event)
+  assert.equal(posts.length, before, 'stale actions cannot execute an old source contract')
 })
