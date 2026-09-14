@@ -28,7 +28,7 @@ export async function agentScenario(options: { qualityFailure?: boolean; testFai
         case 'doc-gen':if(options.proposal) return {splitProposal:{reason:'Two independent topics require a scope decision',suggestedDocuments:['API contract','Internal flow']}};return {title:'Module knowledge',description:'Precise public behavior',keywords:['module'],
           body:options.qualityFailure ? 'Short unsupported statement. '.repeat(9) : `${GOOD_BODY}\n\n## Behavior\n\nResult is ${stage.iteration ? 4 : 3}.`};
         case 'code':return {files:[{path:'src/module.cpp',content:`int calculate(){return ${stage.iteration ? 4 : 3};}\n`}]};
-        case 'check':return {blocking:false,findings:[],scope:['src/module.cpp']};
+        case 'check':return {findings:[],scope:['src/module.cpp']};
         case 'review':return {blocking:stage.iteration===0,historySummary:'The earlier result was wrong and the corrected value passes.',corrections:stage.iteration ? [] : [{correctionId:'COR-0001',knowledgePath:'Behavior',problem:'Expected 4, actual 3',suggestion:'Return 4',evidence:['evaluation']}]};
         default:throw new Error('UNEXPECTED_ROLE');
       }

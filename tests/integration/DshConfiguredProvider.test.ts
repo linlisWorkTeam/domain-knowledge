@@ -18,8 +18,12 @@ test('DSH adapter executes through the official native DSH SDK and reports token
   let authorization = '';
   let receivedPath = '';
   let receivedBody = '';
+  const sessionHeaders: (string | undefined)[] = [];
+  let userAgent = '';
   const upstream = createServer(async (request, response) => {
     authorization = request.headers.authorization ?? '';
+    sessionHeaders.push(request.headers['x-opencode-session'] as string | undefined);
+    userAgent = request.headers['user-agent'] ?? '';
     receivedPath = request.url ?? '';
     const chunks: Buffer[] = [];
     for await (const chunk of request) chunks.push(Buffer.from(chunk));
@@ -42,7 +46,7 @@ test('DSH adapter executes through the official native DSH SDK and reports token
   const address = upstream.address();
   assert.ok(address && typeof address === 'object');
   const settings: ProviderSettingsRecord = {
-    provider: 'deepseek-harness', apiUrl: `http://provider.invalid:${address.port}/v1`, apiKey: 'test-key',
+    provider: 'deepseek-harness', apiUrl: `http://opencode.ai:${address.port}/v1`, apiKey: 'test-key',
     model: 'test-model', enabled: true, revision: 2, verificationStatus: 'VERIFIED',
     verificationReasonCode: 'READY', lastVerifiedAt: '2026-09-04T00:00:00.000Z',
     verifiedFingerprint: 'test-only', updatedAt: '2026-09-04T00:00:00.000Z',
@@ -72,6 +76,8 @@ test('DSH adapter executes through the official native DSH SDK and reports token
     assert.deepEqual(result, { answer: 'ok' });
     assert.equal(receivedPath, '/v1/chat/completions');
     assert.equal(authorization, 'Bearer test-key');
+    assert.match(userAgent, /^domain-knowledge\//);
+    assert.match(sessionHeaders[0] ?? '', /^dk-[a-f0-9]{64}$/);
     assert.match(receivedBody, /Return the requested object/);
     assert.equal(invocations.length, 1);
     assert.deepEqual({
@@ -86,6 +92,11 @@ test('DSH adapter executes through the official native DSH SDK and reports token
       runId: 'run-pi-test', provider: 'deepseek-harness', model: 'test-model', status: 'SUCCEEDED',
       inputTokens: 12, outputTokens: 5, fixture: false,
     });
+    const followup = { role: 'doc-gen', prompt: 'Return the requested object.', outputSchema: { type: 'object', additionalProperties: false, required: ['answer'], properties: { answer: { type: 'string' } } }, metadata: { runId: 'run-pi-test' }, workspaceRoot: directory };
+    await provider.run({ ...followup, idempotencyKey: 'pi-test-1' });
+    await provider.run({ ...followup, idempotencyKey: 'pi-test-2' });
+    assert.equal(sessionHeaders[1], sessionHeaders[0], 'the conversation keeps its routing identity');
+    assert.notEqual(sessionHeaders[2], sessionHeaders[0], 'a different invocation gets a separate identity');
   } finally {
     upstream.close();
     await once(upstream, 'close');
@@ -97,6 +108,7 @@ test('DSH adapter does not follow Provider redirects after endpoint approval', a
   const directory = mkdtempSync(join(tmpdir(), 'pi-agent-redirect-'));
   let requests = 0;
   const upstream = createServer((_request, response) => {
+    assert.equal(_request.headers['x-opencode-session'], undefined, 'other providers receive no OpenCode routing header');
     requests += 1;
     response.writeHead(302, { location: '/private-target' });
     response.end();
@@ -198,6 +210,18 @@ test('DSH adapter retries schema-invalid output with a fresh session and audits 
       { status: 'SUCCEEDED', errorCode: null, retryCount: 1 },
     ]);
     assert.doesNotMatch(JSON.stringify(invocations), /test-key|Return the same governed business result/);
+    bodies.length = 0;
+    invocations.length = 0;
+    await assert.rejects(provider.run({ ...request, outputAttempts: 1 }), (error: unknown) => {
+      assert.ok(error instanceof Error && 'parsedOutputs' in error && 'rawOutput' in error);
+      assert.match(error.message, /AGENT_OUTPUT_INVALID/);
+      assert.deepEqual(error.parsedOutputs, [{ wrong: true }]);
+      assert.match(String(error.rawOutput), /"wrong"/);
+      return true;
+    });
+    assert.equal(bodies.length, 1, 'role-owned repairs must disable nested provider retries');
+    assert.equal(invocations.length, 1);
+
   } finally {
     upstream.close();
     await once(upstream, 'close');

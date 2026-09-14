@@ -18,7 +18,7 @@ SPDX-License-Identifier: MIT
 | [DocGen](docGenAgent/DocGenAgent.md) | 汇总源码分析，或按意见修改上一版文档 | 一份候选文档；必要时提出拆分建议 |
 | [TestGen](testGenAgent/TestGenAgent.md) | 根据源码和公开接口编写测试 | 测试源码和逐项用例清单 |
 | [Code](codeAgent/CodeAgent.md) | 只根据候选文档和必要编写配置重建实现 | 新的 C/C++ 源文件 |
-| [Check](checkAgent/CheckAgent.md) | 按配置规则比较原始代码和重建代码 | 带双方原文依据的差异报告 |
+| [Check](checkAgent/CheckAgent.md) | 按配置规则比较原始代码和重建代码 | 带完整源码依据或明确单侧缺失的差异报告 |
 | [Review](reviewAgent/ReviewAgent.md) | 结合差异报告和实际测试结果分析文档问题 | 指明修改位置、原因和建议的意见 |
 
 DocWorker 是 DocGen 的内部助手，由 DocGen 分派。外层工作流只安排其余六个角色；七个角色都保留独立的提示词、执行记录和开发入口。
@@ -81,11 +81,11 @@ SearchAgent 也还未实现：目标是由 Application 的 KnowledgeSearchApp �
 
 每个角色有入口、Contract、Prompt、测试和样例。`execute(input, context)` 接收该角色的 Payload 与已加载材料；context 提供模型执行接口、effectivePrompt、iteration 和取消信号。
 
-执行顺序为：检查取消及必需材料 → 构建 Prompt/Schema → 调用模型 → 再查取消 → 校验结构和业务规则 → 返回 output/payload/artifacts。缺材料在调用前失败，额外字段、缺字段、角色错配或非法输出被拒绝；取消和失败不能提交半份成功结果。Adapter 负责网络/格式重试；Application 单独发起 TestGen 业务修复。DocGen 汇总前先完成内部 Worker 批次。
+执行顺序为：检查取消及必需材料 → 构建 Prompt/Schema → 调用模型 → 再查取消 → 校验结构和业务规则 → 返回 output/payload/artifacts。缺材料在调用前失败，额外字段、缺字段、角色错配或非法输出被拒绝；取消和失败不能提交半份成功结果。Adapter 默认负责网络/格式重试；Check 禁用适配器嵌套重试，在角色内统一处理两次报告修正；Application 单独发起 TestGen 业务修复。DocGen 汇总前先完成内部 Worker 批次。
 
 Prompt 由角色基础指令、冻结的 promptAddon、适用治理指令、本轮 AgentCommand 和授权工件正文组成；DocGen 另带内部汇总载荷。材料限制同时落实到提示词、工件和工具工作区，不能只写“禁止读取”。应用层保存正文并将 pending 引用换成实际工件引用，Domain 不直接操作 CAS、数据库或发布。
 
-当前执行版本为 `domain-agents-v8-supervised-routing`，命令键为 `contract-v8`；不兼容的旧结果不能作为当前成功结果恢复。
+当前执行版本为 `domain-agents-v10-check-evidence-guards`，命令键为 `contract-v10`；不兼容的旧结果不能作为当前成功结果恢复。
 
 独立入口示例：`npm run agent:run -- --role code --input src/domain/agents/codeAgent/examples/CodeAgentSample.json --output /tmp/code-agent-run`。默认样例使用预设回答；`--provider dsh` 需要真实接入配置。独立角色结果不自动评测或发布，操作见 [AgentDevelopment](../../../AgentDevelopment.md)。
 
@@ -93,3 +93,5 @@ Prompt 由角色基础指令、冻结的 promptAddon、适用治理指令、本�
 ## 实现及测试索引
 
 代码位置：[src/domain/agents/AgentRegistry.ts](../../../../src/domain/agents/AgentRegistry.ts)、[src/domain/agents/AgentExecution.ts](../../../../src/domain/agents/AgentExecution.ts)、[src/domain/agents/AgentContracts.ts](../../../../src/domain/agents/AgentContracts.ts)。
+
+Check 的 check-report-v2 及源码证据组装见角色页。原有命令/结果信封保持兼容，旧运行只读，不复用其 checkpoint 继续新执行。

@@ -5,6 +5,8 @@ SPDX-License-Identifier: MIT
 -->
 # TestGenAgent
 
+运行时输出 Schema 必须将 files[].path 限定为本次 allowedTestPaths，将 cases[].testPath 限定为其中可执行的 C/C++ 源文件，将 sourceEvidence 限定为本次源码和公开接口的精确文件路径。函数/行号说明放在描述字段，不能拼入 sourceEvidence。此约束与已有输出校验一致，使适配器的有限 Schema 修复能处理越界路径或错误证据格式；不得通过自动裁剪模型答案、允许额外 manifest 文件或放宽白名单来通过验收。
+
 ## 1. 职责与边界
 
 TestGen 从原始源码和公开接口生成 C/C++ 测试，用来评测 Code 重建的实现。它不读取候选知识或重建代码，避免文档与测试使用同一个错误答案。

@@ -22,7 +22,7 @@ export interface Output {
 }
 export interface TestGenContext extends ExecutionContext { validatedOutput?: Output }
 const text = { type: 'string', pattern: '\\S' };
-export const outputSchema: Record<string, unknown> = {
+export const outputSchema = {
   type: 'object', required: ['files', 'cases'], additionalProperties: false,
   properties: {
     files: { type: 'array', minItems: 1, items: { type: 'object', required: ['path', 'content'], additionalProperties: false,
@@ -33,7 +33,20 @@ export const outputSchema: Record<string, unknown> = {
         sourceEvidence: { type: 'array', minItems: 1, uniqueItems: true, items: text } } } },
   },
 };
-export function schemaFor(_input: Input): Record<string, unknown> { return outputSchema; }
+export function schemaFor(input: Input): Record<string, unknown> {
+  const { files, cases } = outputSchema.properties;
+  return { ...outputSchema, properties: {
+    files: { ...files, items: { ...files.items, properties: { ...files.items.properties,
+      path: { type: 'string', enum: [...input.payload.allowedTestPaths] },
+    } } },
+    cases: { ...cases, items: { ...cases.items, properties: { ...cases.items.properties,
+      testPath: { type: 'string', enum: input.payload.allowedTestPaths.filter(path => /\.(c|cc|cpp|cxx)$/.test(path)) },
+      sourceEvidence: { ...cases.items.properties.sourceEvidence, items: {
+        type: 'string', enum: [...new Set([...input.sourcePaths, ...input.publicInterfacePaths])],
+      } },
+    } } },
+  } };
+}
 /** 生成路径不能覆盖原始源码、接口或其他文件。 */
 export function validateInput(input: Input): void {
   requireMaterials(input.payload, input.materials, ['moduleId', 'sourceSnapshotRef', 'publicInterfaceRefs', 'languageId', 'testPolicyRef', 'allowedTestPaths']);

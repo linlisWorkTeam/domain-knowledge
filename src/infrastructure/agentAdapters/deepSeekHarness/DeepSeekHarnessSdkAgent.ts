@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { DeepSeekHarness } from '@deepseek-ai/dsh-sdk-client';
 import type { DeepSeekHarnessOptions } from '@deepseek-ai/dsh-sdk-client';
 import Ajv2020Import from 'ajv/dist/2020.js';
+import { ModelResponseError } from '../../../domain/agents/AgentExecution.ts';
 import type { AgentProvider, AgentRequest } from '../../../application/ports/ApplicationPorts.ts';
 
 const Ajv2020 = Ajv2020Import as unknown as new (options: Record<string, unknown>) => {
@@ -290,11 +291,11 @@ function validateOutput(
   const ajv = new Ajv2020({ allErrors: true, strict: true });
   const validate = ajv.compile(schema);
   const candidates = extractJsonCandidates(stdout);
-  if (candidates.length === 0) throw new Error('DSH_AGENT_OUTPUT_NOT_JSON');
+  if (candidates.length === 0) throw new ModelResponseError('DSH_AGENT_OUTPUT_NOT_JSON', stdout);
   const output = [...candidates].reverse().find((candidate) => validate(candidate));
   if (!output) {
     validate(candidates.at(-1));
-    throw new Error(`AGENT_OUTPUT_INVALID: ${ajv.errorsText(validate.errors)}`);
+    throw new ModelResponseError(`AGENT_OUTPUT_INVALID: ${ajv.errorsText(validate.errors)}`, stdout, candidates);
   }
   return output;
 }
@@ -339,14 +340,14 @@ export class DeepSeekHarnessSdkAgent implements AgentProvider {
 
   async run(request: AgentRequest, signal?: AbortSignal): Promise<Record<string, unknown>> {
     let lastError: unknown;
-    for (let providerAttempt = 1; providerAttempt <= this.maxSchemaAttempts; providerAttempt += 1) {
+    for (let providerAttempt = 1; providerAttempt <= (request.outputAttempts ?? this.maxSchemaAttempts); providerAttempt += 1) {
       try {
         return await this.runAttempt(request, signal, providerAttempt);
       } catch (error) {
         lastError = error;
         const code = error instanceof Error ? error.message.split(':', 1)[0] : '';
         const retryable = code === 'DSH_AGENT_OUTPUT_NOT_JSON' || code === 'AGENT_OUTPUT_INVALID';
-        if (!retryable || signal?.aborted || providerAttempt === this.maxSchemaAttempts) throw error;
+        if (!retryable || signal?.aborted || providerAttempt === (request.outputAttempts ?? this.maxSchemaAttempts)) throw error;
       }
     }
     throw lastError;

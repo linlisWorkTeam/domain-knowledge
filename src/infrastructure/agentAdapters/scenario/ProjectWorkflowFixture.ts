@@ -85,7 +85,7 @@ export class FixtureProjectWorkflowStages {
       output = { files: [{ path: assets.testPath, content: this.asset(assets.testSource) }],
         cases: [{ caseId: 'public-result', entryPoint: 'test_public_result', testPath: assets.testPath, target: 'Public behavior', input: 'calculate()', expected: '4', sourceEvidence: scenario.sourcePaths }] };
     } else if (agentId === 'check') {
-      output = { blocking: false, findings: [], scope: scenario.allowedGeneratedPaths };
+      output = { findings: [], scope: scenario.allowedGeneratedPaths };
     } else if (agentId === 'doc-worker') {
       output = {
         workerId: input.workerId,

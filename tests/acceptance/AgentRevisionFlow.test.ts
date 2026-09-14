@@ -66,8 +66,13 @@ function agentOutput(agentType: string, prompt: string): Record<string, unknown>
     case 'code':
       return { files: [{ path: 'src/module.cpp', content: `int calculate() { return ${count === 1 ? 3 : 4}; }\n` }] };
     case 'check':
-      return { blocking: count === 1, findings: count === 1 ? [{ ruleId: 'behavior', sourcePath: 'src/module.cpp', path: 'src/module.cpp', original: 'return 4;', generated: 'return 3;', message: 'The generated return value contradicts the source.', severity: 'BLOCKER' }] : [], scope: ['src/module.cpp'] };
+      return { findings: count <= 3 ? [{ ruleId: 'behavior',
+        original: { status: 'present', locations: [{ path: 'src/module.cpp', startLine: 1, endLine: 1, kind: 'function' }] },
+        generated: { status: 'present', locations: [{ path: 'src/module.cpp', startLine: count === 2 ? 999 : 1, endLine: count === 2 ? 999 : 1, kind: 'function' }] },
+        message: 'The generated return value contradicts the source.', severity: 'BLOCKER' }] : [], scope: count === 1 ? [] : ['src/module.cpp'] };
     case 'review':
+      assert.match(prompt, /check-report-v2/);
+      if (count === 1) assert.match(prompt, /int calculate/);
       if (count > 1) {
         assert.match(prompt, /previousCorrectionRefs/);
         assert.match(prompt, /generated-iteration-0/);
@@ -175,7 +180,11 @@ test('full SDK workflow repairs tests, revises knowledge and publishes only afte
     assert.equal(counts['test-gen'], 2);
     assert.equal(counts.review, 2);
     assert.ok(invocations.length >= 13);
-    assert.equal(invocations.every((record) => record.status === 'SUCCEEDED'), true);
+    assert.equal(counts.check, 4, 'two local Check repairs must not rerun upstream roles');
+    assert.equal(counts.code, 2);
+    assert.equal(counts['doc-gen'], 2);
+    assert.equal(invocations.filter((record) => record.status === 'FAILED').length, 1);
+    assert.equal(invocations.find((record) => record.status === 'FAILED')?.errorCode, 'AGENT_OUTPUT_INVALID');
     assert.equal(invocations.every((record) => record.inputTokens === 100 && record.outputTokens === 20), true);
     assert.equal(composition.service.status().publications, 1);
   } finally {

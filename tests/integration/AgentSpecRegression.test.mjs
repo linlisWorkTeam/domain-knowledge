@@ -35,7 +35,7 @@ async function scenarioProbe(name, setup, steps) { return test(name, async () =>
           case 'test-gen': return env.testOutput(++env.testCalls);
           case 'doc-gen': return { title: 'Module knowledge', description: 'Reference module behavior', keywords: ['module'], body: GOOD_BODY };
           case 'code': return { files: [{ path: 'src/module.cpp', content: env.code }] };
-          case 'check': return { blocking: false, findings: [], scope: ['src/module.cpp'] };
+          case 'check': return { findings: [], scope: ['src/module.cpp'] };
           case 'review': return env.reviewOutput ?? { blocking: false, corrections: [] };
           default: throw new Error(command.agentType);
         }
@@ -116,8 +116,8 @@ await test('Review excerpt resolves to a DocGen revision section', async () => {
 });
 await test('Check rejects invented source evidence', async () => {
   const sample = roleExample('check');
-  sample.output.findings[0].original = 'THIS ORIGINAL SOURCE NEVER EXISTED';
-  await assert.rejects(check(sample.input, sample.context), /CHECK_EVIDENCE_INVALID/);
+  sample.output.findings[0].original.locations[0].startLine = 999;
+  await assert.rejects(check(sample.input, sample.context), /CHECK_REPORT_REPAIR_EXHAUSTED/);
 });
 
 await scenarioProbe('missing comparison rules cannot publish', async (e) => { delete e.scenario.comparisonRules; }, async (e) => {
