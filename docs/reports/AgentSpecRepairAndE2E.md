@@ -5,6 +5,10 @@ SPDX-License-Identifier: MIT
 -->
 # Agent Spec 修复与端到端测试报告
 
+## 2026-09-14：v10 cJSON Utils 真实完整验收
+
+本批计划已补入 [原验收计划](../specs/infrastructure/evaluation/Evaluation.md#2026-09-14-修复后新一次完整验收)。执行源码为 PR #49 合并提交 `22fe34fdf1ee9e37c08d0bd17a03b2c7e4103cf0`，独立工作树 `/tmp/domain-knowledge-cjson-v10`，证据目录 `.workpanel/acceptance/2026-09-14-cjson-v10-real/`。当前为准备状态，尚未宣称完整闭环通过；本节在实际运行后补齐各阶段结果。
+
 ## 2026-09-14：Check 报告证据与有限修正验收
 
 按逐项确认的 [Check Spec](../specs/domainFunction/agents/checkAgent/CheckAgent.md) 修复报告生成，不改变 Check 的只读比较、Review 的知识修订和 Gate 的发布职责。设计提交 `9324e7a`，实现 `7564f33`，完整类型声明及同一行歧义补充修复 `e11e178`；PR 为 [#49](https://github.com/linlisWorkTeam/domain-knowledge/pull/49)。

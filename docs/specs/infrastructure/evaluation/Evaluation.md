@@ -40,6 +40,18 @@ testSuite 使用 `native-cases-v2-supervised` 协议，含 files 与 cases，cas
 
 本节是本次手动验收计划，不新增永久 CI。用户已确认使用真实模型分析有代表性的开源模块，并要求先记录计划再执行。执行结果追加到 [Agent 验收报告](../../../reports/AgentSpecRepairAndE2E.md)，计划不等于通过证据。
 
+#### 2026-09-14 修复后新一次完整验收
+
+本批由用户重新授权，不受上次“第四个最后批次”的结束约定限制。GitHub 已核对 PR #49 合并于 `22fe34fdf1ee9e37c08d0bd17a03b2c7e4103cf0`，分支最终修复 `0b6a0d51fec2bbe76e581c4602659ddb82fa6b26`。从当前 origin/main 创建 `test/cjson-utils-v10-real-e2e` / `/tmp/domain-knowledge-cjson-v10`；执行源码为该合并提交，启动前只更新本计划和报告，最终记录实际 HEAD。契约为 `domain-agents-v10-check-evidence-guards` / `contract-v10`。
+
+测试依据采用用户本次明确的“重建固定版本行为”：cJSON v1.7.19 实际实现是参考依据，RFC 符合性单独说明。转义 Patch 路径必须保留覆盖，由 TestGen 根据冻结源码推导预期；不得修改旧失败项、删除失败项或修改原实现。Code 不获得原实现、旧重建、独立用例和固定预期，只获得本次知识和编写配置；知识不得整份复制实现。Review 只读知识、Check 和评测证据，不额外读取原仓库。
+
+新目录为 `/root/projects/domain-knowledge/.workpanel/acceptance/2026-09-14-cjson-v10-real/`，独立 `Run.mjs` 导入新工作树，使用全新 runtime/SQLite/CAS。从旧固定源码本地 clone，核对 HEAD、全部 229 个受控文件 SHA-256 及 1481 行目标；独立补充用例和上游基线重新执行。旧候选测试通过状态、v8 checkpoint 和 v9 独立 Check 结果均不导入。
+
+预算为一次新 Run、最多 3 个业务轮次（含首轮）、从 workflow.start 调用起 30 分钟、单角色 10 分钟、DocWorker=1、构建串行、TestGen 最多一次修复；Check 首次输出后最多两次报告修正，共三次，outputAttempts=1 且 SDK 网络重试为零。其他角色沿用最多两次 Schema 尝试。生产配置 SDK 超时实际按尝试计算，因此验收入口另按 RUNNING 角色 checkpoint 累计时间监控，达到 10 分钟取消整次 Run，不叠加预算。DocGen 计时包含内部 Worker；这是更保守的验收上界。maxTokens=32768、contextWindow=128000，真实 deepseek-v4-flash，经配置提供方、生产角色入口和 DSH SDK/Bubblewrap；不使用 fixture 或预设回答。
+
+Node 24.13.0 独立 bootstrap 已达到 READY，启动前再次检查。先保存原实现上游、独立 18 项和转义路径复现基线，再验证提供方连接并启动；通过事件和 checkpoint 观察实际 Check、评测、Review、Gate，未到达的阶段明确标注。任何失败先保存原始回答、编译日志、逐项结果、节点事件和摘要，不手工修补模型代码，不自动新开批次。旧 4311 服务保留，本批匹配版本只读前台使用 127.0.0.1:4312 和独立 tunnel；实际浏览器核对本批 Run、节点、知识正文与候选/发布标记。敏感 runtime 不上传，结果继续写入原报告。
+
 #### 固定范围与运行配置
 
 - 执行基线：domain-knowledge `7a9b3bb`，`contract-v8` / `domain-agents-v8-supervised-routing`；最终记录实际运行提交和工作区差异。
