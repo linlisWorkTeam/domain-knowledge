@@ -458,3 +458,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 - [2026-09-14-2359 换行引用恢复](https://github.com/linlisWorkTeam/domain-knowledge/blob/956fe2649acc67ac2ad7557a27ff719acd8525fc/docs/epitaph/2026-09-14-2359-source-v5-newline-resume.md)：保留逐字校验并反馈CRLF差异，同任务恢复保留累计用量。后续任务已执行结束但来源质量未解决，不能依据本记录重启。
 
 - [2026-09-14-2359 UI与来源恢复](https://github.com/linlisWorkTeam/domain-knowledge/blob/679d05b/docs/epitaph/2026-09-14-2359-ui-source-resume.md)：前台v5操作入口与来源恢复的历史交接；后续956fe26已部署，来源434571已执行结束但质量未通过，勿依旧记录恢复已完成任务。
+
+- [2026-09-15-0010 来源恢复边界](https://github.com/linlisWorkTeam/domain-knowledge/blob/20e7949/docs/epitaph/2026-09-15-0010-review-recovery.md)：拒绝记录与原事实恢复保护，固定参考初步反驳裸前缀意见。后续来源已完整执行、质量未通过；六例已通过正式补证，保留历史与未知风险。
