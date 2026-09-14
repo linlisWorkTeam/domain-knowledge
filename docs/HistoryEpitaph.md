@@ -466,3 +466,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 - [2026-09-15-0034 指定候选补证入口](https://github.com/linlisWorkTeam/domain-knowledge/blob/4c34ead/docs/epitaph/2026-09-15-0034-supplied-candidate-stage.md)：冻结候选并交参考验证的入口；后续28fc任务43/43成功，原37例不变，不再按旧记录重启。
 
 - [2026-09-15-0041 C++正式补证](https://github.com/linlisWorkTeam/domain-knowledge/blob/37fc9d9273e851845dd60223065cef30b49f9391/docs/epitaph/2026-09-15-0041-cpp-formal-supplement.md)：43例正式补证成功、原37例保持不变；后续显式历史复核已启动并恢复，补证成功不代表来源质量通过，禁止重复恢复已成功的28fc任务。
+
+- [2026-09-15-0045 补证发布策略](https://github.com/linlisWorkTeam/domain-knowledge/blob/37fc9d9273e851845dd60223065cef30b49f9391/docs/epitaph/2026-09-15-0045-supplement-publication-policy.md)：执行与发布共用补证策略摘要、验证候选绑定；后续完整CI通过，真实复核已完成但质量未通过。评测器文件变化使旧工具链指纹失效，不能跨版本恢复旧补证。

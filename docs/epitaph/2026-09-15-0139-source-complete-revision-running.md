@@ -1,0 +1,11 @@
+# C++历史复核完成，定点修订运行中
+
+工作区/tmp/domain-knowledge-workbench，代码37fc9d9及本地交接54308b0，PR50 Draft不合并。线上956fe26未变。完整goal未完成。旧源码工作区不动，网站/隧道/work/ljy保留。
+
+历史复核stage-7fda8f7f2c60f366dfe396bb9af3146161c902daa5660122b83d7187b9367a67已SUCCEEDED，质量UNRESOLVED；9卡63节38匹配2矛盾23未知，71调用4806852tokens、1934522ms。PID379496退出，不再恢复。cpp-historical-review/FinalAudit.json核对399直接引用。两项明确意见为Float包装函数内联位置及ToInt尾随字符说明。历史ToInt接口TAB意见并未全部反驳，未知项保留；不得将完整执行等同质量通过。
+
+准备5项BoundaryCandidates.json，结构/章节/历史合并检查通过，43旧+5候选48项，旧项逐字不变。正式补证stage-bc8c76bb54d7c9beaa1e369e6ca6cc449db5fe269ad857f576f13fb6122bb145失败NATIVE_TEST_TOOLCHAIN_CHANGED，0模型调用、未运行候选。不能盲目恢复或修改指纹。cpp-fresh-fingerprint/FingerprintDiff.json定位仅NativeSuiteEvaluation.ts及NativeTestCache.ts两文件变化，无系统工具链文件变化。PreparedInput.json仅准备新重建输入，尚未启动新重建；修订后须重算输入。
+
+独立隔离诊断/tmp/VerifyCppHistoricalBoundaries.ts已完成，日志/tmp/CppHistoricalBoundaryDiagnostics.log，cpp-historical-review/BoundaryDiagnostics.json：5例参考/生成均通过，包括ToInt尾部字符与ToInt64带符号前缀（-0x10及+0x10返回true、0）。这不是正式可信集，不导入或伪造trusted，不改旧评测结果。后续正式补证需新重建/评测来源绑定，旧source不能直接绑定新reconstructionId。
+
+当前唯一模型任务为源码定点修订stage-b1805f1fd67e1817610a3702a8c51963dcb18db9ffce791e6ab94a95f8620902。PID391706，exec会话19722，驱动/tmp/RunCppHistoricalSourceRevision.ts，日志/tmp/CppHistoricalSourceRevision.log，证据cpp-historical-source-revision/SourceCorrection.json。已确认RUNNING；128MiB堆、optimize-for-size、expose-gc及周期GC。下次先核对真实状态，不并行编译/模型、不重置用量。完成后审计修订和索引，再用当前工具链重建新卡、保留所有可信测试重验。C后续门禁、最终发布与关联、旧删除兼容、线上完整链路尚未完成。磁盘本轮可用空间升至约2.7GiB，本轮未删除任何数据。
