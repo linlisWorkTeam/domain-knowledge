@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：用受控角色响应驱动真实 LangGraph 和 C++ 测评以验收边界。
  */
+import { testGenerationFixture } from '../../src/infrastructure/agentAdapters/scenario/TestGenerationFixture.ts';
 import { createTestComposition, GOOD_BODY } from './Fixture.ts';
 import { cppScenario, cppTestOutput, orchestratorOutput } from './CppScenario.ts';
 import { ProjectWorkflowStages, AutomatedProjectWorkflowService } from '../../src/application/services/AutomatedProjectWorkflow.ts';
@@ -24,7 +25,7 @@ export async function agentScenario(options: { qualityFailure?: boolean; testFai
       calls.push({role:command.agentType,iteration:stage.iteration,prompt:request.prompt});
       switch(command.agentType){
         case 'orchestrator':return orchestratorOutput(f.scenario.moduleId,stage.iteration);
-        case 'test-gen':return cppTestOutput(options.testFailure ? 3 : 4);
+        case 'test-gen':return testGenerationFixture(cppTestOutput(options.testFailure ? 3 : 4),request.generationStep);
         case 'doc-gen':if(options.proposal) return {splitProposal:{reason:'Two independent topics require a scope decision',suggestedDocuments:['API contract','Internal flow']}};return {title:'Module knowledge',description:'Precise public behavior',keywords:['module'],
           body:options.qualityFailure ? 'Short unsupported statement. '.repeat(9) : `${GOOD_BODY}\n\n## Behavior\n\nResult is ${stage.iteration ? 4 : 3}.`};
         case 'code':return {files:[{path:'src/module.cpp',content:`int calculate(){return ${stage.iteration ? 4 : 3};}\n`}]};

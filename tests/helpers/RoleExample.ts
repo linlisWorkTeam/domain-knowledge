@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：维护Role样例相关的项目配置与工程说明。
  */
+import { testGenerationFixture } from '../../src/infrastructure/agentAdapters/scenario/TestGenerationFixture.ts';
 import { readFileSync } from 'node:fs';
 import { sha256, type ArtifactRef } from '../../src/domain/Domain.ts';
 import type { AgentId } from '../../src/domain/agents/AgentContracts.ts';
@@ -36,9 +37,10 @@ export function roleExample<I>(role: AgentId) {
   const requests: ModelRequest[] = [];
   const phases: string[] = [];
   const controller = new AbortController();
-  const context: ExecutionContext = {
+  const context: ExecutionContext & import('../../src/domain/agents/testGenAgent/TestGenAgentContract.ts').TestGenContext = {
+    testGenerationProgress: { run: async (_step, _input, operation) => operation() },
     command: { schemaVersion: '1.0', commandId: 'command', runId: 'run', agentType: role, generationKey: 'development-command-0', payload },
-    model: { execute: async (request) => { phases.push('model'); requests.push(request); return structuredClone(sample.modelOutput); },
+    model: { execute: async (request) => { phases.push('model'); requests.push(request); return testGenerationFixture(sample.modelOutput, request.generationStep); },
       assertOutput: (output, schema) => { phases.push('validate'); assertModelOutput(output, schema); } },
     effectivePrompt: roleDefinitions.find((definition) => definition.agentId === role)!.basePrompt,
     iteration: sample.iteration, signal: controller.signal,

@@ -35,6 +35,8 @@ test('DocGen standalone composition commits children before its candidate and ex
       assert.equal(command.payload.baseKnowledgeRef, undefined);
       assert.equal(command.payload.corrections, undefined);
       assert.equal(await composition.artifacts.verify(worker.payload.chunkRef), true);
+      const chunk = JSON.parse(Buffer.from(await composition.artifacts.get(worker.payload.chunkRef)).toString('utf8'));
+      assert.deepEqual(chunk.analysisScope.files, command.payload.assignedSourcePaths);
     }
     const projections = composition.repository.listWorkflowNodeProjections(result.runId);
     assert.equal(projections.filter((item) => item.agentId === 'doc-worker' && item.status === 'COMPLETED').length, 2);
@@ -88,7 +90,7 @@ test('internal retries reuse committed workers with frozen prompts and scoped ma
         const id = stage.workerId!; calls[id] = (calls[id] ?? 0) + 1;
         if (id === 'worker-2' && calls[id] === 1) throw new Error('temporary extraction failure');
         return { workerId: id, fragment: `A complete source fragment for ${id}.`, provenance: request.readablePaths,
-          analysisScope: { moduleId: run.moduleId, files: _command.payload['assignedSourcePaths'], symbols: [] },
+          analysisScope: { moduleId: run.moduleId, symbols: [] },
           sourceEvidence: request.readablePaths.map((path) => ({ claim: 'Fixture source evidence', path })),
           unresolvedQuestions: ['Dependency behavior needs follow-up'] };
       } }),

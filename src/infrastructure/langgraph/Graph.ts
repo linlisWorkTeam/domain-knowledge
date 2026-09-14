@@ -36,6 +36,8 @@ interface GraphDependencies {
   readyAtFor(runId: string, nodeId: string, iteration: number, fallback: string): string;
   /** 提供 时钟 对应的时钟操作。 */
   clock(): string;
+  nodeTimeoutMs?: number;
+  trackOperation(runId: string, operation: Promise<unknown>): void;
 }
 
 function projection(
@@ -60,7 +62,7 @@ function projection(
 }
 
 function createNode(deps: GraphDependencies, nodeId: string) {
-  return async (state: InfrastructureState): Promise<InfrastructureStateUpdate> => {
+  const execute = async (state: InfrastructureState, config: { signal?: AbortSignal } = {}): Promise<InfrastructureStateUpdate> => {
     const renderedNodeId = nodeId;
     const attemptKey = `${renderedNodeId}:${state.iteration}`;
     const stateAttempt = (state.attempts[attemptKey] ?? 0) + 1;
@@ -85,7 +87,10 @@ function createNode(deps: GraphDependencies, nodeId: string) {
     deps.observer.record(projection(
       state, renderedNodeId, agentId, attempt, 'RUNNING', startedAt, readyAt,
     ));
+    const signals = [config.signal, deps.signalFor(state.runId)].filter((signal): signal is AbortSignal => Boolean(signal));
+    const signal = signals.length ? AbortSignal.any(signals) : undefined;
     try {
+      signal?.throwIfAborted();
       const result = await deps.executor.execute({
         runId: state.runId,
         nodeId,
@@ -96,8 +101,9 @@ function createNode(deps: GraphDependencies, nodeId: string) {
         prompt,
         context: state.context,
         workerCount: state.workerCount,
-        ...(deps.signalFor(state.runId) ? { signal: deps.signalFor(state.runId) } : {}),
+        ...(signal ? { signal } : {}),
       });
+      signal?.throwIfAborted();
       const completedAt = deps.clock();
       deps.observer.record(projection(
         state, renderedNodeId, agentId, attempt, 'COMPLETED', completedAt, readyAt, result.detail,
@@ -119,14 +125,19 @@ function createNode(deps: GraphDependencies, nodeId: string) {
       throw error;
     }
   };
+  return (state: InfrastructureState, config?: { signal?: AbortSignal }) => {
+    const operation = execute(state, config);
+    deps.trackOperation(state.runId, operation);
+    return operation;
+  };
 }
 
 /** 将领域工作流连接和分支规则映射为 LangGraph 节点、消息及检查点。 */
 export function buildInfrastructureGraph(deps: GraphDependencies, checkpointer: BaseCheckpointSaver) {
   const node = (nodeId: string) => createNode(deps, nodeId);
   const graph = new StateGraph(InfrastructureStateAnnotation)
-    .addNode('orchestrator', async (state: InfrastructureState): Promise<InfrastructureStateUpdate> => ({
-      ...await node('orchestrator')(state), route: null,
+    .addNode('orchestrator', async (state: InfrastructureState, config): Promise<InfrastructureStateUpdate> => ({
+      ...await node('orchestrator')(state, config), route: null,
     }))
     .addNode('doc_gen', node('doc_gen'))
     .addNode('test_gen', node('test_gen'))
@@ -136,12 +147,12 @@ export function buildInfrastructureGraph(deps: GraphDependencies, checkpointer: 
     .addNode('check', node('check'))
     .addNode('evaluation', node('evaluation'))
     .addNode('review', node('review'))
-    .addNode('workflow_router', async (state: InfrastructureState): Promise<InfrastructureStateUpdate> => {
-      const update = await node('workflow_router')(state);
+    .addNode('workflow_router', async (state: InfrastructureState, config): Promise<InfrastructureStateUpdate> => {
+      const update = await node('workflow_router')(state, config);
       return { ...update, iteration: nextIteration(state.iteration, typeof update.route === 'string' ? update.route : null) };
     })
-    .addNode('publication', async (state: InfrastructureState): Promise<InfrastructureStateUpdate> => ({
-      ...await node('publication')(state), executionStatus: 'COMPLETED',
+    .addNode('publication', async (state: InfrastructureState, config): Promise<InfrastructureStateUpdate> => ({
+      ...await node('publication')(state, config), executionStatus: 'COMPLETED',
     }))
     .addNode('failed', async (state: InfrastructureState): Promise<InfrastructureStateUpdate> => ({
       executionStatus: 'FAILED', route: 'FAILED', error: state.error ?? 'workflow failed',
@@ -159,12 +170,12 @@ export function buildInfrastructureGraph(deps: GraphDependencies, checkpointer: 
     .addConditionalEdges('workflow_router', (state: InfrastructureState) =>
       workflowDestination(state.route), ['publication', 'orchestrator', 'failed', 'stopped'])
     .setNodeDefaults({
-      timeout: 600_000,
+      timeout: deps.nodeTimeoutMs ?? 600_000,
       errorHandler: (rawState: unknown, nodeError: NodeError) => {
         const state = rawState as InfrastructureState;
         return new Command({
           update: {
-            executionStatus: 'FAILED', currentNode: nodeError.node, route: 'FAILED',
+            executionStatus: 'FAILED', currentNode: nodeError.node, failedNode: nodeError.node, route: 'FAILED',
             error: nodeError.error.message,
           },
           goto: 'failed',

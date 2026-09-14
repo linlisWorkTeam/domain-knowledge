@@ -9,7 +9,7 @@ import { createServer } from 'node:http';
 import { fetch } from 'undici';
 import type { AgentProvider, AgentRequest, DshExecutionParameters, ProviderEndpointPolicy, ProviderInvocationRecord, ProviderSettingsRecord } from '../../../application/ports/ApplicationPorts.ts';
 import { createPinnedHttpsDispatcher, PublicHttpsEndpointPolicy } from '../../http/PublicHttps.ts';
-import { DeepSeekHarnessSdkAgent, type DeepSeekHarnessSdkAgentOptions } from './DeepSeekHarnessSdkAgent.ts';
+import { DeepSeekHarnessSdkAgent, type DeepSeekHarnessAuditRecord, type DeepSeekHarnessSdkAgentOptions } from './DeepSeekHarnessSdkAgent.ts';
 
 /** 对外提供Token，作为调用方使用的统一约定。 */
 export const DSH_DEFAULT_MAX_TOKENS = 32_768;
@@ -61,6 +61,7 @@ export class ConfiguredDshProvider implements AgentProvider {
     let transportError: string | null = null;
     let inputTokens: number | null = null;
     let outputTokens: number | null = null;
+    let transportRequests: NonNullable<DeepSeekHarnessAuditRecord['reasoningTransport']>['requests'] = [];
     // The real upstream credential stays in the parent. DSH receives only an
     // invocation-local relay token; DNS and redirects cannot escape approval.
     const relay = createServer(async (req, res) => {
@@ -76,8 +77,18 @@ export class ConfiguredDshProvider implements AgentProvider {
           chunks.push(Buffer.from(chunk));
         }
         const target = new URL('chat/completions', endpoint.url.href.replace(/\/?$/, '/'));
+        const body = Buffer.concat(chunks);
+        const fields = JSON.parse(body.toString('utf8'));
+        const wire = { requestSha256: createHash('sha256').update(body).digest('hex'),
+          thinking: ['enabled', 'disabled'].includes(fields.thinking?.type) ? fields.thinking.type : null,
+          reasoningEffort: ['off', 'low', 'medium', 'high', 'max'].includes(fields.reasoning_effort) ? fields.reasoning_effort : null,
+          maxTokens: Number.isSafeInteger(fields.max_tokens) ? fields.max_tokens : null };
+        const observation = { request: wire, reasoningCharacters: 0, contentCharacters: 0,
+          firstReasoningMs: null as number | null, firstContentMs: null as number | null };
+        transportRequests.push(observation);
+        const requestStarted = Date.now();
         const response = await fetch(target, {
-          method: 'POST', body: Buffer.concat(chunks), dispatcher, redirect: 'manual', signal: abort.signal,
+          method: 'POST', body, dispatcher, redirect: 'manual', signal: abort.signal,
           headers: {
             'content-type': 'application/json',
             'user-agent': 'domain-knowledge/0.1 (+https://github.com/linlisWorkTeam/domain-knowledge)',
@@ -104,7 +115,20 @@ export class ConfiguredDshProvider implements AgentProvider {
           for (const line of lines) {
             if (!line.startsWith('data: ')) continue;
             try {
-              const usage = JSON.parse(line.slice(6)).usage;
+              const event = JSON.parse(line.slice(6));
+              const usage = event.usage;
+              for (const choice of event.choices ?? []) {
+                const reasoning = choice.delta?.reasoning_content;
+                const content = choice.delta?.content;
+                if (typeof reasoning === 'string' && reasoning.length) {
+                  observation.firstReasoningMs ??= Date.now() - requestStarted;
+                  observation.reasoningCharacters += reasoning.length;
+                }
+                if (typeof content === 'string' && content.length) {
+                  observation.firstContentMs ??= Date.now() - requestStarted;
+                  observation.contentCharacters += content.length;
+                }
+              }
               if (Number.isSafeInteger(usage?.prompt_tokens) && usage.prompt_tokens >= 0) inputTokens = (inputTokens ?? 0) + usage.prompt_tokens;
               if (Number.isSafeInteger(usage?.completion_tokens) && usage.completion_tokens >= 0) outputTokens = (outputTokens ?? 0) + usage.completion_tokens;
             } catch { /* content/terminal SSE events are not token usage */ }
@@ -131,7 +155,10 @@ export class ConfiguredDshProvider implements AgentProvider {
         maxSchemaAttempts: this.options.maxSchemaAttempts ?? DSH_DEFAULT_MAX_SCHEMA_ATTEMPTS,
         onAudit: async (record) => {
           const errorCode = transportError ?? record.errorCode;
-          await this.options.onAudit?.({ ...record, errorCode, metadata: { ...record.metadata, model: settings.model! } });
+          await this.options.onAudit?.({ ...record, errorCode, metadata: { ...record.metadata, model: settings.model! },
+            reasoningTransport: { requests: structuredClone(transportRequests),
+              disabledButReasoningObserved: transportRequests.some(r => r.request.thinking === 'disabled' && r.reasoningCharacters > 0) },
+          });
           await this.options.onInvocation?.({
             invocationId: `pinv_${randomUUID()}`, runId: String(request.metadata?.runId ?? ''), agentId: request.role,
             provider: 'deepseek-harness', model: settings.model!, startedAt: record.startedAt, completedAt: record.completedAt,
@@ -140,6 +167,7 @@ export class ConfiguredDshProvider implements AgentProvider {
             fixture: false, errorCode,
           });
           inputTokens = null; outputTokens = null;
+          transportRequests = [];
         },
       });
       return await adapter.run(request, signal);

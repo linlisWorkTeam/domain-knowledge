@@ -53,6 +53,8 @@ export interface DomainKnowledgeInfrastructureOptions {
   checkpoint?: { kind: 'memory' } | { kind: 'sqlite'; filename: string };
   /** 提供 时钟 对应的时钟操作。 */
   clock?: () => string;
+  /** 单节点总预算，默认十分钟；不随模型批次重置。 */
+  nodeTimeoutMs?: number;
 }
 
 /** 创建Domain知识Infrastructure。 */
@@ -68,6 +70,10 @@ export async function createDomainKnowledgeInfrastructure(options: DomainKnowled
       await mkdir(dirname(checkpoint.filename), { recursive: true });
       return SqliteSaver.fromConnString(checkpoint.filename);
     })();
+  if (options.nodeTimeoutMs !== undefined && (!Number.isSafeInteger(options.nodeTimeoutMs) || options.nodeTimeoutMs < 1)) {
+    throw new Error('WORKFLOW_ARGUMENT_INVALID: nodeTimeoutMs must be positive');
+  }
+  const operations = new Map<string, Set<Promise<unknown>>>();
   const controllers = new Map<string, AbortController>();
   const resumeReadyAt = new Map<string, string>();
   const readyKey = (runId: string, nodeId: string, iteration: number) => (
@@ -75,6 +81,12 @@ export async function createDomainKnowledgeInfrastructure(options: DomainKnowled
   );
   const graph = buildInfrastructureGraph({
     executor: options.executor,
+    nodeTimeoutMs: options.nodeTimeoutMs,
+    trackOperation: (runId, operation) => {
+      const active = operations.get(runId) ?? new Set<Promise<unknown>>();
+      operations.set(runId, active); active.add(operation);
+      void operation.then(() => active.delete(operation), () => active.delete(operation));
+    },
     observer: options.observer,
     prompts: options.prompts,
     signalFor: (runId) => controllers.get(runId)?.signal,
@@ -183,7 +195,7 @@ export async function createDomainKnowledgeInfrastructure(options: DomainKnowled
         executionStatus: this.running.has(runId) || state.executionStatus === 'PENDING'
           ? 'RUNNING'
           : settledFailure ? 'FAILED' : state.executionStatus,
-        currentNode: state.currentNode,
+        currentNode: settledFailure ? state.failedNode ?? state.currentNode : state.currentNode,
         iteration: state.iteration,
         maxIterations: state.maxIterations,
         route: state.route,
@@ -192,7 +204,11 @@ export async function createDomainKnowledgeInfrastructure(options: DomainKnowled
     }
 
     private track(runId: string, promise: Promise<InfrastructureState>): void {
-      const tracked = promise.finally(() => {
+      const tracked = promise.finally(async () => {
+        // 图的超时可能先于外部请求清理结束；wait/resume/close 必须等待当前执行停止写入。
+        controllers.get(runId)?.abort();
+        while (operations.get(runId)?.size) await Promise.allSettled([...operations.get(runId)!]);
+        operations.delete(runId);
         this.running.delete(runId);
         controllers.delete(runId);
         for (const key of resumeReadyAt.keys()) {

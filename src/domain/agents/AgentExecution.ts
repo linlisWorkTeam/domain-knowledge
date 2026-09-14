@@ -7,7 +7,7 @@ import type { ArtifactRef } from '../Domain.ts';
 import type { AgentCommand, AgentId } from './AgentContracts.ts';
 
 // 执行语义改变时更新版本，阻止旧 checkpoint 在不同角色实现下继续运行。
-export const ROLE_EXECUTION_VERSION = 'domain-agents-v10-check-evidence-guards';
+export const ROLE_EXECUTION_VERSION = 'domain-agents-v12-testgen-batches';
 /** 受信材料。 */
 export interface Material { ref: ArtifactRef; content: unknown }
 /** Application 已加载并校验的角色材料；不包含通用工作流状态或存储实现。 */
@@ -40,6 +40,8 @@ export interface ModelRequest {
   /** Check 在角色内统一修正预算，Provider 每次只输出一次。 */
   outputAttempts?: 1;
   reportAttempt?: number;
+  /** TestGen 内部阶段，框架产生；绑定提供方幂等键，不改变角色命令。 */
+  generationStep?: string;
 }
 /** 模型运行 Port：Adapter 默认负责网络及格式修复；Check 以 outputAttempts=1 接管统一报告预算，避免两层重复重试。 */
 export interface ModelExecutionPort {

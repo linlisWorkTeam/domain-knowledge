@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：验证DshConfiguredFlow的行为、约束及失败场景。
  */
+import { testGenerationFixture } from '../../src/infrastructure/agentAdapters/scenario/TestGenerationFixture.ts';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { once } from 'node:events';
@@ -33,7 +34,8 @@ function git(root: string, args: string[]): string {
 
 const counts: Record<string, number> = {};
 function agentOutput(agentType: string, prompt: string): Record<string, unknown> {
-  const count = counts[agentType] = (counts[agentType] ?? 0) + 1;
+  const step = agentType === 'test-gen' ? (prompt.includes('TESTGEN_PLAN') ? 'plan' : 'batch-1') : undefined;
+  const count = counts[agentType] = (counts[agentType] ?? 0) + (step && step !== 'plan' ? 0 : 1);
 
   switch (agentType) {
     case 'orchestrator':
@@ -43,7 +45,7 @@ function agentOutput(agentType: string, prompt: string): Record<string, unknown>
         workerId: 'worker-1',
         fragment: 'The public contract returns the fixed value four and is covered by a behavior test.',
         provenance: ['src/module.cpp'],
-        analysisScope: { moduleId: 'dsh-module', files: ['src/module.cpp'], symbols: [] },
+        analysisScope: { moduleId: 'dsh-module', symbols: [] },
         sourceEvidence: ['src/module.cpp'].map((path) => ({ claim: 'Returns four', path })),
         unresolvedQuestions: [],
       };
@@ -61,7 +63,7 @@ function agentOutput(agentType: string, prompt: string): Record<string, unknown>
       {
         const output = cppTestOutput(count === 1 ? 3 : 4);
         if (count === 1) output.files[0]!.content = '#include <cassert>\nint calculate();\nint test_public_result(void) { assert(calculate() == 3); return 0; }\n';
-        return output;
+        return testGenerationFixture(output, step);
       }
     case 'code':
       return { files: [{ path: 'src/module.cpp', content: `int calculate() { return ${count === 1 ? 3 : 4}; }\n` }] };

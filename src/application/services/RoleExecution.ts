@@ -7,6 +7,7 @@ import { roleExecutors } from '../../domain/agents/AgentRegistry.ts';
 import type { AgentCommand, AgentResult, AgentId } from '../../domain/agents/AgentContracts.ts';
 import type { ExecutionContext, RoleInput, RoleResult } from '../../domain/agents/AgentExecution.ts';
 import { assertActive, AgentReportFailure } from '../../domain/agents/AgentExecution.ts';
+import { PersistentTestGeneration } from './TestGenerationProgress.ts';
 import type { TestGenContext } from '../../domain/agents/testGenAgent/TestGenAgentContract.ts';
 import type { DocGenContext } from '../../domain/agents/docGenAgent/DocGenAgentContract.ts';
 import type { ArtifactRef } from '../../domain/Domain.ts';
@@ -30,7 +31,12 @@ export class RoleExecutionService {
     command: AgentCommand; nodeId: string; inputRefs: ArtifactRef[];
     input: RoleInput<Record<string, unknown>>; context: DocGenContext & TestGenContext;
   }): Promise<ArtifactRef> {
-    const { command, context, input } = request;
+    const { command, input } = request;
+    // 独立角色入口也共用总预算，不能让多批 SDK 调用各自得到新的十分钟。
+    const context = command.agentType === 'test-gen'
+      ? { ...request.context, signal: AbortSignal.any([AbortSignal.timeout(600_000),
+        ...(request.context.signal ? [request.context.signal] : [])]) }
+      : request.context;
     assertActive(context.signal);
     // 先校验版本化命令，再确认领域输入未在加载材料时被替换。
     this.contracts.assertCommand(command);
@@ -49,7 +55,9 @@ export class RoleExecutionService {
         input: RoleInput<Record<string, unknown>>, context: ExecutionContext,
       ) => Promise<RoleResult<unknown>>;
       let roleResult: RoleResult<unknown>;
-      try { roleResult = await execute(input, context); }
+      try { roleResult = await execute(input, command.agentType === 'test-gen'
+        ? { ...context, testGenerationProgress: new PersistentTestGeneration(this.flywheel, command, request.nodeId, commandRef, context.signal) } as TestGenContext
+        : context); }
       catch (error) {
         if (!(error instanceof AgentReportFailure)) throw error;
         const refs: ArtifactRef[] = [];
@@ -68,7 +76,7 @@ export class RoleExecutionService {
       const bind = (value: unknown): unknown => {
         if (!value || typeof value !== 'object') return value;
         if ('agentNode' in value) return this.nodeByAgent[value.agentNode as AgentId];
-        if ('agentGeneration' in value) return `${command.runId}:${this.nodeByAgent[value.agentGeneration as AgentId]}:${context.iteration}:main:contract-v10`;
+        if ('agentGeneration' in value) return `${command.runId}:${this.nodeByAgent[value.agentGeneration as AgentId]}:${context.iteration}:main:contract-v12`;
         if ('pendingArtifact' in value) {
           const ref = refs.get(String(value.pendingArtifact));
           if (!ref) throw new Error('AGENT_PENDING_ARTIFACT_MISSING');

@@ -59,9 +59,6 @@
     ],
     "analysisScope": {
       "moduleId": "markdown-diff",
-      "files": [
-        "src/domain/services/markdown-diff.ts"
-      ],
       "symbols": []
     },
     "sourceEvidence": [

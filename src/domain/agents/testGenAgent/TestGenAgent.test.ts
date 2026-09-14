@@ -9,12 +9,14 @@ import { execute } from './TestGenAgent.ts';
 import { schemaFor, validateOutput, type Input } from './TestGenAgentContract.ts';
 import { assertModelOutput } from '../../../../src/infrastructure/agentAdapters/ModelExecution.ts';
 import { roleExample } from '../../../../tests/helpers/RoleExample.ts';
+import { planSchema } from './TestGeneration.ts';
+import { AgentReportFailure, ModelResponseError } from '../AgentExecution.ts';
 
-test('test-gen: normal output uses one model call and validates before returning artifacts', async () => {
+test('test-gen: normal output persists a plan and implementation before returning artifacts', async () => {
   const sample = roleExample<Input>('test-gen');
   const result = await execute(sample.input, sample.context);
   assert.deepEqual(result.output, sample.output);
-  assert.deepEqual(sample.phases, ['model', 'validate']);
+  assert.deepEqual(sample.phases, ['model', 'validate', 'validate', 'model', 'validate', 'validate', 'validate']);
   assert.ok(result.payload.resultKind);
 });
 test('test-gen: missing referenced material fails before model execution', async () => {
@@ -79,4 +81,36 @@ test('validated source tests bypass the model even when the prompt changes', asy
   sample.context.model.execute = async () => { throw new Error('must reuse'); };
   const result = await execute(sample.input, { ...sample.context, validatedOutput: sample.output });
   assert.deepEqual(result.output, sample.output);
+});
+
+test('TestGen bounds the plan and rejects duplicate case identities before generating batches', async () => {
+  const sample = roleExample<Input>('test-gen');
+  const plan = { sharedFiles: [], cases: Array.from({ length: 129 }, (_, i) => ({ ...sample.output.cases[0], caseId: `case-${i}`, entryPoint: `test_${i}` })) };
+  assert.throws(() => assertModelOutput(plan, planSchema(sample.input)), /AGENT_OUTPUT_INVALID/);
+  plan.cases = [sample.output.cases[0], sample.output.cases[0]];
+  let calls = 0;
+  sample.context.model.execute = async () => { calls++; return plan; };
+  await assert.rejects(execute(sample.input, sample.context), /TESTGEN_CASE_ENTRY_INVALID/);
+  assert.equal(calls, 1);
+});
+
+test('TestGen rejects repair plans that delete or rename an original failing case', async () => {
+  const sample = roleExample<Input>('test-gen');
+  const ref = { ...sample.input.materials[0]!.ref, artifactId: 'previous-candidate' };
+  sample.input.payload.previousCandidateRef = ref;
+  sample.input.payload.validationFailureRef = sample.input.materials[0]!.ref;
+  sample.input.materials.push({ ref, content: sample.output });
+  sample.context.model.execute = async () => ({ sharedFiles: [], cases: [{ ...sample.output.cases[0], caseId: 'replacement-case' }] });
+  await assert.rejects(execute(sample.input, sample.context), /TESTGEN_REPAIR_CASE_SET_CHANGED/);
+});
+
+test('TestGen retains an invalid raw answer as failure evidence without committing it as a batch', async () => {
+  const sample = roleExample<Input>('test-gen');
+  sample.context.model.execute = async () => { throw new ModelResponseError('DSH_AGENT_OUTPUT_NOT_JSON', '{partial'); };
+  await assert.rejects(execute(sample.input, sample.context), error => {
+    assert.ok(error instanceof AgentReportFailure);
+    assert.equal(JSON.parse(error.artifacts[0]!.content).raw, '{partial');
+    assert.doesNotMatch(error.message, /partial/);
+    return true;
+  });
 });

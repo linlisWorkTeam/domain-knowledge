@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：提供Composition的外部入口、参数转换与响应处理。
  */
+import { testGenerationFixture } from '../../infrastructure/agentAdapters/scenario/TestGenerationFixture.ts';
 import { AgentExampleService } from '../../application/services/AgentExample.ts';
 import { NODE_BY_AGENT } from '../../domain/workflow/AgentDefinitions.ts';
 import { assertModelOutput, modelExecutionFactory } from '../../infrastructure/agentAdapters/ModelExecution.ts';
@@ -460,7 +461,7 @@ export function createComposition(input: {
       const executor = stages instanceof FixtureProjectWorkflowStages ? stages.executor : stages;
       return executor.modelFactory({ ...request, provider: executor.agentResolver?.(request.command.runId) ?? executor.agent });
     },
-    fixtureModel: (output) => ({ assertOutput: assertModelOutput, execute: async () => structuredClone(output) }),
+    fixtureModel: (output) => ({ assertOutput: assertModelOutput, execute: async (request) => testGenerationFixture(output, request.generationStep) }),
   });
   let workflowPromise: Promise<AutomatedProjectWorkflowService> | null = null;
   const workflow = () => {

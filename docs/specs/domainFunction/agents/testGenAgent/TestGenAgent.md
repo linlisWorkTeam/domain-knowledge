@@ -28,6 +28,17 @@ TestGen 交付可执行源码和逐项用例清单。它只能写允许的测试
 
 ## 3. 工作流程
 
+### 分批生成与持久进度
+
+2026-09-14 用户确认取消“一次回答交付全部测试源码”的执行方式。TestGen 首先生成完整用例计划 cases 和公共前置代码 sharedFiles，不在计划中实现测试入口。计划最多 128 个用例，每项描述有长度上限；公共代码每文件最多 4096 字符。框架按计划顺序每批最多 4 个用例串行生成测试源码，每批每文件最多 16000 字符，避免再次形成无界回答。超过计划上限明确失败，不能截断或删掉覆盖项。
+
+批次只返回当前用例涉及路径的源码片段，caseId、entryPoint、预期和依据由已保存计划绑定，不让模型重复填写。框架将共享代码与各批片段按固定顺序组装；共用同一个测试文件也支持分批追加，模型不得重复共享定义，批次辅助符号使用批次前缀。额外路径、缺少本批路径、重复文件、非法依据、重复caseId/entryPoint均拒绝。修复同样分批，保留原候选的caseId/entryPoint/testPath，不通过删除失败项使参考通过；可根据诊断修正断言与预期。
+
+非法回答和诊断保存为受限 CAS 证据；SDK 超时的中断输出由会话记录保留。每个计划/批次经Schema及业务校验后立即通过Application保存CAS和独立checkpoint。提交绑定原角色命令、冻结输入、有效Prompt、阶段和冻结计划（本批用例与公共定义），超时/取消时已提交部分仍为生成进度；它们不是已验证测试，也不能进入重建评测或Gate。恢复相同Run/命令时只执行未完成部分，不能在输入变化后拼接旧片段。单角色总预算仍为10分钟，各批不重新获得10分钟预算，外层Run预算也不增加。
+
+完整测试集经最终结构和关联检查后才提交testCandidates，随后沿用原实现统一编译、逐项行为评测、一次有限修复和通过后的整体冻结。不提前逐批冻结，也不改变原始源码或固定验收答案。模型只用read_material；不因保存批次而开放任意文件写入。独立角色入口和自动工作流通过同一RoleExecution接入持久进度。
+
+
 ### 首次生成并校验
 
 框架确认没有适用于当前源码的固定测试后，调用 TestGen。Prompt 要求只据源码和接口编写测试、提供真实依据，并遵守路径与入口限制。
@@ -106,6 +117,7 @@ stdout/stderr 仅作日志。测试打印的 TAP、成功总数或自称完成�
 规则对应：源码依据为 IO-02；可执行测试为 IO-11；参考校验为 IO-12；固定复用为 IO-13；有限修复为 IO-21。文件与入口验收为 AC-AGENT-101；构建绑定及 cwd 为 AC-AGENT-102、AC-AGENT-102-R1；逐项完成及防伪为 AC-AGENT-103、AC-AGENT-103-R1。
 
 - 文件和入口约束：[TestEntryContract.test.ts](../../../../../tests/integration/TestEntryContract.test.ts)。
+- 分批保存、超时后重启续跑及完整五项参考编译执行：[TestGenerationProgress.test.ts](../../../../../tests/integration/TestGenerationProgress.test.ts)。
 - 修复、停止与跨 Run 复用：[TestGenExecution.test.ts](../../../../../tests/integration/TestGenExecution.test.ts)。
 - 源码身份及修复策略：[TestSuitePolicy.test.ts](../../../../../src/domain/agents/testGenAgent/TestSuitePolicy.test.ts)。
 - 构建参数及 cwd：[TestBuildBinding.test.ts](../../../../../tests/integration/TestBuildBinding.test.ts)。
@@ -115,4 +127,6 @@ stdout/stderr 仅作日志。测试打印的 TAP、成功总数或自称完成�
 - 执行器设计：[Evaluation.md](../../../infrastructure/evaluation/Evaluation.md)。
 - 既往执行版本与产物：[AgentSpecRepairAndE2E.md](../../../../reports/AgentSpecRepairAndE2E.md)。
 
-代码位置：[执行入口](../../../../../src/domain/agents/testGenAgent/TestGenAgent.ts)、[输入输出契约](../../../../../src/domain/agents/testGenAgent/TestGenAgentContract.ts)、[提示词与读取范围](../../../../../src/domain/agents/testGenAgent/TestGenAgentPrompt.ts)、[角色测试](../../../../../src/domain/agents/testGenAgent/TestGenAgent.test.ts)、[独立样例](../../../../../src/domain/agents/testGenAgent/examples/TestGenAgentSample.json)。
+执行版本为 `domain-agents-v12-testgen-batches` / `contract-v12`；旧原子输出 checkpoint 不能改标识后恢复。
+
+代码位置：[分批生成](../../../../../src/domain/agents/testGenAgent/TestGeneration.ts)、[进度保存](../../../../../src/application/services/TestGenerationProgress.ts)、[执行入口](../../../../../src/domain/agents/testGenAgent/TestGenAgent.ts)、[输入输出契约](../../../../../src/domain/agents/testGenAgent/TestGenAgentContract.ts)、[提示词与读取范围](../../../../../src/domain/agents/testGenAgent/TestGenAgentPrompt.ts)、[角色测试](../../../../../src/domain/agents/testGenAgent/TestGenAgent.test.ts)、[独立样例](../../../../../src/domain/agents/testGenAgent/examples/TestGenAgentSample.json)。

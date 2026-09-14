@@ -3,10 +3,10 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：实现测试生成角色的业务步骤与结构化结果转换。
  */
-import type { ExecutionContext, RoleResult, PendingArtifact } from '../AgentExecution.ts';
+import type { RoleResult, PendingArtifact } from '../AgentExecution.ts';
 import { assertActive, pending } from '../AgentExecution.ts';
 import { type Input, type Output, type TestGenContext, schemaFor, validateInput, validateOutput } from './TestGenAgentContract.ts';
-import { definition, buildPrompt, readablePaths } from './TestGenAgentPrompt.ts';
+import { generateTests } from './TestGeneration.ts';
 
 /** 仅根据源码、公开接口和测试策略提出候选测试，不接收候选知识作为依据。 */
 export async function execute(input: Input, context: TestGenContext): Promise<RoleResult<Output>> {
@@ -15,13 +15,7 @@ export async function execute(input: Input, context: TestGenContext): Promise<Ro
   validateInput(input);
   const schema = schemaFor(input);
   // 角色决定本阶段的任务与能力范围；会话、工具执行和格式修复交给模型适配器。
-  const raw = context.validatedOutput ?? await context.model.execute({
-    role: definition.agentId,
-    prompt: buildPrompt(input, context),
-    outputSchema: schema,
-    tools: definition.tools,
-    readablePaths: readablePaths(input),
-  }, context.signal);
+  const raw = context.validatedOutput ?? await generateTests(input, context);
   // 模型返回后仍需检查取消状态，迟到结果不能被当作成功输出。
   assertActive(context.signal);
   context.model.assertOutput(raw, schema);

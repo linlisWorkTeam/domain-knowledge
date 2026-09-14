@@ -29,14 +29,17 @@ export interface Output {
   sourceEvidence: { claim: string; path: string; symbol?: string }[];
   unresolvedQuestions: string[];
 }
+/** 模型只声明分析内容；分配文件由框架从受信输入补齐。 */
+export type Draft = Omit<Output, 'analysisScope'> & {
+  analysisScope: Omit<Output['analysisScope'], 'files'>;
+};
 /** 对外提供输出Schema，作为调用方使用的统一约定。 */
 export const outputSchema: Record<string, unknown> = {
   type: 'object', required: ['workerId', 'fragment', 'provenance', 'analysisScope', 'sourceEvidence', 'unresolvedQuestions'], additionalProperties: false,
   properties: {
     analysisScope: {
-      type: 'object', required: ['moduleId', 'files', 'symbols'], additionalProperties: false,
+      type: 'object', required: ['moduleId', 'symbols'], additionalProperties: false,
       properties: { moduleId: { type: 'string', minLength: 1 },
-        files: { type: 'array', minItems: 1, uniqueItems: true, items: { type: 'string', minLength: 1 } },
         symbols: { type: 'array', uniqueItems: true, items: { type: 'string', minLength: 1 } } },
     },
     sourceEvidence: { type: 'array', minItems: 1, items: {
@@ -57,8 +60,9 @@ export function schemaFor(_input: Input): Record<string, unknown> {
 
 /** 检查本角色必需字段及所引用材料是否完整。 */
 export function validateInput(input: Input): void {
+  const assigned = input.payload.assignedSourcePaths ?? input.sourcePaths;
   if (input.payload.assignedSourcePaths?.some((path) => !input.sourcePaths.includes(path))
-    || input.payload.assignedSourcePaths?.length === 0) throw new Error('DOCWORKER_ASSIGNMENT_INVALID');
+    || assigned.length === 0 || new Set(assigned).size !== assigned.length) throw new Error('DOCWORKER_ASSIGNMENT_INVALID');
   requireMaterials(input.payload, input.materials, ['moduleId', 'sourceRefs', 'publicInterfaceRefs']);
 }
 

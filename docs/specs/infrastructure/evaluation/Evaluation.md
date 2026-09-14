@@ -40,6 +40,32 @@ testSuite 使用 `native-cases-v2-supervised` 协议，含 files 与 cases，cas
 
 本节是本次手动验收计划，不新增永久 CI。用户已确认使用真实模型分析有代表性的开源模块，并要求先记录计划再执行。执行结果追加到 [Agent 验收报告](../../../reports/AgentSpecRepairAndE2E.md)，计划不等于通过证据。
 
+#### 2026-09-14 v12 分批 TestGen 修复后再次完整验收
+
+用户在完成 Worker 分配范围与 TestGen 分批/推理传输审计修复后明确要求“重新跑完cJSON验收”，授权本次新的完整批次。基线为 `099ce794e92202dc006af5df2b631bba9233c720`，包含最新 origin/main `22fe34fdf1ee9e37c08d0bd17a03b2c7e4103cf0` 与两项本地修复；修复尚未合并。本次独立工作树 `/tmp/domain-knowledge-cjson-v12`，分支 `test/cjson-utils-v12-real-e2e`，执行协议 `domain-agents-v12-testgen-batches` / `contract-v12`。启动前提交本节计划，实际执行 HEAD 记录在 Execution.json；不覆盖历史工作树或 runtime。
+
+新证据目录 `/root/projects/domain-knowledge/.workpanel/acceptance/2026-09-14-cjson-v12-real/`。新 Run.mjs 使用当前入口，TestGen 提示遵守计划/批次 Schema，每批最多四项；不沿用旧原子输出要求。229 个源码摘要、1481 行完整目标与独立补充用例先核对，再重跑原实现基线。固定版本实际行为为依据，RFC 差异单列，保留转义路径覆盖；新测试由真实模型重新生成，不导入任何旧候选通过状态、知识或 Check 结果。
+
+预算仍是一个新 Run、含首轮最多三轮、workflow.start 起 30 分钟、各角色/节点总计 10 分钟（DocGen 包含 Worker，TestGen 包含所有批次）、DocWorker=1、构建串行、TestGen 最多一次修复。真实 deepseek-v4-flash、生产角色、DSH SDK/Bubblewrap、thinking=disabled；maxTokens=32768，contextWindow=128000。Check 最多三个报告尝试，每次 outputAttempts=1，无底层叠加重试；其他角色最多两次 Schema 尝试。600 秒由角色/图负责取消，入口 605 秒只作取消清理失效的补充 watchdog，不给模型额外生成预算。新增 reasoningTransport 审计记录实际参数与响应计数，不能依据小型探针的结果假定长任务关闭推理一定生效。
+
+新匹配版本只读前台使用 127.0.0.1:4313、新 SQLite/CAS 和独立临时隧道，实际浏览器核对当前 Run、节点、候选正文、通过/未通过标记。按原完整验收标准观察 Check、参考校验、真实重建编译/行为评测、Review 修订与 Gate；失败保存原始输出、逐项诊断、事件和 CAS 摘要，不手工修改模型代码，不循环新建 Run。结果补充到原报告。
+
+本次 v12 执行已结束：Run `41b1eec9-7ead-400c-9254-f028fa48c33f`，HEAD `00214c6845a2b792452113e28373a2a453ef84a7`，737.113 秒 FAILED。Worker/DocGen 成功，43 项测试计划及前 6 批（24 个用例槽位）保存，第 7 批 SDK 初始化未发请求即超时；Code 实际请求 thinking=disabled，却收到 133511 字符推理、0 字符正文，600 秒节点超时。没有完整测试参考校验、重建编译、Check/Review/Gate 或发布；候选知识保持 CANDIDATE，未执行恢复或另开 Run。详细用量、真实请求证据及前台剩余状态不一致见原报告最新节。
+
+#### 2026-09-14 修复后新一次完整验收
+
+本批由用户重新授权，不受上次“第四个最后批次”的结束约定限制。GitHub 已核对 PR #49 合并于 `22fe34fdf1ee9e37c08d0bd17a03b2c7e4103cf0`，分支最终修复 `0b6a0d51fec2bbe76e581c4602659ddb82fa6b26`。从当前 origin/main 创建 `test/cjson-utils-v10-real-e2e` / `/tmp/domain-knowledge-cjson-v10`；执行源码为该合并提交，启动前只更新本计划和报告，最终记录实际 HEAD。契约为 `domain-agents-v10-check-evidence-guards` / `contract-v10`。
+
+测试依据采用用户本次明确的“重建固定版本行为”：cJSON v1.7.19 实际实现是参考依据，RFC 符合性单独说明。转义 Patch 路径必须保留覆盖，由 TestGen 根据冻结源码推导预期；不得修改旧失败项、删除失败项或修改原实现。Code 不获得原实现、旧重建、独立用例和固定预期，只获得本次知识和编写配置；知识不得整份复制实现。Review 只读知识、Check 和评测证据，不额外读取原仓库。
+
+新目录为 `/root/projects/domain-knowledge/.workpanel/acceptance/2026-09-14-cjson-v10-real/`，独立 `Run.mjs` 导入新工作树，使用全新 runtime/SQLite/CAS。从旧固定源码本地 clone，核对 HEAD、全部 229 个受控文件 SHA-256 及 1481 行目标；独立补充用例和上游基线重新执行。旧候选测试通过状态、v8 checkpoint 和 v9 独立 Check 结果均不导入。
+
+预算为一次新 Run、最多 3 个业务轮次（含首轮）、从 workflow.start 调用起 30 分钟、单角色 10 分钟、DocWorker=1、构建串行、TestGen 最多一次修复；Check 首次输出后最多两次报告修正，共三次，outputAttempts=1 且 SDK 网络重试为零。其他角色沿用最多两次 Schema 尝试。SDK 超时按尝试计算，LangGraph 的 Graph.ts 另有原生节点 timeout=600000；验收入口还按 RUNNING 角色 checkpoint 累计时间监控，达到 10 分钟取消整次 Run，不叠加预算。DocGen 节点计时包含内部 Worker。本批最终由原生 TestGen 节点超时结束，外层补充 watchdog 没有触发。maxTokens=32768、contextWindow=128000，真实 deepseek-v4-flash，经配置提供方、生产角色入口和 DSH SDK/Bubblewrap；不使用 fixture 或预设回答。
+
+Node 24.13.0 独立 bootstrap 已达到 READY，启动前再次检查。先保存原实现上游、独立 18 项和转义路径复现基线，再验证提供方连接并启动；通过事件和 checkpoint 观察实际 Check、评测、Review、Gate，未到达的阶段明确标注。任何失败先保存原始回答、编译日志、逐项结果、节点事件和摘要，不手工修补模型代码，不自动新开批次。旧 4311 服务保留，本批匹配版本只读前台使用 127.0.0.1:4312 和独立 tunnel；实际浏览器核对本批 Run、节点、知识正文与候选/发布标记。敏感 runtime 不上传，结果继续写入原报告。
+
+本批已实际结束：Run `cb4a4f5a-d24f-47a1-87ca-37aba9a35786`，执行 HEAD `4f5c8cc7631cd6f0602a70927e0197a24adbabc7`（仅计划文档提交，生产源码与上述合并提交一致），北京时间 12:04:28—12:15:08，639.622 秒。DocWorker 覆盖声明校验失败，并行 TestGen 触及 10 分钟超时；最终 FAILED，未形成候选知识、测试冻结、重建、Check、Review 或 Gate。两个已完成回答用量 51773 tokens，TestGen 用量未知。前台最终 Run 失败可见，但 TestGen 节点残留 RUNNING，属于本次发现的状态收敛问题。详细证据及未解决项见原报告最新节，本次不追加新模型批次。
+
 #### 固定范围与运行配置
 
 - 执行基线：domain-knowledge `7a9b3bb`，`contract-v8` / `domain-agents-v8-supervised-routing`；最终记录实际运行提交和工作区差异。
@@ -111,3 +137,10 @@ TestEntryContract、TestBuildBinding、TestCaseExecution、NativeCaseSupervisor 
 
 
 文档关系：[设计目录](../../README.md)负责代码与设计定位；[开发指南](../../../Development.md)说明修改和交付步骤。
+
+
+### 2026-09-14 TestGen 后续修复与小型传输诊断
+
+v10 完整验收失败后，用户确认同时排查 reasoning 配置链路并改为 TestGen 分批生成/保存/最终验收。当前实现为 `domain-agents-v12-testgen-batches` / `contract-v12`，位于 `fix/testgen-batches-and-reasoning`，采用固定计划、每批最多四项、CAS/checkpoint 持久化；所有批次共享十分钟角色预算，原实现整体参考校验、一次修复和 Gate 发布规则不变。旧 v10 Run 和未冻结测试状态不改写。
+
+为定位配置，仅追加一次独立真实传输诊断（60 秒、256 tokens、无重试），同一 `deepseek-v4-flash` 实际请求 thinking=disabled，3.722 秒返回简单 JSON，没有 reasoning_content，用量 490+5 tokens。本次没有重跑完整 cJSON、没有更新原前台数据来源，也不声称长任务异常已复现或解决。后续完整验收仍需明确新批次、独立 runtime 与预算。实现、受控分批恢复及真实诊断证据见[现有报告](../../../reports/AgentSpecRepairAndE2E.md#2026-09-14testgen-分批保存与-reasoning-链路诊断)。

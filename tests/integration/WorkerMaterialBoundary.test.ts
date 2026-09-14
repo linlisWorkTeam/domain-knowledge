@@ -47,7 +47,7 @@ test('AC-AGENT-104: concurrent workers, retry and reuse cannot see sibling sourc
       assert.ok(existsSync(join(request.workspaceRoot!, 'src/public.h')));
       if (!first && calls[assigned[0]!] === 1) throw new Error('TRANSIENT_WORKER_FAILURE');
       return { workerId: first ? 'worker-1' : 'worker-2', fragment: 'An evidence-backed source fragment describing the assigned public behavior.', provenance: assigned,
-        analysisScope: { moduleId: 'cpp-module', files: assigned, symbols: [] }, sourceEvidence: assigned.map(path => ({path,claim:'Assigned behavior'})), unresolvedQuestions: [] };
+        analysisScope: { moduleId: 'cpp-module', symbols: [] }, sourceEvidence: assigned.map(path => ({path,claim:'Assigned behavior'})), unresolvedQuestions: [] };
     } };
     const service = new DocWorkerExecutionService({ flywheel: c.service, nodeByAgent: NODE_BY_AGENT,
       contracts: new JsonSchemaAgentContractValidator('docs/specs/schemas'), prompts: c.runConfiguration, observer: { record: () => undefined }, tasks: new ConcurrentTasks(2),
@@ -65,6 +65,9 @@ test('AC-AGENT-104: concurrent workers, retry and reuse cannot see sibling sourc
     for(const result of results){
       const envelope=JSON.parse(Buffer.from(await c.artifacts.get(result.resultRef)).toString());
       const command=JSON.parse(Buffer.from(await c.artifacts.get(envelope.commandRef)).toString());
+      const fragment=JSON.parse(result.material.content as string);
+      assert.deepEqual(fragment.analysisScope.files,command.payload.assignedSourcePaths);
+      assert.ok(!fragment.analysisScope.files.includes('src/public.h'));
       assert.ok((command.payload.sourceRefs as ArtifactRef[]).every(ref=>ref.artifactId!==snapshot.manifestRef.artifactId));
     }
   } finally { c.dispose(); f.cleanup(); }

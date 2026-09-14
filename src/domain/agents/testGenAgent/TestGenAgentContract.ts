@@ -20,7 +20,11 @@ export interface Output {
   files: { path: string; content: string }[];
   cases: { caseId: string; entryPoint: string; testPath: string; target: string; input: string; expected: string; sourceEvidence: string[] }[];
 }
-export interface TestGenContext extends ExecutionContext { validatedOutput?: Output }
+/** 分批进度由 Application 持久化；操作成功才提交，恢复时核对相同输入。 */
+export interface TestGenerationProgress {
+  run(step: string, input: unknown, operation: () => Promise<Record<string, unknown>>): Promise<Record<string, unknown>>;
+}
+export interface TestGenContext extends ExecutionContext { validatedOutput?: Output; testGenerationProgress?: TestGenerationProgress }
 const text = { type: 'string', pattern: '\\S' };
 export const outputSchema = {
   type: 'object', required: ['files', 'cases'], additionalProperties: false,

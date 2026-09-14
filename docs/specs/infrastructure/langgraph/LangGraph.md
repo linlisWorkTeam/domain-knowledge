@@ -10,7 +10,7 @@ SPDX-License-Identifier: MIT
 
 Graph 将 Domain Workflow 的节点、静态连接和分支目标映射到 StateGraph、Send 与 START/END。角色节点执行 Application WorkflowStageExecutor，围绕执行记录尝试编号、readyAt、开始/完成和失败投影。Runtime 管理实例、运行中的取消信号和 checkpoint 恢复；State 定义 Annotation 及更新合并方式。
 
-业务分块任务由 orchestratorTasks 返回，Adapter 只转换消息并发；路由由 candidateDestination、evaluationDestination、workflowDestination 决定。节点默认超时为 600000ms，异常由 NodeError 转为失败 Command；执行故障可与业务 STOPPED 区分。
+业务分块任务由 orchestratorTasks 返回，Adapter 只转换消息并发；路由由 candidateDestination、evaluationDestination、workflowDestination 决定。节点默认总超时为 600000ms，异常由 NodeError 转为失败 Command；执行故障可与业务 STOPPED 区分。节点必须向 executor 传递 LangGraph 的本次 timeout signal，并与 Run 取消信号合并；TestGen 的所有计划/批次共享该预算，不能为每批重置十分钟。运行时跟踪在途 executor，wait/cancel 等其清理和投影保存结束才返回，拒绝超时后的迟到成功。失败节点独立记录，避免并行分支后续完成覆盖错误定位。nodeTimeoutMs 可注入更短预算验证这条边界，默认预算不变；LanggraphInfrastructure 测试覆盖取消、迟到结果及清理。
 
 同版本恢复从持久 checkpoint 继续，Run 配置不兼容由 Application 拒绝。Registry 业务提交与 LangGraph checkpoint 不是同一事务，Graph 在 executor 返回后才保存节点更新。Application 先持久化不可变路由结果，再幂等迁移 Run/保存停止交接；重放返回既有 route-v2 结果，不按已递增的 Run.iteration 重算预算。Gate 已提交而路由未提交时按相同证据取回决定，输入冲突拒绝。`tests/integration/WorkflowRouterReplay.test.ts` 用真实图异常注入及 resume 覆盖这些窗口；不能只凭 Orchestrator 重放测试声明 router 可恢复。SDK 类型不进入 Domain，Console 读取 Registry 投影而非 checkpoint SQLite。
 
