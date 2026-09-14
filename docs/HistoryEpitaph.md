@@ -462,3 +462,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 - [2026-09-15-0010 来源恢复边界](https://github.com/linlisWorkTeam/domain-knowledge/blob/20e7949/docs/epitaph/2026-09-15-0010-review-recovery.md)：拒绝记录与原事实恢复保护，固定参考初步反驳裸前缀意见。后续来源已完整执行、质量未通过；六例已通过正式补证，保留历史与未知风险。
 
 - [2026-09-15-0030 部署与来源质量](https://github.com/linlisWorkTeam/domain-knowledge/blob/c3d54cd/docs/epitaph/2026-09-15-0030-deployed-source-quality.md)：956fe26部署及数据保留已验证；来源执行完成但质量未通过。后续43例正式补证完成，来源旧意见复核和完整发布仍待完成。
+
+- [2026-09-15-0034 指定候选补证入口](https://github.com/linlisWorkTeam/domain-knowledge/blob/4c34ead/docs/epitaph/2026-09-15-0034-supplied-candidate-stage.md)：冻结候选并交参考验证的入口；后续28fc任务43/43成功，原37例不变，不再按旧记录重启。

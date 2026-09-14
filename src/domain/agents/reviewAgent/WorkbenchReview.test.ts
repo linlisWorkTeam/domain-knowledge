@@ -222,3 +222,26 @@ test('review: recovery carries prior format facts without consuming the new atte
     assert.deepEqual(previous, before, 'prior attempts and their deadline remain immutable');
   }
 });
+
+
+test('review: invalid quotes identify their file and a literal source line without relaxing acceptance', () => {
+  const sample = roleExample<Input>('review', 'src/domain/agents/reviewAgent/examples/WorkbenchReviewSample.json');
+  const criteria = sample.input.materials.find(m => m.ref.artifactId === sample.input.payload.criteriaRef.artifactId)!;
+  criteria.content = { pendingReviewConcerns: [{ concernId: 'one', criterion: 'Declaration location', risk: 'Wrong location' }] };
+  const source = sample.input.materials.find(m => m.ref.artifactId === sample.input.payload.evaluationReportRef.artifactId)!;
+  sample.input.payload.checkReportRef = source.ref;
+  const line = '\tfloat FloatAttribute(const char* name, float defaultValue = 0) const;';
+  source.content = { files: [{ path: 'api.h', content: '// Fixed comment\r\n' + line + '\r\n' }] };
+  const output = (quote: string) => ({ blocking: false, recommendation: 'PASS' as const, correction: null,
+    concernResolutions: [{ concernId: 'one', disposition: 'DISPROVED' as const, reason: 'The header declares the function.', sourceQuotes: [{ path: 'api.h', quote }] }] });
+  for (const quote of ['    ' + line.trim(), '// Wrong comment\r\n' + line]) {
+    assert.throws(() => validateOutput(output(quote), sample.input), (error: unknown) => {
+      if (!(error instanceof Error) || !('issue' in error)) return false;
+      const hint = (error.issue as { hint: string }).hint;
+      assert.match(hint, /api\.h/); assert.ok(hint.includes(JSON.stringify(line)));
+      assert.match(hint, /不是整段引用或语义通过证据/); return true;
+    });
+  }
+  assert.doesNotThrow(() => validateOutput(output(line), sample.input));
+  assert.throws(() => validateOutput(output('unrelated statement'), sample.input), /REVIEW_CONCERN_UNRESOLVED/);
+});

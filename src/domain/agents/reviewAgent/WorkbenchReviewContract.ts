@@ -175,7 +175,12 @@ export function validateConcernResolutions(output: Output, input: Input): void {
       if (quote.quote?.trim() && file?.content.replaceAll('\r\n', '\n').includes(quote.quote.replaceAll('\r\n', '\n'))) {
         invalid('源码引用的CRLF/LF换行符与固定文件不一致。保持原结论和理由，从checkReportRef逐字复制引用，在JSON中保留\\r\\n；也可引用足以支持理由的完整单行源码。不要改写源码、移除必要证据或改判PASS。');
       }
-      invalid('源码引用必须逐字存在于本轮checkReportRef的固定文件中，不能引用其他材料或虚构文本。');
+      const requestedLines = new Set(typeof quote.quote === 'string' ? quote.quote.split(/\r?\n/).map(line => line.trim()).filter(line => line.length >= 12) : []);
+      const matchedLine = file?.content.split(/\r?\n/).find(line => line.length <= 400 && requestedLines.has(line.trim()));
+      invalid('源码引用必须逐字存在于本轮checkReportRef的固定文件中，不能引用其他材料或虚构文本。'
+        + ` 未匹配文件：${JSON.stringify(String(quote.path).slice(0, 160))}；引用开头：${JSON.stringify(String(quote.quote).slice(0, 160))}。`
+        + (matchedLine ? ` 固定文件中可核对的单行：${JSON.stringify(matchedLine)}。这不是整段引用或语义通过证据，仅在足以支持理由时引用。` : '')
+        + ' 保留原结论与风险，核对缩进、注释和字符；不要重排多行源码或为了修格式改判PASS。');
     }
     if (resolution.disposition === 'DISPROVED' && !resolution.sourceQuotes.length) invalid('否定线索必须提供固定源码的具体引用和理由，不能仅因测试通过而否定。');
     if (resolution.disposition === 'CONFIRMED' && (!output.correction || output.recommendation !== 'ITERATE')) invalid('确认线索需要保留定位修订意见和ITERATE结论。');
