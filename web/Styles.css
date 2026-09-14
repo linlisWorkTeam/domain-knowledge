@@ -1382,3 +1382,23 @@ body.drawer-active { overflow: hidden; }
 .node-running > summary::before { content: ''; width: 10px; height: 10px; border-radius: 50%; background: currentColor; animation: node-pulse 1.5s ease-in-out infinite; }
 @keyframes node-pulse { 50% { opacity: .25; } }
 @media (prefers-reduced-motion: reduce) { .node-running > summary::before { animation: none; } }
+.batch-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.batch-metrics > button { text-align: left; display: grid; gap: 8px; cursor: pointer; }
+.batch-metrics strong { font-size: 28px; }
+.batch-metrics [aria-pressed=true] { border-color: currentColor; }
+.batch-toolbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
+.batch-table > button { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto auto; width: 100%; gap: 12px; text-align: left; align-items: center; padding: 14px 0; border: 0; border-bottom: 1px solid var(--border); background: transparent; color: inherit; cursor: pointer; }
+.batch-table strong { overflow-wrap: anywhere; }
+.batch-selector > summary, .batch-mini-graph > summary { cursor: pointer; margin-bottom: 16px; }
+.batch-execution-layout { display: grid; grid-template-columns: minmax(220px, .8fr) minmax(0, 1.5fr); gap: 20px; align-items: start; }
+.batch-mini-graph ol { list-style: none; padding: 0; }
+.batch-mini-graph li + li::before { content: '↓'; display: block; text-align: center; padding: 6px; }
+.batch-mini-graph button { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: inherit; cursor: pointer; }
+.batch-mini-graph .node-running button { animation: node-pulse 1.5s ease-in-out infinite; }
+.batch-execution-layout .node-record { padding: 12px; margin-bottom: 10px; border: 1px solid var(--border); border-radius: 8px; overflow-wrap: anywhere; }
+.batch-execution-layout .node-record summary > small { display: block; margin-top: 6px; }
+[data-batch-dialog] { width: min(520px, calc(100vw - 32px)); }
+[data-batch-dialog] label { display: grid; gap: 8px; margin: 16px 0; }
+[data-batch-dialog] [hidden] { display: none; }
+@media (max-width: 700px) { .batch-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } .batch-execution-layout { grid-template-columns: 1fr; } .batch-table > button { grid-template-columns: minmax(0, 1fr) auto; } }
+@media (prefers-reduced-motion: reduce) { .batch-mini-graph .node-running button { animation: none; } }

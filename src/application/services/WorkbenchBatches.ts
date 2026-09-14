@@ -20,6 +20,21 @@ export class WorkbenchBatches {
   constructor(input: { store: WorkbenchBatchStore; projects: WorkbenchProjectStore; pipelines: WorkbenchBatches['pipelines']; clock?: () => string }) {
     this.store = input.store; this.projects = input.projects; this.pipelines = input.pipelines; this.clock = input.clock ?? (() => new Date().toISOString());
   }
+  list(projectId?: string) {
+    return this.store.list(projectId).map(batch => {
+      const versions = new Set<string>(); let verified = false, metadataError = false;
+      for (const round of batch.rounds) {
+        if (!round.pipelineId) continue;
+        try {
+          const pipeline = this.pipelines.get(round.pipelineId);
+          if (round === batch.rounds.at(-1)) verified = pipeline.status === 'SUCCEEDED' && Boolean(pipeline.publicationId);
+          const evaluations = [pipeline.children.EVALUATE, ...(pipeline.iterations ?? []).flatMap(item => [item.evaluation, item.fixedEvaluation])];
+          for (const task of evaluations) if (task?.result) for (const id of task.input.cardVersionIds) versions.add(id);
+        } catch { metadataError = true; }
+      }
+      return { ...batch, verified, evaluatedVersionCount: metadataError ? null : versions.size, evaluatedVersionIds: [...versions].sort(), metadataError };
+    });
+  }
   create(input: { snapshotId: string; moduleId: string; schedule: unknown }, commandId: string) {
     const project = this.projects.get(input.snapshotId); if (!project) throw new Error('PROJECT_INPUT_NOT_FOUND');
     const module = project.modules.find(item => item.moduleId === input.moduleId); if (!module) throw new Error('PROJECT_MODULES_INVALID');

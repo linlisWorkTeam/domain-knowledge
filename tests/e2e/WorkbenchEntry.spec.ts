@@ -9,6 +9,8 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createStageTask, type StageInput } from '../../src/domain/workbench/StageTask.ts';
+import { createPipeline } from '../../src/domain/workbench/WorkbenchPipeline.ts';
 import { createKnowledgeServer } from '../../src/interfaces/runner/Server.ts';
 
 test('project selector owns repository inputs and overview retains historical health', async ({ page }) => {
@@ -74,7 +76,67 @@ test('project folder module saves through HTTP and restores selected project aft
     await page.reload();
     await expect(page.locator('#selected-project-name')).toHaveText('source');
     await expect(page.locator('[data-repository-form]')).toHaveCount(0);
+    await page.getByRole('button', { name: '＋ 新建批次', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: '新建模块批次' });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByLabel('批次所属模块', { exact: true })).toHaveValue('parser-core');
+    await expect(dialog.locator('[data-frequency]')).toBeHidden();
+    await dialog.getByRole('button', { name: '创建批次', exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(page.locator('.batch-detail h2')).toHaveText(/^parser-core-\d{8}-1$/);
+    await expect(page.locator('[name=repositoryRoot]')).toHaveCount(0);
+    const batch = instance.composition.apps.workbenchBatches.store.list()[0]!;
+    expect(batch.status).toBe('READY'); expect(batch.moduleId).toBe('parser-core');
+    await page.getByRole('button', { name: '新建批次', exact: true }).click();
+    await dialog.getByLabel('是否自动运行', { exact: true }).selectOption('yes');
+    await expect(dialog.locator('[data-frequency]')).toBeVisible();
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(dialog.getByRole('button', { name: '创建批次', exact: true })).toBeInViewport();
+    await dialog.getByRole('button', { name: '取消', exact: true }).click();
+    expect(instance.composition.apps.workbenchBatches.store.list()).toHaveLength(1);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     expect(instance.composition.apps.workbenchStages.store.list()).toHaveLength(0);
+    const pipelines = instance.composition.apps.workbenchPipelines, stages = instance.composition.apps.workbenchStages.store;
+    const originalStart = pipelines.start;
+    let taskLease: ReturnType<typeof stages.claim>, pipelineLease: ReturnType<typeof pipelines.dependencies.store.claim> | undefined;
+    pipelines.start = async (snapshotId, _scopes, _materials, _fixed, executionKey) => {
+      const input: StageInput = { projectId: saved.projectId, stage: 'GENERATE', sourceRevision: saved.commit, sourceDigest: saved.sourceDigest,
+        configurationDigest: 'browser-controlled', cardVersionIds: [], parameters: { snapshotId, executionKey: executionKey! } };
+      const task = stages.insert(createStageTask(input, {}, new Date().toISOString())); taskLease = stages.claim(task.taskId);
+      stages.event(task.taskId, taskLease!.leaseId, 'SOURCE_ANALYZED', { message: '已读取固定模块范围' });
+      const pipeline = pipelines.dependencies.store.insert(createPipeline(input, new Date().toISOString(), 'browser-controlled'));
+      pipelineLease = pipelines.dependencies.store.claim(pipeline.pipelineId); return pipelineLease!.value;
+    };
+    try {
+      await page.getByRole('button', { name: '新增轮次', exact: true }).click();
+      await expect(page.getByRole('button', { name: '第 1 轮', exact: true })).toBeVisible();
+      await expect(page.locator('.batch-mini-graph')).not.toHaveAttribute('open', '');
+      await page.locator('.batch-mini-graph > summary').click();
+      await expect(page.locator('.batch-mini-graph .node-running')).toHaveCount(1);
+      await page.locator('[data-batch-node]').first().click();
+      await expect(page.locator('[data-batch-log]')).toHaveAttribute('open', '');
+      await expect(page.locator('[data-batch-log]')).toContainText('开始执行');
+      await page.locator('[data-batch-log] .node-execution-log details').last().locator('summary').click();
+      await expect(page.locator('[data-batch-log]')).toContainText('已读取固定模块范围');
+      stages.finish(taskLease!.task.taskId, taskLease!.leaseId, 'SUCCEEDED', { artifactRefs: [], summary: { cards: [] } }, null);
+      pipelineLease!.value.status = 'PAUSED'; pipelineLease!.value.reasonCode = 'CONTROLLED_QUALITY_PAUSE';
+      pipelines.dependencies.store.save(pipelineLease!.value, pipelineLease!.leaseId, true);
+      await expect(page.locator('.batch-detail')).toContainText('CONTROLLED_QUALITY_PAUSE', { timeout: 12_000 });
+      await expect(page.locator('.batch-mini-graph .node-running')).toHaveCount(0);
+      await expect(page.locator('[data-batch-log]')).toHaveAttribute('open', '');
+      await expect(page.locator('[data-batch-log] > summary')).toContainText('结束时间');
+      await page.locator('[data-batch-filter=attention]').click();
+      await expect(page.locator('[data-module-batch-id]')).toHaveCount(1);
+      await page.locator('[data-batch-filter=verified]').click();
+      await expect(page.locator('[data-module-batch-id]')).toHaveCount(0);
+      expect(stages.get(taskLease!.task.taskId)!.usage.modelCalls).toBe(0);
+    } finally {
+      pipelines.start = originalStart;
+      if (pipelineLease && ['PENDING', 'RUNNING'].includes(pipelines.get(pipelineLease.value.pipelineId).status)) {
+        pipelineLease.value.status = 'PAUSED'; pipelines.dependencies.store.save(pipelineLease.value, pipelineLease.leaseId, true);
+      }
+    }
+
   } finally {
     instance.server.closeAllConnections();
     await new Promise<void>(resolve => instance.server.close(() => resolve()));

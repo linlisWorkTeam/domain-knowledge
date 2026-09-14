@@ -50,6 +50,8 @@ test('batch execution fixes one module, serializes its queue and preserves cance
       pipeline.status = 'SUCCEEDED'; finishers.get(pipelineId)!(pipeline);
     }
     await turn(); assert.ok(app.idle); assert.equal(store.get(b.batchId)!.status, 'SUCCEEDED');
+    assert.equal(app.list(project.projectId).find(item => item.batchId === b.batchId)!.verified, false, 'execution success alone does not verify knowledge');
+    assert.equal(app.list(project.projectId).find(item => item.batchId === b.batchId)!.evaluatedVersionCount, 0);
     assert.equal(store.get(a.batchId)!.rounds.length, 1); assert.equal(store.get(a.batchId)!.rounds[0]!.completedAt, now);
     const automatic = app.create({ ...input, schedule: { enabled: true, intervalMinutes: 1 } }, 'automatic'); await turn();
     const finishAutomatic = (status: 'SUCCEEDED' | 'PAUSED') => {

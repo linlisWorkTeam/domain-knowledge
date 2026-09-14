@@ -208,10 +208,12 @@ test('工作流图由标准节点 API 支撑并保持只读', async ({ page }) =
   const requests: string[] = [];
   page.on('request', (request) => requests.push(new URL(request.url()).pathname));
   await page.goto(baseUrl);
-  await page.getByRole('button', { name: /^工作流图$/ }).click();
-  await expect(page.getByRole('heading', { name: '工作流图', level: 1 })).toBeVisible();
+  await page.getByRole('button', { name: /^飞轮批次$/ }).click();
+  await page.locator('.reference-run-item').first().click();
+  await page.locator('[data-legacy-graph] > summary').click();
+  await expect(page.getByRole('heading', { name: '飞轮批次', level: 1 })).toBeVisible();
   await expect(page.getByLabel('只读 Agent 工作流图')).toBeVisible();
-  await expect(page.getByText(/仅查看 · 自动更新；断线后每 10 秒刷新/)).toBeVisible();
+  await expect(page.locator('[data-legacy-graph]')).toHaveAttribute('open', '');
   await expect(page.locator('.workflow-graph')).toHaveCount(1);
   await expect(page.locator('.graph-node')).toHaveCount(7);
   await expect(page.locator('.graph-edge')).toHaveCount(7);
@@ -220,12 +222,10 @@ test('工作流图由标准节点 API 支撑并保持只读', async ({ page }) =
   expect(requests.some((path) => /\/api\/v1\/runs\/[^/]+\/workflow-nodes$/.test(path))).toBe(true);
   expect(requests.some((path) => /\/api\/v1\/runs\/[^/]+\/workflow-status$/.test(path))).toBe(true);
   expect(requests.some((path) => /\/api\/v1\/runs\/[^/]+\/events$/.test(path))).toBe(true);
-  const runSelector = page.locator('#graph-run-select');
-  const alternateRun = await runSelector.locator('option').evaluateAll((options, selected) => (
-    options.map((option) => (option as HTMLOptionElement).value).find((value) => value && value !== selected)
-  ), await runSelector.inputValue());
-  assert.ok(alternateRun);
-  await runSelector.selectOption(alternateRun);
+  await page.getByRole('button', { name: '← 返回批次列表', exact: true }).click();
+  await expect(page.locator('.reference-run-item').nth(1)).toBeVisible();
+  await page.locator('.reference-run-item').nth(1).click();
+  await page.locator('[data-legacy-graph] > summary').click();
   await expect(page.locator('.workflow-graph')).toHaveCount(1);
   await expect(page.locator('.graph-node')).toHaveCount(7);
   await page.locator('[data-graph-agent]').first().click();
@@ -241,7 +241,7 @@ test.afterAll(async () => {
   rmSync(repositoryDir, { recursive: true, force: true });
 });
 
-test('seven-page Console keeps one H1 and does not scan Sources on entry', async ({ page }) => {
+test('merged Console navigation keeps one H1 and does not scan Sources on entry', async ({ page }) => {
   const requests: string[] = [];
   page.on('request', (request) => requests.push(request.url()));
   await page.goto(baseUrl);
@@ -250,7 +250,7 @@ test('seven-page Console keeps one H1 and does not scan Sources on entry', async
   await expect(page.getByText('browser-contract').first()).toBeVisible();
   await expect(page.getByText(/项需要确认/)).toBeVisible();
 
-  const labels = ['操作中心', '飞轮批次', '知识', '工作流图', '评测', '来源', 'Agent 设置'];
+  const labels = ['操作中心', '飞轮批次', '知识', '评测', '来源', 'Agent 设置'];
   for (const label of labels) {
     await expect(page.getByRole('button', { name: new RegExp(label) }).first()).toBeVisible();
     if (label !== '操作中心') await page.getByRole('button', { name: new RegExp(`^${label}$`) }).click();
@@ -712,7 +712,7 @@ test('light and dark themes keep successful API states across all seven pages an
     expect(background).not.toBe('rgba(0, 0, 0, 0)');
     themeBackgrounds.set(theme, background);
     await expect(page.locator('#registry-label')).toHaveText('服务已连接');
-    for (const label of ['操作中心', '飞轮批次', '知识', '工作流图', '评测', '来源', 'Agent 设置']) {
+    for (const label of ['操作中心', '飞轮批次', '知识', '评测', '来源', 'Agent 设置']) {
       if (label !== '操作中心') await page.getByRole('button', { name: new RegExp(`^${label}$`) }).click();
       await expect(page.locator('h1')).toHaveCount(1);
       await expect(page.locator('.error-state')).toHaveCount(0);
@@ -817,7 +817,8 @@ test('通用场景 API 保留路径校验；浏览器固定模块入口不要求
     await enterGovernance(page);
     await navigateTo(page, '飞轮批次');
     await expect(page.getByLabel('项目场景 JSON')).toHaveCount(0);
-    await expect(page.getByRole('button', { name: '启动知识飞轮' })).toBeVisible();
+    await expect(page.locator('#workflow-start-form')).toHaveCount(0);
+    await expect(page.locator('#page-content')).toContainText('请先在左上角选择项目');
     const scenario = { ...GENERIC_SCENARIO, moduleId: 'browser-module', repositoryRoot: repositoryDir };
     const headers = { authorization: 'Bearer ui-e2e-token', 'Idempotency-Key': 'legacy-invalid-scenario' };
     const denied = await page.request.post(`${baseUrl}/api/v1/runs`, {
@@ -894,11 +895,15 @@ test('操作中心分类筛选真实事项并允许恢复全部', async ({ page 
 test('workflow uses executionStatus and reports missing execution facts as unknown', async ({ page }) => {
   await page.route('**/workflow-status', (route) => route.fulfill({ json: { executionStatus: 'COMPLETED' } }));
   await page.goto(baseUrl);
-  await navigateTo(page, '工作流图');
+  await navigateTo(page, '飞轮批次');
+  await page.locator('.reference-run-item').first().click();
+  await page.locator('[data-legacy-graph] > summary').click();
   await expect(page.locator('.reference-node-detail')).toContainText('工作流 已完成');
   await page.route('**/workflow-status', (route) => route.fulfill({ status: 503, json: {} }));
   await page.reload();
-  await navigateTo(page, '工作流图');
+  await navigateTo(page, '飞轮批次');
+  await page.locator('.reference-run-item').first().click();
+  await page.locator('[data-legacy-graph] > summary').click();
   await expect(page.locator('.reference-node-detail')).toContainText('工作流 未知');
 });
 
@@ -1317,11 +1322,13 @@ test('已完成的一键流程重载展示评测和关联数量', async ({ page 
   } }));
   const errors: string[] = []; page.on('pageerror', (error) => errors.push(error.message));
   await page.goto(baseUrl);
+  await page.locator('#project-selector').click();
   const panel = page.locator('[data-workbench-pipeline-panel]');
   await expect(panel).toContainText('通过 31/31');
   await expect(panel).toContainText('40 条关系');
   await expect(panel).toContainText('累计模型调用 15 次');
   await page.reload();
+  await page.locator('#project-selector').click();
   await expect(panel).toContainText('40 条关系');
   expect(errors).toEqual([]);
 });

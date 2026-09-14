@@ -46,6 +46,8 @@ const assets = new Map([
   ['/', 'index.html'],
   ['/index.html', 'index.html'],
   ['/App.js', 'App.js'],
+  ['/ModuleBatches.js', 'ModuleBatches.js'],
+  ['/WorkbenchLabels.js', 'WorkbenchLabels.js'],
   ['/KnowledgeMarkdown.js', 'KnowledgeMarkdown.js'],
   ['/KnowledgeIndex.js', 'KnowledgeIndex.js'],
   ['/RepositoryAnalysis.js', 'RepositoryAnalysis.js'],
@@ -442,7 +444,7 @@ export function createKnowledgeServer(input: {
         if (materialRoute && request.method === 'GET') { send(response, 200, await materials.read(decodeURIComponent(materialRoute[1]!))); return; }
         const batches = composition.apps.workbenchBatches;
         if (url.pathname === '/api/v1/workbench-batches' && request.method === 'GET') {
-          send(response, 200, { items: batches.store.list(url.searchParams.get('projectId') ?? undefined), schedulerError: batches.lastError }); return;
+          send(response, 200, { items: batches.list(url.searchParams.get('projectId') ?? undefined), schedulerError: batches.lastError }); return;
         }
         if (url.pathname === '/api/v1/workbench-batches' && request.method === 'POST') {
           const payload = await body(request); requireOnlyKeys(payload, ['snapshotId', 'moduleId', 'schedule']);

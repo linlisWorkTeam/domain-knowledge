@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：提供app页面的展示、交互或样式资源。
  */
+import { createModuleBatches } from './ModuleBatches.js'
 import { publicationDownloadName } from './WorkbenchPublication.js'
 import { createRepositoryAnalysisPanel } from './RepositoryAnalysis.js'
 import { createKnowledgeIndexPanel } from './KnowledgeIndex.js'
@@ -440,6 +441,8 @@ function setPageMeta(page) {
 
 const repositoryAnalysisPanel = createRepositoryAnalysisPanel({ root: content, request, escapeHtml, isEditable: () => Boolean(state.capabilities?.directEditing || state.token), onProjectSelected(project) { state.selectedProject = project; try { localStorage.setItem('workbench-project-input', project.snapshotId) } catch {} document.querySelector('#selected-project-name').textContent = project.directory.split('/').at(-1); document.querySelector('#project-selector').title = project.directory } })
 
+const moduleBatches = createModuleBatches({ root: content, request, escapeHtml, project: () => state.selectedProject, isEditable: () => Boolean(state.capabilities?.directEditing || state.token), formatDate })
+
 function renderOverview() {
   const focusedQueueFilter = document.activeElement?.dataset?.queueFilter
   const active = state.runs.filter(isRunActive)
@@ -522,6 +525,10 @@ function renderRuns() {
     renderRunWorkspace(state.selectedRun)
     return
   }
+  if (state.selectedProject) {
+    content.innerHTML = `${moduleBatches.html()}<details class="panel legacy-batches"><summary>旧批次记录（未绑定项目）</summary>${state.runs.map(run => referenceRunRow(run)).join('') || '<p>暂无旧批次。</p>'}</details>`
+    void moduleBatches.refresh(); return
+  }
   const active = state.runs.filter(isRunActive)
   const verified = state.runs.filter((run) => run.state === 'VERIFIED')
   const evaluatedCount = state.runs.every(run => Number.isSafeInteger(run.evaluatedVersionCount))
@@ -529,10 +536,11 @@ function renderRuns() {
   const latest = state.runs[0]
   const rows = state.runs.map((run, index) => referenceRunRow(run, index === 0)).join('')
   content.innerHTML = `
+    ${moduleBatches.html()}
     <section class="reference-metrics"><article><small>运行中</small><b class="mint">${active.length}</b><p>正在执行的批次</p></article><article><small>已验证</small><b>${verified.length}</b><p>${state.runs.length} 个批次</p></article><article><small>需要处理</small><b>${state.runs.filter(needsAttention).length}</b><p>失败、低置信或已停止</p></article><article><small>已评测版本</small><b>${evaluatedCount}</b><p>同一批次的重复版本只计一次</p></article></section>
     <div class="reference-runs-grid"><section class="reference-run-history"><header><h3>批次记录</h3><button class="on" data-run-filter="">全部</button><button data-run-filter="active">运行中</button><button data-run-filter="attention">需处理</button><button data-run-filter="failed">执行失败</button></header><div id="runs-list">${rows || emptyState('没有批次记录', '启动飞轮后，可在这里查看进度和结果。')}</div></section>
     <aside class="reference-run-detail">${latest ? `<header><small>最新批次</small><b>${escapeHtml(shortId(latest.runId, 18))}</b></header><div class="orbit-mini"><span>${escapeHtml(runStatusLabel(latest))}<small>执行状态</small></span></div><p class="done">✓ <b>所属模块</b><small>${escapeHtml(latest.moduleId)}</small></p><p class="doing">⌁ <b>Agent 工作流图</b><small>查看各角色的执行情况</small></p><p>3 <b>评测</b><small>${escapeHtml(latest.latestDecision?.outcome ? displayLabel(latest.latestDecision.outcome) : '等待门禁')}</small></p><button class="wide" data-run-id="${escapeHtml(latest.runId)}">打开批次详情 →</button>` : emptyState('暂无批次', '创建批次后在这里查看。')}</aside></div>
-    <form id="workflow-start-form" class="reference-start-form"><label>服务器项目目录<input name="repositoryRoot" placeholder="选择 ohMyWorkPanel 仓库的绝对路径" required></label><button class="secondary-button" data-browse-directory="repositoryRoot" type="button" ${state.operatorMode ? '' : 'disabled'}>浏览目录</button><p class="muted">代表模块 markdownLite · 七角色顺序执行 · 最多 3 轮 / 30 分钟</p><button class="new" type="submit" ${state.operatorMode ? '' : 'disabled'}>启动知识飞轮</button><div id="directory-browser" class="directory-browser"></div></form>`
+    `
 }
 
 function referenceRunRow(run, selected = false) {
@@ -546,6 +554,7 @@ function renderRunWorkspace(snapshot) {
   const selectedRound = rounds.includes(state.selectedRound) ? state.selectedRound : run.iteration
   const automationNodes = allNodes.filter(node => (node.iteration ?? run.iteration) === selectedRound)
     .sort((a, b) => String(a.startedAt ?? a.readyAt ?? a.updatedAt ?? '').localeCompare(String(b.startedAt ?? b.readyAt ?? b.updatedAt ?? '')))
+  const graphOpen = Boolean(content.querySelector('[data-legacy-graph][open]'))
   const openedNodes = new Set([...content.querySelectorAll('[data-node-record][open]')].map(element => element.dataset.nodeRecord))
   const primaryStates = ['CREATED', 'PLANNED', 'GENERATING', 'EVALUATING', 'REVIEWING', 'PUBLISHING', 'VERIFIED']
   const currentIndex = primaryStates.indexOf(run.state)
@@ -568,6 +577,7 @@ function renderRunWorkspace(snapshot) {
       ${['FAILED', 'UNAVAILABLE', 'NOT_TRACKED'].includes(run.executionStatus) && !TERMINAL.has(run.state) ? `<div class="state-callout ${run.executionStatus === 'FAILED' ? 'failed' : ''}" data-execution-state><b>${escapeHtml(runStatusLabel(run))}</b><span>业务阶段保留：${escapeHtml(displayLabel(run.state))} · 当前没有活动执行</span><span>${escapeHtml(recoveryLabel(run))}</span>${run.executionFailure ? `<span>失败节点：${escapeHtml(NODE_LABELS[run.executionFailure.nodeId] ?? run.executionFailure.nodeId ?? '未记录')} · <code>${escapeHtml(run.executionFailure.code)}</code></span>` : ''}</div>` : ''}
       ${['ITERATING', 'ROLLING_BACK', 'LOW_CONFIDENCE', 'FAILED', 'CANCELLED'].includes(run.state) ? `<div class="state-callout ${run.state.toLowerCase().replaceAll('_', '-')}"><b>当前状态：${escapeHtml(displayLabel(run.state))}</b><span>第 ${escapeHtml(run.iteration + 1)} 轮 · 详情以事件与门禁证据为准</span></div>` : ''}
     </section>
+    <details class="panel" data-legacy-graph ${graphOpen ? 'open' : ''}><summary>节点图</summary><section id="graph-stage" class="reference-graph-shell"></section></details>
     <div class="run-workspace-grid">
       <section class="panel">
         <div class="section-heading"><h2>轮次执行记录</h2><span class="counter">${automationNodes.length} 个节点</span></div>
@@ -604,6 +614,7 @@ function renderRunWorkspace(snapshot) {
         ${latestEvaluation ? evaluationCard(latestEvaluation) : emptyState('等待评测报告', '执行证据尚未提交，暂时不能进入发布门禁。')}
       </section>
     </div>`
+  if (graphOpen) void loadGraph(run.runId).catch(() => {})
 }
 
 function evaluationCard(record) {
@@ -807,7 +818,7 @@ async function loadGraph(runId) {
   state.graphSnapshot = { snapshot, nodes, events, workflowStatus }
   ensureGraphStream(runId, Math.max(0, ...events.map((record) => Number(record.eventSeq) || 0)))
   const stage = document.querySelector('#graph-stage')
-  if (!stage || state.page !== 'graph' || state.graphRunId !== runId) return
+  if (!stage || !((state.page === 'graph') || (state.page === 'runs' && state.selectedRun?.run.runId === runId)) || state.graphRunId !== runId) return
   const definitions = state.agents.length ? state.agents : Object.keys(AGENT_LABELS).map((agentId) => ({ agentId }))
   const nodeStates = new Map(definitions.map((agent) => [agent.agentId, graphNodeState(agent.agentId, nodes)]))
   const statusCounts = { complete: 0, running: 0, failed: 0, idle: 0, unknown: 0 }
@@ -827,7 +838,7 @@ function ensureGraphStream(runId, after) {
   })
   stream.addEventListener('run-event', (event) => {
     stream._cursor = Number(event.lastEventId) || stream._cursor
-    if (state.page === 'graph' && state.graphRunId === runId) loadGraph(runId).catch(() => {})
+    if ((state.page === 'graph' || (state.page === 'runs' && state.selectedRun?.run.runId === runId)) && state.graphRunId === runId) loadGraph(runId).catch(() => {})
   })
   stream.addEventListener('reconnect', (event) => {
     try { stream._cursor = Number(JSON.parse(event.data).after) || stream._cursor } catch {}
@@ -837,10 +848,10 @@ function ensureGraphStream(runId, after) {
     if (state.graphStream === stream) state.graphStream = null
     clearInterval(state.graphPoll)
     state.graphPoll = setInterval(() => {
-      if (state.page === 'graph' && state.graphRunId === runId) loadGraph(runId).catch(() => {})
+      if ((state.page === 'graph' || (state.page === 'runs' && state.selectedRun?.run.runId === runId)) && state.graphRunId === runId) loadGraph(runId).catch(() => {})
     }, 10_000)
     setTimeout(() => {
-      if (state.page === 'graph' && state.graphRunId === runId && !state.graphStream) {
+      if ((state.page === 'graph' || (state.page === 'runs' && state.selectedRun?.run.runId === runId)) && state.graphRunId === runId && !state.graphStream) {
         ensureGraphStream(runId, stream._cursor)
       }
     }, 2_000)
@@ -1237,12 +1248,14 @@ async function verifyProviderSettings() {
     showToast(providerErrorMessage(error), 'danger')
   } finally {
     state.providerVerifying = false
-    if (state.page === 'agent-settings') renderAgents()
+    if (state.page === 'projects') { const focus = repositoryAnalysisPanel.focus(); content.innerHTML = repositoryAnalysisPanel.html(); repositoryAnalysisPanel.restore(focus) }
+  if (state.page === 'agent-settings') renderAgents()
   }
 }
 
 async function navigate(page) {
   if (!PAGE_META[page]) return
+  if (page === 'graph') page = 'runs'
   state.page = page
   state.selectedRun = null
   state.selectedRound = null
@@ -1488,6 +1501,10 @@ nav.addEventListener('click', (event) => {
   const button = event.target.closest('[data-page]')
   if (button) navigate(button.dataset.page).catch(showFatal)
 })
+
+content.addEventListener('toggle', event => {
+  if (event.target.matches('[data-legacy-graph]') && event.target.open && state.selectedRun) void loadGraph(state.selectedRun.run.runId).catch(() => {})
+}, true)
 
 content.addEventListener('click', (event) => {
   const round = event.target.closest('[data-run-round]')
@@ -1744,13 +1761,13 @@ function filterRuns(filter) {
   if (target) target.innerHTML = runs.length ? runs.map((run, index) => target.closest('.reference-run-history') ? referenceRunRow(run, index === 0) : runRow(run)).join('') : emptyState('没有匹配的批次', '请选择其他状态筛选。')
 }
 
-operatorButton.addEventListener('click', () => {
+operatorButton.addEventListener('click', async () => {
   if (!state.capabilities) {
     showToast('能力状态读取失败，请重新连接后再试。', 'warning')
     return
   }
   if (state.capabilities?.directEditing) {
-    navigate('runs')
+    await navigate('runs'); moduleBatches.openCreate()
     return
   }
   if (!state.capabilities?.writeEnabled) {

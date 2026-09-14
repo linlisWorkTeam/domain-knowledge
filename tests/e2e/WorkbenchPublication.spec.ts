@@ -34,6 +34,7 @@ test('saved project to verified publication remains usable without login on desk
   const address = instance.server.address(); if (!address || typeof address === 'string') throw new Error('TEST_SERVER_ADDRESS_INVALID');
   try {
     await page.goto(`http://127.0.0.1:${address.port}`);
+    await page.locator('#project-selector').click();
     await page.locator('[data-project-history-select]').selectOption(fixture.project.snapshotId);
     await expect(page.locator('[data-project-history]')).toContainText('已载入冻结输入');
     const panel = page.locator('[data-workbench-publication-panel]');
@@ -55,6 +56,8 @@ test('saved project to verified publication remains usable without login on desk
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await page.screenshot({ path: test.info().outputPath('publication-narrow.png'), fullPage: true });
     await page.reload();
+    await page.getByRole('button', { name: '打开主导航', exact: true }).click();
+    await page.locator('#project-selector').click();
     await page.locator('[data-project-history-select]').selectOption(fixture.project.snapshotId);
     await expect(page.locator('[data-workbench-publication-panel]')).toContainText('已验证并发布');
     expect(publications.list().length).toBe(1);

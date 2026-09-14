@@ -136,24 +136,29 @@ test.afterAll(async () => {
   rmSync(runtimeDir, { recursive: true, force: true });
 });
 
-test('固定模块入口浏览服务器目录、展示进度并取消运行', async ({ page }) => {
+test('项目入口浏览服务器目录，旧批次保留进度与取消能力', async ({ page }) => {
   const control = await controlledProductApi(page);
   await page.goto(baseUrl);
   await page.getByRole('button', { name: /^飞轮批次$/ }).click();
-  await expect(page.getByRole('button', { name: '启动知识飞轮' })).toBeDisabled();
+  await page.getByRole('button', { name: '选择项目', exact: true }).click();
+  await expect(page.getByRole('button', { name: '分析仓库', exact: true })).toBeDisabled();
   await enterGovernance(page);
   await page.getByRole('button', { name: /^飞轮批次$/ }).click();
+  await page.getByRole('button', { name: '选择项目', exact: true }).click();
   await expect(page.getByLabel('项目场景 JSON')).toHaveCount(0);
-  await page.getByRole('button', { name: '浏览目录', exact: true }).click();
+  await page.getByRole('button', { name: '浏览代码目录', exact: true }).click();
   await page.getByRole('button', { name: 'projects/', exact: true }).click();
   await page.getByRole('button', { name: 'ohMyWorkPanel/', exact: true }).click();
   await page.getByRole('button', { name: '选择当前目录' }).click();
-  await expect(page.getByLabel('服务器项目目录')).toHaveValue(projectDirectory);
-  await expect(page.locator('#workflow-start-form')).toContainText('最多 3 轮 / 30 分钟');
-  await page.getByRole('button', { name: '启动知识飞轮' }).click();
+  await expect(page.getByLabel('服务器仓库目录', { exact: true })).toHaveValue(projectDirectory);
+  await expect(page.locator('#workflow-start-form')).toHaveCount(0);
+  const handle = await page.evaluate(async ({ token, projectDirectory }) => (await fetch('/api/v1/runs/markdown-lite', { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify({ repositoryRoot: projectDirectory }) })).json(), { token, projectDirectory });
+  await page.reload(); await enterGovernance(page);
+  await page.getByRole('button', { name: /^飞轮批次$/ }).click();
+  await page.locator(`.reference-run-item[data-run-id="${handle.runId}"]`).click();
   await expect(page.getByRole('heading', { name: 'markdown-lite-controlled', exact: true })).toBeVisible();
   expect(control.starts).toEqual([{ repositoryRoot: projectDirectory }]);
-  await expect(page.getByRole('heading', { name: '自动化节点' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '轮次执行记录' })).toBeVisible();
   await expect(page.getByText('进度暂不可确定', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: '取消批次', exact: true }).click();
   await expect(page.getByText('当前状态：已取消', { exact: true })).toBeVisible();

@@ -35,11 +35,17 @@ export class WorkbenchPipelines {
     const references = [...WORKBENCH_STAGES.flatMap(stage => pipeline.children[stage] ? [pipeline.children[stage]!] : []),
       ...(pipeline.iterations ?? []).flatMap(round => [round.reconstruction, round.evaluation, round.fixedEvaluation, round.revision, round.sourceVerification].filter((task): task is StageTask => Boolean(task)))];
     const tasks = [...new Map(references.map(child => [child.taskId, this.dependencies.stages.store.get(child.taskId) ?? child])).values()];
+    const events = Object.fromEntries(tasks.map(task => [task.taskId, this.dependencies.stages.store.events(task.taskId)]));
+    const timings = Object.fromEntries(tasks.map(task => {
+      const history = events[task.taskId] ?? [];
+      return [task.taskId, { startedAt: history.find(event => event.kind === 'STARTED')?.createdAt ?? null,
+        completedAt: ['PENDING', 'RUNNING'].includes(task.status) ? null : history.findLast(event => ['SUCCEEDED', 'FAILED', 'PAUSED', 'CANCELLED'].includes(event.kind))?.createdAt ?? null }];
+    }));
     let publication = null;
     if (pipeline.publicationId && this.dependencies.publications) {
       publication = this.dependencies.publications.get(pipeline.publicationId); assertPipelinePublication(pipeline, publication);
     }
-    return { pipeline, tasks, publication, checkpoints: Object.fromEntries(tasks.map((task) => [task.taskId, this.dependencies.stages.store.checkpoints(task.taskId)])), publicationVerified: publication?.status === 'COMMITTED',
+    return { pipeline, tasks, events, timings, publication, checkpoints: Object.fromEntries(tasks.map((task) => [task.taskId, this.dependencies.stages.store.checkpoints(task.taskId)])), publicationVerified: publication?.status === 'COMMITTED',
       usage: tasks.reduce((sum, task) => ({ modelCalls: sum.modelCalls + task.usage.modelCalls, tokens: sum.tokens + task.usage.tokens,
         reservedTokens: sum.reservedTokens + task.usage.reservedTokens, elapsedMs: sum.elapsedMs + task.usage.elapsedMs }), { modelCalls: 0, tokens: 0, reservedTokens: 0, elapsedMs: 0 }) };
   }

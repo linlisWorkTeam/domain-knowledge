@@ -217,3 +217,5 @@ POST /api/v1/projects 新增可选 moduleDefinitions，形如 `[{moduleId:"parse
 `GET /api/v1/workbench-batches?projectId=...` 返回批次列表与调度器错误状态，`GET /api/v1/workbench-batches/:id` 返回记录。`POST /api/v1/workbench-batches` 接受 snapshotId、moduleId 和 schedule（enabled 及启用时的 intervalMinutes，范围 1 到 525600）。服务端验证模块属于快照，固定单模块输入。关闭自动运行时仅创建 READY 记录；启用时加入调度队列。
 
 `POST /api/v1/workbench-batches/:id/rounds` 新增一轮，`/resume` 恢复原轮次，`/cancel` 取消并关闭自动运行。写请求要求 Idempotency-Key；重复命令不新增轮次，不重置既有用量。所有接口复用工作台权限和跨站写入限制。模块不存在或频率非法返回 422，批次不存在为 404，轮次活动或租约冲突为 409。执行前仍需现有工具链、模型配置和可信门禁；创建记录不等于执行成功。
+
+批次列表补充 verified、evaluatedVersionCount、evaluatedVersionIds 和 metadataError，用于前台筛选。已验证要求末轮流程成功并具有发布记录，不能仅以某个节点成功代替。流程详情补充按 taskId 分组的 events 与 timings；startedAt 来自首个 STARTED 事件，completedAt 来自终态事件，正在运行时不复用历史失败时间。
