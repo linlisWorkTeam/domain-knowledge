@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：提供项目工作流夹具的基础设施实现与外部系统接入。
  */
+import { testGenerationFixture } from './TestGenerationFixture.ts';
 import { taskMaterials } from '../../../domain/agents/orchestratorAgent/OrchestratorAgentContract.ts';
 import { readFileSync, realpathSync } from 'node:fs';
 import { isAbsolute, relative, resolve } from 'node:path';
@@ -51,7 +52,7 @@ export class FixtureProjectWorkflowStages {
           return input.modelFactory(request);
         }
         return { assertOutput: assertModelOutput,
-          execute: async () => this.output(request.stage, request.scenario, request.command.agentType, request.command.payload) };
+          execute: async (modelRequest) => testGenerationFixture(await this.output(request.stage, request.scenario, request.command.agentType, request.command.payload), modelRequest.generationStep) };
       },
     });
   }

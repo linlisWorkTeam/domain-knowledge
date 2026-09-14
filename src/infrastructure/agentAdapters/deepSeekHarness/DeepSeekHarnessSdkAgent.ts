@@ -65,6 +65,11 @@ export interface DeepSeekHarnessAuditRecord {
   errorCode: string | null;
   /** 提供元数据信息，供调用方读取或传入。 */
   metadata: Record<string, string | number | boolean | null>;
+  reasoningTransport?: {
+    requests: Array<{ request: { requestSha256: string; thinking: string | null; reasoningEffort: string | null; maxTokens: number | null };
+    reasoningCharacters: number; contentCharacters: number; firstReasoningMs: number | null; firstContentMs: number | null; }>;
+    disabledButReasoningObserved: boolean;
+  };
 }
 
 /** 定义DeepSeekHarness角色选项的数据结构与类型约束。 */

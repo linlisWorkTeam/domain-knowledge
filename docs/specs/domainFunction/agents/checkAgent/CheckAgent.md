@@ -99,7 +99,7 @@ flowchart TD
 
 成功报告附 check-attempts CAS 工件，记录每次原始回答、错误及有效证据。整体 Schema 校验前，按差异索引保留已可识别的既定规则、非空分析和合法严重程度；scope、兄弟条目或定位字段无效不能导致这些结论被删除或降级。DSH 的 Schema 失败携带原始文本和已解析对象，由 Check 保留结论，不在 Domain 猜补损坏的 JSON。已经通过整体 Schema 的报告继续保留差异数量和存在/缺失分类，只修定位和范围。耗尽时 Domain 携带待保存证据，RoleExecution 保存 CAS，并在既有 NodeFailed 错误中记录 reportEvidence 摘要；不提交成功 checkpoint。
 
-执行版本为 domain-agents-v11-worker-derived-scope / contract-v11。旧报告仍能查看，旧运行不能以新协议静默恢复。原始命令与对外 AgentResult 信封不变，comparisonReportRef 指向组装后的完整报告；历史模型回答保留在独立尝试工件中。
+执行版本为 domain-agents-v12-testgen-batches / contract-v12。旧报告仍能查看，旧运行不能以新协议静默恢复。原始命令与对外 AgentResult 信封不变，comparisonReportRef 指向组装后的完整报告；历史模型回答保留在独立尝试工件中。
 
 ## 5. 验收场景
 

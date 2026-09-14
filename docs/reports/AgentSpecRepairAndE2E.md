@@ -5,6 +5,28 @@ SPDX-License-Identifier: MIT
 -->
 # Agent Spec 修复与端到端测试报告
 
+## 2026-09-14：TestGen 分批保存与 reasoning 链路诊断
+
+本次按用户确认的两个问题分别处理，在独立工作树 `/tmp/domain-knowledge-worker-scope`、分支 `fix/testgen-batches-and-reasoning` 继续开发，基于 Worker 修复 `161057e`。没有把节点预算延长到二十分钟，也没有重跑完整 cJSON Run。执行协议升级为 `domain-agents-v12-testgen-batches` / `contract-v12`，旧原子 TestGen checkpoint 不兼容；已通过参考验收的同源固定测试仍按原规则复用。
+
+TestGen 先生成完整用例计划及公共前置代码，再按最多四项用例串行生成一批。计划至多 128 项、公共代码每文件 4096 字符、批次每文件 16000 字符；不允许通过截断或删除失败项绕过上限。每个完成批次经 Schema、授权路径和清单关联校验后独立保存到 CAS/checkpoint，冻结命令和模型请求共同绑定恢复范围。恢复不重复生成已提交批次；失败/不完整批次没有成功资格，原始非法回答和诊断另存受限证据。全部片段组装成完整候选后，才进行原实现编译、逐项行为参考校验及测试冻结。修复仍最多一次，并保留原 caseId/entryPoint/testPath 集合。
+
+发现 Graph 只传 Run signal，没有传 LangGraph 节点 timeout signal。已接通两者，等待在途 executor 清理后才结束 wait/cancel，并拒绝迟到成功；错误节点独立保存，避免并行成功覆盖失败定位。所有 TestGen 批次共享十分钟节点预算；独立角色入口另有同样的整体预算保护，SDK 单次上限不扩大。
+
+### reasoning 的已验证事实与仍未知部分
+
+本地配置为 `thinking=disabled`，DSH 会话使用 `reasoningEffort=off`。真实 SDK 到受控 HTTP 上游的测试确认实际发出 `thinking.type=disabled`，未发启用的 `reasoning_effort`。ConfiguredProvider 原样转发请求字节，新增每次 HTTP 请求的摘要和推理配置、响应推理/正文字符数、首个推理/正文时间；禁用却收到推理时记录 `disabledButReasoningObserved=true`。不把请求正文、推理正文或凭据放入摘要；完整响应仍由受限 SDK 会话保存。
+
+追加一次独立小型真实诊断，复用旧验收的加密提供方配置，走当前 ConfiguredProvider、DSH SDK 和 Bubblewrap，调用配置的 OpenCode 上游 `deepseek-v4-flash`。预算为一次请求、60 秒、maxTokens=256、无重试，输入仅要求返回简单 JSON，不提供 cJSON 材料。这不是新完整验收批次。结果 SUCCEEDED，总耗时 3722ms（提供方记录 3465ms），用量 input=490 / output=5；实际发出的 thinking=disabled，响应 reasoningCharacters=0、contentCharacters=15，首个正文 1762ms。因此本次小请求没有复现旧 TestGen 的长推理，不能认定本地配置丢失，也不能证明大任务/其他路由始终遵守 disabled；旧运行没有 HTTP 请求捕获，约九分钟推理的最终原因仍未确认。
+
+证据位于 `/root/projects/domain-knowledge/.workpanel/acceptance/2026-09-14-reasoning-probe/`，包含 `Probe.mjs`、`Execution.json`（基线 SHA 及工作差异摘要）、`Audit.jsonl`、`Usage.json`、`Result.json` 和 SDK 会话。第一次准备因加密设置路径缺少 secrets 子目录在网络调用前退出，保留 `SetupFailure.log`；修正路径后只有上述一次真实模型请求，没有复制或提交凭据。
+
+### 定向验证
+
+Node 24.13.0，worktree READY。分批持久化测试分别注入第 2 批超时取消及非法回答：计划与第 1 批已提交，父角色与第 2 批失败；关闭并重新打开 SQLite/CAS 后只重试第 2 批，修改冻结请求拒绝复用。组装后的五项完整测试通过真实 C++ 原实现编译与逐项执行，参考合格本身不发布知识。角色测试还覆盖计划上限、重复用例、修复不能换掉失败用例、原始非法 JSON 证据和取消。
+
+受控 SDK 完整流程覆盖分阶段请求、测试修复、知识修订、真实编译/监督器测试与 Gate；受控服务器证明本地接线，不能替代真实 cJSON 模型质量验收。最终结果：TestGen/持久进度/Graph/DSH 定向 25/25；既有生成及参考校验 17/17；契约、独立入口、配置与图恢复 30/30（其中恢复 6 项在旧夹具适配后重跑）；构建、监督、轮次和停止边界 25/25；SDK 修订闭环 1/1；架构 4/4，typecheck、Spec 和差异格式检查通过。最初受控完整流程仍断言总请求数为七次、部分旧夹具仍返回整套测试，按计划/批次协议更新后通过，未放宽业务断言。日志保存于 `.workpanel/acceptance/2026-09-14-testgen-batches-regression/`。没有新增永久 CI，也不改写下节旧 cJSON FAILED、未冻结、未发布的结论。
+
 ## 2026-09-14：Worker 分配范围由框架补齐
 
 用户确认 analysisScope.files 不应由模型生成，分配源码与参考接口的区别由框架掌握。本次在独立工作树 `/tmp/domain-knowledge-worker-scope`、分支 `fix/docworker-derived-scope` 实现：模型 Draft/Schema 不再包含 files，Domain 入口在校验回答后复制 assignedSourcePaths，未提供时复制 input.sourcePaths，组装成完整 Output/knowledgeChunk 再保存并交给 DocGen。Prompt 明确模型只写分析内容、不回填该字段；旧模型回答不能覆盖框架分配。

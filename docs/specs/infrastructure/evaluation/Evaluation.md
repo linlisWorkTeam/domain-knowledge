@@ -125,3 +125,10 @@ TestEntryContract、TestBuildBinding、TestCaseExecution、NativeCaseSupervisor 
 
 
 文档关系：[设计目录](../../README.md)负责代码与设计定位；[开发指南](../../../Development.md)说明修改和交付步骤。
+
+
+### 2026-09-14 TestGen 后续修复与小型传输诊断
+
+v10 完整验收失败后，用户确认同时排查 reasoning 配置链路并改为 TestGen 分批生成/保存/最终验收。当前实现为 `domain-agents-v12-testgen-batches` / `contract-v12`，位于 `fix/testgen-batches-and-reasoning`，采用固定计划、每批最多四项、CAS/checkpoint 持久化；所有批次共享十分钟角色预算，原实现整体参考校验、一次修复和 Gate 发布规则不变。旧 v10 Run 和未冻结测试状态不改写。
+
+为定位配置，仅追加一次独立真实传输诊断（60 秒、256 tokens、无重试），同一 `deepseek-v4-flash` 实际请求 thinking=disabled，3.722 秒返回简单 JSON，没有 reasoning_content，用量 490+5 tokens。本次没有重跑完整 cJSON、没有更新原前台数据来源，也不声称长任务异常已复现或解决。后续完整验收仍需明确新批次、独立 runtime 与预算。实现、受控分批恢复及真实诊断证据见[现有报告](../../../reports/AgentSpecRepairAndE2E.md#2026-09-14testgen-分批保存与-reasoning-链路诊断)。

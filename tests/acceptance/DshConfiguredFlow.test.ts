@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：验证DshConfiguredFlow的行为、约束及失败场景。
  */
+import { testGenerationFixture } from '../../src/infrastructure/agentAdapters/scenario/TestGenerationFixture.ts';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { once } from 'node:events';
@@ -31,7 +32,7 @@ function git(root: string, args: string[]): string {
   return result.stdout.trim();
 }
 
-function agentOutput(agentType: string): Record<string, unknown> {
+function agentOutput(agentType: string, prompt: string): Record<string, unknown> {
   switch (agentType) {
     case 'orchestrator':
       return orchestratorOutput('dsh-module');
@@ -51,7 +52,7 @@ function agentOutput(agentType: string): Record<string, unknown> {
         description: '使用真实 DSH SDK 生成并通过确定性门禁的知识。',
       };
     case 'test-gen':
-      return cppTestOutput();
+      return testGenerationFixture(cppTestOutput(), prompt.includes('TESTGEN_PLAN') ? 'plan' : 'batch-1');
     case 'code':
       return { files: [{ path: 'src/module.cpp', content: 'int calculate() { return 4; }\n' }] };
     case 'check':
@@ -88,7 +89,7 @@ test('a minimum complete Run sends all seven governed nodes through the real nat
     )).join('\n');
     const agentType = prompt.match(/"agentType":"([^"]+)"/)?.[1] ?? '';
     invokedRoles.push(agentType);
-    const output = JSON.stringify(agentOutput(agentType));
+    const output = JSON.stringify(agentOutput(agentType, prompt));
     const common = { id: `chatcmpl-${invokedRoles.length}`, object: 'chat.completion.chunk', created: 1, model: 'test-model' };
     response.writeHead(200, { 'content-type': 'text/event-stream; charset=utf-8' });
     response.write(`data: ${JSON.stringify({
@@ -151,7 +152,8 @@ test('a minimum complete Run sends all seven governed nodes through the real nat
     assert.deepEqual([...new Set(invokedRoles)].sort(), [
       'check', 'code', 'doc-gen', 'doc-worker', 'orchestrator', 'review', 'test-gen',
     ]);
-    assert.equal(invocations.length, 7);
+    assert.equal(invokedRoles.filter(role => role === 'test-gen').length, 2, 'plan and batch use separate SDK requests');
+    assert.equal(invocations.length, 8);
     assert.equal(invocations.every((record) => record.status === 'SUCCEEDED'), true);
     assert.equal(invocations.every((record) => record.inputTokens === 100 && record.outputTokens === 20), true);
     assert.equal(composition.service.status().publications, 1);

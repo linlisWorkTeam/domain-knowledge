@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：验证生成 C++ 测试的参考执行、有限修复与跨 Run 复用。
  */
+import { testGenerationFixture } from '../../src/infrastructure/agentAdapters/scenario/TestGenerationFixture.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createTestComposition } from '../helpers/Fixture.ts';
@@ -23,9 +24,9 @@ for (const fix of [true, false]) test(`C++ first-test validation repairs once an
       contracts: new JsonSchemaAgentContractValidator('docs/specs/schemas'),
       modelFactory: ({ command }) => ({ assertOutput: assertModelOutput, execute: async (request) => {
         if (command.agentType === 'orchestrator') return orchestratorOutput(fixture.scenario.moduleId);
-        calls++;
+        if (request.generationStep === 'plan') calls++;
         if (command.payload.validationFailureRef) assert.match(request.prompt, /validationFailureRef/);
-        return cppTestOutput(fix && calls > 1 ? 4 : 3);
+        return testGenerationFixture(cppTestOutput(fix && calls > 1 ? 4 : 3), request.generationStep);
       } }),
     });
     let lastStage: WorkflowStageInput;
@@ -60,12 +61,12 @@ for (const fault of ['compile', 'assertion', 'environment', 'missing-binary'] as
     const stages = new ProjectWorkflowStages({ flywheel: c.service, evalRunner: c.apps.evalRunner,
       evaluator: new TrustedProjectEvaluator(c.artifacts), nodeByAgent: NODE_BY_AGENT,
       contracts: new JsonSchemaAgentContractValidator('docs/specs/schemas'),
-      modelFactory: ({ command }) => ({ assertOutput: assertModelOutput, execute: async () => {
+      modelFactory: ({ command }) => ({ assertOutput: assertModelOutput, execute: async (request) => {
         if (command.agentType === 'orchestrator') return orchestratorOutput(fixture.scenario.moduleId);
-        calls++; const output = cppTestOutput();
+        if (request.generationStep === 'plan') calls++; const output = cppTestOutput();
         if (fault === 'compile' && calls === 1) output.files[0]!.content = 'invalid C++ source';
         if (fault === 'assertion' && calls === 1) output.files[0]!.content = '#include <cassert>\nint test_public_result(void){assert(false);return 0;}';
-        return output;
+        return testGenerationFixture(output, request.generationStep);
       } }),
     });
     const run = c.service.createRun(fixture.scenario.moduleId, 'cpp-tests');

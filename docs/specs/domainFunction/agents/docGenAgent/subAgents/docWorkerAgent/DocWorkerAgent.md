@@ -70,7 +70,7 @@ Prompt 要求覆盖分配文件、给出依据和列出不确定行为。文件�
 
 ## 7. 实现及测试索引
 
-模型 Draft 不含 analysisScope.files，保存的 Output/knowledgeChunk 保留完整范围；IO-09 的框架绑定、引用授权与缺失依据由角色测试覆盖，DocGenSubAgents 和 WorkerMaterialBoundary 验证保存后交接及复用。执行版本为 domain-agents-v11-worker-derived-scope / contract-v11，内部提交键为 subagent-v4；旧成功结果保持可读，不以旧协议恢复新执行。
+模型 Draft 不含 analysisScope.files，保存的 Output/knowledgeChunk 保留完整范围；IO-09 的框架绑定、引用授权与缺失依据由角色测试覆盖，DocGenSubAgents 和 WorkerMaterialBoundary 验证保存后交接及复用。执行版本为 domain-agents-v12-testgen-batches / contract-v12，内部提交键为 subagent-v4；旧成功结果保持可读，不以旧协议恢复新执行。
 
 角色 ID：`doc-worker`；parentAgentId：`doc-gen`。规则对应：内部管理为 IO-07；待定分组与预算为 IO-08；结构化片段为 IO-09；三通道材料边界为 AC-AGENT-104。
 

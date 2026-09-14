@@ -25,7 +25,7 @@ test('AC-AGENT-102: configured define, include, link and runtime arguments survi
     env.f.scenario.referenceCommands.push({tool:'node',purpose:'check',args:['-e','console.log("independent-check")']});
     const {result}=await env.start(2);
     assert.equal(result.route,'PASS',result.error??'');
-    assert.equal(env.calls.filter(c=>c.role==='test-gen').length,1);
+    assert.equal(env.calls.filter(c=>c.role==='test-gen').length,2);
     const context=env.routes.at(-1)!.context;
     const evidence=JSON.parse(Buffer.from(await env.c.artifacts.get(context['oracleEvidenceRef:0'] as any)).toString());
     assert.ok(evidence.results.some((r:any)=>r.stdout.includes('independent-check')));
@@ -43,7 +43,7 @@ for(const missing of ['entry','binary','opaque'] as const) test(`AC-AGENT-102: $
     if(missing==='opaque') env.f.scenario.referenceCommands=[{tool:'node',purpose:'test',args:['-e','console.log("1..1\\nok 1")']}];
     const {result}=await env.start(1);
     assert.equal(result.route,'STOPPED',result.error??'');
-    assert.equal(env.calls.filter(c=>c.role==='test-gen').length,1);
+    assert.equal(env.calls.filter(c=>c.role==='test-gen').length,2);
     const stopped=env.routes.at(-1)!.context.testValidationRequired as {evidenceRef:any};
     const evidence=JSON.parse(Buffer.from(await env.c.artifacts.get(stopped.evidenceRef)).toString());
     assert.match(evidence.configurationFailure,/TEST_BUILD_CONFIGURATION_INVALID/);

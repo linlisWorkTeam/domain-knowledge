@@ -10,6 +10,32 @@ import type {
   AgentId, WorkflowNodeProjection, WorkflowStageInput,
 } from '../../src/application/ports/ApplicationPorts.ts';
 
+test('node deadline cancels the executor and wait drains cleanup before reporting failure', async () => {
+  const projections: WorkflowNodeProjection[] = [];
+  let cleaned = false;
+  const infrastructure = await createDomainKnowledgeInfrastructure({
+    checkpoint: { kind: 'memory' }, nodeTimeoutMs: 100,
+    prompts: { getPromptAddon: () => '' },
+    observer: { record: value => projections.push(value) },
+    executor: { execute: async input => {
+      if (input.nodeId !== 'test_gen') return { detail: 'ready' };
+      assert.ok(input.signal);
+      await new Promise<void>(resolve => input.signal!.addEventListener('abort', () => resolve(), { once: true }));
+      await new Promise(resolve => setTimeout(resolve, 50));
+      cleaned = true;
+      // Even an executor returning late success must not overwrite the timeout projection.
+      return { detail: 'late success' };
+    } },
+  });
+  const { runId } = await infrastructure.engine.start({ runId: 'node-deadline', maxIterations: 1, workerCount: 0 });
+  const result = await infrastructure.engine.wait(runId);
+  assert.equal(result.executionStatus, 'FAILED');
+  assert.equal(result.currentNode, 'test_gen');
+  assert.equal(cleaned, true);
+  assert.equal(projections.filter(p => p.nodeId === 'test_gen').at(-1)?.status, 'FAILED');
+  assert.equal(projections.some(p => p.nodeId === 'test_gen' && p.status === 'COMPLETED'), false);
+});
+
 test('embedded LangGraph runs every fixed Agent and exposes node projections', async () => {
   const calls: WorkflowStageInput[] = [];
   const projections: WorkflowNodeProjection[] = [];

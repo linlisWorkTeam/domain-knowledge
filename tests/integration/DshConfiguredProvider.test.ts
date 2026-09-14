@@ -20,6 +20,7 @@ test('DSH adapter executes through the official native DSH SDK and reports token
   let receivedBody = '';
   const sessionHeaders: (string | undefined)[] = [];
   let userAgent = '';
+  const transportAudits: import('../../src/infrastructure/agentAdapters/deepSeekHarness/DeepSeekHarnessSdkAgent.ts').DeepSeekHarnessAuditRecord[] = [];
   const upstream = createServer(async (request, response) => {
     authorization = request.headers.authorization ?? '';
     sessionHeaders.push(request.headers['x-opencode-session'] as string | undefined);
@@ -32,7 +33,7 @@ test('DSH adapter executes through the official native DSH SDK and reports token
     const common = { id: 'chatcmpl-test', object: 'chat.completion.chunk', created: 1, model: 'test-model' };
     response.write(`data: ${JSON.stringify({
       ...common,
-      choices: [{ index: 0, delta: { role: 'assistant', content: '{"answer":"ok"}' }, finish_reason: null }],
+      choices: [{ index: 0, delta: { role: 'assistant', reasoning_content: 'upstream reasoning despite disabled', content: '{"answer":"ok"}' }, finish_reason: null }],
     })}\n\n`);
     response.write(`data: ${JSON.stringify({
       ...common,
@@ -60,6 +61,7 @@ test('DSH adapter executes through the official native DSH SDK and reports token
       validate: async (raw) => ({ url: new URL(raw.endsWith('/') ? raw : `${raw}/`), addresses: ['127.0.0.1'] }),
     },
     onInvocation: (record) => { invocations.push(record); },
+    onAudit: (record) => { transportAudits.push(record); },
   });
   try {
     const result = await provider.run({
@@ -79,6 +81,15 @@ test('DSH adapter executes through the official native DSH SDK and reports token
     assert.match(userAgent, /^domain-knowledge\//);
     assert.match(sessionHeaders[0] ?? '', /^dk-[a-f0-9]{64}$/);
     assert.match(receivedBody, /Return the requested object/);
+    const wire = JSON.parse(receivedBody);
+    assert.deepEqual(wire.thinking, { type: 'disabled' });
+    assert.equal(wire.reasoning_effort, undefined);
+    const diagnostic = transportAudits[0]!.reasoningTransport as { requests: Array<{request: {thinking: string; requestSha256: string}; reasoningCharacters: number}>; disabledButReasoningObserved: boolean };
+    assert.equal(diagnostic.requests[0]!.request.thinking, 'disabled');
+    assert.match(diagnostic.requests[0]!.request.requestSha256, /^[a-f0-9]{64}$/);
+    assert.equal(diagnostic.disabledButReasoningObserved, true);
+    assert.equal(diagnostic.requests[0]!.reasoningCharacters, 'upstream reasoning despite disabled'.length);
+    assert.doesNotMatch(JSON.stringify(diagnostic), /test-key|Return the requested object|upstream reasoning despite disabled/);
     assert.equal(invocations.length, 1);
     assert.deepEqual({
       runId: invocations[0]?.runId,

@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：复现并防止 Agent Spec 审查发现的跨角色证据缺口。
  */
+import { testGenerationFixture } from '../../src/infrastructure/agentAdapters/scenario/TestGenerationFixture.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
@@ -32,7 +33,9 @@ async function scenarioProbe(name, setup, steps) { return test(name, async () =>
         env.prompts.push({ role: command.agentType, ...request });
         switch (command.agentType) {
           case 'orchestrator': return orchestratorOutput(env.planModule ?? env.scenario.moduleId);
-          case 'test-gen': return env.testOutput(++env.testCalls);
+          case 'test-gen':
+            if (request.generationStep === 'plan') env.testCalls++;
+            return testGenerationFixture(env.testOutput(env.testCalls), request.generationStep);
           case 'doc-gen': return { title: 'Module knowledge', description: 'Reference module behavior', keywords: ['module'], body: GOOD_BODY };
           case 'code': return { files: [{ path: 'src/module.cpp', content: env.code }] };
           case 'check': return { findings: [], scope: ['src/module.cpp'] };
@@ -89,7 +92,7 @@ await scenarioProbe('repair receives previous test source and cases', async (e) 
   e.testOutput = (call) => { const output = cppTestOutput(call === 1 ? 3 : 4); output.files[0].content += '// unique-prior-test-marker-78421\n'; return output; };
 }, async (e) => {
   for (const id of ['orchestrator', 'test_gen', 'oracle_validation']) await e.step(id);
-  const repair = e.prompts.filter((r) => r.role === 'test-gen')[1];
+  const repair = e.prompts.filter((r) => r.role === 'test-gen' && r.generationStep === 'plan')[1];
   assert.ok(repair); assert.equal(repair.prompt.includes('unique-prior-test-marker-78421'), true);
   assert.equal(repair.readablePaths.includes('tests/generated.cpp'), false);
   return { repairCalls: 1, previousTestContentVisible: false, previousTestFileReadable: false };

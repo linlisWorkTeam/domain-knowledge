@@ -36,3 +36,11 @@ CompanyCodeAgentCliAdapter 保留进程调用和既有契约测试，真实公�
 
 
 文档关系：[设计目录](../../README.md)负责代码与设计定位；[开发指南](../../../Development.md)说明修改和交付步骤。
+
+## reasoning 参数传递与响应诊断
+
+2026-09-14 cJSON 记录显示会话reasoningEffort=off且原生适配配置thinking=disabled，但响应包含持续推理。排查须区分配置声明、实际HTTP请求与上游响应。通过真实DSH SDK到受控上游捕获请求，验证thinking.type=disabled且无启用的reasoning_effort；ConfiguredProvider转发原始请求字节，不替换模型内容。
+
+提供方审计只记录请求摘要、允许的推理配置、响应推理/正文字符数及首次出现的相对时间。关闭推理却收到reasoning_content时明确记录差异，不隐藏推理、不伪称已关闭、不自动修改上游模型参数。请求/响应正文和凭据不进入这份摘要。SDK会话依旧保留原始响应。真实提供方是否遵守请求需独立验证，受控服务器只能证明本地链路。
+
+TestGen计划与批次各用独立Provider幂等键，角色命令和授权材料保持绑定。批次checkpoint由Application实现，Domain决定分批与组装规则；既有节点及SDK超时不因分批延长。

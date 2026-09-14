@@ -26,6 +26,7 @@ function latestTimestamp(left: string, right: string): string {
 export const InfrastructureStateAnnotation = Annotation.Root({
   runId: Annotation<string>({ reducer: replace, default: () => '' }),
   executionStatus: Annotation<InfrastructureExecutionStatus>({ reducer: replace, default: () => 'PENDING' }),
+  failedNode: Annotation<string | null>({ reducer: replace, default: () => null }),
   currentNode: Annotation<string | null>({ reducer: replace, default: () => null }),
   iteration: Annotation<number>({ reducer: replace, default: () => 0 }),
   maxIterations: Annotation<number>({ reducer: replace, default: () => 3 }),
