@@ -14,6 +14,7 @@ import type { SqliteDeletionRunStates } from './SqliteDeletionRunStates.ts';
 import { CasDeletionFiles } from './CasDeletionFiles.ts';
 import { PublishedDeletionFiles } from './PublishedDeletionFiles.ts';
 import { publishedDeletionManifest } from './PublishedDeletionManifest.ts';
+import { workspaceDeletionManifest } from './WorkspaceDeletionManifest.ts';
 import { assertDeletionDirectoryScope } from './DeletionDirectoryScope.ts';
 
 /** 调用者先获得完整维护排他，再创建本会话；数据库句柄由调用者关闭。 */
@@ -21,6 +22,7 @@ export function sqliteRuntimeDeletions(input: {
   databases: Record<string, DatabaseSync>; graph: { name: string; database: DatabaseSync }; journal: DatabaseSync;
   casRoot: string; publicationRoots: Record<string, string>; indexRoot: string; workbenchRoot: string; legacyRoots: string[];
   allowedRoots: string[]; sourceRoots: () => string[];
+  workspaces?: { rootNames: string[]; audits: () => unknown[] };
   runStates: () => Promise<Record<string, SqliteDeletionRunStates>>;
   exclusive: BatchDeletionStore['exclusive'];
 }): SqliteBatchDeletions {
@@ -29,6 +31,10 @@ export function sqliteRuntimeDeletions(input: {
   const assertScope = () => assertDeletionDirectoryScope({ roots: [input.casRoot, ...Object.values(input.publicationRoots)],
     allowedRoots: input.allowedRoots, sourceRoots: input.sourceRoots() });
   assertScope();
+  const workspaceRoots = Object.fromEntries((input.workspaces?.rootNames ?? []).map(name => {
+    if (!input.publicationRoots[name]) throw new Error('DELETION_WORKSPACE_ROOT_UNAUTHORIZED');
+    return [name, input.publicationRoots[name]!];
+  }));
   const cas = new CasDeletionFiles(input.casRoot), files = new PublishedDeletionFiles(input.publicationRoots);
   const graph = new SqliteGraphDeletion(input.graph.name, input.graph.database);
   let snapshot: Awaited<ReturnType<typeof sqliteDeletionSnapshot>> | null = null;
@@ -53,7 +59,8 @@ export function sqliteRuntimeDeletions(input: {
   return new SqliteBatchDeletions({ recovery, exclusive: input.exclusive, inventory: async () => {
     assertScope(); snapshot = null; states = await input.runStates();
     snapshot = await sqliteDeletionSnapshot({ databases: input.databases, graph, runStates: states, reader: cas,
-      published: { files, manifest: inventory => publishedDeletionManifest({ databases: input.databases, inventory,
+      published: { files, additional: input.workspaces ? inventory => workspaceDeletionManifest({ roots: workspaceRoots,
+        inventory, audits: input.workspaces!.audits() }) : undefined, manifest: inventory => publishedDeletionManifest({ databases: input.databases, inventory,
         roots: input.publicationRoots, indexRoot: input.indexRoot, workbenchRoot: input.workbenchRoot, legacyRoots: input.legacyRoots }) } });
     assertScope(); return snapshot.nodes;
   } });

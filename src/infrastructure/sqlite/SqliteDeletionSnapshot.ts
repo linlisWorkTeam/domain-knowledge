@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：合并业务表、LangGraph内部记录及递归CAS引用，并拒绝扫描期间的记录变化。
  */
+import type { DeletionNode } from '../../domain/workbench/BatchDeletion.ts';
 import type { DatabaseSync } from 'node:sqlite';
 import { sha256 } from '../../domain/Domain.ts';
 import { expandDeletionArtifacts } from '../../application/services/DeletionArtifacts.ts';
@@ -24,7 +25,8 @@ function identities(inventory: DeletionRecordInventory) {
 export async function sqliteDeletionSnapshot(input: {
   databases: Record<string, DatabaseSync>; graph?: SqliteGraphDeletion;
   runStates?: Record<string, SqliteDeletionRunStates>; reader: DeletionArtifactReader;
-  published?: { manifest(records: DeletionRecordInventory): PublishedDeletionFile[]; files: PublishedDeletionFiles };
+  published?: { manifest(records: DeletionRecordInventory): PublishedDeletionFile[]; files: PublishedDeletionFiles;
+    additional?(records: DeletionRecordInventory): { files: PublishedDeletionFile[]; protectedNodes: DeletionNode[] } };
 }) {
   const scan = () => {
     let records = sqliteDeletionInventory(input.databases, input.runStates);
@@ -37,12 +39,13 @@ export async function sqliteDeletionSnapshot(input: {
     }
     if (records.unclassifiedTables.length) throw new Error('DELETION_UNCLASSIFIED_TABLES');
     if (!input.published && records.records.some(record => ['wb_card_index', 'wb_publications', 'local_publications_v1'].includes(record.table))) throw new Error('DELETION_PUBLICATION_SCOPE_REQUIRED');
-    const publishedManifest = input.published?.manifest(records) ?? [];
+    const additional = input.published?.additional?.(records);
+    const publishedManifest = [...(input.published?.manifest(records) ?? []), ...(additional?.files ?? [])];
     const publishedNodes = input.published?.files.observe(publishedManifest) ?? [];
-    return { records, publishedManifest, publishedNodes };
+    return { records, publishedManifest, publishedNodes, protectedNodes: additional?.protectedNodes ?? [] };
   };
   const snapshot = scan(), { records, publishedManifest, publishedNodes } = snapshot, revision = sha256(JSON.stringify(snapshot));
-  const artifacts = await expandDeletionArtifacts({ nodes: [...records.nodes, ...publishedNodes], seeds: records.artifactSeeds,
+  const artifacts = await expandDeletionArtifacts({ nodes: [...records.nodes, ...publishedNodes, ...snapshot.protectedNodes], seeds: records.artifactSeeds,
     identities: identities(records), reader: input.reader });
   if (sha256(JSON.stringify(scan())) !== revision) throw new Error('DELETION_RECORD_CHANGED');
   return { ...records, nodes: artifacts.nodes, missingArtifacts: artifacts.missingArtifacts, publishedManifest,

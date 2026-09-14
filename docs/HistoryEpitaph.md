@@ -408,3 +408,7 @@ This document summarizes older handoffs, milestones and architectural decisions 
 ## 2026-09-14 归档：统一删除应用
 
 [2151 原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/c735a701a63a321dd78b8c08704d53bd97e1150c/docs/epitaph/2026-09-14-2151-unified-deletion-application.md)：BatchDeletions统一到跨库恢复v4与receipt-v2，保存准备、记录提交、完成时间；28项测试和类型检查通过，旧单库删除引擎移除。其全写入排他与发布适配缺口已推进，生产接口、完整执行目录覆盖、前台及C/C++最终验收仍未完成。
+
+## 2026-09-14 归档：发布文件清理
+
+[2202 原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/352ca0d7a61073949f78b56fe0511bd66dd32573/docs/epitaph/2026-09-14-2202-published-file-deletion.md)：三类发布/索引文件进入摘要清单及持久清理，41项测试通过；备份只读审计2107记录、336CAS、4发布文件，无缺失与未知表。其生产接线和全部执行目录覆盖仍未完成，进程锁和存储组合已在后续提交推进。

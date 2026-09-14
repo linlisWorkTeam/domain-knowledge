@@ -25,8 +25,16 @@ export class CasDeletionReader implements DeletionArtifactReader {
   }
   protected visitRelative<T>(segments: string[], digest: string, maxBytes: number,
     consume: (file: DeletionFileHandle) => T, missing?: (parent: number) => void): T | null {
-    if (!segments.length || segments.length > 16 || segments.some(part => !part || part === '.' || part === '..' || /[\/\\\0\r\n]/.test(part))
-      || !/^[a-f0-9]{64}$/.test(digest)) throw new Error('DELETION_FILE_PATH_INVALID');
+    if (!/^[a-f0-9]{64}$/.test(digest)) throw new Error('DELETION_FILE_PATH_INVALID');
+    return this.readRelative(segments, digest, maxBytes, consume, missing);
+  }
+  /** 用于首次读取服务器清单；调用者必须验证清单结构并冻结其内容摘要。 */
+  protected inspectRelative<T>(segments: string[], maxBytes: number, consume: (file: DeletionFileHandle) => T): T | null {
+    return this.readRelative(segments, null, maxBytes, consume);
+  }
+  private readRelative<T>(segments: string[], digest: string | null, maxBytes: number,
+    consume: (file: DeletionFileHandle) => T, missing?: (parent: number) => void): T | null {
+    if (!segments.length || segments.length > 16 || segments.some(part => !part || part === '.' || part === '..' || /[\/\\\0\r\n]/.test(part))) throw new Error('DELETION_FILE_PATH_INVALID');
     if (!Number.isSafeInteger(maxBytes) || maxBytes < 0 || maxBytes > 32 * 1024 * 1024) throw new Error('DELETION_ARTIFACT_LIMIT');
     if (process.platform !== 'linux') throw new Error('DELETION_ARTIFACT_PLATFORM_UNSUPPORTED');
     const handles: number[] = [], directoryFlags = constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW;
@@ -54,7 +62,7 @@ export class CasDeletionReader implements DeletionArtifactReader {
       if (readSync(handle, Buffer.alloc(1), 0, 1, offset) !== 0) throw new Error('DELETION_ARTIFACT_CHANGED');
       const after = fstatSync(handle, { bigint: true });
       if (before.size !== after.size || before.mtimeNs !== after.mtimeNs || before.ctimeNs !== after.ctimeNs) throw new Error('DELETION_ARTIFACT_CHANGED');
-      if (sha256(bytes) !== digest) throw new Error('DELETION_ARTIFACT_CORRUPT');
+      if (digest !== null && sha256(bytes) !== digest) throw new Error('DELETION_ARTIFACT_CORRUPT');
       return consume({ bytes, handle, parent: handles.at(-2)!, name: segments.at(-1)!, verified: after });
     } finally { for (const handle of handles.reverse()) closeSync(handle); }
   }
