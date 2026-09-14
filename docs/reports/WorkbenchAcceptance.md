@@ -138,3 +138,13 @@ C++当前v11可信评测`stage-03dc1c087c74a95bd631009a12b2e6ce16d842d24aab141f9
 网站已切换到提交`f543c59f922a522a8998506553788619778da1c1`，目录`/root/projects/domain-knowledge-releases/2026-09-14-workbench-f543c59/app`。保留原tunnel；本机及公网`/health`均200。通过进程cwd确认新代码，原8条Run、1张卡片保留，stage-tasks仍为0。完整数据和启动脚本备份在同发行目录的`pre-deploy-backup`，备份保留符号链接，未改v0.2.0或覆盖旧发行。备份初次误跟随运行目录中的依赖链接，已停止该备份进程并删除本次未完成副本，改为保留链接后完成；原始数据未删除。
 
 本次是部署和HTTP健康确认，尚未执行部署后的真实页面浏览器检查。真实C/C++任务仍在独立运行库，尚未导入网站，不宣称网站已有完整真实链路。固定79e38保留14条参考用例后，两次无进展恢复已停止；来源86fde3已开始，日志`/tmp/CppV11Source.log`。最新CI34828092897仍运行，不能称全绿。
+
+## 已部署页面复查（2026-09-14）
+
+f543c59实际部署的只读浏览器检查通过，覆盖1363×936桌面和390×844窄屏：五阶段入口、前置操作禁用、主要操作可见、无横向溢出、窄屏导航及原知识正文可读，无页面脚本错误。首次脚本未打开窄屏导航即点击知识，修正为正常导航操作后通过；没有force点击或修改页面来绕过。日志`/tmp/WorkbenchDeployedBrowserRetest.log`，原始报告发行目录`browser/Result.json`。人工查看桌面与窄屏截图确认主要表单未被遮挡。截图为真实线上旧数据，不是C/C++新任务成果。
+
+[已部署桌面](workbenchScreenshots/DeployedDesktop.png) · [已部署窄屏](workbenchScreenshots/DeployedNarrow.png) · [已部署知识详情](workbenchScreenshots/DeployedKnowledge.png)
+
+C++可信测试集与历史不可变套件逐字节摘要一致，仍为161328520660adbfd51e3021a847c841bb806086d7bf55f501ef97687cbcf5f7，审计`cpp-v11-evaluation/ImmutableSuiteAudit.json`。为串行运行浏览器，来源86fde3协作取消后同任务恢复，累计7calls469229tokens保留，日志`/tmp/CppV11SourceAfterBrowser.log`；没有重建新任务或重置用量。
+
+[CI 34828092897](https://github.com/linlisWorkTeam/domain-knowledge/actions/runs/34828092897)已完成并全部通过，测试提交f543c59：代码601/601、Console39/39、acceptance25/25。完整日志`/tmp/WorkbenchCi34828092897Passed.log`。此结果解决本轮回归失败，不替代TinyXML2/jsmn真实模型来源复核、固定门禁和完整发布验收。
