@@ -2,6 +2,18 @@
 
 截至2026-09-15，完整验收尚未完成。真实目标证据的历史代码基线为 `e66ec50`；下列结果只证明各自明确列出的版本、任务和范围，不代表全部知识已验证发布。
 
+## 最新真实执行状态（2026-09-15 01:39）
+
+本节优先于下文各次历史状态。历史意见复核 `stage-7fda8f7f2c60f366dfe396bb9af3146161c902daa5660122b83d7187b9367a67` 已执行成功，质量仍为UNRESOLVED：9卡63章节，38匹配、2矛盾、23未知；71次模型调用、4806852 tokens，399个直接引用摘要核验通过，见 `cpp-historical-review/FinalAudit.json`。旧任务不再恢复。Float包装函数位置错误已对固定源码核实；其他未知风险不因行为测试通过而清除。
+
+额外5个边界候选结构和章节绑定有效，与原43项合并为48项，原项逐字保留。正式补证 `stage-bc8c76bb54d7c9beaa1e369e6ca6cc449db5fe269ad857f576f13fb6122bb145` 在运行候选前因NATIVE_TEST_TOOLCHAIN_CHANGED失败。指纹差异仅涉及NativeSuiteEvaluation.ts及NativeTestCache.ts，无系统编译器或库变化；不能修改旧指纹恢复，也不能让旧来源直接绑定新重建任务。`cpp-fresh-fingerprint/FingerprintDiff.json` 保存差异，PreparedInput.json仅为准备输入，未启动新重建。
+
+随后使用现有隔离执行器进行5例诊断，固定参考和原生成代码均通过；包括ToInt尾随字符及ToInt64的带符号十六进制前缀。证据 `cpp-historical-review/BoundaryDiagnostics.json` 不属于持久化可信测试集，不改变43项可信记录或发布状态。正式补证必须在后续新重建/评测绑定下执行。
+
+源码定点修订 `stage-b1805f1fd67e1817610a3702a8c51963dcb18db9ffce791e6ab94a95f8620902` 已启动；运行状态以 `cpp-historical-source-revision/SourceCorrection.json` 和原进程为准，不能凭本段重启。后续需审计修订与索引，在当前评测器版本下重建并保留所有可信预期重验。C后续门禁、真实最终发布、历史删除兼容与线上完整任务仍未完成；网站仍为956fe26，未导入临时验收库。
+
+代码37fc9d9的CI34871914996全部成功：736项代码检查、44项Console、25项隔离验收；本节及后续交接仅更新文档，不能把这组结果称为其他代码提交的重新运行结果。
+
 ## 当前部署与来源核验结论（2026-09-15）
 
 线上代码为 `956fe2649acc67ac2ad7557a27ff719acd8525fc`，地址 https://contract-strict-warren-theories.trycloudflare.com/ 。本节替代下文历史记录中的当前运行状态；下文仍保留各次验证经过。CI [34867068206](https://github.com/linlisWorkTeam/domain-knowledge/actions/runs/34867068206) 通过727项代码测试、44项Console测试和25项隔离验收。
