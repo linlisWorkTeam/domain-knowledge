@@ -302,3 +302,5 @@ This document summarizes older handoffs, milestones and architectural decisions 
 - [2026-09-14-0313-cpp-source-third-resume.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/906b84ed0f6d9c9387e7801786fbc2f2ff20d1d3/docs/epitaph/2026-09-14-0313-cpp-source-third-resume.md)：C++ source508在50调用后第三次恢复，保留旧输入与用量，47段为中间证据；最终63段及后续四卡修订见0646/0654交接，未发布。
 
 - [2026-09-14-0332-cpp-source-fourth-resume.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/1157cd2ee945447a787efbeadf498c69337105ed/docs/epitaph/2026-09-14-0332-cpp-source-fourth-resume.md)：C++ source508在62调用后第四次恢复；当时58段为中间态，最终63段、四卡修订与新重建门禁结果见后续0646/0654/0703记录。
+
+- [2026-09-14-0646-cpp-source-footer-revision.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/c0d2888d339343ea5e34d788b377a02b095cbd88/docs/epitaph/2026-09-14-0646-cpp-source-footer-revision.md)：审计C++ source508终态，定位来源尾注分隔线误判并修复e66ec50，18项测试通过；四卡修订和新重建/门禁后续已完成，仍不能替代整链验收。
