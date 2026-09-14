@@ -18,7 +18,7 @@ ConcurrentTasks 实现 Application 的 TaskBatchRunner，默认最多三个并�
 
 ## Provider 与运行策略
 
-DSH 原生 SDK 是默认接入后端，Adapter 负责输出提取、闭合 Schema 校验、网络/格式修复重试、超时、取消和调用摘要。角色层不再重复网络重试。模型正常返回仍须检查取消，防止迟到输出提交。受控场景模型注入同一入口，不能通过继承覆盖业务步骤。
+DSH 原生 SDK 是默认接入后端，Adapter 负责输出提取、闭合 Schema 校验、网络/格式修复重试、超时、取消和调用摘要。角色层不再重复网络重试。Check 通过 outputAttempts=1 接管报告的统一修正预算，DSH 每次只尝试一个输出；JSON/Schema 错误以 ModelResponseError 保留原始响应，供 Check 反馈修正，其他角色沿用既有策略。报告尝试追加独立 report-N 幂等后缀及审计字段，不改变冻结命令和授权范围。模型正常返回仍须检查取消，防止迟到输出提交。受控场景模型注入同一入口，不能通过继承覆盖业务步骤。
 
 ConfiguredProvider 解析已验证设置或环境配置。Console 已保存但未启用/未验证的配置阻止新 Run，不静默回退；已有 Run 使用冻结配置。OpenCode Go 根据非秘密参数生成运行目录补丁，补丁只记录密钥环境变量名。配置方式见 Runtime 指南。
 

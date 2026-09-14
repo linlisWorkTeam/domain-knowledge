@@ -5,7 +5,7 @@ SPDX-License-Identifier: MIT
 -->
 # CheckAgent
 
-状态：第 1 节职责边界保持不变。第 4 节“2026-09-14 已确认的报告修复方案”及对应验收为已确认、待实现；其余对当前执行入口和输出字段的描述仍是修复前实现。本次仅更新设计，未修改代码或执行模型。
+状态：2026-09-14 已按确认方案实现报告证据提取和两次修正，职责边界保持不变。定向回归与真实模型验收的最终结果记入 Agent 验收报告，不能仅凭实现或 Schema 通过宣称真实验收完成。
 
 ## 1. 职责与边界
 
@@ -19,7 +19,7 @@ Check 解释代码差异及其与给定规则的关系；[Review](../reviewAgent
 
 输入包括固定版本的原始源码、公开接口、全部生成代码及比较规则。原源码按白名单提供，生成文件以内联材料提供；每条规则必须有唯一编号和非空说明。
 
-当前输出包含比较范围、差异列表和是否阻塞。每条差异说明采用的规则、双方文件位置、两段原文、差异含义及严重程度。没有差异时可以返回空列表，但仍需声明完整比较范围。下述待实现方案调整证据生成方式并补充单侧缺失的表达，不要求每条差异都能提供两侧存在的代码。
+模型输出 scope 与 findings；每条差异包含规则、两侧证据定位或缺失声明、自由分析和严重程度。程序提取完整原文，组装 check-report-v2 并根据 findings 计算 blocking。无差异可返回空列表，但仍须声明完整比较范围。
 
 ## 3. 工作流程
 
@@ -31,7 +31,7 @@ Check 解释代码差异及其与给定规则的关系；[Review](../reviewAgent
 
 例如，规则要求比较公开函数的返回行为，原实现为 return 4，生成实现为 return 3。Check 引用双方实际代码，解释这一差异，并按规则判断它是否阻塞通过。
 
-Prompt 要求只读、使用给定规则并引用双方原文。比较完成后，框架核对覆盖范围、规则编号、位置和片段，拒绝虚构引用。
+Prompt 提供授权冻结材料的逐行编号，模型定位双方证据；框架核对范围和规则并提取完整原文，不要求模型抄写代码。单侧缺失按下文表达。
 
 ### 保存和交接报告
 
@@ -39,17 +39,11 @@ Prompt 要求只读、使用给定规则并引用双方原文。比较完成后�
 
 ## 4. 关键约束与失败处理
 
-### 当前实现
+### 输入边界与已实现方案
 
-规则缺失、说明为空或编号重复时，在模型调用前抛出 CHECK_RULES_REQUIRED。其他必需材料缺失同样提前失败。
+规则缺失、说明为空或编号重复时，在模型调用前抛出 CHECK_RULES_REQUIRED；必需材料或正文缺失同样提前失败。完整 scope、授权文件及既定规则不可绕过。报告错误与实际代码问题分别处理。
 
-scope 必须列全生成文件。每条差异只能引用授权源码、实际生成文件和给定规则；original 与 generated 片段必须分别存在于对应文件中。范围不完整、越界路径、伪造规则或片段均拒绝。
-
-severity 只允许 BLOCKER 或 INFO；blocking 必须与是否存在 BLOCKER 一致，矛盾时拒绝。引用存在只能证明有这段原文，不能证明模型对业务差异的解释正确。共同执行与取消规则见 [Agents](../Agents.md)。
-
-### 2026-09-14 已确认的报告修复方案（待实现）
-
-本方案经逐项确认，范围为 Check 报告生成、真实证据组装和有限修正，仍对应 IO-14、IO-15。修复分支为 `fix/check-report-evidence`，设计起点 `59cb00b`。当前没有报告业务修正循环，不能将下面的目标能力描述为已可运行。
+方案对应 IO-14、IO-15；实现于 `fix/check-report-evidence`，设计提交 `9324e7a`。保留现有只读比较、独立评测、Review 文档修订及 Gate 判定边界。
 
 #### 分析正文与机器字段
 
@@ -82,7 +76,7 @@ severity 只允许 BLOCKER 或 INFO；blocking 必须与是否存在 BLOCKER 一
 
 #### 报告内部修正
 
-首次报告输出失败后最多修正 2 次，共最多 3 次报告尝试，与飞轮业务迭代次数分开。JSON / 必需字段错误和证据定位错误使用同一报告修正预算；实现时协调适配器已有格式重试，不能因多层循环叠加而超出这个预算。
+首次报告输出失败后最多修正 2 次，共最多 3 次报告尝试，与飞轮业务迭代次数分开。JSON / 必需字段错误和证据定位错误使用同一预算；Check 请求 outputAttempts=1，DSH 禁用嵌套 Schema 重试。每次报告尝试的 Provider 幂等键追加 report-N，原始命令、冻结输入和节点提交键保持绑定。
 
 能够无歧义处理的外围包装由程序处理，例如从 Markdown 代码块中取得唯一明确的 JSON 对象；不能猜补分析、改写源码字符串、删除问题条目或改变严重程度来通过。排版变化不消耗报告修正次数。
 
@@ -101,18 +95,22 @@ flowchart TD
   D -->|预算耗尽| G[保存尝试及上游结果，停止等待处理]
 ```
 
-提取能力、报告协议调整、旧工件兼容、修正计数及交接测试均在实现阶段同步，现有代码没有因本次设计确认改变。
+提取器按保留字符偏移的 C/C++ 词法边界处理函数、声明和宏，屏蔽注释与普通/原始字符串中的括号。定位到函数内部时扩展到完整函数。它不展开宏、不进行类型解析或编译；不能可靠识别的边界显式拒绝，不能宣称覆盖任意 C++ 语法。不会按字符串出现次数证明函数缺失。
+
+成功报告附 check-attempts CAS 工件，记录每次原始回答、错误及有效证据。格式修正后，已经通过 Schema 的差异数量、规则、严重程度、分析和存在/缺失分类不能被偷偷改写来通过；只修定位和范围。耗尽时 Domain 携带待保存证据，RoleExecution 保存 CAS，并在既有 NodeFailed 错误中记录 reportEvidence 摘要；不提交成功 checkpoint。
+
+执行版本为 domain-agents-v9-check-evidence / contract-v9。旧报告仍能查看，旧运行不能以新协议静默恢复。原始命令与对外 AgentResult 信封不变，comparisonReportRef 指向组装后的完整报告；历史模型回答保留在独立尝试工件中。
 
 ## 5. 验收场景
 
 - **有规则才能比较。** 给定返回行为规则可以执行；删除规则、使用空说明或重复编号，在调用模型前失败，工作流不得发布。
 - **差异引用真实原文。** 对 return 4 与 return 3 的比较可以引用对应片段；改为不存在的原文、未授权规则或文件路径，结果拒绝。
-- **范围和阻塞一致。** 漏掉一个生成文件，或 findings 有 BLOCKER 而 blocking 为 false，均拒绝。无差异时完整 scope 配合空列表可接受。
+- **范围和阻塞一致。** 漏掉生成文件须修正；blocking 由有效 findings 计算，有 BLOCKER 必为 true。无差异时完整 scope 配合空列表可接受。
 - **报告进入后续流程。** Review 收到实际比较报告和独立评测结果，Gate 检查阻塞条件；比较结果不能替换测试结果。
 
 输入校验、原文依据及报告交接已有角色和流程回归。真实业务规则是否充分、模型判断是否准确仍需业务验收。
 
-### 本次修复的验收口径（已确认，未执行）
+### 本次修复的验收口径
 
 | 验收项 | 通过条件 |
 | --- | --- |
@@ -128,7 +126,7 @@ Check 正常发现缺陷并输出阻塞报告，算检查执行成功；报告�
 
 ## 6. 未实现与待定事项
 
-上述 2026-09-14 报告方案已确认、尚未实现。本轮只写 Spec；单侧报告契约、完整源码提取、具体反馈、两次修正及对应真实模型验收均未完成。下一步实现须同步现有角色契约、适配重试与报告消费兼容，保持本页职责边界。
+报告方案已实现；真实模型质量及本次实际验证结论见 Agent 验收报告。词法提取不代替完整 C/C++ 编译器，无法识别的边界不猜测。未实现原生提供方强约束 JSON 输出，不把提示词 Schema 宣称为服务端受约束解码。
 
 相似度算法、评分、权重和阈值按 2026-09-10 的决定留待研究，尚未实现，也没有已确认的量化验收阈值。实现和评测不能自行给出一个相似度分数作为发布依据。
 
@@ -136,7 +134,14 @@ Check 正常发现缺陷并输出阻塞报告，算检查执行成功；报告�
 
 角色 ID：`check`。规则对应：输入与比较规则为 IO-14；比较报告交接为 IO-15。
 
-当前修复前的输出字段为 scope、findings、blocking；finding 包含 ruleId、sourcePath、path、original、generated、message、severity。下游记录映射为 findingId、severity、criterionId、evidenceLocation 和说明，原始报告仍完整保存。第 4 节目标协议尚未替换这些实现字段及旧验收断言。
+模型 Draft：scope、findings；每项 ruleId、original、generated、message、severity。存在侧为 status=present 与 locations（path/startLine/endLine/kind），kind 为 function 或 declaration；缺失侧为 status=missing、完整 checkedPaths 和 reason，两侧不能同时缺失。动态 Schema 限制规则和路径。
+
+组装 Output：reportVersion=check-report-v2、scope、findings、blocking；存在侧 locations 转为包含完整 content 的 excerpts，缺失侧明确保留模型判断和检查范围。下游 AgentResult 继续映射 findingId、severity、criterionId、evidenceLocation 和说明，Review 消费完整 Output。
+
+- 证据提取与失败边界：[CheckEvidence.test.ts](../../../../../src/domain/agents/checkAgent/CheckEvidence.test.ts)。
+- 角色格式/定位统一预算：[CheckAgent.test.ts](../../../../../src/domain/agents/checkAgent/CheckAgent.test.ts)。
+- 失败尝试持久化：[AgentExamples.test.ts](../../../../../tests/integration/AgentExamples.test.ts)。
+- DSH 禁止嵌套重试：[DshConfiguredProvider.test.ts](../../../../../tests/integration/DshConfiguredProvider.test.ts)。
 
 - 缺规则、虚构源码及交接回归：[AgentSpecRegression.test.mjs](../../../../../tests/integration/AgentSpecRegression.test.mjs)。
 - 比较与 Review 的完整流程：[AgentRevisionFlow.test.ts](../../../../../tests/acceptance/AgentRevisionFlow.test.ts)。

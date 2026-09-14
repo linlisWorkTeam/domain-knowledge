@@ -55,7 +55,7 @@ function agentOutput(agentType: string): Record<string, unknown> {
     case 'code':
       return { files: [{ path: 'src/module.cpp', content: 'int calculate() { return 4; }\n' }] };
     case 'check':
-      return { blocking: false, findings: [], scope: ['src/module.cpp'] };
+      return { findings: [], scope: ['src/module.cpp'] };
     case 'review':
       return { blocking: false, corrections: [] };
     default:

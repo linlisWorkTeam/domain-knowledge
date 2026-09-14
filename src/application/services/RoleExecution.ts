@@ -6,7 +6,7 @@
 import { roleExecutors } from '../../domain/agents/AgentRegistry.ts';
 import type { AgentCommand, AgentResult, AgentId } from '../../domain/agents/AgentContracts.ts';
 import type { ExecutionContext, RoleInput, RoleResult } from '../../domain/agents/AgentExecution.ts';
-import { assertActive } from '../../domain/agents/AgentExecution.ts';
+import { assertActive, AgentReportFailure } from '../../domain/agents/AgentExecution.ts';
 import type { TestGenContext } from '../../domain/agents/testGenAgent/TestGenAgentContract.ts';
 import type { DocGenContext } from '../../domain/agents/docGenAgent/DocGenAgentContract.ts';
 import type { ArtifactRef } from '../../domain/Domain.ts';
@@ -48,7 +48,15 @@ export class RoleExecutionService {
       const execute = roleExecutors[command.agentType].execute as unknown as (
         input: RoleInput<Record<string, unknown>>, context: ExecutionContext,
       ) => Promise<RoleResult<unknown>>;
-      const roleResult = await execute(input, context);
+      let roleResult: RoleResult<unknown>;
+      try { roleResult = await execute(input, context); }
+      catch (error) {
+        if (!(error instanceof AgentReportFailure)) throw error;
+        const refs: ArtifactRef[] = [];
+        for (const artifact of error.artifacts) refs.push(await this.flywheel.putArtifact(Buffer.from(artifact.content), artifact.mediaType));
+        // NodeFailed 保存可追溯 CAS 定位，不能提交成功 checkpoint 或丢弃修正历史。
+        throw new Error(`${error.message}; reportEvidence=${refs.map((ref) => ref.artifactId).join(',')}`, { cause: error });
+      }
       const rawRef = await this.flywheel.putArtifact(Buffer.from(JSON.stringify(roleResult.output, null, 2)), 'application/json');
       // 先保存原始输出与角色声明的工件，再将逻辑引用替换成不可变 CAS 引用。
       const refs = new Map<string, ArtifactRef>([['raw', rawRef]]);
@@ -60,7 +68,7 @@ export class RoleExecutionService {
       const bind = (value: unknown): unknown => {
         if (!value || typeof value !== 'object') return value;
         if ('agentNode' in value) return this.nodeByAgent[value.agentNode as AgentId];
-        if ('agentGeneration' in value) return `${command.runId}:${this.nodeByAgent[value.agentGeneration as AgentId]}:${context.iteration}:main:contract-v8`;
+        if ('agentGeneration' in value) return `${command.runId}:${this.nodeByAgent[value.agentGeneration as AgentId]}:${context.iteration}:main:contract-v9`;
         if ('pendingArtifact' in value) {
           const ref = refs.get(String(value.pendingArtifact));
           if (!ref) throw new Error('AGENT_PENDING_ARTIFACT_MISSING');

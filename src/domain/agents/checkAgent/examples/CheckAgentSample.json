@@ -63,19 +63,36 @@
     }
   },
   "modelOutput": {
-    "blocking": true,
     "scope": [
       "tests/fixtures/cpp/Module.cpp"
     ],
     "findings": [
       {
         "ruleId": "behavior",
-        "path": "tests/fixtures/cpp/Module.cpp",
-        "original": "return 4;",
-        "generated": "return 3;",
+        "original": {
+          "status": "present",
+          "locations": [
+            {
+              "path": "tests/fixtures/cpp/Module.cpp",
+              "startLine": 1,
+              "endLine": 1,
+              "kind": "function"
+            }
+          ]
+        },
+        "generated": {
+          "status": "present",
+          "locations": [
+            {
+              "path": "tests/fixtures/cpp/Module.cpp",
+              "startLine": 1,
+              "endLine": 1,
+              "kind": "function"
+            }
+          ]
+        },
         "message": "Public result differs",
-        "severity": "BLOCKER",
-        "sourcePath": "tests/fixtures/cpp/Module.cpp"
+        "severity": "BLOCKER"
       }
     ]
   }

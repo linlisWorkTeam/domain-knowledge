@@ -18,7 +18,7 @@ SPDX-License-Identifier: MIT
 | [DocGen](docGenAgent/DocGenAgent.md) | 汇总源码分析，或按意见修改上一版文档 | 一份候选文档；必要时提出拆分建议 |
 | [TestGen](testGenAgent/TestGenAgent.md) | 根据源码和公开接口编写测试 | 测试源码和逐项用例清单 |
 | [Code](codeAgent/CodeAgent.md) | 只根据候选文档和必要编写配置重建实现 | 新的 C/C++ 源文件 |
-| [Check](checkAgent/CheckAgent.md) | 按配置规则比较原始代码和重建代码 | 带双方原文依据的差异报告 |
+| [Check](checkAgent/CheckAgent.md) | 按配置规则比较原始代码和重建代码 | 带完整源码依据或明确单侧缺失的差异报告 |
 | [Review](reviewAgent/ReviewAgent.md) | 结合差异报告和实际测试结果分析文档问题 | 指明修改位置、原因和建议的意见 |
 
 DocWorker 是 DocGen 的内部助手，由 DocGen 分派。外层工作流只安排其余六个角色；七个角色都保留独立的提示词、执行记录和开发入口。
@@ -93,3 +93,5 @@ Prompt 由角色基础指令、冻结的 promptAddon、适用治理指令、本�
 ## 实现及测试索引
 
 代码位置：[src/domain/agents/AgentRegistry.ts](../../../../src/domain/agents/AgentRegistry.ts)、[src/domain/agents/AgentExecution.ts](../../../../src/domain/agents/AgentExecution.ts)、[src/domain/agents/AgentContracts.ts](../../../../src/domain/agents/AgentContracts.ts)。
+
+Check 的 check-report-v2 与统一两次报告修正见角色页；ROLE_EXECUTION_VERSION 为 domain-agents-v9-check-evidence，节点键为 contract-v9。原有命令/结果信封保持兼容，旧运行只读，不复用其 checkpoint 继续新执行。

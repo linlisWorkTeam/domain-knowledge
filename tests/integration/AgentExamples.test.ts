@@ -20,7 +20,7 @@ for (const role of AGENT_IDS) test(`standalone ${role} sample commits through th
     assert.equal(saved.result.agentType, role);
     assert.equal(saved.result.status, 'SUCCEEDED');
     assert.equal(saved.configuration.provider.kind, 'fixture');
-    assert.equal(saved.configuration.roleExecutionVersion, 'domain-agents-v8-supervised-routing');
+    assert.equal(saved.configuration.roleExecutionVersion, 'domain-agents-v9-check-evidence');
     assert.equal(saved.publication, 'NOT_EVALUATED');
     assert.ok(saved.outputs.length >= 1);
     const audit = readFileSync(join(result.outputDirectory, 'audit.json'), 'utf8');
@@ -40,5 +40,25 @@ test('standalone invalid output records failure and retains the failed Run for i
     assert.equal(JSON.parse(readFileSync(join(directory, runDirectory, 'failure.json'), 'utf8')).status, 'FAILED');
     assert.ok(readdirSync(join(directory, runDirectory, 'runtime')).length > 0);
     assert.equal(readdirSync(join(directory, runDirectory)).includes('result.json'), false);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
+test('Check exhaustion saves every attempt in CAS without a successful result', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'check-report-exhausted-'));
+  try {
+    const sample = JSON.parse(readFileSync(roleExamplePath('check'), 'utf8'));
+    sample.modelOutput.findings[0].generated.locations[0].startLine = 999;
+    const path = join(directory, 'invalid.json'); writeFileSync(path, JSON.stringify(sample));
+    await assert.rejects(main(['--role', 'check', '--input', path, '--output', directory]), /CHECK_REPORT_REPAIR_EXHAUSTED.*reportEvidence=sha256:/);
+    const runDirectory = join(directory, readdirSync(directory).find((name) => name.startsWith('check-'))!);
+    const failure = JSON.parse(readFileSync(join(runDirectory, 'failure.json'), 'utf8'));
+    const digest = failure.error.match(/reportEvidence=sha256:([a-f0-9]{64})/)[1];
+    const files = (root: string): string[] => readdirSync(root, { withFileTypes: true }).flatMap((entry) => entry.isDirectory() ? files(join(root, entry.name)) : [join(root, entry.name)]);
+    const artifact = files(join(runDirectory, 'runtime')).find((file) => file.endsWith(digest) || file.endsWith(digest + '.json'));
+    assert.ok(artifact, 'failed report evidence must be persisted');
+    const attempts = JSON.parse(readFileSync(artifact, 'utf8')).attempts;
+    assert.equal(attempts.length, 3);
+    assert.equal(attempts[0].raw.findings[0].generated.locations[0].startLine, 999);
+    assert.equal(readdirSync(runDirectory).includes('result.json'), false);
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });

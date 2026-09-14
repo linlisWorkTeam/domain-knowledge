@@ -210,6 +210,12 @@ test('DSH adapter retries schema-invalid output with a fresh session and audits 
       { status: 'SUCCEEDED', errorCode: null, retryCount: 1 },
     ]);
     assert.doesNotMatch(JSON.stringify(invocations), /test-key|Return the same governed business result/);
+    bodies.length = 0;
+    invocations.length = 0;
+    await assert.rejects(provider.run({ ...request, outputAttempts: 1 }), /AGENT_OUTPUT_INVALID/);
+    assert.equal(bodies.length, 1, 'role-owned repairs must disable nested provider retries');
+    assert.equal(invocations.length, 1);
+
   } finally {
     upstream.close();
     await once(upstream, 'close');
