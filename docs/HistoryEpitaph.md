@@ -404,3 +404,7 @@ This document summarizes older handoffs, milestones and architectural decisions 
 ## 2026-09-14 归档：持久文件恢复
 
 [2146 原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/a00d9018cd944f022490e3e3e1a5d074d58f8ebf/docs/epitaph/2026-09-14-2146-persisted-file-recovery.md)：文件参与者与首次冻结见证进入恢复协调器；27项及最终11项测试通过，目录身份变化拒绝恢复。其v3现已由统一应用v4替代，生产删除接口、完整执行目录覆盖和真实C/C++最终验收仍未完成。
+
+## 2026-09-14 归档：统一删除应用
+
+[2151 原记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/c735a701a63a321dd78b8c08704d53bd97e1150c/docs/epitaph/2026-09-14-2151-unified-deletion-application.md)：BatchDeletions统一到跨库恢复v4与receipt-v2，保存准备、记录提交、完成时间；28项测试和类型检查通过，旧单库删除引擎移除。其全写入排他与发布适配缺口已推进，生产接口、完整执行目录覆盖、前台及C/C++最终验收仍未完成。
