@@ -59,6 +59,9 @@ test('workbench Code repair accepts only prior generated files and compiler diag
   const prior = { files: [{ path, content: 'int calculate() { return 4; }' }], knowledgeErrorProven: false,
     diagnostic: { exitCode: 1, timedOut: false, outputLimitExceeded: false, durationMs: 2, stdout: '', stderr: 'missing declaration' } };
   config.previousGeneratedAttempt = prior; validateInput(input);
+  config.previousGeneratedAttempt = { ...prior, diagnostic: { exitCode: 1, timedOut: false, outputLimitExceeded: false, stderr: 'missing declaration' } };
+  validateInput(input);
+  config.previousGeneratedAttempt = prior;
   prior.files[0]!.path = 'reference.cpp';
   assert.throws(() => validateInput(input), /CODE_CONFIGURATION_INVALID/);
   prior.files[0]!.path = path;

@@ -22,7 +22,7 @@ import { createTestComposition } from '../helpers/Fixture.ts';
 test('role stage: rejected attempts remain immutable and resume cannot reset the two-attempt limit', async () => {
   const composition = createTestComposition();
   try {
-    const sample = roleExample<RoleInput<Record<string, unknown>>>('doc-worker');
+    const sample = roleExample<RoleInput<Record<string, unknown>>>('doc-worker', 'src/domain/agents/docGenAgent/subAgents/docWorkerAgent/examples/SourceFactsSample.json');
     for (const material of sample.input.materials) await composition.service.putArtifact(Buffer.from(JSON.stringify(material.content)), material.ref.mediaType);
     const run = composition.service.createRun(sample.input.moduleId, 'stage-recovery');
     sample.context.command.runId = run.runId;
@@ -49,8 +49,9 @@ test('role stage: rejected attempts remain immutable and resume cannot reset the
 test('role stage: resume reuses the accepted outline and starts only the remaining body attempt', async () => {
   const composition = createTestComposition();
   try {
-    const sample = roleExample<RoleInput<Record<string, unknown>>>('doc-gen');
+    const sample = roleExample<RoleInput<Record<string, unknown>>>('doc-gen', 'src/domain/agents/docGenAgent/examples/WorkbenchDocGenSample.json');
     delete sample.input.payload.baseKnowledgeRef; delete sample.input.payload.corrections;
+    sample.context.iteration = 0;
     for (const material of sample.input.materials) await composition.service.putArtifact(Buffer.from(JSON.stringify(material.content)), material.ref.mediaType);
     const run = composition.service.createRun(sample.input.moduleId, 'stage-recovery');
     sample.context.command.runId = run.runId;
@@ -78,7 +79,7 @@ test('role stage: resume reuses the accepted outline and starts only the remaini
 });
 
 test('role stage: timeout reaches the model signal, drains cleanup and prevents another attempt', async () => {
-  const sample = roleExample<RoleInput<Record<string, unknown>>>('doc-worker');
+  const sample = roleExample<RoleInput<Record<string, unknown>>>('doc-worker', 'src/domain/agents/docGenAgent/subAgents/docWorkerAgent/examples/SourceFactsSample.json');
   let calls = 0; let cleaned = false;
   const records: StageAttempt[] = [];
   sample.context.stageJournal = { read: async () => [], record: async (entry) => { records.push(structuredClone(entry)); } };
@@ -96,7 +97,7 @@ test('role stage: timeout reaches the model signal, drains cleanup and prevents 
 });
 
 test('role stage: operator cancellation between rejection and feedback cannot launch a repair', async () => {
-  const sample = roleExample<RoleInput<Record<string, unknown>>>('doc-worker');
+  const sample = roleExample<RoleInput<Record<string, unknown>>>('doc-worker', 'src/domain/agents/docGenAgent/subAgents/docWorkerAgent/examples/SourceFactsSample.json');
   let calls = 0;
   sample.context.model.execute = async () => { calls++; return {}; };
   sample.context.model.assertOutput = () => {};
@@ -112,7 +113,7 @@ test('role stage: a killed checkpoint owner can be recovered before the stage de
     let composition = createComposition({ runtimeDir });
     let child: ReturnType<typeof spawn> | undefined;
     try {
-      const sample = roleExample<RoleInput<Record<string, unknown>>>('doc-worker');
+      const sample = roleExample<RoleInput<Record<string, unknown>>>('doc-worker', 'src/domain/agents/docGenAgent/subAgents/docWorkerAgent/examples/SourceFactsSample.json');
       for (const material of sample.input.materials) await composition.service.putArtifact(Buffer.from(JSON.stringify(material.content)), material.ref.mediaType);
       const run = composition.service.createRun(sample.input.moduleId, 'crash-recovery');
       sample.context.command.runId = run.runId;

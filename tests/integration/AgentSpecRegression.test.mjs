@@ -18,7 +18,7 @@ import { assertModelOutput } from '../../src/infrastructure/agentAdapters/ModelE
 import { NODE_BY_AGENT } from '../../src/domain/workflow/AgentDefinitions.ts';
 import { execute as review } from '../../src/domain/agents/reviewAgent/ReviewAgent.ts';
 import { execute as check } from '../../src/domain/agents/checkAgent/CheckAgent.ts';
-import { validateRevision } from '../../src/domain/agents/docGenAgent/DocGenRevision.ts';
+import { validateRevisionInput } from '../../src/domain/agents/docGenAgent/DocGenRevision.ts';
 const observations = [];
 async function scenarioProbe(name, setup, steps) { return test(name, async () => {
   const c = createTestComposition(), fixture = cppScenario();
@@ -112,7 +112,7 @@ await test('Review excerpt resolves to a DocGen revision section', async () => {
   doc.input.payload.baseKnowledgeRef = sample.input.payload.knowledgeRef;
   doc.input.payload.corrections = result.payload.corrections;
   doc.input.materials.push(...sample.input.materials);
-  validateRevision(doc.input);
+  validateRevisionInput(doc.input);
 });
 await test('Check rejects invented source evidence', async () => {
   const sample = roleExample('check');

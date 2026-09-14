@@ -143,8 +143,10 @@ export class WorkbenchReconstruction {
         .sort((a, b) => Number(a.key.slice(rejectionPrefix.length)) - Number(b.key.slice(rejectionPrefix.length)));
       const revision = rejections.length;
       const latest = rejections.at(-1);
+      const priorDiagnostic = latest ? JSON.parse(await this.load(latest.result.artifactRefs[1]!)) : null;
       const previousGeneratedAttempt = latest ? { files: JSON.parse(await this.load(latest.result.artifactRefs[0]!)).files,
-        diagnostic: JSON.parse(await this.load(latest.result.artifactRefs[1]!)), knowledgeErrorProven: false } : null;
+        diagnostic: { exitCode: priorDiagnostic.exitCode, timedOut: priorDiagnostic.timedOut,
+          outputLimitExceeded: priorDiagnostic.outputLimitExceeded, stderr: priorDiagnostic.stderr }, knowledgeErrorProven: false } : null;
       // Code只获取知识、公开接口、构建约束及自身上次生成代码的编译诊断，不读参考源码或测试预期。
       const knowledge = [];
       for (const card of cards) knowledge.push({ cardId: card.metadata.cardId, versionId: card.versionId, body: await this.load(card.bodyRef) });

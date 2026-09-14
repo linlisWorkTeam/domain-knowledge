@@ -84,7 +84,7 @@ export async function createPublicationPreparationFixture(options: { sourceEvide
     section: 'Value', verifyPreamble: true, allowedKnowledgePaths: ['knowledge/knowledge-unit.md#Value'] })), 'application/json');
   const rawRef = await put(Buffer.from(JSON.stringify({ recommendation: 'PASS', blocking: false, correction: null })), 'application/json');
   const command = { schemaVersion: '1.0', commandId: 'source-command', runId: input.sourceVerification.taskId, agentType: 'review', generationKey: sha256('source'),
-    payload: { knowledgeRef: bodyRef, checkReportRef: sourceReferenceRef, evaluationReportRef: observationsRef, criteriaRef } };
+    payload: { executionContract: 'workbench-review-v1', knowledgeRef: bodyRef, checkReportRef: sourceReferenceRef, evaluationReportRef: observationsRef, criteriaRef } };
   const commandRef = await put(Buffer.from(JSON.stringify(command)), 'application/json');
   const resultRef = await put(Buffer.from(JSON.stringify({ schemaVersion: '1.0', commandId: command.commandId, commandRef, runId: command.runId, agentType: 'review', status: 'SUCCEEDED',
     rawOutputRef: rawRef, outputRefs: [rawRef], payload: { resultKind: 'attribution', corrections: [], unresolvedRisks: [] } })), 'application/json');

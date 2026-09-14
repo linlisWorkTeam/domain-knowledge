@@ -22,7 +22,7 @@ Code 看不到原始实现、测试用例和答案，也不会拿到整份项目
 
 知识和配置以内联材料提供，工具仓库视图为空。配置只包含 languageId、standard、dependencies、constraints、allowedGeneratedPaths；编译及运行命令由评测器持有。
 
-工作台命令必须显式填写 `executionContract: workbench-code-v1`，引用知识、公开接口和声明式 buildContractRef，不能同时传 projectConfigurationRef。原生构建材料只含语言、工具链约束、范围、允许路径及上一次生成代码的编译诊断；诊断不能包含测试答案。TypeScript 使用固定 `typescript-build-v1` 配置（ES2022、ESNext、允许路径），不传完整场景。没有版本标记的旧工作台命令不能静默升级恢复。
+工作台命令必须显式填写 `executionContract: workbench-code-v1`，引用知识、公开接口和声明式 buildContractRef，不能同时传 projectConfigurationRef。原生构建材料只含语言、工具链约束、范围、允许路径及上一次生成代码的编译诊断；诊断只投影 exitCode、timedOut、outputLimitExceeded 和 stderr，不能包含测试答案或额外材料。历史诊断可附带实际 stdout 与非负 durationMs；未记录的字段不能由框架补造。TypeScript 使用固定 `typescript-build-v1` 配置（ES2022、ESNext、允许路径），不传完整场景。没有版本标记的旧工作台命令不能静默升级恢复。
 
 输出是 `files: [{ path, content }]`。允许生成的集合可以大于必须重建的集合。独立角色契约允许省略 requiredGeneratedPaths；生产流程必须提供，取 sourcePaths 中不属于 publicInterfacePaths 的实现路径。
 

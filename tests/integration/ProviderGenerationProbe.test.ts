@@ -38,7 +38,7 @@ async function controlled(handler: (request: IncomingMessage, response: ServerRe
   };
 }
 
-test('provider probe uses one native isolated generation after models discovery', async () => {
+for (const providerHost of ['opencode.ai', 'provider-does-not-resolve.invalid']) test(`provider probe uses one native isolated generation after models discovery for ${providerHost}`, async () => {
   const paths: string[] = [];
   const headers: IncomingMessage['headers'][] = [];
   const bodies: Record<string, unknown>[] = [];
@@ -52,13 +52,15 @@ test('provider probe uses one native isolated generation after models discovery'
     response.writeHead(200, { 'content-type': 'text/event-stream' });
     response.end(completion('{"answer":"ok"}'));
   });
+  fixture.input.endpoint.url.hostname = providerHost; // 地址仍固定到本地受控服务器，不访问外部提供方。
   try {
     const result = await new OpenAiCompatibleProviderProbe(30_000, fixture.directory).verify({ ...fixture.input, model: null });
     assert.deepEqual(result, { status: 'VERIFIED', reasonCode: 'GENERATION_READY', model: 'probe-model',
       checks: { modelList: 'PASSED', generation: 'PASSED' } });
     assert.deepEqual(paths, ['/v1/models', '/v1/chat/completions']);
     assert.equal(headers[1]!['user-agent'], 'domain-knowledge/0.2.0');
-    assert.match(String(headers[1]!['x-opencode-session']), /^wp-[a-f0-9]{32}$/);
+    if (providerHost === 'opencode.ai') assert.match(String(headers[1]!['x-opencode-session']), /^wp-[a-f0-9]{32}$/);
+    else assert.equal(headers[1]!['x-opencode-session'], undefined);
     assert.equal(headers[1]!.authorization, 'Bearer controlled-private-test-key');
     assert.equal(bodies[0]!.max_tokens, 64);
     assert.equal(bodies[0]!.stream, true);

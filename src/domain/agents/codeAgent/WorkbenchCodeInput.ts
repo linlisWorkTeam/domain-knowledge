@@ -48,7 +48,9 @@ export function validateWorkbenchCodeInput(input: Input): void {
     const diagnostic = record(previous.diagnostic);
     keys(diagnostic, ['exitCode', 'timedOut', 'outputLimitExceeded', 'durationMs', 'stdout', 'stderr']);
     if (!(diagnostic.exitCode === null || Number.isInteger(diagnostic.exitCode)) || typeof diagnostic.timedOut !== 'boolean'
-      || typeof diagnostic.outputLimitExceeded !== 'boolean' || typeof diagnostic.durationMs !== 'number'
-      || typeof diagnostic.stdout !== 'string' || typeof diagnostic.stderr !== 'string') throw new Error('CODE_CONFIGURATION_INVALID');
+      || typeof diagnostic.outputLimitExceeded !== 'boolean'
+      || (diagnostic.durationMs !== undefined && (typeof diagnostic.durationMs !== 'number' || !Number.isFinite(diagnostic.durationMs) || diagnostic.durationMs < 0))
+      || (diagnostic.stdout !== undefined && typeof diagnostic.stdout !== 'string')
+      || typeof diagnostic.stderr !== 'string') throw new Error('CODE_CONFIGURATION_INVALID');
   }
 }

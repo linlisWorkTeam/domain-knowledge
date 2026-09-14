@@ -1,0 +1,15 @@
+# 完整回归结果与原生资源限制
+
+goal active，本轮progress；main集成84c98b3已推送到Draft PR50，PR正文也已更新。GitHub仍返回mergeable=false/dirty且无check/run（Actions enabled），但本地及已推送c5211c5确实以main22fe34fd为第二父提交。未强制改PR状态或重新合并main，后续新提交推送再核对。未关闭/合入PR38/50，未部署，旧ec72网站不变。
+
+完整npm test基线84c98b3终态exit1，600项577通过23失败、无跳过，331秒。/tmp/WorkbenchMergedFullRegression.log及/tmp/WorkbenchMergedRegressionManifest.json（139文件），原session26893已终止不要重启同handle。失败在已执行测试文件后做的局部修正未算入基线结果。
+
+修复旧样例：AgentSpecRegression调用默认validateRevisionInput而非H2字节比较validateRevision；RoleStageRecovery显式SourceFacts/WorkbenchDocGenSample并首次context.iteration=0；ProviderGenerationProbe分别覆盖opencode.ai有wp原生session与其他主机无专属头，仍固定127.0.0.1，不访问外部；PublicationPreparationFixture Review命令显式workbench-review-v1。原行为/安全/不可变/限次断言保留。
+
+发现并修复实际Code修复交接：NativeToolchain失败cause为精简exitCode/timedOut/outputLimitExceeded/stderr（另有issues），新Code校验误要求durationMs/stdout。WorkbenchReconstruction现在只投影4受信字段，不传原cause其他字段；Domain允许历史真实stdout/非负durationMs可选，继续拒绝额外字段、测试答案、未授权文件。单元补精简诊断，Spec同步。不是补造缺失时间/输出，不降低编译门禁。
+
+复验/tmp/WorkbenchMergedContractRetest.log 49项48通过1失败（DocGen首次轮次）；修复轮次后/tmp/WorkbenchMergedRepairRetest.log 13/13涵盖RoleStageRecovery全部、Code输入及两个真实编译修复（含legacy检查点重建）。完整类型/tmp/WorkbenchPostRegressionTypes.log、Spec/tmp/WorkbenchPostRegressionSpecs.log与diff检查通过。报告WorkbenchAcceptance新增准确基线/复验/残留限制。
+
+原生复验使用较小测试堆192MiB，13项8通过5失败，/tmp/WorkbenchMergedNativeResourceRetest.log：NativeCases持久化cache、WorkbenchEvaluation三个变体、WorkbenchFixedEvaluation math.c仍WORKBENCH_RESOURCE_INSUFFICIENT。WorkbenchGeneration与Reconstruction通过。缓存再以96MiB单测仍预检失败（/tmp/WorkbenchNativeCacheLowHeap.log）；不要无依据继续调低或反复跑。NativeToolchain预留512+64MiB，测试Composition开销后host可用内存不足，宿主约3.6GiB无swap，常态可用约740MiB。未降低预检/隔离/内存约束，未杀无关进程或删除证据。原生强监督、防伪造、资源拒绝等基线测试实际通过；不能据此抹掉5个失败。
+
+所有本轮进程均终态：78229、32735、62472、13714、6331已完成。下一步先提交/推送本轮已验证修复（尚未提交），更新PR检查，再继续浏览器/前台和真实新v11验收；内存不足须明确暂停/可用环境验证，不伪造通过或绕隔离。别以资源问题宣布全目标blocked：前台/关联/证据审阅等仍可推进。如需归档最新三篇，本轮已把1610固定至84c98b3归档后移除。

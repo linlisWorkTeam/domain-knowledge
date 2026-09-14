@@ -344,3 +344,7 @@ This document summarizes older handoffs, milestones and architectural decisions 
 | [2026-09-14-0753-worker-testgen-registry-merge.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/c5211c53034cfcb68b8b4983b5f73a0de0714684/docs/epitaph/2026-09-14-0753-worker-testgen-registry-merge.md) | Worker事实模式、TestGen声明式模式与真实Registry集成；角色116/116，原生cache仍未通过。 |
 | [2026-09-14-1604-source-types-example-merge.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/c5211c53034cfcb68b8b4983b5f73a0de0714684/docs/epitaph/2026-09-14-1604-source-types-example-merge.md) | 生产类型、独立运行17/17及DocGen受控SDK5/5通过；固定历史路径修复，整图尚未验证。 |
 | [2026-09-14-1607-flow-regression-merge.md](https://github.com/linlisWorkTeam/domain-knowledge/blob/c5211c53034cfcb68b8b4983b5f73a0de0714684/docs/epitaph/2026-09-14-1607-flow-regression-merge.md) | C++受控图及全树类型通过；TS回归发现内部Worker缺失，未放宽原断言。 |
+
+## 2026-09-14 TypeScript回归交接归档
+
+[1610原文](https://github.com/linlisWorkTeam/domain-knowledge/blob/84c98b3c9310d3a9c84087a0403b5af33432f586/docs/epitaph/2026-09-14-1610-typescript-flow-restored.md)：内部Worker、显式DocGen/Review协议与H2/风险门禁接通，TS完整7/7和C++/停止组合3/3通过；当时仅定向验证，真实目标与部署未完成。后续完整回归结果见最新记录。
