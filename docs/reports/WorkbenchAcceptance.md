@@ -2,7 +2,7 @@
 
 截至2026-09-15，完整验收尚未完成。真实目标证据的历史代码基线为 `e66ec50`；下列结果只证明各自明确列出的版本、任务和范围，不代表全部知识已验证发布。
 
-## 最新真实执行状态（2026-09-15 01:39）
+## 最新真实执行状态（2026-09-15，已停止验收）
 
 本节优先于下文各次历史状态。历史意见复核 `stage-7fda8f7f2c60f366dfe396bb9af3146161c902daa5660122b83d7187b9367a67` 已执行成功，质量仍为UNRESOLVED：9卡63章节，38匹配、2矛盾、23未知；71次模型调用、4806852 tokens，399个直接引用摘要核验通过，见 `cpp-historical-review/FinalAudit.json`。旧任务不再恢复。Float包装函数位置错误已对固定源码核实；其他未知风险不因行为测试通过而清除。
 
@@ -10,13 +10,17 @@
 
 随后使用现有隔离执行器进行5例诊断，固定参考和原生成代码均通过；包括ToInt尾随字符及ToInt64的带符号十六进制前缀。证据 `cpp-historical-review/BoundaryDiagnostics.json` 不属于持久化可信测试集，不改变43项可信记录或发布状态。正式补证必须在后续新重建/评测绑定下执行。
 
-源码定点修订 `stage-b1805f1fd67e1817610a3702a8c51963dcb18db9ffce791e6ab94a95f8620902` 已启动；运行状态以 `cpp-historical-source-revision/SourceCorrection.json` 和原进程为准，不能凭本段重启。后续需审计修订与索引，在当前评测器版本下重建并保留所有可信预期重验。C后续门禁、真实最终发布、历史删除兼容与线上完整任务仍未完成；网站仍为956fe26，未导入临时验收库。
+源码定点修订 `stage-b1805f1fd67e1817610a3702a8c51963dcb18db9ffce791e6ab94a95f8620902` 已执行结束，质量 UNRESOLVED；4次模型调用、581626 tokens，两次草稿均未获通过，updatedVersionIds=[]、indexed=false。34个直接引用核验通过。Review 对 FloatAttribute/FloatText 定义位置及 0xg 返回值的意见与固定源码、可信观察存在冲突，不能据此改写正确正文或原可信预期。证据见 `cpp-historical-source-revision/FinalAudit.json` 与 `SourceCorrection.json`。
+
+C 当前修订卡重建 `stage-289c05a1cd76d080c3a20707ae7d1cec4652c48c240025059e5fc081250c0d94` 已按用户要求 CANCELLED/STAGE_CANCELLED，累计2次调用、144721 tokens；后续评测驱动只准备，未执行。用户要求停止验收并交给下一 Agent，本次合并不恢复任务或发布知识。
+
+网站最后核验版本为956fe26；生产库有8条旧运行、10个知识版本，工作台阶段及模块批次均为0。独立验收库有97个阶段任务、41个知识版本、0个模块批次。两者未合并，不能把 CLI 阶段证据当作网站链路验收。恢复约束和剩余清单见[最终交接](../epitaph/2026-09-15-1007-merge-and-acceptance-handoff.md)。
 
 代码37fc9d9的CI34871914996全部成功：736项代码检查、44项Console、25项隔离验收；本节及后续交接仅更新文档，不能把这组结果称为其他代码提交的重新运行结果。
 
-## 当前部署与来源核验结论（2026-09-15）
+## 历史记录：部署与来源核验（2026-09-15）
 
-线上代码为 `956fe2649acc67ac2ad7557a27ff719acd8525fc`，地址 https://contract-strict-warren-theories.trycloudflare.com/ 。本节替代下文历史记录中的当前运行状态；下文仍保留各次验证经过。CI [34867068206](https://github.com/linlisWorkTeam/domain-knowledge/actions/runs/34867068206) 通过727项代码测试、44项Console测试和25项隔离验收。
+线上代码为 `956fe2649acc67ac2ad7557a27ff719acd8525fc`，地址 https://contract-strict-warren-theories.trycloudflare.com/ 。本节及以下记录保留当时的验证经过，其中“当前”“下一步”“尚未启动”均指记录当时；最新终态以上节为准。CI [34867068206](https://github.com/linlisWorkTeam/domain-knowledge/actions/runs/34867068206) 通过727项代码测试、44项Console测试和25项隔离验收。
 
 发行目录为 `/root/projects/domain-knowledge-releases/2026-09-15-workbench-956fe26`。停止旧服务后备份运行目录，沿用免登录配置、4310端口及原隧道；公网HTML和两个脚本逐字节匹配发行文件。桌面、390px窄屏及公网设置页检查通过；模型服务配置与知识发布设置默认折叠，悬停提示及展开读取正常，未保存配置。`PublicVerification.json`、`DataPreservation.json`、`Prepared.json`和`browser/after-*.png`记录验证。原8个运行和10个知识版本按原字段逐行摘要比较不变。临时真实验收库未导入线上。
 

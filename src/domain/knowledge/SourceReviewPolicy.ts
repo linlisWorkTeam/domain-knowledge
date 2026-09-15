@@ -1,7 +1,7 @@
 /**
  * Copyright (c) 2026 linlisWorkTeam
  * SPDX-License-Identifier: MIT
- * 文件功能：限定版本化来源复核期限，保留旧输入和普通Review的原期限。
+ * 文件功能：定义版本化来源复核期限、事实判断及历史意见策略，保留旧输入与普通 Review 的原语义。
  */
 import { sha256 } from '../Domain.ts';
 import { canonicalJson } from '../workbench/StageTask.ts';
