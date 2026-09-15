@@ -5,6 +5,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
+import { visibleExecutionSql } from '../sqlite/DeletionTombstones.ts';
 import type {
   OperationalMetricsPort,
   ProviderInvocationRecord,
@@ -387,7 +388,7 @@ export class SQLiteOperationalMetrics implements OperationalMetricsPort {
         configuration.snapshot_json
       FROM runs AS run
       LEFT JOIN run_configuration_snapshots AS configuration ON configuration.run_id = run.run_id
-      WHERE run.updated_at >= ? ORDER BY run.created_at, run.run_id
+      WHERE run.updated_at >= ? AND ${visibleExecutionSql(this.database, 'runs', 'run.run_id')} ORDER BY run.created_at, run.run_id
     `).all(from) as Record<string, unknown>[];
     return rows.map((row) => {
       const snapshot = row.snapshot_json === null

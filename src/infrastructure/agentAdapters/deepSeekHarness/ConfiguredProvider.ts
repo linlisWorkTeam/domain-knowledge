@@ -3,7 +3,9 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：提供Configured提供方的基础设施实现与外部系统接入。
  */
-import { createHash, randomUUID } from 'node:crypto';
+import { ProviderQuotaStop, providerErrorCode } from './ProviderQuota.ts';
+import { ProviderStreamDiagnostics } from './ProviderStreamDiagnostics.ts';
+import { randomUUID } from 'node:crypto';
 import { once } from 'node:events';
 import { createServer } from 'node:http';
 import { fetch } from 'undici';
@@ -17,12 +19,20 @@ export const DSH_DEFAULT_MAX_TOKENS = 32_768;
 export const DSH_DEFAULT_MAX_SCHEMA_ATTEMPTS = 2;
 /** 对外提供窗口，作为调用方使用的统一约定。 */
 export const DSH_DEFAULT_CONTEXT_WINDOW = 128_000;
+/** SSE 帧有固定协议开销；累计传输上限独立于单行缓冲和模型输出上限。 */
+export const DSH_DEFAULT_MAX_WIRE_BYTES = 16 * 1024 * 1024;
 
 interface Options extends Partial<DshExecutionParameters> {
   /** 提供settings信息，供调用方读取或传入。 */
   settings: ProviderSettingsRecord;
   /** 提供dshHome信息，供调用方读取或传入。 */
   dshHome: string;
+  /** 账户额度停止状态独立于临时会话目录。 */
+  quotaHome?: string;
+  /** 显式探针限制上游请求次数，防止原生工具往返产生额外费用。 */
+  maxProviderRequests?: number;
+  /** 限制上游响应字节，包含所有流帧及非内容字段。 */
+  maxProviderResponseBytes?: number;
   /** 提供endpoint策略信息，供调用方读取或传入。 */
   endpointPolicy?: ProviderEndpointPolicy;
   /** 提供runtime信息，供调用方读取或传入。 */
@@ -43,6 +53,9 @@ export class ConfiguredDshProvider implements AgentProvider {
     if (options.settings.provider !== 'deepseek-harness' || !options.settings.model || !options.settings.enabled) {
       throw new Error('DSH_CONFIGURATION_UNAVAILABLE');
     }
+    for (const limit of [options.maxProviderRequests, options.maxProviderResponseBytes]) {
+      if (limit !== undefined && (!Number.isSafeInteger(limit) || limit < 1)) throw new Error('DSH_PROVIDER_LIMIT_INVALID');
+    }
     this.options = structuredClone({ ...options, endpointPolicy: undefined, onInvocation: undefined, onAudit: undefined });
     this.options.endpointPolicy = options.endpointPolicy;
     this.options.onInvocation = options.onInvocation;
@@ -54,19 +67,26 @@ export class ConfiguredDshProvider implements AgentProvider {
     if (signal?.aborted) throw new Error('AGENT_CANCELLED');
     if (!request.workspaceRoot) throw new Error('DSH_AGENT_WORKSPACE_REQUIRED');
     const settings = this.options.settings;
+    const quota = new ProviderQuotaStop(this.options.quotaHome ?? this.options.dshHome, settings);
+    quota.assertAvailable();
     const endpoint = await (this.options.endpointPolicy ?? new PublicHttpsEndpointPolicy()).validate(settings.apiUrl);
-    const dispatcher = createPinnedHttpsDispatcher(endpoint);
+    const dispatcher = createPinnedHttpsDispatcher(endpoint, this.options.maxProviderResponseBytes ?? DSH_DEFAULT_MAX_WIRE_BYTES);
     const token = randomUUID();
     const abort = new AbortController();
     let transportError: string | null = null;
+    let sessionId: string | undefined;
+    let providerRequests = 0;
     let inputTokens: number | null = null;
     let outputTokens: number | null = null;
+    const streamDiagnostics = new ProviderStreamDiagnostics();
     // The real upstream credential stays in the parent. DSH receives only an
     // invocation-local relay token; DNS and redirects cannot escape approval.
     const relay = createServer(async (req, res) => {
       if (req.method !== 'POST' || req.url !== '/v1/chat/completions' || req.headers.authorization !== `Bearer ${token}`) {
         res.writeHead(403); res.end(); return;
       }
+      let requestInputTokens: number | null = null;
+      let requestOutputTokens: number | null = null;
       try {
         const chunks: Buffer[] = [];
         let size = 0;
@@ -76,43 +96,68 @@ export class ConfiguredDshProvider implements AgentProvider {
           chunks.push(Buffer.from(chunk));
         }
         const target = new URL('chat/completions', endpoint.url.href.replace(/\/?$/, '/'));
+        if (!sessionId) throw new Error('DSH_AGENT_SESSION_MISMATCH');
+        quota.assertAvailable();
+        if (++providerRequests > (this.options.maxProviderRequests ?? Infinity)) throw new Error('PROVIDER_REQUEST_LIMIT');
+        streamDiagnostics.request();
         const response = await fetch(target, {
           method: 'POST', body: Buffer.concat(chunks), dispatcher, redirect: 'manual', signal: abort.signal,
-          headers: {
-            'content-type': 'application/json',
-            'user-agent': 'domain-knowledge/0.1 (+https://github.com/linlisWorkTeam/domain-knowledge)',
-            ...(endpoint.url.hostname === 'opencode.ai' ? {
-              'x-opencode-session': `dk-${createHash('sha256').update(request.idempotencyKey).digest('hex')}`,
-            } : {}),
-            ...(settings.apiKey ? { authorization: `Bearer ${settings.apiKey}` } : {}),
-          },
+          // 使用本次原生会话的稳定标识，工具往返保持一致，重试和其他角色各自隔离。
+          headers: { 'content-type': 'application/json', 'user-agent': 'domain-knowledge/0.2.0',
+            ...(endpoint.url.hostname === 'opencode.ai' ? { 'x-opencode-session': sessionId } : {}), ...(settings.apiKey ? { authorization: `Bearer ${settings.apiKey}` } : {}) },
         });
+        streamDiagnostics.headers();
         if (response.status >= 300 && response.status < 400) {
           await response.body?.cancel();
           throw new Error('PROVIDER_REDIRECT_DENIED');
         }
-        if (!response.ok) { await response.body?.cancel(); throw new Error('DSH_PROVIDER_REQUEST_FAILED'); }
+        if (!response.ok) {
+          let errorBody = ''; let size = 0;
+          if (response.body) for await (const chunk of response.body) {
+            size += chunk.byteLength;
+            if (size > 16_384) { errorBody = ''; break; }
+            errorBody += Buffer.from(chunk).toString('utf8');
+          }
+          const code = providerErrorCode(response.status, errorBody);
+          quota.record(code);
+          throw new Error(code);
+        }
         res.writeHead(200, { 'content-type': 'text/event-stream' });
         let pending = '';
+        let responseBytes = 0;
         const decoder = new TextDecoder();
         for await (const chunk of response.body ?? []) {
+          streamDiagnostics.data(chunk.byteLength);
+          responseBytes += chunk.byteLength;
+          if (responseBytes > (this.options.maxProviderResponseBytes ?? DSH_DEFAULT_MAX_WIRE_BYTES)) throw new Error('DSH_PROVIDER_OUTPUT_LIMIT');
           if (!res.write(chunk)) await once(res, 'drain', { signal: abort.signal });
           pending += decoder.decode(chunk, { stream: true });
           const lines = pending.split('\n');
           pending = lines.pop() ?? '';
-          if (pending.length > 2 * 1024 * 1024) throw new Error('DSH_PROVIDER_OUTPUT_LIMIT');
+          if (pending.length > 2 * 1024 * 1024) throw new Error('DSH_PROVIDER_FRAME_LIMIT');
           for (const line of lines) {
             if (!line.startsWith('data: ')) continue;
             try {
-              const usage = JSON.parse(line.slice(6)).usage;
-              if (Number.isSafeInteger(usage?.prompt_tokens) && usage.prompt_tokens >= 0) inputTokens = (inputTokens ?? 0) + usage.prompt_tokens;
-              if (Number.isSafeInteger(usage?.completion_tokens) && usage.completion_tokens >= 0) outputTokens = (outputTokens ?? 0) + usage.completion_tokens;
+              const event = JSON.parse(line.slice(6));
+              streamDiagnostics.frame(event);
+              const usage = event.usage;
+              // 同一 HTTP 流里的 usage 是累计快照；替换该请求旧值，工具往返的独立请求才相加。
+              if (Number.isSafeInteger(usage?.prompt_tokens) && usage.prompt_tokens >= 0) {
+                inputTokens = (inputTokens ?? 0) - (requestInputTokens ?? 0) + usage.prompt_tokens;
+                requestInputTokens = usage.prompt_tokens;
+              }
+              if (Number.isSafeInteger(usage?.completion_tokens) && usage.completion_tokens >= 0) {
+                outputTokens = (outputTokens ?? 0) - (requestOutputTokens ?? 0) + usage.completion_tokens;
+                requestOutputTokens = usage.completion_tokens;
+              }
             } catch { /* content/terminal SSE events are not token usage */ }
           }
         }
         res.end();
       } catch (error) {
-        transportError = error instanceof Error && /^[A-Z_]+$/.test(error.message) ? error.message : 'DSH_PROVIDER_REQUEST_FAILED';
+        const limitCodes = [(error as { code?: unknown })?.code, (error as { cause?: { code?: unknown } })?.cause?.code];
+        transportError = limitCodes.includes('UND_ERR_RES_EXCEEDED_MAX_SIZE') ? 'DSH_PROVIDER_OUTPUT_LIMIT'
+          : error instanceof Error && /^[A-Z_]+$/.test(error.message) ? error.message : 'DSH_PROVIDER_REQUEST_FAILED';
         if (!res.headersSent) res.writeHead(400, { 'content-type': 'application/json' });
         res.end(JSON.stringify({ error: { message: transportError, type: 'invalid_request_error' } }));
       }
@@ -124,14 +169,15 @@ export class ConfiguredDshProvider implements AgentProvider {
         processIsolation: 'bubblewrap', ...this.options.runtime,
         allowedWorkspaceRoots: this.options.runtime?.allowedWorkspaceRoots ?? [request.workspaceRoot],
         transportFailure: () => transportError,
+        onSessionStarted: (id) => { sessionId = id; },
         dshHome: this.options.dshHome, profile: 'sdk-minimal', provider: 'deepseek-official', model: settings.model!,
         nativeConnection: { baseURL: `http://127.0.0.1:${port}/v1`, contextWindow: this.options.contextWindow ?? DSH_DEFAULT_CONTEXT_WINDOW },
         env: { DEEPSEEK_API_KEY: token },
-        maxTokens: this.options.maxTokens ?? DSH_DEFAULT_MAX_TOKENS,
+        maxTokens: Math.min(request.maxTokens ?? DSH_DEFAULT_MAX_TOKENS, this.options.maxTokens ?? DSH_DEFAULT_MAX_TOKENS),
         maxSchemaAttempts: this.options.maxSchemaAttempts ?? DSH_DEFAULT_MAX_SCHEMA_ATTEMPTS,
         onAudit: async (record) => {
           const errorCode = transportError ?? record.errorCode;
-          await this.options.onAudit?.({ ...record, errorCode, metadata: { ...record.metadata, model: settings.model! } });
+          await this.options.onAudit?.({ ...record, errorCode, metadata: { ...record.metadata, model: settings.model!, streamDiagnostics: JSON.stringify(streamDiagnostics.snapshot()) } });
           await this.options.onInvocation?.({
             invocationId: `pinv_${randomUUID()}`, runId: String(request.metadata?.runId ?? ''), agentId: request.role,
             provider: 'deepseek-harness', model: settings.model!, startedAt: record.startedAt, completedAt: record.completedAt,

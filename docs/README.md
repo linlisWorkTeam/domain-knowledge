@@ -15,6 +15,7 @@ SPDX-License-Identifier: MIT
 | 修改代码 | [Development](Development.md) | [设计目录](specs/README.md)、[CodeTaste](specs/totalRules/CodeTaste.md) |
 | 修改单个角色 | [AgentDevelopment](AgentDevelopment.md) | [七角色独立设计索引](specs/domainFunction/agents/Agents.md) |
 | 接入模型 | [Runtime](Runtime.md) | [AgentAdapters](specs/infrastructure/agentAdapters/AgentAdapters.md) |
+| 查看工作台验收进度 | [五阶段工作台验收记录](reports/WorkbenchAcceptance.md) | 已验证范围、任务绑定及未完成项目 |
 | 运行和排障 | [Operations](Operations.md) | [HttpApi](specs/interfaces/HttpApi.md)、基础设施同名设计 |
 | 看开发任务、步骤与验收进度 | [Status](Status.md) | [验收追踪](specs/totalRules/Verification.md) |
 | 查历史变更 | [historyEpitaph](HistoryEpitaph.md)、[最近三次交接](epitaph/) | 完整原记录通过固定 Git 提交审计 |

@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     outputs:
       acceptance: ${{ steps.changes.outputs.acceptance }}
@@ -52,6 +52,24 @@ jobs:
         if: steps.changes.outputs.runtime == 'true'
         run: npm ci
 
+      - name: Install and verify Linux isolation
+        if: steps.changes.outputs.runtime == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends bubblewrap
+          # 仅给临时 CI 机的 bwrap 授予 userns；不关闭全局 AppArmor，也不修改 ECS 内核策略。
+          # https://discourse.ubuntu.com/t/ubuntu-24-04-lts-noble-numbat-release-notes/39890
+          if [ -f /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
+            sudo tee /etc/apparmor.d/bwrap > /dev/null <<'PROFILE'
+          abi <abi/4.0>,
+          profile bwrap /usr/bin/bwrap flags=(unconfined) {
+            userns,
+          }
+          PROFILE
+            sudo apparmor_parser -r /etc/apparmor.d/bwrap
+          fi
+          bwrap --unshare-all --die-with-parent --ro-bind / / --proc /proc --dev /dev /bin/true
+
       - name: Type-check
         if: steps.changes.outputs.runtime == 'true'
         run: npm run typecheck
@@ -63,8 +81,18 @@ jobs:
       - name: Run scoped checks
         env:
           VERIFICATION_SCOPES: ${{ steps.changes.outputs.scopes }}
+          VERIFICATION_RUNTIME: ${{ steps.changes.outputs.runtime }}
         # Acceptance runs below in its own environment.
-        run: node scripts/VerificationRouter.ts --run "${VERIFICATION_SCOPES//,acceptance/}"
+        run: |
+          if [ "$VERIFICATION_RUNTIME" = true ]; then
+            bash scripts/RunIsolatedCi.sh node scripts/VerificationRouter.ts --run "${VERIFICATION_SCOPES//,acceptance/}"
+          else
+            node scripts/VerificationRouter.ts --run "${VERIFICATION_SCOPES//,acceptance/}"
+          fi
+
+      - name: Install Chinese fonts for affected UI
+        if: steps.changes.outputs.web == 'true'
+        run: sudo apt-get install -y --no-install-recommends fonts-noto-cjk
 
       - name: Install browser for affected UI
         if: steps.changes.outputs.web == 'true'
@@ -72,12 +100,20 @@ jobs:
 
       - name: Run Console browser tests
         if: steps.changes.outputs.web == 'true'
-        run: npm run test:ui
+        run: bash scripts/RunIsolatedCi.sh npm run test:ui
 
+      - name: Preserve failed visual comparisons
+        if: failure() && steps.changes.outputs.web == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: console-visual-comparisons
+          path: test-results/**/*.png
+          if-no-files-found: ignore
+          retention-days: 7
   acceptance:
     needs: verify
     if: needs.verify.outputs.acceptance == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
@@ -88,6 +124,23 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: Install and verify Linux isolation
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends bubblewrap
+          # 仅给临时 CI 机的 bwrap 授予 userns；不关闭全局 AppArmor，也不修改 ECS 内核策略。
+          # https://discourse.ubuntu.com/t/ubuntu-24-04-lts-noble-numbat-release-notes/39890
+          if [ -f /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
+            sudo tee /etc/apparmor.d/bwrap > /dev/null <<'PROFILE'
+          abi <abi/4.0>,
+          profile bwrap /usr/bin/bwrap flags=(unconfined) {
+            userns,
+          }
+          PROFILE
+            sudo apparmor_parser -r /etc/apparmor.d/bwrap
+          fi
+          bwrap --unshare-all --die-with-parent --ro-bind / / --proc /proc --dev /dev /bin/true
+
       - name: Fetch only the DocGen reference source and test commits
         run: |
           node --input-type=module <<'NODE'
@@ -97,4 +150,4 @@ jobs:
             execFileSync('git', ['fetch', '--no-tags', '--depth=1', 'origin', commit], { stdio: 'inherit' });
           }
           NODE
-      - run: npm run test:acceptance
+      - run: bash scripts/RunIsolatedCi.sh npm run test:acceptance

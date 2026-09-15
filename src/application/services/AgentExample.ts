@@ -32,6 +32,8 @@ export interface AgentExampleInput {
   materials: Record<string, { content: unknown; mediaType: string }>;
   /** 提供模型输出信息，供调用方读取或传入。 */
   modelOutput?: Record<string, unknown>;
+  /** 分阶段样例逐阶段提供显式模型响应，禁止在业务代码中跳过概要。 */
+  modelStages?: Record<string, Record<string, unknown>>;
   /** 组合样例按内部任务身份提供模拟输出；真实模式不读取此字段。 */
   workerModelOutputs?: Record<string, Record<string, unknown>>;
 }
@@ -45,7 +47,7 @@ export class AgentExampleService {
     nodeByAgent: Record<AgentId, string>;
     configurePrompt: (role: AgentId, addon: string) => void;
     model: ProjectWorkflowStages['modelFactory'];
-    fixtureModel: (output: Record<string, unknown>) => ModelExecutionPort;
+    fixtureModel: (output: Record<string, unknown>, stages?: Record<string, Record<string, unknown>>) => ModelExecutionPort;
   };
   /** 注入协作依赖并初始化实例状态。 */
   constructor(dependencies: AgentExampleService['dependencies']) { this.dependencies = dependencies; }
@@ -90,7 +92,7 @@ export class AgentExampleService {
         attempt: 1, maxIterations: 1, workerCount: 0, prompt, context: { snapshot, scenario: sample.scenario }, signal };
       // Fixture 只替换模型输出来源，仍执行真实角色入口、Schema 校验和结果提交。
       const model = sample.provider === 'fixture'
-        ? this.dependencies.fixtureModel(sample.modelOutput ?? {})
+        ? this.dependencies.fixtureModel(sample.modelOutput ?? {}, sample.modelStages)
         : this.dependencies.model({ command, stage, scenario: sample.scenario });
       const service = new RoleExecutionService(flywheel, contracts, nodeByAgent);
       let resultRef: ArtifactRef | undefined;

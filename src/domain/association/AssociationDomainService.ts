@@ -3,6 +3,8 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：定义AssociationDomain服务的领域数据与确定性业务规则。
  */
+import { associateExternalMaterials } from './ExternalAssociations.ts';
+import { associateCards, type AssociationCard, type CardAssociation } from './CardAssociations.ts';
 import { assertInvariant } from '../Domain.ts';
 
 /** 定义ExternalFact的数据结构与类型约束。 */
@@ -57,6 +59,9 @@ export interface ReverseMapper {
  */
 /** 封装AssociationDomain服务的对外操作与协作依赖。 */
 export class AssociationDomainService {
+  associateExternalMaterials(...input: Parameters<typeof associateExternalMaterials>) { return associateExternalMaterials(...input); }
+  /** 工作台卡片版本关联与已有外部事实关联共用领域入口。 */
+  associateCards(cards: readonly AssociationCard[]): CardAssociation[] { return associateCards(cards); }
   /** 提供 associate 对应的associate操作。 */
   associate(input: {
     content: string;

@@ -3,6 +3,8 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：实现证据复核角色的业务步骤与结构化结果转换。
  */
+import { execute as executeWorkbench } from './WorkbenchReviewExecution.ts';
+import type { Input as WorkbenchInput, Output as WorkbenchOutput } from './WorkbenchReviewContract.ts';
 import { correctionTarget } from '../docGenAgent/DocGenRevision.ts';
 import { sha256 } from '../../Domain.ts';
 import type { ExecutionContext, RoleResult, PendingArtifact } from '../AgentExecution.ts';
@@ -11,7 +13,16 @@ import { type Input, type Output, schemaFor, validateInput, validateOutput } fro
 import { definition, buildPrompt, readablePaths } from './ReviewAgentPrompt.ts';
 
 /** 依据知识与评测证据给出纠正意见，并将意见绑定到本轮评测工件。 */
-export async function execute(input: Input, context: ExecutionContext): Promise<RoleResult<Output>> {
+export function execute(input: WorkbenchInput, context: ExecutionContext): Promise<RoleResult<WorkbenchOutput>>;
+export function execute(input: Input, context: ExecutionContext): Promise<RoleResult<Output>>;
+export async function execute(input: Input | WorkbenchInput, context: ExecutionContext): Promise<RoleResult<Output | WorkbenchOutput>> {
+  if ('executionContract' in input.payload) {
+    if (input.payload.executionContract !== 'workbench-review-v1') throw new Error('REVIEW_EXECUTION_CONTRACT_INVALID');
+    return executeWorkbench(input as WorkbenchInput, context);
+  }
+  return executeComparison(input as Input, context);
+}
+async function executeComparison(input: Input, context: ExecutionContext): Promise<RoleResult<Output>> {
   assertActive(context.signal);
   // 缺失材料应在调用模型之前失败，避免模型用猜测填补业务证据。
   validateInput(input);
@@ -19,6 +30,7 @@ export async function execute(input: Input, context: ExecutionContext): Promise<
   // 角色决定本阶段的任务与能力范围；会话、工具执行和格式修复交给模型适配器。
   const raw = await context.model.execute({
     role: definition.agentId,
+    stage: 'evidence-attribution',
     prompt: buildPrompt(input, context),
     outputSchema: schema,
     tools: definition.tools,

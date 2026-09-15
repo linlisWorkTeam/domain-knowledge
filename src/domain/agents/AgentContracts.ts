@@ -31,7 +31,7 @@ export interface AgentCommand {
 
 /** 角色结果。 */
 export interface AgentResult {
-  /** 显式原始输出引用，多个 JSON 工件不能按排序猜测。 */
+  /** 新执行版本显式区分原始角色结果与概要/案例等同类型工件；旧记录仍可读。 */
   rawOutputRef?: ArtifactRef;
   /** 提供Schema版本信息，供调用方读取或传入。 */
   schemaVersion: '1.0';

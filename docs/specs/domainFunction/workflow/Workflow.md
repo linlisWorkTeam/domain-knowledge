@@ -8,6 +8,8 @@ SPDX-License-Identifier: MIT
 代码位置：[src/domain/workflow/Workflow.ts](../../../../src/domain/workflow/Workflow.ts)、[src/domain/workflow/AgentDefinitions.ts](../../../../src/domain/workflow/AgentDefinitions.ts)、[src/application/services/AutomatedProjectWorkflow.ts](../../../../src/application/services/AutomatedProjectWorkflow.ts)。
 
 
+`AgentExecutionService.ts` 是领域对外角色执行入口；业务工作流与独立 agent:run 经 Application RoleExecutionService 调用，Application 保存 CAS、阶段日志和幂等提交。
+
 ## 输入、阶段和输出
 
 当前阶段不实现外部知识关联，见 [Association IO-23](../association/Association.md)；不为该功能新增节点或阻塞单文档飞轮交付。该延期不影响 IO-22 已确认的文档描述和渐进加载索引。
@@ -76,3 +78,9 @@ AC-AGENT-105：maxIterations 表示包含首轮的最大业务轮数；内部 it
 Registry 与 LangGraph 的提交不是同一事务。router 以 `${runId}:workflow_router:${iteration}:route-v2` 保存不可变决定，业务状态迁移不能改变重放结果。先固定决定再执行可重复的迁移/交接；Gate 已提交而路由尚未保存时，可按相同证据取回既有 Gate，不重复记录评测。输入冲突应拒绝。
 
 验收 `tests/integration/WorkflowRouterReplay.test.ts`：质量 ITERATE、Gate ITERATE、Gate STOPPED、质量 STOPPED 均在 Registry 副作用提交后、LangGraph 节点输出保存前注入故障，然后用原始输入恢复；决定、业务轮次、Gate 和交接数量保持一致；该验收已通过，属于精确边界异常注入，不宣称操作系统强杀命中同一窗口。另覆盖决定已固定、迁移尚未执行的恢复窗口，不只重放 Orchestrator。
+
+## TypeScript 独立模块工作台协议
+
+配置 moduleContract 的模块在首个角色运行前冻结固定门禁；TestGen 声明式候选在参考实现通过后才晋升。生成实现必须同时通过固定与可信候选测试，模型不控制执行器、计数或预期。Code 只接收知识、公开接口和构建约束；DocGen 内部 Worker 按授权范围读取固定源码。显式 section-doc-v1 与 workbench-review-v1 将纠正绑定评测和精确 H2，未指定正文逐字不变。未解决风险或缺少必要证据阻止发布。
+
+五阶段工作台的外部材料关联由独立 Application 用例执行，输入仅为用户登记材料；本页通用单文档工作流中的关联延期不等于取消工作台的关联验收目标。

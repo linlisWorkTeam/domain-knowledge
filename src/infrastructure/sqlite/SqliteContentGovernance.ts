@@ -7,8 +7,9 @@ import {
   lstatSync, readFileSync, realpathSync, statSync,
 } from 'node:fs';
 import { randomUUID } from 'node:crypto';
-import { isAbsolute, relative, resolve, sep } from 'node:path';
+import { extname, isAbsolute, relative, resolve, sep } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
+import { visibleExecutionSql } from './DeletionTombstones.ts';
 import { fetch as undiciFetch, type Dispatcher } from 'undici';
 import type {
   ContentCommand, ContentGovernancePort,
@@ -29,6 +30,8 @@ import { projectActionItemObservation } from './SqliteActionItems.ts';
 type Row = Record<string, unknown>;
 
 interface SourceAccess {
+  bytes: Uint8Array;
+  mediaType: string;
   /** 提供locator信息，供调用方读取或传入。 */
   locator: string;
   /** 提供observed修订号信息，供调用方读取或传入。 */
@@ -365,7 +368,7 @@ export class SQLiteContentGovernance implements ContentGovernancePort {
     }
     const uniqueRunIds = [...new Set(runIds)];
     const runs = uniqueRunIds.map((runId) => {
-      const row = this.database.prepare('SELECT state, iteration, updated_at FROM runs WHERE run_id = ?')
+      const row = this.database.prepare(`SELECT state, iteration, updated_at FROM runs WHERE run_id = ? AND ${visibleExecutionSql(this.database, 'runs', 'runs.run_id')}`)
         .get(runId) as Row | undefined;
       return row ? {
         runId,
@@ -1119,6 +1122,19 @@ export class SQLiteContentGovernance implements ContentGovernancePort {
     };
   }
 
+  /** 仅捕获用户登记并确认修订的来源，不发现或搜索其他地址。 */
+  async readSourceMaterial(sourceId: string) {
+    const row = this.sourceRow(sourceId);
+    if (!row || row.deleted_at !== null) throw new Error('SOURCE_NOT_FOUND');
+    if (row.status === 'DISABLED') throw new Error('SOURCE_DISABLED');
+    const access = await this.validateSourceAccess(row.kind, row.locator, row.credential_ref ?? undefined);
+    const current = this.sourceRow(sourceId);
+    if (!current || current.record_revision !== row.record_revision) throw new Error('REVISION_CONFLICT');
+    if (access.observedRevision !== row.pinned_revision) throw new Error('SOURCE_REVISION_INVALID');
+    return { sourceId, revision: access.observedRevision, locator: access.locator, title: row.display_name,
+      bytes: access.bytes, mediaType: access.mediaType };
+  }
+
   private async validateSourceAccess(
     kind: string,
     rawLocator: string,
@@ -1152,9 +1168,11 @@ export class SQLiteContentGovernance implements ContentGovernancePort {
     if (lstatSync(requested).isSymbolicLink()) throw new Error('SOURCE_ACCESS_DENIED: symbolic link sources are not accepted');
     const info = statSync(actual);
     if (!info.isFile()) throw new Error('SOURCE_ACCESS_DENIED: FILE source must resolve to a regular file');
+    if (info.size > 10 * 1024 * 1024) throw new Error('SOURCE_ACCESS_DENIED: source exceeds 10 MiB');
     const bytes = readFileSync(actual);
     if (bytes.byteLength > 10 * 1024 * 1024) throw new Error('SOURCE_ACCESS_DENIED: source exceeds 10 MiB');
     return {
+      bytes, mediaType: ['.html', '.htm'].includes(extname(actual).toLowerCase()) ? 'text/html' : extname(actual).toLowerCase() === '.md' ? 'text/markdown' : 'text/plain',
       locator: relative(this.repositoryRoot, actual).replaceAll('\\', '/'),
       observedRevision: `sha256:${sha256(bytes)}`,
       size: bytes.byteLength,
@@ -1198,7 +1216,7 @@ export class SQLiteContentGovernance implements ContentGovernancePort {
       const response = await undiciFetch(locator, {
         method: 'GET', redirect: 'manual', signal: controller.signal, dispatcher,
         headers: {
-          accept: 'text/markdown,text/plain;q=0.9,application/json;q=0.5',
+          accept: 'text/markdown,text/plain;q=0.9,text/html;q=0.8,application/json;q=0.5',
           ...(secret ? { authorization: `Bearer ${secret}` } : {}),
         },
       });
@@ -1225,6 +1243,7 @@ export class SQLiteContentGovernance implements ContentGovernancePort {
       }
       const bytes = Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)), size);
       return {
+        bytes, mediaType: response.headers.get('content-type') ?? 'application/octet-stream',
         locator: locator.toString(),
         observedRevision: `sha256:${sha256(bytes)}`,
         size,

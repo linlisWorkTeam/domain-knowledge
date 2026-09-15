@@ -3,7 +3,56 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：提供Composition的外部入口、参数转换与响应处理。
  */
+import { WorkbenchBatches } from '../../application/services/WorkbenchBatches.ts';
+import { RuntimeDeletionOperations } from './RuntimeDeletionOperations.ts';
+import { RuntimeFileLock } from '../../infrastructure/sqlite/RuntimeFileLock.ts';
+import { RuntimeMaintenance } from '../../application/services/RuntimeMaintenance.ts';
+import { deletionRecoveryPending, deletionWorkbenchExecutionsIdle } from '../../infrastructure/sqlite/DeletionRecoveryPending.ts';
+import { SqliteDeletionRunStates } from '../../infrastructure/sqlite/SqliteDeletionRunStates.ts';
+import { SqliteWorkbenchBatches } from '../../infrastructure/sqlite/SqliteWorkbenchBatches.ts';
+import { moduleBuild } from '../../domain/workbench/WorkbenchProject.ts';
+import { WorkbenchPublicationEvidence } from '../../application/services/WorkbenchPublicationEvidence.ts';
+import { WorkbenchPublications } from '../../application/services/WorkbenchPublications.ts';
+import { SqliteWorkbenchPublications } from '../../infrastructure/sqlite/SqliteWorkbenchPublications.ts';
+import { LocalWorkbenchPublicationFiles } from '../../infrastructure/publication/LocalWorkbenchPublicationFiles.ts';
+import { SOURCE_COMPARISON_CONTRACT } from '../../domain/evaluation/NativeSourceComparison.ts';
+import { WorkbenchMaterials } from '../../application/services/WorkbenchMaterials.ts';
+import { SqliteExternalMaterials } from '../../infrastructure/sqlite/SqliteExternalMaterials.ts';
+import { MaterialText } from '../../infrastructure/source/MaterialText.ts';
+import { RepositoryAnalysisService } from '../../application/services/RepositoryAnalysis.ts';
+import { NativeSuiteEvaluation } from '../../application/services/NativeSuiteEvaluation.ts';
+import { IsolatedLanguageCases } from '../../infrastructure/evaluation/project/IsolatedLanguageCases.ts';
+import { nativeFingerprint } from '../../infrastructure/evaluation/project/NativeFingerprint.ts';
+import { SqliteNativeTests } from '../../infrastructure/sqlite/SqliteNativeTests.ts';
+import { WorkbenchProjects } from '../../application/services/WorkbenchProjects.ts';
+import { WorkbenchPipelines } from '../../application/services/WorkbenchPipelines.ts';
+import { SqliteWorkbenchPipelines } from '../../infrastructure/sqlite/SqliteWorkbenchPipelines.ts';
+import { WorkbenchGeneration } from '../../application/services/WorkbenchGeneration.ts';
+import { NativeToolchain } from '../../infrastructure/evaluation/project/NativeToolchain.ts';
+import { WorkbenchAssociations } from '../../application/services/WorkbenchAssociations.ts';
+import { CARD_ASSOCIATION_CONTRACT } from '../../domain/association/CardAssociations.ts';
+import { WorkbenchSourceRevision } from '../../application/services/WorkbenchSourceRevision.ts';
+import { SOURCE_REVISION_CONTRACT } from '../../domain/knowledge/SourceRevision.ts';
+import { WorkbenchSourceVerification } from '../../application/services/WorkbenchSourceVerification.ts';
+import { SOURCE_VERIFICATION_CONTRACT } from '../../domain/knowledge/KnowledgeSourceVerification.ts';
+import { WorkbenchKnowledgeRevision } from '../../application/services/WorkbenchKnowledgeRevision.ts';
+import { KNOWLEDGE_REVISION_CONTRACT } from '../../domain/knowledge/KnowledgeRevision.ts';
+import { WorkbenchFixedEvaluation } from '../../application/services/WorkbenchFixedEvaluation.ts';
+import { FIXED_EVALUATION_CONTRACT } from '../../domain/evaluation/NativeFixedEvaluation.ts';
+import { WorkbenchEvaluation } from '../../application/services/WorkbenchEvaluation.ts';
+import { WorkbenchReconstruction } from '../../application/services/WorkbenchReconstruction.ts';
+import { WorkbenchRoleExecution } from '../../application/services/WorkbenchRoleExecution.ts';
+import { materialModelExecution } from '../../infrastructure/agentAdapters/MaterialModelExecution.ts';
+import { SqliteWorkbenchProjects } from '../../infrastructure/sqlite/SqliteWorkbenchProjects.ts';
+import { ProjectDirectoryReader } from '../../infrastructure/source/ProjectDirectoryReader.ts';
+import { WorkbenchStages } from '../../application/services/WorkbenchStages.ts';
+import { KnowledgeIndexService } from '../../application/services/KnowledgeIndex.ts';
+import { SqliteStageTasks } from '../../infrastructure/sqlite/SqliteStageTasks.ts';
+import { SqliteKnowledgeIndex } from '../../infrastructure/sqlite/SqliteKnowledgeIndex.ts';
 import { AgentExampleService } from '../../application/services/AgentExample.ts';
+import { PublicationOperations } from '../../application/services/PublicationOperations.ts';
+import { LocalMarkdownPublisher } from '../../infrastructure/publication/LocalMarkdownPublisher.ts';
+import { createMarkdownLiteScenario } from '../../infrastructure/evaluation/markdownLite/MarkdownLiteScenario.ts';
 import { NODE_BY_AGENT } from '../../domain/workflow/AgentDefinitions.ts';
 import { assertModelOutput, modelExecutionFactory } from '../../infrastructure/agentAdapters/ModelExecution.ts';
 import { appendFile, mkdir } from 'node:fs/promises';
@@ -114,7 +163,7 @@ export function loadWorkpanelConfig(_repositoryRoot = defaultRepositoryRoot): Wo
 }
 
 /** 创建Composition。 */
-export function createComposition(input: {
+interface CompositionInput {
   repositoryRoot?: string;
   fixtureAssetRoot?: string;
   agentProviderMode?: 'fixture' | 'deepseek-harness' | 'company-codeagent-cli';
@@ -127,13 +176,31 @@ export function createComposition(input: {
   allowedSourceHosts?: string[];
   providerProbe?: ProviderConnectionProbe;
   operationalMetrics?: OperationalMetricsPort;
-} = {}) {
+}
+export function createComposition(input: CompositionInput = {}) {
   const repositoryRoot = resolve(input.repositoryRoot ?? defaultRepositoryRoot);
   const config = loadWorkpanelConfig(repositoryRoot);
   const configuredRuntime = input.runtimeDir ?? process.env.WP_FLYWHEEL_HOME ?? config.runtimeDir;
   const runtimeDir = isAbsolute(configuredRuntime) ? configuredRuntime : join(componentRoot, configuredRuntime);
+  const runtimeLock = new RuntimeFileLock(runtimeDir);
+  try { return composeRuntime(input, repositoryRoot, config, runtimeLock); }
+  catch (error) { runtimeLock.close(); throw error; }
+}
+
+function composeRuntime(input: CompositionInput, repositoryRoot: string, config: ReturnType<typeof loadWorkpanelConfig>, runtimeLock: RuntimeFileLock) {
+  const runtimeDir = runtimeLock.directory;
   const artifacts = new LocalCasArtifactStore(join(runtimeDir, 'cas'));
   const repository = new SQLiteFlywheelRepository(join(runtimeDir, 'registry.sqlite'));
+  const directoryRoots = (process.env.WP_KNOWLEDGE_DIRECTORY_ROOTS ?? `${dirname(runtimeDir)}${delimiter}${dirname(repositoryRoot)}`).split(delimiter).filter(Boolean);
+  const repositoryReader = new ProjectDirectoryReader(directoryRoots, runtimeDir, artifacts);
+  const repositoryAnalysis = new RepositoryAnalysisService(repositoryReader, artifacts);
+  const projectStore = new SqliteWorkbenchProjects(join(runtimeDir, 'workbench.sqlite'));
+  const batchStore = new SqliteWorkbenchBatches(join(runtimeDir, 'workbench.sqlite'));
+  const workbenchProjects = new WorkbenchProjects(projectStore, repositoryAnalysis, repositoryReader, artifacts);
+  const publisher = new LocalMarkdownPublisher({ runtimeDir, directoryRoots,
+    defaultDirectory: process.env.WP_KNOWLEDGE_OUTPUT_DIRECTORY ?? join(runtimeDir, 'knowledge'),
+  });
+  const publicationOperations = new PublicationOperations(publisher);
   const runProjections = new ConsoleReadModel(repository.database);
   const flywheelApp = new FlywheelApp({
     artifacts,
@@ -144,6 +211,22 @@ export function createComposition(input: {
   });
   const evalRunnerApp = new EvalRunnerApp(flywheelApp);
   const knowledgeSearchApp = new KnowledgeSearchApp(artifacts, repository);
+  const pipelineStore = new SqliteWorkbenchPipelines(join(runtimeDir, 'workbench.sqlite'));
+  const stageStore = new SqliteStageTasks(join(runtimeDir, 'workbench.sqlite'));
+  const nativeTestStore = new SqliteNativeTests(join(runtimeDir, 'workbench.sqlite'));
+  const nativeEvaluation = new NativeSuiteEvaluation({ artifacts, runner: new IsolatedLanguageCases(artifacts), snapshot: nativeFingerprint, store: nativeTestStore });
+  const indexStore = new SqliteKnowledgeIndex(join(runtimeDir, 'workbench.sqlite'), join(runtimeDir, 'card-index'));
+  const knowledgeIndex = new KnowledgeIndexService(repository, artifacts, indexStore);
+  let workbenchGeneration!: WorkbenchGeneration;
+  let workbenchReconstruction!: WorkbenchReconstruction;
+  let workbenchEvaluation!: WorkbenchEvaluation;
+  let workbenchFixedEvaluation!: WorkbenchFixedEvaluation;
+  let workbenchSourceRevision!: WorkbenchSourceRevision;
+  let workbenchSourceVerification!: WorkbenchSourceVerification;
+  let workbenchKnowledgeRevision!: WorkbenchKnowledgeRevision;
+  let workbenchAssociations!: WorkbenchAssociations;
+  const workbenchStages = new WorkbenchStages(stageStore, { INDEX: (context) => knowledgeIndex.build(context), GENERATE: (context) => workbenchGeneration.generate(context),
+    FLYWHEEL: (context) => context.task.input.parameters.operation === 'KNOWLEDGE_SOURCE_REVISION' ? workbenchSourceRevision.revise(context) : context.task.input.parameters.operation === 'KNOWLEDGE_REVISION' ? workbenchKnowledgeRevision.revise(context) : workbenchReconstruction.reconstruct(context), EVALUATE: (context) => context.task.input.parameters.operation === 'FIXED_NATIVE_EVALUATION' ? workbenchFixedEvaluation.evaluate(context) : context.task.input.parameters.operation === 'KNOWLEDGE_SOURCE_VERIFICATION' ? workbenchSourceVerification.verify(context) : workbenchEvaluation.evaluate(context), ASSOCIATE: (context) => workbenchAssociations.build(context) }, (input) => input.stage === 'ASSOCIATE' ? input.parameters.associationContract === CARD_ASSOCIATION_CONTRACT : input.stage === 'EVALUATE' ? (input.parameters.operation === undefined && (input.parameters.supplementContract === undefined || input.parameters.supplementContract === 'knowledge-test-supplement-v1') || (input.parameters.operation === 'FIXED_NATIVE_EVALUATION' && input.parameters.fixedEvaluationContract === FIXED_EVALUATION_CONTRACT) || (input.parameters.operation === 'KNOWLEDGE_SOURCE_VERIFICATION' && input.parameters.verificationContract === SOURCE_VERIFICATION_CONTRACT)) : input.stage !== 'FLYWHEEL' || (input.parameters.operation === 'KNOWLEDGE_SOURCE_REVISION' ? input.parameters.revisionContract === SOURCE_REVISION_CONTRACT : input.parameters.operation === 'KNOWLEDGE_REVISION' ? input.parameters.revisionContract === KNOWLEDGE_REVISION_CONTRACT : input.parameters.operation === undefined && input.parameters.comparisonContract === SOURCE_COMPARISON_CONTRACT));
   const scanner = new SourceScanner(repositoryRoot, repository);
   const knowledgeDiscoveryApp = new KnowledgeDiscoveryApp(scanner, undefined, {
     migrate: (legacyKnowledgeRoot) => migrateLegacyOkf({
@@ -151,7 +234,7 @@ export function createComposition(input: {
       service: flywheelApp,
     }),
   });
-  const contentGovernance = new ContentGovernanceApp(new SQLiteContentGovernance({
+  const contentGovernanceStore = new SQLiteContentGovernance({
     database: repository.database,
     artifacts,
     repositoryRoot,
@@ -166,7 +249,10 @@ export function createComposition(input: {
       maxIterations: config.publicationGate.maxIterations,
     },
     clock: input.clock,
-  }));
+  });
+  const contentGovernance = new ContentGovernanceApp(contentGovernanceStore);
+  const workbenchMaterials = new WorkbenchMaterials(contentGovernanceStore, new SqliteExternalMaterials(repository.database), artifacts, new MaterialText());
+  workbenchAssociations = new WorkbenchAssociations(repository, artifacts, knowledgeIndex, workbenchStages, workbenchMaterials);
   const metrics = input.operationalMetrics ?? new SQLiteOperationalMetrics(
     repository.database,
     () => new Date(input.clock?.() ?? Date.now()),
@@ -203,7 +289,7 @@ export function createComposition(input: {
       new EncryptedFileProviderSettingsStore(join(runtimeDir, 'secrets', 'provider-settings.enc'), join(runtimeDir, 'secrets', 'provider-settings.key')),
     ),
     endpointPolicy: providerEndpointPolicy,
-    probe: input.providerProbe ?? new OpenAiCompatibleProviderProbe(),
+    probe: input.providerProbe ?? new OpenAiCompatibleProviderProbe(30_000, undefined, join(runtimeDir, 'provider-budget')),
     executionParameters: configuredExecutionParameters,
     clock: input.clock,
     audit: (event) => {
@@ -244,6 +330,7 @@ export function createComposition(input: {
   const allowedRoots = (process.env.WP_DSH_ALLOWED_ROOTS?.split(delimiter) ?? [repositoryRoot])
     .map((root) => root.trim()).filter(Boolean).map((root) => resolve(root));
   const agentWorkspaceRoot = join(runtimeDir, 'agent-workspaces');
+  const agentWorkspaces = new LocalAgentWorkspace({ workspaceRoot: agentWorkspaceRoot, allowedSourceRoots: allowedRoots });
   const sdkPatches = process.env.WP_DSH_PATCHES_JSON
     ? JSON.parse(process.env.WP_DSH_PATCHES_JSON) as string[]
     : agentProviderMode === 'deepseek-harness' && sdkProvider === 'opencode-go'
@@ -313,6 +400,8 @@ export function createComposition(input: {
     runtimeVersion: '0.1.2-alpha.4',
   }));
   const schemaRoot = join(componentRoot, 'docs', 'specs', 'schemas');
+  // 校验同步执行且不保存业务状态；同一装配只编译一份冻结契约。
+  const agentContracts = new JsonSchemaAgentContractValidator(schemaRoot);
   const artifactRefSchemaSha256 = sha256(readFileSync(join(schemaRoot, 'ArtifactRef.schema.json')));
   const correctionSchemaSha256 = sha256(readFileSync(join(schemaRoot, 'Correction.schema.json')));
   const fallbackRunProvider = {
@@ -342,6 +431,65 @@ export function createComposition(input: {
     },
     clock: input.clock,
   });
+  workbenchGeneration = new WorkbenchGeneration({ projects: projectStore, artifacts, configuration: runConfiguration,
+    native: new NativeToolchain(), contracts: agentContracts, flywheel: flywheelApp, stages: workbenchStages,
+    model: (command, configuration, onUsage) => {
+      if (processIsolation !== 'bubblewrap') throw new Error('MODULE_ISOLATION_REQUIRED');
+      const configured = providerOperations.requireRuntimeConfiguration(configuration.provider);
+      const provider = new ConfiguredDshProvider({ ...configured, maxProviderRequests: configuration.policy.maxProviderRequests,
+        maxSchemaAttempts: configuration.policy.maxSchemaAttempts, dshHome: join(runtimeDir, 'dsh-configured'), quotaHome: join(runtimeDir, 'provider-budget'),
+        runtime: { processIsolation, bubblewrapCommand, timeoutMs, maxOutputBytes, allowedWorkspaceRoots: [...allowedRoots, agentWorkspaceRoot] },
+        endpointPolicy: providerEndpointPolicy,
+        onInvocation: (record) => { metrics.recordProviderInvocation(record); onUsage(record.invocationId,
+          record.inputTokens === null || record.outputTokens === null ? null : record.inputTokens + record.outputTokens); },
+        onAudit: async (record) => { const directory = join(runtimeDir, 'workbench-audit'); await mkdir(directory, { recursive: true });
+          await appendFile(join(directory, 'model.jsonl'), `${JSON.stringify(record)}\n`, { encoding: 'utf8', mode: 0o600 }); },
+      });
+      return materialModelExecution(provider, command, join(agentWorkspaceRoot, 'stage-materials'));
+    },
+  });
+  workbenchReconstruction = new WorkbenchReconstruction({ projects: projectStore, repository, artifacts, native: new NativeToolchain(),
+    snapshot: nativeFingerprint, configuration: runConfiguration, stages: workbenchStages,
+    roles: new WorkbenchRoleExecution({ artifacts, events: (taskId, after) => workbenchStages.store.events(taskId, after), contracts: agentContracts, model: workbenchGeneration.dependencies.model }) });
+  workbenchEvaluation = new WorkbenchEvaluation({ projects: projectStore, repository, artifacts, native: new NativeToolchain(),
+    configuration: runConfiguration, stages: workbenchStages, roles: workbenchReconstruction.dependencies.roles, evaluation: nativeEvaluation });
+  workbenchSourceRevision = new WorkbenchSourceRevision(workbenchEvaluation, flywheelApp, knowledgeIndex);
+  workbenchSourceVerification = new WorkbenchSourceVerification(workbenchEvaluation);
+  workbenchFixedEvaluation = new WorkbenchFixedEvaluation(workbenchEvaluation);
+  workbenchKnowledgeRevision = new WorkbenchKnowledgeRevision(workbenchEvaluation, flywheelApp, knowledgeIndex);
+  const publicationStore = new SqliteWorkbenchPublications(join(runtimeDir, 'workbench.sqlite'));
+  const workbenchPublications = new WorkbenchPublications({ store: publicationStore, render: indexStore,
+    files: new LocalWorkbenchPublicationFiles(join(runtimeDir, 'publications'), artifacts),
+    evidence: new WorkbenchPublicationEvidence({ stages: workbenchStages, repository, artifacts, projects: projectStore,
+      tests: nativeTestStore, contracts: workbenchReconstruction.dependencies.roles.dependencies.contracts }) });
+  const workbenchPipelines = new WorkbenchPipelines({ publications: workbenchPublications, artifacts, fixedEvaluation: workbenchFixedEvaluation, materials: workbenchMaterials.store, environment: async (snapshotId, signal) => {
+    const project = projectStore.get(snapshotId); if (!project) throw new Error('PROJECT_INPUT_NOT_FOUND');
+    const fingerprints = [];
+    if (project.moduleBuilds) {
+      for (const module of [...project.modules].sort((a, b) => a.moduleId.localeCompare(b.moduleId))) {
+        if (module.language !== 'c' && module.language !== 'cpp') throw new Error('GENERATION_LANGUAGE_UNSUPPORTED');
+        fingerprints.push({ moduleId: module.moduleId, language: module.language, digest: (await workbenchReconstruction.dependencies.snapshot(module.language, moduleBuild(project, module.moduleId), signal)).digest });
+      }
+    } else {
+      for (const language of [...new Set(project.modules.map((module) => module.language))].sort()) {
+        if (language !== 'c' && language !== 'cpp') throw new Error('GENERATION_LANGUAGE_UNSUPPORTED');
+        fingerprints.push({ language, digest: (await workbenchReconstruction.dependencies.snapshot(language, project.build, signal)).digest });
+      }
+    }
+    return sha256(JSON.stringify(fingerprints));
+  }, store: pipelineStore, stages: workbenchStages, generation: workbenchGeneration, reconstruction: workbenchReconstruction, evaluation: workbenchEvaluation, revision: workbenchKnowledgeRevision, sourceVerification: workbenchSourceVerification, sourceRevision: workbenchSourceRevision, index: knowledgeIndex, associations: workbenchAssociations });
+  let maintenance: RuntimeMaintenance;
+  const workbenchBatches = new WorkbenchBatches({ store: batchStore, projects: projectStore, pipelines: workbenchPipelines, materials: workbenchMaterials.store,
+    canSchedule: () => maintenance?.available ?? false });
+  maintenance = new RuntimeMaintenance({ isolate: work => runtimeLock.exclusive(work),
+    needsRecovery: () => !runtimeLock.available || deletionRecoveryPending(join(runtimeDir, 'deletion-recovery.sqlite')),
+    idle: () => workbenchBatches.idle && workbenchPipelines.idle && workbenchStages.idle && workbenchPublications.idle
+      && deletionWorkbenchExecutionsIdle(join(runtimeDir, 'workbench.sqlite')),
+    verifyIdle: async () => {
+      const states = await SqliteDeletionRunStates.inspect(repository.database, async runId => (await workflow()).workflow.status(runId));
+      if (states.hasUnknownCheckpointOwners) throw new Error('DELETION_CHECKPOINT_OWNER_UNKNOWN');
+      return states.idle;
+    } });
   const projectStages = () => {
       const auditDirectory = join(runtimeDir, 'demo');
       const auditPath = join(auditDirectory, 'agent-runs.jsonl');
@@ -419,7 +567,8 @@ export function createComposition(input: {
         flywheel: flywheelApp,
         evalRunner: evalRunnerApp,
         evaluator: new TrustedProjectEvaluator(artifacts, input.evaluationArtifactsDirectory),
-        contracts: new JsonSchemaAgentContractValidator(schemaRoot),
+        contracts: agentContracts,
+        localPublication: publicationOperations,
         ...(agent ? { agent } : {}),
         agentResolver: (runId) => {
           const snapshot = runConfiguration.get(runId);
@@ -427,7 +576,7 @@ export function createComposition(input: {
           if (snapshot?.provider.kind !== 'deepseek-harness' || snapshot.provider.parametersSha256 === fallbackRunProvider.parametersSha256) return undefined;
           return new ConfiguredDshProvider({
             ...providerOperations.requireRuntimeConfiguration(snapshot.provider),
-            dshHome: join(runtimeDir, 'dsh-configured'),
+            dshHome: join(runtimeDir, 'dsh-configured'), quotaHome: join(runtimeDir, 'provider-budget'),
             runtime: { processIsolation, bubblewrapCommand, timeoutMs, maxOutputBytes, allowedWorkspaceRoots: [...allowedRoots, agentWorkspaceRoot] },
             onAudit: async (record) => {
               await mkdir(auditDirectory, { recursive: true });
@@ -437,10 +586,7 @@ export function createComposition(input: {
             onInvocation: (record) => metrics.recordProviderInvocation(record),
           });
         },
-        modelFactory: modelExecutionFactory(new LocalAgentWorkspace({
-          workspaceRoot: agentWorkspaceRoot,
-          allowedSourceRoots: allowedRoots,
-        })),
+        modelFactory: modelExecutionFactory(agentWorkspaces),
       };
       const executor = agentProviderMode === 'fixture'
         ? new FixtureProjectWorkflowStages({
@@ -452,7 +598,7 @@ export function createComposition(input: {
   const agentExample = new AgentExampleService({
     tasks: new ConcurrentTasks(),
     flywheel: flywheelApp, runConfiguration, evaluator: new TrustedProjectEvaluator(artifacts, input.evaluationArtifactsDirectory),
-    contracts: new JsonSchemaAgentContractValidator(schemaRoot), observer: workflowObserver,
+    contracts: agentContracts, observer: workflowObserver,
     nodeByAgent: NODE_BY_AGENT,
     configurePrompt: (role, addon) => { agents.updatePromptAddon(role, addon); },
     model: (request) => {
@@ -460,7 +606,8 @@ export function createComposition(input: {
       const executor = stages instanceof FixtureProjectWorkflowStages ? stages.executor : stages;
       return executor.modelFactory({ ...request, provider: executor.agentResolver?.(request.command.runId) ?? executor.agent });
     },
-    fixtureModel: (output) => ({ assertOutput: assertModelOutput, execute: async () => structuredClone(output) }),
+    fixtureModel: (output, stages) => ({ assertOutput: assertModelOutput,
+      execute: async (request) => structuredClone(stages?.[request.stage?.split(':')[0] ?? 'execute'] ?? output) }),
   });
   let workflowPromise: Promise<AutomatedProjectWorkflowService> | null = null;
   const workflow = () => {
@@ -476,6 +623,16 @@ export function createComposition(input: {
     })();
     return workflowPromise;
   };
+  const batchDeletions = new RuntimeDeletionOperations({ runtimeDir, allowedRoots: directoryRoots, maintenance,
+    publicationDirectory: () => publisher.getSettings().directory, evaluationArtifactsDirectory: input.evaluationArtifactsDirectory,
+    sourceRoots: async () => {
+      const roots = [repositoryRoot, ...projectStore.list().map(project => project.directory)];
+      const runs = repository.database.prepare("SELECT DISTINCT run_id FROM checkpoints WHERE node_id='project-scenario' AND status='COMMITTED'").all();
+      for (const run of runs) roots.push((await (await workflow()).scenarioForRun(String(run.run_id))).repositoryRoot);
+      return [...new Set(roots)];
+    },
+    runStates: async database => SqliteDeletionRunStates.inspect(database, async runId => (await workflow()).workflow.status(runId)),
+  });
   const orchestrator = new Orchestrator({
     workflow,
     agents,
@@ -493,12 +650,43 @@ export function createComposition(input: {
     artifacts,
     repository,
     apps: {
+      publicationOperations,
+      workbenchStages,
+      workbenchPipelines,
+      workbenchBatches,
+      maintenance, batchDeletions,
+      workbenchPublications,
+      knowledgeIndex,
+      workbenchAssociations,
+      repositoryAnalysis,
+      workbenchProjects,
+      workbenchGeneration,
+      nativeEvaluation,
+      workbenchReconstruction,
+      workbenchEvaluation,
+      workbenchFixedEvaluation,
+      workbenchKnowledgeRevision,
+      workbenchSourceVerification,
+      workbenchSourceRevision,
+      markdownLite: {
+        start: async (directory: string, budgetMode?: 'provider-quota') => {
+          // 固定模块入口只接受服务器目录；源码与模型设置在服务端验证。
+          const scenario = await createMarkdownLiteScenario(directory);
+          if (processIsolation !== 'bubblewrap') throw new Error('MODULE_ISOLATION_REQUIRED');
+          if (!agentWorkspaces.allowedSourceRoots.includes(scenario.repositoryRoot)) {
+            agentWorkspaces.allowedSourceRoots.push(scenario.repositoryRoot);
+          }
+          publisher.excludeSourceRoot(scenario.repositoryRoot);
+          await publicationOperations.recover();
+          return (await workflow()).start(scenario, { ...config.publicationGate, ...(budgetMode ? { policyId: 'mvp-provider-quota-v1' } : {}), budgetMode, maxIterations: budgetMode ? Number.MAX_SAFE_INTEGER : 3, workerCount: 1 });
+        },
+      },
       agentExample,
       flywheel: flywheelApp,
       evalRunner: evalRunnerApp,
       knowledgeSearch: knowledgeSearchApp,
       knowledgeDiscovery: knowledgeDiscoveryApp,
-      contentGovernance,
+      contentGovernance, workbenchMaterials,
       providerOperations,
       operationalMetrics: operationalMetricsApp,
       orchestrator,
@@ -512,6 +700,13 @@ export function createComposition(input: {
     runConfiguration,
     agentProviderMode,
     automatedWorkflow: workflow,
-    close: () => repository.close(),
+    shutdown: async () => { workbenchBatches.stop(); await workbenchPipelines.shutdown(); await workbenchBatches.shutdown(); await workbenchStages.shutdown(); await workbenchPublications.shutdown(); if (workflowPromise) await (await workflowPromise).shutdown(); },
+    close: function close(): void | Promise<void> {
+      workbenchBatches.stop();
+      if (!runtimeLock.idle) return runtimeLock.whenIdle().then(() => close());
+      const release = () => { batchStore.close(); publicationStore.close(); pipelineStore.close(); nativeTestStore.close(); projectStore.close(); indexStore.close(); stageStore.close(); publisher.close(); repository.close(); runtimeLock.close(); };
+      if (workbenchBatches.idle && workbenchPipelines.idle && workbenchStages.idle && workbenchPublications.idle) { void workbenchPipelines.shutdown(); void workbenchStages.shutdown(); void workbenchPublications.shutdown(); release(); }
+      else return workbenchPipelines.shutdown().then(() => workbenchBatches.shutdown()).then(() => workbenchStages.shutdown()).then(() => workbenchPublications.shutdown()).then(release);
+    },
   };
 }

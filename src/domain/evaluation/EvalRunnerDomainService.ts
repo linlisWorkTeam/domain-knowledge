@@ -37,3 +37,6 @@ export class EvalRunnerDomainService implements EvaluationAgent {
     return decideGate(run, report, policy, now);
   }
 }
+
+/** 工作台既有调用方的领域服务类型名称。 */
+export type EvaluationService = EvaluationAgent;

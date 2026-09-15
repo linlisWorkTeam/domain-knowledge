@@ -94,4 +94,39 @@ Prompt 由角色基础指令、冻结的 promptAddon、适用治理指令、本�
 
 代码位置：[src/domain/agents/AgentRegistry.ts](../../../../src/domain/agents/AgentRegistry.ts)、[src/domain/agents/AgentExecution.ts](../../../../src/domain/agents/AgentExecution.ts)、[src/domain/agents/AgentContracts.ts](../../../../src/domain/agents/AgentContracts.ts)。
 
+
+领域外调用角色统一经过 `src/domain/workflow/AgentExecutionService.ts`；本目录拥有角色内部实现和共享契约。服务负责选择已注册角色，角色负责生成步骤，Application 负责材料与持久化。association / evaluation 的确定性规则归各自服务，详见 [领域边界](../../totalRules/DomainDrivenDesign.md)。开发时的 subagent 委派遵循 [并行协作规则](../../totalRules/CodeTaste.md#开发过程中的-subagent-并行协作)。
+
+工作台的分阶段生成、事实提取与证据修订使用显式 section-doc-v1、source-facts-v1、workbench-review-v1；默认角色契约和 Check 的 check-report-v2 见各角色页，不能混用。
+
+## 阶段反馈、预算与恢复
+
+`domain-agents-v11-workbench-evidence` 冻结默认及显式工作台模型契约，旧角色结果/知识正文仍可读，但旧执行版本禁止恢复。`StageValidationIssue` 只携带确定性错误码、字段和受信修正建议，不把模型错误文本作为指令。反馈使用原材料、工具和路径授权，不能扩大修订范围。TestGen 的参考行为校验失败仍直接拒绝并保留候选；阶段反馈不读取 oracle 结果去修改测试预期。
+
+Application 的 `RoleExecutionService` 在模型调用前保存 STARTED 次数，返回后保存 PASSED/REJECTED/FAILED 与原始模型输出到 CAS，并关联 `ArtifactCommitted(kind=role-stage-attempt)` 审计事件。失败尝试不进入成功角色信封；历史失败工件不覆盖。恢复重用已通过阶段，失败或中断尝试消耗额度，不因重启获得第三次尝试。阶段首次开始时间亦持久化，恢复不重置阶段截止时间。
+
+DocWorker extract：180 秒、最多 8192 输出 token；DocGen outline：90 秒、2048；body/revision：240 秒、12288。时间上限包含排队、格式重试及语义反馈，两次语义尝试共享同一截止时间，Provider 配置更低时取更低输出上限。取消/超时沿模型 Port 传给真实子进程，等待清理后返回。持久化失败不能触发额外模型调用。
+
+Review 的提示材料由程序提取当前知识的唯一 H2 与完整 knowledgePath 列表；H3/H4 和围栏示例不授权。模型必须选用已有 H2，严格范围校验保持不变，不能通过改写失败输出绕过。
+
+
+## 工作台知识风险的证据复核
+
+代码：[KnowledgeRisks.ts](../../../../src/domain/knowledge/KnowledgeRisks.ts)。当前执行禁止旧版本检查点恢复；历史输出和失败记录继续可读，不重判旧门禁。`knowledge-risk-v1` 原始记录包含稳定 riskId、来源工件、种类与声明；`knowledge-risk-assessment-v1` 工件绑定 runId、versionId、iteration 和每项证据。报告独立使用 knowledgeRiskBlocking，原因 KNOWLEDGE_RISK_UNRESOLVED，不再混入 CHECK_BLOCKING。
+
+普通 unresolvedRisks 是任意缺证据声明，始终 OPEN，不能靠 Review PASS、字符串分类或测试总分自动关闭。DocWorker 可以另外声明 verificationNeeds 的三个预定义编号；编号不接受自定义描述，由 Domain 生成精确范围声明：MODULE_BEHAVIOR_TESTS 只要求当前版本固定与晋升案例全部通过；SYSTEM_INTEGRATION 与 OUTSIDE_PUBLIC_TYPES 只在冻结 moduleContract 限定独立模块公开类型验收时记 OUT_OF_SCOPE，仍保留未验证限制。不能用预定义事项替换具体源码缺失、未知行为或安全缺陷。
+
+Domain 按 Application 绑定的冻结场景与本轮可信评测逐项形成 OPEN / VERIFIED / OUT_OF_SCOPE。只有完整、非空、无基础设施失败、稳定性为 1 的通过评测能验证 MODULE_BEHAVIOR_TESTS；不声称覆盖所有输入。没有模块契约或证据不足保持 OPEN；未知种类和篡改的声明不能通过。每轮重新评估，不沿用上一版本的通过。原始记录不删除、不修改，处置工件作为门禁 evidenceRefs 保存，可从 Console 评测证据下载；页面独立显示知识风险原因。
+
+本版普通自由文本缺证据风险尚不支持自动解除，需要补充材料后重新提取事实；不提供任意风险的模型自评清除接口。验收覆盖失败后修订通过且保留逐轮风险审计、未解决风险拒绝、缺少范围证据、跨版本评测不复用及旧版本拒绝恢复。
+
+Review evidence-attribution 阶段为 180 秒，PASS 与阻塞/修订/未解决风险矛盾时最多反馈一次，保留两次输出与共享截止时间。反馈要求保留实际风险并选择 ITERATE，不能通过清空风险满足格式；权限与传输失败不重试。DocWorker 在字段 Schema 中明确风险、待验证事项和适用限制的职责，未来版本及未承诺的性能上界不等于当前源码行为未知；具体安全缺陷仍阻止发布。旧风险及失败门禁不重分类、不删除。
+
+工作台使用冻结预算策略，不因恢复重置累计用量；用户取消、额度拒绝、阶段期限或连续无进展时保留已提交证据并停止或暂停。供应商额度未知不能解释为无限额度。
+
+
+### Review 的证据范围约束
+
+调用方可在 criteriaRef 指向的受信对象中提供 allowedKnowledgePaths。Review 在调用模型前校验每项属于当前卡片唯一现有 H2，并将相同集合用于提示词目标列表、动态输出 Schema 的 knowledgePath/targetHeading 枚举和角色输出校验。未提供此字段时保持原有全文 H2 范围。不得先接受越界角色结果，再依赖应用层拒绝形成无法恢复的成功缓存。工作台与默认项目使用显式不同契约，已有执行不跨版本迁移。
+
 Check 的 check-report-v2 及源码证据组装见角色页。原有命令/结果信封保持兼容，旧运行只读，不复用其 checkpoint 继续新执行。

@@ -44,10 +44,22 @@ test('code: output whitelist and duplicate paths are enforced', async () => {
   await assert.rejects(execute(sample.input, sample.context), /AGENT_OUTPUT_INVALID|PROJECT_PATH_DENIED/);
   const path = sample.input.payload.allowedGeneratedPaths[0]!;
   sample.input.payload.allowedGeneratedPaths.push('second.cpp');
-  const config = sample.input.materials.find(({ ref }) => ref.artifactId === sample.input.payload.projectConfigurationRef.artifactId)!.content as { allowedGeneratedPaths: string[] };
+  const config = sample.input.materials.find(({ ref }) => ref.artifactId === sample.input.payload.projectConfigurationRef!.artifactId)!.content as { allowedGeneratedPaths: string[] };
   config.allowedGeneratedPaths.push('second.cpp');
   sample.context.model.execute = async () => ({ files: [{ path, content: 'a' }, { path, content: 'b' }] });
   await assert.rejects(execute(sample.input, sample.context), /PROJECT_PATH_DUPLICATED/);
+});
+
+test('code: rejects unsafe caller whitelist and hides unrelated source materials', async () => {
+  const sample = roleExample<Input>('code');
+  sample.input.materials.push({ ref: { ...sample.input.materials[0]!.ref, artifactId: 'reference-source' }, content: 'REFERENCE_SOURCE_SECRET' });
+  await execute(sample.input, sample.context);
+  assert.doesNotMatch(sample.requests[0]!.prompt, /REFERENCE_SOURCE_SECRET/);
+  assert.deepEqual(sample.requests[0]!.readablePaths, []);
+  sample.input.payload.allowedGeneratedPaths = ['../escape.ts'];
+  const config = sample.input.materials.find(({ ref }) => ref.artifactId === sample.input.payload.projectConfigurationRef!.artifactId)!.content as { allowedGeneratedPaths: string[] };
+  config.allowedGeneratedPaths = [...sample.input.payload.allowedGeneratedPaths];
+  await assert.rejects(execute(sample.input, sample.context), /CODE_PATH_INVALID/);
 });
 
 test('code: model sees only knowledge and cropped configuration with no repository reads', async () => {

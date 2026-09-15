@@ -225,6 +225,24 @@ process.stdout.write(JSON.stringify({ answer: 'validated' }));
   }
 });
 
+test('provider prompt distinguishes optional fields without requiring fabricated values', async () => {
+  const workspace = mkdtempSync(join(tmpdir(), 'wp-dsh-optional-'));
+  const script = join(workspace, 'fake-dsh.mjs');
+  writeFileSync(script, `
+import { readFileSync } from 'node:fs';
+const prompt = readFileSync(0, 'utf8');
+if (!prompt.includes('必填字段：answer。') || prompt.includes('对象键必须恰好是')) process.exit(8);
+process.stdout.write(JSON.stringify({ answer: 'valid without optional field' }));
+`);
+  try {
+    const provider = new DeepSeekHarnessHeadlessAgent({ command: process.execPath, args: [script], allowedWorkspaceRoots: [workspace] });
+    const result = await provider.run({ ...request(workspace), outputSchema: {
+      ...OUTPUT_SCHEMA, properties: { ...OUTPUT_SCHEMA.properties, initial: { type: 'integer' } },
+    } });
+    assert.deepEqual(result, { answer: 'valid without optional field' });
+  } finally { rmSync(workspace, { recursive: true, force: true }); }
+});
+
 test('DSH SDK provider audits and closes when harness.run throws synchronously', async () => {
   const workspace = mkdtempSync(join(tmpdir(), 'wp-dsh-sdk-sync-failure-'));
   const audits: DeepSeekHarnessAuditRecord[] = [];

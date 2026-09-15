@@ -19,6 +19,8 @@ import type {
   ArtifactStore, GeneratedProjectFile, ProjectCommand, ProjectCommandResult,
   ProjectEvaluation, ProjectEvaluator, ProjectSnapshot, ProjectTool,
 } from '../../../application/ports/ApplicationPorts.ts';
+import { IsolatedLanguageCases } from './IsolatedLanguageCases.ts';
+import { bundledLibraryEnvironment } from '../../runtime/BundledLibraries.ts';
 
 interface ResolvedTool {
   supervised?: boolean;
@@ -154,7 +156,7 @@ function executionEnvironment(isolationRoot?: string): NodeJS.ProcessEnv {
     'ProgramFiles', 'ProgramFiles(x86)', 'ProgramData',
     'NUMBER_OF_PROCESSORS', 'PROCESSOR_ARCHITECTURE',
   ]);
-  const env: NodeJS.ProcessEnv = { CI: '1', NO_COLOR: '1', FORCE_COLOR: '0' };
+  const env: NodeJS.ProcessEnv = { CI: '1', NO_COLOR: '1', FORCE_COLOR: '0', ...bundledLibraryEnvironment() };
   for (const [key, value] of Object.entries(process.env)) {
     if (allowed.has(key) && value !== undefined) env[key] = value;
   }
@@ -364,15 +366,24 @@ export class TrustedProjectEvaluator implements ProjectEvaluator {
     }
     const sourcePaths = input.sourcePaths.map(safeRelativePath);
     const publicInterfacePaths = input.publicInterfacePaths.map(safeRelativePath);
-    const files = [...new Set([...sourcePaths, ...publicInterfacePaths])].map((path) => {
-      const bytes = spawnSync('git', ['show', `${commit}:${path}`], {
+    const sourceContentRefs = [];
+    const publicInterfaceRefs = [];
+    const files = [];
+    for (const path of [...new Set([...sourcePaths, ...publicInterfacePaths])]) {
+      const bytes = spawnSync('git', ['--no-replace-objects', 'show', `${commit}:${path}`], {
         cwd: repositoryRoot, env: executionEnvironment(),
         encoding: null, shell: false, windowsHide: true, maxBuffer: 16 * 1024 * 1024,
       });
       if (bytes.error) throw bytes.error;
       if (bytes.status !== 0 || !bytes.stdout) throw new Error(`PROJECT_SOURCE_MISSING: ${path}`);
-      return { path, sha256: digest(bytes.stdout), size: bytes.stdout.byteLength, content: bytes.stdout.toString('utf8') };
-    });
+      const sha256 = digest(bytes.stdout);
+      const ref = await this.artifacts.put(Buffer.from(JSON.stringify({
+        path, commit, content: bytes.stdout.toString('utf8'), sha256,
+      })), 'application/json');
+      if (sourcePaths.includes(path)) sourceContentRefs.push(ref);
+      if (publicInterfacePaths.includes(path)) publicInterfaceRefs.push(ref);
+      files.push({ path, sha256, size: bytes.stdout.byteLength, content: bytes.stdout.toString('utf8') });
+    }
     const remote = syncText('git', ['config', '--get', 'remote.origin.url'], repositoryRoot, true);
     const dirty = syncText('git', ['status', '--porcelain=v1'], repositoryRoot, true).length > 0;
     const manifest = {
@@ -380,11 +391,14 @@ export class TrustedProjectEvaluator implements ProjectEvaluator {
       sourcePaths, publicInterfacePaths, files,
     };
     const manifestRef = await this.artifacts.put(Buffer.from(JSON.stringify(manifest, null, 2)), 'application/json');
-    return { repositoryRoot, remote, checkoutHead, commit, dirty, sourcePaths, publicInterfacePaths, manifestRef };
+    return { repositoryRoot, remote, checkoutHead, commit, dirty, sourcePaths, publicInterfacePaths,
+      manifestRef, sourceContentRefs, publicInterfaceRefs };
   }
 
   /** 评估请求。 */
   async evaluate(input: Parameters<ProjectEvaluator['evaluate']>[0], signal?: AbortSignal): Promise<ProjectEvaluation> {
+    if (input.moduleSuite && input.testSuite) throw new Error('PROJECT_EVALUATION_MODE_INVALID');
+    if (input.moduleSuite) return (await new IsolatedLanguageCases(this.artifacts).evaluate({ language: 'typescript', input: { ...input, moduleSuite: input.moduleSuite } }, signal)).detail;
     if (input.commands.length === 0) throw new Error('PROJECT_GATE_EMPTY');
     if (this.retainedWorkspaceRoot) mkdirSync(this.retainedWorkspaceRoot, { recursive: true });
     const tempRoot = mkdtempSync(join(this.retainedWorkspaceRoot ?? tmpdir(), 'wp-project-eval-'));

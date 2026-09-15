@@ -90,6 +90,10 @@ interface ReviewOutput {
 
 /** 定义Real源码Scenario的数据结构与类型约束。 */
 export interface RealSourceScenario {
+  /** 独立函数模块的公开构建约束，不包含实现、参考测试或门禁数据。 */
+  moduleContract?: { modulePath: string; exportName: string; signature: string };
+  /** 在角色生成开始前冻结；任何角色均不能通过材料或文件访问此测试集。 */
+  fixedSuite?: import('../../domain/agents/testGenAgent/ModuleBehaviorSuite.ts').ModuleBehaviorSuite;
   /** 明确授权的候选模块；每个 Run 选择一个模块并保持到结束。 */
   modules?: Omit<RealSourceScenario, 'modules'>[];
   /** 本轮冻结的项目级 Agent 编写约束。 */

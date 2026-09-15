@@ -3,6 +3,8 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：实现文档生成角色的业务步骤与结构化结果转换。
  */
+import { generateSections } from './DocGenSectionGeneration.ts';
+import { collectRisks } from '../../knowledge/KnowledgeRisks.ts';
 import { validateRevisionOutput } from './DocGenRevision.ts';
 import { renderKnowledgeDocument } from '../../knowledge/KnowledgeDocument.ts';
 import type { RoleResult, PendingArtifact } from '../AgentExecution.ts';
@@ -32,9 +34,10 @@ export async function execute(input: Input, context: DocGenContext): Promise<Rol
     payload: { ...input.payload, ...(fragmentRefs.length ? { workerFragmentRefs: fragmentRefs } : {}) },
     materials: [...input.materials, ...ordered.map(({ material }) => material)],
   };
+  const sectionResult = input.payload.executionContract === 'section-doc-v1' ? await generateSections(synthesisInput, context) : undefined;
   const schema = schemaFor(synthesisInput);
   // 角色决定本阶段的任务与能力范围；会话、工具执行和格式修复交给模型适配器。
-  const raw = await context.model.execute({
+  const raw = sectionResult?.output ?? await context.model.execute({
     role: definition.agentId,
     prompt: buildPrompt(synthesisInput, context),
     outputSchema: schema,
@@ -43,7 +46,7 @@ export async function execute(input: Input, context: DocGenContext): Promise<Rol
   }, context.signal);
   // 模型返回后仍需检查取消状态，迟到结果不能被当作成功输出。
   assertActive(context.signal);
-  context.model.assertOutput(raw, schema);
+  if (!sectionResult) context.model.assertOutput(raw, schema);
   if ('splitProposal' in raw) {
     const output = raw as unknown as SplitProposal;
     const proposal = { moduleId: input.moduleId,
@@ -54,14 +57,15 @@ export async function execute(input: Input, context: DocGenContext): Promise<Rol
       artifacts: [{ key: 'proposal', content: JSON.stringify(proposal, null, 2), mediaType: 'application/json' }] };
   }
   const output = raw as unknown as Output;
-  validateRevisionOutput(input, output.body);
-  const artifacts: PendingArtifact[] = [];
+  if (!sectionResult) validateRevisionOutput(input, output.body);
+  const artifacts: PendingArtifact[] = [...(sectionResult?.artifacts ?? [])];
   const document = output;
   // 这里只声明正文工件；实际 CAS 引用由 Application 保存后回填。
   const bodyRef = pending('body');
-  artifacts.push({ key: 'body', content: renderKnowledgeDocument(document), mediaType: 'text/markdown' });
+  artifacts.push({ key: 'body', content: sectionResult ? document.body : renderKnowledgeDocument(document), mediaType: 'text/markdown' });
   const payload = {
     resultKind: 'knowledgeCandidate',
+    knowledgeRisks: collectRisks(synthesisInput.materials.filter(({ ref }) => fragmentRefs.some(item => item.artifactId === ref.artifactId))),
     bodyRef,
     ...(input.payload.baseKnowledgeRef ? { baseKnowledgeRef: input.payload.baseKnowledgeRef } : {}),
     ...(input.payload.corrections?.length ? { appliedCorrectionIds: input.payload.corrections.map((item) => item.correctionId) } : {}),

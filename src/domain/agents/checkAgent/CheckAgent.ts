@@ -23,7 +23,7 @@ export async function execute(input: Input, context: ExecutionContext): Promise<
       assertActive(context.signal);
       let raw: unknown = null, output: Output | undefined, errors: string[] = [];
       try {
-        raw = await context.model.execute({ role: definition.agentId,
+        raw = await context.model.execute({ role: definition.agentId, stage: 'constraint-check',
           prompt: basePrompt + (attempts.length ? `\n\n修正上次报告，保留有效证据和有依据的意见，不通过删除差异或改变严重程度掩盖错误。修正反馈：\n${JSON.stringify(attempts.at(-1))}\n已识别的差异结论（索引从0开始）：\n${JSON.stringify([...retained])}` : ''),
           outputSchema: schema, tools: definition.tools, readablePaths: readablePaths(input),
           outputAttempts: 1, reportAttempt: attempt,

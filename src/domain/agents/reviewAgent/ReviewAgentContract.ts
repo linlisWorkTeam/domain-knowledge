@@ -25,6 +25,7 @@ export function schemaFor(input: Input): Record<string, unknown> {
     ? { ...outputSchema, required: ['blocking', 'corrections', 'historySummary'] } : outputSchema;
 }
 export function validateInput(input: Input): void {
+  if (Object.hasOwn(input.payload, 'criteriaRef') || Object.hasOwn(input.payload, 'checkReportRef')) throw new Error('REVIEW_EXECUTION_CONTRACT_INVALID');
   requireMaterials(input.payload, input.materials, ['knowledgeRef', 'evaluationReportRef', 'comparisonReportRef']);
 }
 /** 定位必须出现在本轮知识正文中；不能为其他卡片创建修订意见。 */

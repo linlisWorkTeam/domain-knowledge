@@ -165,3 +165,28 @@ test('A rejected downgrade does not prevent the final repair from restoring the 
   assert.equal(calls, 3); assert.equal(result.output.blocking, true);
   assert.match(JSON.parse(result.artifacts[0]!.content).attempts[1].errors.join(), /CHECK_REPAIR_CONCLUSION_CHANGED/);
 });
+
+test('check: blocking findings bind a criterion to real frozen generated code', async () => {
+  const s = sample();
+  const result = await execute(s.input, s.context);
+  const finding = (result.payload.findings as { criterionId: string; evidenceLocation: string }[])[0]!;
+  assert.equal(finding.criterionId, s.output.findings[0].ruleId);
+  const side = result.output.findings[0]!.generated;
+  assert.equal(side.status, 'present');
+  if (side.status === 'present') {
+    const excerpt = side.excerpts[0]!;
+    assert.ok(finding.evidenceLocation.includes(`${excerpt.path}:${excerpt.startLine}-${excerpt.endLine}`));
+  }
+  for (const missing of [false, true]) {
+    const output = structuredClone(s.output);
+    if (missing) output.findings[0].generated.locations = [];
+    else output.findings[0].generated.locations[0].startLine = 100;
+    s.context.model.execute = async () => output;
+    await assert.rejects(execute(s.input, s.context), (error: unknown) => {
+      assert.ok(error instanceof AgentReportFailure);
+      assert.match(error.message, /CHECK_REPORT_REPAIR_EXHAUSTED/);
+      assert.match(error.artifacts[0]!.content, missing ? /AGENT_OUTPUT_INVALID/ : /CHECK_LOCATION_INVALID/);
+      return true;
+    });
+  }
+});

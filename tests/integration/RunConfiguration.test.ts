@@ -222,7 +222,7 @@ test('DSH RunConfigurationSnapshot freezes every non-secret execution parameter'
         }),
       },
       providerProbe: {
-        verify: async ({ model }) => ({ status: 'VERIFIED', reasonCode: 'READY', model }),
+        verify: async ({ model }) => ({ status: 'VERIFIED', reasonCode: 'GENERATION_READY', checks: { modelList: 'PASSED' as const, generation: 'PASSED' as const }, model }),
       },
     });
     compositions.push(composition);
@@ -295,7 +295,7 @@ test('old role execution versions remain readable but cannot resume; same versio
   try {
     const run = composition.apps.flywheel.createRun('role-version', 'local-v1');
     const snapshot = await composition.runConfiguration.capture(run.runId);
-    assert.equal(snapshot.roleExecutionVersion, 'domain-agents-v10-check-evidence-guards');
+    assert.equal(snapshot.roleExecutionVersion, 'domain-agents-v11-workbench-evidence');
     await composition.runConfiguration.assertCompatible(run.runId);
     const original = composition.repository.getRunConfiguration.bind(composition.repository);
     composition.repository.getRunConfiguration = (runId) => {
@@ -307,6 +307,13 @@ test('old role execution versions remain readable but cannot resume; same versio
     assert.ok(composition.repository.getRun(run.runId));
     await assert.rejects(composition.runConfiguration.assertCompatible(run.runId), /RUN_CONFIGURATION_INCOMPATIBLE: role execution version/);
     await assert.rejects(composition.runConfiguration.resolvePrompt(run.runId, 'doc-gen'), /RUN_CONFIGURATION_INCOMPATIBLE/);
+    composition.repository.getRunConfiguration = (runId) => {
+      const result = original(runId);
+      if (result) result.roleExecutionVersion = 'seven-role-mvp-v3';
+      return result;
+    };
+    assert.equal(composition.runConfiguration.get(run.runId)?.runId, run.runId);
+    await assert.rejects(composition.runConfiguration.assertCompatible(run.runId), /RUN_CONFIGURATION_INCOMPATIBLE: role execution version/);
     composition.repository.getRunConfiguration = original;
     await composition.runConfiguration.assertCompatible(run.runId);
   } finally { composition.close(); rmSync(runtimeDir, { recursive: true, force: true }); }

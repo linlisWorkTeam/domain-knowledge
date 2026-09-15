@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：提供服务端的外部入口、参数转换与响应处理。
  */
+import { presentWorkflowStatus } from '../../application/services/RunExecutionPresentation.ts';
+import type { RuntimeOperation } from '../../application/services/RuntimeMaintenance.ts';
 import { createServer as createHttpServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { readFileSync } from 'node:fs';
 import { extname, join, resolve } from 'node:path';
@@ -11,6 +13,7 @@ import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
 import { createComposition } from './Composition.ts';
+import type { PublicationOperations } from '../../application/services/PublicationOperations.ts';
 import { parseProjectScenario } from '../../application/services/ProjectScenario.ts';
 import type {
   OperationalMetricsPort, ProviderConnectionProbe, ProviderEndpointPolicy, ProviderSettingsStore,
@@ -44,6 +47,25 @@ const assets = new Map([
   ['/', 'index.html'],
   ['/index.html', 'index.html'],
   ['/App.js', 'App.js'],
+  ['/ModuleBatches.js', 'ModuleBatches.js'],
+  ['/BatchDeletion.js', 'BatchDeletion.js'],
+  ['/WorkbenchLabels.js', 'WorkbenchLabels.js'],
+  ['/KnowledgeMarkdown.js', 'KnowledgeMarkdown.js'],
+  ['/KnowledgeIndex.js', 'KnowledgeIndex.js'],
+  ['/RepositoryAnalysis.js', 'RepositoryAnalysis.js'],
+  ['/ProjectHistory.js', 'ProjectHistory.js'],
+  ['/StageHistory.js', 'StageHistory.js'],
+  ['/BuildDiagnostics.js', 'BuildDiagnostics.js'],
+  ['/KnowledgeGeneration.js', 'KnowledgeGeneration.js'],
+  ['/SourceComparison.js', 'SourceComparison.js'],
+  ['/KnowledgeRevision.js', 'KnowledgeRevision.js'],
+  ['/KnowledgeSourceVerification.js', 'KnowledgeSourceVerification.js'],
+  ['/WorkbenchPipeline.js', 'WorkbenchPipeline.js'],
+  ['/KnowledgeReconstruction.js', 'KnowledgeReconstruction.js'],
+  ['/KnowledgeEvaluation.js', 'KnowledgeEvaluation.js'],
+  ['/FixedEvaluation.js', 'FixedEvaluation.js'],
+  ['/WorkbenchPublication.js', 'WorkbenchPublication.js'],
+  ['/KnowledgeAssociations.js', 'KnowledgeAssociations.js'],
   ['/Styles.css', 'Styles.css'],
 ]);
 
@@ -137,8 +159,31 @@ function keysetPage<T>(values: T[], url: URL, keyOf: (value: T) => string): {
   };
 }
 
-function authorized(request: IncomingMessage, token: string | undefined): boolean {
-  if (!token) return false;
+/** 本机浏览器或 SSH 转发无需额外令牌，校验 Host/Origin 防止跨站写入。 */
+function isDirectLocalRequest(request: IncomingMessage): boolean {
+  if (!['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(request.socket.remoteAddress ?? '')) return false;
+  if (Object.keys(request.headers).some((key) => key === 'forwarded' || key.startsWith('x-forwarded-') || key.startsWith('cf-'))) return false;
+  try {
+    const target = new URL(`http://${request.headers.host ?? ''}`);
+    if (!['localhost', '127.0.0.1', '[::1]'].includes(target.hostname)) return false;
+    if (request.headers.origin && request.headers.origin !== target.origin) return false;
+    if (request.headers['sec-fetch-site'] && !['same-origin', 'none'].includes(String(request.headers['sec-fetch-site']))) return false;
+    return true;
+  } catch { return false; }
+}
+
+/** 免登录仍拒绝其他网站从浏览器发起的写入。 */
+function sameSiteRequest(request: IncomingMessage): boolean {
+  if (request.headers['sec-fetch-site'] === 'cross-site') return false;
+  if (!request.headers.origin) return true;
+  try { return new URL(request.headers.origin).host === request.headers.host; }
+  catch { return false; }
+}
+
+function authorized(request: IncomingMessage, token: string | undefined, anonymousAccess = false): boolean {
+  // 单用户本地部署直接编辑；代理流量与跨站请求不能借用回环地址。
+  if (anonymousAccess) return sameSiteRequest(request);
+  if (!token) return isDirectLocalRequest(request);
   const supplied = request.headers.authorization?.replace(/^Bearer\s+/i, '') ?? '';
   const left = Buffer.from(supplied);
   const right = Buffer.from(token);
@@ -240,11 +285,51 @@ function requireOnlyKeys(payload: Record<string, unknown>, allowed: readonly str
 export function mapHttpError(error: unknown, id = 'req_unknown'): { status: number; body: ApiErrorBody } {
   const message = error instanceof Error ? error.message : String(error);
   const code = message.split(':', 1)[0] || 'INTERNAL_ERROR';
+  if (code.startsWith('DELETION_')) {
+    const message = code === 'DELETION_TARGET_NOT_FOUND' ? '批次不存在，或已被删除。'
+      : code.startsWith('DELETION_CONFIRMATION') ? '删除清单已变化或尚未确认，请重新预览并确认。'
+      : code === 'DELETION_TARGET_REFERENCED' ? '该批次仍被其他记录引用，暂时不能删除。'
+      : code === 'DELETION_PUBLICATION_ROOT_UNAUTHORIZED' ? '历史发布文件位于当前授权目录之外，请先核对发布目录设置。'
+      : code === 'DELETION_SOURCE_DIRECTORY_OVERLAP' ? '产物目录与源码目录重叠，已停止删除。'
+      : code === 'DELETION_RETAINED_EVALUATION_UNSUPPORTED' ? '检测到单独保留的评测目录，其清理范围尚未确认。'
+      : '无法确认完整删除范围或文件状态，数据已保留。请检查后重试。';
+    return { status: code === 'DELETION_TARGET_NOT_FOUND' ? 404 : 409, body: errorBody(code, message, id) };
+  }
+  if (code.startsWith('RUNTIME_')) return { status: 503, body: errorBody(code, '还有其他操作或服务进程占用运行目录，请稍后重试。', id, true) };
+  if (code === 'MATERIAL_NOT_FOUND') return { status: 404, body: errorBody(code, '材料不存在', id) };
+  if (code.startsWith('ASSOCIATION_')) return { status: 422, body: errorBody(code, code, id) };
+  if (code.startsWith('MATERIAL_')) return { status: 422, body: errorBody(code, code, id) };
+  if (code === 'BATCH_NOT_FOUND') return { status: 404, body: errorBody(code, '批次不存在', id) };
+  if (['BATCH_ROUND_ACTIVE', 'BATCH_INPUT_CHANGED', 'BATCH_LEASE_LOST'].includes(code)) return { status: 409, body: errorBody(code, code, id) };
+  if (code === 'BATCH_OWNER_UNAVAILABLE') return { status: 503, body: errorBody(code, '无法确认执行进程身份', id) };
+  if (code.startsWith('BATCH_')) return { status: 422, body: errorBody(code, code, id) };
+  if (code === 'PIPELINE_INPUT_INVALID') return { status: 422, body: errorBody(code, '流程输入无效', id) };
+  if (code === 'PIPELINE_NOT_FOUND') return { status: 404, body: errorBody(code, '流程不存在', id) };
+  if (['PIPELINE_CARD_SELECTION_INVALID', 'PIPELINE_CARD_SNAPSHOT_CHANGED', 'PIPELINE_CARD_LINEAGE_CHANGED', 'PIPELINE_CONTRACT_INCOMPATIBLE', 'PIPELINE_INPUT_CHANGED', 'PIPELINE_NOT_RESUMABLE'].includes(code)) return { status: 409, body: errorBody(code, code, id) };
+  if (['PIPELINE_SHUTDOWN', 'PIPELINE_OWNER_UNAVAILABLE'].includes(code)) return { status: 503, body: errorBody(code, code, id) };
+  if (['SOURCE_REVISION_VERIFICATION_REQUIRED', 'SOURCE_REVISION_NO_CORRECTION', 'SOURCE_REVISION_BINDING_INVALID', 'SOURCE_VERIFICATION_EVALUATION_REQUIRED', 'SOURCE_VERIFICATION_CARD_UNBOUND', 'SOURCE_VERIFICATION_BINDING_INVALID', 'STAGE_CONTRACT_INCOMPATIBLE', 'STAGE_INPUT_CHANGED', 'STAGE_NOT_RESUMABLE', 'STAGE_BUDGET_EXHAUSTED', 'INDEX_VERSION_NOT_CURRENT', 'EVALUATION_RECONSTRUCTION_REQUIRED', 'RECONSTRUCTION_RETRY_INVALID', 'REVISION_COMPLETED_EVALUATION_REQUIRED', 'REVISION_REFERENCE_NOT_TRUSTED', 'REVISION_REPORT_BINDING_INVALID', 'REVISION_KNOWLEDGE_BINDING_INVALID', 'REVISION_NO_ELIGIBLE_FAILURE', 'REVISION_CARD_CHANGED', 'REVISION_CORRECTION_OUTSIDE_EVIDENCE'].includes(code)) return { status: 409, body: errorBody(code, message, id) };
+  if (['STAGE_OWNER_UNAVAILABLE', 'STAGE_SHUTDOWN'].includes(code)) return { status: 503, body: errorBody(code, message, id) };
+  if (['NATIVE_SUPPLIED_CANDIDATES_INVALID', 'NATIVE_BEHAVIOR_SUITE_INVALID', 'NATIVE_CONTRACT_INVALID'].includes(code)) return { status: 422, body: errorBody(code, '补充用例格式或模块、接口、章节范围无效。', id) };
+  if (['NATIVE_SUPPLEMENT_SOURCE_REQUIRED', 'NATIVE_SUPPLEMENT_BINDING_INVALID'].includes(code)) return { status: 409, body: errorBody(code, '补充用例需要同一源码和卡片版本的已完成来源核验。', id) };
+  if (['SOURCE_HISTORICAL_REVIEW_POLICY_INVALID', 'SOURCE_REASSESSMENT_NO_FINDINGS'].includes(code)) return { status: 409, body: errorBody(code, '没有可重新核实的历史意见，或复核执行版本不匹配。', id) };
+  if (code.startsWith('DIRECTORY_')) return { status: 422, body: errorBody(code, code, id) };
+  if (code.startsWith('REPOSITORY_')) return { status: 422, body: errorBody(code, code, id) };
+  if (code.startsWith('PROJECT_')) return { status: 422, body: errorBody(code, code, id) };
+  if (code.startsWith('GENERATION_') || code.startsWith('RECONSTRUCTION_')) return { status: 422, body: errorBody(code, code, id) };
+  if (code.startsWith('WORKBENCH_RESOURCE_')) return { status: 503, body: errorBody(code, '服务器资源不足，分析未启动。', id) };
+  if (code === 'MODULE_BASELINE_MISMATCH') return { status: 422, body: errorBody(code, '所选仓库不包含本版固定的 markdownLite 源码、参考测试或依赖快照。', id) };
+  if (code === 'MODULE_ISOLATION_UNAVAILABLE' || code === 'MODULE_ISOLATION_REQUIRED') return { status: 503, body: errorBody(code, '服务器的 Linux 隔离能力不可用，任务未启动。请检查 Bubblewrap 和内核命名空间配置。', id) };
   if (code === 'RUN_CONFIGURATION_INCOMPATIBLE' || code === 'PROVIDER_MIGRATION_REQUIRED' || code === 'DSH_CONFIGURATION_UNAVAILABLE') return { status: 409, body: errorBody(code, message, id) };
+  if (['ACCEPTANCE_LIMIT_REACHED', 'WORKFLOW_BUDGET_EXHAUSTED', 'WORKFLOW_NOT_RECOVERABLE'].includes(code)) {
+    const messages: Record<string, string> = { ACCEPTANCE_LIMIT_REACHED: 'Real acceptance budget is exhausted; new authorization is required.', WORKFLOW_BUDGET_EXHAUSTED: 'The original execution budget is exhausted.', WORKFLOW_NOT_RECOVERABLE: 'No recoverable failed node is available.' };
+    return { status: 409, body: errorBody(code, messages[code]!, id) };
+  }
   if (code === 'INVALID_EVENT_CURSOR') return { status: 400, body: errorBody(code, message, id) };
   if (code === 'PAYLOAD_TOO_LARGE') return { status: 413, body: errorBody(code, 'Request payload is too large.', id) };
   if (code === 'METHOD_NOT_ALLOWED') return { status: 405, body: errorBody(code, 'Method not allowed.', id) };
   if (code.endsWith('_NOT_FOUND')) return { status: 404, body: errorBody(code, 'Resource not found.', id) };
+  if (code === 'PUBLICATION_NOT_FOUND') return { status: 404, body: errorBody(code, message, id) };
+  if (code.startsWith('GIT_') || code.startsWith('PUBLICATION_') || code === 'SYNC_IN_PROGRESS') return { status: 409, body: errorBody(code, message, id, true) };
   if (code === 'SOURCE_ACCESS_DENIED') return { status: 403, body: errorBody(code, 'Source access is outside the configured boundary.', id) };
   if (code === 'SOURCE_ALREADY_EXISTS' || code === 'SOURCE_DELETED') {
     return { status: 409, body: errorBody(code, message, id) };
@@ -272,6 +357,7 @@ export function createKnowledgeServer(input: {
   runtimeDir?: string;
   clock?: () => string;
   writeToken?: string;
+  anonymousAccess?: boolean;
   providerSettingsStore?: ProviderSettingsStore;
   providerEndpointPolicy?: ProviderEndpointPolicy;
   sourceEndpointPolicy?: ProviderEndpointPolicy;
@@ -283,10 +369,21 @@ export function createKnowledgeServer(input: {
 } = {}) {
   const composition = createComposition(input);
   const writeToken = input.writeToken ?? process.env.WP_KNOWLEDGE_WRITE_TOKEN;
+  const anonymousAccess = input.anonymousAccess ?? process.env.WP_KNOWLEDGE_NO_LOGIN === '1';
+  const productApps = composition.apps as typeof composition.apps & {
+    publicationOperations: PublicationOperations;
+    markdownLite: { start(repositoryRoot: string): Promise<unknown> };
+  };
   const idempotencyResults = new Map<string, { fingerprint: string; status: number; value: unknown }>();
+  if (composition.apps.maintenance.available) {
+    composition.apps.workbenchStages.recover();
+    composition.apps.workbenchPipelines.recover();
+  }
+  composition.apps.workbenchBatches.start();
   const server = createHttpServer(async (request, response) => {
     const url = new URL(request.url ?? '/', 'http://127.0.0.1');
     const currentRequestId = requestId(request);
+    let operation: RuntimeOperation | undefined;
     try {
       if (request.method === 'GET' && assets.has(url.pathname)) {
         const file = assets.get(url.pathname) as string;
@@ -306,6 +403,316 @@ export function createKnowledgeServer(input: {
       if (request.method === 'GET' && url.pathname === '/health') {
         send(response, 200, { ok: true });
         return;
+      }
+      // 目录、配置和写入仅允许直接本机访问，或携带远程访问令牌。
+      const localClient = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(request.socket.remoteAddress ?? '');
+      const workbenchRoute = /^\/api\/v1\/(batch-deletions|workbench-batches|external-materials|workbench-publications|workbench-pipelines|stage-tasks|index-builds|knowledge-index|repository-analyses|projects|generations|reconstructions|native-evaluations|fixed-evaluations|knowledge-revisions|source-verifications|source-revisions|associations)(\/|$)/.test(url.pathname);
+      const productRoute = url.pathname.startsWith('/api/v1/publications')
+        || url.pathname === '/api/v1/server-directories' || url.pathname === '/api/v1/runs/markdown-lite';
+      if (url.pathname.startsWith('/api/') && (!localClient || productRoute || workbenchRoute) && !authorized(request, writeToken, anonymousAccess)) {
+        send(response, writeToken ? 401 : 503, errorBody(writeToken ? 'UNAUTHORIZED' : 'WRITE_API_DISABLED',
+          'A valid Bearer token is required for remote access and server directory operations.', currentRequestId));
+        return;
+      }
+      if (request.method === 'GET' && url.pathname === '/api/v1/maintenance') {
+        send(response, 200, { status: composition.apps.maintenance.status }); return;
+      }
+      if (request.method === 'GET' && url.pathname === '/api/v1/batch-deletions') {
+        send(response, 200, { items: await composition.apps.batchDeletions.pending() }); return;
+      }
+      if (request.method === 'POST' && url.pathname === '/api/v1/batch-deletions/recover') {
+        const payload = await body(request); requireOnlyKeys(payload, ['planId']);
+        const receipt = await composition.apps.batchDeletions.recoverPending(typeof payload.planId === 'string' ? payload.planId : '');
+        if (receipt.status === 'DELETED' && composition.apps.maintenance.available) {
+          composition.apps.workbenchStages.recover(); composition.apps.workbenchPipelines.recover(); composition.apps.workbenchBatches.tick();
+        }
+        send(response, receipt.status === 'DELETED' ? 200 : 202, receipt); return;
+      }
+      const deletionRoute = /^\/api\/v1\/batch-deletions\/(runs|batches)\/([^/]+)\/(preview|confirm|recover)$/.exec(url.pathname);
+      if (deletionRoute && request.method === 'POST') {
+        const kind = deletionRoute[1] as 'runs' | 'batches', target = decodeURIComponent(deletionRoute[2]!);
+        const action = deletionRoute[3], deletions = composition.apps.batchDeletions;
+        if (action === 'preview') { send(response, 200, await deletions.preview(kind, target)); return; }
+        const payload = await body(request);
+        const receipt = action === 'confirm' ? await deletions.confirm(kind, target, payload)
+          : await deletions.recover(kind, target, typeof payload.planId === 'string' ? payload.planId : '');
+        if (receipt.status === 'DELETED' && composition.apps.maintenance.available) {
+          composition.apps.workbenchStages.recover(); composition.apps.workbenchPipelines.recover();
+          composition.apps.workbenchBatches.tick();
+        }
+        send(response, receipt.status === 'DELETED' ? 200 : 202, receipt); return;
+      }
+      if (url.pathname.startsWith('/api/')) operation = composition.apps.maintenance.enter();
+      if (workbenchRoute) {
+        const publications = composition.apps.workbenchPublications;
+        if (url.pathname === '/api/v1/workbench-publications' && request.method === 'GET') {
+          send(response, 200, { items: publications.list(url.searchParams.get('projectId') ?? undefined, url.searchParams.get('versionId') ?? undefined)
+            .map(publication => ({ ...publication, publicationVerified: publication.status === 'COMMITTED' })) }); return;
+        }
+        if (url.pathname === '/api/v1/workbench-publications' && request.method === 'POST') {
+          const payload = await body(request);
+          const keys = ['reconstructionTaskId', 'evaluationTaskId', 'fixedEvaluationTaskId', 'sourceVerificationTaskId'];
+          requireOnlyKeys(payload, keys);
+          if (keys.some(key => typeof payload[key] !== 'string' || !(payload[key] as string).trim())) throw new Error('PAYLOAD_INVALID');
+          const publication = await publications.publishFromTasks({ reconstruction: payload.reconstructionTaskId as string,
+            evaluation: payload.evaluationTaskId as string, fixedEvaluation: payload.fixedEvaluationTaskId as string,
+            sourceVerification: payload.sourceVerificationTaskId as string });
+          send(response, 200, await publications.detail(publication.publicationId)); return;
+        }
+        const publicationArtifact = /^\/api\/v1\/workbench-publications\/([^/]+)\/artifacts\/([a-f0-9]{64})$/.exec(url.pathname);
+        if (publicationArtifact && request.method === 'GET') {
+          const artifact = await publications.artifact(decodeURIComponent(publicationArtifact[1]!), publicationArtifact[2]!);
+          response.setHeader('content-disposition', `attachment; filename="${artifact.path.split('/').at(-1)}"`);
+          send(response, 200, Buffer.from(artifact.bytes), artifact.ref.mediaType); return;
+        }
+        const publicationRoute = /^\/api\/v1\/workbench-publications\/([^/]+)(?:\/(resume))?$/.exec(url.pathname);
+        if (publicationRoute && request.method === 'GET' && !publicationRoute[2]) {
+          send(response, 200, await publications.detail(decodeURIComponent(publicationRoute[1]!))); return;
+        }
+        if (publicationRoute && request.method === 'POST' && publicationRoute[2]) {
+          requireOnlyKeys(await body(request), []);
+          const id = decodeURIComponent(publicationRoute[1]!); await publications.resume(id);
+          send(response, 200, await publications.detail(id)); return;
+        }
+        const materials = composition.apps.workbenchMaterials;
+        if (url.pathname === '/api/v1/external-materials' && request.method === 'GET') {
+          send(response, 200, { items: materials.store.list() }); return;
+        }
+        if (url.pathname === '/api/v1/external-materials' && request.method === 'POST') {
+          const payload = await body(request); requireOnlyKeys(payload, ['sourceId', 'applicability']);
+          if (typeof payload.sourceId !== 'string' || typeof payload.applicability !== 'string') throw new Error('PAYLOAD_INVALID');
+          send(response, 201, { material: await materials.capture(payload.sourceId, payload.applicability) }); return;
+        }
+        const materialArtifact = /^\/api\/v1\/external-materials\/([^/]+)\/artifacts\/([a-f0-9]{64})$/.exec(url.pathname);
+        if (materialArtifact && request.method === 'GET') {
+          const result = await materials.artifact(decodeURIComponent(materialArtifact[1]!), materialArtifact[2]!);
+          response.setHeader('content-disposition', 'attachment; filename="material-evidence"');
+          send(response, 200, Buffer.from(result.bytes), result.ref.mediaType); return;
+        }
+        const materialRoute = /^\/api\/v1\/external-materials\/([^/]+)$/.exec(url.pathname);
+        if (materialRoute && request.method === 'GET') { send(response, 200, await materials.read(decodeURIComponent(materialRoute[1]!))); return; }
+        const batches = composition.apps.workbenchBatches;
+        if (url.pathname === '/api/v1/workbench-batches' && request.method === 'GET') {
+          send(response, 200, { items: batches.list(url.searchParams.get('projectId') ?? undefined), schedulerError: batches.lastError }); return;
+        }
+        if (url.pathname === '/api/v1/workbench-batches' && request.method === 'POST') {
+          const payload = await body(request); requireOnlyKeys(payload, ['snapshotId', 'moduleId', 'schedule', 'execution']);
+          const commandId = request.headers['idempotency-key'];
+          if (typeof commandId !== 'string' || !commandId.trim() || commandId.length > 256) throw new Error('IDEMPOTENCY_KEY_REQUIRED');
+          if (typeof payload.snapshotId !== 'string' || typeof payload.moduleId !== 'string') throw new Error('PAYLOAD_INVALID');
+          send(response, 201, { batch: batches.create({ snapshotId: payload.snapshotId, moduleId: payload.moduleId, schedule: payload.schedule, execution: payload.execution }, commandId) }); return;
+        }
+        const batchRoute = /^\/api\/v1\/workbench-batches\/([^/]+)(?:\/(rounds|cancel|resume))?$/.exec(url.pathname);
+        if (batchRoute && request.method === 'GET' && !batchRoute[2]) {
+          const batch = batches.store.get(decodeURIComponent(batchRoute[1]!)); if (!batch) throw new Error('BATCH_NOT_FOUND');
+          send(response, 200, { batch }); return;
+        }
+        if (batchRoute && request.method === 'POST' && batchRoute[2]) {
+          requireOnlyKeys(await body(request), []); const id = decodeURIComponent(batchRoute[1]!);
+          const commandId = request.headers['idempotency-key'];
+          if (typeof commandId !== 'string' || !commandId.trim() || commandId.length > 256) throw new Error('IDEMPOTENCY_KEY_REQUIRED');
+          send(response, 202, { batch: batchRoute[2] === 'rounds' ? batches.enqueue(id, commandId) : batchRoute[2] === 'resume' ? batches.resume(id, commandId) : batches.cancel(id, commandId) }); return;
+        }
+        const pipelines = composition.apps.workbenchPipelines;
+        if (url.pathname === '/api/v1/workbench-pipelines' && request.method === 'GET') {
+          send(response, 200, { items: pipelines.dependencies.store.list() }); return;
+        }
+        if (url.pathname === '/api/v1/workbench-pipelines' && request.method === 'POST') {
+          const payload = await body(request); requireOnlyKeys(payload, ['snapshotId', 'scopes', 'materialIds', 'fixedSuites']);
+          if (typeof payload.snapshotId !== 'string') throw new Error('PAYLOAD_INVALID');
+          const pipeline = await pipelines.start(payload.snapshotId, payload.scopes as Parameters<typeof pipelines.start>[1], payload.materialIds as string[] | undefined, payload.fixedSuites as Parameters<typeof pipelines.start>[3]);
+          send(response, pipeline.status === 'SUCCEEDED' ? 200 : 202, { pipeline }); return;
+        }
+        const pipelineRoute = /^\/api\/v1\/workbench-pipelines\/([^/]+)(?:\/(resume|cancel))?$/.exec(url.pathname);
+        if (pipelineRoute && request.method === 'GET' && !pipelineRoute[2]) {
+          send(response, 200, pipelines.detail(decodeURIComponent(pipelineRoute[1]!))); return;
+        }
+        if (pipelineRoute && request.method === 'POST' && pipelineRoute[2]) {
+          const payload = await body(request); const id = decodeURIComponent(pipelineRoute[1]!);
+          requireOnlyKeys(payload, pipelineRoute[2] === 'resume' ? ['inputDigest'] : []);
+          if (pipelineRoute[2] === 'resume' && typeof payload.inputDigest !== 'string') throw new Error('PAYLOAD_INVALID');
+          const pipeline = pipelineRoute[2] === 'resume' ? pipelines.resume(id, payload.inputDigest as string) : pipelines.cancel(id);
+          send(response, 202, { pipeline }); return;
+        }
+        if (request.method === 'POST' && url.pathname === '/api/v1/associations') {
+          const payload = await body(request); requireOnlyKeys(payload, ['versionIds', 'materialIds']);
+          if (!Array.isArray(payload.versionIds) || payload.versionIds.some((id) => typeof id !== 'string')) throw new Error('PAYLOAD_INVALID');
+          const task = composition.apps.workbenchStages.start(composition.apps.workbenchAssociations.prepare(payload.versionIds as string[], payload.materialIds as string[] | undefined));
+          send(response, task.status === 'SUCCEEDED' ? 200 : 202, { task }); return;
+        }
+        const associated = url.pathname.match(/^\/api\/v1\/associations\/([^/]+)$/);
+        if (request.method === 'GET' && associated) {
+          send(response, 200, await composition.apps.workbenchAssociations.candidates(decodeURIComponent(associated[1]!))); return;
+        }
+        if (request.method === 'POST' && url.pathname === '/api/v1/native-evaluations') {
+          const payload = await body(request); requireOnlyKeys(payload, ['reconstructionTaskId', 'sourceVerificationTaskId', 'candidateSuites']);
+          if (typeof payload.reconstructionTaskId !== 'string') throw new Error('PAYLOAD_INVALID');
+          if (payload.sourceVerificationTaskId !== undefined && typeof payload.sourceVerificationTaskId !== 'string') throw new Error('PAYLOAD_INVALID');
+          const task = await composition.apps.workbenchEvaluation.start(payload.reconstructionTaskId, payload.sourceVerificationTaskId as string | undefined, payload.candidateSuites);
+          send(response, task.status === 'SUCCEEDED' ? 200 : 202, { task }); return;
+        }
+        if (request.method === 'POST' && url.pathname === '/api/v1/reconstructions') {
+          const payload = await body(request); requireOnlyKeys(payload, ['snapshotId', 'versionIds', 'retryEvaluationTaskId']);
+          if (typeof payload.snapshotId !== 'string' || !Array.isArray(payload.versionIds) || payload.versionIds.some((id) => typeof id !== 'string')) throw new Error('PAYLOAD_INVALID');
+          if (payload.retryEvaluationTaskId !== undefined && typeof payload.retryEvaluationTaskId !== 'string') throw new Error('PAYLOAD_INVALID');
+          const task = await composition.apps.workbenchReconstruction.start(payload.snapshotId, payload.versionIds as string[], { retryEvaluationTaskId: payload.retryEvaluationTaskId as string | undefined });
+          send(response, task.status === 'SUCCEEDED' ? 200 : 202, { task }); return;
+        }
+        if (request.method === 'POST' && url.pathname === '/api/v1/generations') {
+          const payload = await body(request); requireOnlyKeys(payload, ['snapshotId', 'scopes']);
+          if (typeof payload.snapshotId !== 'string') throw new Error('PAYLOAD_INVALID');
+          const task = await composition.apps.workbenchGeneration.start(payload.snapshotId,
+            payload.scopes as Parameters<typeof composition.apps.workbenchGeneration.start>[1]);
+          send(response, task.status === 'SUCCEEDED' ? 200 : 202, { task }); return;
+        }
+        if (request.method === 'GET' && url.pathname === '/api/v1/projects') {
+          send(response, 200, { snapshots: composition.apps.workbenchProjects.store.list(url.searchParams.get('projectId') ?? undefined) }); return;
+        }
+        const projectInput = /^\/api\/v1\/projects\/([^/]+)$/.exec(url.pathname);
+        if (request.method === 'GET' && projectInput) {
+          const snapshot = composition.apps.workbenchProjects.store.get(decodeURIComponent(projectInput[1]!));
+          if (!snapshot) { send(response, 404, errorBody('NOT_FOUND', '项目输入不存在', currentRequestId)); return; }
+          send(response, 200, snapshot); return;
+        }
+        if (request.method === 'POST' && url.pathname === '/api/v1/projects') {
+          const payload = await body(request); requireOnlyKeys(payload, ['directory', 'revision', 'moduleIds', 'moduleDefinitions', 'build', 'moduleBuilds']);
+          if (typeof payload.directory !== 'string' || (payload.revision !== undefined && typeof payload.revision !== 'string')
+            || (payload.moduleIds !== undefined && (!Array.isArray(payload.moduleIds) || payload.moduleIds.some((value) => typeof value !== 'string')))) throw new Error('PAYLOAD_INVALID');
+          const controller = new AbortController(); const abort = () => { if (!response.writableEnded) controller.abort(); };
+          response.once('close', abort);
+          try { send(response, 200, await composition.apps.workbenchProjects.create({ directory: payload.directory, revision: payload.revision as string | undefined, moduleIds: payload.moduleIds as string[] | undefined, moduleDefinitions: payload.moduleDefinitions, build: payload.build, moduleBuilds: payload.moduleBuilds }, controller.signal)); }
+          finally { response.off('close', abort); }
+          return;
+        }
+        if (request.method === 'POST' && url.pathname === '/api/v1/repository-analyses') {
+          const payload = await body(request); requireOnlyKeys(payload, ['directory', 'revision']);
+          if (typeof payload.directory !== 'string' || (payload.revision !== undefined && typeof payload.revision !== 'string')) throw new Error('PAYLOAD_INVALID');
+          const controller = new AbortController();
+          const abort = () => { if (!response.writableEnded) controller.abort(); };
+          response.once('close', abort);
+          try { send(response, 200, await composition.apps.repositoryAnalysis.analyze(payload.directory, payload.revision as string | undefined, controller.signal)); }
+          finally { response.off('close', abort); }
+          return;
+        }
+        const stages = composition.apps.workbenchStages;
+        const index = composition.apps.knowledgeIndex;
+        const revisionEvidence = /^\/api\/v1\/native-evaluations\/([^/]+)\/revision-evidence$/.exec(url.pathname);
+        if (request.method === 'GET' && revisionEvidence) {
+          send(response, 200, await composition.apps.workbenchEvaluation.revisionEvidence(decodeURIComponent(revisionEvidence[1]!))); return;
+        }
+        if (request.method === 'GET' && url.pathname === '/api/v1/stage-tasks') {
+          send(response, 200, page(stages.store.list(url.searchParams.get('projectId') ?? undefined).filter(task => (!url.searchParams.has('snapshotId') || task.input.parameters.snapshotId === url.searchParams.get('snapshotId')) && (!url.searchParams.has('stage') || task.input.stage === url.searchParams.get('stage'))), url)); return;
+        }
+        const stageArtifact = /^\/api\/v1\/stage-tasks\/([^/]+)\/artifacts\/([a-f0-9]{64})$/.exec(url.pathname);
+        if (request.method === 'GET' && stageArtifact) {
+          const value = await composition.apps.workbenchReconstruction.artifact(decodeURIComponent(stageArtifact[1]!), stageArtifact[2]!);
+          if (!value) { send(response, 404, errorBody('NOT_FOUND', '阶段工件不存在', currentRequestId)); return; }
+          response.setHeader('content-disposition', 'attachment; filename="stage-evidence"');
+          send(response, 200, Buffer.from(value.bytes), value.ref.mediaType); return;
+        }
+        const taskRoute = url.pathname.match(/^\/api\/v1\/stage-tasks\/([^/]+)(?:\/(resume|cancel))?$/);
+        if (taskRoute && request.method === 'GET' && !taskRoute[2]) {
+          const taskId = decodeURIComponent(taskRoute[1]!);
+          send(response, 200, { task: stages.get(taskId), checkpoints: stages.store.checkpoints(taskId), events: stages.store.events(taskId) }); return;
+        }
+        if (taskRoute && request.method === 'POST' && taskRoute[2]) {
+          const payload = await body(request); const taskId = decodeURIComponent(taskRoute[1]!);
+          requireOnlyKeys(payload, taskRoute[2] === 'resume' ? ['inputDigest'] : []);
+          if (taskRoute[2] === 'resume' && typeof payload.inputDigest !== 'string') throw new Error('STAGE_INPUT_INVALID');
+          const task = taskRoute[2] === 'resume' ? stages.resume(taskId, String(payload.inputDigest)) : stages.cancel(taskId);
+          send(response, 202, { task }); return;
+        }
+        if (request.method === 'POST' && url.pathname === '/api/v1/source-revisions') {
+          const payload = await body(request); requireOnlyKeys(payload, ['sourceVerificationTaskId']);
+          if (typeof payload.sourceVerificationTaskId !== 'string') throw new Error('PAYLOAD_INVALID');
+          send(response, 202, { task: await composition.apps.workbenchSourceRevision.start(payload.sourceVerificationTaskId) }); return;
+        }
+        if (request.method === 'POST' && url.pathname === '/api/v1/fixed-evaluations') {
+          const payload = await body(request); requireOnlyKeys(payload, ['reconstructionTaskId', 'suites']);
+          if (typeof payload.reconstructionTaskId !== 'string' || !Array.isArray(payload.suites)) throw new Error('PAYLOAD_INVALID');
+          send(response, 202, { task: await composition.apps.workbenchFixedEvaluation.start(payload.reconstructionTaskId, payload.suites as unknown as import('../../application/services/WorkbenchFixedEvaluation.ts').FixedModuleSuite[]) }); return;
+        }
+        if (request.method === 'POST' && url.pathname === '/api/v1/source-verifications') {
+          const payload = await body(request); requireOnlyKeys(payload, ['evaluationTaskId', 'reassessHistoricalFindings']);
+          if (payload.reassessHistoricalFindings !== undefined && typeof payload.reassessHistoricalFindings !== 'boolean') throw new Error('PAYLOAD_INVALID');
+          if (typeof payload.evaluationTaskId !== 'string') throw new Error('PAYLOAD_INVALID');
+          send(response, 202, { task: await composition.apps.workbenchSourceVerification.start(payload.evaluationTaskId, payload.reassessHistoricalFindings as boolean | undefined) }); return;
+        }
+        if (request.method === 'POST' && url.pathname === '/api/v1/knowledge-revisions') {
+          const payload = await body(request); requireOnlyKeys(payload, ['evaluationTaskId']);
+          if (typeof payload.evaluationTaskId !== 'string') throw new Error('PAYLOAD_INVALID');
+          send(response, 202, { task: await composition.apps.workbenchKnowledgeRevision.start(payload.evaluationTaskId) }); return;
+        }
+        if (request.method === 'POST' && url.pathname === '/api/v1/index-builds') {
+          const payload = await body(request); requireOnlyKeys(payload, ['versionIds']);
+          if (payload.versionIds !== undefined && (!Array.isArray(payload.versionIds) || !payload.versionIds.every((id) => typeof id === 'string'))) throw new Error('INDEX_SELECTION_INVALID');
+          const frozen = index.prepare(payload.versionIds as string[] | undefined);
+          const restored = await index.recover();
+          const task = stages.start(frozen);
+          send(response, task.status === 'SUCCEEDED' ? 200 : 202, { task, restored, reusedTask: task.status === 'SUCCEEDED' }); return;
+        }
+        if (request.method === 'GET' && url.pathname === '/api/v1/knowledge-index') {
+          const query = url.searchParams.get('q') ?? '';
+          if (query.length > 1024) throw new Error('ARGUMENT_INVALID');
+          send(response, 200, index.search(query)); return;
+        }
+        const preview = url.pathname.match(/^\/api\/v1\/knowledge-index\/([^/]+)$/);
+        if (preview && request.method === 'GET') {
+          send(response, 200, await index.preview(decodeURIComponent(preview[1]!))); return;
+        }
+        send(response, 404, errorBody('NOT_FOUND', 'Resource not found.', currentRequestId)); return;
+      }
+      if (productRoute) {
+        if (!productApps.publicationOperations) throw new Error('PRODUCT_UNAVAILABLE: publication service is unavailable');
+        const app = productApps.publicationOperations;
+        if (request.method === 'GET' && url.pathname === '/api/v1/server-directories') {
+          send(response, 200, app.listDirectories(url.searchParams.get('path') ?? undefined)); return;
+        }
+        if (request.method === 'GET' && url.pathname === '/api/v1/publications/settings') {
+          send(response, 200, app.getSettings()); return;
+        }
+        if (request.method === 'GET' && url.pathname === '/api/v1/publications') {
+          send(response, 200, { items: app.list() }); return;
+        }
+        if (request.method === 'GET' && /^\/api\/v1\/publications\/[^/]+$/.test(url.pathname)) {
+          send(response, 200, app.get(decodeURIComponent(url.pathname.split('/').at(-1)!))); return;
+        }
+        if (request.method === 'POST' || request.method === 'PUT') {
+          const payload = await body(request);
+          const key = request.headers['idempotency-key'];
+          if (typeof key !== 'string' || !key.trim() || key.length > 256) throw new Error('IDEMPOTENCY_KEY_REQUIRED');
+          const scope = `product:${url.pathname}`;
+          const fingerprint = payloadFingerprint(payload);
+          const previous = composition.apps.flywheel.getCommandReceipt(scope, key);
+          if (previous && previous.fingerprint !== fingerprint) throw new Error('IDEMPOTENCY_CONFLICT');
+          if (previous) { send(response, previous.status, previous.value); return; }
+          let value: unknown;
+          let status = 200;
+          if (request.method === 'PUT' && url.pathname === '/api/v1/publications/settings') {
+            requireOnlyKeys(payload, ['directory', 'git']);
+            if (payload.directory !== undefined && typeof payload.directory !== 'string') throw new Error('DIRECTORY_INVALID');
+            if (payload.git !== undefined) {
+              if (!payload.git || typeof payload.git !== 'object' || Array.isArray(payload.git)) throw new Error('GIT_SETTINGS_INVALID');
+              const git = payload.git as Record<string, unknown>;
+              requireOnlyKeys(git, ['enabled', 'remote', 'branch', 'token', 'clearToken']);
+              if (typeof git.enabled !== 'boolean' || typeof git.remote !== 'string' || typeof git.branch !== 'string'
+                || (git.token !== undefined && typeof git.token !== 'string')
+                || (git.clearToken !== undefined && typeof git.clearToken !== 'boolean')) throw new Error('GIT_SETTINGS_INVALID');
+            }
+            value = app.putSettings(payload as Parameters<PublicationOperations['putSettings']>[0]);
+          } else if (request.method === 'POST' && url.pathname === '/api/v1/publications/sync') {
+            requireOnlyKeys(payload, []); value = await app.sync();
+          } else if (request.method === 'POST' && url.pathname === '/api/v1/publications/recover') {
+            requireOnlyKeys(payload, []); value = { items: await app.recover() };
+          } else if (request.method === 'POST' && url.pathname === '/api/v1/runs/markdown-lite') {
+            requireOnlyKeys(payload, ['repositoryRoot']);
+            if (typeof payload.repositoryRoot !== 'string' || !payload.repositoryRoot.trim()) throw new Error('ARGUMENT_REQUIRED: repositoryRoot');
+            value = await productApps.markdownLite.start(payload.repositoryRoot); status = 202;
+          } else { throw new Error('METHOD_NOT_ALLOWED'); }
+          composition.apps.flywheel.saveCommandReceipt({ scope, idempotencyKey: key, fingerprint, status, value });
+          send(response, status, value); return;
+        }
+        throw new Error('METHOD_NOT_ALLOWED');
       }
       // GET /api/v1/system/status：读取系统运行状态。
       if (request.method === 'GET' && url.pathname === '/api/v1/system/status') {
@@ -348,7 +755,8 @@ export function createKnowledgeServer(input: {
         const sdkIsolation = activeProvider === 'deepseek-harness'
           && (process.env.WP_DSH_PROCESS_ISOLATION?.trim() || 'bubblewrap') === 'bubblewrap';
         send(response, 200, {
-          writeEnabled: Boolean(writeToken),
+          writeEnabled: anonymousAccess || Boolean(writeToken) || isDirectLocalRequest(request),
+          directEditing: anonymousAccess || (!writeToken && isDirectLocalRequest(request)),
           automatedWorkflow: true,
           langGraphInfrastructure: true,
           agentProvider: activeProvider,
@@ -364,7 +772,7 @@ export function createKnowledgeServer(input: {
           agentSourceIsolation: sdkIsolation ? 'bubblewrap' : 'not-proven',
           trustedProjectEvaluation: true,
           hostileCodeIsolation: false,
-          authentication: writeToken ? 'bearer' : 'disabled',
+          authentication: anonymousAccess ? 'none' : writeToken ? 'bearer' : isDirectLocalRequest(request) ? 'local' : 'disabled',
         });
         return;
       }
@@ -441,7 +849,7 @@ export function createKnowledgeServer(input: {
             .filter((entry): entry is [string, string] => entry[1] !== null && entry[1] !== ''),
         );
         const items = composition.apps.flywheel.listActionItems(filters).map((item) => (
-          authorized(request, writeToken) ? item : { ...item, allowedActions: [] }
+          authorized(request, writeToken, anonymousAccess) ? item : { ...item, allowedActions: [] }
         ));
         send(response, 200, keysetPage(
           items,
@@ -455,6 +863,7 @@ export function createKnowledgeServer(input: {
         let cursor = activitySseCursor(request, url);
         openSse(response);
         const flush = () => {
+          if (!composition.apps.maintenance.available) return;
           const pending = composition.apps.flywheel.listActivities()
             .map((item) => ({ item, position: decodeActivityCursor(String(item.cursor)) }))
             .filter((entry) => entry.position > cursor)
@@ -488,7 +897,7 @@ export function createKnowledgeServer(input: {
           return;
         }
         const item = composition.apps.flywheel.getActionItem(actionItemId);
-        const visible = item && !authorized(request, writeToken) ? { ...item, allowedActions: [] } : item;
+        const visible = item && !authorized(request, writeToken, anonymousAccess) ? { ...item, allowedActions: [] } : item;
         send(response, visible ? 200 : 404, visible ?? errorBody('NOT_FOUND', 'Resource not found.', currentRequestId));
         return;
       }
@@ -509,8 +918,15 @@ export function createKnowledgeServer(input: {
       // GET /api/v1/runs：读取运行记录和节点状态。
       if (request.method === 'GET' && url.pathname === '/api/v1/runs') {
         const states = (url.searchParams.get('status') ?? '').split(',').filter(Boolean);
-        const runs = composition.apps.flywheel.listRunSummaries(states.length ? states : undefined)
+        const summaries = composition.apps.flywheel.listRunSummaries(states.length ? states : undefined)
           .sort((left, right) => String(right.updatedAt ?? right.createdAt ?? '').localeCompare(String(left.updatedAt ?? left.createdAt ?? '')));
+        const executionStatuses = (url.searchParams.get('executionStatus') ?? '').split(',').filter(Boolean);
+        const runs: Record<string, unknown>[] = [];
+        // 顺序读取复用单个工作流实例，避免列表并发创建重运行时。
+        for (const run of summaries) {
+          const execution = await composition.apps.orchestrator.executionForRun({ runId: String(run.runId), state: String(run.state) });
+          if (!executionStatuses.length || executionStatuses.includes(execution.executionStatus)) runs.push({ ...run, ...execution });
+        }
         send(response, 200, page(runs, url));
         return;
       }
@@ -543,6 +959,7 @@ export function createKnowledgeServer(input: {
           let cursor = sseCursor(request, url);
           openSse(response);
           const flush = () => {
+            if (!composition.apps.maintenance.available) return;
             const current = composition.apps.flywheel.getRunSnapshot(runId);
             const pending = ((current?.events ?? []) as { eventSeq: number; event: unknown }[])
               .filter((record) => record.eventSeq > cursor);
@@ -573,7 +990,7 @@ export function createKnowledgeServer(input: {
           return;
         }
         if (child === 'workflow-status') {
-          send(response, 200, await composition.apps.orchestrator.status(runId));
+          send(response, 200, presentWorkflowStatus(await composition.apps.orchestrator.status(runId)));
           return;
         }
         if (child === 'progress') {
@@ -589,7 +1006,9 @@ export function createKnowledgeServer(input: {
           send(response, 404, errorBody('NOT_FOUND', 'Resource not found.', currentRequestId));
           return;
         }
-        send(response, 200, snapshot);
+        const run = snapshot.run as { runId: string; state: string };
+        const execution = await composition.apps.orchestrator.executionForRun(run);
+        send(response, 200, { ...snapshot, run: { ...run, ...execution } });
         return;
       }
       // GET /api/v1/knowledge/health：读取知识健康度。
@@ -615,6 +1034,16 @@ export function createKnowledgeServer(input: {
         const value = await composition.apps.contentGovernance.getKnowledgeDiff(versionId, against);
         send(response, value ? 200 : 404,
           value ?? errorBody('KNOWLEDGE_VERSION_NOT_FOUND', 'Resource not found.', currentRequestId));
+        return;
+      }
+      // v1 卡片读取契约；旧版本检索与正文入口保持可审计。
+      if (request.method === 'GET' && url.pathname === '/api/v1/cards') {
+        const cards = composition.apps.knowledgeSearch.cards({
+          versionId: url.searchParams.get('versionId') ?? undefined,
+          query: url.searchParams.get('q') ?? '',
+          statuses: (url.searchParams.get('status') ?? '').split(',').filter(Boolean),
+        });
+        send(response, 200, { ...page(cards, url), total: cards.length, contractVersion: '1.0' });
         return;
       }
       // GET /api/v1/knowledge：读取知识条目、正文和血缘。
@@ -654,11 +1083,11 @@ export function createKnowledgeServer(input: {
         /^\/api\/v1\/evaluations\/([^/]+)\/artifacts\/([^/]+)$/,
       );
       if (request.method === 'GET' && evaluationArtifact) {
-        if (!writeToken) {
+        if (!anonymousAccess && !writeToken && !isDirectLocalRequest(request)) {
           send(response, 503, errorBody('WRITE_API_DISABLED', 'Set WP_KNOWLEDGE_WRITE_TOKEN to authorize evidence downloads.', currentRequestId, true));
           return;
         }
-        if (!authorized(request, writeToken)) {
+        if (!authorized(request, writeToken, anonymousAccess)) {
           send(response, 401, errorBody('UNAUTHORIZED', 'A valid Bearer token is required.', currentRequestId));
           return;
         }
@@ -678,7 +1107,7 @@ export function createKnowledgeServer(input: {
         const evaluationId = decodeURIComponent(evaluationArtifacts[1] ?? '');
         const value = composition.apps.contentGovernance.listEvaluationArtifacts(
           evaluationId,
-          authorized(request, writeToken),
+          authorized(request, writeToken, anonymousAccess),
         );
         send(response, value ? 200 : 404,
           value ?? errorBody('EVALUATION_NOT_FOUND', 'Resource not found.', currentRequestId));
@@ -751,11 +1180,11 @@ export function createKnowledgeServer(input: {
       const isContentMutation = (request.method === 'PATCH' && (ruleUpdate !== null || sourceUpdate !== null))
         || (request.method === 'POST' && (url.pathname === '/api/v1/sources' || sourceRefresh !== null));
       if (isContentMutation) {
-        if (!writeToken) {
+        if (!anonymousAccess && !writeToken && !isDirectLocalRequest(request)) {
           send(response, 503, errorBody('WRITE_API_DISABLED', 'Set WP_KNOWLEDGE_WRITE_TOKEN to enable mutations.', currentRequestId, true));
           return;
         }
-        if (!authorized(request, writeToken)) {
+        if (!authorized(request, writeToken, anonymousAccess)) {
           send(response, 401, errorBody('UNAUTHORIZED', 'A valid Bearer token is required.', currentRequestId));
           return;
         }
@@ -806,11 +1235,11 @@ export function createKnowledgeServer(input: {
       );
       const isControlMutation = actionItemCommand !== null || regenerationCommand !== null;
       if ((request.method === 'POST' || request.method === 'PUT') && (isMutationRoute || isControlMutation)) {
-        if (!writeToken) {
+        if (!anonymousAccess && !writeToken && !isDirectLocalRequest(request)) {
           send(response, 503, errorBody('WRITE_API_DISABLED', 'Set WP_KNOWLEDGE_WRITE_TOKEN to enable mutations.', currentRequestId, true));
           return;
         }
-        if (!authorized(request, writeToken)) {
+        if (!authorized(request, writeToken, anonymousAccess)) {
           send(response, 401, errorBody('UNAUTHORIZED', 'A valid Bearer token is required.', currentRequestId));
           return;
         }
@@ -848,19 +1277,23 @@ export function createKnowledgeServer(input: {
             send(response, previous.status, previous.value);
             return;
           }
-          const value = scope === 'provider-settings.verify'
-            ? await composition.apps.providerOperations.verify({
-                expectedRevision: payload.expectedRevision,
-                enable: payload.enable,
-              })
-            : await composition.apps.providerOperations.put({
-                provider: payload.provider,
-                apiUrl: payload.apiUrl,
-                apiKey: payload.apiKey,
-                clearApiKey: payload.clearApiKey,
-                model: payload.model,
-                expectedRevision: payload.expectedRevision,
-              });
+          let value;
+          if (scope === 'provider-settings.verify') {
+            const controller = new AbortController();
+            const disconnected = () => { if (!response.writableEnded) controller.abort(); };
+            response.once('close', disconnected);
+            if (response.destroyed) controller.abort();
+            try {
+              value = await composition.apps.providerOperations.verify({
+                expectedRevision: payload.expectedRevision, enable: payload.enable,
+              }, controller.signal);
+            } finally { response.off('close', disconnected); }
+          } else {
+            value = await composition.apps.providerOperations.put({
+              provider: payload.provider, apiUrl: payload.apiUrl, apiKey: payload.apiKey,
+              clearApiKey: payload.clearApiKey, model: payload.model, expectedRevision: payload.expectedRevision,
+            });
+          }
           composition.apps.flywheel.saveCommandReceipt({
             scope, idempotencyKey: normalizedKey, fingerprint, status: 200, value,
           });
@@ -1047,9 +1480,16 @@ export function createKnowledgeServer(input: {
       }
       send(response, 404, errorBody('NOT_FOUND', 'Resource not found.', currentRequestId));
     } catch (error) {
+      if (error instanceof Error && error.message === 'DELETION_CHECKPOINT_OWNER_UNKNOWN') {
+        send(response, 409, errorBody(error.message, '历史执行记录不完整，无法确认旧任务已停止，删除已暂停。需先核实旧任务的执行进程；重试不会自动解除此限制。', currentRequestId, false)); return;
+      }
+      if (error instanceof Error && ['DELETION_RECOVERY_REQUIRED', 'RUNTIME_MAINTENANCE', 'RUNTIME_OPERATIONS_ACTIVE'].includes(error.message)) {
+        send(response, 503, errorBody(error.message, error.message === 'DELETION_RECOVERY_REQUIRED'
+          ? '历史删除尚未恢复完成，请先完成恢复。' : '工作台正在维护或有操作执行中，请稍后重试。', currentRequestId, true)); return;
+      }
       const mapped = mapHttpError(error, currentRequestId);
       send(response, mapped.status, mapped.body);
-    }
+    } finally { operation?.release(); }
   });
   server.on('close', composition.close);
   return { server, composition };
@@ -1062,6 +1502,16 @@ export function startKnowledgeServer() {
   instance.server.listen(binding.port, binding.host, () => {
     process.stdout.write(`domain-knowledge dashboard: http://${binding.host}:${binding.port}\n`);
   });
+  let stopping = false;
+  const stop = async () => {
+    if (stopping) return;
+    stopping = true;
+    await instance.composition.shutdown();
+    instance.server.closeAllConnections();
+    instance.server.close();
+  };
+  process.once('SIGTERM', () => { void stop(); });
+  process.once('SIGINT', () => { void stop(); });
   return instance;
 }
 

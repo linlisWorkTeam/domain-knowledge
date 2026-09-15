@@ -20,6 +20,8 @@ import type {
 
 /** 定义候选请求的数据结构与类型约束。 */
 export interface CandidateRequest {
+  /** 定点修订提交时校验头版本；普通采集可省略。 */
+  expectedParentVersionId?: string | null;
   /** 提供模块标识信息，供调用方读取或传入。 */
   moduleId: string;
   /** 提供正文信息，供调用方读取或传入。 */
@@ -127,6 +129,11 @@ export class KnowledgeFlywheelService {
     }
     const bodyRef = await this.artifacts.put(Buffer.from(request.body, 'utf8'), 'text/markdown; charset=utf-8');
     const existing = this.repository.findKnowledgeVersionByBody(request.moduleId, bodyRef.artifactId);
+    if (request.expectedParentVersionId !== undefined) {
+      const head = this.repository.latestKnowledgeVersion(request.moduleId);
+      if ((head?.versionId ?? null) !== request.expectedParentVersionId
+        && !(existing && existing.versionId === head?.versionId && existing.parentVersionId === request.expectedParentVersionId)) throw new Error('CANDIDATE_PARENT_CHANGED');
+    }
     if (existing) {
       return {
         version: existing,
@@ -201,13 +208,18 @@ export class KnowledgeFlywheelService {
         && existing.report.stability === input.stability
         && existing.report.infrastructureFailure === (input.infrastructureFailure ?? false)
         && (existing.report.checkBlocking ?? false) === (input.checkBlocking ?? false)
+        && (existing.report.knowledgeRiskBlocking ?? false) === (input.knowledgeRiskBlocking ?? false)
         && (existing.report.reviewBlocking ?? false) === (input.reviewBlocking ?? false),
         'evaluation replay input collision',
       );
       return existing;
     }
     assertInvariant(run.state === 'EVALUATING', 'run must be EVALUATING before recording a behavioral evaluation');
-    const effectivePolicy = this.repository.resolveEvaluationPolicy?.(policy) ?? policy;
+    const frozenRef = this.getCommittedNodeOutputs({ runId: run.runId, nodeId: 'workflow-policy',
+      generationKey: `${run.runId}:workflow-policy` })?.[0];
+    const effectivePolicy: GatePolicy = frozenRef
+      ? JSON.parse(Buffer.from(await this.getArtifact(frozenRef)).toString('utf8'))
+      : this.resolveEvaluationPolicy(policy);
     const now = this.clock();
     const report: EvaluationReport = {
       reportId: randomUUID(), runId: run.runId, versionId: version.versionId,
@@ -219,6 +231,7 @@ export class KnowledgeFlywheelService {
       stability: input.stability,
       infrastructureFailure: input.infrastructureFailure ?? false,
       checkBlocking: input.checkBlocking ?? false,
+      knowledgeRiskBlocking: input.knowledgeRiskBlocking ?? false,
       reviewBlocking: input.reviewBlocking ?? false,
       createdAt: now,
     };
@@ -234,13 +247,19 @@ export class KnowledgeFlywheelService {
     return { report, decision };
   }
 
+  /** 在创建运行时读取当前受管策略，工作流随后固定该值。 */
+  resolveEvaluationPolicy(policy: GatePolicy): GatePolicy {
+    return this.repository.resolveEvaluationPolicy?.(policy) ?? policy;
+  }
+
   /** 依据确定性门禁结果发布知识。 */
-  async publish(runId: string, versionId: string, decisionId: string): Promise<{
+  async publish(runId: string, versionId: string, decisionId: string, signal?: AbortSignal): Promise<{
     publicationKey: string;
     versionId: string;
     publishedAt: string;
     replayed: boolean;
   }> {
+    signal?.throwIfAborted();
     const run = this.requireRun(runId);
     const version = this.requireVersion(versionId);
     const decision = this.repository.getGateDecision(decisionId);
@@ -255,6 +274,8 @@ export class KnowledgeFlywheelService {
     const publicationKey = `${version.moduleId}:${version.versionId}:${run.policyId}`;
     const existing = this.repository.getPublication(publicationKey);
     if (existing) return { ...existing, replayed: true };
+    // 最后的异步证据校验之后、同步发布事务之前检查取消，迟到结果不得发布。
+    signal?.throwIfAborted();
     const now = this.clock();
     const publishing = run.state === 'PUBLISHING'
       ? run

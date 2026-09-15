@@ -8,6 +8,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import test from 'node:test';
+import YAML from 'yaml';
 
 test('static pages resolve local assets and anchors under a project subpath', () => {
   for (const page of ['site/index.html', 'web/index.html']) {
@@ -54,7 +55,48 @@ test('site and Console content security policies restrict active content', () =>
     }));
     assert.deepEqual(directives.get('default-src'), ["'self'"]);
     assert.deepEqual(directives.get('connect-src'), [connections]);
-    if (path.startsWith('web/')) assert.deepEqual(directives.get('object-src'), ["'none'"]);
+    if (path.startsWith('web/')) {
+      assert.deepEqual(directives.get('object-src'), ["'none'"]);
+      assert.deepEqual(directives.get('frame-ancestors'), ["'none'"]);
+    }
     assert.ok(!directives.get('script-src')?.some((value) => ["'unsafe-inline'", "'unsafe-eval'", '*'].includes(value)));
   }
+});
+
+test('Pages workflow deploys the static directory only for an Actions source', () => {
+  const workflow = readFileSync('.github/workflows/Pages.yml', 'utf8');
+  const config = YAML.parse(workflow);
+  const steps = config.jobs.deploy.steps as Array<{
+    name?: string;
+    id?: string;
+    if?: string;
+    uses?: string;
+    run?: string;
+    with?: { path?: string };
+  }>;
+  assert.deepEqual(Object.keys(config.on), ['workflow_dispatch']);
+  assert.deepEqual(config.permissions, {
+    contents: 'read', pages: 'write', 'id-token': 'write',
+  });
+  const sourceStep = steps.find((step) => step.id === 'pages-source');
+  assert.match(sourceStep?.run ?? '', /\/repos\/\$\{GITHUB_REPOSITORY\}\/pages/);
+  assert.match(sourceStep?.run ?? '', /--fail-with-body/);
+  assert.match(sourceStep?.run ?? '', /jq -er '\.build_type'/);
+  assert.match(sourceStep?.run ?? '', /jq -er '\.source\.branch'/);
+  assert.match(sourceStep?.run ?? '', /current_source_branch.*!=.*main/);
+  assert.doesNotMatch(sourceStep?.run ?? '', /\|\| echo legacy/);
+  assert.doesNotMatch(sourceStep?.run ?? '', /--request PUT/);
+  assert.match(sourceStep?.run ?? '', /deploy=false/);
+  const configureStep = steps.find((step) => step.uses === 'actions/configure-pages@v6');
+  assert.equal(configureStep?.if, "steps.pages-source.outputs.deploy == 'true'");
+  const uploadStep = steps.find((step) => step.uses === 'actions/upload-pages-artifact@v5');
+  assert.equal(uploadStep?.if, "steps.pages-source.outputs.deploy == 'true'");
+  assert.equal(
+    uploadStep?.with?.path,
+    'site',
+  );
+  const deployStep = steps.find((step) => step.uses === 'actions/deploy-pages@v5');
+  assert.equal(deployStep?.if, "steps.pages-source.outputs.deploy == 'true'");
+  assert.equal(existsSync('LICENSE'), true);
+  assert.match(readFileSync('LICENSE', 'utf8'), /MIT License/);
 });

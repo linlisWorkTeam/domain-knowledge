@@ -3,6 +3,15 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：提供app页面的展示、交互或样式资源。
  */
+import { nodeExplanation, executionNote } from './WorkbenchLabels.js'
+import { createKnowledgeGenerationPanel } from './KnowledgeGeneration.js'
+import { openBatchDeletion, recoverBatchDeletions } from './BatchDeletion.js'
+import { createModuleBatches } from './ModuleBatches.js'
+import { publicationDownloadName } from './WorkbenchPublication.js'
+import { createRepositoryAnalysisPanel } from './RepositoryAnalysis.js'
+import { createKnowledgeIndexPanel } from './KnowledgeIndex.js'
+import { renderKnowledgeMarkdown } from './KnowledgeMarkdown.js'
+
 const content = document.querySelector('#page-content')
 const nav = document.querySelector('#primary-nav')
 const title = document.querySelector('#page-title')
@@ -51,8 +60,10 @@ applyTheme(initialTheme)
 
 const PAGE_META = {
   overview: '操作中心',
-  runs: '飞轮批次',
-  knowledge: '知识',
+  projects: '项目设置',
+  stages: '阶段操作',
+  runs: '知识飞轮管理',
+  knowledge: '知识治理',
   graph: '工作流图',
   evaluations: '评测',
   sources: '来源',
@@ -60,6 +71,10 @@ const PAGE_META = {
 }
 
 const UI_LABELS = {
+  ALL_DETERMINISTIC_GATES_PASSED: '所有确定性检查均已通过',
+  KNOWLEDGE_RISK_UNRESOLVED: '知识风险尚未解决',
+  CHECK_BLOCKING: '代码检查存在阻塞',
+  REVIEW_BLOCKING: '复核要求继续修订',
   CREATED: '已创建', PLANNED: '已计划', GENERATING: '生成中', EVALUATING: '评测中',
   REVIEWING: '复核中', ITERATING: '迭代中', ROLLING_BACK: '回滚中', PUBLISHING: '发布中',
   VERIFIED: '已验证', LOW_CONFIDENCE: '低置信', FAILED: '失败', CANCELLED: '已取消',
@@ -67,6 +82,7 @@ const UI_LABELS = {
   PASS: '通过', ITERATE: '继续迭代', ROLLBACK: '回滚', STOPPED: '已停止',
   PENDING: '等待中', RUNNING: '运行中', COMPLETED: '已完成', COMMITTED: '已提交',
   AVAILABLE: '可用', DEGRADED: '降级', UNAVAILABLE: '不可用', UNKNOWN: '未知',
+  NOT_RUN: '未执行', GENERATION_READY: '生成验证通过', GENERATION_VERIFICATION_REQUIRED: '需要生成验证',
   AUTHENTICATED: '已认证', NOT_CONFIGURED: '未配置', UNVERIFIED: '未验证',
   ACTIVE: '正常', STALE: '已过期', DISABLED: '已停用',
   OPEN: '待处理', ACKNOWLEDGED: '已接手', RESOLVED: '已解决',
@@ -87,7 +103,7 @@ const EVENT_LABELS = {
 }
 
 const RESOURCE_LABELS = {
-  status: '系统状态', capabilities: '系统能力', runs: '批次', knowledge: '知识', agents: 'Agent',
+  status: '系统状态', capabilities: '系统能力', runs: '批次', knowledge: '知识治理', agents: 'Agent',
   actionItems: '治理事项', activities: '最近动态', components: '组件状态', knowledgeHealth: '知识健康度',
   providerStatus: '服务提供方状态', providerSettings: '服务提供方配置', runMetrics: '运行指标', governanceMetrics: '治理指标',
 }
@@ -126,6 +142,7 @@ const ERROR_LABELS = {
   UNSUPPORTED: '当前服务不支持这项操作。',
   METRICS_WINDOW_INVALID: '统计窗口无效，请重新选择。',
   VERIFICATION_REQUIRED: '当前配置尚未通过验证。',
+  GENERATION_VERIFICATION_REQUIRED: '尚未完成最小生成验证，请重新验证后启用。',
   EVALUATION_RULE_NOT_FOUND: '未找到这条评测规则。',
   EVALUATION_NOT_FOUND: '未找到这条评测记录。',
   EVALUATION_ARTIFACT_NOT_FOUND: '未找到这份评测证据。',
@@ -138,6 +155,10 @@ const ERROR_LABELS = {
   SOURCE_KIND_UNSUPPORTED: '当前不支持这种来源类型。',
   SOURCE_REVISION_INVALID: '确认修订与最新观测内容不一致，请先刷新来源。',
   SOURCE_URL_INVALID: '请输入有效的 HTTPS 来源地址。',
+  RUN_CONFIGURATION_INCOMPATIBLE: '此批次的执行版本或配置已变更，历史记录可读，不能恢复。',
+  WORKFLOW_NOT_RECOVERABLE: '缺少可恢复的失败节点，请查看执行证据。',
+  WORKFLOW_BUDGET_EXHAUSTED: '此批次的执行预算已耗尽，不能恢复。',
+  ACCEPTANCE_LIMIT_REACHED: '真实模型验收预算已用完，需要新的执行授权。',
 }
 
 const NODE_LABELS = {
@@ -199,6 +220,7 @@ const state = {
   sourceProject: '',
   providerStatus: null,
   providerSettings: null,
+  providerVerifying: false,
   runMetrics: null,
   governanceMetrics: null,
   metricsWindow: '7d',
@@ -208,6 +230,8 @@ const state = {
   token: '',
   operatorMode: false,
   selectedRun: null,
+  selectedRound: null,
+  selectedProject: null,
   discovery: null,
   resourceErrors: {},
   loadedAt: null,
@@ -226,8 +250,40 @@ function collection(payload, legacyKey) {
   return []
 }
 
+function isRunActive(run) {
+  return run?.executionStatus === 'RUNNING' && run.isActive === true
+}
+
+function runStatusLabel(run) {
+  if (run.executionStatus === 'FAILED') return '执行失败'
+  if (run.executionStatus === 'UNAVAILABLE') return '执行状态不可用'
+  if (run.executionStatus === 'CANCELLED') return '已取消'
+  if (run.executionStatus === 'STOPPED') return '已停止'
+  if (run.executionStatus === 'COMPLETED') return TERMINAL.has(run.state) ? displayLabel(run.state) : '执行已完成'
+  if (isRunActive(run)) return displayLabel(run.state)
+  if (TERMINAL.has(run.state)) return displayLabel(run.state)
+  return run.executionStatus === 'NOT_TRACKED' ? '未关联执行' : '执行状态未知'
+}
+
+function runStatusBadge(run) {
+  const tone = run.executionStatus === 'FAILED' ? 'FAILED'
+    : ['UNAVAILABLE', 'NOT_TRACKED'].includes(run.executionStatus) && !TERMINAL.has(run.state) ? 'UNKNOWN'
+    : run.executionStatus === 'CANCELLED' ? 'CANCELLED' : run.executionStatus === 'STOPPED' ? 'STOPPED' : run.state
+  return badge(tone, runStatusLabel(run))
+}
+
+function recoveryLabel(run) {
+  if (run.recovery?.canResume) return '可恢复；仍使用原有预算'
+  return ({ BUDGET_EXHAUSTED: '预算已耗尽，不能恢复', BUDGET_UNAVAILABLE: '缺少原始预算，不能恢复',
+    STAGE_ATTEMPTS_EXHAUSTED: '当前阶段修正次数已耗尽，不能恢复', STAGE_BUDGET_EXHAUSTED: '当前阶段时间预算已耗尽，不能恢复',
+    RUN_CONFIGURATION_INCOMPATIBLE: '执行版本或配置已变更，不能恢复', FAILED_NODE_UNAVAILABLE: '没有可恢复的失败节点',
+    BUSINESS_TERMINAL: '业务流程已结束，不能恢复', EXECUTION_UNAVAILABLE: '执行状态暂不可读取',
+    EXECUTION_NOT_TRACKED: '没有关联的工作流执行记录' })[run.recovery?.reasonCode] ?? '当前不可恢复'
+}
+
 function needsAttention(run) {
-  return ATTENTION.has(run.state) || run.latestDecision?.outcome === 'STOPPED'
+  return ['FAILED', 'STOPPED', 'UNAVAILABLE'].includes(run.executionStatus)
+    || ATTENTION.has(run.state) || run.latestDecision?.outcome === 'STOPPED'
 }
 
 const escapeHtml = (value) => String(value ?? '')
@@ -372,7 +428,7 @@ function healthEvidence(name) {
 function runRow(run, compact = false) {
   return `<button class="run-row" data-run-id="${escapeHtml(run.runId)}">
     <span class="run-identity"><b>${escapeHtml(run.moduleId)}</b><small>${escapeHtml(shortId(run.runId, 18))}</small></span>
-    ${badge(run.state)}
+    ${runStatusBadge(run)}
     <span class="iteration">第 ${escapeHtml(run.iteration + 1)} 轮</span>
     <span class="updated">${escapeHtml(relativeTime(run.updatedAt))}</span>
     ${compact ? '' : '<span class="row-arrow" aria-hidden="true">→</span>'}
@@ -381,11 +437,28 @@ function runRow(run, compact = false) {
 
 function setPageMeta(page) {
   title.textContent = PAGE_META[page] ?? PAGE_META.overview
-  for (const item of nav.querySelectorAll('[data-page]')) item.classList.toggle('active', item.dataset.page === page)
+  for (const item of nav.querySelectorAll('[data-page]')) {
+    item.classList.toggle('active', item.dataset.page === page)
+    if (item.dataset.page === page) item.setAttribute('aria-current', 'page')
+    else item.removeAttribute('aria-current')
+  }
+}
+
+const repositoryAnalysisPanel = createRepositoryAnalysisPanel({ root: content, request, escapeHtml, isEditable: () => Boolean(state.capabilities?.directEditing || state.token), onProjectSelected(project) { state.selectedProject = project; try { localStorage.setItem('workbench-project-input', project.snapshotId) } catch {} document.querySelector('#selected-project-name').textContent = project.directory.split('/').at(-1); document.querySelector('#project-selector').title = project.directory } })
+
+const moduleBatches = createModuleBatches({ root: content, request, escapeHtml, project: () => state.selectedProject, isEditable: () => Boolean(state.capabilities?.directEditing || state.token), formatDate })
+
+const stageOperations = createKnowledgeGenerationPanel({ root: content, request, escapeHtml, isEditable: () => Boolean(state.capabilities?.directEditing || state.token) })
+function renderStageOperations() {
+  const project = state.selectedProject
+  content.innerHTML = `<section class="panel"><button type="button" class="secondary-button" data-stage-back>返回知识飞轮管理</button><h2>阶段操作</h2>${project ? `<p>当前项目范围：${project.modules.map(module => escapeHtml(module.moduleId)).join('、')}</p><p>使用已保存的源码与构建参数；可查看历史产物并独立执行各阶段。</p>${stageOperations.html()}` : '<p>请先在左上角选择项目并保存模块范围。</p>'}</section>`
+  stageOperations.setProject(project)
+  stageOperations.refresh()
 }
 
 function renderOverview() {
-  const active = state.runs.filter((run) => !TERMINAL.has(run.state))
+  const focusedQueueFilter = document.activeElement?.dataset?.queueFilter
+  const active = state.runs.filter(isRunActive)
   const attention = state.actionItems.filter((item) => item.status !== 'RESOLVED')
   const status = state.status ?? {}
   const verified = state.status ? status.verified : (state.resourceErrors.knowledge ? '不可用' : state.knowledge.filter((item) => item.status === 'VERIFIED').length)
@@ -399,7 +472,9 @@ function renderOverview() {
     : health?.overall?.value
   const healthScore = healthOverall === null || healthOverall === undefined ? '—' : formatNumber(healthOverall)
   const healthAvailable = healthScore !== '—'
-  const runIssueRows = attention.length ? attention.slice(0, 5).map((item, index) => {
+  const queueMatches = (item, filter) => !filter || (filter === 'SOURCE' ? item.subject?.kind === 'SOURCE' : item.type === filter)
+  const visibleAttention = attention.filter((item) => queueMatches(item, state.queueFilter))
+  const runIssueRows = visibleAttention.length ? visibleAttention.map((item) => {
     const isSource = item.subject?.kind === 'SOURCE' && item.subject?.id
     const subjectId = item.runId || item.subject?.id || ''
     const subjectLink = item.runId
@@ -407,7 +482,7 @@ function renderOverview() {
       : isSource ? `data-action-source-id="${escapeHtml(item.subject.id)}"` : 'disabled'
     const subjectLabel = isSource ? '来源' : '批次'
     return `
-    <div class="attention-row ${index === 0 ? 'selected' : ''}">
+    <div class="attention-row">
       <i class="attention-dot ${item.severity === 'HIGH' ? 'danger' : 'warning'}" aria-hidden="true"></i>
       <button class="attention-subject" ${subjectLink} type="button"><b>${escapeHtml(item.summary)}</b><small>${subjectLabel} ${escapeHtml(shortId(subjectId, 26))} · ${escapeHtml(displayLabel(item.reasonCode))}</small></button>
       ${badge(item.status)}
@@ -415,39 +490,43 @@ function renderOverview() {
       <time>${escapeHtml(formatDate(item.updatedAt))}</time>
     </div>`
   }).join('') : ''
-  const queueRemainder = `<div class="queue-partial-state"><span aria-hidden="true">◇</span><div><b>${attention.length ? '暂无更多待办' : '目前没有待处理事项'}</b><small>${state.resourceErrors.actionItems ? '待处理事项读取失败' : '所有服务端治理事项均已处理'}</small></div><em>${state.resourceErrors.actionItems ? '读取失败' : '暂无数据'}</em></div>`
+  const queueRemainder = visibleAttention.length ? '' : `<div class="queue-partial-state"><div><b>${state.resourceErrors.actionItems ? '待处理事项读取失败' : state.queueFilter ? '该分类暂无待处理事项' : '目前没有待处理事项'}</b><small>${state.resourceErrors.actionItems ? '请重新连接后查看' : '可切换分类或查看全部批次'}</small></div></div>`
   const pulseRows = recent.slice(0, 3).map((activity) => `
-    <button class="pulse-row" ${activity.runId ? `data-run-id="${escapeHtml(activity.runId)}"` : 'disabled'} type="button"><i class="${activity.severity === 'HIGH' ? 'warning' : 'success'}"></i><span><b>${escapeHtml(EVENT_LABELS[activity.type] ?? activity.summary)}</b><small>${escapeHtml(EVENT_LABELS[activity.type] ?? '系统活动')} · ${escapeHtml(formatDate(activity.occurredAt))}</small></span></button>`).join('')
+    <button class="pulse-row" ${activity.runId ? `data-run-id="${escapeHtml(activity.runId)}"` : 'disabled'} type="button"><i class="${activity.severity === 'HIGH' ? 'warning' : 'success'}"></i><span><b>${escapeHtml(EVENT_LABELS[activity.type] ?? activity.summary)}</b><small>${escapeHtml(formatDate(activity.occurredAt))}</small></span></button>`).join('')
   content.innerHTML = `
     ${notices.length ? partialNotice(`${notices.map((key) => RESOURCE_LABELS[key] ?? key).join('、')}获取失败；其余区域仍展示已读取的服务端事实。`) : ''}
+    <header class="workbench-history-heading"><h2>历史运行与知识健康</h2></header>
     <section class="overview-summary-grid" aria-label="关键摘要">
       <article class="attention-summary">
         <span class="attention-orb"><i></i></span>
-        <div><p class="eyebrow danger-text">需要处理</p><h2>${state.resourceErrors.actionItems ? '治理事项不可用' : `${attention.length} 项需要确认`}</h2><p>${state.resourceErrors.actionItems ? '无法读取治理事项' : '来自服务端持久化治理队列'}</p></div>
-        <footer><i></i><i></i><i></i></footer>
+        <div><p class="eyebrow danger-text">需要处理</p><h2>${state.resourceErrors.actionItems ? '待处理事项暂不可用' : `${attention.length} 项需要确认`}</h2><p>${state.resourceErrors.actionItems ? '读取失败，请重新连接' : '查看需要复核的问题'}</p></div>
+
       </article>
       <article class="knowledge-summary">
         <header><p class="eyebrow">知识健康度</p><span>${healthAvailable ? `${escapeHtml(health.window?.key ?? health.window ?? '当前窗口')} · 规则 ${escapeHtml(health.ruleVersion ?? '—')}` : '暂无完整样本'}</span></header>
-        <div><strong>${escapeHtml(healthScore)}</strong><small>/ 100</small><b>${healthAvailable ? `采样于 ${escapeHtml(formatDate(health.sampledAt))}` : '无分母时不计算分数'}</b></div>
+        <div><strong>${escapeHtml(healthScore)}</strong><small>/ 100</small><b>${healthAvailable ? `采样于 ${escapeHtml(formatDate(health.sampledAt))}` : '数据不足，暂不评分'}</b></div>
         <footer><span>覆盖率 <b>${escapeHtml(healthValue('coverage'))}</b><small>${escapeHtml(healthEvidence('coverage'))}</small></span><span>新鲜度 <b>${escapeHtml(healthValue('freshness'))}</b><small>${escapeHtml(healthEvidence('freshness'))}</small></span><span>质量 <b>${escapeHtml(healthValue('quality'))}</b><small>${escapeHtml(healthEvidence('quality'))}</small></span></footer>
       </article>
     </section>
     <div class="overview-workspace">
       <section class="attention-queue">
-        <header><div><h2>需要处理</h2><small>由批次、门禁、组件与来源事实产生</small></div><button class="text-button" data-page-link="runs">查看批次 →</button></header>
-        <div class="queue-filters"><button class="active">全部　${attention.length}</button><button>批次失败　${attention.filter((item) => item.type === 'RUN_FAILED').length}</button><button>低置信　${attention.filter((item) => item.type === 'LOW_CONFIDENCE').length}</button><button>来源异常　${attention.filter((item) => item.subject?.kind === 'SOURCE').length}</button><span>${state.operatorMode ? '可执行治理操作' : '进入治理模式后可操作'}</span></div>
+        <header><div><h2>需要处理</h2><small>打开事项查看详情</small></div><button class="text-button" data-page-link="runs">查看批次 →</button></header>
+        <div class="queue-filters" aria-label="待处理事项分类">${[['', '全部'], ['RUN_FAILED', '批次失败'], ['LOW_CONFIDENCE', '低置信'], ['SOURCE', '来源异常']].map(([filter, label]) => `<button type="button" data-queue-filter="${filter}" aria-pressed="${(state.queueFilter || '') === filter}" class="${(state.queueFilter || '') === filter ? 'active' : ''}">${label}　${attention.filter((item) => queueMatches(item, filter)).length}</button>`).join('')}</div>
         <div class="queue-labels"><span>事项</span><span>状态与操作</span><span>更新</span></div>
         <div class="queue-body">${runIssueRows}${queueRemainder}</div>
       </section>
       <aside class="overview-rail">
-        <article class="current-run-card">
-          <header><small><i></i> 飞轮${active.length ? '运行中' : '状态'}</small><button class="text-button" data-page-link="runs">打开批次 ↗</button></header>
-          ${latestRun ? `<h3>${escapeHtml(shortId(latestRun.runId, 18))}</h3><p>${escapeHtml(latestRun.moduleId)} · ${escapeHtml(displayLabel(latestRun.state))}</p><div class="run-state-line"><i></i></div><div class="run-state-meta"><b>${escapeHtml(displayLabel(latestRun.state))}</b><span>暂不提供预计完成时间</span></div>` : emptyState('暂无批次', '注册中没有批次记录。')}
-          <ol class="flywheel-stages"><li class="observed"><i>1</i><span>发现<small>批次已登记</small></span></li><li class="observed"><i>2</i><span>生成<small>${latestRun ? escapeHtml(displayLabel(latestRun.state)) : '等待运行'}</small></span></li><li><i>3</i><span>评测<small>${state.latestProgress?.mode === 'DETERMINATE' ? `${state.latestProgress.completedUnits}/${state.latestProgress.totalUnits}` : '等待可证明进度'}</small></span></li><li><i>4</i><span>演进<small>发布状态待确认</small></span></li></ol>
+        <article class="current-run-card ${latestRun && needsAttention(latestRun) ? 'needs-attention' : ''}">
+          <header><small><i></i> 最新飞轮状态</small><button class="text-button" data-page-link="runs">打开批次 ↗</button></header>
+          ${latestRun ? `<h3>${escapeHtml(shortId(latestRun.runId, 18))}</h3><p>${escapeHtml(latestRun.moduleId)} · ${escapeHtml(runStatusLabel(latestRun))}</p><div class="run-state-meta"><b>${escapeHtml(runStatusLabel(latestRun))}</b></div>` : emptyState('暂无批次', '启动飞轮后，可在这里查看进度和结果。')}
+          <div class="latest-result"><span>已记录进度</span><strong>${state.latestProgress?.mode === 'DETERMINATE' ? `${state.latestProgress.completedUnits} / ${state.latestProgress.totalUnits}` : '暂无进度数据'}</strong><small>暂不提供预计完成时间</small><small>${latestRun?.latestDecision?.outcome ? `最近门禁：${escapeHtml(displayLabel(latestRun.latestDecision.outcome))}` : '打开批次查看评测与发布记录'}</small></div>
+          ${latestRun ? `<button class="wide" data-run-id="${escapeHtml(latestRun.runId)}">查看本次结果 →</button>` : ''}
         </article>
-        <article class="recent-pulse"><header><h3>最近动态</h3><span>${state.activityStream ? '实时连接' : '轮询更新'}</span></header>${pulseRows || '<div class="pulse-empty"><b>暂无真实活动</b><small>服务端尚未记录活动</small></div>'}</article>
+        <article class="recent-pulse"><header><h3>最近动态</h3><span>${state.activityStream ? '实时连接' : '轮询更新'}</span></header>${pulseRows || '<div class="pulse-empty"><b>暂无动态</b><small>运行记录将在这里显示</small></div>'}</article>
       </aside>
     </div>`
+  // 轮询刷新不能打断正在使用分类按钮的键盘用户。
+  if (focusedQueueFilter !== undefined) content.querySelector(`[data-queue-filter="${CSS.escape(focusedQueueFilter)}"]`)?.focus({ preventScroll: true })
 }
 
 function renderRuns() {
@@ -459,29 +538,42 @@ function renderRuns() {
     renderRunWorkspace(state.selectedRun)
     return
   }
-  const active = state.runs.filter((run) => !TERMINAL.has(run.state))
+  if (state.selectedProject) {
+    content.innerHTML = `${moduleBatches.html()}<details class="panel legacy-batches"><summary>旧批次记录（未绑定项目）</summary>${state.runs.map(run => referenceRunRow(run)).join('') || '<p>暂无旧批次。</p>'}</details>`
+    void moduleBatches.refresh(); return
+  }
+  const active = state.runs.filter(isRunActive)
   const verified = state.runs.filter((run) => run.state === 'VERIFIED')
+  const evaluatedCount = state.runs.every(run => Number.isSafeInteger(run.evaluatedVersionCount))
+    ? state.runs.reduce((sum, run) => sum + run.evaluatedVersionCount, 0) : '—'
   const latest = state.runs[0]
   const rows = state.runs.map((run, index) => referenceRunRow(run, index === 0)).join('')
   content.innerHTML = `
-    <section class="reference-metrics"><article><small>运行中</small><b class="mint">${active.length}</b><p>来自注册当前状态</p></article><article><small>已验证</small><b>${verified.length}</b><p>${state.runs.length} 个批次</p></article><article><small>需要处理</small><b>${state.runs.filter(needsAttention).length}</b><p>失败、低置信或已停止</p></article><article><small>知识版本</small><b>${state.runs.reduce((sum, run) => sum + (run.knowledgeVersionIds?.length ?? 0), 0)}</b><p>由批次事实汇总</p></article></section>
-    <div class="reference-runs-grid"><section class="reference-run-history"><header><h3>批次记录</h3><button class="on" data-run-filter="">全部</button><button data-run-filter="active">运行中</button><button data-run-filter="attention">需处理</button></header><div id="runs-list">${rows || emptyState('没有批次记录', '当前注册中还没有批次记录。')}</div></section>
-    <aside class="reference-run-detail">${latest ? `<header><small>最新批次</small><b>${escapeHtml(shortId(latest.runId, 18))}</b></header><div class="orbit-mini"><span>${escapeHtml(displayLabel(latest.state))}<small>批次状态</small></span></div><p class="done">✓ <b>批次事实</b><small>${escapeHtml(latest.moduleId)}</small></p><p class="doing">⌁ <b>Agent 工作流图</b><small>查看真实节点投影</small></p><p>3 <b>评测</b><small>${escapeHtml(latest.latestDecision?.outcome ? displayLabel(latest.latestDecision.outcome) : '等待门禁')}</small></p><button class="wide" data-run-id="${escapeHtml(latest.runId)}">打开批次详情 →</button>` : emptyState('暂无批次', '创建批次后在这里查看。')}</aside></div>
-    <form id="workflow-start-form" class="reference-start-form"><label>受信项目路径<input name="repositoryRoot" placeholder="请输入项目仓库的绝对路径" required></label><label>项目场景 JSON<textarea name="scenario" placeholder="粘贴场景：模块、材料路径、允许生成路径及测试命令" required></textarea></label><label>并行任务数<input name="workerCount" type="number" min="0" max="5" value="1"></label><button class="new" type="submit" ${state.operatorMode ? '' : 'disabled'}>启动项目流程</button></form>`
+    ${moduleBatches.html()}
+    <section class="reference-metrics"><article><small>运行中</small><b class="mint">${active.length}</b><p>正在执行的批次</p></article><article><small>已验证</small><b>${verified.length}</b><p>${state.runs.length} 个批次</p></article><article><small>需要处理</small><b>${state.runs.filter(needsAttention).length}</b><p>失败、低置信或已停止</p></article><article><small>已评测版本</small><b>${evaluatedCount}</b><p>同一批次的重复版本只计一次</p></article></section>
+    <div class="reference-runs-grid"><section class="reference-run-history"><header><h3>批次记录</h3><button class="on" data-run-filter="">全部</button><button data-run-filter="active">运行中</button><button data-run-filter="attention">需处理</button><button data-run-filter="failed">执行失败</button></header><div id="runs-list">${rows || emptyState('没有批次记录', '启动飞轮后，可在这里查看进度和结果。')}</div></section>
+    <aside class="reference-run-detail">${latest ? `<header><small>最新批次</small><b>${escapeHtml(shortId(latest.runId, 18))}</b></header><div class="orbit-mini"><span>${escapeHtml(runStatusLabel(latest))}<small>执行状态</small></span></div><p class="done">✓ <b>所属模块</b><small>${escapeHtml(latest.moduleId)}</small></p><p class="doing">⌁ <b>Agent 工作流图</b><small>查看各角色的执行情况</small></p><p>3 <b>评测</b><small>${escapeHtml(latest.latestDecision?.outcome ? displayLabel(latest.latestDecision.outcome) : '等待门禁')}</small></p><button class="wide" data-run-id="${escapeHtml(latest.runId)}">打开批次详情 →</button>` : emptyState('暂无批次', '创建批次后在这里查看。')}</aside></div>
+    `
 }
 
 function referenceRunRow(run, selected = false) {
-  return `<button class="reference-run-item ${selected ? 'selected' : ''}" data-run-id="${escapeHtml(run.runId)}" type="button"><i class="${TERMINAL.has(run.state) ? (run.state === 'VERIFIED' ? 'run-ok' : 'run-bad') : 'run-live'}">${run.state === 'VERIFIED' ? '✓' : run.state === 'FAILED' ? '!' : ''}</i><span><b>${escapeHtml(shortId(run.runId, 18))}</b><small>${escapeHtml(run.moduleId)} · 第 ${escapeHtml(run.iteration + 1)} 轮</small></span><em>${escapeHtml(displayLabel(run.state))}</em><span>${escapeHtml(run.latestDecision?.outcome ? displayLabel(run.latestDecision.outcome) : '等待门禁')}</span><strong>${escapeHtml(run.knowledgeVersionIds?.length ?? 0)} 版本</strong><time>${escapeHtml(relativeTime(run.updatedAt))}</time></button>`
+  return `<button class="reference-run-item ${selected ? 'selected' : ''}" data-run-id="${escapeHtml(run.runId)}" type="button"><i class="${isRunActive(run) ? 'run-live' : run.state === 'VERIFIED' ? 'run-ok' : 'run-bad'}">${run.state === 'VERIFIED' ? '✓' : needsAttention(run) ? '!' : ''}</i><span><b>${escapeHtml(shortId(run.runId, 18))}</b><small>${escapeHtml(run.moduleId)} · 第 ${escapeHtml(run.iteration + 1)} 轮</small></span><em>${escapeHtml(runStatusLabel(run))}</em><span>${escapeHtml(run.latestDecision?.outcome ? displayLabel(run.latestDecision.outcome) : '等待门禁')}</span><strong>${Number.isSafeInteger(run.evaluatedVersionCount) ? run.evaluatedVersionCount : '—'} 已评测版本</strong><time>${escapeHtml(relativeTime(run.updatedAt))}</time></button>`
 }
 
 function renderRunWorkspace(snapshot) {
   const { run, events = [], checkpoints = [], workflowNodes = [], evaluations = [], versions = [], latestDecision, progress, workflowStatus } = snapshot
-  const automationNodes = workflowNodes.length ? workflowNodes : checkpoints
+  const allNodes = workflowNodes.length ? workflowNodes : checkpoints
+  const rounds = [...new Set([run.iteration, ...allNodes.map(node => node.iteration ?? run.iteration)])].sort((a, b) => a - b)
+  const selectedRound = rounds.includes(state.selectedRound) ? state.selectedRound : run.iteration
+  const automationNodes = allNodes.filter(node => (node.iteration ?? run.iteration) === selectedRound)
+    .sort((a, b) => String(a.startedAt ?? a.readyAt ?? a.updatedAt ?? '').localeCompare(String(b.startedAt ?? b.readyAt ?? b.updatedAt ?? '')))
+  const graphOpen = Boolean(content.querySelector('[data-legacy-graph][open]'))
+  const openedNodes = new Set([...content.querySelectorAll('[data-node-record][open]')].map(element => element.dataset.nodeRecord))
   const primaryStates = ['CREATED', 'PLANNED', 'GENERATING', 'EVALUATING', 'REVIEWING', 'PUBLISHING', 'VERIFIED']
   const currentIndex = primaryStates.indexOf(run.state)
   const steps = primaryStates.map((item, index) => {
     const completed = currentIndex >= 0 && index < currentIndex
-    const active = item === run.state
+    const active = item === run.state && isRunActive(run)
     return `<li class="${completed ? 'complete' : ''} ${active ? 'active' : ''}"><i>${completed ? '✓' : index + 1}</i><span>${displayLabel(item)}</span></li>`
   }).join('')
   const latestEvaluation = evaluations.at(-1)
@@ -490,21 +582,26 @@ function renderRunWorkspace(snapshot) {
       <button class="back-button" data-run-back>← 返回批次列表</button>
       <div class="run-title-row">
         <div><p class="eyebrow">${escapeHtml(shortId(run.runId, 28))}</p><h2>${escapeHtml(run.moduleId)}</h2><p class="subtitle">策略 ${escapeHtml(run.policyId)} · 更新于 ${escapeHtml(formatDate(run.updatedAt))}</p></div>
-        <div class="run-title-actions">${badge(run.state)}<a class="secondary-button" href="/api/v1/runs/${encodeURIComponent(run.runId)}/report" download>导出报告</a><button class="secondary-button" data-refresh-run="${escapeHtml(run.runId)}">刷新</button></div>
+        <div class="run-title-actions">${runStatusBadge(run)}<a class="secondary-button" href="/api/v1/runs/${encodeURIComponent(run.runId)}/report" download>导出报告</a><button class="secondary-button" data-refresh-run="${escapeHtml(run.runId)}">刷新</button><button type="button" class="secondary-button" data-delete-kind="runs" data-delete-id="${escapeHtml(run.runId)}" ${isRunActive(run) || !state.operatorMode ? 'disabled' : ''}>删除批次</button>${run.canCancel === true && isRunActive(run) ? `<button class="secondary-button" data-cancel-run="${escapeHtml(run.runId)}" type="button" ${state.operatorMode ? '' : 'disabled'}>取消批次</button>` : ''}${run.recovery?.canResume ? `<button class="primary-button" data-resume-run="${escapeHtml(run.runId)}" type="button" ${state.operatorMode ? '' : 'disabled'}>恢复批次</button>` : ''}</div>
       </div>
       <ol class="run-stepper">${steps}</ol>
-      <div class="state-callout"><b>工作流执行：${escapeHtml(displayLabel(workflowStatus?.executionStatus ?? 'UNKNOWN'))}</b><span>${escapeHtml(workflowStatus?.currentNode ? `阶段 ${NODE_LABELS[workflowStatus.currentNode] ?? workflowStatus.currentNode}` : '执行状态暂不可读')}${workflowStatus?.error ? ` · ${escapeHtml(workflowStatus.error)}` : ''}</span></div>
-      ${progress?.mode === 'DETERMINATE' ? `<div class="state-callout"><b>可证明进度：${escapeHtml(progress.completedUnits)} / ${escapeHtml(progress.totalUnits)}</b><span>当前阶段 ${escapeHtml(displayLabel(progress.currentStage))} · 不提供推测性的预计完成时间</span><progress class="progress" value="${escapeHtml(progress.completedUnits)}" max="${escapeHtml(progress.totalUnits)}"></progress></div>` : '<div class="state-callout"><b>进度暂不可确定</b><span>服务端没有完整冻结工作单元，不显示百分比或预计完成时间。</span></div>'}
+      <div class="state-callout"><b>工作流执行：${escapeHtml(displayLabel(workflowStatus?.executionStatus ?? 'UNKNOWN'))}</b><span>${escapeHtml(workflowStatus?.currentNode ? `阶段 ${NODE_LABELS[workflowStatus.currentNode] ?? workflowStatus.currentNode}` : '执行状态暂不可读')}${run.executionFailure?.code ? ` · ${escapeHtml(run.executionFailure.code)}` : ''}</span></div>
+      ${progress?.mode === 'DETERMINATE' ? `<div class="state-callout"><b>已完成步骤：${escapeHtml(progress.completedUnits)} / ${escapeHtml(progress.totalUnits)}</b><span>${isRunActive(run) ? `当前阶段 ${escapeHtml(displayLabel(progress.currentStage))}` : escapeHtml(runStatusLabel(run))} · 暂不提供预计完成时间</span><progress class="progress" value="${escapeHtml(progress.completedUnits)}" max="${escapeHtml(progress.totalUnits)}"></progress></div>` : '<div class="state-callout"><b>进度暂不可确定</b><span>暂时无法计算总步骤，完成比例和剩余时间未知。</span></div>'}
+      ${['FAILED', 'UNAVAILABLE', 'NOT_TRACKED'].includes(run.executionStatus) && !TERMINAL.has(run.state) ? `<div class="state-callout ${run.executionStatus === 'FAILED' ? 'failed' : ''}" data-execution-state><b>${escapeHtml(runStatusLabel(run))}</b><span>业务阶段保留：${escapeHtml(displayLabel(run.state))} · 当前没有活动执行</span><span>${escapeHtml(recoveryLabel(run))}</span>${run.executionFailure ? `<span>失败节点：${escapeHtml(NODE_LABELS[run.executionFailure.nodeId] ?? run.executionFailure.nodeId ?? '未记录')} · <code>${escapeHtml(run.executionFailure.code)}</code></span>` : ''}</div>` : ''}
       ${['ITERATING', 'ROLLING_BACK', 'LOW_CONFIDENCE', 'FAILED', 'CANCELLED'].includes(run.state) ? `<div class="state-callout ${run.state.toLowerCase().replaceAll('_', '-')}"><b>当前状态：${escapeHtml(displayLabel(run.state))}</b><span>第 ${escapeHtml(run.iteration + 1)} 轮 · 详情以事件与门禁证据为准</span></div>` : ''}
     </section>
+    <details class="panel" data-legacy-graph ${graphOpen ? 'open' : ''}><summary>节点图</summary><section id="graph-stage" class="reference-graph-shell"></section></details>
     <div class="run-workspace-grid">
       <section class="panel">
-        <div class="section-heading"><div><p class="eyebrow">工作流执行记录</p><h2>自动化节点</h2><p>这里展示节点执行进度；运行聚合仍是业务状态的唯一依据。</p></div><span class="counter">${automationNodes.length}</span></div>
-        <div class="node-list">${automationNodes.length ? automationNodes.map((node) => `
-          <article class="node-card">
-            <div><span class="node-icon">${['COMMITTED', 'COMPLETED'].includes(node.status) ? '✓' : node.status === 'FAILED' ? '!' : '●'}</span><div><b>${escapeHtml(NODE_LABELS[node.nodeId] ?? node.nodeId)}</b><small>${escapeHtml(node.agentId ? `${AGENT_LABELS[node.agentId] ?? node.agentId} · ${node.error || node.detail || '等待详情'}` : node.generationKey || node.detail || '确定性节点')}</small></div></div>
-            <div>${badge(node.status)}<small>第 ${escapeHtml((node.iteration ?? run.iteration) + 1)} 轮 · 第 ${escapeHtml(node.attempt ?? ((node.retryCount ?? 0) + 1))} 次尝试</small></div>
-          </article>`).join('') : emptyState('暂无节点记录', '这个批次可能由命令行创建，或者尚未执行 Agent 节点。')}</div>
+        <div class="section-heading"><h2>轮次执行记录</h2><span class="counter">${automationNodes.length} 个节点</span></div>
+        <div class="round-tabs" aria-label="选择轮次">${rounds.map(round => `<button type="button" class="secondary-button" data-run-round="${round}" aria-pressed="${round === selectedRound}">第 ${round + 1} 轮</button>`).join('')}</div>
+        <div class="node-list">${automationNodes.length ? automationNodes.map(node => {
+          const key = `${node.iteration ?? run.iteration}:${node.nodeId}:${node.attempt ?? 1}`
+          return `<details class="node-record ${node.status === 'RUNNING' && isRunActive(run) ? 'node-running' : ''}" data-node-record="${escapeHtml(key)}" ${openedNodes.has(key) ? 'open' : ''}>
+            <summary class="node-card"><span><b>${escapeHtml(nodeExplanation(node.nodeId).name)}</b>${badge(node.status ?? 'UNKNOWN', node.status === 'RUNNING' && !isRunActive(run) ? '历史节点状态：运行中' : displayLabel(node.status ?? 'UNKNOWN'))}</span><span><small>开始 ${escapeHtml(formatDate(node.startedAt))}</small><small>结束 ${escapeHtml(formatDate(node.completedAt))}</small></span></summary>
+            <div class="node-execution-log"><p>${escapeHtml(nodeExplanation(node.nodeId).purpose)}</p><dl><div><dt>输入</dt><dd>${escapeHtml(nodeExplanation(node.nodeId).input)}</dd></div><div><dt>产出</dt><dd>${escapeHtml(nodeExplanation(node.nodeId).output)}</dd></div></dl><h3>运行日志</h3><dl><div><dt>记录时间</dt><dd>${escapeHtml(formatDate(node.updatedAt))}</dd></div><div><dt>执行记录</dt><dd>${escapeHtml(executionNote(node.detail))}</dd></div>${node.error ? `<div><dt>错误</dt><dd>${escapeHtml(executionNote(node.error))}</dd></div>` : ''}</dl><details><summary>原始技术记录</summary><pre>${escapeHtml(node.detail || '')}${node.error ? '\n' + escapeHtml(node.error) : ''}</pre></details></div>
+          </details>`
+        }).join('') : emptyState('暂无节点记录', '当前轮次尚未记录执行节点。')}</div>
       </section>
       <aside class="panel gate-summary">
         <p class="eyebrow">最近一次门禁判定</p>
@@ -512,11 +609,11 @@ function renderRunWorkspace(snapshot) {
         ${latestDecision ? badge(latestDecision.outcome) : badge('CANDIDATE', '尚未判定')}
         <dl class="fact-list">
           <div><dt>当前轮次</dt><dd>${escapeHtml(run.iteration + 1)}</dd></div>
-          <div><dt>知识版本</dt><dd>${escapeHtml(versions.length)}</dd></div>
+          <div><dt>模块知识版本</dt><dd>${escapeHtml(versions.length)}</dd></div>
           <div><dt>评测次数</dt><dd>${escapeHtml(evaluations.length)}</dd></div>
           <div><dt>最佳版本</dt><dd title="${escapeHtml(run.bestVersionId)}">${escapeHtml(shortId(run.bestVersionId || '—'))}</dd></div>
         </dl>
-        ${latestDecision ? `<h3>判定原因</h3><div class="reason-list">${latestDecision.reasonCodes.map((reason) => `<code>${escapeHtml(reason)}</code>`).join('')}</div>` : ''}
+        ${latestDecision ? `<h3>判定原因</h3><div class="reason-list">${latestDecision.reasonCodes.map((reason) => `<code>${escapeHtml(displayLabel(reason))}</code>`).join('')}</div>` : ''}
       </aside>
     </div>
     <div class="run-workspace-grid lower">
@@ -530,6 +627,7 @@ function renderRunWorkspace(snapshot) {
         ${latestEvaluation ? evaluationCard(latestEvaluation) : emptyState('等待评测报告', '执行证据尚未提交，暂时不能进入发布门禁。')}
       </section>
     </div>`
+  if (graphOpen) void loadGraph(run.runId).catch(() => {})
 }
 
 function evaluationCard(record) {
@@ -549,6 +647,8 @@ function evaluationCard(record) {
   </article>`
 }
 
+const knowledgeIndexPanel = createKnowledgeIndexPanel({ root: content, request, escapeHtml, isEditable: () => Boolean(state.capabilities?.directEditing || state.token) })
+
 function renderKnowledge(items = state.knowledge) {
   if (state.resourceErrors.knowledge) {
     content.innerHTML = errorState('无法读取知识目录', state.resourceErrors.knowledge, '<button class="primary-button" data-reload type="button">重新连接</button>')
@@ -557,12 +657,13 @@ function renderKnowledge(items = state.knowledge) {
   const modules = [...new Set(state.knowledge.map((item) => item.moduleId))].slice(0, 12)
   const visible = state.knowledgeModule ? items.filter((item) => item.moduleId === state.knowledgeModule) : items
   content.innerHTML = `
-    <section class="reference-knowledge-tools"><label>⌕　<input id="knowledge-search" type="search" value="${escapeHtml(state.knowledgeQuery)}" placeholder="搜索概念、模块或正文…"></label><kbd>⌘ K</kbd><select id="knowledge-status" aria-label="知识状态"><option value="">全部状态</option>${['VERIFIED', 'CANDIDATE', 'LOW_CONFIDENCE', 'SUPERSEDED'].map((value) => `<option value="${value}" ${state.knowledgeStatus === value ? 'selected' : ''}>${displayLabel(value)}</option>`).join('')}</select></section>
+    <section class="reference-knowledge-tools"><label>⌕　<input id="knowledge-search" type="search" value="${escapeHtml(state.knowledgeQuery)}" placeholder="搜索名称、用途或关键词…"></label><kbd>⌘ K</kbd><select id="knowledge-status" aria-label="知识状态"><option value="">全部状态</option>${['VERIFIED', 'CANDIDATE', 'LOW_CONFIDENCE', 'SUPERSEDED'].map((value) => `<option value="${value}" ${state.knowledgeStatus === value ? 'selected' : ''}>${displayLabel(value)}</option>`).join('')}</select></section>
+    ${knowledgeIndexPanel.html()}
     <div class="reference-knowledge-grid"><aside class="reference-domains"><header><h3>领域</h3><span id="knowledge-count">${visible.length}</span></header><button class="${state.knowledgeModule ? '' : 'active'}" data-knowledge-module="">全部知识 <b>${items.length}</b></button>${modules.map((moduleId) => `<button class="${state.knowledgeModule === moduleId ? 'active' : ''}" data-knowledge-module="${escapeHtml(moduleId)}">${escapeHtml(moduleId)} <b>${items.filter((item) => item.moduleId === moduleId).length}</b></button>`).join('')}</aside><section class="reference-docs"><header><span>知识</span><span>来源</span><span>质量</span><span>更新时间</span></header><div id="knowledge-list">${knowledgeCards(visible)}</div></section></div>`
 }
 
 function knowledgeCards(items) {
-  return items.length ? items.map((item) => `<button class="reference-doc" data-version-id="${escapeHtml(item.versionId)}" data-module="${escapeHtml(item.moduleId)}"><span><em class="${item.status === 'VERIFIED' ? 'verified' : ''}">${escapeHtml(displayLabel(item.status))}</em><b>${escapeHtml(item.title || item.moduleId)}</b><small>${escapeHtml(item.description || item.moduleId)}</small></span><span>${escapeHtml(item.provenance?.length ?? 0)} 来源</span><strong class="${item.status === 'LOW_CONFIDENCE' ? 'risk' : ''}">${escapeHtml(item.qualityScore)}</strong><time>${escapeHtml(relativeTime(item.createdAt))}</time></button>`).join('') : emptyState('没有知识版本', '当前筛选条件下没有可以展示的知识。')
+  return items.length ? items.map((item) => `<button class="reference-doc" data-version-id="${escapeHtml(item.versionId)}" data-module="${escapeHtml(item.moduleId)}"><span><em class="${item.status === 'VERIFIED' ? 'verified' : ''}">${escapeHtml(displayLabel(item.status))}</em><b>${escapeHtml(item.title || item.moduleId)}</b><small>${escapeHtml(item.description || item.moduleId)}${item.matchedTerms?.length ? ` · 命中：${escapeHtml(item.matchedTerms.join('、'))}` : ''}</small></span><span>${escapeHtml(item.provenance?.length ?? 0)} 来源 · ${escapeHtml(item.versionCount ?? 1)} 版本</span><strong class="${item.status === 'LOW_CONFIDENCE' ? 'risk' : ''}">${escapeHtml(item.qualityScore)}</strong><time>${escapeHtml(relativeTime(item.createdAt))}</time></button>`).join('') : emptyState('没有知识版本', '当前筛选条件下没有可以展示的知识。')
 }
 
 function applyKnowledgeModule(moduleId) {
@@ -583,7 +684,7 @@ async function refreshKnowledgeList() {
   const params = new URLSearchParams()
   if (state.knowledgeQuery) params.set('q', state.knowledgeQuery)
   if (state.knowledgeStatus) params.set('status', state.knowledgeStatus)
-  const result = await request(`/api/v1/knowledge${params.size ? `?${params}` : ''}`)
+  const result = await request(`/api/v1/cards${params.size ? `?${params}` : ''}`)
   const items = collection(result, 'knowledge')
   const list = document.querySelector('#knowledge-list')
   const focusedVersionId = document.activeElement?.dataset?.versionId
@@ -599,13 +700,15 @@ async function refreshKnowledgeList() {
 
 async function openKnowledge(versionId, returnFocus) {
   const encoded = encodeURIComponent(versionId)
-  const [item, lineageResult] = await Promise.all([
+  const [item, lineageResult, cardResult] = await Promise.all([
     request(`/api/v1/knowledge/${encoded}`),
     request(`/api/v1/knowledge/${encoded}/lineage`).catch((error) => ({ error })),
+    request(`/api/v1/cards?versionId=${encoded}`).catch(() => ({ items: [] })),
   ])
   const lineage = lineageResult?.error ? null : lineageResult
   const lineageNodes = Array.isArray(lineage?.nodes) ? lineage.nodes.map((node) => node?.version ?? node) : []
-  const comparisonVersions = lineageNodes
+  const cardHistory = collection(cardResult, 'cards')[0]?.history ?? []
+  const comparisonVersions = [...cardHistory, ...lineageNodes]
     .filter((node) => node?.versionId && node.versionId !== item.versionId)
     .filter((node, index, all) => all.findIndex((entry) => entry.versionId === node.versionId) === index)
   const defaultAgainst = item.parentVersionId && comparisonVersions.some((node) => node.versionId === item.parentVersionId)
@@ -614,22 +717,25 @@ async function openKnowledge(versionId, returnFocus) {
   const relationCounts = lineage?.relations
     ? Object.entries(lineage.relations).map(([name, values]) => `${({ runs: '批次', evaluations: '评测', corrections: '修订', publications: '发布', provenance: '来源' })[name] ?? name} ${Array.isArray(values) ? values.length : 0}`).join(' · ')
     : ''
+  const rendered = renderKnowledgeMarkdown(item.body)
   drawerTitle.textContent = item.title || item.moduleId
   drawerContent.innerHTML = `
-    <div class="drawer-badges">${badge(item.status)} ${badge(item.qualityOutcome)}</div>
-    <p class="lead">${escapeHtml(item.description || '暂无描述')}</p>
-    <dl class="fact-grid">
-      <div><dt>模块</dt><dd>${escapeHtml(item.moduleId)}</dd></div>
-      <div><dt>版本</dt><dd>${escapeHtml(item.versionId)}</dd></div>
-      <div><dt>质量门禁</dt><dd>${escapeHtml(item.qualityScore)} / 100</dd></div>
-      <div><dt>行为门禁</dt><dd>${item.gateDecisionId ? escapeHtml(shortId(item.gateDecisionId, 22)) : '尚未通过，不可发布'}</dd></div>
-    </dl>
-    <section class="drawer-section"><h3>来源记录</h3><ul class="provenance-list">${item.provenance.map((source) => `<li><code>${escapeHtml(source.path)}</code>${source.commit ? `<small>@ ${escapeHtml(source.commit)}</small>` : ''}</li>`).join('')}</ul></section>
-    <section class="drawer-section"><h3>内容摘要</h3><button class="copy-value" data-copy="${escapeHtml(item.bodyRef.sha256)}"><code>${escapeHtml(item.bodyRef.sha256)}</code><span>复制</span></button></section>
-    <section class="drawer-section"><h3>正文</h3><pre class="knowledge-body">${escapeHtml(item.body)}</pre></section>
-    <section class="drawer-section"><h3>版本血缘</h3>${lineage
+    <div class="reader-status"><div class="drawer-badges">${badge(item.status)} ${badge(item.qualityOutcome)}</div><span>${escapeHtml(item.moduleId)} · 质量 ${escapeHtml(item.qualityScore)} / 100</span></div>
+    <details class="reader-evidence"><summary>版本、来源与内容摘要</summary>
+      <p class="lead">${escapeHtml(item.description || '暂无描述')}</p>
+      <dl class="fact-grid"><div><dt>版本</dt><dd>${escapeHtml(item.versionId)}</dd></div><div><dt>行为门禁</dt><dd>${item.gateDecisionId ? escapeHtml(item.gateDecisionId) : '尚未通过，不可发布'}</dd></div></dl>
+      <h3>来源记录</h3><ul class="provenance-list">${item.provenance.map((source) => `<li><code>${escapeHtml(source.path)}</code>${source.commit ? `<small>@ ${escapeHtml(source.commit)}</small>` : ''}</li>`).join('')}</ul>
+      <h3>内容摘要</h3><button class="copy-value" data-copy="${escapeHtml(item.bodyRef.sha256)}"><code>${escapeHtml(item.bodyRef.sha256)}</code><span>复制</span></button>
+    </details>
+    <section class="reader-section"><div class="reader-toolbar"><h3>正文</h3><button class="secondary-button" data-copy="${escapeHtml(item.body)}" type="button">复制 Markdown</button></div>
+      ${rendered.headings.length ? `<details class="reader-toc"><summary>文章目录 · ${rendered.headings.length} 节</summary><nav aria-label="文章目录">${rendered.headings.map((heading) => `<a href="#${heading.id}">${escapeHtml(heading.text)}</a>`).join('')}</nav></details>` : ''}
+      <article class="knowledge-body">${rendered.html || '<p>暂无正文</p>'}</article>
+      <details class="reader-source"><summary>查看 Markdown 原文</summary><pre>${escapeHtml(item.body)}</pre></details>
+    </section>
+    <section class="drawer-section"><h3>版本血缘</h3>${comparisonVersions.length ? `<details><summary>历史版本 · ${comparisonVersions.length}</summary>${comparisonVersions.map((version) => `<button class="text-button" data-version-id="${escapeHtml(version.versionId)}">${escapeHtml(version.title || version.versionId)} · ${escapeHtml(displayLabel(version.status))}</button>`).join('')}</details>` : ''}${lineage
       ? `<p class="lead">${escapeHtml(relationCounts || `${lineageNodes.length} 个关联版本`)}</p>${lineageRelationList(lineage)}${comparisonVersions.length ? `<form id="knowledge-diff-form" data-version="${escapeHtml(item.versionId)}"><label>对比版本<select name="against">${comparisonVersions.map((node) => `<option value="${escapeHtml(node.versionId)}" ${node.versionId === defaultAgainst ? 'selected' : ''}>${escapeHtml(shortId(node.versionId, 28))}${node.status ? ` · ${escapeHtml(displayLabel(node.status))}` : ''}</option>`).join('')}</select></label><button class="secondary-button" type="submit">比较版本</button></form><div id="knowledge-diff-result"></div>` : emptyState('暂无可比较版本', '当前血缘中只有这个知识版本。')}`
       : partialNotice(userFacingError(lineageResult.error, '版本血缘暂不可用。'))}</section>
+    ${collection(cardResult, 'cards')[0]?.cardId ? `<section class="drawer-section"><h3>知识关联</h3><button class="secondary-button" type="button" data-card-alternatives="${escapeHtml(collection(cardResult, 'cards')[0].cardId)}">当前卡片不适用</button><div data-card-relations></div></section>` : ''}
     <section class="drawer-section feedback-section"><h3>使用反馈</h3><p>反馈会进入后续治理流程，但不会直接修改知识或门禁判定。</p>
       <form id="feedback-form" data-version="${escapeHtml(item.versionId)}">
         <div class="feedback-actions"><label><input type="radio" name="action" value="hit" checked>有帮助</label><label><input type="radio" name="action" value="rate">评分</label><label><input type="radio" name="action" value="correct">需要纠正</label></div>
@@ -674,7 +780,7 @@ function renderGovernance() {
       <div class="section-heading"><div><p class="eyebrow">待处理队列</p><h2>待治理运行</h2></div></div>
       <div class="governance-list">${items.length ? items.map((run) => `<article class="governance-card">
         <div><span class="risk-icon">!</span><div><b>${escapeHtml(run.moduleId)}</b><small>${escapeHtml(shortId(run.runId, 24))}</small></div></div>
-        <div>${badge(run.state)}${run.latestDecision?.outcome === 'STOPPED' ? badge('STOPPED') : ''}<span>第 ${escapeHtml(run.iteration + 1)} 轮</span><button class="secondary-button" data-run-id="${escapeHtml(run.runId)}">查看证据</button></div>
+        <div>${runStatusBadge(run)}${run.latestDecision?.outcome === 'STOPPED' ? badge('STOPPED') : ''}<span>第 ${escapeHtml(run.iteration + 1)} 轮</span><button class="secondary-button" data-run-id="${escapeHtml(run.runId)}">查看证据</button></div>
       </article>`).join('') : emptyState('治理队列为空', '当前没有低置信或失败的运行。')}</div>
     </section>`
 }
@@ -694,7 +800,7 @@ function graphStatus(status) {
   if (['COMMITTED', 'COMPLETED'].includes(status)) return 'complete'
   if (status === 'RUNNING') return 'running'
   if (status === 'FAILED') return 'failed'
-  return 'idle'
+  return status === 'PENDING' ? 'idle' : 'unknown'
 }
 
 function graphEdge(from, to, nodeStates) {
@@ -708,7 +814,7 @@ function graphEdge(from, to, nodeStates) {
 
 function renderGraph() {
   const selected = state.graphRunId || state.runs[0]?.runId || ''
-  content.innerHTML = `<section class="reference-graph-tools"><label>选择批次　<select id="graph-run-select"><option value="">请选择批次</option>${state.runs.map((run) => `<option value="${escapeHtml(run.runId)}" ${run.runId === selected ? 'selected' : ''}>${escapeHtml(run.moduleId)} · ${escapeHtml(shortId(run.runId))}</option>`).join('')}</select></label><span>只读 · 实时事件；断线后每 10 秒轮询</span></section><section id="graph-stage" class="reference-graph-shell">${selected ? '<div class="loading-state"><span class="spinner"></span>正在读取 Agent 节点事实…</div>' : emptyState('选择一个批次', '这里只展示服务端记录的 Agent 工作状态。')}</section>`
+  content.innerHTML = `<section class="reference-graph-tools"><label>选择批次　<select id="graph-run-select"><option value="">请选择批次</option>${state.runs.map((run) => `<option value="${escapeHtml(run.runId)}" ${run.runId === selected ? 'selected' : ''}>${escapeHtml(run.moduleId)} · ${escapeHtml(shortId(run.runId))}</option>`).join('')}</select></label><span>仅查看 · 自动更新；断线后每 10 秒刷新</span></section><section id="graph-stage" class="reference-graph-shell">${selected ? '<div class="loading-state"><span class="spinner"></span>正在加载执行记录…</div>' : emptyState('选择一个批次', '选择批次后，可查看各角色的执行情况。')}</section>`
   if (selected) loadGraph(selected).catch((error) => { const stage = document.querySelector('#graph-stage'); if (stage) stage.innerHTML = errorState('无法读取工作流图', error) })
 }
 
@@ -717,7 +823,7 @@ async function loadGraph(runId) {
   const encoded = encodeURIComponent(runId)
   const [snapshot, nodePayload, workflowStatus, eventPayload] = await Promise.all([
     request(`/api/v1/runs/${encoded}`), request(`/api/v1/runs/${encoded}/workflow-nodes`),
-    request(`/api/v1/runs/${encoded}/workflow-status`).catch(() => ({ status: 'PENDING', partial: true })),
+    request(`/api/v1/runs/${encoded}/workflow-status`).catch(() => ({ executionStatus: 'UNKNOWN', partial: true })),
     request(`/api/v1/runs/${encoded}/events?after=0`),
   ])
   const nodes = collection(nodePayload, 'nodes').length ? collection(nodePayload, 'nodes') : (snapshot.workflowNodes ?? [])
@@ -725,12 +831,12 @@ async function loadGraph(runId) {
   state.graphSnapshot = { snapshot, nodes, events, workflowStatus }
   ensureGraphStream(runId, Math.max(0, ...events.map((record) => Number(record.eventSeq) || 0)))
   const stage = document.querySelector('#graph-stage')
-  if (!stage || state.page !== 'graph' || state.graphRunId !== runId) return
+  if (!stage || !((state.page === 'graph') || (state.page === 'runs' && state.selectedRun?.run.runId === runId)) || state.graphRunId !== runId) return
   const definitions = state.agents.length ? state.agents : Object.keys(AGENT_LABELS).map((agentId) => ({ agentId }))
   const nodeStates = new Map(definitions.map((agent) => [agent.agentId, graphNodeState(agent.agentId, nodes)]))
-  const statusCounts = { complete: 0, running: 0, failed: 0, idle: 0 }
+  const statusCounts = { complete: 0, running: 0, failed: 0, idle: 0, unknown: 0 }
   for (const node of nodeStates.values()) statusCounts[graphStatus(node?.status)] += 1
-  stage.innerHTML = `<div class="reference-graph-canvas"><div class="workflow-graph" aria-label="只读 Agent 工作流图"><svg class="graph-connections" viewBox="0 0 900 540" preserveAspectRatio="none" aria-hidden="true"><defs><marker id="graph-arrow-idle" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z"></path></marker><marker id="graph-arrow-running" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z"></path></marker><marker id="graph-arrow-complete" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z"></path></marker></defs>${GRAPH_EDGES.map(([from, to]) => graphEdge(from, to, nodeStates)).join('')}</svg>${definitions.map((agent) => { const node = nodeStates.get(agent.agentId); const status = node?.status ?? 'PENDING'; return `<button class="graph-node node-${escapeHtml(agent.agentId)} ${graphStatus(status)}" data-graph-agent="${escapeHtml(agent.agentId)}"><span class="graph-node-icon" aria-hidden="true">${['COMMITTED', 'COMPLETED'].includes(status) ? '✓' : status === 'FAILED' ? '!' : status === 'RUNNING' ? '●' : '○'}</span><b>${escapeHtml(AGENT_LABELS[agent.agentId] ?? agent.name ?? agent.agentId)}</b><small>${escapeHtml(displayLabel(status))}${node ? ` · 第 ${(node.iteration ?? 0) + 1} 轮 · 第 ${node.attempt ?? (node.retryCount ?? 0) + 1} 次尝试` : ''}</small></button>` }).join('')}</div><div class="graph-status-legend"><span><i class="running"></i>运行中 ${statusCounts.running}</span><span><i class="complete"></i>已完成 ${statusCounts.complete}</span><span><i class="failed"></i>失败 ${statusCounts.failed}</span><span><i></i>未开始 ${statusCounts.idle}</span></div></div><aside class="reference-node-detail"><header><em>批次状态</em><b>${nodes.length}</b></header><h3>${escapeHtml(snapshot.run?.moduleId ?? runId)}</h3><p>业务状态 ${escapeHtml(displayLabel(snapshot.run?.state))}<br>工作流 ${escapeHtml(displayLabel(workflowStatus.executionStatus ?? 'UNKNOWN'))}</p><small>执行情况</small><div><span>运行中</span><b>${statusCounts.running}</b></div><div><span>已完成</span><b>${statusCounts.complete}</b></div><div><span>失败</span><b>${statusCounts.failed}</b></div><div><span>未开始</span><b>${statusCounts.idle}</b></div><button class="wide" data-page-link="evaluations">查看评测证据 →</button></aside>`
+  stage.innerHTML = `<div class="reference-graph-canvas"><div class="workflow-graph" aria-label="只读 Agent 工作流图"><svg class="graph-connections" viewBox="0 0 900 540" preserveAspectRatio="none" aria-hidden="true"><defs><marker id="graph-arrow-idle" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z"></path></marker><marker id="graph-arrow-running" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z"></path></marker><marker id="graph-arrow-complete" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z"></path></marker></defs>${GRAPH_EDGES.map(([from, to]) => graphEdge(from, to, nodeStates)).join('')}</svg>${definitions.map((agent) => { const node = nodeStates.get(agent.agentId); const status = node?.status ?? 'UNKNOWN'; return `<button class="graph-node node-${escapeHtml(agent.agentId)} ${graphStatus(status)}" data-graph-agent="${escapeHtml(agent.agentId)}"><span class="graph-node-icon" aria-hidden="true">${['COMMITTED', 'COMPLETED'].includes(status) ? '✓' : status === 'FAILED' ? '!' : status === 'RUNNING' ? '●' : '○'}</span><b>${escapeHtml(AGENT_LABELS[agent.agentId] ?? agent.name ?? agent.agentId)}</b><small>${escapeHtml(displayLabel(status))}${node ? ` · 第 ${(node.iteration ?? 0) + 1} 轮 · 第 ${node.attempt ?? (node.retryCount ?? 0) + 1} 次尝试` : ''}</small></button>` }).join('')}</div><div class="graph-status-legend"><span><i class="running"></i>运行中 ${statusCounts.running}</span><span><i class="complete"></i>已完成 ${statusCounts.complete}</span><span><i class="failed"></i>失败 ${statusCounts.failed}</span><span><i></i>未开始 ${statusCounts.idle}</span><span><i></i>未知 ${statusCounts.unknown}</span></div></div><aside class="reference-node-detail"><header><em>执行记录</em><b>${nodes.length}</b></header><h3>${escapeHtml(snapshot.run?.moduleId ?? runId)}</h3><p>业务状态 ${escapeHtml(displayLabel(snapshot.run?.state))}<br>工作流 ${escapeHtml(displayLabel(workflowStatus.executionStatus ?? workflowStatus.status ?? workflowStatus.workflowStatus ?? 'UNKNOWN'))}</p><small>执行情况</small><div><span>运行中</span><b>${statusCounts.running}</b></div><div><span>已完成</span><b>${statusCounts.complete}</b></div><div><span>失败</span><b>${statusCounts.failed}</b></div><div><span>未开始</span><b>${statusCounts.idle}</b></div><div><span>未知</span><b>${statusCounts.unknown}</b></div><button class="wide" data-page-link="evaluations">查看评测证据 →</button></aside>`
 }
 
 function ensureGraphStream(runId, after) {
@@ -745,7 +851,7 @@ function ensureGraphStream(runId, after) {
   })
   stream.addEventListener('run-event', (event) => {
     stream._cursor = Number(event.lastEventId) || stream._cursor
-    if (state.page === 'graph' && state.graphRunId === runId) loadGraph(runId).catch(() => {})
+    if ((state.page === 'graph' || (state.page === 'runs' && state.selectedRun?.run.runId === runId)) && state.graphRunId === runId) loadGraph(runId).catch(() => {})
   })
   stream.addEventListener('reconnect', (event) => {
     try { stream._cursor = Number(JSON.parse(event.data).after) || stream._cursor } catch {}
@@ -755,10 +861,10 @@ function ensureGraphStream(runId, after) {
     if (state.graphStream === stream) state.graphStream = null
     clearInterval(state.graphPoll)
     state.graphPoll = setInterval(() => {
-      if (state.page === 'graph' && state.graphRunId === runId) loadGraph(runId).catch(() => {})
+      if ((state.page === 'graph' || (state.page === 'runs' && state.selectedRun?.run.runId === runId)) && state.graphRunId === runId) loadGraph(runId).catch(() => {})
     }, 10_000)
     setTimeout(() => {
-      if (state.page === 'graph' && state.graphRunId === runId && !state.graphStream) {
+      if ((state.page === 'graph' || (state.page === 'runs' && state.selectedRun?.run.runId === runId)) && state.graphRunId === runId && !state.graphStream) {
         ensureGraphStream(runId, stream._cursor)
       }
     }, 2_000)
@@ -772,6 +878,21 @@ function openGraphNode(agentId, returnFocus) {
   drawerTitle.textContent = AGENT_LABELS[agentId] ?? agentId
   drawerContent.innerHTML = `${node ? `<div class="drawer-badges">${badge(node.status)}</div><dl class="fact-grid"><div><dt>节点</dt><dd>${escapeHtml(node.nodeId)}</dd></div><div><dt>Agent</dt><dd>${escapeHtml(node.agentId ?? agentId)}</dd></div><div><dt>轮次</dt><dd>${escapeHtml((node.iteration ?? 0) + 1)}</dd></div><div><dt>尝试次数</dt><dd>${escapeHtml(node.attempt ?? (node.retryCount ?? 0) + 1)}</dd></div></dl><section class="drawer-section"><h3>受控执行事实</h3><pre class="json-view">${json(node)}</pre></section>` : partialNotice('这个 Agent 在当前批次中尚无服务端节点记录。')}<section class="drawer-section"><h3>相关事件</h3><pre class="json-view">${json(events.filter((record) => JSON.stringify(record).includes(agentId)).slice(-10))}</pre></section>`
   openDrawer(returnFocus)
+}
+
+function evaluationRuleForm(rule, canEdit) {
+  const help = (key, label, description, control) => `<div class="rule-field"><div class="rule-label"><label for="rule-${escapeHtml(rule.ruleId)}-${key}">${label}<small>${key}</small></label><span class="field-help"><button type="button" aria-label="${label}的用途" aria-describedby="rule-help-${escapeHtml(rule.ruleId)}-${key}">?</button><span role="tooltip" id="rule-help-${escapeHtml(rule.ruleId)}-${key}">${description}</span></span></div>${control}</div>`
+  const input = (key, attributes = '') => `<input id="rule-${escapeHtml(rule.ruleId)}-${key}" name="${key}" value="${escapeHtml(rule.config?.[key] ?? '')}" ${attributes} ${canEdit ? '' : 'disabled'}>`
+  return `<form class="rule-card" data-rule-id="${escapeHtml(rule.ruleId)}" data-revision="${escapeHtml(rule.revision)}">
+    <div class="card-heading"><b>${escapeHtml(rule.name ?? rule.ruleId)}</b><small>修订 ${escapeHtml(rule.revision)}</small></div>
+    ${help('kind', '适用范围', '这条发布门禁应用于全局；现有评测保留执行时绑定的规则修订。', '<span>全局</span>')}
+    ${help('policyId', '策略标识', '标识本条门禁策略，创建后不可修改。', `<span>${escapeHtml(rule.config?.policyId)}</span>`)}
+    ${help('minimumStability', '最低稳定性', '评测报告中的稳定性低于此值时，门禁不能通过。取值范围为 0 到 1。', input('minimumStability', 'type="number" min="0" max="1" step="any" required'))}
+    ${help('requireAllTests', '要求全部测试通过', '启用后，只要有测试未通过，门禁就不能通过。', `<select id="rule-${escapeHtml(rule.ruleId)}-requireAllTests" name="requireAllTests" ${canEdit ? '' : 'disabled'}><option value="true" ${rule.config?.requireAllTests ? 'selected' : ''}>是</option><option value="false" ${rule.config?.requireAllTests ? '' : 'selected'}>否</option></select>`)}
+    ${help('maxIterations', '最大轮次', '传统批次门禁允许的最大迭代次数；不代表五阶段工作台的固定总轮数。', input('maxIterations', 'type="number" min="0" step="1" required'))}
+    <label class="inline-check"><input name="enabled" type="checkbox" ${rule.enabled ? 'checked' : ''} ${canEdit ? '' : 'disabled'}>启用这条规则</label>
+    <button class="secondary-button" type="submit" ${canEdit ? '' : 'disabled'}>保存新修订</button>
+  </form>`
 }
 
 async function renderEvidence(append = false) {
@@ -804,26 +925,18 @@ async function renderEvidence(append = false) {
   const canEdit = Boolean(state.operatorMode && state.capabilities?.writeEnabled)
   content.innerHTML = `
     ${errors.length ? partialNotice('部分评测资源读取失败；已读取的不可变事实仍可查看。') : ''}
-    <form id="evaluation-filter-form" class="resource-filter"><label>批次<input name="runId" value="${escapeHtml(state.evaluationFilters.runId)}" placeholder="批次标识"></label><label>知识模块<input name="moduleId" value="${escapeHtml(state.evaluationFilters.moduleId)}" placeholder="模块标识"></label><label>门禁<select name="gate"><option value="">全部</option>${['PASS', 'ITERATE', 'STOPPED'].map((value) => `<option value="${value}" ${state.evaluationFilters.gate === value ? 'selected' : ''}>${displayLabel(value)}</option>`).join('')}</select></label><label>状态<select name="status"><option value="">全部</option>${['PASSED', 'FAILED', 'ERROR'].map((value) => `<option value="${value}" ${state.evaluationFilters.status === value ? 'selected' : ''}>${displayLabel(value)}</option>`).join('')}</select></label><label>开始日期<input name="from" type="date" value="${escapeHtml(state.evaluationFilters.from)}"></label><label>结束日期<input name="to" type="date" value="${escapeHtml(state.evaluationFilters.to)}"></label><button class="secondary-button" type="submit">筛选</button></form>
-    <section class="reference-metrics"><article><small>评测记录</small><b class="mint">${state.evaluations.length}</b><p>跨批次持久化记录</p></article><article><small>门禁通过</small><b>${passed}</b><p>${state.evaluations.length ? `${formatNumber(passed / state.evaluations.length * 100, 1)}%` : '无样本'}</p></article><article><small>测试样本</small><b>${formatNumber(tests)}</b><p>由不可变报告汇总</p></article><article><small>评测规则</small><b>${state.evaluationRules.length}</b><p>${canEdit ? '可创建新修订' : '当前只读'}</p></article></section>
-    <div class="quality-layout">
-      <section class="panel"><div class="section-heading"><h2>评测记录</h2><span class="counter">${state.evaluations.length}</span></div>
-        <div class="evidence-grid">${state.evaluations.length ? state.evaluations.map((record) => `<article class="evidence-card">
+    <form id="evaluation-filter-form" class="resource-filter"><label>批次<select name="runId"><option value="">全部批次</option>${[...new Set([...state.runs.map(run => run.runId), state.evaluationFilters.runId].filter(Boolean))].map(id => `<option value="${escapeHtml(id)}" ${state.evaluationFilters.runId === id ? 'selected' : ''}>${escapeHtml(id)}</option>`).join('')}</select></label><label>知识模块<input name="moduleId" value="${escapeHtml(state.evaluationFilters.moduleId)}" placeholder="模块标识"></label><label>门禁<select name="gate"><option value="">全部</option>${['PASS', 'ITERATE', 'STOPPED'].map((value) => `<option value="${value}" ${state.evaluationFilters.gate === value ? 'selected' : ''}>${displayLabel(value)}</option>`).join('')}</select></label><label>状态<select name="status"><option value="">全部</option>${['PASSED', 'FAILED', 'ERROR'].map((value) => `<option value="${value}" ${state.evaluationFilters.status === value ? 'selected' : ''}>${displayLabel(value)}</option>`).join('')}</select></label><label>开始日期<input name="from" type="date" value="${escapeHtml(state.evaluationFilters.from)}"></label><label>结束日期<input name="to" type="date" value="${escapeHtml(state.evaluationFilters.to)}"></label><button class="secondary-button" type="submit">筛选</button></form>
+    <section class="reference-metrics"><article><small>评测记录</small><b class="mint">${state.evaluations.length}</b><p>包含各批次的评测结果</p></article><article><small>门禁通过</small><b>${passed}</b><p>${state.evaluations.length ? `${formatNumber(passed / state.evaluations.length * 100, 1)}%` : '无样本'}</p></article><article><small>测试样本</small><b>${formatNumber(tests)}</b><p>各次评测的测试数量合计</p></article><article><small>评测规则</small><b>${state.evaluationRules.length}</b><p>${canEdit ? '可创建新修订' : '当前只读'}</p></article></section>
+    <div class="evaluation-workspace">
+      <section class="panel"><div class="section-heading"><h2>评测记录</h2><span class="counter">${state.evaluations.length}</span>      <details class="evaluation-settings"><summary class="secondary-button">设置</summary><div class="rule-list">${state.evaluationRules.length ? state.evaluationRules.map(rule => evaluationRuleForm(rule, canEdit)).join('') : emptyState('没有评测规则', '服务端尚未建立规则记录。')}</div></details></div>
+        <div class="evidence-grid">${state.evaluations.length ? [...state.evaluations].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map((record, index) => `${index === 1 ? '<details class="evaluation-history"><summary>历史评测记录</summary>' : ''}<article class="evidence-card">
           <div class="card-heading"><div><b>${escapeHtml(record.moduleId || record.versionId)}</b><small>${escapeHtml(shortId(record.runId, 20))}</small></div>${badge(record.gate ?? record.status)}</div>
           <strong>${escapeHtml(record.tests?.passed ?? '—')} / ${escapeHtml(record.tests?.total ?? '—')}</strong><span>测试通过</span>
           <dl><div><dt>稳定性</dt><dd>${escapeHtml(record.stability ?? '—')}</dd></div><div><dt>评测时间</dt><dd>${escapeHtml(formatDate(record.createdAt))}</dd></div></dl>
           <button class="text-button" data-evaluation-id="${escapeHtml(record.evaluationId)}">检查证据 →</button>
-        </article>`).join('') : emptyState('没有评测记录', '批次进入行为评测后，记录会显示在这里。')}</div>${state.evaluationEnvelope?.nextCursor ? '<button class="secondary-button load-more" data-load-evaluations type="button">加载更多评测</button>' : ''}
+        </article>${index === state.evaluations.length - 1 && index > 0 ? '</details>' : ''}` ).join('') : emptyState('没有评测记录', '批次进入行为评测后，记录会显示在这里。')}</div>${state.evaluationEnvelope?.nextCursor ? '<button class="secondary-button load-more" data-load-evaluations type="button">加载更多评测</button>' : ''}
       </section>
-      <section class="panel"><div class="section-heading"><h2>评测规则</h2><span class="counter">${state.evaluationRules.length}</span></div>
-        <div class="rule-list">${state.evaluationRules.length ? state.evaluationRules.map((rule) => `<form class="rule-card" data-rule-id="${escapeHtml(rule.ruleId)}" data-revision="${escapeHtml(rule.revision)}">
-        <div class="card-heading"><div><b>${escapeHtml(rule.name ?? rule.ruleId)}</b><small>修订 ${escapeHtml(rule.revision)} · ${escapeHtml(typeof rule.scope === 'string' ? rule.scope : JSON.stringify(rule.scope ?? {}))}</small></div>${badge(rule.enabled ? 'ACTIVE' : 'DISABLED')}</div>
-          <label>适用范围<input name="scope" value="${escapeHtml(typeof rule.scope === 'string' ? rule.scope : JSON.stringify(rule.scope ?? {}))}" ${canEdit ? '' : 'disabled'}></label>
-          <label>规则配置<textarea name="config" rows="4" ${canEdit ? '' : 'disabled'}>${escapeHtml(JSON.stringify(rule.config ?? {}, null, 2))}</textarea></label>
-          <label class="inline-check"><input name="enabled" type="checkbox" ${rule.enabled ? 'checked' : ''} ${canEdit ? '' : 'disabled'}> 启用这条规则</label>
-          <div><span>旧修订和既有报告保持不变</span><button class="secondary-button" type="submit" ${canEdit ? '' : 'disabled'}>保存新修订</button></div>
-        </form>`).join('') : emptyState('没有评测规则', '服务端尚未建立规则记录。')}</div>
-      </section>
+
     </div>`
 }
 
@@ -837,17 +950,17 @@ async function openEvaluation(evaluationId, returnFocus) {
   drawerContent.innerHTML = `<div class="drawer-badges">${badge(decision.outcome ?? detail.status)}</div>
     <dl class="fact-grid"><div><dt>批次</dt><dd>${escapeHtml(detail.runId ?? report.runId)}</dd></div><div><dt>知识版本</dt><dd>${escapeHtml(detail.versionId ?? report.versionId)}</dd></div><div><dt>规则修订</dt><dd>${escapeHtml(detail.ruleRef?.ruleId ?? '—')} · ${escapeHtml(detail.ruleRef?.revision ?? '—')}</dd></div><div><dt>记录时间</dt><dd>${escapeHtml(formatDate(detail.createdAt ?? report.createdAt))}</dd></div></dl>
     <section class="drawer-section"><h3>不可变报告</h3><pre class="json-view">${json(report)}</pre></section>
-    <section class="drawer-section"><h3>门禁判定</h3><pre class="json-view">${json(decision)}</pre></section>
+    <section class="drawer-section"><h3>门禁判定</h3><div class="reason-list">${(decision.reasonCodes ?? []).map(reason => `<code>${escapeHtml(displayLabel(reason))}</code>`).join('')}</div><pre class="json-view">${json(decision)}</pre></section>
     <section class="drawer-section"><h3>证据工件</h3>${artifacts.error ? partialNotice('证据元数据暂不可用。') : artifacts.items?.length ? `<ul class="artifact-list">${artifacts.items.map((item) => `<li><span><b>${escapeHtml(displayLabel(item.relation))}</b><code>${escapeHtml(item.ref?.artifactId ?? item.artifactId ?? '—')}</code><small>${item.contentAddressed ? '内容地址完整' : '完整性未确认'}</small></span>${item.downloadUrl ? `<button class="secondary-button" data-download-artifact="${escapeHtml(item.downloadUrl)}" type="button">下载</button>` : `<em>${state.token ? '无下载权限' : '进入治理模式后可下载'}</em>`}</li>`).join('')}</ul>` : emptyState('没有证据工件', '这条评测没有可见的证据引用。')}</section>`
   openDrawer(returnFocus)
 }
 
 async function downloadArtifact(path) {
-  if (!state.token || !String(path).startsWith('/api/v1/evaluations/')) {
+  if ((!state.token && !state.capabilities?.directEditing) || !/^\/api\/v1\/(?:evaluations\/[^/]+\/artifacts\/[^/?#]+|(?:stage-tasks|external-materials|workbench-publications)\/[^/]+\/artifacts\/[a-f0-9]{64})$/.test(String(path))) {
     showToast('请先进入治理模式。', 'warning')
     return
   }
-  const response = await fetch(path, { headers: { authorization: `Bearer ${state.token}` } })
+  const response = await fetch(path, { headers: state.token ? { authorization: `Bearer ${state.token}` } : {} })
   if (!response.ok) {
     let payload = null
     try { payload = await response.json() } catch {}
@@ -858,30 +971,25 @@ async function downloadArtifact(path) {
   const url = URL.createObjectURL(await response.blob())
   const link = document.createElement('a')
   link.href = url
-  link.download = 'evaluation-evidence'
+  link.download = path.startsWith('/api/v1/workbench-publications/') ? publicationDownloadName(response.headers.get('content-disposition')) : path.includes('/external-materials/') ? 'material-evidence' : path.includes('/stage-tasks/') ? 'stage-evidence.json' : 'evaluation-evidence'
   link.click()
   setTimeout(() => URL.revokeObjectURL(url), 0)
 }
 
 async function saveEvaluationRule(form) {
-  if (!state.operatorMode || !state.token) {
+  if (!state.operatorMode || (!state.token && !state.capabilities?.directEditing)) {
     showToast('请先进入治理模式。', 'warning')
     return
   }
   const data = new FormData(form)
-  let scope
-  let config
-  try {
-    scope = JSON.parse(String(data.get('scope') || '{}'))
-    if (!scope || Array.isArray(scope) || typeof scope !== 'object') throw new Error('invalid scope')
-  } catch {
-    showToast('适用范围必须是有效的 JSON 对象。', 'warning')
-    return
-  }
-  try {
-    config = JSON.parse(String(data.get('config') || '{}'))
-  } catch {
-    showToast('规则配置必须是有效的 JSON。', 'warning')
+  const rule = state.evaluationRules.find(item => item.ruleId === form.dataset.ruleId)
+  if (!rule) return
+  const scope = rule.scope
+  const config = { ...rule.config, minimumStability: Number(data.get('minimumStability')),
+    maxIterations: Number(data.get('maxIterations')), requireAllTests: data.get('requireAllTests') === 'true' }
+  if (!Number.isFinite(config.minimumStability) || config.minimumStability < 0 || config.minimumStability > 1
+    || !Number.isSafeInteger(config.maxIterations) || config.maxIterations < 0) {
+    showToast('最低稳定性应在 0 到 1 之间，最大轮次应为非负整数。', 'warning')
     return
   }
   const reason = window.prompt('说明本次规则修订原因。')?.trim()
@@ -928,18 +1036,18 @@ async function renderDiscovery(force = false, append = false) {
     content.innerHTML = `
       ${state.resourceErrors.sourceScan ? partialNotice('来源候选扫描失败；已登记的来源事实仍可查看和管理。') : ''}
       <form id="source-filter-form" class="resource-filter"><label>来源状态<select name="status"><option value="">全部状态</option>${['ACTIVE', 'DEGRADED', 'STALE', 'DISABLED'].map((value) => `<option value="${value}" ${state.sourceStatus === value ? 'selected' : ''}>${displayLabel(value)}</option>`).join('')}</select></label><label>来源类型<select name="kind"><option value="">全部类型</option><option value="FILE" ${state.sourceKind === 'FILE' ? 'selected' : ''}>文件</option><option value="HTTPS" ${state.sourceKind === 'HTTPS' ? 'selected' : ''}>HTTPS</option></select></label><label>项目<input name="project" value="${escapeHtml(state.sourceProject)}" placeholder="全部项目"></label><button class="secondary-button" type="submit">筛选</button></form>
-      <section class="reference-metrics"><article><small>已注册来源</small><b class="mint">${state.sources.length}</b><p>持久化来源事实</p></article><article><small>正常来源</small><b>${active}</b><p>最近访问成功</p></article><article><small>发现漂移</small><b>${drifted}</b><p>需要刷新或复核</p></article><article><small>扫描候选</small><b>${state.discovery ? candidates.length : '—'}</b><p>${state.discovery ? (truncated ? `共 ${total} 条，结果已截断` : '本次显式扫描') : '尚未执行扫描'}</p></article></section>
+      <section class="reference-metrics"><article><small>已注册来源</small><b class="mint">${state.sources.length}</b><p>已登记的文件和链接</p></article><article><small>正常来源</small><b>${active}</b><p>最近访问成功</p></article><article><small>发现漂移</small><b>${drifted}</b><p>需要刷新或复核</p></article><article><small>扫描候选</small><b>${state.discovery ? candidates.length : '—'}</b><p>${state.discovery ? (truncated ? `共 ${total} 条，结果已截断` : '本次扫描结果') : '尚未执行扫描'}</p></article></section>
       <div class="sources-layout">
         <section class="panel"><div class="section-heading"><h2>来源注册</h2><span class="counter">${state.sources.length}</span></div>
           <div class="source-list">${state.sources.length ? state.sources.map((source) => `<article class="source-card">
             <button class="source-main" data-source-id="${escapeHtml(source.sourceId)}" type="button"><span><b>${escapeHtml(source.displayName ?? source.locator)}</b><small>${escapeHtml(source.locator)}</small></span>${badge(source.status)}<em>${source.drift ? '检测到漂移' : `修订 ${escapeHtml(source.recordRevision ?? source.revision ?? '—')}`}</em></button>
             <button class="secondary-button" data-refresh-source="${escapeHtml(source.sourceId)}" type="button" ${canEdit ? '' : 'disabled'}>刷新</button>
-          </article>`).join('') : emptyState('没有注册来源', '可从扫描候选登记，或在治理模式中手动添加。')}</div>${state.sourceEnvelope?.nextCursor ? '<button class="secondary-button load-more" data-load-sources type="button">加载更多来源</button>' : ''}
+          </article>`).join('') : emptyState('没有注册来源', '可手动添加来源，或扫描后选择文件。')}</div>${state.sourceEnvelope?.nextCursor ? '<button class="secondary-button load-more" data-load-sources type="button">加载更多来源</button>' : ''}
         </section>
         <aside class="panel source-actions"><div class="section-heading"><h2>添加来源</h2></div>
           <form id="source-create-form"><label>来源类型<select name="kind" ${canEdit ? '' : 'disabled'}><option value="FILE">文件</option><option value="HTTPS">HTTPS</option></select></label><label>路径或地址<input name="locator" placeholder="仓库相对路径或 HTTPS 地址" required ${canEdit ? '' : 'disabled'}></label><label>项目<input name="project" value="default" required ${canEdit ? '' : 'disabled'}></label><label>显示名称<input name="displayName" placeholder="可选" ${canEdit ? '' : 'disabled'}></label><label>凭据引用<input name="credentialRef" placeholder="secret://env/环境变量名（可选）" ${canEdit ? '' : 'disabled'}></label><button class="primary-button" type="submit" ${canEdit ? '' : 'disabled'}>登记来源</button></form>
           <button class="secondary-button scan-button" data-refresh-discovery type="button">扫描候选</button>
-          <p>只有通过仓库访问边界校验的文件才能登记；扫描本身不会创建来源。</p>
+          <p>扫描会列出可用文件，由你选择后登记。文件须在允许访问的仓库范围内。</p>
         </aside>
       </div>
       ${state.discovery ? `<section class="panel discovery-panel"><div class="section-heading"><h2>扫描候选</h2><button class="secondary-button" data-refresh-discovery type="button">重新扫描</button></div>
@@ -951,7 +1059,7 @@ async function renderDiscovery(force = false, append = false) {
 }
 
 async function createSource(input) {
-  if (!state.operatorMode || !state.token) {
+  if (!state.operatorMode || (!state.token && !state.capabilities?.directEditing)) {
     showToast('请先进入治理模式。', 'warning')
     return
   }
@@ -964,7 +1072,7 @@ async function createSource(input) {
 }
 
 async function refreshSource(sourceId) {
-  if (!state.operatorMode || !state.token) {
+  if (!state.operatorMode || (!state.token && !state.capabilities?.directEditing)) {
     showToast('请先进入治理模式。', 'warning')
     return
   }
@@ -981,14 +1089,27 @@ async function openSource(sourceId, returnFocus) {
   drawerTitle.textContent = source.displayName ?? source.locator
   drawerContent.innerHTML = `<div class="drawer-badges">${badge(source.status)} ${source.drift ? badge('STALE', '检测到漂移') : ''}</div>
     <dl class="fact-grid"><div><dt>来源</dt><dd>${escapeHtml(source.sourceId)}</dd></div><div><dt>类型</dt><dd>${escapeHtml(displayLabel(source.kind))}</dd></div><div><dt>固定修订</dt><dd>${escapeHtml(source.revision ?? '—')}</dd></div><div><dt>观测修订</dt><dd>${escapeHtml(source.observedRevision ?? '—')}</dd></div><div><dt>最近同步</dt><dd>${escapeHtml(formatDate(source.lastSyncAt))}</dd></div></dl>
+    <section class="drawer-section"><h3>外部关联材料</h3><p>捕获已确认修订的文本。材料提供引用依据，尚未验证其适用性。</p><form id="source-material-form" data-source-id="${escapeHtml(source.sourceId)}"><label>材料适用条件<textarea name="applicability" required maxlength="2000" ${canEdit ? '' : 'disabled'} placeholder="例如：适用于 jsmn 的 JSON 分词接口"></textarea></label><button type="submit" class="secondary-button" ${canEdit ? '' : 'disabled'}>捕获材料快照</button></form><div data-material-result aria-live="polite"></div></section>
     <section class="drawer-section"><h3>关联知识</h3><pre class="json-view">${json(source.knowledge ?? {})}</pre></section>
     <section class="drawer-section"><h3>来源配置</h3><form id="source-update-form" data-source-id="${escapeHtml(source.sourceId)}" data-revision="${escapeHtml(source.recordRevision)}"><label>显示名称<input name="displayName" value="${escapeHtml(source.displayName ?? '')}" ${canEdit ? '' : 'disabled'}></label><label>路径或地址<input name="locator" value="${escapeHtml(source.locator)}" ${canEdit ? '' : 'disabled'}></label><label>确认修订<input name="revision" value="${escapeHtml(source.observedRevision ?? source.revision ?? '')}" ${canEdit ? '' : 'disabled'}></label><label class="inline-check"><input name="enabled" type="checkbox" ${source.status !== 'DISABLED' ? 'checked' : ''} ${canEdit ? '' : 'disabled'}> 启用来源</label><button class="secondary-button" type="submit" ${canEdit ? '' : 'disabled'}>保存新修订</button></form></section>
     <section class="drawer-section"><h3>审计记录</h3><pre class="json-view">${json(source.audit ?? [])}</pre></section>`
   openDrawer(returnFocus)
 }
 
+async function captureSourceMaterial(form) {
+  if (!state.capabilities?.writeEnabled) return
+  const button = form.querySelector('button'); button.disabled = true
+  const result = drawerContent.querySelector('[data-material-result]')
+  try {
+    const saved = await request('/api/v1/external-materials', { method: 'POST', body: JSON.stringify({ sourceId: form.dataset.sourceId, applicability: new FormData(form).get('applicability') }) })
+    const detail = await request(`/api/v1/external-materials/${encodeURIComponent(saved.material.materialId)}`)
+    if (result?.isConnected) result.innerHTML = `<p>材料已捕获：${escapeHtml(detail.material.title)}</p><details><summary>查看固定正文与标识</summary><p class="material-identity">${escapeHtml(detail.material.materialId)}</p><pre class="json-view">${escapeHtml(detail.text)}</pre></details>`
+  } catch (error) { if (result?.isConnected) result.textContent = userFacingError(error, `材料捕获失败：${error.code ?? '连接失败'}`) }
+  finally { button.disabled = false }
+}
+
 async function updateSource(form) {
-  if (!state.operatorMode || !state.token) {
+  if (!state.operatorMode || (!state.token && !state.capabilities?.directEditing)) {
     showToast('请先进入治理模式。', 'warning')
     return
   }
@@ -1010,6 +1131,7 @@ async function updateSource(form) {
 }
 
 function renderAgents() {
+  const expanded = [...content.querySelectorAll('.provider-card[open], .agent-prompts[open]')].map(element => element.classList.contains('provider-card') ? '.provider-card' : '.agent-prompts')
   if (state.resourceErrors.agents) {
     content.innerHTML = errorState('无法读取 Agent 目录', state.resourceErrors.agents, '<button class="primary-button" data-reload type="button">重新连接</button>')
     return
@@ -1028,24 +1150,23 @@ function renderAgents() {
   const operationErrorLabels = operationErrorKeys.map((key) => RESOURCE_LABELS[key]).join('、')
   content.innerHTML = `
     ${operationErrorKeys.length ? partialNotice(`${operationErrorLabels}暂不可用；其他已读取数据仍可查看。`) : ''}
-    <section class="reference-metrics"><article><small>Agent 数量</small><b class="mint">${state.agents.length}</b><p>固定角色定义</p></article><article><small>服务提供方</small><b>${escapeHtml(providerLabel)}</b><p>${escapeHtml(provider?.model ?? '未选择模型')}</p></article><article><small>配置状态</small><b>${escapeHtml(settings?.verification?.status ? displayLabel(settings.verification.status) : '未读取')}</b><p>${settings?.enabled ? '已作为新批次默认方式' : '尚未启用'}</p></article><article><small>观测样本</small><b>${formatNumber(runSamples)}</b><p>${escapeHtml(displayLabel(runs?.cohort?.kind ?? 'EMPTY'))}</p></article></section>
-    <div class="provider-layout">
-      <section class="panel provider-card"><div class="section-heading"><h2>模型服务配置</h2>${provider?.availability ? badge(provider.availability) : badge('UNKNOWN')}</div>
-        ${state.capabilities?.writeEnabled ? '' : '<div class="notice"><b>服务端写入尚未启用。</b><p>复制仓库根目录的 <code>.env.example</code> 为 <code>.env.local</code>，设置 <code>WP_KNOWLEDGE_WRITE_TOKEN=请替换为随机长令牌</code>，然后重启服务。配置文件不会提交到版本库。</p></div>'}
+    <section class="reference-metrics"><article><small>Agent 数量</small><b class="mint">${state.agents.length}</b><p>各角色分工固定</p></article><article><small>服务提供方</small><b>${escapeHtml(providerLabel)}</b><p>${escapeHtml(provider?.model ?? '未选择模型')}</p></article><article><small>配置状态</small><b>${escapeHtml(settings?.verification?.status ? displayLabel(settings.verification.status) : '未读取')}</b><p>${settings?.enabled ? '新批次将使用此配置' : '尚未启用'}</p></article><article><small>统计批次</small><b>${formatNumber(runSamples)}</b><p>${escapeHtml(displayLabel(runs?.cohort?.kind ?? 'EMPTY'))}</p></article></section>
+    <details class="panel publication-panel"><summary class="publication-heading">知识发布设置<span class="field-help"><button type="button" aria-label="知识发布设置说明" aria-describedby="publication-help">?</button><span role="tooltip" id="publication-help">知识通过门禁后，会自动保存为本地 Markdown 文件。需要同步到 Git 时，先启用同步，再手动发起。</span></span></summary><div id="publication-settings"></div></details>
+    <details class="panel provider-card"><summary>模型服务配置</summary>
         <dl class="settings-list"><div><dt>当前执行方式</dt><dd>${escapeHtml(executionProviderLabel)}</dd></div><div><dt>认证状态</dt><dd>${escapeHtml(displayLabel(provider?.authentication ?? 'UNKNOWN'))}</dd></div><div><dt>接口地址</dt><dd>${escapeHtml(settings?.apiUrlMasked ?? '未配置')}</dd></div><div><dt>模型</dt><dd>${escapeHtml(settings?.model ?? provider?.model ?? '未配置')}</dd></div><div><dt>最近验证</dt><dd>${escapeHtml(formatDate(settings?.verification?.checkedAt))}</dd></div></dl>
-        <form id="provider-settings-form" data-revision="${escapeHtml(settings?.revision ?? 0)}"><label>API 地址<input name="apiUrl" type="url" required placeholder="${escapeHtml(settings?.apiUrlMasked ? `重新输入完整地址；当前 ${settings.apiUrlMasked}` : 'https://模型服务地址/v1')}" ${canEdit ? '' : 'disabled'}></label><label>API Key<input name="apiKey" type="password" autocomplete="new-password" placeholder="${settings?.apiKeyConfigured ? '留空表示保留现有密钥' : '输入服务密钥'}" ${canEdit ? '' : 'disabled'}></label><label>模型<input name="model" value="${escapeHtml(settings?.model ?? '')}" placeholder="模型标识" ${canEdit ? '' : 'disabled'}></label><label class="inline-check"><input name="clearApiKey" type="checkbox" ${canEdit ? '' : 'disabled'}> 清除已保存的 API Key</label><button class="secondary-button" type="submit" ${canEdit ? '' : 'disabled'}>保存待验证配置</button></form>
-        <button class="primary-button verify-provider" data-verify-provider type="button" ${canEdit && settings?.revision > 0 ? '' : 'disabled'}>验证并启用</button>
-        <p class="form-note">保存会使旧验证失效；只有无副作用验证成功后，新批次才会默认使用这项配置。</p>
-      </section>
-      <section class="panel metrics-card"><div class="section-heading"><h2>运行观测</h2><label>统计窗口<select id="metrics-window"><option value="24h" ${state.metricsWindow === '24h' ? 'selected' : ''}>24 小时</option><option value="7d" ${state.metricsWindow === '7d' ? 'selected' : ''}>7 天</option><option value="30d" ${state.metricsWindow === '30d' ? 'selected' : ''}>30 天</option></select></label></div>
+        <form id="provider-settings-form" data-revision="${escapeHtml(settings?.revision ?? 0)}"><label>API 地址<input name="apiUrl" type="url" required placeholder="${escapeHtml(settings?.apiUrlMasked ? `重新输入完整地址；当前 ${settings.apiUrlMasked}` : 'https://模型服务地址/v1')}" ${canEdit ? '' : 'disabled'}></label><label>API Key<input name="apiKey" type="password" autocomplete="new-password" placeholder="${settings?.apiKeyConfigured ? '留空表示保留现有密钥' : '输入服务密钥'}" ${canEdit ? '' : 'disabled'}></label><label>模型<input name="model" value="${escapeHtml(settings?.model ?? '')}" placeholder="模型标识" ${canEdit ? '' : 'disabled'}></label><label class="inline-check"><input name="clearApiKey" type="checkbox" ${canEdit ? '' : 'disabled'}> 清除已保存的 API Key</label><button class="secondary-button" type="submit" ${canEdit ? '' : 'disabled'}>保存配置</button></form>
+        <dl class="provider-checks"><div><dt>模型列表</dt><dd>${escapeHtml(displayLabel(settings?.verification?.checks?.modelList ?? 'NOT_RUN'))}</dd></div><div><dt>生成测试</dt><dd>${escapeHtml(displayLabel(settings?.verification?.checks?.generation ?? 'NOT_RUN'))}</dd></div></dl>
+        ${settings?.verification?.reasonCode === 'GENERATION_VERIFICATION_REQUIRED' ? '<p class="notice">尚未完成最小生成验证，请重新验证后启用。</p>' : ''}
+        <button class="primary-button verify-provider" data-verify-provider type="button" ${canEdit && settings?.revision > 0 && !state.providerVerifying ? '' : 'disabled'}>${state.providerVerifying ? '正在验证…' : '验证并启用'}</button>
+        <p class="form-note">验证会调用模型生成一段短文本，最多输出 64 个 token，可能产生少量费用，失败后不会自动重试。修改配置后，需要再次验证才能用于新批次。</p>
+      </details>
+    <div class="provider-layout">
+      <section class="panel metrics-card"><div class="section-heading"><h2>运行统计</h2><label>统计窗口<select id="metrics-window"><option value="24h" ${state.metricsWindow === '24h' ? 'selected' : ''}>24 小时</option><option value="7d" ${state.metricsWindow === '7d' ? 'selected' : ''}>7 天</option><option value="30d" ${state.metricsWindow === '30d' ? 'selected' : ''}>30 天</option></select></label></div>
         <div class="compact-metrics"><div><span>批次耗时 P50 / P95</span><b>${formatDuration(runs?.runDurationMs?.p50)} / ${formatDuration(runs?.runDurationMs?.p95)}</b><small>${sampleHint(runs?.runDurationMs)}</small></div><div><span>节点耗时 P50 / P95</span><b>${formatDuration(runs?.nodeDurationMs?.p50)} / ${formatDuration(runs?.nodeDurationMs?.p95)}</b><small>${sampleHint(runs?.nodeDurationMs)}</small></div><div><span>排队耗时 P50 / P95</span><b>${formatDuration(runs?.queueDurationMs?.p50)} / ${formatDuration(runs?.queueDurationMs?.p95)}</b><small>${sampleHint(runs?.queueDurationMs)}</small></div><div><span>服务提供方调用</span><b>${sampledNumber(runs?.providerCalls)}</b><small>${sampleHint(runs?.providerCalls)}</small></div><div><span>Token</span><b>${sampledNumber(runs?.tokens)}</b><small>${sampleHint(runs?.tokens)}</small></div><div><span>估算成本</span><b>${Number(runs?.estimatedCostUsd?.sampleSize ?? 0) > 0 ? `$${formatNumber(runs.estimatedCostUsd.total, 4)}` : '—'}</b><small>${sampleHint(runs?.estimatedCostUsd)}</small></div><div><span>模型调用重试</span><b>${sampledNumber(runs?.providerCalls, 'retries')}</b><small>${sampleHint(runs?.providerCalls)}</small></div><div><span>工作流节点重试</span><b>${sampledNumber(runs?.workflowNodeRetries)}</b><small>${sampleHint(runs?.workflowNodeRetries)}</small></div></div>
       </section>
+    <section class="panel governance-metrics"><div class="section-heading"><h2>修订与处理结果</h2><span>${escapeHtml(displayLabel(governance?.cohort?.kind ?? 'EMPTY'))}</span></div><div class="compact-metrics"><div><span>首次修订通过率</span><b>${formatRate(governance?.firstRevisionPassRate)}</b><small>${sampleHint(governance?.firstRevisionPassRate)}</small></div><div><span>三轮内通过率</span><b>${formatRate(governance?.threeIterationConvergenceRate)}</b><small>${sampleHint(governance?.threeIterationConvergenceRate)}</small></div><div><span>人工介入比例</span><b>${formatRate(governance?.humanInterventionRate)}</b><small>${sampleHint(governance?.humanInterventionRate)}</small></div><div><span>平均处理时间</span><b>${formatDuration(governance?.meanResolutionTimeMs?.value)}</b><small>${sampleHint(governance?.meanResolutionTimeMs)}</small></div><div><span>短期复发率</span><b>${formatRate(governance?.shortTermRecurrenceRate)}</b><small>${sampleHint(governance?.shortTermRecurrenceRate)}</small></div></div>${metricDefinitions(runs, governance)}</section>
     </div>
-    <section class="panel governance-metrics"><div class="section-heading"><h2>治理效果</h2><span>${escapeHtml(displayLabel(governance?.cohort?.kind ?? 'EMPTY'))}</span></div><div class="compact-metrics"><div><span>首次修订通过率</span><b>${formatRate(governance?.firstRevisionPassRate)}</b><small>${sampleHint(governance?.firstRevisionPassRate)}</small></div><div><span>三轮内收敛率</span><b>${formatRate(governance?.threeIterationConvergenceRate)}</b><small>${sampleHint(governance?.threeIterationConvergenceRate)}</small></div><div><span>人工介入比例</span><b>${formatRate(governance?.humanInterventionRate)}</b><small>${sampleHint(governance?.humanInterventionRate)}</small></div><div><span>平均处理时间</span><b>${formatDuration(governance?.meanResolutionTimeMs?.value)}</b><small>${sampleHint(governance?.meanResolutionTimeMs)}</small></div><div><span>短期复发率</span><b>${formatRate(governance?.shortTermRecurrenceRate)}</b><small>${sampleHint(governance?.shortTermRecurrenceRate)}</small></div></div>${metricDefinitions(runs, governance)}</section>
-    <section class="agent-boundary panel">
-      <div><h2>Agent 可以调整表达，不能改变职责</h2><p>拓扑、职责、输入输出、工具权限和基础提示词由代码固定。这里保存的内容只会作为追加提示词，用于后续节点执行。</p></div>
-      ${badge(canEdit ? 'VERIFIED' : 'CANDIDATE', canEdit ? '可编辑提示词' : '只读查看')}
-    </section>
+    <details class="panel agent-prompts"><summary>补充 Agent 提示词</summary>
     <section class="agent-grid">${state.agents.map((agent) => `<article class="agent-card panel">
       <div class="card-heading"><h2>${escapeHtml(AGENT_LABELS[agent.agentId] ?? agent.displayName)}</h2>${badge('CANDIDATE', '职责固定')}</div>
       <p class="agent-responsibility">${escapeHtml(agent.responsibility)}</p>
@@ -1061,7 +1182,8 @@ function renderAgents() {
         </label>
         <div><span>仅影响后续执行</span><button class="secondary-button" type="submit" ${canEdit ? '' : 'disabled'}>保存提示词</button></div>
       </form>
-    </article>`).join('')}</section>`
+    </article>`).join('')}</section></details>`
+  for (const selector of expanded) content.querySelector(selector)?.setAttribute('open', '')
 }
 
 async function loadAgentOperations(force = false) {
@@ -1086,7 +1208,7 @@ function providerErrorMessage(error) {
 }
 
 async function saveProviderSettings(form) {
-  if (!state.operatorMode || !state.token) {
+  if (!state.operatorMode || (!state.token && !state.capabilities?.directEditing)) {
     showToast('请先进入治理模式。', 'warning')
     return
   }
@@ -1113,10 +1235,13 @@ async function saveProviderSettings(form) {
 }
 
 async function verifyProviderSettings() {
-  if (!state.operatorMode || !state.token || !state.providerSettings) {
-    showToast('请先进入治理模式并保存配置。', 'warning')
+  if (state.providerVerifying) return
+  if (!state.operatorMode || (!state.token && !state.capabilities?.directEditing) || !state.providerSettings) {
+    showToast('请先保存模型配置。', 'warning')
     return
   }
+  state.providerVerifying = true
+  renderAgents()
   try {
     const verification = await request('/api/v1/provider-settings/verify', {
       method: 'POST',
@@ -1134,15 +1259,23 @@ async function verifyProviderSettings() {
     await loadAgentOperations(true)
     renderAgents()
     showToast(providerErrorMessage(error), 'danger')
+  } finally {
+    state.providerVerifying = false
+    if (state.page === 'projects') { const focus = repositoryAnalysisPanel.focus(); content.innerHTML = repositoryAnalysisPanel.html(); repositoryAnalysisPanel.restore(focus) }
+  if (state.page === 'agent-settings') renderAgents()
   }
 }
 
 async function navigate(page) {
   if (!PAGE_META[page]) return
+  if (page === 'graph') page = 'runs'
   state.page = page
   state.selectedRun = null
+  state.selectedRound = null
   setPageMeta(page)
   closeDrawer()
+  if (page === 'projects') { content.innerHTML = repositoryAnalysisPanel.html(); repositoryAnalysisPanel.restore(null) }
+  if (page === 'stages') renderStageOperations()
   if (page === 'overview') renderOverview()
   if (page === 'runs') renderRuns()
   if (page === 'knowledge') renderKnowledge()
@@ -1162,10 +1295,12 @@ async function navigate(page) {
     renderAgents()
   }
   closeNavigation()
+  window.scrollTo({ top: 0, behavior: 'instant' })
   content.focus({ preventScroll: true })
 }
 
 async function openRun(runId) {
+  if (state.selectedRun?.run?.runId !== runId) state.selectedRound = null
   setPageMeta('runs')
   state.page = 'runs'
   content.innerHTML = '<div class="loading-state"><span class="spinner"></span>正在读取批次快照…</div>'
@@ -1179,8 +1314,33 @@ async function openRun(runId) {
   renderRunWorkspace(state.selectedRun)
 }
 
+let refreshingRun = false
+async function refreshSelectedRun() {
+  if (refreshingRun || state.page !== 'runs' || !state.selectedRun) return
+  const runId = state.selectedRun.run.runId
+  refreshingRun = true
+  try {
+    const encoded = encodeURIComponent(runId)
+    const [snapshot, progress, workflowStatus] = await Promise.all([
+      request(`/api/v1/runs/${encoded}`), request(`/api/v1/runs/${encoded}/progress`),
+      request(`/api/v1/runs/${encoded}/workflow-status`).catch(() => ({ executionStatus: 'UNKNOWN' })),
+    ])
+    if (state.page !== 'runs' || state.selectedRun?.run.runId !== runId) return
+    const focused = document.activeElement
+    const round = focused?.dataset?.runRound
+    const nodeKey = focused?.closest('[data-node-record]')?.dataset.nodeRecord
+    state.selectedRun = { ...snapshot, progress, workflowStatus }
+    renderRunWorkspace(state.selectedRun)
+    if (round !== undefined) content.querySelector(`[data-run-round="${CSS.escape(round)}"]`)?.focus({ preventScroll: true })
+    else if (nodeKey) content.querySelector(`[data-node-record="${CSS.escape(nodeKey)}"] > summary`)?.focus({ preventScroll: true })
+  } catch {
+    // 连接恢复后重新读取；保留此前已取得的执行证据。
+  } finally { refreshingRun = false }
+}
+setInterval(() => { void refreshSelectedRun() }, 5_000)
+
 async function performActionItem(button) {
-  if (!state.operatorMode || !state.token) {
+  if (!state.operatorMode || (!state.token && !state.capabilities?.directEditing)) {
     showToast('请先进入治理模式。', 'warning')
     return
   }
@@ -1217,7 +1377,7 @@ function openEvidence(encoded, returnFocus) {
   drawerTitle.textContent = '评测证据'
   drawerContent.innerHTML = `<div class="drawer-badges">${badge(record.decision.outcome)}</div>
     <section class="drawer-section"><h3>评测报告</h3><pre class="json-view">${json(record.report)}</pre></section>
-    <section class="drawer-section"><h3>门禁判定</h3><pre class="json-view">${json(record.decision)}</pre></section>`
+    <section class="drawer-section"><h3>门禁判定</h3><div class="reason-list">${(decision.reasonCodes ?? []).map(reason => `<code>${escapeHtml(displayLabel(reason))}</code>`).join('')}</div><pre class="json-view">${json(record.decision)}</pre></section>`
   openDrawer(returnFocus)
 }
 
@@ -1226,6 +1386,9 @@ function openDrawer(returnFocus = document.activeElement) {
   drawerReturnKey = returnFocus?.dataset?.versionId
     ? `[data-version-id="${CSS.escape(returnFocus.dataset.versionId)}"]`
     : null
+  drawer.classList.toggle('knowledge-reader', Boolean(drawerContent.querySelector('.reader-section')))
+  drawer.scrollTop = 0
+  document.body.classList.add('drawer-active')
   drawer.hidden = false
   drawer.setAttribute('aria-hidden', 'false')
   drawerBackdrop.hidden = false
@@ -1241,6 +1404,7 @@ function closeDrawer() {
   drawer.setAttribute('aria-hidden', 'true')
   drawerBackdrop.hidden = true
   drawer.hidden = true
+  document.body.classList.remove('drawer-active')
   requestAnimationFrame(() => {
     const returnTarget = document.contains(previousReturnFocus)
       ? previousReturnFocus
@@ -1284,6 +1448,10 @@ function showUnavailable() {
 }
 
 async function submitFeedback(form) {
+  if (state.capabilities?.directEditing) {
+    navigate('runs')
+    return
+  }
   if (!state.capabilities?.writeEnabled) {
     showToast('服务端尚未配置写入令牌。请到“Agent 设置”查看配置方法。', 'warning')
     return
@@ -1308,7 +1476,7 @@ async function submitFeedback(form) {
 }
 
 async function saveAgentPrompt(form) {
-  if (!state.operatorMode || !state.token) {
+  if (!state.operatorMode || (!state.token && !state.capabilities?.directEditing)) {
     showToast('请先进入治理模式。', 'warning')
     return
   }
@@ -1324,17 +1492,15 @@ async function saveAgentPrompt(form) {
 }
 
 async function startWorkflow(form) {
-  if (!state.operatorMode || !state.token) {
+  if (!state.operatorMode || (!state.token && !state.capabilities?.directEditing)) {
     showToast('请先进入治理模式，再启动自动运行。', 'warning')
     return
   }
   const data = new FormData(form)
-  const handle = await request('/api/v1/runs', {
+  const handle = await request('/api/v1/runs/markdown-lite', {
     method: 'POST',
     body: JSON.stringify({
-      scenario: JSON.parse(String(data.get('scenario') || '{}')),
       repositoryRoot: String(data.get('repositoryRoot') || ''),
-      workerCount: Number(data.get('workerCount') || 1),
     }),
   })
   state.runs = collection(await request('/api/v1/runs'), 'runs')
@@ -1343,12 +1509,41 @@ async function startWorkflow(form) {
   await openRun(runId)
 }
 
+document.querySelector('#project-selector').addEventListener('click', () => { navigate('projects').catch(showFatal) })
+
 nav.addEventListener('click', (event) => {
   const button = event.target.closest('[data-page]')
   if (button) navigate(button.dataset.page).catch(showFatal)
 })
 
+content.addEventListener('toggle', event => {
+  if (event.target.matches('[data-legacy-graph]') && event.target.open && state.selectedRun) void loadGraph(state.selectedRun.run.runId).catch(() => {})
+}, true)
+
+content.addEventListener('toggle', event => {
+  if (event.target.matches?.('.publication-panel') && event.target.open && !event.target.querySelector('#publication-settings')?.dataset.loaded) loadPublications().catch(productError)
+}, true)
+
 content.addEventListener('click', (event) => {
+  const deletion = event.target.closest('[data-delete-kind]')
+  if (deletion && !deletion.disabled) {
+    void openBatchDeletion({ request, kind: deletion.dataset.deleteKind, id: deletion.dataset.deleteId, label: deletion.dataset.deleteId }).then(async changed => {
+      if (changed) { state.selectedRun = null; state.runs = collection(await request('/api/v1/runs'), 'runs'); renderRuns(); await moduleBatches.refresh(); showToast('批次删除已完成。', 'success') }
+    }).catch(productError); return
+  }
+  const recovery = event.target.closest('[data-recover-deletions]')
+  if (recovery) { void recoverBatchDeletions(request).then(changed => changed ? boot() : showToast('没有未完成的删除。', 'success')).catch(productError); return }
+  const round = event.target.closest('[data-run-round]')
+  if (round && state.selectedRun) { state.selectedRound = Number(round.dataset.runRound); renderRunWorkspace(state.selectedRun); return }
+  const download = event.target.closest('[data-download-artifact]')
+  if (download) { downloadArtifact(download.dataset.downloadArtifact).catch((error) => showToast(userFacingError(error, '无法下载阶段证据。'), 'danger')); return }
+  const queueFilter = event.target.closest('[data-queue-filter]')
+  if (queueFilter) {
+    state.queueFilter = queueFilter.dataset.queueFilter
+    renderOverview()
+    content.querySelector(`[data-queue-filter="${CSS.escape(state.queueFilter)}"]`)?.focus()
+    return
+  }
   const pageLink = event.target.closest('[data-page-link]')
   if (pageLink) navigate(pageLink.dataset.pageLink).catch(showFatal)
   const runButton = event.target.closest('[data-run-id]')
@@ -1365,6 +1560,8 @@ content.addEventListener('click', (event) => {
   }
   const actionButton = event.target.closest('[data-action-item]')
   if (actionButton) performActionItem(actionButton)
+  if (event.target.closest('[data-stage-operations]')) void navigate('stages')
+  if (event.target.closest('[data-stage-back]')) void navigate('runs')
   if (event.target.closest('[data-run-back]')) { state.selectedRun = null; renderRuns() }
   const refresh = event.target.closest('[data-refresh-run]')
   if (refresh) openRun(refresh.dataset.refreshRun).catch(showFatal)
@@ -1383,6 +1580,19 @@ content.addEventListener('click', (event) => {
   if (event.target.closest('[data-load-evaluations]')) renderEvidence(true).catch((error) => showToast(userFacingError(error, '无法加载更多评测记录。'), 'danger'))
   if (event.target.closest('[data-load-sources]')) renderDiscovery(false, true).catch((error) => showToast(userFacingError(error, '无法加载更多来源。'), 'danger'))
   if (event.target.closest('[data-verify-provider]')) verifyProviderSettings()
+  const resumeRunButton = event.target.closest('[data-resume-run]')
+  if (resumeRunButton) resumeWorkflow(resumeRunButton).catch((error) => showToast(userFacingError(error, '无法恢复当前批次。'), 'danger'))
+  const cancelRunButton = event.target.closest('[data-cancel-run]')
+  if (cancelRunButton) cancelWorkflow(cancelRunButton).catch((error) => showToast(userFacingError(error, '无法取消当前批次。'), 'danger'))
+  if (event.target.closest('[data-load-publications]')) loadPublications().catch(productError)
+  if (event.target.closest('[data-sync-publications]')) syncPublications().catch(productError)
+  if (event.target.closest('[data-recover-publications]')) recoverPublications().catch(productError)
+  const browseDirectory = event.target.closest('[data-browse-directory]')
+  if (browseDirectory) browseServerDirectory(browseDirectory.dataset.browseDirectory, browseDirectory.dataset.path).catch(productError)
+  const selectDirectory = event.target.closest('[data-select-directory]')
+  if (selectDirectory) { const field = document.querySelector(`[name="${CSS.escape(selectDirectory.dataset.field)}"]`); field.value = selectDirectory.dataset.selectDirectory; field.dispatchEvent(new Event('input', { bubbles: true })); document.querySelector('#directory-browser').innerHTML = '' }
+  const publication = event.target.closest('[data-publication-key]')
+  if (publication) openPublication(publication.dataset.publicationKey).catch(productError)
   const lineageRun = event.target.closest('[data-lineage-run]')
   if (lineageRun) navigate('runs').then(() => openRun(lineageRun.dataset.lineageRun)).catch(showFatal)
   const knowledgeModule = event.target.closest('[data-knowledge-module]')
@@ -1423,7 +1633,7 @@ content.addEventListener('change', async (event) => {
       if (stage) stage.innerHTML = emptyState('选择一个批次', '工作流图只展示服务端已记录的 Agent 工作状态。')
       return
     }
-    if (stage) stage.innerHTML = '<div class="loading-state"><span class="spinner"></span>正在读取 Agent 节点事实…</div>'
+    if (stage) stage.innerHTML = '<div class="loading-state"><span class="spinner"></span>正在加载执行记录…</div>'
     await loadGraph(runId)
   }
   if (event.target.id === 'knowledge-status') {
@@ -1458,6 +1668,10 @@ content.addEventListener('submit', (event) => {
   if (event.target.id === 'workflow-start-form') {
     event.preventDefault()
     startWorkflow(event.target).catch((error) => showToast(userFacingError(error, '无法创建新批次。'), 'danger'))
+  }
+  if (event.target.id === 'publication-settings-form') {
+    event.preventDefault()
+    savePublicationSettings(event.target).catch(productError)
   }
   if (event.target.id === 'provider-settings-form') {
     event.preventDefault()
@@ -1512,6 +1726,17 @@ drawerContent.addEventListener('submit', (event) => {
 })
 
 drawerContent.addEventListener('click', (event) => {
+  const alternatives = event.target.closest('[data-card-alternatives]')
+  if (alternatives) {
+    const cardId = alternatives.dataset.cardAlternatives, panel = drawerContent.querySelector('[data-card-relations]')
+    panel.textContent = '正在读取已有关联…'
+    request(`/api/v1/associations/${encodeURIComponent(cardId)}`).then((result) => {
+      if (!panel.isConnected) return
+      panel.innerHTML = `<p>${result.scope === 'INTERNAL_AND_EXTERNAL' ? '包含固定外部材料引用' : '仅库内关联'}；候选未验证可替代性。${result.staleTasks ? '部分关系已失效，请重新建立关联。' : ''}</p>${result.relations.length ? result.relations.map((relation) => `<article><button class="text-button" type="button" data-version-id="${escapeHtml(relation.fromCardId === cardId ? relation.toVersionId : relation.fromVersionId)}">查看关联卡片</button><p>${escapeHtml(relation.reason)}</p><blockquote>${escapeHtml(relation.evidence.excerpt)}</blockquote><p>适用条件：${escapeHtml(relation.fromCardId === cardId ? relation.applicability : relation.fromApplicability ?? '未提供适用条件')}</p></article>`).join('') : '<p>没有有效库内关联。可先更新索引并建立关联，或直接检索其他卡片。</p>'}${(result.externalRelations ?? []).map((relation) => `<article><h4>${escapeHtml(relation.title)}</h4><p>${escapeHtml(relation.reason)}</p><blockquote>${escapeHtml(relation.evidence.excerpt)}</blockquote><p>材料适用条件：${escapeHtml(relation.materialApplicability)}</p><p>卡片适用条件：${escapeHtml(relation.cardApplicability)}</p><p class="material-identity">来源：${escapeHtml(relation.locator)} · ${escapeHtml(relation.sourceRevision)}</p><button class="secondary-button" type="button" data-download-artifact="/api/v1/external-materials/${escapeHtml(relation.materialId)}/artifacts/${escapeHtml(relation.materialDigest)}">下载引用正文</button><button class="secondary-button" type="button" data-download-artifact="/api/v1/external-materials/${escapeHtml(relation.materialId)}/artifacts/${escapeHtml(relation.rawDigest)}">下载材料原文</button></article>`).join('')}`
+    }).catch(() => { if (panel.isConnected) panel.textContent = '关联暂不可读取，请重试。' })
+    return
+  }
+
   const download = event.target.closest('[data-download-artifact]')
   if (download) {
     downloadArtifact(download.dataset.downloadArtifact).catch((error) => showToast(userFacingError(error, '无法下载评测证据。'), 'danger'))
@@ -1539,6 +1764,13 @@ drawerContent.addEventListener('click', (event) => {
 })
 
 content.addEventListener('click', (event) => {
+  const queueFilter = event.target.closest('[data-queue-filter]')
+  if (queueFilter) {
+    state.queueFilter = queueFilter.dataset.queueFilter
+    renderOverview()
+    content.querySelector(`[data-queue-filter="${CSS.escape(state.queueFilter)}"]`)?.focus()
+    return
+  }
   const filter = event.target.closest('[data-run-filter]')
   if (!filter) return
   for (const item of content.querySelectorAll('[data-run-filter]')) item.classList.toggle('active', item === filter)
@@ -1548,7 +1780,8 @@ content.addEventListener('click', (event) => {
 function filterRuns(filter) {
   const runs = state.runs.filter((run) => {
     if (!filter) return true
-    if (filter === 'active') return !TERMINAL.has(run.state)
+    if (filter === 'active') return isRunActive(run)
+    if (filter === 'failed') return run.executionStatus === 'FAILED'
     if (filter === 'attention') return needsAttention(run)
     return run.state === filter
   })
@@ -1556,9 +1789,13 @@ function filterRuns(filter) {
   if (target) target.innerHTML = runs.length ? runs.map((run, index) => target.closest('.reference-run-history') ? referenceRunRow(run, index === 0) : runRow(run)).join('') : emptyState('没有匹配的批次', '请选择其他状态筛选。')
 }
 
-operatorButton.addEventListener('click', () => {
+operatorButton.addEventListener('click', async () => {
   if (!state.capabilities) {
     showToast('能力状态读取失败，请重新连接后再试。', 'warning')
+    return
+  }
+  if (state.capabilities?.directEditing) {
+    await navigate('runs'); moduleBatches.openCreate()
     return
   }
   if (!state.capabilities?.writeEnabled) {
@@ -1579,6 +1816,7 @@ operatorButton.addEventListener('click', () => {
 themeButton.addEventListener('click', () => {
   applyTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light', true)
 })
+matchMedia('(max-width: 767px)').addEventListener('change', closeNavigation)
 navToggle.addEventListener('click', () => sidebar.classList.contains('open') ? closeNavigation() : openNavigation())
 navBackdrop.addEventListener('click', () => { closeNavigation(); navToggle.focus() })
 globalSearchButton.addEventListener('click', async () => {
@@ -1586,13 +1824,14 @@ globalSearchButton.addEventListener('click', async () => {
   document.querySelector('#knowledge-search')?.focus()
 })
 
-operatorForm.addEventListener('submit', (event) => {
+operatorForm.addEventListener('submit', async (event) => {
   event.preventDefault()
   if (!operatorToken.value.trim()) return
   state.token = operatorToken.value.trim()
   state.operatorMode = true
   operatorToken.value = ''
   operatorDialog.close()
+  await restoreSelectedProject()
   updateMode()
   refreshControlPlane().then(() => state.page === 'overview' && renderOverview()).catch((error) => showToast(userFacingError(error, '无法刷新控制面数据。'), 'danger'))
   showToast('令牌已载入当前页面内存。', 'success')
@@ -1622,7 +1861,12 @@ document.addEventListener('keydown', (event) => {
 })
 
 function updateMode() {
-  if (state.operatorMode) {
+  if (state.capabilities?.directEditing) {
+    state.operatorMode = true
+    modePill.textContent = '可编辑'
+    modePill.className = 'status-pill'
+    operatorButton.textContent = '＋ 新建批次'
+  } else if (state.operatorMode) {
     modePill.textContent = '治理模式'
     modePill.className = 'status-pill operator'
     operatorButton.textContent = '退出治理'
@@ -1642,10 +1886,27 @@ function showFatal(error) {
   content.innerHTML = emptyState('无法读取知识飞轮', userFacingError(error, '无法连接控制面服务。'), '<button class="primary-button" data-reload>重新连接</button>')
 }
 
+async function restoreSelectedProject() {
+  if (state.selectedProject) return
+  try {
+    const snapshotId = localStorage.getItem('workbench-project-input')
+    if (!snapshotId) return
+    const project = await request(`/api/v1/projects/${encodeURIComponent(snapshotId)}`)
+    if (!state.selectedProject && localStorage.getItem('workbench-project-input') === snapshotId) repositoryAnalysisPanel.selectProject(project)
+  } catch { /* 未授权或输入不可用时保留原选择标识，授权后可重试。 */ }
+}
+
 async function boot() {
+  try {
+    const maintenance = await request('/api/v1/maintenance')
+    if (maintenance.status === 'RECOVERY_REQUIRED') {
+      content.innerHTML = '<section class="panel"><h2>历史删除尚未完成</h2><p>恢复完成前，数据操作暂停。此前确认的范围与累计用量会保留。</p><button type="button" class="primary-button" data-recover-deletions>恢复未完成删除</button></section>'
+      return
+    }
+  } catch { /* 由常规加载展示连接或认证错误。 */ }
   const keys = ['status', 'capabilities', 'runs', 'knowledge', 'agents', 'actionItems', 'activities', 'components', 'knowledgeHealth']
   const results = await Promise.allSettled([
-    request('/api/v1/system/status'), request('/api/v1/system/capabilities'), request('/api/v1/runs'), request('/api/v1/knowledge'), request('/api/v1/agents'),
+    request('/api/v1/system/status'), request('/api/v1/system/capabilities'), request('/api/v1/runs'), request('/api/v1/cards'), request('/api/v1/agents'),
     request('/api/v1/action-items'), request('/api/v1/activity'), request('/api/v1/system/components'), request('/api/v1/knowledge/health'),
   ])
   results.forEach((result, index) => {
@@ -1654,6 +1915,7 @@ async function boot() {
   if (results.every((result) => result.status === 'rejected')) throw results[0].reason
   state.status = results[0].status === 'fulfilled' ? results[0].value : null
   state.capabilities = results[1].status === 'fulfilled' ? results[1].value : null
+  if (state.capabilities?.directEditing) state.operatorMode = true
   state.runs = results[2].status === 'fulfilled' ? collection(results[2].value, 'runs') : []
   state.knowledge = results[3].status === 'fulfilled' ? collection(results[3].value, 'knowledge') : []
   state.agents = results[4].status === 'fulfilled' ? collection(results[4].value, 'agents') : []
@@ -1664,6 +1926,7 @@ async function boot() {
   if (state.runs[0]) {
     state.latestProgress = await request(`/api/v1/runs/${encodeURIComponent(state.runs[0].runId)}/progress`).catch(() => null)
   }
+  await restoreSelectedProject()
   state.loadedAt = new Date().toISOString()
   const partial = Object.values(state.resourceErrors).some(Boolean)
   registryIndicator.className = `health-dot ${partial ? 'pending' : 'healthy'}`
@@ -1754,3 +2017,102 @@ function connectActivityStreamFrom(after) {
 }
 
 boot().catch(showFatal)
+
+
+// 本地发布操作使用认证 API；目录内容属于服务器文件系统。
+function productError(error) {
+  const messages = {
+    GIT_DISABLED: '请先启用 Git 同步并保存配置。',
+    GIT_CONFLICT: '远端分支已发生变化。请在独立知识仓库处理冲突后重试；本地发布仍然保留。',
+    GIT_AUTHENTICATION_FAILED: 'Git 认证失败，请检查仓库地址与令牌。',
+    GIT_REMOTE_CONTENT_DENIED: '远端包含已发布知识的修改或无关文件，已停止同步。本地知识保持原样，请检查远端后重试。',
+    GIT_SYNC_FAILED: 'Git 同步失败，请检查网络和仓库地址后重试。本地发布仍然保留。',
+    DIRECTORY_DENIED: '此目录不在授权范围内，或不是独立的空知识目录。',
+    PUBLICATION_CONFLICT: '发布正文与审计摘要不一致，请检查发布目录。',
+    PUBLICATION_PENDING: '发布尚待恢复，请点击恢复待完成发布。',
+  }
+  showToast(messages[error.code] ?? userFacingError(error, '操作失败，请检查配置后重试。'), 'danger')
+}
+async function browseServerDirectory(field, path) {
+  const input = document.querySelector(`[name="${field}"]`)
+  const listing = await request(`/api/v1/server-directories${path || input?.value ? `?path=${encodeURIComponent(path || input.value)}` : ''}`)
+  const container = document.querySelector('#directory-browser')
+  container.innerHTML = `<p>服务器目录：<code>${escapeHtml(listing.path)}</code></p><div class="directory-options">${listing.parent ? `<button type="button" class="secondary-button" data-browse-directory="${escapeHtml(field)}" data-path="${escapeHtml(listing.parent)}">上一级</button>` : ''}<button type="button" class="primary-button" data-select-directory="${escapeHtml(listing.path)}" data-field="${escapeHtml(field)}">选择当前目录</button>${listing.directories.map((directory) => `<button type="button" class="secondary-button" data-browse-directory="${escapeHtml(field)}" data-path="${escapeHtml(directory)}">${escapeHtml(directory.split('/').at(-1))}/</button>`).join('')}</div>`
+}
+async function loadPublications() {
+  const target = document.querySelector('#publication-settings')
+  if (!target || target.dataset.loading) return
+  target.dataset.loading = 'true'
+  try {
+  const settings = await request('/api/v1/publications/settings')
+  const publications = await request('/api/v1/publications')
+  if (!target.isConnected) return
+  target.innerHTML = `<form id="publication-settings-form" class="publication-form"><label>服务器知识目录<input name="directory" value="${escapeHtml(settings.directory)}" required></label><button class="secondary-button" data-browse-directory="directory" type="button">浏览服务器目录</button><div id="directory-browser" class="directory-browser"></div><label class="inline-check"><input type="checkbox" name="gitEnabled" ${settings.git.enabled ? 'checked' : ''}> 启用手动 Git 同步</label><label>目标仓库<input name="remote" value="${escapeHtml(settings.git.remote)}" placeholder="https://git.example/team/knowledge.git"></label><label>分支<input name="branch" value="${escapeHtml(settings.git.branch)}" required></label><label>HTTPS 访问令牌<input name="gitToken" type="password" autocomplete="new-password" placeholder="${settings.git.tokenConfigured ? '已配置；留空保留' : 'SSH 可使用服务器已有身份'}"></label><label class="inline-check"><input type="checkbox" name="clearToken"> 清除保存的 Git 令牌</label><button class="primary-button" type="submit">保存发布设置</button></form><div class="publication-actions"><button type="button" class="secondary-button" data-sync-publications ${settings.git.enabled ? '' : 'disabled'}>立即同步 Git</button><button type="button" class="secondary-button" data-recover-publications>恢复待完成发布</button></div><div class="publication-list">${publications.items.length ? publications.items.map((item) => `<button type="button" class="reference-doc" data-publication-key="${escapeHtml(item.publicationKey)}"><span><b>${escapeHtml(item.moduleId)}</b><small>${escapeHtml(item.versionId)}</small></span><span>${item.status === 'PUBLISHED' ? '已发布' : '待恢复'}</span><code>${escapeHtml(item.path)}</code></button>`).join('') : '<p>暂无通过门禁的本地发布。</p>'}</div>`
+  target.dataset.loaded = 'true'
+  } catch (error) {
+    if (target.isConnected) target.innerHTML = '<p>发布设置暂时无法读取。</p><button type="button" class="secondary-button" data-load-publications>重新读取</button>'
+    throw error
+  } finally { delete target.dataset.loading }
+}
+async function savePublicationSettings(form) {
+  const data = new FormData(form)
+  await request('/api/v1/publications/settings', { method: 'PUT', body: JSON.stringify({ directory: String(data.get('directory')), git: { enabled: data.get('gitEnabled') === 'on', remote: String(data.get('remote') || ''), branch: String(data.get('branch')), token: String(data.get('gitToken') || ''), clearToken: data.get('clearToken') === 'on' } }) })
+  form.reset()
+  await loadPublications()
+  showToast('发布设置已保存。', 'success')
+}
+async function syncPublications() {
+  const button = document.querySelector('[data-sync-publications]')
+  button.disabled = true
+  try { const result = await request('/api/v1/publications/sync', { method: 'POST', body: '{}' }); showToast(`已同步 ${result.publishedCount} 个本地发布。`, 'success') }
+  finally { button.disabled = false }
+}
+async function recoverPublications() {
+  await request('/api/v1/publications/recover', { method: 'POST', body: '{}' })
+  await loadPublications()
+  showToast('待完成发布已恢复。', 'success')
+}
+async function openPublication(key) {
+  const result = await request(`/api/v1/publications/${encodeURIComponent(key)}`)
+  const target = document.querySelector('#publication-settings')
+  target.innerHTML = `<button class="secondary-button" type="button" data-load-publications>返回发布列表</button><h3>${escapeHtml(result.metadata.title || result.receipt.moduleId)}</h3><p>版本 ${escapeHtml(result.receipt.versionId)} · 来源 ${escapeHtml(result.metadata.sourceCommit)}</p><article class="knowledge-body publication-readable">${renderKnowledgeMarkdown(result.markdown).html}</article><details class="reader-source"><summary>查看 Markdown 原文</summary><pre class="publication-markdown">${escapeHtml(result.markdown)}</pre></details><details><summary>来源与门禁证据</summary><pre class="json-view">${json(result.metadata)}</pre></details>`
+}
+
+
+async function cancelWorkflow(button) {
+  if (!state.operatorMode || (!state.token && !state.capabilities?.directEditing)) return
+  button.disabled = true
+  button.textContent = '正在取消…'
+  try {
+    await request(`/api/v1/runs/${encodeURIComponent(button.dataset.cancelRun)}/cancel`, { method: 'POST', body: '{}' })
+    state.runs = collection(await request('/api/v1/runs'), 'runs')
+    await openRun(button.dataset.cancelRun)
+    showToast('批次已取消。已完成的运行证据仍然保留。', 'success')
+  } catch (error) {
+    button.disabled = false
+    button.textContent = '取消批次'
+    throw error
+  }
+}
+
+
+async function resumeWorkflow(button) {
+  if (!state.operatorMode || (!state.token && !state.capabilities?.directEditing)) return
+  button.disabled = true
+  button.textContent = '正在恢复…'
+  try {
+    const result = await request(`/api/v1/runs/${encodeURIComponent(button.dataset.resumeRun)}/resume`, { method: 'POST', body: '{}' })
+    state.runs = collection(await request('/api/v1/runs'), 'runs')
+    await openRun(button.dataset.resumeRun)
+    showToast(result.executionStatus === 'RUNNING' ? '批次已恢复，继续使用原有预算。' : '恢复请求已处理，请查看当前执行状态。', result.executionStatus === 'RUNNING' ? 'success' : 'warning')
+  } catch (error) {
+    await openRun(button.dataset.resumeRun).catch(() => {})
+    throw error
+  }
+}
+
+// 指定来源捕获不触发刷新、搜索或其他表单提交。
+drawerContent.addEventListener('submit', (event) => {
+  if (event.target.id !== 'source-material-form') return
+  event.preventDefault(); captureSourceMaterial(event.target)
+})

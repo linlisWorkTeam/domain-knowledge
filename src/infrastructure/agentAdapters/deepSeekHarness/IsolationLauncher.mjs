@@ -7,6 +7,7 @@
 import { spawn } from 'node:child_process';
 import { existsSync, realpathSync } from 'node:fs';
 import { dirname, isAbsolute, parse, resolve, sep } from 'node:path';
+import { bundledLibraryEnvironment, bundledLibrarySandboxArgs } from '../../runtime/BundledLibraries.ts';
 
 function requiredPath(name) {
   const value = process.env[name];
@@ -79,11 +80,12 @@ const args = [
   ...patches.flatMap((path) => ['--ro-bind', path, path]),
   '--setenv', 'HOME', dshHome,
   '--setenv', 'TMPDIR', '/tmp',
+  ...bundledLibrarySandboxArgs(nodeBin),
   '--chdir', workspace,
   '--', nodeBin, runtimeBin, ...process.argv.slice(2),
 ];
 
-const child = spawn(command, args, { stdio: 'inherit', env: process.env });
+const child = spawn(command, args, { stdio: 'inherit', env: { ...process.env, ...bundledLibraryEnvironment(nodeBin) } });
 for (const signal of ['SIGTERM', 'SIGINT']) {
   process.on(signal, () => child.kill(signal));
 }

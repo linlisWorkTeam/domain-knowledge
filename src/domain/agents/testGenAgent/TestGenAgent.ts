@@ -3,13 +3,24 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：实现测试生成角色的业务步骤与结构化结果转换。
  */
+import { execute as executeBehavior } from './BehaviorCasesExecution.ts';
+import type { Input as BehaviorInput, Output as BehaviorOutput } from './BehaviorCasesContract.ts';
 import type { ExecutionContext, RoleResult, PendingArtifact } from '../AgentExecution.ts';
 import { assertActive, pending } from '../AgentExecution.ts';
 import { type Input, type Output, type TestGenContext, schemaFor, validateInput, validateOutput } from './TestGenAgentContract.ts';
 import { definition, buildPrompt, readablePaths } from './TestGenAgentPrompt.ts';
 
 /** 仅根据源码、公开接口和测试策略提出候选测试，不接收候选知识作为依据。 */
-export async function execute(input: Input, context: TestGenContext): Promise<RoleResult<Output>> {
+export function execute(input: BehaviorInput, context: ExecutionContext): Promise<RoleResult<BehaviorOutput>>;
+export function execute(input: Input, context: TestGenContext): Promise<RoleResult<Output>>;
+export async function execute(input: Input | BehaviorInput, context: TestGenContext): Promise<RoleResult<Output | BehaviorOutput>> {
+  if ('executionContract' in input.payload) {
+    if (input.payload.executionContract !== 'behavior-cases-v1' || context.validatedOutput !== undefined) throw new Error('TESTGEN_EXECUTION_CONTRACT_INVALID');
+    return executeBehavior(input as BehaviorInput, context);
+  }
+  return executeSources(input as Input, context);
+}
+async function executeSources(input: Input, context: TestGenContext): Promise<RoleResult<Output>> {
   assertActive(context.signal);
   // 缺失材料应在调用模型之前失败，避免模型用猜测填补业务证据。
   validateInput(input);
@@ -17,6 +28,7 @@ export async function execute(input: Input, context: TestGenContext): Promise<Ro
   // 角色决定本阶段的任务与能力范围；会话、工具执行和格式修复交给模型适配器。
   const raw = context.validatedOutput ?? await context.model.execute({
     role: definition.agentId,
+    stage: 'behavior-cases',
     prompt: buildPrompt(input, context),
     outputSchema: schema,
     tools: definition.tools,

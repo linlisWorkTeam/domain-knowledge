@@ -65,3 +65,18 @@ test('dependency scanning covers imports and exports without matching prompt pro
     type Shape = import('./type.ts').Shape;
   `), ['./static.ts', './export.ts', './dynamic.ts', './legacy.ts', './type.ts']);
 });
+
+test('external layers enter internal role execution through domain services', () => {
+  for (const root of ['src/application', 'src/infrastructure', 'src/interfaces']) {
+    for (const path of files(root).filter((path) => path.endsWith('.ts'))) {
+      const source = readFileSync(path, 'utf8');
+      assert.doesNotMatch(source, /(?:from\s*|import\s*\(|require\s*\()\s*['"][^'"]*domain\/agents\/(?:AgentRegistry|[^/]+\/[^/]+Agent)\.ts['"]/, `${path}: internal role execution must remain in Domain`);
+    }
+  }
+  const application = readFileSync('src/application/services/RoleExecution.ts', 'utf8');
+  assert.match(application, /domain\/workflow\/AgentExecutionService\.ts/);
+  for (const path of ['src/domain/association/AssociationDomainService.ts', 'src/domain/evaluation/EvalRunnerDomainService.ts']) {
+    const source = readFileSync(path, 'utf8');
+    assert.doesNotMatch(source, /from\s*['"][^'"]*agents\//, `${path}: deterministic service must not invoke a generative role`);
+  }
+});

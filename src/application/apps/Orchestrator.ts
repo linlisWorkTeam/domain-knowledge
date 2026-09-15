@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：协调Orchestrator用例及其依赖的领域规则与端口。
  */
+import { presentRunExecution, stageRecoveryBlock } from '../services/RunExecutionPresentation.ts';
 import type { AgentId, DemoReportBuilder, RunConfigurationManager } from '../ports/ApplicationPorts.ts';
 import type {
   AgentCatalogService, AutomatedProjectWorkflowService,
@@ -54,6 +55,24 @@ export class Orchestrator {
   /** 提供 状态 对应的状态操作。 */
   async status(...args: Parameters<AutomatedProjectWorkflowService['status']>) {
     return (await this.workflow()).status(...args);
+  }
+
+  /** 读取执行状态及恢复约束，保持业务阶段和失败证据原样。 */
+  async executionForRun(run: { runId: string; state: string }) {
+    let view;
+    try {
+      view = await this.status(run.runId);
+    } catch (error) {
+      const notTracked = error instanceof Error && error.message.startsWith('WORKFLOW_NOT_FOUND:');
+      return presentRunExecution(run.state, notTracked ? 'NOT_TRACKED' : 'UNAVAILABLE');
+    }
+    let compatible = false;
+    if (view.executionStatus === 'FAILED' && view.budget && view.budget.remainingMs > 0 && view.currentNode) {
+      try { await this.runConfiguration.assertCompatible(run.runId); compatible = true; }
+      catch { /* 旧执行版本或已变更配置仍可阅读，但不可声明可恢复。 */ }
+    }
+    const stageBlock = compatible ? stageRecoveryBlock((await this.workflow()).flywheel.repository.listEvents(run.runId)) : undefined;
+    return presentRunExecution(run.state, view, compatible, stageBlock);
   }
 
   /** 恢复请求。 */

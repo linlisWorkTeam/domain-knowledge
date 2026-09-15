@@ -7,7 +7,7 @@ import type { ArtifactRef } from '../Domain.ts';
 import type { AgentCommand, AgentId } from './AgentContracts.ts';
 
 // 执行语义改变时更新版本，阻止旧 checkpoint 在不同角色实现下继续运行。
-export const ROLE_EXECUTION_VERSION = 'domain-agents-v10-check-evidence-guards';
+export const ROLE_EXECUTION_VERSION = 'domain-agents-v11-workbench-evidence';
 /** 受信材料。 */
 export interface Material { ref: ArtifactRef; content: unknown }
 /** Application 已加载并校验的角色材料；不包含通用工作流状态或存储实现。 */
@@ -27,6 +27,10 @@ export interface RoleInput<P> {
 }
 /** 模型请求。 */
 export interface ModelRequest {
+  /** 当前阶段的输出上限；只能收紧 Provider 的配置上限。 */
+  maxTokens?: number;
+  /** 业务阶段参与会话和幂等键，概要与正文不得共用模型会话。 */
+  stage?: string;
   /** 提供role信息，供调用方读取或传入。 */
   role: AgentId;
   /** 提供提示词信息，供调用方读取或传入。 */
@@ -41,7 +45,7 @@ export interface ModelRequest {
   outputAttempts?: 1;
   reportAttempt?: number;
 }
-/** 模型运行 Port：Adapter 默认负责网络及格式修复；Check 以 outputAttempts=1 接管统一报告预算，避免两层重复重试。 */
+/** Adapter 默认负责格式重试；Check 以 outputAttempts=1 接管报告预算。角色语义修复共享阶段信号与截止时间。 */
 export interface ModelExecutionPort {
   /** 执行当前角色或业务阶段并返回结构化结果。 */
   execute(request: ModelRequest, signal?: AbortSignal): Promise<Record<string, unknown>>;
@@ -50,6 +54,17 @@ export interface ModelExecutionPort {
 }
 /** 执行上下文。 */
 export interface ExecutionContext {
+  /** 新阶段使用累计活跃时间；旧Run省略时保留原墙钟契约。 */
+  now?: () => number;
+  /** 新阶段可在额度、取消等操作性中断后继续；实际请求仍累计计费。 */
+  resumeOperationalFailures?: boolean;
+  /** Application 保存阶段尝试，包括失败；同版本恢复使用同一记录。 */
+  stageJournal?: {
+    read(stage: string): Promise<StageAttempt[]>;
+    /** 跨任务尝试的只读事实约束，不参与当前语义尝试计数或截止时间。 */
+    history?(stage: string): Promise<StageAttempt[]>;
+    record(attempt: StageAttempt): Promise<void>;
+  };
   /** 提供模型信息，供调用方读取或传入。 */
   model: ModelExecutionPort;
   /** 提供命令信息，供调用方读取或传入。 */
@@ -60,6 +75,18 @@ export interface ExecutionContext {
   iteration: number;
   /** 提供取消信号信息，供调用方读取或传入。 */
   signal?: AbortSignal;
+}
+/** 阶段审计原文只保存在本地工件中，失败记录不能晋升为角色成功结果。 */
+export interface StageAttempt {
+  schemaVersion: 'role-stage-v1';
+  stage: string;
+  attempt: number;
+  startedAt: number;
+  deadlineAt: number;
+  status: 'STARTED' | 'PASSED' | 'REJECTED' | 'FAILED';
+  output?: Record<string, unknown>;
+  issue?: { code: string; field: string; hint: string };
+  failureCode?: string;
 }
 /** 待保存工件只有内容和逻辑名称，Domain 不创建 CAS 引用或操作文件系统。 */
 export interface PendingArtifact { key: string; content: string; mediaType: string }

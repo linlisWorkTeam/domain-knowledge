@@ -36,6 +36,11 @@ SPDX-License-Identifier: MIT
 
 新增 HTTP 能力先在 Application App 确认用例和端口，随后接 Server 路由和 Console；不要让接口绕过 App 调用数据库。新增角色必须显式更新 AgentContracts、AgentRegistry、Domain Workflow、可信输入加载和版本化契约。
 
+## 调度 subagent 开发
+
+执行 [subagent 并行协作规则](specs/totalRules/CodeTaste.md#开发过程中的-subagent-并行协作)。主 Agent 可以先冻结接口，再把角色实现、独立服务改动和只读审查分给不同 subagent；每个写入任务先建独立 worktree 并 bootstrap 到 READY。交付记录使用“目标 / 基线 / 文件范围 / 依赖 / 验证命令 / 提交与未完成项”六项即可，无需新增模板系统。
+
+例如修改 Association 服务与 DocGen 提示词时，两项在契约不变的前提下可以并行；合并到集成 worktree 后重跑领域测试、类型检查和 Spec 校验。共享 AgentContracts 或锁文件的改动由单一负责人处理。宿主不能调度 subagent 时记录串行回退，不能把串行执行记为并行验收。
 ## 修改代码后同步现有文档
 
 以本次 PR 的实际 base 到 HEAD 差异定位受影响模块；未提交修改也纳入核对。先对照模块 Spec 更新行为、输入输出、不变量、失败与恢复，按实际影响同步跨模块 Workflow、4+1 视图和使用指南；验收条件或持久状态未变时不机械更新追踪矩阵或 Status。删除的是已经失效的当前状态描述；尚未实现的目标、用户延期事项和历史证据保留并明确标记，不能按代码现状缩减目标。

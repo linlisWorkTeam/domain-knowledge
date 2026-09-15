@@ -3,13 +3,14 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：为生产与独立开发统一执行角色、保存工件并提交结果信封。
  */
-import { roleExecutors } from '../../domain/agents/AgentRegistry.ts';
-import type { AgentCommand, AgentResult, AgentId } from '../../domain/agents/AgentContracts.ts';
-import type { ExecutionContext, RoleInput, RoleResult } from '../../domain/agents/AgentExecution.ts';
+import { commitRoleArtifacts } from './RoleArtifacts.ts';
+import { executeAgent } from '../../domain/workflow/AgentExecutionService.ts';
+import type { AgentCommand, AgentId } from '../../domain/agents/AgentContracts.ts';
+import type { ExecutionContext, RoleInput, RoleResult, StageAttempt } from '../../domain/agents/AgentExecution.ts';
 import { assertActive, AgentReportFailure } from '../../domain/agents/AgentExecution.ts';
+import { createEvent, type ArtifactRef } from '../../domain/Domain.ts';
 import type { TestGenContext } from '../../domain/agents/testGenAgent/TestGenAgentContract.ts';
 import type { DocGenContext } from '../../domain/agents/docGenAgent/DocGenAgentContract.ts';
-import type { ArtifactRef } from '../../domain/Domain.ts';
 import type { AgentContractValidator } from '../ports/ApplicationPorts.ts';
 import type { KnowledgeFlywheelService } from './ApplicationServices.ts';
 
@@ -44,48 +45,38 @@ export class RoleExecutionService {
       runId: command.runId, nodeId: request.nodeId, generationKey: command.generationKey,
       inputRefs: uniqueRefs([...request.inputRefs, ...input.materials.map(({ ref }) => ref), commandRef]),
     }, async () => {
-      // 版本化命令已验证角色与 payload 的对应关系，在唯一调度边界收窄为具体角色入口。
-      const execute = roleExecutors[command.agentType].execute as unknown as (
-        input: RoleInput<Record<string, unknown>>, context: ExecutionContext,
-      ) => Promise<RoleResult<unknown>>;
+      const stageJournal: NonNullable<ExecutionContext['stageJournal']> = {
+        read: async (stage) => {
+          const latest = new Map<number, StageAttempt>();
+          for (const event of this.flywheel.repository.listEvents(command.runId)) {
+            const payload = event.payload;
+            if (payload.kind !== 'role-stage-attempt' || payload.generationKey !== command.generationKey || payload.stage !== stage) continue;
+            const bytes = await this.flywheel.getArtifact(payload.artifactRef as ArtifactRef);
+            const attempt = JSON.parse(Buffer.from(bytes).toString('utf8')) as StageAttempt;
+            if (attempt.schemaVersion !== 'role-stage-v1' || attempt.stage !== stage) throw new Error('AGENT_STAGE_JOURNAL_INVALID');
+            latest.set(attempt.attempt, attempt);
+          }
+          return [...latest.values()].sort((a, b) => a.attempt - b.attempt);
+        },
+        record: async (attempt) => {
+          const artifactRef = await this.flywheel.putArtifact(Buffer.from(JSON.stringify(attempt)), 'application/json');
+          this.flywheel.repository.recordOperationalEvent(createEvent(command.runId, 'ArtifactCommitted', {
+            kind: 'role-stage-attempt', generationKey: command.generationKey, agentType: command.agentType,
+            stage: attempt.stage, attempt: attempt.attempt, status: attempt.status, deadlineAt: attempt.deadlineAt, artifactRef,
+          }, this.flywheel.clock()));
+        },
+      };
       let roleResult: RoleResult<unknown>;
-      try { roleResult = await execute(input, context); }
+      try { roleResult = await executeAgent(input, { ...context, stageJournal }); }
       catch (error) {
         if (!(error instanceof AgentReportFailure)) throw error;
         const refs: ArtifactRef[] = [];
         for (const artifact of error.artifacts) refs.push(await this.flywheel.putArtifact(Buffer.from(artifact.content), artifact.mediaType));
-        // NodeFailed 保存可追溯 CAS 定位，不能提交成功 checkpoint 或丢弃修正历史。
+        // 保留失败报告的 CAS 证据，不提交成功 checkpoint。
         throw new Error(`${error.message}; reportEvidence=${refs.map((ref) => ref.artifactId).join(',')}`, { cause: error });
       }
-      const rawRef = await this.flywheel.putArtifact(Buffer.from(JSON.stringify(roleResult.output, null, 2)), 'application/json');
-      // 先保存原始输出与角色声明的工件，再将逻辑引用替换成不可变 CAS 引用。
-      const refs = new Map<string, ArtifactRef>([['raw', rawRef]]);
-      for (const artifact of roleResult.artifacts) {
-        if (refs.has(artifact.key)) throw new Error('AGENT_PENDING_ARTIFACT_DUPLICATED');
-        refs.set(artifact.key, await this.flywheel.putArtifact(Buffer.from(artifact.content), artifact.mediaType));
-      }
-      // 只做通用引用绑定，不在这里维护七角色的业务分支或决定图连接。
-      const bind = (value: unknown): unknown => {
-        if (!value || typeof value !== 'object') return value;
-        if ('agentNode' in value) return this.nodeByAgent[value.agentNode as AgentId];
-        if ('agentGeneration' in value) return `${command.runId}:${this.nodeByAgent[value.agentGeneration as AgentId]}:${context.iteration}:main:contract-v10`;
-        if ('pendingArtifact' in value) {
-          const ref = refs.get(String(value.pendingArtifact));
-          if (!ref) throw new Error('AGENT_PENDING_ARTIFACT_MISSING');
-          return ref;
-        }
-        if (Array.isArray(value)) return value.map(bind);
-        return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, bind(item)]));
-      };
-      const result: AgentResult = {
-        schemaVersion: '1.0', commandId: command.commandId, commandRef, rawOutputRef: rawRef,
-        runId: command.runId, agentType: command.agentType, status: 'SUCCEEDED',
-        outputRefs: uniqueRefs([...refs.values()]), payload: bind(roleResult.payload) as Record<string, unknown>,
-      };
-      // 保存结果信封前再次校验对外契约，取消或失败时不能提交成功 checkpoint。
-      this.contracts.assertResult(result);
-      const resultRef = await this.flywheel.putArtifact(Buffer.from(JSON.stringify(result, null, 2)), 'application/json');
-      assertActive(context.signal);
+      const { resultRef, rawRef } = await commitRoleArtifacts(this.flywheel.artifacts, this.contracts, command, commandRef, roleResult,
+        (role) => this.nodeByAgent[role], (role) => `${command.runId}:${this.nodeByAgent[role]}:${context.iteration}:main:contract-v11`, context.signal);
       return [resultRef, rawRef];
     });
     const ref = checkpoint.outputRefs[0];

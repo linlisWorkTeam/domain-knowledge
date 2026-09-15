@@ -5,6 +5,7 @@
  */
 import { validateProjectAgentConfiguration } from '../../domain/agents/ProjectAgentConfiguration.ts';
 import type { RealSourceScenario } from './ProjectFlow.ts';
+import { assertModuleBehaviorSuite } from '../../domain/agents/testGenAgent/ModuleBehaviorSuite.ts';
 
 /** Validate task data before creating a Run. Tool execution stays in the trusted evaluator. */
 /** 解析项目Scenario。 */
@@ -33,9 +34,22 @@ export function parseProjectScenario(value: unknown, repositoryRoot?: string): R
     if (!Array.isArray(paths) || !paths.every(path) || (key !== 'publicInterfacePaths' && !paths.length)) return fail();
     result[key] = [...paths];
   }
+  if ((result.publicInterfacePaths as string[]).some((path) => (result.sourcePaths as string[]).includes(path))) return fail();
+  if (item.moduleContract !== undefined || item.fixedSuite !== undefined) {
+    const contract = item.moduleContract as RealSourceScenario['moduleContract'];
+    if ((result.publicInterfacePaths as string[]).length) return fail();
+    if (!contract || Object.keys(contract).length !== 3 || !path(contract.modulePath)
+      || !(result.allowedGeneratedPaths as string[]).includes(contract.modulePath)
+      || typeof contract.exportName !== 'string' || !/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(contract.exportName)
+      || typeof contract.signature !== 'string' || !contract.signature.trim()) return fail();
+    assertModuleBehaviorSuite(item.fixedSuite, [contract.modulePath]);
+    if (item.fixedSuite.exportName !== contract.exportName) return fail();
+    result.moduleContract = structuredClone(contract);
+    result.fixedSuite = structuredClone(item.fixedSuite);
+  }
   for (const key of ['prepareCommands', 'referenceCommands', 'firstIterationCommands', 'finalCommands']) {
     const commands = item[key];
-    if (!Array.isArray(commands) || (key !== 'prepareCommands' && !commands.length)) return fail();
+    if (!Array.isArray(commands) || (key !== 'prepareCommands' && !commands.length && !result.moduleContract)) return fail();
     result[key] = commands.map((command: unknown) => {
       if (!command || typeof command !== 'object' || Array.isArray(command)) return fail();
       const c = command as Record<string, unknown>;

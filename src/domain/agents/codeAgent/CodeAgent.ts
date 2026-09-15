@@ -17,6 +17,7 @@ export async function execute(input: Input, context: ExecutionContext): Promise<
   // 角色决定本阶段的任务与能力范围；会话、工具执行和格式修复交给模型适配器。
   const raw = await context.model.execute({
     role: definition.agentId,
+    stage: 'implementation',
     prompt: buildPrompt(input, context),
     outputSchema: schema,
     tools: definition.tools,

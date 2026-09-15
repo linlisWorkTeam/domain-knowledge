@@ -17,7 +17,7 @@ test('FlywheelDomainService owns lifecycle rules and keeps generation capabiliti
   assert.deepEqual(domain.generationCapabilities(), ['doc-gen', 'test-gen', 'code']);
 });
 
-test('EvalRunnerDomainService exposes deterministic EvaluationAgent capability', () => {
+test('EvalRunnerDomainService exposes deterministic evaluation service capability', () => {
   const flywheel = new FlywheelDomainService();
   const evaluator = new EvalRunnerDomainService();
   const run = flywheel.createRun('module-a', 'policy-a', '2026-09-03T00:00:00.000Z');

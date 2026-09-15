@@ -22,11 +22,25 @@ DSH 原生 SDK 是默认接入后端，Adapter 负责输出提取、闭合 Schem
 
 ConfiguredProvider 解析已验证设置或环境配置。Console 已保存但未启用/未验证的配置阻止新 Run，不静默回退；已有 Run 使用冻结配置。OpenCode Go 根据非秘密参数生成运行目录补丁，补丁只记录密钥环境变量名。配置方式见 Runtime 指南。
 
-已配置提供方的 HTTP 转发使用自己的 `User-Agent` 标识。对 `opencode.ai`，依据 [Go 客户端约定](https://opencode.ai/docs/go/#where-can-i-use-it) 发送 `x-opencode-session`：从当前角色调用的 idempotencyKey 生成不可逆摘要，同一次调用内的工具往返和格式修复保持稳定，不同角色/轮次使用不同标识；不发送原始项目路径或密钥，也不转发客户端任意头。其他主机不发送此提供方专属头。传输策略版本进入运行配置指纹；已有失败运行不在配置改变后静默恢复。`GET /models` 通过只证明模型目录可访问，不证明正式生成请求成功。
+模型转发请求使用产品 User-Agent，仅对 opencode.ai 在 x-opencode-session 头中传递原生 DSH 会话标识。会话启动回调在首次请求前绑定标识，工具往返保持稳定，格式重试使用新会话；不能将整次飞轮或不同角色共用一个会话。该头来自可信适配器，不从模型或转发请求复制。此行为遵循 [OpenCode Go 客户端要求](https://opencode.ai/docs/go/#where-can-i-use-it)，凭据仍只由父进程注入。
+
+SSE usage 按单次 HTTP 请求的最新累计快照统计，不能逐帧累加；工具往返的不同请求相加，格式重试的调用记录独立计数。旧记录保持原样，若旧适配器对累计快照重复求和，验收证据必须标注其 token 统计不可作为实际用量或计费依据。
+
+## 显式连接验证
+
+用户点击验证后，先读取模型列表，再通过生产 ConfiguredDshProvider 和原生 DSH SDK 执行一次最小 JSON 生成。模型列表可访问不代表生成协议可用；只有两阶段均通过才记录 GENERATION_READY 并允许启用。公开结果和持久化记录分别保存 modelList、generation 检查结论；旧版仅 READY 的记录保持可读，显示 GENERATION_VERIFICATION_REQUIRED，等待用户重新验证。保存、读取、启动服务及加载旧记录均不触发生成。
+
+最小生成使用空的临时工作空间、无授权工具、64 个输出 token、一次 Schema 尝试和最多一次上游生成请求。复用生产原生会话标识、产品 User-Agent、流解析、Bubblewrap 隔离及凭据转发，不另造与实际运行脱节的生成 HTTP 请求。原生网络重试关闭；即使模型意外请求工具，转发器也不会产生第二次付费请求。界面在操作前说明可能产生少量模型费用。
+
+探针与业务模型共用 ECS 串行执行槽，30 秒总期限覆盖排队、模型列表请求及生成，HTTP 客户端断开传递取消。模型列表最多 64 KiB，生成响应及进程输出均有上限；超时、取消与失败等待子进程退出后清理临时目录。失败只返回固定原因码，不返回响应正文、密钥或任意异常消息。受控端点回归证明协议与隔离；不把受控通过当作真实提供方验收。
+
+其他主机不发送此提供方专属头。传输策略版本进入运行配置指纹；已有失败运行不在配置改变后静默恢复。
 
 ## 凭据与材料
 
 ProviderSettings 加密保存凭据，对外只返回配置状态、脱敏摘要和校验结果；密钥不进入浏览器持久化、Prompt 日志或 Run 摘要。PublicHttps 位于独立 http 适配器，模型探针与来源读取共用。材料插件按角色白名单读取；Bubblewrap 隔离和会话限制由运行时实现，不扩大 Domain 工具权限。
+
+read_material 在访问文件系统前校验词法路径，拒绝隐藏路径、穿越及路径中的符号链接，再核对规范路径和普通文件类型。越权请求统一返回 DSH_MATERIAL_DENIED，不因隔离空间内目标不存在而改变分类。原生 DSH 验收使用真实 Bubblewrap，并在子进程内部单独探测授权文件可见、同级参考文件不可见，避免仅凭工具拒绝结果推断进程隔离成立。
 
 2026-09-10 已确认的 CodeAgent 目标见 [CodeAgent](../../domainFunction/agents/codeAgent/CodeAgent.md) 和 [Workspace](../../domainFunction/workspace/Workspace.md)：读取本轮卡片与必要配置，不给原仓库接口授权；工具限制与进程隔离必须同时落实，不能仅设置 cwd。当前默认 DSH 入口启用 Bubblewrap，但底层仍允许 `processIsolation: none`，因此不能把现有可选隔离描述为目标已完成。后续实现应拒绝无法满足隔离的目标运行，并验证提示词材料也没有绕过文件白名单。CodeAgent 不开放 Shell、全局文件读取或直接写入工具；源码由框架校验后落盘。
 
@@ -36,3 +50,18 @@ CompanyCodeAgentCliAdapter 保留进程调用和既有契约测试，真实公�
 
 
 文档关系：[设计目录](../../README.md)负责代码与设计定位；[开发指南](../../../Development.md)说明修改和交付步骤。
+
+业务 DSH 的 SSE 累计传输上限为 16 MiB，覆盖帧头、usage 快照和推理字段；该值不作为内存缓冲大小。单行未闭合缓冲仍限 2 Mi 字符，原生进程输出、token、阶段/总时间限制保持独立。显式连接探针仍限 64 KiB，不随业务默认值增大。大帧开销的小正文受控流必须通过；累计流、超长单行及探针超限仍拒绝，且不自动重试。
+
+
+## 提供方额度停止
+
+ConfiguredProvider有界读取最多16KiB错误JSON，仅以机器code/type识别insufficient_quota、quota_exceeded、credit_balance_too_low；不依据自然语言或全部429推测额度耗尽。402无明确机器码映射PROVIDER_PAYMENT_REQUIRED，其他429仍为PROVIDER_RATE_LIMITED。模型错误正文不进入报告。所有这些传输失败不进入Schema/阶段语义重试。
+
+ProviderQuotaStop按端点与凭据摘要在私有DSH目录留下停止状态。先创建停止目录，再写固定原因；原因不可读时拒绝调用。每次上游请求检查，同一凭据的配置revision或模型变化不自动清除。原始凭据不写入标记；临时限流不产生永久标记。新实例和进程重启必须保持停止。
+
+### 流式超时诊断
+
+ConfiguredDshProvider 审计 metadata.streamDiagnostics 增加 JSON 编码的 provider-stream-diagnostics-v1，范围为单次 provider.run 的累计 HTTP 传输：请求数、首响应头/首数据/末数据距启动毫秒、接收字节、SSE 数据帧数、可见输出和 reasoning 字段的 UTF-16 字符数。只保存计数，不保存正文、推理内容、凭据、URL 或请求头。工具往返与内部格式重试属于同一 provider.run，快照显式标记累计范围。没有数据时首末时刻为 null。字符数不能换算或代替供应商 tokens；供应商未报告用量仍未知。该诊断不改变请求材料、角色期限、失败状态或发布门禁。
+
+来源Review的source-review-policy-v1最长600000ms，与适配器默认600000ms并列约束；适配器或阶段总预算更短时先停止。策略来自冻结criteria，不能关闭AbortSignal、放开输出上限或更改供应商用量未知规则。

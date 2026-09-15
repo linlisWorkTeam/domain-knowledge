@@ -24,6 +24,11 @@ Worker 不生成最终知识版本，也不判断文档是否通过。DocGen 收
 
 结果同时保留 workerId 和来源。框架将完整 JSON 保存为 knowledgeChunk，chunkRef 指向该结果；最终来源使用受信输入，不直接采用模型自报的来源。
 
+
+父级使用工作台 `section-doc-v1` 时，子任务显式携带 `source-facts-v1`，保存接口、行为与边界事实及其授权源码行区间。模型只输出定位，程序从冻结源码提取逐字 quote，拒绝越权路径、越界行号和空白证据。缺失类别必须保留具体风险；固定验收待办使用 verificationNeeds，不能借此清除实际缺陷。默认项目子任务继续使用 analysisScope、sourceEvidence 和 unresolvedQuestions，并校验全部已分配文件的覆盖。两种模式均通过 DocGen 内部子任务服务执行，不增加外层工作流节点。
+
+内部子任务将完整片段作为 CAS JSON 字符串交接，DocGen 的风险收集同时支持对象与此序列化形式；同一来源的风险标识保持一致。JSON 风险字段损坏时拒绝交接，不能把编码问题当作没有风险。任务版本更新为 subagent-v4，输入契约、源码范围及提示词参与生成键。
+
 ## 3. 工作流程
 
 ### 接收分配并阅读

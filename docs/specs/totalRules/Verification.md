@@ -62,6 +62,7 @@ SPDX-License-Identifier: MIT
 | AC-DOC-002 | Given 一个跨层大规模特性，When 准备合入，Then Console、GitHub Pages、工程文档、Spec、追踪矩阵和自动化验收均已更新或在 PR 中明确说明不适用。 |
 | AC-DOC-003 | Given 仓库中已跟踪的 Markdown 和关键入口文档，When 审阅文档，Then 中文说明和适用的 English summary 便于目标读者理解，不以字数或固定 HTML 模板作为永久门禁，代码标识符和协议值仍可与源码直接互查。 |
 | AC-DOC-004 | Given 官网和控制台，When 检查静态文案、状态标签和运行时投影，Then 除品牌、项目名、`Agent`、API/协议缩写、代码字段、枚举原值和技术标识符外，用户看到的栏目、状态与说明均为自然中文；`Registry` 显示为“注册”，名词 `Run` 显示为“批次”。 |
+| AC-DEV-001 | Given 支持 subagent 的开发宿主和两个无写入冲突的任务，When 主 Agent 分派并行执行，Then 每个写入任务有独立 worktree、READY、明确范围及可审计交付，集成后验证通过；失败或取消保留原因；宿主不支持时明确记录串行回退且不宣称并行通过。 |
 | AC-CONFIG-001 | Given 两个项目配置、同项目不同场景及知识卡片版本，When 选择项目/场景并启动任务、随后修改配置及恢复旧任务，Then 依赖/构建说明留在项目配置，角色只收到必要字段；同项目只换卡片可复用配置，不同项目使用各自配置；本轮卡片/配置版本与摘要、实际生效场景、可读白名单及输出根目录固定可查，旧任务不随修改漂移，冻结版本不可用则明确失败。 |
 | AC-CODE-001 | Given 含公开接口的知识卡片和合法项目配置，When 组装并执行 CodeAgent，Then 无须独立 publicInterfaceRefs 或原仓库接口文件，只接收卡片与裁剪出的 C/C++ 标准、依赖和允许输出路径；不传整份场景、参考测试或答案，完整构建配置仅交执行器，返回包含源码 path/content 的 files 列表。 |
 | AC-CODE-002 | Given 合法输出及包含绝对路径、越界、重复、未授权文件或符号链接逃逸的输出，When 框架接收 CodeAgent files，Then 先校验整组再落盘，非法输出不写入源码目录；合法 C/C++ 源码只写本轮隔离输出目录并留工件引用，原业务仓库不变，比较、编译和测试由后续执行器完成。 |
@@ -149,6 +150,14 @@ SPDX-License-Identifier: MIT
 | NFR-009 | AC-SEC-003 | Partial | `src/infrastructure/agentAdapters/deepSeekHarness` + `src/infrastructure/agentAdapters/companyCodeAgent` + `src/interfaces/runner/DemoReport.ts` | `tests/integration/DeepseekHarnessAgent.test.ts` + `tests/integration/CompanyCodeagentCli.test.ts` + `tests/integration/DemoReport.test.ts` |
 | NFR-010 | AC-FLOW-004 | Planned | — | — |
 | NFR-011 | AC-E2E-001 | Implemented | `src/application/services/ProjectFlow.ts` + `src/infrastructure/sqlite/SqliteCas.ts` | `tests/acceptance/RealSourceFlow.test.ts` |
+| NFR-012 | AC-UI-012 | Implemented | `web/index.html` + `web/Styles.css` + `web/App.js` | `tests/contract/Site.test.ts` + `tests/e2e/Console.spec.ts` |
+| NFR-013 | AC-DEV-001 | Partial | `docs/specs/totalRules/CodeTaste.md` + `docs/Development.md` + `scripts/BootstrapWorktree.ts` | `tests/integration/WorktreeBootstrap.test.ts` |
+
+## 执行方式
+
+正常变更依次执行 `npm run typecheck`、`npm run validate:specs`、相关测试、完整回归和受影响 Console 检查。规范校验脚本位于 `scripts/ValidateSpecs.ts`，保留 Schema 正反例、引用、需求唯一性和追踪证据存在性校验。测试路径存在不代表当前通过，实际结果见 [当前状态](../../Status.md)。
+
+NFR-013 的协作规则和隔离 bootstrap 已具备；实际 subagent 调度由开发宿主提供。本次没有执行双 subagent 并行验收，因此保持 Partial，不能由规则文档或 bootstrap 测试推定该场景已通过。
 | NFR-012 | AC-UI-012 | Implemented | `web/index.html` + `web/Styles.css` + `web/App.js` | `tests/e2e/Console.spec.ts` |
 
 ## 执行方式

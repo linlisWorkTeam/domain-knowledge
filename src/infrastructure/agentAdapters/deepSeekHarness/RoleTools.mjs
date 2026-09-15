@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：为 DSH 注册受限的只读材料工具，按角色权限校验工作区内的文件访问。
  */
-import { constants, closeSync, fstatSync, openSync, readSync, realpathSync } from 'node:fs';
+import { constants, closeSync, fstatSync, lstatSync, openSync, readSync, realpathSync } from 'node:fs';
 import { isAbsolute, relative, resolve } from 'node:path';
 
 // A DSH tool plugin, not a second tool dispatcher. All roles return changes in
@@ -31,9 +31,22 @@ export function apply(ctx, config) {
     },
     async execute(args, exec) {
       exec.signal?.throwIfAborted();
+      const requested = relative(root, resolve(root, args.path));
+      if (requested === '' || requested.startsWith('..') || isAbsolute(requested)
+        || requested.split('/').some((part) => part.startsWith('.'))) throw new Error('DSH_MATERIAL_DENIED');
       let file;
-      try { file = realpathSync(resolve(root, args.path)); }
-      catch { throw new Error('DSH_MATERIAL_UNAVAILABLE'); }
+      try {
+        // 先拒绝路径穿越与链接，隔离后目标不可见也不能改变越权错误的分类。
+        let candidate = root;
+        for (const part of requested.split('/')) {
+          candidate = resolve(candidate, part);
+          if (lstatSync(candidate).isSymbolicLink()) throw new Error('DSH_MATERIAL_DENIED');
+        }
+        file = realpathSync(candidate);
+      } catch (error) {
+        if (error.message === 'DSH_MATERIAL_DENIED') throw error;
+        throw new Error('DSH_MATERIAL_UNAVAILABLE');
+      }
       const path = relative(root, file);
       if (path === '' || path.startsWith('..') || isAbsolute(path)
         || path.split('/').some((part) => part.startsWith('.'))) {

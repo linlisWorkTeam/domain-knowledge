@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：提供DeepSeekHarnessSdk角色的基础设施实现与外部系统接入。
  */
-import { roleDefinitions } from '../../../domain/agents/AgentRegistry.ts';
+import { DOMAIN_KNOWLEDGE_AGENT_DEFINITIONS } from '../../../domain/workflow/AgentDefinitions.ts';
 import { spawn } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
@@ -93,6 +93,8 @@ export interface DeepSeekHarnessAgentOptions {
 
 /** 定义DeepSeekHarnessSdk角色选项的数据结构与类型约束。 */
 export interface DeepSeekHarnessSdkAgentOptions {
+  /** 在原生会话发出请求前绑定传输标识；格式重试使用新的会话。 */
+  onSessionStarted?: (sessionId: string) => void;
   /** 提供 transportFailure 对应的transportFailure操作。 */
   transportFailure?: () => string | null;
   /** 提供nativeConnection信息，供调用方读取或传入。 */
@@ -254,7 +256,8 @@ function providerPrompt(request: AgentRequest): string {
     const rules: string[] = [];
     if (properties && typeof properties === 'object' && !Array.isArray(properties)) {
       const entries = Object.entries(properties as Record<string, unknown>);
-      rules.push(`${path} 对象键必须恰好是：${entries.map(([key]) => key).join('、')}。`);
+      const required = Array.isArray(schema.required) ? schema.required.filter((key): key is string => typeof key === 'string') : [];
+      rules.push(`${path} 声明的字段：${entries.map(([key]) => key).join('、')}；必填字段：${required.length ? required.join('、') : '无'}。其他声明字段可省略，具体约束以 Schema 为准。`);
       for (const [key, child] of entries) {
         if (!child || typeof child !== 'object' || Array.isArray(child)) continue;
         const childSchema = child as Record<string, unknown>;
@@ -358,6 +361,9 @@ export class DeepSeekHarnessSdkAgent implements AgentProvider {
     signal: AbortSignal | undefined,
     providerAttempt: number,
   ): Promise<Record<string, unknown>> {
+    const maxTokens = request.maxTokens === undefined ? this.options.maxTokens
+      : Math.min(request.maxTokens, this.options.maxTokens ?? request.maxTokens);
+    if (maxTokens !== undefined && (!Number.isSafeInteger(maxTokens) || maxTokens < 1)) throw new Error('DSH_AGENT_MAX_TOKENS_INVALID');
     if (!request.workspaceRoot) throw new Error('DSH_AGENT_WORKSPACE_REQUIRED');
     if (signal?.aborted) throw new Error('AGENT_CANCELLED');
     const workspaceRoot = canonicalWorkspace(request.workspaceRoot, this.allowedWorkspaceRoots);
@@ -380,12 +386,12 @@ export class DeepSeekHarnessSdkAgent implements AgentProvider {
       ...(this.options.nativeConnection ? [{ id: 'llm-deepseek', config: {
         apiKeyEnv: 'DEEPSEEK_API_KEY', baseURL: this.options.nativeConnection.baseURL,
         thinking: 'disabled', defaultContextWindow: this.options.nativeConnection.contextWindow,
-        maxTokens: this.options.maxTokens, retryPolicy: { mode: 'normal', maxRetries: 0 },
+        maxTokens: maxTokens, retryPolicy: { mode: 'normal', maxRetries: 0 },
         models: [{ id: this.options.model, contextWindow: this.options.nativeConnection.contextWindow,
-          maxTokens: this.options.maxTokens }],
+          maxTokens: maxTokens }],
       } }] : []),
       ...['persistent-bash', 'persistent-pwsh', 'str-replace-editor'].map((id) => ({ id, disabled: true })),
-      { insert: [{ id: 'workpanel-role-tools', name: policyPath, config: { workspaceRoot, canRead: (request.authorizedTools ?? roleDefinitions.find((definition) => definition.agentId === request.role)?.tools ?? []).includes('read_material') } }] },
+      { insert: [{ id: 'workpanel-role-tools', name: policyPath, config: { workspaceRoot, canRead: (request.authorizedTools ?? DOMAIN_KNOWLEDGE_AGENT_DEFINITIONS.find((definition) => definition.agentId === request.role)?.tools ?? []).includes('read_material') } }] },
     ]), { mode: 0o600 });
     // The final patch and monotonic DSH guard enforce the business role view.
     const patches = [...(this.options.patches ?? []).map((path) => resolve(path)), policyPatch];
@@ -415,7 +421,7 @@ export class DeepSeekHarnessSdkAgent implements AgentProvider {
       provider: this.options.provider ?? 'deepseek-official',
       model: this.options.model ?? 'deepseek-v4-flash',
       ...this.options.reasoningEffort === undefined ? {} : { reasoningEffort: this.options.reasoningEffort },
-      ...this.options.maxTokens === undefined ? {} : { maxTokens: this.options.maxTokens },
+      ...maxTokens === undefined ? {} : { maxTokens: maxTokens },
       initializeTimeoutMs: this.options.initializeTimeoutMs ?? Math.min(this.timeoutMs, 30_000),
       shutdownTimeoutMs: this.options.shutdownTimeoutMs ?? 1_000,
       disposeEofGraceMs: this.options.disposeEofGraceMs ?? 2_000,
@@ -446,6 +452,7 @@ export class DeepSeekHarnessSdkAgent implements AgentProvider {
     // session can settle immediately without producing a new assistant turn.
     const sessionId = `wp-${randomUUID().replaceAll('-', '')}`;
     try {
+      this.options.onSessionStarted?.(sessionId);
       const run = harness.run(prompt, {
         sessionId,
         onNotification: () => { notificationCount += 1; },

@@ -50,3 +50,22 @@ test('orchestrator: reject foreign modules, source leakage and incomplete plans'
     await assert.rejects(execute(sample.input, sample.context), /ORCHESTRATOR_(TASK_SCOPE|PLAN|MODULE_SELECTION)_INVALID/);
   }
 });
+
+// 模型不能改变固定依赖或自行授予源码路径；DocWorker 属于 DocGen 内部。
+test('orchestrator: rejects model-authored dependencies and source permissions', async () => {
+  for (const field of ['dependsOn', 'sourcePaths']) {
+    const sample = roleExample<Input>('orchestrator');
+    sample.output.tasks[2][field] = field === 'dependsOn' ? ['test-gen'] : ['secret.cpp'];
+    await assert.rejects(execute(sample.input, sample.context), /AGENT_OUTPUT_INVALID/);
+  }
+});
+test('orchestrator: accepted model plan preserves fixed symbolic graph connections', async () => {
+  const sample = roleExample<Input>('orchestrator');
+  const result = await execute(sample.input, sample.context);
+  assert.equal(sample.requests[0]!.stage, 'plan');
+  assert.deepEqual(sample.requests[0]!.readablePaths, []);
+  const nodes = result.payload.nodes as { agentType: string; dependsOn: { agentNode: string }[] }[];
+  assert.deepEqual(nodes.map(node => [node.agentType, node.dependsOn.map(parent => parent.agentNode)]), [
+    ['doc-gen', []], ['test-gen', []], ['code', ['doc-gen']], ['check', ['code']], ['review', ['check']],
+  ]);
+});

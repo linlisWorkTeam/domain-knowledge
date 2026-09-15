@@ -5,7 +5,7 @@
  */
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -13,16 +13,52 @@ import test from 'node:test';
 import type { ProviderInvocationRecord, ProviderSettingsRecord } from '../../src/application/ports/ApplicationPorts.ts';
 import { ConfiguredDshProvider } from '../../src/infrastructure/agentAdapters/deepSeekHarness/ConfiguredProvider.ts';
 
+test('interrupted upstream streaming retains activity diagnostics while unreported token usage stays unknown', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'provider-stream-interruption-'));
+  const controller = new AbortController();
+  const invocations: ProviderInvocationRecord[] = []; const streams: Array<Record<string, unknown>> = [];
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const upstream = createServer((request, response) => {
+    request.resume(); response.writeHead(200, { 'content-type': 'text/event-stream' });
+    response.write(`data: ${JSON.stringify({ id: 'partial', object: 'chat.completion.chunk', created: 1, model: 'test-model', choices: [{ index: 0, delta: { reasoning_content: 'private response fragment' }, finish_reason: null }] })}\n\n`);
+    timer = setTimeout(() => controller.abort(), 250);
+  });
+  upstream.listen(0, '127.0.0.1'); await once(upstream, 'listening');
+  const address = upstream.address(); assert.ok(address && typeof address === 'object');
+  const provider = new ConfiguredDshProvider({
+    settings: { provider: 'deepseek-harness', apiUrl: `http://provider.invalid:${address.port}/v1`, apiKey: 'test-key', model: 'test-model', enabled: true,
+      revision: 1, verificationStatus: 'VERIFIED', verificationReasonCode: 'READY', lastVerifiedAt: '2026-09-04T00:00:00.000Z', verifiedFingerprint: 'test-only', updatedAt: '2026-09-04T00:00:00.000Z' },
+    runtime: { processIsolation: 'none', allowedWorkspaceRoots: [directory] }, dshHome: join(directory, 'agent'),
+    endpointPolicy: { validate: async raw => ({ url: new URL(raw.endsWith('/') ? raw : `${raw}/`), addresses: ['127.0.0.1'] }) },
+    onInvocation: record => { invocations.push(record); },
+    onAudit: record => { streams.push(JSON.parse(String(record.metadata.streamDiagnostics))); },
+  });
+  try {
+    await assert.rejects(provider.run({ role: 'review', prompt: 'Return an answer.', workspaceRoot: directory, idempotencyKey: 'interrupted-stream',
+      outputSchema: { type: 'object', required: ['answer'], properties: { answer: { type: 'string' } } } }, controller.signal));
+    assert.equal(controller.signal.aborted, true); assert.equal(streams.length, 1);
+    assert.equal(streams[0]!.requests, 1); assert.ok(Number(streams[0]!.responseBytes) > 0);
+    assert.equal(streams[0]!.reasoningUtf16Units, 'private response fragment'.length);
+    assert.equal(streams[0]!.contentUtf16Units, 0); assert.notEqual(streams[0]!.lastDataMs, null);
+    assert.equal(invocations[0]!.inputTokens, null); assert.equal(invocations[0]!.outputTokens, null);
+    assert.doesNotMatch(JSON.stringify(streams), /private response fragment|test-key/);
+  } finally { clearTimeout(timer); controller.abort(); upstream.closeAllConnections(); await new Promise<void>(resolve => upstream.close(() => resolve())); rmSync(directory, { recursive: true, force: true }); }
+});
+
 test('DSH adapter executes through the official native DSH SDK and reports token usage', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'pi-agent-'));
   let authorization = '';
   let receivedPath = '';
   let receivedBody = '';
-  const sessionHeaders: (string | undefined)[] = [];
+  const sessionHeaders: string[] = [];
+  const auditedSessions: string[] = [];
+  const streamAudits: unknown[] = [];
+  writeFileSync(join(directory, 'source.txt'), 'AUTHORIZED_MATERIAL');
   let userAgent = '';
   const upstream = createServer(async (request, response) => {
+    assert.equal(request.headers['user-agent'], 'domain-knowledge/0.2.0');
+    sessionHeaders.push(String(request.headers['x-opencode-session'] ?? ''));
     authorization = request.headers.authorization ?? '';
-    sessionHeaders.push(request.headers['x-opencode-session'] as string | undefined);
     userAgent = request.headers['user-agent'] ?? '';
     receivedPath = request.url ?? '';
     const chunks: Buffer[] = [];
@@ -30,9 +66,18 @@ test('DSH adapter executes through the official native DSH SDK and reports token
     receivedBody = Buffer.concat(chunks).toString('utf8');
     response.writeHead(200, { 'content-type': 'text/event-stream; charset=utf-8' });
     const common = { id: 'chatcmpl-test', object: 'chat.completion.chunk', created: 1, model: 'test-model' };
+    if (sessionHeaders.length === 1) {
+      response.end(`data: ${JSON.stringify({ ...common, choices: [{ index: 0, delta: { tool_calls: [{ index: 0,
+        id: 'read-source', type: 'function', function: { name: 'read_material', arguments: '{"path":"source.txt"}' },
+      }] }, finish_reason: null }], usage: { prompt_tokens: 7, completion_tokens: 1 } })}\n\n`
+        + `data: ${JSON.stringify({ ...common, choices: [{ index: 0, delta: {}, finish_reason: 'tool_calls' }], usage: { prompt_tokens: 7, completion_tokens: 2 } })}\n\n`
+        + 'data: [DONE]\n\n');
+      return;
+    }
     response.write(`data: ${JSON.stringify({
       ...common,
       choices: [{ index: 0, delta: { role: 'assistant', content: '{"answer":"ok"}' }, finish_reason: null }],
+      usage: { prompt_tokens: 12, completion_tokens: 3 },
     })}\n\n`);
     response.write(`data: ${JSON.stringify({
       ...common,
@@ -54,16 +99,19 @@ test('DSH adapter executes through the official native DSH SDK and reports token
   const invocations: ProviderInvocationRecord[] = [];
   const provider = new ConfiguredDshProvider({
     settings,
+    maxTokens: 256,
     runtime: { processIsolation: 'none', allowedWorkspaceRoots: [directory] },
     dshHome: join(directory, 'agent'),
     endpointPolicy: {
       validate: async (raw) => ({ url: new URL(raw.endsWith('/') ? raw : `${raw}/`), addresses: ['127.0.0.1'] }),
     },
     onInvocation: (record) => { invocations.push(record); },
+    onAudit: (record) => { auditedSessions.push(record.sessionId!); streamAudits.push(JSON.parse(String(record.metadata.streamDiagnostics))); },
   });
   try {
     const result = await provider.run({
       role: 'doc-gen',
+      maxTokens: 64,
       prompt: 'Return the requested object.',
       outputSchema: {
         type: 'object', additionalProperties: false, required: ['answer'],
@@ -77,8 +125,17 @@ test('DSH adapter executes through the official native DSH SDK and reports token
     assert.equal(receivedPath, '/v1/chat/completions');
     assert.equal(authorization, 'Bearer test-key');
     assert.match(userAgent, /^domain-knowledge\//);
-    assert.match(sessionHeaders[0] ?? '', /^dk-[a-f0-9]{64}$/);
+    assert.match(sessionHeaders[0] ?? '', /^wp-[a-f0-9]{32}$/);
     assert.match(receivedBody, /Return the requested object/);
+    assert.match(receivedBody, /AUTHORIZED_MATERIAL/);
+    assert.equal(JSON.parse(receivedBody).max_tokens, 64, 'request ceiling reaches the actual tool-roundtrip HTTP request');
+    assert.equal(sessionHeaders.length, 2);
+    const stream = streamAudits[0] as Record<string, number | string>;
+    assert.equal(stream.schemaVersion, 'provider-stream-diagnostics-v1');
+    assert.equal(stream.requests, 2); assert.ok(Number(stream.responseBytes) > 0); assert.ok(Number(stream.contentUtf16Units) > 0);
+    assert.doesNotMatch(JSON.stringify(stream), /test-key|AUTHORIZED_MATERIAL|answer/);
+    assert.match(sessionHeaders[0]!, /^wp-[a-f0-9]{32}$/);
+    assert.deepEqual(sessionHeaders, [auditedSessions[0], auditedSessions[0]], 'tool requests retain the native conversation ID');
     assert.equal(invocations.length, 1);
     assert.deepEqual({
       runId: invocations[0]?.runId,
@@ -90,13 +147,14 @@ test('DSH adapter executes through the official native DSH SDK and reports token
       fixture: invocations[0]?.fixture,
     }, {
       runId: 'run-pi-test', provider: 'deepseek-harness', model: 'test-model', status: 'SUCCEEDED',
-      inputTokens: 12, outputTokens: 5, fixture: false,
+      inputTokens: 19, outputTokens: 7, fixture: false,
     });
     const followup = { role: 'doc-gen', prompt: 'Return the requested object.', outputSchema: { type: 'object', additionalProperties: false, required: ['answer'], properties: { answer: { type: 'string' } } }, metadata: { runId: 'run-pi-test' }, workspaceRoot: directory };
     await provider.run({ ...followup, idempotencyKey: 'pi-test-1' });
     await provider.run({ ...followup, idempotencyKey: 'pi-test-2' });
     assert.equal(sessionHeaders[1], sessionHeaders[0], 'the conversation keeps its routing identity');
-    assert.notEqual(sessionHeaders[2], sessionHeaders[0], 'a different invocation gets a separate identity');
+    assert.notEqual(sessionHeaders[2], sessionHeaders[0], 'a new invocation gets a separate native identity even with the same business key');
+    assert.notEqual(sessionHeaders[3], sessionHeaders[2], 'another business request does not reuse the prior conversation');
   } finally {
     upstream.close();
     await once(upstream, 'close');
@@ -151,7 +209,10 @@ test('DSH adapter does not follow Provider redirects after endpoint approval', a
 test('DSH adapter retries schema-invalid output with a fresh session and audits every attempt', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'pi-agent-schema-retry-'));
   const bodies: string[] = [];
+  const sessions: string[] = [];
+  const auditedSessions: string[] = [];
   const upstream = createServer(async (request, response) => {
+    sessions.push(String(request.headers['x-opencode-session'] ?? ''));
     const chunks: Buffer[] = [];
     for await (const chunk of request) chunks.push(Buffer.from(chunk));
     bodies.push(Buffer.concat(chunks).toString('utf8'));
@@ -173,9 +234,10 @@ test('DSH adapter retries schema-invalid output with a fresh session and audits 
   await once(upstream, 'listening');
   const address = upstream.address();
   assert.ok(address && typeof address === 'object');
-  const apiUrl = `http://provider.invalid:${address.port}/v1`;
+  const apiUrl = `http://opencode.ai:${address.port}/v1`;
   const invocations: ProviderInvocationRecord[] = [];
   const provider = new ConfiguredDshProvider({
+    maxTokens: 128,
     settings: {
       provider: 'deepseek-harness', apiUrl, apiKey: 'test-key', model: 'test-model', enabled: true,
       revision: 2, verificationStatus: 'VERIFIED', verificationReasonCode: 'READY',
@@ -191,6 +253,7 @@ test('DSH adapter retries schema-invalid output with a fresh session and audits 
   });
   const request = {
     role: 'doc-gen', prompt: 'Return the same governed business result.',
+    maxTokens: 512,
     outputSchema: {
       type: 'object', additionalProperties: false, required: ['answer'],
       properties: { answer: { type: 'string' } },
@@ -198,9 +261,14 @@ test('DSH adapter retries schema-invalid output with a fresh session and audits 
     idempotencyKey: 'same-business-request', metadata: { runId: 'run-schema-retry' },
     workspaceRoot: directory,
   };
+  provider.options.onAudit = (record) => { auditedSessions.push(record.sessionId!); };
   try {
     assert.deepEqual(await provider.run(request), { answer: 'recovered' });
     assert.equal(bodies.length, 2);
+    assert.deepEqual(bodies.map((value) => JSON.parse(value).max_tokens), [128, 128],
+      'a request cannot raise the configured ceiling, including schema retries');
+    assert.deepEqual(sessions, auditedSessions);
+    assert.notEqual(sessions[0], sessions[1], 'schema retry must route as a new native conversation');
     const messages = bodies.map((value) => (JSON.parse(value) as { messages: unknown }).messages);
     assert.deepEqual(messages[1], messages[0], 'a retry uses the same request in a new conversation');
     assert.deepEqual(invocations.map((record) => ({
@@ -209,6 +277,7 @@ test('DSH adapter retries schema-invalid output with a fresh session and audits 
       { status: 'FAILED', errorCode: 'AGENT_OUTPUT_INVALID', retryCount: 0 },
       { status: 'SUCCEEDED', errorCode: null, retryCount: 1 },
     ]);
+    assert.deepEqual(invocations.map((record) => [record.inputTokens, record.outputTokens]), [[3, 2], [3, 2]], 'retry usage is audited separately');
     assert.doesNotMatch(JSON.stringify(invocations), /test-key|Return the same governed business result/);
     bodies.length = 0;
     invocations.length = 0;
@@ -287,5 +356,87 @@ test('DSH adapter fails after the configured schema-attempt budget is exhausted'
     upstream.close();
     await once(upstream, 'close');
     rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+
+test('native streaming separates bounded wire overhead from line buffers and explicit probe limits', async () => {
+  for (const scenario of [
+    { name: 'framed-success', bytes: 3 * 1024 * 1024, framed: true, error: null },
+    { name: 'wire-limit', bytes: 17 * 1024 * 1024, framed: true, error: /DSH_PROVIDER_OUTPUT_LIMIT/ },
+    { name: 'frame-limit', bytes: 3 * 1024 * 1024, framed: false, error: /DSH_PROVIDER_FRAME_LIMIT/ },
+    { name: 'probe-limit', bytes: 128 * 1024, framed: true, error: /DSH_PROVIDER_OUTPUT_LIMIT/, limit: 65_536 },
+  ]) {
+    const directory = mkdtempSync(join(tmpdir(), 'dsh-wire-'));
+    let requests = 0;
+    const upstream = createServer(async (request, response) => {
+      requests++;
+      for await (const _ of request) { /* drain the small request */ }
+      response.writeHead(200, { 'content-type': 'text/event-stream' });
+      // 单次只持有 8KiB；总帧开销较大不等于正文或内存需要同样大的缓冲。
+      const frame = scenario.framed ? ': ' + 'x'.repeat(8187) + '\n\n' : 'x'.repeat(8192);
+      try {
+        for (let bytes = 0; bytes < scenario.bytes && !response.destroyed; bytes += Buffer.byteLength(frame)) {
+          if (!response.write(frame)) await once(response, 'drain', { signal: AbortSignal.timeout(5000) });
+        }
+        if (!response.destroyed) response.end('data: ' + JSON.stringify({ id: 'stream-test', object: 'chat.completion.chunk', model: 'test-model',
+          choices: [{ index: 0, delta: { role: 'assistant', content: '{"answer":"ok"}' }, finish_reason: 'stop' }] }) + '\n\ndata: [DONE]\n\n');
+      } catch { response.destroy(); }
+    });
+    upstream.listen(0, '127.0.0.1'); await once(upstream, 'listening');
+    const address = upstream.address(); assert.ok(address && typeof address === 'object');
+    const apiUrl = `http://provider.invalid:${address.port}/v1/`;
+    const provider = new ConfiguredDshProvider({
+      settings: { provider: 'deepseek-harness', apiUrl, apiKey: 'fixture-only', model: 'test-model', enabled: true,
+        revision: 1, verificationStatus: 'VERIFIED', verificationReasonCode: 'READY', lastVerifiedAt: null,
+        verifiedFingerprint: null, updatedAt: new Date().toISOString() },
+      dshHome: join(directory, 'dsh'), maxSchemaAttempts: 1, maxTokens: 64,
+      maxProviderResponseBytes: scenario.limit,
+      endpointPolicy: { validate: async () => ({ url: new URL(apiUrl), addresses: ['127.0.0.1'] }) },
+      runtime: { processIsolation: 'bubblewrap', allowedWorkspaceRoots: [directory], timeoutMs: 15_000, maxOutputBytes: 65_536 },
+    });
+    try {
+      const pending = provider.run({ role: 'test-gen', prompt: 'Return JSON.', authorizedTools: [], workspaceRoot: directory,
+        idempotencyKey: scenario.name, outputSchema: { type: 'object', required: ['answer'], additionalProperties: false,
+          properties: { answer: { const: 'ok' } } } });
+      if (scenario.error) await assert.rejects(pending, scenario.error);
+      else assert.deepEqual(await pending, { answer: 'ok' });
+      assert.equal(requests, 1, 'a transport limit must not trigger another provider request');
+    } finally { upstream.closeAllConnections(); upstream.close(); await once(upstream, 'close'); rmSync(directory, { recursive: true, force: true }); }
+  }
+});
+
+
+test('native quota rejection stops later provider instances without leaking upstream error text', async () => {
+  for (const scenario of [
+    { status: 429, body: '{"error":{"code":"insufficient_quota","message":"SECRET_REMOTE_ERROR"}}', expected: 'PROVIDER_QUOTA_EXHAUSTED', stops: true },
+    { status: 402, body: 'SECRET_REMOTE_ERROR', expected: 'PROVIDER_PAYMENT_REQUIRED', stops: true },
+    { status: 429, body: '{"error":{"message":"quota SECRET_REMOTE_ERROR"}}', expected: 'PROVIDER_RATE_LIMITED', stops: false },
+    { status: 429, body: 'x'.repeat(20_000), expected: 'PROVIDER_RATE_LIMITED', stops: false },
+  ]) {
+    const directory = mkdtempSync(join(tmpdir(), 'dsh-quota-')); let requests = 0;
+    const upstream = createServer(async (request, response) => {
+      requests++; for await (const _ of request) {}
+      response.writeHead(scenario.status, { 'content-type': 'application/json' }); response.end(scenario.body);
+    });
+    upstream.listen(0, '127.0.0.1'); await once(upstream, 'listening');
+    const address = upstream.address(); assert.ok(address && typeof address === 'object');
+    const apiUrl = `http://provider.invalid:${address.port}/v1/`;
+    const make = () => new ConfiguredDshProvider({
+      settings: { provider: 'deepseek-harness', apiUrl, apiKey: 'fixture-only', model: 'test-model', enabled: true,
+        revision: 1, verificationStatus: 'VERIFIED', verificationReasonCode: 'READY', lastVerifiedAt: null,
+        verifiedFingerprint: null, updatedAt: new Date().toISOString() },
+      dshHome: join(directory, 'dsh'), maxSchemaAttempts: 2, maxTokens: 64,
+      endpointPolicy: { validate: async () => ({ url: new URL(apiUrl), addresses: ['127.0.0.1'] }) },
+      runtime: { processIsolation: 'bubblewrap', allowedWorkspaceRoots: [directory], timeoutMs: 15_000, maxOutputBytes: 65_536 },
+    });
+    const request = { role: 'test-gen' as const, prompt: 'Return JSON.', authorizedTools: [], workspaceRoot: directory,
+      idempotencyKey: 'quota-test', outputSchema: { type: 'object', required: ['answer'], properties: { answer: { const: 'ok' } } } };
+    try {
+      await assert.rejects(make().run(request), (error: Error) => error.message === scenario.expected);
+      assert.equal(requests, 1, 'quota and rate errors must not trigger schema retries');
+      await assert.rejects(make().run(request), (error: Error) => error.message === scenario.expected);
+      assert.equal(requests, scenario.stops ? 1 : 2);
+    } finally { upstream.closeAllConnections(); upstream.close(); await once(upstream, 'close'); rmSync(directory, { recursive: true, force: true }); }
   }
 });

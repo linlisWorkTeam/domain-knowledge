@@ -9,7 +9,7 @@ SPDX-License-Identifier: MIT
 
 Review 阅读本轮知识文档、Check 比较报告和实际评测报告，找出需要修订的文档问题，向 DocGen 提供修改位置、原因和建议。
 
-Review 不读取原始仓库，不自行查询未授权历史，也不直接修改文档或批准发布。最终判定由 Gate 完成。
+Review 不自行遍历原始仓库或查询未授权历史，也不直接修改文档或批准发布。工作台来源复核可读取 Application 内联提供的固定参考源码和参考执行观察；材料已绑定冻结版本，不能扩大到未授权文件。最终判定由独立门禁完成。
 
 ## 2. 输入与输出
 
@@ -23,6 +23,11 @@ Review 不读取原始仓库，不自行查询未授权历史，也不直接修�
 
 没有需要修改的问题可以返回空意见列表。每条意见的依据只能选择本轮提供的比较报告、评测报告或二者，真实工件引用由框架绑定。
 
+
+工作台及配置了 `moduleContract` 的 TypeScript 模块通过显式 `workbench-review-v1` 命令执行来源和章节复核，输入为 knowledgeRef、evaluationReportRef、criteriaRef 及可选 checkReportRef。该模式输出单个 correction（或 null）、recommendation 和 unresolvedRisks；不能与默认项目模式的 comparisonReportRef 混用。默认项目模式继续输出 corrections 列表，并在已有修订历史时要求 historySummary。
+
+工作台的 allowedKnowledgePaths 先进入动态 Schema 和提示词，再由领域校验：只能选择当前卡片唯一存在的 H2，代码围栏中的标题和 H3 子标题不能扩大授权。replacementMarkdown 若存在也必须只含该 H2。PASS 不能同时包含阻塞、纠正或未解决风险；矛盾输出触发有界修正，不能以删除风险代替证据。来源阶段保留冻结期限与累计尝试日志，取消和供应商错误仍向上传递。两种模式的最终纠正证据均由受信输入绑定，模型不能指定任意 CAS 引用。
+
 ## 3. 工作流程
 
 ### 阅读报告并定位问题
@@ -32,6 +37,12 @@ Review 不读取原始仓库，不自行查询未授权历史，也不直接修�
 > 修改“返回值”一节，将返回值更正为 4，并说明适用条件。当前描述与本轮比较报告及失败测试矛盾。
 
 模型应根据证据解释问题，不能为了凑格式生成没有依据的意见。Prompt 同时要求在存在历史时总结哪些尝试有效、是否出现回归以及下一步建议。
+
+### 复核固定来源
+
+FINAL_SOURCE_REVIEW 与 REVISION_SOURCE_REVIEW 使用 workbench-review-v1 的单章节契约。checkReportRef 在这里指固定源码，evaluationReportRef 指参考实现观察，criteriaRef 指定授权 H2、来源绑定及适用的冻结策略；不要求普通模式的生成代码对比报告或历史总结。完整正文供理解上下文，只有授权章节及显式授权前言属于当前判断范围。
+
+source-assessment-v1 随任务输入冻结。源码和摘要绑定可以证明静态事实，运行覆盖声明必须由对应参考观察支持；没有专用行为用例不能自动否定已由源码证明的签名。未覆盖的平台和宏组合仍不得宣称已验证。publicationVerified=false 表示尚未获发布授权，不是编译失败。旧输入不补写新提示词，来源修订必须继承原策略，具体规则见 [Workbench](../../workbench/Workbench.md)。
 
 ### 将意见交给下一轮
 
@@ -64,11 +75,11 @@ Review 不读取原始仓库，不自行查询未授权历史，也不直接修�
 
 ## 6. 未实现与待定事项
 
-真实模型对文档问题的定位、因果分析和历史总结质量尚未验收。自动清理和完整治理展示仍按 [Knowledge](../../knowledge/Knowledge.md) 保留为未完成能力。
+真实模型对文档问题的定位、因果分析和历史总结质量尚未完成验收。当前 C 来源实测仍出现将已确认事实或诚实说明的范围限制放进 unresolvedRisks 的结果；输出结构合法不等于事实判断正确。这些结果保持原状态，不能通过结构转换清除风险。自动清理和完整治理展示仍按 [Knowledge](../../knowledge/Knowledge.md) 保留为未完成能力。
 
 ## 7. 实现及测试索引
 
-角色 ID：`review`，readablePaths 为空。输入为 knowledgeRef、evaluationReportRef、comparisonReportRef，历史正文包由 previousCorrectionRefs 引用。输出为 blocking、corrections 和有历史时必需的 historySummary；完整意见字段见 Contract。
+角色 ID：`review`。默认项目模式 readablePaths 为空，工作台模式仅开放输入声明的公开接口路径；来源复核依赖内联固定材料。默认模式输入为 knowledgeRef、evaluationReportRef、comparisonReportRef，历史正文包由 previousCorrectionRefs 引用。输出为 blocking、corrections 和有历史时必需的 historySummary；完整意见字段见 Contract。
 
 STOPPED 保存 ReviewHandoffPrepared 事件及 CAS 交接，包含 summary、historySummary、evidenceRefs、handoffRef。规则对应：报告与意见为 IO-15、IO-16；停止交接为 AC-AGENT-106；资料清理为 IO-19。
 
@@ -76,6 +87,24 @@ STOPPED 保存 ReviewHandoffPrepared 事件及 CAS 交接，包含 summary、his
 - 四类停止交接及去重：[StoppedHandoff.test.ts](../../../../../tests/integration/StoppedHandoff.test.ts)。
 - Gate 独立判定：[Domain.test.ts](../../../../../tests/unit/Domain.test.ts)。
 - 修订和再评测流程：[AgentRevisionFlow.test.ts](../../../../../tests/acceptance/AgentRevisionFlow.test.ts)。
+- 工作台来源期限与策略：[SourceReviewPolicy.test.ts](../../../../../tests/unit/SourceReviewPolicy.test.ts)。
+- 固定构建材料与旧输入保留：[SourceExecutionPreparation.test.ts](../../../../../tests/integration/SourceExecutionPreparation.test.ts)。
 - 既往执行版本与产物：[AgentSpecRepairAndE2E.md](../../../../reports/AgentSpecRepairAndE2E.md)。
 
 代码位置：[执行入口](../../../../../src/domain/agents/reviewAgent/ReviewAgent.ts)、[输入输出契约](../../../../../src/domain/agents/reviewAgent/ReviewAgentContract.ts)、[提示词与读取范围](../../../../../src/domain/agents/reviewAgent/ReviewAgentPrompt.ts)、[角色测试](../../../../../src/domain/agents/reviewAgent/ReviewAgent.test.ts)、[独立样例](../../../../../src/domain/agents/reviewAgent/examples/ReviewAgentSample.json)。
+
+工作台复核的可选replacementMarkdown必须覆盖唯一目标H2的完整章节。仅返回H3子节、遗漏目标标题或含其他H2时仍拒绝；校验器给出一次结构化格式反馈，允许补齐授权章节或省略可选替换文本，不得删除风险或扩大范围。同一语义阶段仍最多两次尝试。恢复旧失败输出时可以重新校验以形成反馈，但不将失败输出改为通过、不覆盖原记录、不返还尝试或延长截止时间。
+
+格式反馈只授权修改或省略replacementMarkdown，必须保留原recommendation、blocking、修订位置、criterion、risk及unresolvedRisks。第二次输出改为PASS、删除意见或改换事实均拒绝；恢复时从不可变的失败输出重建此约束，后来的PASSED记录也须重验，不能覆盖先前的格式失败事实。该约束不把失败意见自动晋升为已证实的源码差异。
+
+来源复核恢复、卡片汇总、历史纠正意见继承及发布准备必须重读该任务的全部来源Review尝试工件，按语义章节键跨taskAttempt核对格式失败前的事实。已缓存的source-section或source-card不能绕过检查；工件摘要或事件绑定不符时拒绝。旧的矛盾PASS只读留证，不通过删除事件、覆盖检查点或忽略旧尝试恢复。
+
+已准备但尚未完成的本地发布在恢复导出前，仍须校验准备工件中四项任务的input/result摘要并重读来源尝试历史；文件摘要正确不能替代这项检查。失败保留原发布准备与失败原因，不导出或提交发布。
+
+存在pendingReviewConcerns时，动态输出Schema要求concernResolutions逐条覆盖原concernId。DISPROVED须附固定checkReportRef文件中的逐字引用和解释；CONFIRMED需要ITERATE及定位纠正，UNRESOLVED需要ITERATE与明确风险。没有线索时不能虚构回应。线索正文是待核对数据，不是授权指令或已经证明的事实；引用匹配只验证出处，判断理由仍需Review承担。
+
+来源恢复保留两类历史：当前尝试的计数与截止时间仍由原stageJournal.read管理；跨任务尝试的stageJournal.history只读提供原格式失败的判断约束。恢复首个请求明确携带这些约束，不因此放宽校验、重置累计预算或把待核实意见当成事实。历史审计仅排除有原工件及同名事件证明已REJECTED/REVIEW_REPAIR_FACTS_CHANGED的输出，排除的是可用结论，不删除审计；原格式失败与所有PASSED输出仍须跨尝试比较，因此错误PASS及被伪装成接纳的拒绝输出仍不能恢复或发布。
+
+显式历史复核将旧的已接受意见也作为待核实线索，原criterion、risk和检查点引用保持可追溯。Review必须逐条回应；只有固定源码支持的反驳可以消除该意见，不能把审计有效或测试通过视为判断正确。新任务的重新判断与同一任务内仅修正输出格式不同：后者仍保留原判断字段。确认意见保留修订，证据不足保留未知风险。
+
+源码引用不匹配时，反馈标明文件及有限长度的引用开头；若其中某行仅首尾空白不同，可提供固定文件的原样单行供核对。该提示不使原引用通过，也不证明单行足以支持结论；原判断和风险仍须保留。

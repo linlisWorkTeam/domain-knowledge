@@ -13,7 +13,7 @@ SPDX-License-Identifier: MIT
 | domainFunction | src/domain | [Agents](domainFunction/agents/Agents.md)、[Workflow](domainFunction/workflow/Workflow.md)、[Knowledge](domainFunction/knowledge/Knowledge.md)、[Association](domainFunction/association/Association.md)、[Evaluation](domainFunction/evaluation/Evaluation.md)、[SourceScan](domainFunction/sourceScan/SourceScan.md)、[Workspace](domainFunction/workspace/Workspace.md)、[legacyOkf](domainFunction/migration/LegacyOkf.md) |
 | languagePlugins | 当前只有 application/ports 契约 | [LanguagePlugins](domainFunction/languagePlugins/LanguagePlugins.md)，未创建具体插件 |
 | application | src/application | [Application](application/Application.md) |
-| infrastructure | src/infrastructure 的同名目录 | [sqlite](infrastructure/sqlite/Sqlite.md)、[redis](infrastructure/redis/Redis.md)、[langgraph](infrastructure/langgraph/LangGraph.md)、[agentAdapters](infrastructure/agentAdapters/AgentAdapters.md)、[evaluation](infrastructure/evaluation/Evaluation.md)、[http](infrastructure/http/Http.md)、[observability](infrastructure/observability/Observability.md) |
+| infrastructure | src/infrastructure 的同名目录 | [source](infrastructure/source/Source.md)、[runtime](infrastructure/runtime/Runtime.md)、[sqlite](infrastructure/sqlite/Sqlite.md)、[redis](infrastructure/redis/Redis.md)、[langgraph](infrastructure/langgraph/LangGraph.md)、[agentAdapters](infrastructure/agentAdapters/AgentAdapters.md)、[evaluation](infrastructure/evaluation/Evaluation.md)、[http](infrastructure/http/Http.md)、[observability](infrastructure/observability/Observability.md) |
 | interfaces | src/interfaces、web | [HttpApi](interfaces/HttpApi.md)、[UiuxDesign](totalRules/UiuxDesign.md) |
 | schemas | 跨层版本化机器契约 | [Schema 目录](schemas/README.md)，保持 $id 和字节兼容 |
 

@@ -19,11 +19,11 @@ import { sha256, type ArtifactRef } from '../../src/domain/Domain.ts';
 import type { WorkflowStageInput } from '../../src/application/ports/ApplicationPorts.ts';
 
 function body() {
-  return '# structuredMarkdownDiff\n\n证据 src/domain/services/markdown-diff.ts:L142-L150\n\n```json\n' + JSON.stringify({ examples: [
+  return '# 受控 DocGen\n\n## Examples\n证据 src/domain/services/markdown-diff.ts:L142-L150\n\n```json\n' + JSON.stringify({ examples: [
     { before: '', after: '', expectedHunkCount: 0, expectedChangedSections: [] },
     { before: 'a\r\nb', after: 'a\nb', expectedHunkCount: 0, expectedChangedSections: [] },
     { before: '# A\nold', after: '# A\nnew', expectedHunkCount: 1, expectedChangedSections: ['# A'] },
-  ] }) + '\n```';
+  ] }) + '\n```\n';
 }
 
 test('DocGen checker rejects wrong expectations, absent coverage, malformed data and invalid citations', () => {
@@ -46,7 +46,7 @@ test('DocGen reference preflight checks the pinned source and seven real tests',
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test('DocGen example uses the shared production DSH stages, freezes prompts and stores results without publication', async () => {
+for (const sectionMode of [false, true]) test(`DocGen ${sectionMode ? 'section' : 'default'} example freezes DSH prompts and stores results without publication`, async () => {
   const runtimeDir = mkdtempSync(join(tmpdir(), 'docgen-native-example-'));
   const previous = process.env.WP_DSH_PROCESS_ISOLATION;
   process.env.WP_DSH_PROCESS_ISOLATION = 'none'; // controlled SSE transport, not a sandbox acceptance
@@ -56,7 +56,11 @@ test('DocGen example uses the shared production DSH stages, freezes prompts and 
     for await (const chunk of request) chunks.push(Buffer.from(chunk));
     const payload = Buffer.concat(chunks).toString('utf8');
     prompts.push(payload);
-    const text = JSON.stringify({ title: '受控 DocGen', description: '机制验证', keywords: ['Markdown'], body: body() });
+    const outline = !payload.includes('当前阶段：body');
+    const text = sectionMode ? JSON.stringify(outline
+      ? { title: '受控 DocGen', description: '机制验证', sections: [{ heading: 'Examples', purpose: '机制验证' }] }
+      : { title: '受控 DocGen', description: '机制验证', sections: [{ sectionId: 'section-1', body: body().split('## Examples\n')[1] }] })
+      : JSON.stringify({ title: '受控 DocGen', description: '机制验证', keywords: ['Markdown'], body: body() });
     response.writeHead(200, { 'content-type': 'text/event-stream' });
     response.write(`data: ${JSON.stringify({ id: 'example', object: 'chat.completion.chunk', created: 1, model: 'controlled', choices: [{ index: 0, delta: { role: 'assistant', content: text }, finish_reason: null }] })}\n\n`);
     response.write(`data: ${JSON.stringify({ id: 'example', object: 'chat.completion.chunk', created: 1, model: 'controlled', choices: [{ index: 0, delta: {}, finish_reason: 'stop' }], usage: { prompt_tokens: 73, completion_tokens: 31 } })}\n\n`);
@@ -67,13 +71,14 @@ test('DocGen example uses the shared production DSH stages, freezes prompts and 
   const port = (server.address() as { port: number }).port;
   const composition = createComposition({ runtimeDir,
     providerEndpointPolicy: { validate: async () => ({ url: new URL(`http://local.invalid:${port}/v1/`), addresses: ['127.0.0.1'] }) },
-    providerProbe: { verify: async ({ model }) => ({ status: 'VERIFIED', reasonCode: 'READY', model }) },
+    providerProbe: { verify: async ({ model }) => ({ status: 'VERIFIED', reasonCode: 'GENERATION_READY', checks: { modelList: 'PASSED' as const, generation: 'PASSED' as const }, model }) },
   });
   try {
     await composition.apps.providerOperations.put({ provider: 'deepseek-harness', apiUrl: 'https://model.invalid/v1/', apiKey: 'controlled-secret', model: 'controlled', expectedRevision: 0 });
     await composition.apps.providerOperations.verify({ expectedRevision: 1 });
     const sample = JSON.parse(readFileSync(new URL('../../src/domain/agents/docGenAgent/examples/DocGenFixedSourceSample.json', import.meta.url), 'utf8')) as AgentExampleInput;
     sample.provider = 'dsh';
+    if (sectionMode) sample.payload.executionContract = 'section-doc-v1';
     sample.scenario.repositoryRoot = componentRoot;
     // 本用例验证已保存的提示词冻结；专用样例的追加指令不覆盖测试设置。
     delete sample.promptAddon;
@@ -82,15 +87,17 @@ test('DocGen example uses the shared production DSH stages, freezes prompts and 
     composition.apps.orchestrator.updatePromptAddon('doc-gen', 'modified-example-instruction');
     const second = await composition.apps.agentExample.run('doc-gen', sample);
     assert.notEqual(first.runId, second.runId);
-    assert.equal(prompts.length, 2);
+    const callsPerRun = sectionMode ? 2 : 1;
+    assert.equal(prompts.length, callsPerRun * 2);
     assert.match(prompts[0]!, /original-example-instruction/);
     assert.doesNotMatch(prompts[0]!, /modified-example-instruction/);
-    assert.match(prompts[1]!, /modified-example-instruction/);
+    for (const prompt of prompts.slice(callsPerRun)) assert.match(prompt, /modified-example-instruction/);
     assert.match(await composition.runConfiguration.resolvePrompt(first.runId, 'doc-gen'), /original-example-instruction/);
     const bodyRef = first.result.payload['bodyRef'] as ArtifactRef;
     const document = first.outputs.find(({ ref }) => ref.artifactId === bodyRef.artifactId)?.content;
     assert.ok(document!.endsWith(body()));
-    assert.match(document!, /^---\ntitle:/);
+    if (sectionMode) assert.equal(document, body());
+    else assert.match(document!, /^---\ntitle:/);
     const command = JSON.parse(Buffer.from(await composition.artifacts.get(first.result.commandRef)).toString('utf8'));
     const sourceBytes = await composition.artifacts.get(command.payload.sourceRefs[0]);
     assert.equal(sha256(sourceBytes), DOCGEN_SOURCE_SHA256);
@@ -99,7 +106,7 @@ test('DocGen example uses the shared production DSH stages, freezes prompts and 
     assert.equal(composition.apps.flywheel.status().publications, 0);
     const report = await composition.apps.orchestrator.buildDemoReport(first.runId);
     const calls = report.agentCalls as Array<{ correlation: { sessionId: string }; tokens: { input: number; output: number } }>;
-    assert.equal(calls.length, 1);
+    assert.equal(calls.length, callsPerRun);
     assert.equal(typeof calls[0]!.correlation.sessionId, 'string');
     assert.deepEqual({ input: calls[0]!.tokens.input, output: calls[0]!.tokens.output }, { input: 73, output: 31 });
     assert.doesNotMatch(JSON.stringify(report), /controlled-secret|original-example-instruction/);

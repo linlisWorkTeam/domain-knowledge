@@ -16,3 +16,10 @@ SourceScanner 实现 KnowledgeDiscoveryPort，只依赖最小 SourceKnowledgeRea
 
 
 文档关系：[设计目录](../../README.md)负责代码与设计定位；[开发指南](../../../Development.md)说明修改和交付步骤。
+
+
+## 固定 Git 源码分析
+
+RepositoryAnalysis 定义固定提交清单与模块候选。groupRepositoryModules 按同名源码/声明提出分组，仅生产源码参与默认选择，测试和示例分开保留。不支持语言、单文件超过1MiB或同名混合语言实现不默认选择；测试路径仅按名字匹配候选，不能自动成为可信门禁。
+
+这一步尚未提取 AST、公开接口或真实编译依赖，不能把模块候选当作完整知识单元。C/C++ 头文件语言由扩展名与生产源码上下文推测，生成前仍需实际接口与构建验证。源码版本固定到完整 Git commit，工作区未提交改动不参与。

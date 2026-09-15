@@ -26,6 +26,11 @@ TestGen 交付可执行源码和逐项用例清单。它只能写允许的测试
 
 框架分别保存文件集合与清单，返回 candidateSetRef 和 caseManifestRef。完整字段与入口约定见第 4 节和文末 Contract。
 
+
+工作台命令使用显式 `behavior-cases-v1`，输出由宿主比较的声明式数据用例：TypeScript 为 module-cases-v1，原生语言为 native-cases-v1。原生测试策略可以引用当前知识正文和公开接口，参考实现正文留在独立 oracle 一侧；TypeScript 模式依据冻结源码和公开接口。该模式不能与默认项目的 allowedTestPaths/validatedOutput 混用。默认项目流程继续生成受监督执行的 C/C++ 测试源码、独立入口及清单，不能相信测试自报成功数。
+
+新工作台执行必须有明确模块或原生行为契约，不能回退为旧 candidateCommands；旧命令只作为历史材料可读。oracleRequired 必须为 true，候选未通过参考实现前只保存为 PENDING_ORACLE。参考失败不能证明知识有错、不能晋升，也不能修改已可信测试的预期。实际晋升与跨批次缓存由独立评测和应用事务完成。
+
 ## 3. 工作流程
 
 ### 首次生成并校验

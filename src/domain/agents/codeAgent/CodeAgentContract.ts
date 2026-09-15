@@ -6,6 +6,7 @@
 import type { ArtifactRef } from '../../Domain.ts';
 import type { RoleInput } from '../AgentExecution.ts';
 import { requireMaterials } from '../AgentExecution.ts';
+import { validateWorkbenchCodeInput } from './WorkbenchCodeInput.ts';
 
 /** 角色业务载荷。 */
 export interface Payload {
@@ -14,7 +15,11 @@ export interface Payload {
   /** 提供语言标识信息，供调用方读取或传入。 */
   languageId: string;
   /** 提供build契约引用信息，供调用方读取或传入。 */
-  projectConfigurationRef: ArtifactRef;
+  projectConfigurationRef?: ArtifactRef;
+  /** 显式区分工作台声明式构建输入，不将旧命令静默升级。 */
+  executionContract?: 'workbench-code-v1';
+  publicInterfaceRefs?: ArtifactRef[];
+  buildContractRef?: ArtifactRef;
   /** 提供allowedGenerated路径列表信息，供调用方读取或传入。 */
   allowedGeneratedPaths: string[];
   requiredGeneratedPaths?: string[];
@@ -45,10 +50,15 @@ export function schemaFor(input: Input): Record<string, unknown> {
 
 /** 检查本角色必需字段及所引用材料是否完整。 */
 export function validateInput(input: Input): void {
+  if (input.payload.executionContract === 'workbench-code-v1') {
+    validateWorkbenchCodeInput(input);
+    return;
+  }
+  if (input.payload.executionContract !== undefined || input.payload.buildContractRef !== undefined || input.payload.publicInterfaceRefs !== undefined) throw new Error('CODE_CONFIGURATION_INVALID');
   requireMaterials(input.payload, input.materials, ['knowledgeRef', 'languageId', 'projectConfigurationRef', 'allowedGeneratedPaths']);
   if (input.payload.requiredGeneratedPaths?.some((path) => !input.payload.allowedGeneratedPaths.includes(path))) throw new Error('CODE_RECONSTRUCTION_SCOPE_INVALID');
   if (!['c', 'cpp'].includes(input.payload.languageId)) throw new Error('CODE_LANGUAGE_INVALID');
-  const config = input.materials.find(({ ref }) => ref.artifactId === input.payload.projectConfigurationRef.artifactId)?.content as Record<string, unknown>;
+  const config = input.materials.find(({ ref }) => ref.artifactId === input.payload.projectConfigurationRef!.artifactId)?.content as Record<string, unknown>;
   if (!config || Object.keys(config).some((key) => !['languageId', 'standard', 'dependencies', 'constraints', 'allowedGeneratedPaths'].includes(key))
     || config.languageId !== input.payload.languageId || typeof config.standard !== 'string'
     || !(config.languageId === 'c' ? /^(c89|c99|c11|c17|c23)$/ : /^(c\+\+11|c\+\+14|c\+\+17|c\+\+20|c\+\+23)$/).test(config.standard)

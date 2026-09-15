@@ -10,6 +10,10 @@ SPDX-License-Identifier: MIT
 
 Domain 按领域功能组织：agents、workflow、evaluation、association、knowledge、sourceScan、workspace、migration 是同层级目录，不设置 services 分组或总导出文件。领域服务类放在所属功能目录；Domain.ts 保留共享实体与不变量。
 
+Application 的 RoleExecutionService 经 `workflow/AgentExecutionService.ts` 执行角色，由领域服务选择内部显式注册的 Agent。Application 保留材料加载、阶段日志、CAS 写入及幂等提交；领域执行服务只委派已有角色实现。外层不能直接调用角色 execute 或读取 AgentRegistry；共享类型、Schema、材料校验函数及受控 fixture 辅助函数仍可按职责导入，不额外建立全 Domain 总导出。
+
+AssociationDomainService 注入 ExternalExtractor / ReverseMapper，校验事实身份、目标引用和置信度；DocWorkerAgent 从固定源码提取可追溯事实供 DocGen 使用，当前两者没有互相调用。未来若用 Agent 实现提取策略，应接入既有服务边界，不复制关联校验。EvalRunnerDomainService 根据独立报告确定 PASS / ITERATE / STOPPED；TestGen、Check、Review 只生成候选或意见，不能替代该判定。`evaluation-agent` 是既有能力标识，接口命名为 EvaluationAgent（保留 EvaluationService 兼容别名），不加入七角色注册。
+
 ## 聚合与边界
 
 FlywheelRun 管理批次身份、状态和当前轮次。KnowledgeVersion 关联正文、来源、父版本和治理状态。EvaluationReport 是独立执行产生的证据；GateDecision 是 Domain 对报告和策略的确定性解释；发布回执由存储事务生成。工件正文不嵌进跨阶段通用状态，使用 ArtifactRef 传递。

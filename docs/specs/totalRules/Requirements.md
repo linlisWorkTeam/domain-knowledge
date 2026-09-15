@@ -51,7 +51,7 @@ SPDX-License-Identifier: MIT
 | KF-SYS-028 | P1 | 官网和控制台的用户可见文案必须使用自然、统一的中文；除固定标题 `WORKPANEL · KNOWLEDGE FLYWHEEL` 外，不得使用中英文拼接的栏目名、状态名或说明句。源码标识符、项目名、命令和环境变量作为技术值原样保留。 | AC-DOC-004 |
 | KF-SYS-029 | P0 | 本地服务必须提供可提交的写入令牌配置样例、默认忽略的本地配置文件和页面内配置说明；未配置时继续默认拒绝写入，但必须告诉用户如何启用并重启服务。 | AC-SEC-004 |
 | KF-SYS-030 | P0 | 运行代码、Spec、测试和前台必须只在 domain-knowledge 演进；wpKnowledge 只能保存知识正文、研究、设计、证据与索引，不得保留可运行副本。 | AC-ARCH-003 |
-| KF-SYS-031 | P0 | UI/API 必须只通过 Orchestrator、Flywheel、EvalRunner、KnowledgeSearch、KnowledgeDiscovery、ContentGovernance、ProviderOperations 和 OperationalMetrics Application App 进入系统；领域规则由 Flywheel、EvalRunner 和 Association Domain Service 持有，LangGraph、Provider SDK、秘密持有、数据库与 Redis 实现只能位于 Infrastructure。 | AC-ARCH-004 |
+| KF-SYS-031 | P0 | UI/API 必须只通过 Orchestrator、Flywheel、EvalRunner、KnowledgeSearch、KnowledgeDiscovery、ContentGovernance、ProviderOperations 和 OperationalMetrics Application App 进入系统；agents 与 services 在 Domain 平级，内部角色实现由 services 的执行入口调用；领域规则由 services 内的 Flywheel、EvalRunner 和 Association Domain Service 持有，LangGraph、Provider SDK、秘密持有、数据库与 Redis 实现只能位于 Infrastructure。 | AC-ARCH-004 |
 | KF-SYS-032 | P1 | Preview HTTP API 必须按 system、runs、knowledge、evaluations、sources、graph、agents 资源分组；迁移必须原子更新 Server、Console、DSH Adapter、测试和文档，首个 Release 前不得保留旧路由别名。 | AC-API-001 |
 | KF-SYS-033 | P1 | 系统必须提供持久化 Action Item 治理能力，能够从运行、评测、来源和安全事实确定性地产生、去重、处理和审计事项；治理动作不得改写既有 GateDecision 或 publication。 | AC-API-002 |
 | KF-SYS-034 | P1 | Run 必须提供可证明的进度、合法重试和可断线续传的实时事件；无法从固定工作单元计算时不得输出百分比或 ETA。 | AC-API-003 |
@@ -61,7 +61,7 @@ SPDX-License-Identifier: MIT
 | KF-SYS-038 | P1 | 系统必须提供持久化 Source Registry，管理来源身份、固定版本、同步状态、漂移、刷新任务、访问边界及其与知识的关联。 | AC-API-007 |
 | KF-SYS-039 | P1 | Console 必须为选定 Run 提供只读 Agent 工作流执行图，使用 Knowledge Registry 中的固定拓扑、WorkflowNodeProjection、Run snapshot 与事件展示节点状态、轮次、尝试和时间；不得读取 graph checkpoint、修改拓扑或人工推进节点。 | AC-API-008 |
 | KF-SYS-040 | P1 | Agent Settings 必须能够读取 Provider 可用性、认证状态、模型标识和受控错误摘要，但不得返回凭据或允许修改固定 Agent 契约。 | AC-API-009 |
-| KF-SYS-041 | P1 | 本地管理员必须能通过服务端安全配置、脱敏读取并无副作用验证模型 API URL 与 API Key；启用后新批次默认使用 DSH 原生 SDK；运行中配置冻结，旧 Pi Run 可读但不跨后端恢复，完整凭据不得进入浏览器持久化、URL、日志或运行快照。 | AC-API-010 |
+| KF-SYS-041 | P1 | 本地管理员必须能通过服务端安全配置、脱敏读取模型 API URL 与 API Key，并在明确获知可能费用后显式验证模型列表及一次最多 64 输出 token 的生产 DSH 最小生成；不自动重试，只有两阶段通过才启用。旧版仅列表验证需用户重新验证；保存、读取和启动服务不调用模型。启用后新批次默认使用 DSH 原生 SDK；运行中配置冻结，旧 Pi Run 可读但不跨后端恢复，完整凭据不得进入浏览器持久化、URL、日志或运行快照。 | AC-API-010 |
 | KF-SYS-042 | P1 | 系统必须按批次、节点、Provider 和模型记录排队与执行耗时、调用与重试、Token、可空估算成本、自动修订收敛和人工治理处理数据，并提供 P50/P95 聚合；缺少可信定价源时成本必须为 `null`，指标不得包含凭据、Prompt、模型正文或未脱敏上游错误。 | AC-OBS-004 |
 | KF-SYS-043 | P1 | 用户检索必须由 Application 的 KnowledgeSearchApp 直接调度 SearchAgent，不经过 OrchestratorAgent 或 LangGraph，不创建或推进 FlywheelRun。Agent 只能读取和返回经飞轮治理、原子发布、当前状态为 VERIFIED 且正文完整性有效的文档及授权元数据；结果包含版本、来源和 Artifact 引用，无命中不得自动生成知识或启动治理。 | AC-SEARCH-001 |
 | KF-SYS-044 | P0 | 框架必须按业务项目管理版本化运行配置，场景引用对应配置；依赖和构建说明不进入知识卡片，角色按需获得裁剪配置。每次启动固定知识卡片和项目配置版本、实际可读白名单及输出位置；配置变更只影响新任务，恢复不得静默换用新配置。 | AC-CONFIG-001 |
@@ -85,5 +85,6 @@ SPDX-License-Identifier: MIT
 | NFR-010 | P0 | 本地 V1 在 5 个并行 worker 上限内不得因并发产生同路径写冲突；冲突必须在调度前拒绝。 | AC-FLOW-004 |
 | NFR-011 | P0 | 真实源码验收必须记录仓库 URL、本地路径、commit、脏状态、运行时版本、逐条 argv、退出码、截断后的 stdout/stderr 摘要与完整证据 Artifact 摘要；验收不得依赖修改原工作区。 | AC-E2E-001 |
 | NFR-012 | P1 | 控制台必须支持键盘导航、可见焦点、语义名称、非纯颜色状态表达、WCAG AA 文字对比度和 200% 缩放下的核心读取路径；默认页面资源必须同源提供。 | AC-UI-012 |
+| NFR-013 | P1 | 易用性：开发过程中支持主 Agent 调度 subagent 并行完成独立任务，明确任务与写入边界、独立 worktree、READY、资源上限、失败回报和集成验证；宿主不支持时明确回退串行。 | AC-DEV-001 |
 
 需求变化需要同时更新模块设计、对应实现和验收追踪，不能只修改本表。运行及接入方式见 [快速开始](../../GettingStarted.md)。

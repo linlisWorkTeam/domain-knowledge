@@ -21,17 +21,16 @@ SPDX-License-Identifier: MIT
         <span class="brand-mark" aria-hidden="true">⌁</span>
         <div><strong>domain<span>/</span>knowledge</strong></div>
       </div>
-      <div class="project-card" aria-label="当前项目">
+      <button type="button" id="project-selector" class="project-card" aria-label="选择项目">
         <span class="project-avatar" aria-hidden="true">WP</span>
-        <span><small>项目</small><strong>wpKnowledge</strong></span>
+        <span><small>项目</small><strong id="selected-project-name">选择代码目录</strong></span>
         <i aria-hidden="true">⌄</i>
-      </div>
+      </button>
       <nav id="primary-nav">
         <p class="nav-section">工作区</p>
         <button class="nav-item active" data-page="overview"><span aria-hidden="true">⌂</span>操作中心 <em id="governance-count"></em></button>
-        <button class="nav-item" data-page="runs"><span aria-hidden="true">◎</span>飞轮批次</button>
-        <button class="nav-item" data-page="knowledge"><span aria-hidden="true">▤</span>知识</button>
-        <button class="nav-item" data-page="graph"><span aria-hidden="true">⌘</span>工作流图</button>
+        <button class="nav-item" data-page="runs"><span aria-hidden="true">◎</span>知识飞轮管理</button>
+        <button class="nav-item" data-page="knowledge"><span aria-hidden="true">▤</span>知识治理</button>
         <p class="nav-section">质量</p>
         <button class="nav-item" data-page="evaluations"><span aria-hidden="true">◫</span>评测</button>
         <button class="nav-item" data-page="sources"><span aria-hidden="true">⌕</span>来源</button>
@@ -39,7 +38,7 @@ SPDX-License-Identifier: MIT
       </nav>
       <div class="sidebar-foot">
         <span id="registry-indicator" class="health-dot pending" aria-hidden="true"></span>
-        <div><strong id="registry-label">连接中</strong><small>知识注册</small></div>
+        <div><strong id="registry-label">连接中</strong><small>知识库服务</small></div>
       </div>
     </aside>
 

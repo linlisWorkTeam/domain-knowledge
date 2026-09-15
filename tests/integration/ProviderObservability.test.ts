@@ -47,7 +47,7 @@ test('Provider HTTP contract redacts credentials, persists idempotency, and acti
     },
     providerProbe: {
       verify: async ({ model }) => verificationSucceeds
-        ? { status: 'VERIFIED', reasonCode: 'READY', model: model ?? 'discovered-model' }
+        ? { status: 'VERIFIED', reasonCode: 'GENERATION_READY', checks: { modelList: 'PASSED' as const, generation: 'PASSED' as const }, model: model ?? 'discovered-model' }
         : { status: 'FAILED', reasonCode: 'PROVIDER_AUTH_INVALID', model },
     },
     clock: () => '2026-09-04T01:02:03.000Z',

@@ -31,7 +31,7 @@ function git(root: string, args: string[]): string {
   return result.stdout.trim();
 }
 
-function agentOutput(agentType: string): Record<string, unknown> {
+function agentOutput(agentType: string, stage: string): Record<string, unknown> {
   switch (agentType) {
     case 'orchestrator':
       return orchestratorOutput('dsh-module');
@@ -44,12 +44,14 @@ function agentOutput(agentType: string): Record<string, unknown> {
         sourceEvidence: ['src/module.cpp'].map((path) => ({ claim: 'Returns four', path })),
         unresolvedQuestions: [],
       };
-    case 'doc-gen':
-      return {
+    case 'doc-gen': {
+      const document = {
         body: `${GOOD_BODY}\n\n## 行为契约\n\n公开函数必须返回固定数值 4，且由隔离行为测试验证。`,
         title: 'DSH 最小知识批次', keywords: ['DSH'],
         description: '使用真实 DSH SDK 生成并通过确定性门禁的知识。',
       };
+      return document;
+    }
     case 'test-gen':
       return cppTestOutput();
     case 'code':
@@ -88,7 +90,8 @@ test('a minimum complete Run sends all seven governed nodes through the real nat
     )).join('\n');
     const agentType = prompt.match(/"agentType":"([^"]+)"/)?.[1] ?? '';
     invokedRoles.push(agentType);
-    const output = JSON.stringify(agentOutput(agentType));
+    const stage = prompt.includes('当前阶段：outline') ? 'outline' : prompt.includes('当前阶段：body') ? 'body' : 'execute';
+    const output = JSON.stringify(agentOutput(agentType, stage));
     const common = { id: `chatcmpl-${invokedRoles.length}`, object: 'chat.completion.chunk', created: 1, model: 'test-model' };
     response.writeHead(200, { 'content-type': 'text/event-stream; charset=utf-8' });
     response.write(`data: ${JSON.stringify({
@@ -119,7 +122,7 @@ test('a minimum complete Run sends all seven governed nodes through the real nat
     operationalMetrics: { recordProviderInvocation: (record) => { invocations.push(record); }, runs: () => ({}), governance: () => ({}) },
     providerSettingsStore: store,
     providerEndpointPolicy: endpointPolicy,
-    providerProbe: { verify: async ({ model }) => ({ status: 'VERIFIED', reasonCode: 'READY', model }) },
+    providerProbe: { verify: async ({ model }) => ({ status: 'VERIFIED', reasonCode: 'GENERATION_READY', checks: { modelList: 'PASSED' as const, generation: 'PASSED' as const }, model }) },
   });
   try {
     await composition.apps.providerOperations.put({
@@ -152,6 +155,7 @@ test('a minimum complete Run sends all seven governed nodes through the real nat
       'check', 'code', 'doc-gen', 'doc-worker', 'orchestrator', 'review', 'test-gen',
     ]);
     assert.equal(invocations.length, 7);
+    assert.equal(invokedRoles.filter((role) => role === 'doc-gen').length, 1);
     assert.equal(invocations.every((record) => record.status === 'SUCCEEDED'), true);
     assert.equal(invocations.every((record) => record.inputTokens === 100 && record.outputTokens === 20), true);
     assert.equal(composition.service.status().publications, 1);

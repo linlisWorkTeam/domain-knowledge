@@ -10,6 +10,8 @@ import {
 import { dirname, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
+import { visibleExecutionSql } from './DeletionTombstones.ts';
+import { checkpointOwner, checkpointOwnerExited } from './CheckpointOwner.ts';
 import {
   assertArtifactRef, assertInvariant, createArtifactRef, sha256,
 } from '../../domain/Domain.ts';
@@ -244,6 +246,11 @@ export class SQLiteFlywheelRepository implements FlywheelRepository {
         updated_at TEXT NOT NULL
       );
 
+      CREATE TABLE IF NOT EXISTS checkpoint_owners (
+        generation_key TEXT PRIMARY KEY REFERENCES checkpoints(generation_key),
+        owner_json TEXT NOT NULL
+      );
+
       CREATE TABLE IF NOT EXISTS agent_prompt_configurations (
         agent_id TEXT PRIMARY KEY,
         prompt_addon TEXT NOT NULL,
@@ -364,6 +371,7 @@ export class SQLiteFlywheelRepository implements FlywheelRepository {
       INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (4, datetime('now'));
       INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (5, datetime('now'));
       INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (6, datetime('now'));
+      INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (7, datetime('now'));
     `);
   }
 
@@ -586,7 +594,7 @@ export class SQLiteFlywheelRepository implements FlywheelRepository {
 
   /** 读取指定运行的业务状态。 */
   getRun(runId: string): FlywheelRun | null {
-    const row = this.database.prepare('SELECT * FROM runs WHERE run_id = ?').get(runId) as Record<string, unknown> | undefined;
+    const row = this.database.prepare(`SELECT * FROM runs WHERE run_id = ? AND ${visibleExecutionSql(this.database, 'runs', 'runs.run_id')}`).get(runId) as Record<string, unknown> | undefined;
     return row ? this.runFromRow(row) : null;
   }
 
@@ -797,8 +805,11 @@ export class SQLiteFlywheelRepository implements FlywheelRepository {
           && Number.isFinite(existingUpdatedAt)
           && Number.isFinite(requestedAt)
           && requestedAt - existingUpdatedAt >= this.checkpointLeaseMs;
+        const owner = this.database.prepare('SELECT owner_json FROM checkpoint_owners WHERE generation_key = ?')
+          .get(checkpoint.generationKey) as { owner_json: string } | undefined;
+        const exited = owner ? checkpointOwnerExited(JSON.parse(owner.owner_json)) : false;
         assertInvariant(
-          existing.status === 'FAILED' || leaseExpired,
+          existing.status === 'FAILED' || leaseExpired || exited,
           `checkpoint is already running: ${checkpoint.generationKey}`,
         );
         assertInvariant(
@@ -824,6 +835,8 @@ export class SQLiteFlywheelRepository implements FlywheelRepository {
           json(checkpoint.inputRefs), checkpoint.retryCount, checkpoint.updatedAt,
         );
       }
+      this.database.prepare('INSERT INTO checkpoint_owners(generation_key, owner_json) VALUES (?, ?) ON CONFLICT(generation_key) DO UPDATE SET owner_json = excluded.owner_json')
+        .run(checkpoint.generationKey, JSON.stringify(checkpointOwner()));
       return this.getCheckpoint(checkpoint.generationKey) as NodeCheckpoint;
     });
   }
@@ -1004,7 +1017,7 @@ export class SQLiteFlywheelRepository implements FlywheelRepository {
       FROM knowledge_versions
     `).get() as Record<string, unknown>;
     const feedback = this.database.prepare('SELECT COUNT(*) AS count FROM feedback').get() as Record<string, unknown>;
-    const runs = this.database.prepare('SELECT COUNT(*) AS count FROM runs').get() as Record<string, unknown>;
+    const runs = this.database.prepare(`SELECT COUNT(*) AS count FROM runs WHERE ${visibleExecutionSql(this.database, 'runs', 'runs.run_id')}`).get() as Record<string, unknown>;
     const publications = this.database.prepare('SELECT COUNT(*) AS count FROM publications').get() as Record<string, unknown>;
     return {
       ok: true,

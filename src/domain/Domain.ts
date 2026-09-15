@@ -140,6 +140,8 @@ export interface EvaluationReport {
   infrastructureFailure: boolean;
   /** 提供check阻塞信息，供调用方读取或传入。 */
   checkBlocking?: boolean;
+  /** 知识风险独立于代码检查；旧记录缺失时按 false 读取。 */
+  knowledgeRiskBlocking?: boolean;
   /** 提供review阻塞信息，供调用方读取或传入。 */
   reviewBlocking?: boolean;
   /** 提供创建时间信息，供调用方读取或传入。 */
@@ -274,6 +276,10 @@ export function decideGate(
   if (report.checkBlocking) {
     if (outcome !== 'STOPPED') outcome = !canContinueIteration(run.iteration, policy.maxIterations) ? 'STOPPED' : 'ITERATE';
     reasons.push('CHECK_BLOCKING');
+  }
+  if (report.knowledgeRiskBlocking) {
+    if (outcome !== 'STOPPED') outcome = !canContinueIteration(run.iteration, policy.maxIterations) ? 'STOPPED' : 'ITERATE';
+    reasons.push('KNOWLEDGE_RISK_UNRESOLVED');
   }
   if (report.reviewBlocking) {
     if (outcome !== 'STOPPED') outcome = !canContinueIteration(run.iteration, policy.maxIterations) ? 'STOPPED' : 'ITERATE';

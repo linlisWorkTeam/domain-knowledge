@@ -62,6 +62,7 @@ test('HTTPS Sources hash approved content, reject redirects, and use the one app
         pool.intercept({ method: 'GET', path: '/approved.md' }).reply(200, body, {
           headers: {
             'content-length': String(body.byteLength),
+            'content-type': 'text/markdown; charset=utf-8',
             'last-modified': 'Fri, 04 Sep 2026 00:00:00 GMT',
           },
         });
@@ -107,6 +108,11 @@ test('HTTPS Sources hash approved content, reject redirects, and use the one app
     for (const entry of dispatched) assert.deepEqual(entry.addresses, approvedAddresses);
     assert.ok(dispatched.every((entry) => entry.maxResponseSize === 10 * 1024 * 1024));
     assert.equal(governance.listSources().length, 1);
+    const captured = await governance.readSourceMaterial(String(source.sourceId));
+    assert.deepEqual(Buffer.from(captured.bytes), body);
+    assert.equal(captured.mediaType, 'text/markdown; charset=utf-8');
+    assert.equal(captured.revision, source.revision);
+    assert.equal(dispatched.length, 3, 'capture reads only the explicitly registered URL once');
   } finally {
     repository.close();
     rmSync(projectRoot, { recursive: true, force: true });

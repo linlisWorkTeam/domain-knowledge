@@ -16,8 +16,8 @@ export function roleExamplePath(role: AgentId): string {
   return `src/domain/agents/${directory}/examples/${name}Sample.json`;
 }
 
-export function roleExample<I>(role: AgentId) {
-  const sample = JSON.parse(readFileSync(roleExamplePath(role), 'utf8'));
+export function roleExample<I>(role: AgentId, examplePath = roleExamplePath(role)) {
+  const sample = JSON.parse(readFileSync(examplePath, 'utf8'));
   const materials: Material[] = [];
   const named = new Map<string, ArtifactRef>();
   for (const [name, value] of Object.entries(sample.materials)) {
@@ -38,12 +38,12 @@ export function roleExample<I>(role: AgentId) {
   const controller = new AbortController();
   const context: ExecutionContext = {
     command: { schemaVersion: '1.0', commandId: 'command', runId: 'run', agentType: role, generationKey: 'development-command-0', payload },
-    model: { execute: async (request) => { phases.push('model'); requests.push(request); return structuredClone(sample.modelOutput); },
+    model: { execute: async (request) => { phases.push('model'); requests.push(request); return structuredClone(sample.modelStages?.[request.stage?.split(':')[0] ?? 'execute'] ?? sample.modelOutput); },
       assertOutput: (output, schema) => { phases.push('validate'); assertModelOutput(output, schema); } },
     effectivePrompt: roleDefinitions.find((definition) => definition.agentId === role)!.basePrompt,
     iteration: sample.iteration, signal: controller.signal,
   };
   const input = { payload, materials, sourcePaths: sample.scenario.sourcePaths,
     publicInterfacePaths: sample.scenario.publicInterfacePaths, provenance: materials.map(({ ref }) => ref), moduleId: sample.scenario.moduleId } as I;
-  return { input, context, requests, phases, controller, output: sample.modelOutput };
+  return { input, context, requests, phases, controller, output: sample.modelOutput, expectedOutput: sample.expectedOutput ?? sample.modelOutput, modelStages: sample.modelStages };
 }

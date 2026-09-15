@@ -7,6 +7,16 @@ SPDX-License-Identifier: MIT
 
 本文件只在 roadmap、能力边界或验收状态发生持久变化时更新。普通任务的命令、临时分工和验证流水记录在 PR、commit 或必要交接中，不要求每次同步 Status。实施方法与 CI 范围见 [Development](Development.md)，设计见 [规范目录](specs/README.md)。
 
+## 五阶段工作台（2026-09-15，验收未完成）
+
+PR #50 已退出草稿，包含 PR #38 的提交历史及当前 main；用户已授权在最终提交 CI 通过后合入，剩余验收交给下一 Agent。合入状态以 GitHub 为准。稳定卡片/版本、阶段任务、索引、C/C++ 重建评测、指定材料与关联用例及 Console 入口已有实现。代码 37fc9d9 的 CI 通过 736 项代码检查、44 项 Console 和 25 项隔离验收，不代表真实链路已全部验收。
+
+TinyXML2 XMLUtil 对应重建已有 43/43 可信测试及 40/40 固定测试通过；最新来源复核完成但质量仍为 UNRESOLVED，后续修订没有产生新版本。jsmn 修订卡的重建已按用户要求取消，后续门禁未完成。来源质量、最终发布、关联查看、历史删除兼容及网站完整链路仍待验收；不能以旧版本或受控测试替代当前版本结果。旧执行不可跨契约或工具链指纹恢复。
+
+最近核验的网站版本为 956fe26，生产数据与独立 C/C++ 验收库分开，验收任务尚未成为网站中的项目/模块批次。合并不自动部署或导入数据。免登录、无主动联网搜索、复用服务器工具链及串行资源限制保持。任务编号、证据与停止边界见[交接记录](epitaph/2026-09-15-1007-merge-and-acceptance-handoff.md)及[验收报告](reports/WorkbenchAcceptance.md)。
+
+v0.2.0 是独立的历史发行成果，不重写该版本。其 markdownLite 七角色真实验收及旧工作台流水保留在[合并前状态记录](https://github.com/linlisWorkTeam/domain-knowledge/blob/39092ce/docs/Status.md)，不能用于证明当前 C/C++ 工作台已经完成。
+
 ## 四阶段总览
 
 当前处于 S2 实现审阅阶段。DocGen/DocWorker 已合入；TestGen、Code、Check、Review、Orchestrator 已按顺序完成已确认契约和生产接线，业务验收边界见下表。S3 外部真实模型和 S4 公司 CLI 业务验收仍单独开展。

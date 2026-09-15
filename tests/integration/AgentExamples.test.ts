@@ -9,6 +9,7 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'n
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import test from 'node:test';
+import { ROLE_EXECUTION_VERSION } from '../../src/domain/agents/AgentExecution.ts';
 import { AGENT_IDS } from '../../src/domain/agents/AgentContracts.ts';
 import { main } from '../../src/interfaces/runner/AgentRun.ts';
 
@@ -20,7 +21,7 @@ for (const role of AGENT_IDS) test(`standalone ${role} sample commits through th
     assert.equal(saved.result.agentType, role);
     assert.equal(saved.result.status, 'SUCCEEDED');
     assert.equal(saved.configuration.provider.kind, 'fixture');
-    assert.equal(saved.configuration.roleExecutionVersion, 'domain-agents-v10-check-evidence-guards');
+    assert.equal(saved.configuration.roleExecutionVersion, ROLE_EXECUTION_VERSION);
     assert.equal(saved.publication, 'NOT_EVALUATED');
     assert.ok(saved.outputs.length >= 1);
     const audit = readFileSync(join(result.outputDirectory, 'audit.json'), 'utf8');
@@ -43,6 +44,34 @@ test('standalone invalid output records failure and retains the failed Run for i
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 
+
+test('standalone first DocGen generation persists outline and body from distinct model stages', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'agent-docgen-stages-'));
+  try {
+    const sample = JSON.parse(readFileSync('src/domain/agents/docGenAgent/examples/WorkbenchDocGenSample.json', 'utf8'));
+    delete sample.payload.baseKnowledgeRef;
+    delete sample.payload.corrections;
+    sample.iteration = 0;
+    const path = join(directory, 'initial.json');
+    writeFileSync(path, JSON.stringify(sample));
+    const result = await main(['--role', 'doc-gen', '--input', path, '--output', directory]);
+    const saved = JSON.parse(readFileSync(join(result.outputDirectory, 'result.json'), 'utf8'));
+    assert.equal(saved.result.status, 'SUCCEEDED');
+    assert.equal(saved.publication, 'NOT_EVALUATED');
+    const body = saved.outputs.find((item: { content: string }) => item.content === sample.expectedOutput.body);
+    const outline = saved.outputs.find((item: { content: string }) => item.content === JSON.stringify(sample.modelStages.outline));
+    assert.ok(body, 'body artifact must be committed');
+    assert.ok(outline, 'outline artifact must be committed independently');
+    assert.notEqual(body.ref.artifactId, outline.ref.artifactId);
+    assert.equal(saved.result.payload.bodyRef.artifactId, body.ref.artifactId);
+    assert.ok(saved.result.rawOutputRef, 'the role output reference must be explicit');
+    const raw = saved.outputs.find((item: { ref: { artifactId: string } }) => item.ref.artifactId === saved.result.rawOutputRef.artifactId);
+    assert.ok(raw, 'raw output artifact must remain readable');
+    assert.deepEqual(JSON.parse(raw.content), sample.expectedOutput);
+    assert.notEqual(raw.ref.artifactId, outline.ref.artifactId);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
 test('Check exhaustion saves every attempt in CAS without a successful result', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'check-report-exhausted-'));
   try {
@@ -60,5 +89,6 @@ test('Check exhaustion saves every attempt in CAS without a successful result', 
     assert.equal(attempts.length, 3);
     assert.equal(attempts[0].raw.findings[0].generated.locations[0].startLine, 999);
     assert.equal(readdirSync(runDirectory).includes('result.json'), false);
+
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });

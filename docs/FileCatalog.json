@@ -4,9 +4,21 @@
   "description": "不可注释格式的补充说明；顶层版权与许可适用于未单独登记的此类文件，不要求全仓库逐文件覆盖。",
   "files": [
     {
+      "path": "LICENSE",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "声明本仓库的 MIT 许可条件与版权归属。",
+      "metadataLocation": "catalog"
+    },
+    {
       "path": "Runner.config.json",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "保存runnerconfig的结构化配置、样例或元数据。",
+      "metadataLocation": "catalog"
+    },
+    {
+      "path": "docs/FileCatalog.json",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "记录全仓库文件的版权归属、功能说明及元数据存放位置。",
       "metadataLocation": "catalog"
     },
     {
@@ -124,6 +136,12 @@
       "metadataLocation": "catalog"
     },
     {
+      "path": "site/.nojekyll",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "提供.nojekyll页面的展示、交互或样式资源。",
+      "metadataLocation": "catalog"
+    },
+    {
       "path": "site/ConsoleDev007Dev008.gif",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "提供console-dev007-dev008界面展示或验收使用的图像资源。",
@@ -199,6 +217,18 @@
       "path": "tests/e2e/snapshots/ActionCenter1363x936LightLinux.png",
       "copyright": "Copyright (c) 2026 linlisWorkTeam",
       "description": "提供action-center-1363x936-light-linux界面展示或验收使用的图像资源。",
+      "metadataLocation": "catalog"
+    },
+    {
+      "path": "tests/e2e/snapshots/PublicationSettings1363LightLinux.png",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "本地发布与 Git 设置的受控浏览器视觉基线。",
+      "metadataLocation": "catalog"
+    },
+    {
+      "path": "tests/e2e/snapshots/PublishedKnowledge1363LightLinux.png",
+      "copyright": "Copyright (c) 2026 linlisWorkTeam",
+      "description": "已发布知识正文及来源证据的受控浏览器视觉基线。",
       "metadataLocation": "catalog"
     },
     {

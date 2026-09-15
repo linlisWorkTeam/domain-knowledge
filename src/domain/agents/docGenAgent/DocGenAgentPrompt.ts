@@ -18,7 +18,9 @@ export const definition = {
 
 /** 组合基础提示词和本角色可见的受信材料。 */
 export function buildPrompt(input: Input, context: ExecutionContext): string {
-  return `${context.effectivePrompt}\n\n受信 AgentCommand：\n${JSON.stringify(context.command)}\n\nDocGen 内部汇总载荷：\n${JSON.stringify(input.payload)}\n\n汇总材料：\n${JSON.stringify(materialsFor(input.payload, input.materials))}`;
+  const unit = input.materials.find(({ content }) => content && typeof content === 'object' && 'schemaVersion' in content && content.schemaVersion === 'knowledge-unit-v1');
+  const scope = unit ? '\n\n本次只为 knowledge-unit-v1 中指定的知识单元生成一张完整卡片，覆盖用途、接口、行为、边界、适用条件和来源；其他公开声明仅用于理解依赖。缺证据明确标注，不把推测写成事实，不宣称已通过评测。全部授权材料已内联，无需调用文件工具。' : '';
+  return `${context.effectivePrompt}${scope}\n\n受信 AgentCommand：\n${JSON.stringify(context.command)}\n\nDocGen 内部汇总载荷：\n${JSON.stringify(input.payload)}\n\n命令引用工件（已校验内容摘要）：\n${JSON.stringify(materialsFor(input.payload, input.materials))}`;
 }
 
 /** 确定本角色允许读取的文件路径。 */
