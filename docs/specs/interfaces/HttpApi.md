@@ -53,7 +53,7 @@ Available 是已接线路由；Planned 路由不作为当前能力。Available /
 | `POST /api/v1/projects` | Available | directory、revision、moduleIds及声明式build；固定选定源码正文和构建配置，返回不可变workbench-project-v1快照。同输入复用，不启动生成。 |
 | `GET /api/v1/projects` | Available | snapshots输入历史，可按projectId过滤，最新保存优先；不读取源码正文。 |
 | `GET /api/v1/projects/:snapshotId` | Available | 读取明确输入版本，不跟随HEAD或覆盖历史。 |
-| `POST /api/v1/generations` | Available | snapshotId及可选scopes（以moduleId为键，entryPath/astFilter/symbols）；冻结模型配置，启动或复用C/C++ GENERATE任务，返回task。已有卡片可立即读取；任务状态、取消和同输入恢复共用stage-tasks。 |
+| `POST /api/v1/generations` | Available | snapshotId及可选scopes（以moduleId为键，entryPath/astFilter/symbols）；默认全量生成。传入可选baseGenerationTaskId后，比较同项目已成功生成任务的 Git 快照与目标 Git 快照，冻结增量范围。启动或复用C/C++ GENERATE任务，返回task。任务状态、取消和同输入恢复共用stage-tasks。 |
 | `POST /api/v1/reconstructions` | Available | snapshotId、versionIds；冻结模型与实际工具链身份，启动或复用FLYWHEEL中的代码重建及接口比较。返回阶段任务；行为评测与知识修订由独立接口继续执行，重建结果本身不具有发布资格。 |
 | `GET /api/v1/stage-tasks/:taskId/artifacts/:sha256` | Available | 仅下载该任务结果或成功检查点直接引用的工件；无关系的CAS摘要返回404。沿用免登录或令牌访问规则，不提供任意CAS读取。 |
 | `POST /api/v1/native-evaluations` | Available | reconstructionTaskId，可选sourceVerificationTaskId及candidateSuites；后者仅在补证时接受native-supplied-candidates-v1对象（modules中的moduleId及声明式suite），拒绝可信标志或运行报告。候选按固定模块/卡片章节/接口校验并冻结CAS；候选改变形成新输入，同输入重启复用。提供的候选不调用TestGen或自动改预期，仍经参考验证和历史可信门禁。补证时冻结knowledge-test-supplement-v1及来源未知章节需求，必须绑定同一重建/版本/源/配置；绑定成功重建的结果摘要、配置、工具链与卡片版本，启动或复用EVALUATE。候选参考失败以TEST_CANDIDATE_REJECTED结束，模型提出的候选可同输入恢复生成新候选；显式提供的候选恢复时仍使用冻结内容，修改候选须形成新输入；行为失败保存报告，不授予发布资格。 |

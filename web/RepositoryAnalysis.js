@@ -5,7 +5,7 @@
  */
 import { createProjectHistory } from './ProjectHistory.js'
 export function createRepositoryAnalysisPanel({ root, request, escapeHtml: escape, isEditable, onProjectSelected = () => {} }) {
-  let directory = ''
+  let directory = '', revision = ''
   let report = null
   let error = ''
   let busy = false
@@ -21,6 +21,9 @@ export function createRepositoryAnalysisPanel({ root, request, escapeHtml: escap
       for (const [key, value] of Object.entries(project.build)) build[key] = Array.isArray(value) ? value.join('\n') : value
       const directoryField = root.querySelector('[name="repositoryDirectory"]')
       if (directoryField) directoryField.value = directory
+      revision = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(value.commit) ? value.commit : ''
+      const revisionField = root.querySelector('[name="repositoryRevision"]')
+      if (revisionField) revisionField.value = revision
       const resultPanel = root.querySelector('[data-repository-result]'); if (resultPanel) resultPanel.innerHTML = '<p>已载入保存的源码与构建输入。需要修改模块或参数时，可重新分析该版本。</p>'
       onProjectSelected(project)
   }
@@ -122,6 +125,7 @@ export function createRepositoryAnalysisPanel({ root, request, escapeHtml: escap
   root.addEventListener('input', (event) => {
     if (!event.target.closest('[data-repository-form]')) return
     if (event.target.name === 'repositoryDirectory') directory = event.target.value
+    if (event.target.name === 'repositoryRevision') revision = event.target.value
   })
   root.addEventListener('submit', (event) => {
     if (!event.target.matches('[data-repository-form]')) return
@@ -130,8 +134,9 @@ export function createRepositoryAnalysisPanel({ root, request, escapeHtml: escap
     busy = true; error = ''; customModules = []; moduleBuilds.clear(); editingModule = ''; report = null; project = null;
     event.target.querySelector('button').disabled = true
     event.target.querySelector('button').textContent = '分析中…'
-    root.querySelector('[data-repository-result]').textContent = '正在冻结目录当前内容…'
-    request('/api/v1/repository-analyses', { method: 'POST', body: JSON.stringify({ directory, revision: 'WORKTREE' }) })
+    const requestedRevision = revision.trim() || 'WORKTREE'
+    root.querySelector('[data-repository-result]').textContent = requestedRevision === 'WORKTREE' ? '正在冻结目录当前内容…' : '正在读取 Git 提交…'
+    request('/api/v1/repository-analyses', { method: 'POST', body: JSON.stringify({ directory, revision: requestedRevision }) })
       .then((value) => { report = value; selected = new Set(value.modules.slice(0, 200).filter((module) => module.selectedByDefault).map((module) => module.moduleId)) })
       .catch((failure) => { error = errors[failure.code] ?? '目录读取失败，请检查目录和服务器环境。' })
       .finally(() => {
@@ -147,6 +152,7 @@ export function createRepositoryAnalysisPanel({ root, request, escapeHtml: escap
     html: () => `<section class="repository-panel" data-repository-panel>
       <form data-repository-form>
       <label>本地代码目录<input name="repositoryDirectory" value="${escape(directory)}" placeholder="输入服务器上的代码目录" required></label>
+      <label>Git 版本（可选）<input name="repositoryRevision" value="${escape(revision)}" placeholder="HEAD 或提交 SHA，留空读取目录快照" maxlength="256"></label>
       <button class="primary-button" type="submit" ${busy || saving || !isEditable() ? 'disabled' : ''}>${busy ? '读取中…' : '读取目录'}</button><button class="secondary-button" type="button" data-browse-directory="repositoryDirectory" ${busy || saving || !isEditable() ? 'disabled' : ''}>浏览代码目录</button></form><div id="directory-browser" class="directory-browser"></div>
       <p role="status" data-repository-notice>${escape(error)}</p><div data-repository-result>${result()}</div><section class="repository-history" data-project-history>${history.html()}</section></section>`,
   }

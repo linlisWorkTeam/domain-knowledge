@@ -9,10 +9,10 @@ import { createWorkbenchPipelinePanel } from './WorkbenchPipeline.js'
 import { createKnowledgeReconstructionPanel } from './KnowledgeReconstruction.js'
 export function createKnowledgeGenerationPanel({ root, request, escapeHtml: escape, isEditable }) {
   let project = null, task = null, checkpoints = [], events = [], timer = null
-  let busy = false, notice = '', epoch = 0, initialized = false, scopesOpen = false
+  let busy = false, notice = '', epoch = 0, initialized = false, scopesOpen = false, baseTaskId = ''
   const reconstruction = createKnowledgeReconstructionPanel({ root, request, escapeHtml: escape, isEditable,
-    selection: () => task?.status === 'SUCCEEDED' ? { snapshotId: task.input.parameters.snapshotId,
-      versionIds: (task.result?.summary?.cards ?? []).map((card) => card.versionId) } : null })
+    selection: () => task?.status === 'SUCCEEDED' && task.result?.summary?.cards?.length ? { snapshotId: task.input.parameters.snapshotId,
+      versionIds: task.result.summary.cards.map((card) => card.versionId) } : null })
   const scopes = new Map()
   const pipeline = createWorkbenchPipelinePanel({ root, request, escapeHtml: escape, isEditable, selection: () => project ? { snapshotId: project.snapshotId,
     scopes: Object.fromEntries(project.modules.map((module) => [module.moduleId, Object.fromEntries(Object.entries(scopes.get(module.moduleId) ?? {}).filter(([, value]) => value.trim()).map(([key, value]) => [key, key === 'symbols' ? value.split('\n').map((line) => line.trim()).filter(Boolean) : value.trim()]))])) } : null })
@@ -24,6 +24,10 @@ export function createKnowledgeGenerationPanel({ root, request, escapeHtml: esca
     DSH_CONFIGURATION_CHANGED: '模型配置已变化；恢复需要与冻结输入一致的配置。',
     RUN_CONFIGURATION_INCOMPATIBLE: '当前执行配置与冻结输入不兼容，请检查 Agent 设置。',
     GENERATION_LANGUAGE_UNSUPPORTED: '此生成入口当前支持 C、C++；TypeScript 请使用现有模块回归入口。',
+    GENERATION_BASE_INVALID: '请输入已成功完成的生成任务 ID。',
+    GENERATION_BASE_PROJECT_MISMATCH: '基线任务必须属于当前项目。',
+    GENERATION_BASE_UNAVAILABLE: '基线任务的项目快照不可用。',
+    GENERATION_GIT_REQUIRED: '增量生成要求基线和目标都由 Git 提交创建。',
     NATIVE_INTERFACE_EMPTY: '未发现选定接口，请检查入口路径及类或符号范围。',
     NATIVE_INTERFACE_COMPILE_FAILED: '公开接口提取失败，请检查依赖和构建参数；诊断保留在执行记录中。',
     WORKBENCH_RESOURCE_INSUFFICIENT: '可用内存或磁盘不足，任务已暂停；释放资源后可以恢复。',
@@ -36,10 +40,12 @@ export function createKnowledgeGenerationPanel({ root, request, escapeHtml: esca
   function taskHtml() {
     if (!task) return project ? '<p>生成后即可阅读；评测结果独立记录。</p>' : ''
     const cards = checkpoints.filter((item) => item.key.startsWith('card:')).map((item) => item.result.summary)
+    const incremental = task.input.parameters.incremental
     const progress = [...events].reverse().find((event) => event.kind === 'PROGRESS' && ['card', 'interfaces'].includes(event.detail?.phase))?.detail
     const resume = ['FAILED', 'PAUSED', 'CANCELLED'].includes(task.status) && task.contractVersion === 'knowledge-workbench-v1'
       && Object.entries(task.limits ?? {}).every(([key, limit]) => task.usage[key] < limit)
     return `<p><b>${escape(task.cancelRequested && active() ? '正在取消' : labels[task.status] ?? '未知')}</b> · 已生成 ${escape(cards.length)} 张 · 评测结果见后续阶段</p>
+      ${incremental ? `<p>增量基线 <code>${escape(incremental.baseRevision)}</code> · ${incremental.moduleIds.length ? `生成模块：${escape(incremental.moduleIds.join('、'))}` : '没有需要重新生成的模块'}${incremental.removedModuleIds.length ? ` · 已移出范围：${escape(incremental.removedModuleIds.join('、'))}` : ''}</p>` : ''}
       ${active() && progress ? `<p>当前：${escape(progress.symbol ?? progress.module)}</p>` : ''}
       <ul>${cards.map((card) => `<li><button class="text-button" data-version-id="${escape(card.versionId)}" type="button">${escape(card.title)}</button> · ${escape(card.quality)}</li>`).join('')}</ul>
       ${task.reasonCode ? `<p>${escape(reasons[task.reasonCode] ?? task.reasonCode)}</p>` : ''}
@@ -51,7 +57,9 @@ export function createKnowledgeGenerationPanel({ root, request, escapeHtml: esca
   }
   function html() {
     return `<section data-generation-panel><section data-workbench-pipeline-panel></section><h3>知识库生成</h3>
-      ${project ? `<p>使用已保存输入 ${escape(project.snapshotId)}</p><details data-generation-scopes ${scopesOpen ? 'open' : ''}><summary>接口范围（可选）</summary>
+      ${project ? `<p>使用已保存输入 ${escape(project.snapshotId)}</p>
+        ${/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(project.commit) ? `<label>增量基线任务 ID（留空时全量生成）<input data-generation-base maxlength="70" value="${escape(baseTaskId)}" ${busy || active() || !isEditable() ? 'disabled' : ''}></label>` : ''}
+        <details data-generation-scopes ${scopesOpen ? 'open' : ''}><summary>接口范围（可选）</summary>
         ${project.modules.map((module) => `<fieldset><legend>${escape(module.moduleId)}</legend>
           ${[['entryPath', '接口入口路径'], ['astFilter', '类范围（例如 tinyxml2::XMLUtil）'], ['symbols', '限定符号（每行一个，留空自动提取）']].map(([key, label]) => `<label>${label}<textarea name="scope-${escape(module.moduleId)}-${key}" data-generation-scope="${key}" data-generation-module="${escape(module.moduleId)}" ${busy || active() ? 'disabled' : ''}>${escape(scopes.get(module.moduleId)?.[key] ?? '')}</textarea></label>`).join('')}</fieldset>`).join('')}</details>
         <button class="primary-button" data-generation-action="start" ${busy || active() || !isEditable() ? 'disabled' : ''} type="button">生成知识库</button>` : '<p>先保存项目输入，再生成知识库。</p>'}
@@ -65,6 +73,7 @@ export function createKnowledgeGenerationPanel({ root, request, escapeHtml: esca
     reconstruction.refresh()
     pipeline.render()
     for (const field of panel.querySelectorAll('[data-generation-scope]')) field.disabled = busy || active()
+    const base = panel.querySelector('[data-generation-base]'); if (base) base.disabled = busy || active() || !isEditable()
   }
   async function observe() {
     clearTimeout(timer); timer = null; if (!task || !host()) return
@@ -77,6 +86,7 @@ export function createKnowledgeGenerationPanel({ root, request, escapeHtml: esca
     if (active() && host()) timer = setTimeout(observe, 800)
   }
   root.addEventListener('input', (event) => {
+    if (event.target.matches?.('[data-generation-base]')) { baseTaskId = event.target.value.trim(); return }
     const key = event.target.dataset?.generationScope; if (!key) return
     const id = event.target.dataset.generationModule
     scopes.set(id, { ...scopes.get(id), [key]: event.target.value })
@@ -93,7 +103,8 @@ export function createKnowledgeGenerationPanel({ root, request, escapeHtml: esca
       const selectedScopes = Object.fromEntries((project?.modules ?? []).map((module) => [module.moduleId,
         Object.fromEntries(Object.entries(scopes.get(module.moduleId) ?? {}).filter(([, value]) => value.trim()).map(([key, value]) => [key, key === 'symbols' ? value.split('\n').map((line) => line.trim()).filter(Boolean) : value.trim()]))]))
       const path = action === 'start' ? '/api/v1/generations' : `/api/v1/stage-tasks/${encodeURIComponent(task.taskId)}/${action}`
-      const payload = action === 'start' ? { snapshotId: project.snapshotId, scopes: selectedScopes } : action === 'resume' ? { inputDigest: task.inputDigest } : {}
+      const payload = action === 'start' ? { snapshotId: project.snapshotId, scopes: selectedScopes,
+        ...(baseTaskId ? { baseGenerationTaskId: baseTaskId } : {}) } : action === 'resume' ? { inputDigest: task.inputDigest } : {}
       const result = await request(path, { method: 'POST', body: JSON.stringify(payload) })
       if (current !== epoch) return
       task = result.task; if (action === 'start') { checkpoints = []; events = [] }
@@ -102,7 +113,7 @@ export function createKnowledgeGenerationPanel({ root, request, escapeHtml: esca
     finally { if (current === epoch) { busy = false; render() } }
   })
   return { html,
-    setProject(value) { if (project?.snapshotId !== value?.snapshotId) { epoch++; task = null; checkpoints = []; events = []; scopes.clear(); notice = ''; busy = false; initialized = false; clearTimeout(timer); timer = null } project = value; const panel = host(); if (panel) panel.outerHTML = html(); queueMicrotask(observe); reconstruction.refresh(); pipeline.refresh() },
+    setProject(value) { if (project?.snapshotId !== value?.snapshotId) { epoch++; task = null; checkpoints = []; events = []; scopes.clear(); baseTaskId = ''; notice = ''; busy = false; initialized = false; clearTimeout(timer); timer = null } project = value; const panel = host(); if (panel) panel.outerHTML = html(); queueMicrotask(observe); reconstruction.refresh(); pipeline.refresh() },
     refresh() {
       pipeline.refresh()
       reconstruction.refresh()
