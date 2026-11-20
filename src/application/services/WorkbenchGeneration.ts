@@ -3,13 +3,14 @@
  * SPDX-License-Identifier: MIT
  * 文件功能：交接固定源码、接口和现有DocGen角色，逐卡提交并保留恢复材料。
  */
-import { moduleBuild } from '../../domain/workbench/WorkbenchProject.ts';
+import { moduleBuild, type WorkbenchProjectSnapshot } from '../../domain/workbench/WorkbenchProject.ts';
+import { gitGenerationScope, type GenerationScope } from '../../domain/workbench/GitGenerationScope.ts';
 import { sha256, type ArtifactRef } from '../../domain/Domain.ts';
 import { executeAgent } from '../../domain/workflow/AgentExecutionService.ts';
 import type { AgentCommand } from '../../domain/agents/AgentContracts.ts';
 import type { Material, StageAttempt } from '../../domain/agents/AgentExecution.ts';
 import { knowledgeUnits, cardBodyWithSource } from '../../domain/knowledge/KnowledgeUnits.ts';
-import { canonicalJson, type JsonValue } from '../../domain/workbench/StageTask.ts';
+import { canonicalJson, STAGE_CONTRACT, type JsonValue } from '../../domain/workbench/StageTask.ts';
 import type { ArtifactStore, AgentContractValidator } from '../ports/ApplicationPorts.ts';
 import type { NativeLanguageToolchain } from '../ports/LanguageToolchainPorts.ts';
 import type { StageConfigurationProvider, StageModelConfiguration, StageModelFactory } from '../ports/WorkbenchGenerationPorts.ts';
@@ -18,7 +19,8 @@ import type { KnowledgeFlywheelService } from './ApplicationServices.ts';
 import type { WorkbenchStages, StageExecutionContext } from './WorkbenchStages.ts';
 import { commitRoleArtifacts } from './RoleArtifacts.ts';
 
-export interface GenerationScope { entryPath?: string; astFilter?: string; symbols?: string[] }
+export type { GenerationScope } from '../../domain/workbench/GitGenerationScope.ts';
+type IncrementalGeneration = ReturnType<typeof gitGenerationScope> & { baseTaskId: string; baseRevision: string };
 interface Dependencies {
   projects: WorkbenchProjectStore; artifacts: ArtifactStore; configuration: StageConfigurationProvider;
   native: NativeLanguageToolchain; model: StageModelFactory; contracts: AgentContractValidator;
@@ -28,11 +30,25 @@ const json = (value: unknown): JsonValue => JSON.parse(JSON.stringify(value));
 export class WorkbenchGeneration {
   readonly dependencies: Dependencies;
   constructor(dependencies: Dependencies) { this.dependencies = dependencies; }
-  async start(snapshotId: string, scopes: Record<string, GenerationScope> = {}) {
-    return this.dependencies.stages.start(await this.prepare(snapshotId, scopes));
+  async start(snapshotId: string, scopes: Record<string, GenerationScope> = {}, baseGenerationTaskId?: string) {
+    return this.dependencies.stages.start(await this.prepare(snapshotId, scopes, baseGenerationTaskId));
   }
-  async prepare(snapshotId: string, scopes: Record<string, GenerationScope> = {}): Promise<import('../../domain/workbench/StageTask.ts').StageInput> {
-    const { projects, artifacts, configuration, stages } = this.dependencies;
+  private generationBase(project: WorkbenchProjectSnapshot, taskId: string) {
+    const { stages, projects } = this.dependencies;
+    if (typeof taskId !== 'string' || !/^stage-[a-f0-9]{64}$/.test(taskId)) throw new Error('GENERATION_BASE_INVALID');
+    const task = stages.store.get(taskId);
+    if (!task || task.status !== 'SUCCEEDED' || task.input.stage !== 'GENERATE'
+      || task.contractVersion !== STAGE_CONTRACT || !task.result) throw new Error('GENERATION_BASE_INVALID');
+    if (task.input.projectId !== project.projectId) throw new Error('GENERATION_BASE_PROJECT_MISMATCH');
+    const snapshotId = task.input.parameters.snapshotId;
+    const snapshot = typeof snapshotId === 'string' ? projects.get(snapshotId) : null;
+    if (!snapshot || snapshot.commit !== task.input.sourceRevision || snapshot.sourceDigest !== task.input.sourceDigest) {
+      throw new Error('GENERATION_BASE_UNAVAILABLE');
+    }
+    return { task, snapshot };
+  }
+  async prepare(snapshotId: string, scopes: Record<string, GenerationScope> = {}, baseGenerationTaskId?: string): Promise<import('../../domain/workbench/StageTask.ts').StageInput> {
+    const { projects, artifacts, configuration } = this.dependencies;
     const project = projects.get(snapshotId); if (!project) throw new Error('PROJECT_INPUT_NOT_FOUND');
     if (!scopes || typeof scopes !== 'object' || Array.isArray(scopes)) throw new Error('GENERATION_SCOPE_INVALID');
     for (const [moduleId, scope] of Object.entries(scopes)) {
@@ -41,16 +57,35 @@ export class WorkbenchGeneration {
         || (scope.entryPath !== undefined && typeof scope.entryPath !== 'string') || (scope.astFilter !== undefined && typeof scope.astFilter !== 'string')
         || (scope.symbols !== undefined && (!Array.isArray(scope.symbols) || scope.symbols.some((symbol) => typeof symbol !== 'string')))) throw new Error('GENERATION_SCOPE_INVALID');
     }
+    const base = baseGenerationTaskId === undefined ? null : this.generationBase(project, baseGenerationTaskId);
     const frozen = await configuration.captureStage();
     const configurationRef = await artifacts.put(Buffer.from(canonicalJson(frozen)), 'application/json');
+    const incremental = base ? {
+      baseTaskId: base.task.taskId,
+      baseRevision: base.snapshot.commit,
+      ...gitGenerationScope(
+        base.snapshot, project,
+        (base.task.input.parameters.scopes ?? {}) as unknown as Record<string, GenerationScope>,
+        scopes, base.task.input.configurationDigest !== configurationRef.sha256,
+      ),
+    } : null;
     return { projectId: project.projectId, stage: 'GENERATE', sourceRevision: project.commit, sourceDigest: project.sourceDigest,
-      cardVersionIds: [], configurationDigest: configurationRef.sha256, parameters: { snapshotId, configurationRef: json(configurationRef), scopes: json(scopes) } };
+      cardVersionIds: [], configurationDigest: configurationRef.sha256, parameters: {
+        snapshotId, configurationRef: json(configurationRef), scopes: json(scopes),
+        ...(incremental ? { incremental: json(incremental) } : {}),
+      } };
   }
   async generate(context: StageExecutionContext) {
     const { projects, artifacts, configuration, native, model, contracts, flywheel, stages } = this.dependencies;
     const start = performance.now(); const now = () => context.task.usage.elapsedMs + Math.floor(performance.now() - start);
     const project = projects.get(String(context.task.input.parameters.snapshotId)); if (!project) throw new Error('PROJECT_INPUT_NOT_FOUND');
     if (project.commit !== context.task.input.sourceRevision || project.sourceDigest !== context.task.input.sourceDigest) throw new Error('STAGE_INPUT_CHANGED');
+    const incremental = context.task.input.parameters.incremental as unknown as IncrementalGeneration | undefined;
+    const selectedIds = incremental ? new Set(incremental.moduleIds) : null;
+    const modules = selectedIds ? project.modules.filter(module => selectedIds.has(module.moduleId)) : project.modules;
+    if (!modules.length && incremental) {
+      return { artifactRefs: [], summary: { snapshotId: project.snapshotId, cards: [], generated: 0, evaluated: false, incremental: json(incremental) } };
+    }
     const load = async (ref: ArtifactRef) => {
       if (!await artifacts.verify(ref)) throw new Error('GENERATION_ARTIFACT_CORRUPT');
       return Buffer.from(await artifacts.get(ref)).toString('utf8');
@@ -66,10 +101,10 @@ export class WorkbenchGeneration {
     const allSources: Array<{ path: string; content: string }> = [];
     for (const file of project.sourceFiles.filter((file) => file.kind === 'source')) allSources.push({ path: file.path, content: await load(file.ref) });
     const cards: JsonValue[] = []; const resultRefs: ArtifactRef[] = [];
-    for (const module of project.modules) {
+    for (const module of modules) {
       context.signal.throwIfAborted();
       if (!['c', 'cpp'].includes(module.language)) throw new Error('GENERATION_LANGUAGE_UNSUPPORTED');
-      const scope = scopes[module.moduleId] ?? {};
+      const scope = Object.hasOwn(scopes, module.moduleId) ? scopes[module.moduleId]! : {};
       const entryPath = scope.entryPath ?? module.sourcePaths.find((path) => /\.(h|hpp|hh|hxx)$/.test(path)) ?? module.sourcePaths[0]!;
       if (!module.sourcePaths.includes(entryPath)) throw new Error('GENERATION_SCOPE_INVALID');
       context.progress({ phase: 'interfaces', module: module.moduleId });
@@ -148,6 +183,7 @@ export class WorkbenchGeneration {
         cards.push(completed.summary); resultRefs.push(...completed.artifactRefs);
       }
     }
-    return { artifactRefs: resultRefs, summary: { snapshotId: project.snapshotId, cards, generated: cards.length, evaluated: false } };
+    return { artifactRefs: resultRefs, summary: { snapshotId: project.snapshotId, cards, generated: cards.length, evaluated: false,
+      ...(incremental ? { incremental: json(incremental) } : {}) } };
   }
 }

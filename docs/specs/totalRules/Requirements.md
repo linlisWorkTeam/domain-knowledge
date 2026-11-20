@@ -66,6 +66,7 @@ SPDX-License-Identifier: MIT
 | KF-SYS-043 | P1 | 用户检索必须由 Application 的 KnowledgeSearchApp 直接调度 SearchAgent，不经过 OrchestratorAgent 或 LangGraph，不创建或推进 FlywheelRun。Agent 只能读取和返回经飞轮治理、原子发布、当前状态为 VERIFIED 且正文完整性有效的文档及授权元数据；结果包含版本、来源和 Artifact 引用，无命中不得自动生成知识或启动治理。 | AC-SEARCH-001 |
 | KF-SYS-044 | P0 | 框架必须按业务项目管理版本化运行配置，场景引用对应配置；依赖和构建说明不进入知识卡片，角色按需获得裁剪配置。每次启动固定知识卡片和项目配置版本、实际可读白名单及输出位置；配置变更只影响新任务，恢复不得静默换用新配置。 | AC-CONFIG-001 |
 | KF-SYS-045 | P0 | CodeAgent 以包含公开接口的知识卡片为主要业务输入，结合项目配置裁剪出的 C/C++ 标准、依赖约束及允许生成路径，返回 path/content 文件列表。完整构建命令交执行器，框架校验文件列表后写入本轮临时目录，再交后续比较、编译和测试；CodeAgent 不直接覆盖业务仓库。 | AC-CODE-001、AC-CODE-002 |
+| KF-SYS-046 | P1 | 独立知识生成应默认覆盖目标快照的全部选中模块，并允许按同项目已成功的 Git 生成基线冻结增量范围。共享输入变化扩大生成范围，没有受影响的模块时跳过生成。 | AC-API-011 |
 
 ## 非功能需求
 

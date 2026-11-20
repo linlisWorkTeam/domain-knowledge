@@ -56,6 +56,7 @@ SPDX-License-Identifier: MIT
 | AC-API-008 | Given 一个含并行、迭代和失败 attempt 的 Run，When 打开 Graph 并选择节点，Then 固定七 Agent 的节点与依赖边稳定，状态、iteration、attempt、时间、ArtifactRef 和错误摘要来自 Registry 投影；刷新和 SSE 续传后状态一致，且页面不能读取 checkpoint、修改拓扑或人工推进节点。 |
 | AC-API-009 | Given Provider 可用、未认证、过期和故障状态，When 打开 Agent 设置，Then 返回稳定状态、模型、检查时间和受控原因，不返回凭据、会话或提示词，也不能修改固定 Agent 契约。 |
 | AC-API-010 | Given 本地管理员提交合法、非法、不可达和受限网络地址的 API URL 与可选 API Key，When 保存、读取和验证 Provider 配置，Then 只有通过地址与权限校验的配置被服务端加密或受限持有，读取只返回脱敏状态，验证无生成副作用；启用后新批次冻结 DSH 原生协议、地址、模型、Token/上下文上限和 Schema 尝试上限的摘要但不冻结完整 Key，恢复时任一非秘密执行参数变化均失败关闭。 |
+| AC-API-011 | Given 同项目两个 Git 快照及已成功的基线生成任务，When 启动增量生成，Then 任务冻结基线和受影响模块，跳过未受影响的模块，且空增量不调用模型。不同项目或无效基线应拒绝。 |
 | AC-OBS-004 | Given 真实与 fixture 批次、重试、自动修订和人工治理事项，When 查询 24 小时与 7/30 天观测窗口，Then 返回有样本量的节点/批次 P50/P95、Token、可空估算成本、首次修订通过率、三轮收敛率、人工介入比例、平均处理时间和短期复发率；无样本或无可信定价源时成本返回空值，任何响应不含 Prompt、正文、凭据、Session 或上游原始错误。 |
 | AC-SEARCH-001 | Given 同时存在已发布 VERIFIED、仅 Quality ACCEPTED 的候选、LOW_CONFIDENCE、SUPERSEDED 和缺少发布回执的版本，When 用户经 Application / KnowledgeSearchApp 调用 SearchAgent，Then 仅合法已发布文档能进入 Agent 上下文和结果，且每项包含可验证的版本、provenance 和正文 Artifact 引用；显式请求其他状态或直接读取候选 versionId 同样不能绕过限制。 |
 | AC-DOC-001 | Given DocGenAgent 首次生成或按 Correction 修订中文知识，When Orchestrator 发送生成请求并执行 Quality Gate，Then 两轮 Prompt 都包含自然写作约束，模板化填充、无来源宣传词和超长段落会降低 `humanReadability` 并形成 weak point；任何润色都不得改变事实、来源、验收条件或安全边界。 |
@@ -118,6 +119,7 @@ SPDX-License-Identifier: MIT
 | KF-SYS-043 | AC-SEARCH-001 | Planned | — | — |
 | KF-SYS-044 | AC-CONFIG-001 | Partial | `src/domain/agents/ProjectAgentConfiguration.ts`、`src/application/services/AutomatedProjectWorkflow.ts` | `tests/integration/TestGenExecution.test.ts`、`tests/integration/RunConfiguration.test.ts` |
 | KF-SYS-045 | AC-CODE-001、AC-CODE-002 | Implemented | `src/domain/agents/codeAgent/CodeAgentContract.ts` | `src/domain/agents/codeAgent/CodeAgent.test.ts`、`tests/acceptance/AutomatedLanggraphFlow.test.ts`、`tests/acceptance/DshConfiguredFlow.test.ts` |
+| KF-SYS-046 | AC-API-011 | Implemented | `src/domain/workbench/GitGenerationScope.ts`、`src/application/services/WorkbenchGeneration.ts`、`src/interfaces/runner/Server.ts`、`web/KnowledgeGeneration.js` | `tests/unit/GitGenerationScope.test.ts`、`tests/integration/WorkbenchGeneration.test.ts` |
 | KF-UI-001 | AC-UI-001 | Implemented | `web/App.js` + `src/interfaces/runner/Server.ts` | `tests/e2e/Console.spec.ts` + `tests/integration/Server.test.ts` |
 | KF-UI-002 | AC-UI-002 | Implemented | `web/App.js` + `src/interfaces/runner/ConsoleReadModel.ts` | `tests/e2e/Console.spec.ts` + `tests/integration/Server.test.ts` |
 | KF-UI-003 | AC-UI-003 | Implemented | `src/application/services/AutomatedProjectWorkflow.ts` + `web/App.js` | `tests/acceptance/AutomatedLanggraphFlow.test.ts` + `tests/e2e/Console.spec.ts` |
