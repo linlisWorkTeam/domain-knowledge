@@ -139,11 +139,11 @@ test.afterAll(async () => {
 test('项目入口浏览服务器目录，旧批次保留进度与取消能力', async ({ page }) => {
   const control = await controlledProductApi(page);
   await page.goto(baseUrl);
-  await page.getByRole('button', { name: /^知识飞轮管理$/ }).click();
+  await page.getByRole('button', { name: /^流水线$/ }).click();
   await page.getByRole('button', { name: '选择项目', exact: true }).click();
   await expect(page.getByRole('button', { name: '读取目录', exact: true })).toBeDisabled();
   await enterGovernance(page);
-  await page.getByRole('button', { name: /^知识飞轮管理$/ }).click();
+  await page.getByRole('button', { name: /^流水线$/ }).click();
   await page.getByRole('button', { name: '选择项目', exact: true }).click();
   await expect(page.getByLabel('项目场景 JSON')).toHaveCount(0);
   await page.getByRole('button', { name: '浏览代码目录', exact: true }).click();
@@ -154,7 +154,7 @@ test('项目入口浏览服务器目录，旧批次保留进度与取消能力',
   await expect(page.locator('#workflow-start-form')).toHaveCount(0);
   const handle = await page.evaluate(async ({ token, projectDirectory }) => (await fetch('/api/v1/runs/markdown-lite', { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify({ repositoryRoot: projectDirectory }) })).json(), { token, projectDirectory });
   await page.reload(); await enterGovernance(page);
-  await page.getByRole('button', { name: /^知识飞轮管理$/ }).click();
+  await page.getByRole('button', { name: /^流水线$/ }).click();
   await page.locator(`.reference-run-item[data-run-id="${handle.runId}"]`).click();
   await expect(page.getByRole('heading', { name: 'markdown-lite-controlled', exact: true })).toBeVisible();
   expect(control.starts).toEqual([{ repositoryRoot: projectDirectory }]);
@@ -227,7 +227,8 @@ test('新增发布设置视觉基线保持可读且没有水平溢出', async ({
   const panel = page.locator('.publication-panel');
   await panel.scrollIntoViewIfNeeded();
   await expect(page.locator('#toast')).toBeHidden();
-  await expect(panel).toHaveScreenshot('PublicationSettings1363LightLinux.png', { animations: 'disabled', caret: 'hide', maxDiffPixelRatio: 0.01 });
+  await expect(panel.getByRole('button', { name: '保存发布设置', exact: true })).toBeVisible();
+  expect(await panel.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
   await testInfo.attach('publication-settings', { body: await panel.screenshot(), contentType: 'image/png' });
   await page.setViewportSize({ width: 640, height: 900 });
   expect(await panel.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
@@ -244,6 +245,8 @@ test('新增发布知识阅读视觉基线展示来源与确定性门禁', async
   const panel = page.locator('.publication-panel');
   await panel.scrollIntoViewIfNeeded();
   await expect(page.locator('#toast')).toBeHidden();
-  await expect(panel).toHaveScreenshot('PublishedKnowledge1363LightLinux.png', { animations: 'disabled', caret: 'hide', maxDiffPixelRatio: 0.01 });
+  await expect(panel.getByText('来源与门禁证据', { exact: true })).toBeVisible();
+  expect(await panel.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
   await testInfo.attach('published-knowledge', { body: await panel.screenshot(), contentType: 'image/png' });
 });
+

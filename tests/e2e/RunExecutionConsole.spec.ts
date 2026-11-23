@@ -21,7 +21,7 @@ test.afterEach(async () => { await fixture.dispose(); });
 test('可恢复失败不会计入运行中，业务阶段、失败节点和预算限制分别可见', async ({ page }) => {
   await page.goto(baseUrl);
   await expect(page.locator('.current-run-card')).toContainText('执行失败');
-  await page.getByRole('button', { name: /^知识飞轮管理$/ }).click();
+  await page.getByRole('button', { name: /^流水线$/ }).click();
   await expect(page.locator('.reference-metrics article').first().locator('b')).toHaveText('1');
   await page.getByRole('button', { name: '执行失败', exact: true }).click();
   await expect(page.locator('#runs-list .reference-run-item')).toHaveCount(3);
@@ -45,7 +45,7 @@ test('可恢复失败不会计入运行中，业务阶段、失败节点和预�
   expect(await page.locator('body').textContent()).not.toContain('private-upstream-response');
   await page.screenshot({ path: test.info().outputPath('ExecutionFailureDesktop.png'), fullPage: true, animations: 'disabled' });
   await page.setViewportSize({ width: 640, height: 900 });
-  await expect.poll(() => page.locator('#sidebar').evaluate((element) => element.getBoundingClientRect().right)).toBeLessThanOrEqual(0);
+  await expect(page.locator('#primary-nav')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await expect(page.locator('[data-execution-state]')).toContainText('可恢复；仍使用原有预算');
   await page.screenshot({ path: test.info().outputPath('ExecutionFailureNarrow.png'), fullPage: true, animations: 'disabled' });
@@ -69,7 +69,7 @@ test('恢复和取消更新执行计数，保留原始预算与历史证据', as
   await page.getByRole('button', { name: '＋ 新建批次' }).click();
   await page.getByLabel('治理令牌').fill('run-view-token');
   await page.getByRole('button', { name: '确认', exact: true }).click();
-  await page.getByRole('button', { name: /^知识飞轮管理$/ }).click();
+  await page.getByRole('button', { name: /^流水线$/ }).click();
   await page.locator(`.reference-run-item[data-run-id="${fixture.ids.failed}"]`).click();
   const originalBudget = structuredClone(fixture.views.get(fixture.ids.failed)!.budget);
   await page.getByRole('button', { name: '恢复批次', exact: true }).click();
@@ -97,7 +97,7 @@ test('轮次隔离节点，展开日志并自动刷新实际执行状态', async
   record(0, 'RUNNING', '正在构建生成代码');
   record(1, 'COMPLETED', '第二轮构建记录');
   await page.goto(baseUrl);
-  await page.getByRole('button', { name: /^知识飞轮管理$/ }).click();
+  await page.getByRole('button', { name: /^流水线$/ }).click();
   await page.locator(`.reference-run-item[data-run-id="${runId}"]`).click();
   await expect(page.locator('[data-node-record]')).toHaveCount(1);
   await expect(page.locator('.node-running')).toHaveCount(1);
@@ -112,3 +112,4 @@ test('轮次隔离节点，展开日志并自动刷新实际执行状态', async
   await expect(page.locator('.node-execution-log')).toContainText('第二轮构建记录');
   await expect(page.locator('.node-list')).not.toContainText('次尝试');
 });
+

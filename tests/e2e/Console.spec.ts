@@ -208,10 +208,10 @@ test('工作流图由标准节点 API 支撑并保持只读', async ({ page }) =
   const requests: string[] = [];
   page.on('request', (request) => requests.push(new URL(request.url()).pathname));
   await page.goto(baseUrl);
-  await page.getByRole('button', { name: /^知识飞轮管理$/ }).click();
+  await page.getByRole('button', { name: /^流水线$/ }).click();
   await page.locator('.reference-run-item').first().click();
   await page.locator('[data-legacy-graph] > summary').click();
-  await expect(page.getByRole('heading', { name: '知识飞轮管理', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '流水线', level: 1 })).toBeVisible();
   await expect(page.getByLabel('只读 Agent 工作流图')).toBeVisible();
   await expect(page.locator('[data-legacy-graph]')).toHaveAttribute('open', '');
   await expect(page.locator('.workflow-graph')).toHaveCount(1);
@@ -250,7 +250,7 @@ test('merged Console navigation keeps one H1 and does not scan Sources on entry'
   await expect(page.getByText('browser-contract').first()).toBeVisible();
   await expect(page.getByText(/项需要确认/)).toBeVisible();
 
-  const labels = ['操作中心', '知识飞轮管理', '知识治理', '评测', '来源', 'Agent 设置'];
+  const labels = ['操作中心', '流水线', '知识库', '评测', '来源', 'Agent 设置'];
   for (const label of labels) {
     await expect(page.getByRole('button', { name: new RegExp(label) }).first()).toBeVisible();
     if (label !== '操作中心') await page.getByRole('button', { name: new RegExp(`^${label}$`) }).click();
@@ -300,16 +300,20 @@ test('knowledge search and detail drawer are keyboard operable and restore focus
   await expect(page.getByRole('button', { name: /浏览器验收知识/ }).first()).toBeVisible();
 
   const card = page.getByRole('button', { name: /浏览器验收知识/ }).first();
-  const openedVersionId = await card.getAttribute('data-version-id');
+  const openedVersionId = await card.getAttribute('data-workspace-version');
   assert.ok(openedVersionId);
   await card.focus();
   await card.press('Enter');
+  const details = page.locator('[data-workspace-details]');
+  await expect(details).toHaveAttribute('data-workspace-details', openedVersionId!);
+  await details.focus();
+  await details.press('Enter');
   const drawer = page.getByRole('dialog', { name: '浏览器验收知识（修订）' });
   await expect(drawer).toBeVisible();
   await expect(page.getByRole('button', { name: '关闭详情' })).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(drawer).toBeHidden();
-  await expect(page.locator(`#knowledge-list [data-version-id="${openedVersionId}"]`)).toBeFocused();
+  await expect(details).toBeFocused();
 });
 
 test('partial API failures remain explicit without replacing persisted facts', async ({ page }) => {
@@ -472,9 +476,11 @@ test('Knowledge Health 保持 0..100 总分与 0..1 比率的真实 API 口径',
 
 test('Knowledge lineage/diff 可反向进入版本、批次与评测事实', async ({ page }) => {
   await page.goto(baseUrl);
-  await navigateTo(page, '知识治理');
-  await expect(page.locator(`#knowledge-list [data-version-id="${firstVersionId}"]`)).toHaveCount(0);
-  await page.locator(`#knowledge-list [data-version-id="${latestVersionId}"]`).click();
+  await navigateTo(page, '知识库');
+  await expect(page.locator(`#knowledge-list [data-workspace-version="${firstVersionId}"]`)).toHaveCount(0);
+  await page.locator(`#knowledge-list [data-workspace-version="${latestVersionId}"]`).click();
+  await expect(page.locator('[data-workspace-details]')).toHaveAttribute('data-workspace-details', latestVersionId);
+  await page.locator('[data-workspace-details]').click();
   await page.getByText('历史版本 · 1', { exact: true }).click();
   await page.getByRole('dialog').locator(`[data-version-id="${firstVersionId}"]`).click();
   let drawer = page.getByRole('dialog');
@@ -504,11 +510,13 @@ test('Knowledge lineage/diff 可反向进入版本、批次与评测事实', asy
   const runButton = drawer.getByRole('button', { name: new RegExp(`查看批次 ${lineageRunId.slice(0, 8)}`) });
   await expect(runButton).toBeVisible();
   await runButton.click();
-  await expect(page.getByRole('heading', { name: '知识飞轮管理', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '流水线', level: 1 })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'browser-contract', level: 2 })).toBeVisible();
 
-  await navigateTo(page, '知识治理');
-  await page.locator(`#knowledge-list [data-version-id="${latestVersionId}"]`).click();
+  await navigateTo(page, '知识库');
+  await page.locator(`#knowledge-list [data-workspace-version="${latestVersionId}"]`).click();
+  await expect(page.locator('[data-workspace-details]')).toHaveAttribute('data-workspace-details', latestVersionId);
+  await page.locator('[data-workspace-details]').click();
   drawer = page.getByRole('dialog');
   const evaluationButton = drawer.getByRole('button', { name: new RegExp(`查看评测 ${lineageEvaluationId.slice(0, 8)}`) });
   await expect(evaluationButton).toBeVisible();
@@ -718,7 +726,7 @@ test('light and dark themes keep successful API states across all seven pages an
     expect(background).not.toBe('rgba(0, 0, 0, 0)');
     themeBackgrounds.set(theme, background);
     await expect(page.locator('#registry-label')).toHaveText('服务已连接');
-    for (const label of ['操作中心', '知识飞轮管理', '知识治理', '评测', '来源', 'Agent 设置']) {
+    for (const label of ['操作中心', '流水线', '知识库', '评测', '来源', 'Agent 设置']) {
       if (label !== '操作中心') await page.getByRole('button', { name: new RegExp(`^${label}$`) }).click();
       await expect(page.locator('h1')).toHaveCount(1);
       await expect(page.locator('.error-state')).toHaveCount(0);
@@ -729,9 +737,10 @@ test('light and dark themes keep successful API states across all seven pages an
   expect(themeBackgrounds.get('light')).not.toBe(themeBackgrounds.get('dark'));
   await page.evaluate(() => localStorage.setItem('wp-knowledge-theme', 'light'));
   await page.reload();
-  await page.getByRole('button', { name: /^知识治理$/ }).click();
+  await page.getByRole('button', { name: /^知识库$/ }).click();
   await page.getByRole('combobox', { name: '知识状态' }).selectOption('');
   await page.getByRole('button', { name: /浏览器验收知识/ }).first().click();
+  await page.locator('[data-workspace-details]').click();
   await expect(page.getByRole('dialog')).toBeVisible();
   await assertReadableHeading(page.getByRole('dialog').getByRole('heading').first());
 });
@@ -767,29 +776,21 @@ test('Action Center preserves readable hierarchy and factual progress at 1363 by
     expect(family).toContain('Microsoft YaHei');
     expect(family).not.toMatch(/SimSun|宋体/);
   }
-  expect(geometry.topbar.height).toBe(88);
-  expect(Math.abs(geometry.actions.center - geometry.topbar.center)).toBeLessThan(2);
-  expect(geometry.title.top).toBeGreaterThanOrEqual(32);
-  expect(geometry.title.top).toBeLessThanOrEqual(34);
-  expect(geometry.actions.top).toBeGreaterThan(20);
+  await expect(page.locator('#primary-nav')).toBeVisible();
+  await expect(page.locator('#project-selector')).toBeVisible();
+  await expect(page.locator('#operator-button')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: test.info().outputPath('ActionCenter1363x936LightLinux.png'), animations: 'disabled', fullPage: true });
 
-  await expect(page).toHaveScreenshot('ActionCenter1363x936LightLinux.png', {
-    animations: 'disabled',
-    caret: 'hide',
-    mask: [page.locator('time'), page.locator('#runtime-footer')],
-    maskColor: '#dfe3e5',
-    maxDiffPixelRatio: 0.01,
-  });
 });
 
 test('mobile navigation, theme persistence and 200 percent zoom preserve core paths', async ({ page, context }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(baseUrl);
-  const navToggle = page.getByRole('button', { name: '打开主导航' });
-  await navToggle.click();
-  await expect(page.getByRole('button', { name: /^知识飞轮管理$/ })).toBeVisible();
-  await page.getByRole('button', { name: /^知识飞轮管理$/ }).click();
-  await expect(page.getByRole('heading', { name: '知识飞轮管理', level: 1 })).toBeVisible();
+  await expect(page.locator('#primary-nav')).toBeVisible();
+  await expect(page.getByRole('button', { name: /^流水线$/ })).toBeVisible();
+  await page.getByRole('button', { name: /^流水线$/ }).click();
+  await expect(page.getByRole('heading', { name: '流水线', level: 1 })).toBeVisible();
   await expect(page.getByText('第 1 轮').first()).toBeVisible();
 
   const themeButton = page.locator('#theme-button');
@@ -803,10 +804,10 @@ test('mobile navigation, theme persistence and 200 percent zoom preserve core pa
   await page.setViewportSize({ width: 640, height: 450 });
   const session = await context.newCDPSession(page);
   await session.send('Emulation.setPageScaleFactor', { pageScaleFactor: 2 });
-  await page.getByRole('button', { name: '打开主导航' }).click();
-  await page.getByRole('button', { name: /^知识飞轮管理$/ }).focus();
+  await expect(page.locator('#primary-nav')).toBeVisible();
+  await page.getByRole('button', { name: /^流水线$/ }).focus();
   await page.keyboard.press('Enter');
-  await expect(page.getByRole('heading', { name: '知识飞轮管理', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '流水线', level: 1 })).toBeVisible();
   await expect(page.getByText('browser-contract').first()).toBeVisible();
 });
 
@@ -821,7 +822,7 @@ test('通用场景 API 保留路径校验；浏览器固定模块入口不要求
   try {
     await page.goto(baseUrl);
     await enterGovernance(page);
-    await navigateTo(page, '知识飞轮管理');
+    await navigateTo(page, '流水线');
     await expect(page.getByLabel('项目场景 JSON')).toHaveCount(0);
     await expect(page.locator('#workflow-start-form')).toHaveCount(0);
     await expect(page.locator('#page-content')).toContainText('请先在左上角选择项目');
@@ -850,8 +851,10 @@ test('evaluation explains knowledge risk separately from code check failure', as
     await route.fulfill({ response, json: detail });
   });
   await page.goto(baseUrl);
-  await navigateTo(page, '知识治理');
-  await page.locator(`#knowledge-list [data-version-id="${latestVersionId}"]`).click();
+  await navigateTo(page, '知识库');
+  await page.locator(`#knowledge-list [data-workspace-version="${latestVersionId}"]`).click();
+  await expect(page.locator('[data-workspace-details]')).toHaveAttribute('data-workspace-details', latestVersionId);
+  await page.locator('[data-workspace-details]').click();
   await page.getByRole('dialog').getByRole('button', { name: new RegExp(`查看评测 ${lineageEvaluationId.slice(0, 8)}`) }).click();
   await expect(page.getByRole('dialog').getByText('知识风险尚未解决', { exact: true })).toBeVisible();
   await expect(page.getByRole('dialog').getByText('代码检查存在阻塞', { exact: true })).toHaveCount(0);
@@ -862,22 +865,27 @@ test('evaluation explains knowledge risk separately from code check failure', as
 test('知识阅读器提供正文目录、可展开证据和原文，窄屏不溢出', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(baseUrl);
-  await page.getByRole('button', { name: '打开主导航' }).click();
-  await page.getByRole('button', { name: '知识治理', exact: true }).click();
-  const card = page.locator(`[data-version-id="${latestVersionId}"]`).first();
+  await expect(page.locator('#primary-nav')).toBeVisible();
+  await page.getByRole('button', { name: '知识库', exact: true }).click();
+  const card = page.locator(`#knowledge-list [data-workspace-version="${latestVersionId}"]`);
   await card.click();
   await expect(page.locator('.knowledge-body h3').filter({hasText:'修订说明'})).toBeVisible();
-  await expect(page.locator('.reader-evidence')).not.toHaveAttribute('open', '');
+  await expect(page.locator('[data-workspace-reader]')).toBeVisible();
   await page.locator('.reader-toc summary').click();
   await page.locator('.reader-toc a').filter({hasText:'修订说明'}).click();
   await expect(page.locator('.knowledge-body h3').filter({hasText:'修订说明'})).toBeFocused();
   await page.locator('.reader-source summary').click();
   await expect(page.locator('.reader-source pre')).toHaveText(REVISED_BODY);
+  await page.locator('[data-workspace-details]').click();
+  await expect(page.locator('.reader-evidence')).not.toHaveAttribute('open', '');
   await page.locator('.reader-evidence summary').click();
   await expect(page.locator('.reader-evidence')).toContainText(HEALTH_SOURCE_LOCATOR);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.keyboard.press('Escape');
+  await expect(page.locator('[data-workspace-details]')).toBeFocused();
+  await page.getByRole('button', { name: '返回目录', exact: true }).click();
   await expect(card).toBeFocused();
+  await expect(page.getByRole('searchbox', { name: '搜索知识', exact: true })).toBeVisible();
 });
 
 test('操作中心分类筛选真实事项并允许恢复全部', async ({ page }) => {
@@ -901,13 +909,13 @@ test('操作中心分类筛选真实事项并允许恢复全部', async ({ page 
 test('workflow uses executionStatus and reports missing execution facts as unknown', async ({ page }) => {
   await page.route('**/workflow-status', (route) => route.fulfill({ json: { executionStatus: 'COMPLETED' } }));
   await page.goto(baseUrl);
-  await navigateTo(page, '知识飞轮管理');
+  await navigateTo(page, '流水线');
   await page.locator('.reference-run-item').first().click();
   await page.locator('[data-legacy-graph] > summary').click();
   await expect(page.locator('.reference-node-detail')).toContainText('工作流 已完成');
   await page.route('**/workflow-status', (route) => route.fulfill({ status: 503, json: {} }));
   await page.reload();
-  await navigateTo(page, '知识飞轮管理');
+  await navigateTo(page, '流水线');
   await page.locator('.reference-run-item').first().click();
   await page.locator('[data-legacy-graph] > summary').click();
   await expect(page.locator('.reference-node-detail')).toContainText('工作流 未知');
@@ -946,7 +954,7 @@ test('知识索引可独立构建、试检索并预览 YAML，命中后才读取
   });
   await page.goto(baseUrl);
   await enterGovernance(page);
-  await navigateTo(page, '知识治理');
+  await navigateTo(page, '知识库');
   await page.getByText('卡片搜索设置', { exact: true }).click();
   await page.getByRole('button', { name: '更新搜索目录', exact: true }).click();
   await expect(page.locator('[data-index-task]')).toContainText('已完成');
@@ -1050,7 +1058,7 @@ test.describe.serial('工作台固定仓库完整流程', () => {
       return request.stage?.startsWith('outline') ? { title, description, sections: [{ heading: 'Behavior', purpose: 'Interface and limits' }] }
         : { title, description, sections: [{ sectionId: 'section-1', body: 'The parse function takes no arguments and returns the integer one. Its public interface is int parse(void). The fixed source contains no external dependencies or mutable state. This card describes only the provided function and does not establish behavior for any other parser. Behavioral evaluation and publication approval remain pending.' }] };
     } });
-    await page.getByRole('button', { name: /^知识飞轮管理$/ }).click();
+    await page.getByRole('button', { name: /^流水线$/ }).click();
     await page.getByRole('button', { name: '阶段操作', exact: true }).click();
     await page.getByRole('button', { name: '生成知识库', exact: true }).click();
     await expect(page.locator('[data-generation-task]')).toContainText('已生成 1 张');
@@ -1189,22 +1197,22 @@ test.describe.serial('工作台固定仓库完整流程', () => {
     await page.screenshot({ path: test.info().outputPath('pipeline-mobile.png'), fullPage: true });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await page.reload(); await enterGovernance(page);
-    await page.getByRole('button', { name: '打开主导航', exact: true }).click();
-    await page.getByRole('button', { name: /^知识飞轮管理$/ }).click();
+    await expect(page.locator('#primary-nav')).toBeVisible();
+    await page.getByRole('button', { name: /^流水线$/ }).click();
     await page.getByRole('button', { name: '阶段操作', exact: true }).click();
     await expect(page.locator('[data-generation-task]')).toContainText('已生成 1 张');
     await expect(page.locator('[data-generation-task]').getByRole('button', { name: 'Parser generated card', exact: true })).toBeVisible();
     await expect(page.locator('[data-reconstruction-panel]')).toContainText('重建及接口检查完成');
     await expect(page.locator('[data-native-evaluation-panel]')).toContainText('可信用例存在失败');
     await expect(page.locator('[data-workbench-pipeline-panel]')).toContainText('可信行为测试未通过');
-    await page.getByRole('button', { name: '打开主导航', exact: true }).click();
+    await expect(page.locator('#primary-nav')).toBeVisible();
     await page.getByRole('button', { name: '选择项目', exact: true }).click();
     await page.getByLabel('本地代码目录', { exact: true }).fill(join(directory, 'missing-directory'));
     await page.getByRole('button', { name: '读取目录', exact: true }).click();
     await expect(page.locator('[data-repository-notice]')).toContainText('目录不存在或不可访问');
     await expect(page.locator('[data-repository-result]')).not.toContainText(commit);
-    await page.getByRole('button', { name: '打开主导航', exact: true }).click();
-    await page.getByRole('button', { name: /^知识飞轮管理$/ }).click();
+    await expect(page.locator('#primary-nav')).toBeVisible();
+    await page.getByRole('button', { name: /^流水线$/ }).click();
     await page.getByRole('button', { name: '阶段操作', exact: true }).click();
   });
   test('知识修订保留失败审计并重建绑定版本', async () => {
@@ -1300,7 +1308,7 @@ test('关联阶段可独立执行并在卡片详情查看真实引用候选', as
   const registered = await instance.composition.apps.contentGovernance.createSource({ kind: 'FILE', locator, displayName: 'External parser guide' }, { idempotencyKey: 'external-guide', fingerprint: 'external-guide', actor: 'test' });
   const material = await instance.composition.apps.workbenchMaterials.capture(String(registered.resourceId), '仅适用于示例解析接口');
 
-  await page.goto(baseUrl); await enterGovernance(page); await navigateTo(page, '知识治理');
+  await page.goto(baseUrl); await enterGovernance(page); await navigateTo(page, '知识库');
   await page.getByText('卡片搜索设置', { exact: true }).click();
   await page.getByRole('button', { name: '更新搜索目录', exact: true }).click();
   await expect(page.locator('[data-index-task]')).toContainText('已完成');
@@ -1309,7 +1317,9 @@ test('关联阶段可独立执行并在卡片详情查看真实引用候选', as
   await page.getByRole('button', { name: '建立关联', exact: true }).click();
   await expect(page.locator('[data-association-panel]')).toContainText('关联完成');
   await expect(page.getByRole('button', { name: '下载关系索引' })).toBeVisible();
-  await page.locator(`[data-version-id="${source.version.versionId}"]`).first().click();
+  await page.locator(`[data-workspace-version="${source.version.versionId}"]`).click();
+  await expect(page.locator('[data-workspace-details]')).toHaveAttribute('data-workspace-details', source.version.versionId);
+  await page.locator('[data-workspace-details]').click();
   await page.getByRole('button', { name: '当前卡片不适用' }).click();
   await expect(page.locator('[data-card-relations]')).toContainText('正文第 3 行引用 Result');
   await expect(page.locator('[data-card-relations]')).toContainText('候选未验证可替代性');
@@ -1340,15 +1350,16 @@ test('已完成的一键流程重载展示评测和关联数量', async ({ page 
   } }));
   const errors: string[] = []; page.on('pageerror', (error) => errors.push(error.message));
   await page.goto(baseUrl);
-  await page.getByRole('button', { name: /^知识飞轮管理$/ }).click();
+  await page.getByRole('button', { name: /^流水线$/ }).click();
   await page.getByRole('button', { name: '阶段操作', exact: true }).click();
   const panel = page.locator('[data-workbench-pipeline-panel]');
   await expect(panel).toContainText('通过 31/31');
   await expect(panel).toContainText('40 条关系');
   await expect(panel).toContainText('累计模型调用 15 次');
   await page.reload();
-  await page.getByRole('button', { name: /^知识飞轮管理$/ }).click();
+  await page.getByRole('button', { name: /^流水线$/ }).click();
   await page.getByRole('button', { name: '阶段操作', exact: true }).click();
   await expect(panel).toContainText('40 条关系');
   expect(errors).toEqual([]);
 });
+

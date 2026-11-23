@@ -63,7 +63,7 @@ const PAGE_META = {
   overview: '操作中心',
   projects: '项目设置',
   stages: '阶段操作',
-  runs: '知识飞轮管理',
+  runs: '流水线',
   knowledge: '知识库',
   graph: '工作流图',
   evaluations: '评测',
@@ -1918,8 +1918,7 @@ async function boot() {
   governanceCount.textContent = state.actionItems.filter((item) => item.status !== 'RESOLVED').length || ''
   runtimeFooter.innerHTML = `<span><i class="health-dot healthy"></i>控制台 API 已连接</span><span>读取于 ${escapeHtml(formatDate(state.loadedAt))}</span><span>${escapeHtml(state.runs.length)} 个批次 · ${escapeHtml(state.knowledge.length)} 个知识版本</span>`
   updateMode()
-  setPageMeta('overview')
-  renderOverview()
+  await navigate(state.page)
   connectActivityStream()
   closeNavigation()
 }

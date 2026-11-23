@@ -5,7 +5,7 @@
  */
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -114,7 +114,8 @@ test('HTTP adapter rejects missing credentials and accepts authenticated candida
     assert.ok(allStatusPayload.sampledAt);
     const page = await fetch(`${base}/`);
     assert.equal(page.status, 200);
-    assert.match(await page.text(), /知识飞轮控制台/);
+    assert.match(page.headers.get('content-type') ?? '', /text\/html/);
+    assert.equal(await page.text(), readFileSync(new URL('../../web/index.html', import.meta.url), 'utf8'));
 
     const capabilities = await (await fetch(`${base}/api/v1/system/capabilities`)).json();
     assert.equal(capabilities.writeEnabled, true);
@@ -665,3 +666,4 @@ test('native evaluation HTTP forwards explicit candidates and reports input erro
     rmSync(runtimeDir, { recursive: true, force: true });
   }
 });
+
