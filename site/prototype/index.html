@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="小飞轮知识工作台 UI/UX 交互原型。目录、阅读与知识版本管理。使用示例数据。">
+  <title>知识库 · 小飞轮</title>
+  <link rel="stylesheet" href="./Styles.css">
+  <script src="./App.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#reader">跳到正文</a>
+  <div class="app-shell" id="app">
+    <header class="topbar">
+      <a class="brand" href="?page=knowledge" data-page="knowledge"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 28 28"><path d="M14 3.5a10.5 10.5 0 0 1 9.1 15.7M23.1 19.2H17m6.1 0 2.7-5.1M14 24.5A10.5 10.5 0 0 1 4.9 8.8M4.9 8.8H11m-6.1 0L2.2 14"/><circle cx="14" cy="14" r="3.1"/></svg></span><span>小飞轮</span></a>
+      <span class="brand-divider"></span>
+      <nav class="topnav" aria-label="主导航"><a href="?page=pipelines" data-page="pipelines">流水线</a><a href="?page=knowledge" data-page="knowledge" aria-current="page">知识库</a></nav>
+      <div class="topbar-end"><a class="prototype-tag" href="../index.html">返回项目官网</a><span class="prototype-tag">交互原型 · 示例数据</span><button class="icon-button" id="theme-button" aria-label="切换深色主题" title="切换主题"></button></div>
+    </header>
+    <main class="main-shell">
+      <section class="page-heading"><div class="heading-copy"><span class="eyebrow" id="page-eyebrow">KNOWLEDGE WORKSPACE</span><div class="heading-line"><h1 id="page-title">知识库</h1><span class="heading-description" id="page-description">让代码里的知识，持续生长。</span></div></div><div class="page-actions"><label class="project-picker"><span id="project-icon"></span><select id="project-select" aria-label="选择项目"><option value="flywheel">domain-knowledge</option><option value="agent">agent-runtime</option></select></label><button class="button" id="refresh-button"></button></div></section>
+      <section id="knowledge-view" class="knowledge-view" aria-label="知识工作台">
+        <div class="version-toolbar"><div class="version-context"><span class="context-icon" id="branch-icon"></span><span class="version-label">浏览版本</span><code id="current-version"></code><span class="pill success" id="version-status">主版本</span><span class="version-separator">/</span><span class="muted" id="catalog-count"></span></div><div class="version-controls"><button class="text-button" id="return-main" hidden>返回主版本</button><button class="button subtle" id="versions-button"></button></div></div>
+        <div class="workbench" id="workbench">
+          <aside class="catalog" id="catalog" aria-label="文档导航"><form id="search-form" class="search-form" role="search"><span id="search-icon"></span><input id="search-input" type="search" placeholder="搜索当前版本…" aria-label="搜索当前浏览版本的知识文档" autocomplete="off"><button type="submit" class="search-submit" aria-label="提交搜索" title="Enter 搜索">↵</button></form><div class="catalog-heading"><span id="catalog-title">文档目录</span><span id="catalog-counter"></span><button class="text-button" id="clear-search" hidden>清除</button><button class="icon-button small" id="collapse-folders" title="折叠所有目录" aria-label="折叠所有目录"></button></div><div class="catalog-content" id="catalog-content"></div><footer class="catalog-footer"><span class="status-dot"></span><span id="catalog-footer-text">当前版本已登记</span><span class="keyboard-hint">/ 搜索</span></footer></aside>
+          <section class="reader" id="reader" aria-label="文档阅读器" tabindex="-1"><header class="reader-header"><div class="reader-breadcrumb"><button class="icon-button" id="mobile-back" aria-label="返回文档目录" title="返回目录"></button><span id="breadcrumb-icon"></span><span id="reader-breadcrumb"></span></div><div class="reader-actions"><button class="button subtle" id="doc-history-button"></button><button class="icon-button" id="focus-button" aria-label="专注阅读" title="专注阅读"></button></div></header><div class="reader-scroll" id="reader-scroll"><article class="document" id="document"></article><footer class="document-footer"><span id="document-source"></span><span>由源码生成 · 人工评审可追溯</span></footer></div></section>
+        </div>
+      </section>
+      <section id="pipelines-view" class="pipelines-view" hidden></section>
+    </main>
+    <footer class="app-footer"><span>小飞轮 <span class="footer-dot">·</span> Knowledge, in motion.</span><span>示例数据 <span class="footer-dot">·</span> 未连接项目后端</span></footer>
+  </div>
+  <dialog id="version-dialog" class="drawer"><div class="drawer-header"><div><span class="eyebrow">KNOWLEDGE SNAPSHOTS</span><h2>版本历史</h2></div><button class="icon-button" data-close="version-dialog" aria-label="关闭版本历史"></button></div><div class="drawer-intro">选择一个快照浏览。设为主版本与剪枝需要单独确认。</div><div class="version-timeline" id="version-timeline"></div><div class="version-detail" id="version-detail"></div><div class="drawer-footer"><span class="status-dot"></span>版本操作仅作用于本地示例数据</div></dialog>
+  <dialog id="confirm-dialog" class="confirm-dialog"><form id="confirm-form"><div class="modal-header"><h2 id="confirm-title"></h2><button type="button" class="icon-button" data-close="confirm-dialog" aria-label="关闭确认框"></button></div><p id="confirm-description"></p><div class="confirm-scope" id="confirm-scope"></div><p class="demo-notice">交互原型：仅演示操作流程，不会修改你的仓库或服务器。</p><label class="checkbox-line" id="prune-check-row" hidden><input type="checkbox" id="prune-check">我确认删除该版本及其后继记录</label><div class="modal-actions"><button type="button" class="button" data-close="confirm-dialog">取消</button><button type="submit" class="button primary" id="confirm-submit">确认</button></div></form></dialog>
+  <dialog id="history-dialog" class="history-dialog"><div class="modal-header"><div><span class="eyebrow">DOCUMENT HISTORY</span><h2>文档版本</h2></div><button class="icon-button" data-close="history-dialog" aria-label="关闭文档历史"></button></div><p class="muted" id="history-document-name"></p><div id="document-history-list"></div></dialog>
+  <dialog id="diff-dialog" class="diff-dialog"><div class="modal-header"><div><span class="eyebrow">VERSION COMPARISON</span><h2>与上一版对比</h2></div><button class="icon-button" data-close="diff-dialog" aria-label="关闭版本对比"></button></div><div id="diff-content"></div></dialog>
+  <dialog id="pipeline-dialog" class="history-dialog"><div class="modal-header"><h2>流水线摘要</h2><button class="icon-button" data-close="pipeline-dialog" aria-label="关闭流水线摘要"></button></div><div id="pipeline-summary"></div></dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>

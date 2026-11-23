@@ -10,27 +10,23 @@ SPDX-License-Identifier: MIT
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark light">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
-  <title>知识飞轮控制台</title>
+  <title>小飞轮 · 知识工作台</title>
   <link rel="stylesheet" href="/Styles.css">
+  <link rel="stylesheet" href="/Workspace.css">
 </head>
-<body>
+<body class="flywheel-workbench">
   <a class="skip-link" href="#page-content">跳到主要内容</a>
   <div class="app-shell">
     <aside id="sidebar" class="sidebar" aria-label="主导航" aria-hidden="false">
       <div class="brand">
         <span class="brand-mark" aria-hidden="true">⌁</span>
-        <div><strong>domain<span>/</span>knowledge</strong></div>
+        <div><strong>小飞轮</strong></div>
       </div>
-      <button type="button" id="project-selector" class="project-card" aria-label="选择项目">
-        <span class="project-avatar" aria-hidden="true">WP</span>
-        <span><small>项目</small><strong id="selected-project-name">选择代码目录</strong></span>
-        <i aria-hidden="true">⌄</i>
-      </button>
       <nav id="primary-nav">
         <p class="nav-section">工作区</p>
         <button class="nav-item active" data-page="overview"><span aria-hidden="true">⌂</span>操作中心 <em id="governance-count"></em></button>
-        <button class="nav-item" data-page="runs"><span aria-hidden="true">◎</span>知识飞轮管理</button>
-        <button class="nav-item" data-page="knowledge"><span aria-hidden="true">▤</span>知识治理</button>
+        <button class="nav-item" data-page="runs"><span aria-hidden="true">◎</span>流水线</button>
+        <button class="nav-item" data-page="knowledge"><span aria-hidden="true">▤</span>知识库</button>
         <p class="nav-section">质量</p>
         <button class="nav-item" data-page="evaluations"><span aria-hidden="true">◫</span>评测</button>
         <button class="nav-item" data-page="sources"><span aria-hidden="true">⌕</span>来源</button>
@@ -46,9 +42,15 @@ SPDX-License-Identifier: MIT
       <header class="topbar">
         <button id="nav-toggle" class="icon-button nav-toggle" type="button" aria-label="打开主导航" aria-controls="sidebar" aria-expanded="false">☰</button>
         <div class="topbar-title">
-          <h1 id="page-title">操作中心</h1>
+          <p class="workspace-eyebrow">知识工作台</p><h1 id="page-title">操作中心</h1>
         </div>
         <div class="topbar-actions">
+      <button type="button" id="project-selector" class="project-card" aria-label="选择项目">
+        <span class="project-avatar" aria-hidden="true">WP</span>
+        <span><small>项目</small><strong id="selected-project-name">选择代码目录</strong></span>
+        <i aria-hidden="true">⌄</i>
+      </button>
+
           <button id="global-search-button" class="secondary-button search-button" type="button" aria-label="搜索知识">⌕ 搜索知识　⌘ K</button>
           <button id="theme-button" class="secondary-button theme-button" type="button" aria-label="切换到浅色主题">☼</button>
           <span id="mode-pill" class="status-pill">只读模式</span>
@@ -90,3 +92,4 @@ SPDX-License-Identifier: MIT
   <script type="module" src="/App.js"></script>
 </body>
 </html>
+

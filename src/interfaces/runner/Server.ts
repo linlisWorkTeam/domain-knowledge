@@ -51,6 +51,8 @@ const assets = new Map([
   ['/BatchDeletion.js', 'BatchDeletion.js'],
   ['/WorkbenchLabels.js', 'WorkbenchLabels.js'],
   ['/KnowledgeMarkdown.js', 'KnowledgeMarkdown.js'],
+  ['/KnowledgeWorkspace.js', 'KnowledgeWorkspace.js'],
+  ['/Workspace.css', 'Workspace.css'],
   ['/KnowledgeIndex.js', 'KnowledgeIndex.js'],
   ['/RepositoryAnalysis.js', 'RepositoryAnalysis.js'],
   ['/ProjectHistory.js', 'ProjectHistory.js'],
@@ -1518,3 +1520,4 @@ export function startKnowledgeServer() {
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
   startKnowledgeServer();
 }
+
