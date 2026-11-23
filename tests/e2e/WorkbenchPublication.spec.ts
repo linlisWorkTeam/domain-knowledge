@@ -33,9 +33,8 @@ test('saved project to verified publication remains usable without login on desk
   instance.server.listen(0, '127.0.0.1'); await once(instance.server, 'listening');
   const address = instance.server.address(); if (!address || typeof address === 'string') throw new Error('TEST_SERVER_ADDRESS_INVALID');
   const openStages = async () => {
-    const menu = page.getByRole('button', { name: '打开主导航', exact: true });
-    if (await menu.isVisible()) await menu.click();
-    await page.getByRole('button', { name: /^知识飞轮管理$/ }).click();
+    await expect(page.locator('#primary-nav')).toBeVisible();
+    await page.getByRole('button', { name: /^流水线$/ }).click();
     await page.getByRole('button', { name: '阶段操作', exact: true }).click();
   };
   try {
@@ -63,7 +62,7 @@ test('saved project to verified publication remains usable without login on desk
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await page.screenshot({ path: test.info().outputPath('publication-narrow.png'), fullPage: true });
     await page.reload();
-    await page.getByRole('button', { name: '打开主导航', exact: true }).click();
+    await expect(page.locator('#primary-nav')).toBeVisible();
     await page.locator('#project-selector').click();
     await page.locator('[data-project-history-select]').selectOption(fixture.project.snapshotId);
     await openStages();
@@ -74,3 +73,4 @@ test('saved project to verified publication remains usable without login on desk
     await new Promise<void>(resolve => instance.server.close(() => resolve())); rmSync(root, { recursive: true, force: true });
   }
 });
+
