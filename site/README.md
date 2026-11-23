@@ -5,7 +5,7 @@ SPDX-License-Identifier: MIT
 -->
 # 项目官网
 
-这里是 domain-knowledge 的 GitHub Pages 源码。它介绍 Knowledge Flywheel、LangGraph 执行层和知识治理层的边界，不读取本地 Registry，也不提供治理入口。Agent 列表、节点状态和提示词配置属于本地 Console，不属于静态站点。
+这里是 domain-knowledge 的 GitHub Pages 源码。它介绍 Knowledge Flywheel、LangGraph 执行层和知识治理层的边界，不读取本地 Registry，也不提供真实治理入口。`prototype/` 提供与后端隔离的示例交互。Agent 列表、节点状态和提示词配置属于本地 Console，不属于静态站点。
 
 ## 本地预览
 
@@ -51,3 +51,10 @@ node scripts/CaptureConsoleDemo.mjs
 本目录是公开站点的唯一源码。根目录保留兼容分支/Jekyll 的薄入口，构建时嵌入本页，并把资源指向本目录；不要在根目录复制页面资产。`.github/workflows/Pages.yml` 仅允许从 Actions 页面手动运行，不随 main 推送自动部署。使用前先在 Settings → Pages 启用站点并选择 **GitHub Actions**；工作流会探测 Source，Actions 模式发布本目录，分支模式跳过。未启用 Pages 时，探测接口可能返回 404，需先完成配置。
 
 默认地址是 <https://linlisworkteam.github.io/domain-knowledge/>。若组织或仓库改名，要同步更新 `index.html` 中的 canonical、Open Graph URL 和文档里的访问地址。
+
+
+## 小飞轮交互原型
+
+官网“交互原型”入口及 `prototype/index.html` 可离线演示目录阅读、当前版本搜索、文档历史、示例差异、版本确认与流水线摘要。浏览器示例状态使用独立的 `flywheel-prototype-v1:*` 命名空间；不会调用正式 API，也不会修改仓库或正式版本。
+
+视觉来源：[小飞轮 · 知识工作台](https://little-flywheel-workbench.icedblkamericano.chatgpt.site)。移植保留其原有交互，移除外部字体请求并增加同源 CSP。正式控制台的对应实现位于 `web/KnowledgeWorkspace.js` 与 `web/Workspace.css`；主分支没有知识库快照切换与剪枝接口，正式界面只展示真实卡片版本。

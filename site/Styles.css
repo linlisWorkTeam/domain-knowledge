@@ -672,3 +672,9 @@ button:focus-visible {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
   .reveal { opacity: 1; transform: none; }
 }
+
+
+/* 小飞轮原型嵌入；iframe 隔离演示状态与官网样式。 */
+.workbench-demo-frame { display: block; width: 100%; height: 820px; border: 1px solid var(--border, #303642); border-radius: 12px; background: #f5f6f8; }
+.prototype-disclosure { color: var(--muted, #a0a9b8); line-height: 1.8; margin: 0 0 24px; font-size: 14px; }
+@media (max-width: 767px) { .workbench-demo-frame { height: 780px; } }

@@ -23,7 +23,7 @@ test.afterEach(async () => {
   rmSync(root, { recursive: true, force: true });
 });
 test('cancel preserves a batch; second confirmation deletes it on a narrow screen', async ({ page }) => {
-  await page.goto(base); await page.getByRole('button', { name: '知识飞轮管理', exact: true }).click();
+  await page.goto(base); await page.getByRole('button', { name: '流水线', exact: true }).click();
   await page.locator(`[data-run-id="${runId}"]`).first().click();
   await page.getByRole('button', { name: '删除批次', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: '确认删除批次' });
@@ -41,7 +41,7 @@ test('cancel preserves a batch; second confirmation deletes it on a narrow scree
   await expect(page.locator(`[data-run-id="${runId}"]`)).toHaveCount(0);
 });
 test('reload exposes recovery for an already confirmed partial deletion', async ({ page }) => {
-  await page.goto(base); await page.getByRole('button', { name: '知识飞轮管理', exact: true }).click();
+  await page.goto(base); await page.getByRole('button', { name: '流水线', exact: true }).click();
   await page.locator(`[data-run-id="${runId}"]`).first().click();
   await page.getByRole('button', { name: '删除批次', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: '确认删除批次' });
@@ -70,7 +70,7 @@ test('selected project module batch uses the same confirmation flow and preserve
     await page.addInitScript(snapshotId => localStorage.setItem('workbench-project-input', snapshotId), project.snapshotId);
     await page.goto(base);
     await expect(page.locator('#selected-project-name')).not.toHaveText('选择代码目录');
-    await page.getByRole('button', { name: '知识飞轮管理', exact: true }).click();
+    await page.getByRole('button', { name: '流水线', exact: true }).click();
     await page.locator(`[data-module-batch-id="${batch.batchId}"]`).click();
     await page.getByRole('button', { name: '删除所选批次', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: '确认删除批次' });
@@ -82,3 +82,4 @@ test('selected project module batch uses the same confirmation flow and preserve
     expect(readFileSync(join(source, 'Parser.c'), 'utf8')).toBe('int parse(void) { return 1; }\n');
   } finally { rmSync(source, { recursive: true, force: true }); }
 });
+

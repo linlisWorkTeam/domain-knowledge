@@ -11,6 +11,7 @@ import { publicationDownloadName } from './WorkbenchPublication.js'
 import { createRepositoryAnalysisPanel } from './RepositoryAnalysis.js'
 import { createKnowledgeIndexPanel } from './KnowledgeIndex.js'
 import { renderKnowledgeMarkdown } from './KnowledgeMarkdown.js'
+import { createKnowledgeWorkspace } from './KnowledgeWorkspace.js'
 
 const content = document.querySelector('#page-content')
 const nav = document.querySelector('#primary-nav')
@@ -62,8 +63,8 @@ const PAGE_META = {
   overview: '操作中心',
   projects: '项目设置',
   stages: '阶段操作',
-  runs: '知识飞轮管理',
-  knowledge: '知识治理',
+  runs: '流水线',
+  knowledge: '知识库',
   graph: '工作流图',
   evaluations: '评测',
   sources: '来源',
@@ -103,7 +104,7 @@ const EVENT_LABELS = {
 }
 
 const RESOURCE_LABELS = {
-  status: '系统状态', capabilities: '系统能力', runs: '批次', knowledge: '知识治理', agents: 'Agent',
+  status: '系统状态', capabilities: '系统能力', runs: '批次', knowledge: '知识库', agents: 'Agent',
   actionItems: '治理事项', activities: '最近动态', components: '组件状态', knowledgeHealth: '知识健康度',
   providerStatus: '服务提供方状态', providerSettings: '服务提供方配置', runMetrics: '运行指标', governanceMetrics: '治理指标',
 }
@@ -649,53 +650,34 @@ function evaluationCard(record) {
 
 const knowledgeIndexPanel = createKnowledgeIndexPanel({ root: content, request, escapeHtml, isEditable: () => Boolean(state.capabilities?.directEditing || state.token) })
 
+const knowledgeWorkspace = createKnowledgeWorkspace({
+  root: content, request, escapeHtml, renderMarkdown: renderKnowledgeMarkdown, displayLabel, formatDate,
+  onDetails: (versionId, button) => openKnowledge(versionId, button).catch(showFatal),
+})
+
 function renderKnowledge(items = state.knowledge) {
   if (state.resourceErrors.knowledge) {
     content.innerHTML = errorState('无法读取知识目录', state.resourceErrors.knowledge, '<button class="primary-button" data-reload type="button">重新连接</button>')
     return
   }
-  const modules = [...new Set(state.knowledge.map((item) => item.moduleId))].slice(0, 12)
-  const visible = state.knowledgeModule ? items.filter((item) => item.moduleId === state.knowledgeModule) : items
-  content.innerHTML = `
-    <section class="reference-knowledge-tools"><label>⌕　<input id="knowledge-search" type="search" value="${escapeHtml(state.knowledgeQuery)}" placeholder="搜索名称、用途或关键词…"></label><kbd>⌘ K</kbd><select id="knowledge-status" aria-label="知识状态"><option value="">全部状态</option>${['VERIFIED', 'CANDIDATE', 'LOW_CONFIDENCE', 'SUPERSEDED'].map((value) => `<option value="${value}" ${state.knowledgeStatus === value ? 'selected' : ''}>${displayLabel(value)}</option>`).join('')}</select></section>
-    ${knowledgeIndexPanel.html()}
-    <div class="reference-knowledge-grid"><aside class="reference-domains"><header><h3>领域</h3><span id="knowledge-count">${visible.length}</span></header><button class="${state.knowledgeModule ? '' : 'active'}" data-knowledge-module="">全部知识 <b>${items.length}</b></button>${modules.map((moduleId) => `<button class="${state.knowledgeModule === moduleId ? 'active' : ''}" data-knowledge-module="${escapeHtml(moduleId)}">${escapeHtml(moduleId)} <b>${items.filter((item) => item.moduleId === moduleId).length}</b></button>`).join('')}</aside><section class="reference-docs"><header><span>知识</span><span>来源</span><span>质量</span><span>更新时间</span></header><div id="knowledge-list">${knowledgeCards(visible)}</div></section></div>`
-}
-
-function knowledgeCards(items) {
-  return items.length ? items.map((item) => `<button class="reference-doc" data-version-id="${escapeHtml(item.versionId)}" data-module="${escapeHtml(item.moduleId)}"><span><em class="${item.status === 'VERIFIED' ? 'verified' : ''}">${escapeHtml(displayLabel(item.status))}</em><b>${escapeHtml(item.title || item.moduleId)}</b><small>${escapeHtml(item.description || item.moduleId)}${item.matchedTerms?.length ? ` · 命中：${escapeHtml(item.matchedTerms.join('、'))}` : ''}</small></span><span>${escapeHtml(item.provenance?.length ?? 0)} 来源 · ${escapeHtml(item.versionCount ?? 1)} 版本</span><strong class="${item.status === 'LOW_CONFIDENCE' ? 'risk' : ''}">${escapeHtml(item.qualityScore)}</strong><time>${escapeHtml(relativeTime(item.createdAt))}</time></button>`).join('') : emptyState('没有知识版本', '当前筛选条件下没有可以展示的知识。')
-}
-
-function applyKnowledgeModule(moduleId) {
-  state.knowledgeModule = moduleId
-  let visible = 0
-  for (const card of content.querySelectorAll('.reference-doc[data-module]')) {
-    card.hidden = Boolean(moduleId && card.dataset.module !== moduleId)
-    if (!card.hidden) visible += 1
-  }
-  for (const button of content.querySelectorAll('[data-knowledge-module]')) {
-    button.classList.toggle('active', button.dataset.knowledgeModule === moduleId)
-  }
-  const count = document.querySelector('#knowledge-count')
-  if (count) count.textContent = visible
+  content.innerHTML = knowledgeWorkspace.html({ query: state.knowledgeQuery, filter: state.knowledgeStatus }) + knowledgeIndexPanel.html()
+  knowledgeWorkspace.setItems(items)
+  if (state.knowledgeQuery || state.knowledgeStatus) void refreshKnowledgeList().catch((error) => showToast(userFacingError(error, '检索失败'), 'danger'))
 }
 
 async function refreshKnowledgeList() {
+  const ticket = knowledgeWorkspace.beginSearch()
   const params = new URLSearchParams()
   if (state.knowledgeQuery) params.set('q', state.knowledgeQuery)
   if (state.knowledgeStatus) params.set('status', state.knowledgeStatus)
-  const result = await request(`/api/v1/cards${params.size ? `?${params}` : ''}`)
-  const items = collection(result, 'knowledge')
-  const list = document.querySelector('#knowledge-list')
-  const focusedVersionId = document.activeElement?.dataset?.versionId
-  if (list) {
-    list.innerHTML = knowledgeCards(items)
-    if (focusedVersionId) {
-      list.querySelector(`[data-version-id="${CSS.escape(focusedVersionId)}"]`)
-        ?.focus({ preventScroll: true })
-    }
+  let result
+  try { result = await request(`/api/v1/cards${params.size ? `?${params}` : ''}`) }
+  catch (error) {
+    if (state.page !== 'knowledge' || !knowledgeWorkspace.isCurrentSearch(ticket)) return
+    throw error
   }
-  applyKnowledgeModule(state.knowledgeModule)
+  if (state.page !== 'knowledge' || !knowledgeWorkspace.isCurrentSearch(ticket)) return
+  knowledgeWorkspace.setItems(collection(result, 'knowledge'))
 }
 
 async function openKnowledge(versionId, returnFocus) {
@@ -1431,8 +1413,7 @@ function closeNavigation() {
   navBackdrop.hidden = true
   navToggle.setAttribute('aria-expanded', 'false')
   navToggle.setAttribute('aria-label', '打开主导航')
-  if (matchMedia('(max-width: 767px)').matches) sidebar.setAttribute('aria-hidden', 'true')
-  else sidebar.setAttribute('aria-hidden', 'false')
+  sidebar.setAttribute('aria-hidden', 'false')
 }
 
 function showToast(message, tone = '') {
@@ -1595,8 +1576,6 @@ content.addEventListener('click', (event) => {
   if (publication) openPublication(publication.dataset.publicationKey).catch(productError)
   const lineageRun = event.target.closest('[data-lineage-run]')
   if (lineageRun) navigate('runs').then(() => openRun(lineageRun.dataset.lineageRun)).catch(showFatal)
-  const knowledgeModule = event.target.closest('[data-knowledge-module]')
-  if (knowledgeModule) applyKnowledgeModule(knowledgeModule.dataset.knowledgeModule)
   const graphNode = event.target.closest('[data-graph-agent]')
   if (graphNode) openGraphNode(graphNode.dataset.graphAgent, graphNode)
   const unavailable = event.target.closest('[data-unavailable]')
@@ -1613,13 +1592,16 @@ content.addEventListener('click', (event) => {
 content.addEventListener('input', (event) => {
   if (event.target.id !== 'knowledge-search') return
   state.knowledgeQuery = event.target.value.trim()
+  knowledgeWorkspace.beginSearch()
   clearTimeout(state.searchTimer)
   state.searchTimer = setTimeout(async () => {
     try {
       await refreshKnowledgeList()
     } catch (error) {
-      document.querySelector('#knowledge-list').innerHTML = errorState('检索失败', error)
-      document.querySelector('#knowledge-count').textContent = '—'
+      const list = content.querySelector('#knowledge-list')
+      if (list) list.innerHTML = errorState('检索失败', error)
+      const count = content.querySelector('#knowledge-count')
+      if (count) count.textContent = '—'
     }
   }, 250)
 })
@@ -1641,8 +1623,10 @@ content.addEventListener('change', async (event) => {
     try {
       await refreshKnowledgeList()
     } catch (error) {
-      document.querySelector('#knowledge-list').innerHTML = errorState('筛选失败', error)
-      document.querySelector('#knowledge-count').textContent = '—'
+      const list = content.querySelector('#knowledge-list')
+      if (list) list.innerHTML = errorState('筛选失败', error)
+      const count = content.querySelector('#knowledge-count')
+      if (count) count.textContent = '—'
     }
   }
   if (event.target.id === 'metrics-window') {
@@ -1934,8 +1918,7 @@ async function boot() {
   governanceCount.textContent = state.actionItems.filter((item) => item.status !== 'RESOLVED').length || ''
   runtimeFooter.innerHTML = `<span><i class="health-dot healthy"></i>控制台 API 已连接</span><span>读取于 ${escapeHtml(formatDate(state.loadedAt))}</span><span>${escapeHtml(state.runs.length)} 个批次 · ${escapeHtml(state.knowledge.length)} 个知识版本</span>`
   updateMode()
-  setPageMeta('overview')
-  renderOverview()
+  await navigate(state.page)
   connectActivityStream()
   closeNavigation()
 }
@@ -2116,3 +2099,4 @@ drawerContent.addEventListener('submit', (event) => {
   if (event.target.id !== 'source-material-form') return
   event.preventDefault(); captureSourceMaterial(event.target)
 })
+

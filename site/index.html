@@ -43,6 +43,7 @@ SPDX-License-Identifier: MIT
         <a href="#why">为什么</a>
         <a href="#flywheel">飞轮流程</a>
         <a href="#use-cases">使用场景</a>
+        <a href="#workbench-demo">交互原型</a>
         <a href="#evidence-demo">真实演示</a>
         <a href="#architecture">架构</a>
         <a href="#quickstart">开始使用</a>
@@ -66,7 +67,8 @@ SPDX-License-Identifier: MIT
       <a href="#why">为什么</a>
       <a href="#flywheel">飞轮流程</a>
       <a href="#use-cases">使用场景</a>
-      <a href="#evidence-demo">真实演示</a>
+      <a href="#workbench-demo">交互原型</a>
+        <a href="#evidence-demo">真实演示</a>
       <a href="#architecture">架构</a>
       <a href="#quickstart">开始使用</a>
       <a href="https://github.com/linlisWorkTeam/domain-knowledge">源码仓库 ↗</a>
@@ -338,6 +340,12 @@ SPDX-License-Identifier: MIT
       </div>
     </section>
 
+    <section id="workbench-demo" class="section section-shell">
+      <div class="section-heading reveal"><div><p class="eyebrow">小飞轮 · 知识工作台</p><h2>打开目录，直接阅读知识。</h2><p>体验双栏阅读、搜索、文档历史、亮暗主题与流水线摘要。</p></div><a class="button primary" href="./prototype/index.html">打开交互原型</a></div>
+      <p class="prototype-disclosure">以下为独立交互原型，全部使用浏览器内的示例数据。主版本切换和剪枝仅用于演示，不连接后端、不修改仓库；正式控制台通过现有接口读取卡片正文、历史与证据。</p>
+      <iframe class="workbench-demo-frame" src="./prototype/index.html" title="小飞轮知识工作台交互原型（示例数据）" loading="lazy"></iframe>
+    </section>
+
     <section id="evidence-demo" class="section section-shell">
       <div class="section-heading reveal">
         <div>
@@ -550,3 +558,4 @@ npm run knowledge:serve</code></pre>
   <script src="./App.js?v=20260904-4" defer></script>
 </body>
 </html>
+
