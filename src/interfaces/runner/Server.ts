@@ -561,10 +561,10 @@ export function createKnowledgeServer(input: {
           send(response, task.status === 'SUCCEEDED' ? 200 : 202, { task }); return;
         }
         if (request.method === 'POST' && url.pathname === '/api/v1/generations') {
-          const payload = await body(request); requireOnlyKeys(payload, ['snapshotId', 'scopes']);
-          if (typeof payload.snapshotId !== 'string') throw new Error('PAYLOAD_INVALID');
+          const payload = await body(request); requireOnlyKeys(payload, ['snapshotId', 'scopes', 'baseGenerationTaskId']);
+          if (typeof payload.snapshotId !== 'string' || (payload.baseGenerationTaskId !== undefined && typeof payload.baseGenerationTaskId !== 'string')) throw new Error('PAYLOAD_INVALID');
           const task = await composition.apps.workbenchGeneration.start(payload.snapshotId,
-            payload.scopes as Parameters<typeof composition.apps.workbenchGeneration.start>[1]);
+            payload.scopes as Parameters<typeof composition.apps.workbenchGeneration.start>[1], payload.baseGenerationTaskId as string | undefined);
           send(response, task.status === 'SUCCEEDED' ? 200 : 202, { task }); return;
         }
         if (request.method === 'GET' && url.pathname === '/api/v1/projects') {

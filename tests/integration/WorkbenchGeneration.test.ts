@@ -57,14 +57,29 @@ test('generation commits each C card before interruption, resumes frozen role jo
     writeFileSync(join(root, 'math.c'), '#include "math.h"\nint add(int a,int b){return a+b;}\nint sub(int a,int b){return a-b;}\n/* new source version */\n');
     git('add', '.'); git('commit', '-qm', 'Changed source');
     const next = await composition.apps.workbenchProjects.create({ directory: root, moduleIds: ['math'] });
-    const revised = await composition.apps.workbenchGeneration.start(next.snapshotId);
+    await assert.rejects(composition.apps.workbenchGeneration.start(next.snapshotId, {}, indexed.taskId), /GENERATION_BASE_INVALID/);
+    const revised = await composition.apps.workbenchGeneration.start(next.snapshotId, {}, task.taskId);
     const final = await composition.apps.workbenchStages.wait(revised.taskId, AbortSignal.timeout(30000));
     assert.equal(final.status, 'SUCCEEDED', final.reasonCode ?? '');
+    assert.deepEqual(final.result?.summary.incremental, {
+      baseTaskId: task.taskId, baseRevision: project.commit, moduleIds: ['math'],
+      changedFileCount: 1, removedModuleIds: [], sharedInputsChanged: false, configurationChanged: false,
+    });
     assert.notEqual(revised.taskId, task.taskId); assert.equal(calls, 10);
     assert.equal(composition.apps.knowledgeIndex.search('').stale, 2);
     const oldCards = done.result!.summary.cards as Array<{ cardId: string; versionId: string }>;
     const newCards = final.result!.summary.cards as Array<{ cardId: string; versionId: string }>;
     assert.deepEqual(oldCards.map((card) => card.cardId), newCards.map((card) => card.cardId));
     assert.ok(oldCards.every((card, index) => card.versionId !== newCards[index]!.versionId));
+    writeFileSync(join(root, 'README.md'), 'Only documentation changed.\n');
+    git('add', '.'); git('commit', '-qm', 'Update documentation');
+    const latest = await composition.apps.workbenchProjects.create({ directory: root, moduleIds: ['math'] });
+    const unchanged = await composition.apps.workbenchGeneration.start(latest.snapshotId, {}, revised.taskId);
+    const noOp = await composition.apps.workbenchStages.wait(unchanged.taskId, AbortSignal.timeout(30000));
+    assert.equal(noOp.status, 'SUCCEEDED', noOp.reasonCode ?? '');
+    assert.notEqual(latest.commit, next.commit);
+    assert.equal(noOp.result?.summary.generated, 0);
+    assert.equal(noOp.usage.modelCalls, 0);
+    assert.equal(calls, 10);
   } finally { await composition.close(); rmSync(root, { recursive: true, force: true }); rmSync(runtimeDir, { recursive: true, force: true }); }
 });

@@ -47,6 +47,20 @@ KnowledgeUnits按固定仓库身份、源码模块和完整符号名生成稳定
 
 GENERATE冻结项目输入、模型配置和接口选择；逐卡提交候选版本，生成成功不等于行为验证或允许发布。配置与资源问题暂停，质量及执行错误保留原始原因，不撤销已完成卡片。阶段独立于旧Run生命周期，不把“未评测”映射为旧Run的失败或发布状态。
 
+### 基于 Git 基线的增量生成
+
+独立 GENERATE 默认全量生成当前快照的所有选中模块。要生成增量，在项目设置中输入 Git 版本（例如 `HEAD` 或提交 SHA）并保存目标快照，在知识库生成面板填写同项目已成功的生成任务 ID。也可通过 [HTTP API](../../interfaces/HttpApi.md) 提交 `baseGenerationTaskId`。基线和目标均须来自 Git 固定提交。基线可以是先前的增量任务。
+
+系统比较两个已保存快照的路径、文件类型和 Git blob ID。实现文件增删改及模块文件集合、语言、构建参数或接口范围变化会触发相关模块；重命名按删除加新增计算。共享头文件、其他非实现源码、构建文件或冻结模型配置变化时，重新生成目标快照的所有选中模块。实现文件按所选模块的文件归属计算影响，不解析完整 C/C++ 依赖图。比较只使用快照中记录的输入，支持比较分叉提交，不依赖工作区状态或服务器上仍存在历史 Git 对象。
+
+任务输入冻结基线任务、基线提交和模块选择，恢复沿用原选择。没有受影响模块时返回成功且不读取生成材料、不调用编译器或模型。结果仅含本次生成的候选卡片，并列出已移出范围的模块。旧卡片保持原版本和来源，不自动清理或重新发布。五阶段一键流水线仍使用当前快照全量生成，保持后续评测的单快照输入约束。
+
+<details lang="en"><summary>English summary</summary>
+
+Standalone generation defaults to the full set of selected modules. For incremental generation, save a Git-backed target snapshot and pass a successful baseline generation task ID from the same project. The scope is frozen from the two saved snapshots. Changes to shared inputs or model configuration regenerate all selected modules. An empty delta skips the compiler and model. The five-stage pipeline continues to generate the complete target snapshot.
+
+</details>
+
 新阶段显式启用操作性恢复策略：额度停止、用户取消、服务关闭和预算中断写入failureCode，已消耗请求与Token不回退。这些已分类中断不消耗角色的两次语义修正额度；尝试编号持续递增，每次错误立即停止，必须显式恢复，不能自动循环调用。未知传输错误、未知进程中断和语义拒绝仍受既有尝试上限约束。旧Run不启用此策略，原限次恢复契约不变。
 
 ### 持久化一键执行契约
@@ -278,7 +292,7 @@ SQLite 用事务分配编号，以项目与模块为范围建立唯一执行租�
 
 ### 本地目录项目快照
 
-项目设置可以读取服务器本地代码目录，无需 Git 根目录。前台请求 WORKTREE，基础设施以 directory-snapshot-v1 冻结全部普通文件内容（包括文档和二进制）及链接目标文本；目录版本显示为 directory:内容摘要，与 Git 提交区分。模块仅决定生成范围，未选文件仍在项目清单和内容寻址存储中。Git 元数据 .git 明确排除，链接不跟随，设备和管道拒绝；不得将工作台运行数据目录递归纳入项目。旧 Git 提交接口与旧输入保持原读取语义。
+项目设置默认读取服务器本地代码目录，无需 Git 根目录。Git 版本留空时，前台请求 WORKTREE，基础设施以 directory-snapshot-v1 冻结全部普通文件内容（包括文档和二进制）及链接目标文本；目录版本显示为 directory:内容摘要，与 Git 提交区分。模块仅决定生成范围，未选文件仍在项目清单和内容寻址存储中。Git 元数据 .git 明确排除，链接不跟随，设备和管道拒绝；不得将工作台运行数据目录递归纳入项目。填写 Git 版本时沿用固定提交的读取语义。
 
 目录访问仍限定配置根目录，使用不跟随链接的文件/目录描述符确认真实边界；逐文件检查大小、身份和读取前后状态，结束前重新检查成员清单及文件状态。读取期间变化、取消或超限不提交快照清单。限额为20000个目录项、单文件8MiB、内容合计64MiB和60秒采集期限；生成源码原单文件1MiB、所选合计8MiB上限保留。文件内容进入CAS后原子保存快照清单，读取旧快照必须校验清单摘要及引用内容，不能从已修改目录重新读正文。
 
